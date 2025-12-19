@@ -196,14 +196,12 @@ def main():
         print(f"Loading training data from {args.training_data}")
         df = pd.read_excel(args.training_data)
         
-        # Define features and target
-        # TODO: Make this configurable
-        feature_cols = ['Historical Loan Amount', 'Number of Loans', 'Education', 
-                       'Monthly Income', 'Gender']
-        target_col = 'Customer Value'
+        # Import configuration
+        from config import FEATURE_COLUMNS, TARGET_COLUMN, PREDICTION_COLUMN
         
-        X = df[feature_cols]
-        y = df[target_col]
+        # Define features and target
+        X = df[FEATURE_COLUMNS]
+        y = df[TARGET_COLUMN]
         
         # Build and train model on ALL data
         print(f"Training {args.model} on all data...")
@@ -215,14 +213,14 @@ def main():
         pred_df = pd.read_excel(args.input)
         
         # Extract features
-        X_pred = pred_df[feature_cols]
+        X_pred = pred_df[FEATURE_COLUMNS]
         
         # Make predictions
         print("Making predictions...")
         y_pred = model.predict(X_pred)
         
         # Add predictions to dataframe
-        pred_df['Predicted Customer Value'] = y_pred
+        pred_df[PREDICTION_COLUMN] = y_pred
         
         # Save output
         print(f"Saving predictions to {args.output}")

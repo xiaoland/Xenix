@@ -21,8 +21,11 @@ export async function executePythonTask(options: PythonTaskOptions): Promise<voi
       })
       .where(eq(schema.tasks.taskId, taskId));
 
+    // Use python3 explicitly or from environment variable
+    const pythonCmd = process.env.PYTHON_EXECUTABLE || 'python3';
+    
     // Execute Python script
-    const pythonProcess = spawn('python', [script, ...args], {
+    const pythonProcess = spawn(pythonCmd, [script, ...args], {
       cwd: cwd || process.cwd(),
       env: process.env,
     });

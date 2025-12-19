@@ -200,6 +200,38 @@ Check the status and results of a background task.
 }
 ```
 
+## Configuration
+
+### Data Column Configuration
+
+The default configuration is set up for customer value prediction with the following columns:
+
+```python
+# app/models/regression/config.py
+FEATURE_COLUMNS = [
+    'Historical Loan Amount',
+    'Number of Loans',
+    'Education',
+    'Monthly Income',
+    'Gender'
+]
+TARGET_COLUMN = 'Customer Value'
+```
+
+To use different column names, edit `app/models/regression/config.py` and update the `FEATURE_COLUMNS` and `TARGET_COLUMN` constants.
+
+### Environment Variables
+
+Create a `.env` file from the example:
+
+```bash
+cp .env.example .env
+```
+
+Available variables:
+- `DATABASE_URL` - PostgreSQL connection string (required)
+- `PYTHON_EXECUTABLE` - Python command to use (default: `python3`)
+
 ## Development
 
 ### Build for production

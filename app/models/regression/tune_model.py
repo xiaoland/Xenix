@@ -202,14 +202,12 @@ def main():
         print(f"Loading data from {args.input}")
         df = pd.read_excel(args.input)
         
-        # Define features and target
-        # TODO: Make this configurable
-        feature_cols = ['Historical Loan Amount', 'Number of Loans', 'Education', 
-                       'Monthly Income', 'Gender']
-        target_col = 'Customer Value'
+        # Import configuration
+        from config import FEATURE_COLUMNS, TARGET_COLUMN
         
-        X = df[feature_cols]
-        y = df[target_col]
+        # Define features and target
+        X = df[FEATURE_COLUMNS]
+        y = df[TARGET_COLUMN]
         
         # Train-test split
         X_train, X_test, y_train, y_test = train_test_split(

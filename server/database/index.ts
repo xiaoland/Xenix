@@ -2,7 +2,12 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://xenix:xenix_password@localhost:5432/xenix_db';
+// Ensure DATABASE_URL is provided
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL environment variable is required');
+}
+
+const connectionString = process.env.DATABASE_URL;
 
 // Create postgres client
 const client = postgres(connectionString);

@@ -107,9 +107,11 @@ def main():
         print(f"Loading data from {args.input}")
         df = pd.read_excel(args.input)
         
-        X = df[['Historical Loan Amount', 'Number of Loans', 'Education', 
-                'Monthly Income', 'Gender']]
-        y = df['Customer Value']
+        # Import configuration
+        from config import FEATURE_COLUMNS, TARGET_COLUMN
+        
+        X = df[FEATURE_COLUMNS]
+        y = df[TARGET_COLUMN]
         
         # Train-test split
         X_train, X_test, y_train, y_test = train_test_split(
