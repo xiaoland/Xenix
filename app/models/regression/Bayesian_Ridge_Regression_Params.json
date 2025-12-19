@@ -1,7 +1,0 @@
-{
-    "alpha_1": 0.01,
-    "alpha_2": 1e-06,
-    "lambda_1": 1e-06,
-    "lambda_2": 0.01,
-    "max_iter": 100
-}
