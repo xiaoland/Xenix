@@ -1,6 +1,6 @@
-import { db, schema } from '~/server/database';
-import { generateTaskId } from '~/server/utils/taskUtils';
-import { executePythonTask } from '~/server/utils/pythonExecutor';
+import { db, schema } from '../database';
+import { generateTaskId } from '../utils/taskUtils';
+import { executePythonTask } from '../utils/pythonExecutor';
 import path from 'path';
 
 export default defineEventHandler(async (event) => {
