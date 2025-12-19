@@ -1,0 +1,15 @@
+[project]
+name = "Xenix"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "Lanzhijiang", email = "lanzhijiang@foxmail.com"},
+]
+dependencies = ["pandas>=2.3.3", "statsmodels>=0.14.6", "scikit-learn>=1.8.0", "openpyxl>=3.1.5"]
+requires-python = "==3.12.*"
+readme = "README.md"
+license = {text = "MIT"}
+
+
+[tool.pdm]
+distribution = false

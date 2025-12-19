@@ -1,0 +1,6 @@
+{
+    "estimator__max_depth": 2,
+    "learning_rate": 0.1,
+    "loss": "linear",
+    "n_estimators": 100
+}
