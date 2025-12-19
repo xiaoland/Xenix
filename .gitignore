@@ -33,6 +33,7 @@ data/*
 
 # PDM
 .pdm-python
+__pypackages__/
 
 # Python
 __pycache__/
@@ -58,6 +59,9 @@ uploads/
 !package.json
 !tsconfig.json
 !drizzle.config.ts
+*_Params.json
+Model_Comparison_*.xlsx
+output.xlsx
 
 # Database migrations
 server/database/migrations/

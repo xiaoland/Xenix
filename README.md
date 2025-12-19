@@ -1,75 +1,238 @@
-# Nuxt Minimal Starter
+# Xenix
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+Machine Learning Model Training and Prediction Platform
+
+![Xenix UI](https://github.com/user-attachments/assets/9a227c7b-8394-4558-8afa-5ced3dcd7afa)
+
+Xenix provides an interface for teachers and mid-small enterprises to analyze their data with ease. The platform supports automated hyperparameter tuning, model comparison, and batch prediction for regression tasks.
+
+## Features
+
+- **3-Step Workflow**: Upload data → Train models → Make predictions
+- **Automated Hyperparameter Tuning**: GridSearchCV-based optimization for 12 regression models
+- **Model Comparison**: Side-by-side comparison of all tuned models
+- **Background Task Processing**: Long-running tasks execute asynchronously with status polling
+- **Database Persistence**: All tasks, parameters, and results stored in PostgreSQL
+- **Modern UI**: Built with Nuxt.js and Ant Design Vue
+
+## Supported Models
+
+- Linear Regression
+- Ridge Regression
+- Lasso Regression
+- Bayesian Ridge Regression
+- K-Nearest Neighbors (KNN)
+- Decision Tree
+- Random Forest
+- Gradient Boosting (GBDT)
+- AdaBoost
+- XGBoost
+- LightGBM
+- Polynomial Regression
+
+## Tech Stack
+
+### Frontend
+- **Framework**: Nuxt.js 4.2.2
+- **UI Library**: Ant Design Vue
+- **Styling**: UnoCSS + SCSS
+
+### Backend
+- **Runtime**: Node.js with Nitro
+- **Database**: PostgreSQL 16
+- **ORM**: DrizzleORM
+- **Container**: Docker Compose
+
+### Data Processing
+- **Language**: Python 3.12
+- **Package Manager**: PDM
+- **Libraries**: scikit-learn, pandas, statsmodels, XGBoost, LightGBM
+
+## Prerequisites
+
+- Node.js 18+ and pnpm
+- Python 3.12
+- Docker and Docker Compose
+- PostgreSQL client tools (for migrations)
 
 ## Setup
 
-Make sure to install dependencies:
+### 1. Clone the repository
 
 ```bash
-# npm
-npm install
+git clone https://github.com/xiaoland/Xenix.git
+cd Xenix
+```
 
-# pnpm
+### 2. Install dependencies
+
+```bash
+# Install Node.js dependencies
 pnpm install
 
-# yarn
-yarn install
+# Install PDM (Python package manager)
+pip install --user pdm
 
-# bun
-bun install
+# Install Python dependencies
+pdm install
 ```
 
-## Development Server
-
-Start the development server on `http://localhost:3000`:
+### 3. Start PostgreSQL database
 
 ```bash
-# npm
-npm run dev
+docker compose up -d
+```
 
-# pnpm
+Wait a few seconds for PostgreSQL to be ready, then run migrations:
+
+```bash
+# Generate migrations
+pnpm db:generate
+
+# Apply migrations
+PGPASSWORD=xenix_password psql -h localhost -U xenix -d xenix_db -f server/database/migrations/0000_*.sql
+```
+
+### 4. Configure environment
+
+```bash
+cp .env.example .env
+```
+
+The default configuration connects to the local PostgreSQL instance started by Docker Compose.
+
+### 5. Start the development server
+
+```bash
 pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
 ```
 
-## Production
+The application will be available at `http://localhost:3005` (or `http://localhost:3000` if 3005 is in use).
 
-Build the application for production:
+## Usage
+
+### 1. Upload Training Data
+
+- Upload an Excel file (.xlsx or .xls) containing your training data
+- The file should have feature columns and a target variable column
+- Example: `Customer Value Data Table.xlsx`
+
+### 2. Train Models
+
+- Select one or more models to tune
+- Click "Start Hyperparameter Tuning" to begin optimization
+- Wait for tuning to complete (status updates automatically)
+- Click "Compare All Models" to see performance metrics
+- The best model is automatically identified based on R² score
+
+### 3. Make Predictions
+
+- Upload a new Excel file with the same features (without the target variable)
+- Click "Generate Predictions" to run the best model
+- Download the results with predictions added as a new column
+
+## Project Structure
+
+```
+Xenix/
+├── app/
+│   ├── models/
+│   │   └── regression/          # Python scripts for ML models
+│   │       ├── tune_model.py    # Generic hyperparameter tuning
+│   │       ├── compare_models.py # Model comparison
+│   │       ├── predict.py       # Batch prediction
+│   │       └── db_utils.py      # Database utilities
+│   ├── pages/
+│   │   └── index.vue            # Main application page
+│   └── app.vue                  # Root component
+├── server/
+│   ├── api/                     # API endpoints
+│   │   ├── upload.post.ts       # File upload & tuning
+│   │   ├── compare.post.ts      # Model comparison
+│   │   ├── predict.post.ts      # Batch prediction
+│   │   └── task/[taskId].get.ts # Task status polling
+│   ├── database/
+│   │   ├── schema.ts            # Database schema
+│   │   ├── index.ts             # Database client
+│   │   └── migrations/          # SQL migrations
+│   └── utils/
+│       ├── taskUtils.ts         # Task utilities
+│       └── pythonExecutor.ts    # Python process manager
+├── docker-compose.yml           # PostgreSQL container
+├── drizzle.config.ts            # DrizzleORM configuration
+├── pyproject.toml               # Python dependencies
+└── package.json                 # Node.js dependencies
+```
+
+## API Endpoints
+
+### POST /api/upload
+Upload training data and start hyperparameter tuning for a specific model.
+
+**Request**: FormData with `file` and `model` fields
+**Response**: `{ success: true, taskId: string, message: string }`
+
+### POST /api/compare
+Compare all tuned models and identify the best one.
+
+**Response**: `{ success: true, taskId: string, message: string }`
+
+### POST /api/predict
+Generate predictions using the best model.
+
+**Request**: FormData with `file` and `model` fields
+**Response**: `{ success: true, taskId: string, message: string }`
+
+### GET /api/task/:taskId
+Check the status and results of a background task.
+
+**Response**: 
+```json
+{
+  "success": true,
+  "task": {
+    "taskId": "string",
+    "type": "tuning|comparison|prediction",
+    "status": "pending|running|completed|failed",
+    "error": "string|null"
+  },
+  "results": { /* task-specific results */ }
+}
+```
+
+## Development
+
+### Build for production
 
 ```bash
-# npm
-npm run build
-
-# pnpm
 pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
 ```
 
-Locally preview production build:
+### Run production build
 
 ```bash
-# npm
-npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
+node .output/server/index.mjs
 ```
 
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+### Database management
+
+```bash
+# Open Drizzle Studio
+pnpm db:studio
+
+# Generate new migration
+pnpm db:generate
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+MIT
+
+## Author
+
+Lanzhijiang (lanzhijiang@foxmail.com)
+
