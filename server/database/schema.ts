@@ -1,0 +1,36 @@
+import { pgTable, serial, text, varchar, timestamp, jsonb, integer } from 'drizzle-orm/pg-core';
+
+export const tasks = pgTable('tasks', {
+  id: serial('id').primaryKey(),
+  taskId: varchar('task_id', { length: 255 }).notNull().unique(),
+  type: varchar('type', { length: 50 }).notNull(), // 'tuning', 'comparison', 'prediction'
+  status: varchar('status', { length: 50 }).notNull().default('pending'), // 'pending', 'running', 'completed', 'failed'
+  model: varchar('model', { length: 100 }), // model name for tuning
+  inputFile: text('input_file'),
+  outputFile: text('output_file'),
+  error: text('error'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const modelResults = pgTable('model_results', {
+  id: serial('id').primaryKey(),
+  taskId: varchar('task_id', { length: 255 }).notNull(),
+  model: varchar('model', { length: 100 }).notNull(),
+  params: jsonb('params'), // best parameters from tuning
+  mse_train: text('mse_train'),
+  mae_train: text('mae_train'),
+  r2_train: text('r2_train'),
+  mse_test: text('mse_test'),
+  mae_test: text('mae_test'),
+  r2_test: text('r2_test'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const comparisonResults = pgTable('comparison_results', {
+  id: serial('id').primaryKey(),
+  taskId: varchar('task_id', { length: 255 }).notNull(),
+  results: jsonb('results').notNull(), // array of model comparison results
+  bestModel: varchar('best_model', { length: 100 }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});

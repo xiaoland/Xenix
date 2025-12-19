@@ -33,3 +33,31 @@ data/*
 
 # PDM
 .pdm-python
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+venv/
+.venv/
+
+# Uploads
+uploads/
+*.xlsx
+*.xls
+!Customer\ Value\ Data\ Table.xlsx
+!Customer\ Value\ Data\ Table\ -\ test.xlsx
+
+# Model outputs
+*.json
+!package.json
+!tsconfig.json
+!drizzle.config.ts
+
+# Database migrations
+server/database/migrations/

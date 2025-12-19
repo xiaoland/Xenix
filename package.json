@@ -7,12 +7,18 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@ant-design-vue/nuxt": "1.4.6",
     "ant-design-vue": "^4.2.6",
+    "drizzle-kit": "^0.31.8",
+    "drizzle-orm": "^0.45.1",
     "nuxt": "^4.2.2",
+    "postgres": "^3.4.7",
     "vue": "^3.5.25",
     "vue-router": "^4.6.4"
   },
