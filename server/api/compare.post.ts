@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
     });
 
     // Get Python script path for model comparison
-    const scriptPath = path.join(process.cwd(), 'app', 'models', 'regression', 'Model_Compare_By_JSON.py');
+    const scriptPath = path.join(process.cwd(), 'app', 'models', 'regression', 'compare_models.py');
     
     // Execute Python task in background
     setImmediate(() => {
@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
         script: scriptPath,
         args: ['--output-db', taskId],
         taskId,
-        cwd: path.dirname(scriptPath),
+        cwd: path.join(process.cwd(), 'app', 'models', 'regression'),
       }).catch(error => {
         console.error(`Failed to execute task ${taskId}:`, error);
       });

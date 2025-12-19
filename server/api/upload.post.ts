@@ -46,16 +46,16 @@ export default defineEventHandler(async (event) => {
       inputFile,
     });
 
-    // Get Python script path based on model
-    const scriptPath = path.join(process.cwd(), 'app', 'models', 'regression', `${model}.py`);
+    // Get Python script path for generic tuning script
+    const scriptPath = path.join(process.cwd(), 'app', 'models', 'regression', 'tune_model.py');
     
     // Execute Python task in background
     setImmediate(() => {
       executePythonTask({
         script: scriptPath,
-        args: ['--input', inputFile, '--output-db', taskId],
+        args: ['--input', inputFile, '--output-db', taskId, '--model', model],
         taskId,
-        cwd: path.dirname(scriptPath),
+        cwd: path.join(process.cwd(), 'app', 'models', 'regression'),
       }).catch(error => {
         console.error(`Failed to execute task ${taskId}:`, error);
       });
