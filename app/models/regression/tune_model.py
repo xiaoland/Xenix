@@ -40,12 +40,14 @@ try:
     HAS_XGB = True
 except ImportError:
     HAS_XGB = False
+    print("Warning: XGBoost not available. XGBoost model will be skipped.")
 
 try:
     from lightgbm import LGBMRegressor
     HAS_LGBM = True
 except ImportError:
     HAS_LGBM = False
+    print("Warning: LightGBM not available. LightGBM model will be skipped.")
 
 
 def get_model_and_param_grid(model_name):

@@ -12,6 +12,8 @@ export interface PythonTaskOptions {
 export async function executePythonTask(options: PythonTaskOptions): Promise<void> {
   const { script, args, taskId, cwd } = options;
   
+  let taskCompleted = false; // Flag to prevent race conditions
+  
   try {
     // Update task status to running
     await db.update(schema.tasks)
@@ -44,6 +46,9 @@ export async function executePythonTask(options: PythonTaskOptions): Promise<voi
     });
 
     pythonProcess.on('close', async (code) => {
+      if (taskCompleted) return; // Prevent duplicate updates
+      taskCompleted = true;
+      
       if (code === 0) {
         // Task completed successfully
         await db.update(schema.tasks)
@@ -69,6 +74,9 @@ export async function executePythonTask(options: PythonTaskOptions): Promise<voi
     });
 
     pythonProcess.on('error', async (error) => {
+      if (taskCompleted) return; // Prevent duplicate updates
+      taskCompleted = true;
+      
       // Task failed to start
       await db.update(schema.tasks)
         .set({ 
@@ -82,6 +90,9 @@ export async function executePythonTask(options: PythonTaskOptions): Promise<voi
     });
 
   } catch (error) {
+    if (taskCompleted) return; // Prevent duplicate updates
+    taskCompleted = true;
+    
     // Update task status to failed
     await db.update(schema.tasks)
       .set({ 
