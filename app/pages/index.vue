@@ -14,240 +14,42 @@
         </a-steps>
 
         <!-- Step 1: Upload Training Data -->
-        <div v-if="currentStep === 0" class="space-y-4">
-          <h2 class="text-2xl font-semibold mb-4">Upload Training Data</h2>
-          
-          <a-upload-dragger
-            v-model:file-list="trainingFileList"
-            name="file"
-            :before-upload="beforeUpload"
-            :max-count="1"
-            accept=".xlsx,.xls"
-          >
-            <p class="ant-upload-drag-icon">
-              <i class="i-mdi-cloud-upload text-6xl text-blue-500"></i>
-            </p>
-            <p class="ant-upload-text">Click or drag file to upload training data</p>
-            <p class="ant-upload-hint">
-              Support for Excel files (.xlsx, .xls). Data should contain features and target variable.
-            </p>
-          </a-upload-dragger>
-
-          <a-button 
-            type="primary" 
-            size="large" 
-            block
-            :disabled="trainingFileList.length === 0"
-            @click="nextStep"
-          >
-            Continue to Model Training
-          </a-button>
-        </div>
+        <UploadStep
+          v-if="currentStep === 0"
+          v-model="trainingFileList"
+          @continue="nextStep"
+        />
 
         <!-- Step 2: Model Training -->
-        <div v-if="currentStep === 1" class="space-y-6">
-          <h2 class="text-2xl font-semibold mb-4">Model Training & Comparison</h2>
-
-          <!-- Available Models -->
-          <div>
-            <h3 class="text-lg font-medium mb-3">Available Models for Tuning</h3>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              <a-button
-                v-for="model in availableModels"
-                :key="model.value"
-                :type="selectedModels.includes(model.value) ? 'primary' : 'default'"
-                @click="toggleModel(model.value)"
-                class="h-auto py-3"
-              >
-                <div class="text-center">
-                  <div class="font-medium">{{ model.label }}</div>
-                  <div v-if="tuningStatus[model.value]" class="text-xs mt-1">
-                    <a-tag :color="getStatusColor(tuningStatus[model.value])">
-                      {{ tuningStatus[model.value] }}
-                    </a-tag>
-                  </div>
-                </div>
-              </a-button>
-            </div>
-          </div>
-
-          <!-- Tuning Actions -->
-          <div class="flex gap-4">
-            <a-button
-              type="primary"
-              size="large"
-              :loading="isTuning"
-              :disabled="selectedModels.length === 0"
-              @click="startTuning"
-            >
-              <i class="i-mdi-tune mr-2"></i>
-              Start Hyperparameter Tuning
-            </a-button>
-
-            <a-button
-              type="default"
-              size="large"
-              :loading="isComparing"
-              :disabled="!canCompare"
-              @click="startComparison"
-            >
-              <i class="i-mdi-compare mr-2"></i>
-              Compare All Models
-            </a-button>
-          </div>
-
-          <!-- Task Logs Viewer -->
-          <div v-if="Object.keys(tuningTasks).length > 0 || comparisonTaskId" class="mt-6">
-            <h3 class="text-lg font-medium mb-3">Task Logs</h3>
-            <a-tabs v-model:activeKey="activeLogTab">
-              <a-tab-pane 
-                v-for="(taskId, modelName) in tuningTasks"
-                :key="taskId"
-                :tab="modelName"
-              >
-                <div class="bg-gray-900 rounded-lg p-4 max-h-96 overflow-y-auto">
-                  <div v-if="taskLogs[taskId] && taskLogs[taskId].length > 0">
-                    <div 
-                      v-for="log in taskLogs[taskId]" 
-                      :key="log.id"
-                      class="mb-2 font-mono text-sm"
-                      :class="{
-                        'text-gray-400': log.severity === 'DEBUG',
-                        'text-white': log.severity === 'INFO',
-                        'text-yellow-400': log.severity === 'WARNING',
-                        'text-red-400': log.severity === 'ERROR',
-                        'text-red-600': log.severity === 'CRITICAL'
-                      }"
-                    >
-                      <span class="text-gray-500">[{{ formatTimestamp(log.timestamp) }}]</span>
-                      <span class="font-bold ml-2">[{{ log.severity }}]</span>
-                      <span class="ml-2">{{ log.message }}</span>
-                    </div>
-                  </div>
-                  <div v-else class="text-gray-500 text-center py-4">
-                    No logs available yet...
-                  </div>
-                </div>
-              </a-tab-pane>
-              <a-tab-pane 
-                v-if="comparisonTaskId" 
-                key="comparison" 
-                tab="Comparison"
-              >
-                <div class="bg-gray-900 rounded-lg p-4 max-h-96 overflow-y-auto">
-                  <div v-if="taskLogs[comparisonTaskId] && taskLogs[comparisonTaskId].length > 0">
-                    <div 
-                      v-for="log in taskLogs[comparisonTaskId]" 
-                      :key="log.id"
-                      class="mb-2 font-mono text-sm"
-                      :class="{
-                        'text-gray-400': log.severity === 'DEBUG',
-                        'text-white': log.severity === 'INFO',
-                        'text-yellow-400': log.severity === 'WARNING',
-                        'text-red-400': log.severity === 'ERROR',
-                        'text-red-600': log.severity === 'CRITICAL'
-                      }"
-                    >
-                      <span class="text-gray-500">[{{ formatTimestamp(log.timestamp) }}]</span>
-                      <span class="font-bold ml-2">[{{ log.severity }}]</span>
-                      <span class="ml-2">{{ log.message }}</span>
-                    </div>
-                  </div>
-                  <div v-else class="text-gray-500 text-center py-4">
-                    No logs available yet...
-                  </div>
-                </div>
-              </a-tab-pane>
-            </a-tabs>
-          </div>
-
-          <!-- Comparison Results -->
-          <div v-if="comparisonResults" class="mt-6">
-            <h3 class="text-lg font-medium mb-3">Model Comparison Results</h3>
-            <a-table
-              :columns="comparisonColumns"
-              :data-source="comparisonResults.results"
-              :pagination="false"
-              bordered
-              size="small"
-            >
-              <template #bodyCell="{ column, record }">
-                <template v-if="column.key === 'Model'">
-                  <a-tag v-if="record.Model === comparisonResults.bestModel" color="green">
-                    {{ record.Model }} ⭐
-                  </a-tag>
-                  <span v-else>{{ record.Model }}</span>
-                </template>
-              </template>
-            </a-table>
-          </div>
-
-          <!-- Navigation -->
-          <div class="flex gap-4 mt-6">
-            <a-button @click="prevStep">Back</a-button>
-            <a-button
-              type="primary"
-              :disabled="!comparisonResults"
-              @click="nextStep"
-            >
-              Continue to Prediction
-            </a-button>
-          </div>
-        </div>
+        <TrainingStep
+          v-if="currentStep === 1"
+          v-model:selected-models="selectedModels"
+          v-model:active-log-tab="activeLogTab"
+          :available-models="availableModels"
+          :tuning-status="tuningStatus"
+          :tuning-tasks="tuningTasks"
+          :is-tuning="isTuning"
+          :is-comparing="isComparing"
+          :comparison-results="comparisonResults"
+          :comparison-task-id="comparisonTaskId"
+          :task-logs="taskLogs"
+          @start-tuning="startTuning"
+          @start-comparison="startComparison"
+          @back="prevStep"
+          @continue="nextStep"
+        />
 
         <!-- Step 3: Prediction -->
-        <div v-if="currentStep === 2" class="space-y-4">
-          <h2 class="text-2xl font-semibold mb-4">Make Predictions</h2>
-
-          <a-alert
-            v-if="comparisonResults && comparisonResults.bestModel"
-            :message="`Best Model: ${comparisonResults.bestModel}`"
-            type="success"
-            show-icon
-            class="mb-4"
-          />
-
-          <a-upload-dragger
-            v-model:file-list="predictionFileList"
-            name="file"
-            :before-upload="beforeUpload"
-            :max-count="1"
-            accept=".xlsx,.xls"
-          >
-            <p class="ant-upload-drag-icon">
-              <i class="i-mdi-file-table text-6xl text-green-500"></i>
-            </p>
-            <p class="ant-upload-text">Upload data for prediction</p>
-            <p class="ant-upload-hint">
-              The file should have the same features as the training data.
-            </p>
-          </a-upload-dragger>
-
-          <a-button
-            type="primary"
-            size="large"
-            block
-            :loading="isPredicting"
-            :disabled="predictionFileList.length === 0"
-            @click="startPrediction"
-          >
-            <i class="i-mdi-chart-line mr-2"></i>
-            Generate Predictions
-          </a-button>
-
-          <div v-if="predictionTask" class="mt-4">
-            <a-alert
-              :message="predictionTaskMessage"
-              :type="predictionTaskType"
-              show-icon
-            />
-          </div>
-
-          <div class="flex gap-4 mt-6">
-            <a-button @click="prevStep">Back</a-button>
-            <a-button @click="reset">Start Over</a-button>
-          </div>
-        </div>
+        <PredictionStep
+          v-if="currentStep === 2"
+          v-model="predictionFileList"
+          :best-model="comparisonResults?.bestModel"
+          :is-predicting="isPredicting"
+          :prediction-task="predictionTask"
+          @predict="startPrediction"
+          @back="prevStep"
+          @reset="reset"
+        />
       </a-card>
     </div>
   </div>
@@ -255,7 +57,6 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import type { UploadProps } from 'ant-design-vue';
 import { message } from 'ant-design-vue';
 
 const currentStep = ref(0);
@@ -291,87 +92,6 @@ const predictionTask = ref<any>(null);
 // Logs state
 const taskLogs = ref<Record<string, any[]>>({});
 const activeLogTab = ref<string>('');
-
-// Comparison table columns
-const comparisonColumns = [
-  { title: 'Model', dataIndex: 'Model', key: 'Model' },
-  { title: 'MSE (Train)', dataIndex: 'MSE_train', key: 'MSE_train' },
-  { title: 'MAE (Train)', dataIndex: 'MAE_train', key: 'MAE_train' },
-  { title: 'R² (Train)', dataIndex: 'R2_train', key: 'R2_train' },
-  { title: 'MSE (Test)', dataIndex: 'MSE_test', key: 'MSE_test' },
-  { title: 'MAE (Test)', dataIndex: 'MAE_test', key: 'MAE_test' },
-  { title: 'R² (Test)', dataIndex: 'R2_test', key: 'R2_test' },
-];
-
-const canCompare = computed(() => {
-  return Object.values(tuningStatus.value).some(status => status === 'completed');
-});
-
-const predictionTaskMessage = computed(() => {
-  if (!predictionTask.value) return '';
-  
-  switch (predictionTask.value.status) {
-    case 'pending':
-      return 'Prediction task queued...';
-    case 'running':
-      return 'Generating predictions...';
-    case 'completed':
-      return 'Predictions completed successfully!';
-    case 'failed':
-      return `Prediction failed: ${predictionTask.value.error || 'Unknown error'}`;
-    default:
-      return '';
-  }
-});
-
-const predictionTaskType = computed(() => {
-  if (!predictionTask.value) return 'info';
-  
-  switch (predictionTask.value.status) {
-    case 'completed':
-      return 'success';
-    case 'failed':
-      return 'error';
-    default:
-      return 'info';
-  }
-});
-
-const beforeUpload: UploadProps['beforeUpload'] = (file) => {
-  const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
-  if (!isExcel) {
-    message.error('You can only upload Excel files!');
-  }
-  return false; // Prevent auto upload
-};
-
-const toggleModel = (modelValue: string) => {
-  const index = selectedModels.value.indexOf(modelValue);
-  if (index > -1) {
-    selectedModels.value.splice(index, 1);
-  } else {
-    selectedModels.value.push(modelValue);
-  }
-};
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'completed':
-      return 'green';
-    case 'running':
-      return 'blue';
-    case 'failed':
-      return 'red';
-    default:
-      return 'default';
-  }
-};
-
-const formatTimestamp = (timestamp: number) => {
-  // Convert nanoseconds to milliseconds
-  const date = new Date(timestamp / 1000000);
-  return date.toLocaleTimeString();
-};
 
 const fetchTaskLogs = async (taskId: string) => {
   try {
@@ -614,9 +334,3 @@ const reset = () => {
   predictionTask.value = null;
 };
 </script>
-
-<style scoped>
-.ant-upload-drag-icon {
-  margin-bottom: 1rem;
-}
-</style>
