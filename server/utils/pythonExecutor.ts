@@ -4,19 +4,19 @@ import { eq } from 'drizzle-orm';
 
 export interface PythonTaskOptions {
   script: string;
-  args: string[];
+  stdinData: any; // JSON data to pass via stdin
   taskId: string;
   cwd?: string;
 }
 
 // Pattern for structured output from Python scripts
 interface StructuredOutput {
-  type: 'log' | 'status' | 'result' | 'comparison_result';
+  type: 'log' | 'status' | 'result' | 'comparison_result' | 'prediction_result';
   data: any;
 }
 
 export async function executePythonTask(options: PythonTaskOptions): Promise<void> {
-  const { script, args, taskId, cwd } = options;
+  const { script, stdinData, taskId, cwd } = options;
   
   let taskCompleted = false; // Flag to prevent race conditions
   
@@ -32,11 +32,17 @@ export async function executePythonTask(options: PythonTaskOptions): Promise<voi
     // Use python3 explicitly or from environment variable
     const pythonCmd = process.env.PYTHON_EXECUTABLE || 'python3';
     
-    // Execute Python script
-    const pythonProcess = spawn(pythonCmd, [script, ...args], {
+    // Execute Python script (no CLI args, use stdin instead)
+    const pythonProcess = spawn(pythonCmd, [script], {
       cwd: cwd || process.cwd(),
       env: process.env,
     });
+
+    // Write JSON data to stdin
+    if (stdinData) {
+      pythonProcess.stdin.write(JSON.stringify(stdinData));
+      pythonProcess.stdin.end();
+    }
 
     let stdoutBuffer = '';
     let stderrBuffer = '';
@@ -182,13 +188,18 @@ async function handleStructuredOutput(output: StructuredOutput, taskId: string) 
         break;
       
       case 'comparison_result':
-        // Store comparison result
+        // Store comparison result (if needed for future use)
         await db.insert(schema.comparisonResults).values({
           taskId: taskId,
           results: output.data.results,
           bestModel: output.data.best_model,
           createdAt: new Date()
         });
+        break;
+        
+      case 'prediction_result':
+        // Log prediction completion (file already saved by Python script)
+        console.log(`[${taskId}] Prediction completed: ${output.data.num_predictions} predictions`);
         break;
     }
   } catch (error) {
