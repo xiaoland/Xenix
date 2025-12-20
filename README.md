@@ -4,16 +4,17 @@ Machine Learning Model Training and Prediction Platform
 
 ![Xenix UI](https://github.com/user-attachments/assets/9a227c7b-8394-4558-8afa-5ced3dcd7afa)
 
-Xenix provides an interface for teachers and mid-small enterprises to analyze their data with ease. The platform supports automated hyperparameter tuning, model comparison, and batch prediction for regression tasks.
+Xenix provides an interface for teachers and mid-small enterprises to analyze their data with ease. The platform supports automated hyperparameter tuning with evaluation metrics display and batch prediction for regression tasks.
 
 ## Features
 
-- **3-Step Workflow**: Upload data → Train models → Make predictions
+- **2-Step Workflow**: Upload & Train → View Results & Predict
 - **Automated Hyperparameter Tuning**: GridSearchCV-based optimization for 12 regression models
-- **Model Comparison**: Side-by-side comparison of all tuned models
+- **Evaluation Metrics Display**: Real-time display of MSE, MAE, and R² scores from tuning
 - **Background Task Processing**: Long-running tasks execute asynchronously with status polling
-- **Database Persistence**: All tasks, parameters, and results stored in PostgreSQL
-- **Modern UI**: Built with Nuxt.js and Ant Design Vue
+- **Real-Time Logs**: OpenTelemetry-compliant logging with structured JSON output
+- **Database Persistence**: All tasks, parameters, metrics, and results stored in PostgreSQL
+- **Modern UI**: Built with Nuxt.js and Ant Design Vue with modular components
 
 ## Supported Models
 
@@ -111,53 +112,72 @@ The application will be available at `http://localhost:3005` (or `http://localho
 
 ## Usage
 
-### 1. Upload Training Data
+### Step 1: Upload & Train
 
-- Upload an Excel file (.xlsx or .xls) containing your training data
-- The file should have feature columns and a target variable column
-- Example: `Customer Value Data Table.xlsx`
+1. **Upload Training Data**
+   - Upload an Excel file (.xlsx or .xls) containing your training data
+   - The file should have feature columns and a target variable column
+   - Example: `Customer Value Data Table.xlsx`
 
-### 2. Train Models
+2. **Select & Tune Models**
+   - Select one or more models to tune from the 12 available options
+   - Click "Start Hyperparameter Tuning" to begin Grid SearchCV optimization
+   - Watch real-time logs as models train
+   - Wait for tuning to complete (status updates automatically)
 
-- Select one or more models to tune
-- Click "Start Hyperparameter Tuning" to begin optimization
-- Wait for tuning to complete (status updates automatically)
-- Click "Compare All Models" to see performance metrics
-- The best model is automatically identified based on R² score
+3. **View Results & Select Best Model**
+   - See evaluation metrics table with MSE, MAE, and R² scores
+   - Table automatically sorts by R² (best first)
+   - Click radio button to select the model you want to use
+   - Click "Continue to Prediction"
 
-### 3. Make Predictions
+### Step 2: Predict
 
-- Upload a new Excel file with the same features (without the target variable)
-- Click "Generate Predictions" to run the best model
-- Download the results with predictions added as a new column
+1. **Upload Prediction Data**
+   - Upload a new Excel file with the same features (without the target variable)
+   - Must have same column names as training data
+
+2. **Generate Predictions**
+   - Click "Start Prediction" to run the selected model
+   - Wait for prediction to complete
+   - Download the results with predictions added as a new column
 
 ## Project Structure
 
 ```
 Xenix/
 ├── app/
+│   ├── components/               # Vue components
+│   │   ├── UploadStep.vue       # Upload interface
+│   │   ├── TrainingStep.vue     # Model selection & tuning
+│   │   ├── PredictionStep.vue   # Prediction interface
+│   │   ├── ModelSelector.vue    # Model selection grid
+│   │   ├── TuningResults.vue    # Results table with selection
+│   │   ├── TaskLogViewer.vue    # Tabbed log interface
+│   │   └── LogPanel.vue         # Terminal-style log display
 │   ├── models/
-│   │   └── regression/          # Python scripts for ML models
-│   │       ├── tune_model.py    # Generic hyperparameter tuning
-│   │       ├── compare_models.py # Model comparison
+│   │   └── regression/          # Python ML scripts
+│   │       ├── tune_model.py    # Hyperparameter tuning (outputs JSON)
 │   │       ├── predict.py       # Batch prediction
-│   │       └── db_utils.py      # Database utilities
+│   │       ├── structured_output.py # JSON emission utilities
+│   │       └── config.py        # Configuration
 │   ├── pages/
-│   │   └── index.vue            # Main application page
+│   │   └── index.vue            # Main application page (2-step workflow)
 │   └── app.vue                  # Root component
 ├── server/
 │   ├── api/                     # API endpoints
 │   │   ├── upload.post.ts       # File upload & tuning
-│   │   ├── compare.post.ts      # Model comparison
 │   │   ├── predict.post.ts      # Batch prediction
-│   │   └── task/[taskId].get.ts # Task status polling
+│   │   ├── task/[taskId].get.ts # Task status polling
+│   │   ├── results/[taskId].get.ts # Fetch model metrics
+│   │   └── logs/[taskId].get.ts # Fetch task logs
 │   ├── database/
-│   │   ├── schema.ts            # Database schema
+│   │   ├── schema.ts            # Database schema (tasks, model_results, logs)
 │   │   ├── index.ts             # Database client
 │   │   └── migrations/          # SQL migrations
 │   └── utils/
 │       ├── taskUtils.ts         # Task utilities
-│       └── pythonExecutor.ts    # Python process manager
+│       └── pythonExecutor.ts    # Python process manager & JSON parser
 ├── docker-compose.yml           # PostgreSQL container
 ├── drizzle.config.ts            # DrizzleORM configuration
 ├── pyproject.toml               # Python dependencies
@@ -170,17 +190,12 @@ Xenix/
 Upload training data and start hyperparameter tuning for a specific model.
 
 **Request**: FormData with `file` and `model` fields
-**Response**: `{ success: true, taskId: string, message: string }`
-
-### POST /api/compare
-Compare all tuned models and identify the best one.
-
-**Response**: `{ success: true, taskId: string, message: string }`
+**Response**: `{ success: true, taskId: string, inputFile: string, message: string }`
 
 ### POST /api/predict
-Generate predictions using the best model.
+Generate predictions using a selected model.
 
-**Request**: FormData with `file` and `model` fields
+**Request**: FormData with `file`, `model`, and `outputFile` fields
 **Response**: `{ success: true, taskId: string, message: string }`
 
 ### GET /api/task/:taskId
@@ -192,11 +207,49 @@ Check the status and results of a background task.
   "success": true,
   "task": {
     "taskId": "string",
-    "type": "tuning|comparison|prediction",
+    "type": "tuning|prediction",
     "status": "pending|running|completed|failed",
     "error": "string|null"
-  },
-  "results": { /* task-specific results */ }
+  }
+}
+```
+
+### GET /api/results/:taskId
+Fetch evaluation metrics for a completed tuning task.
+
+**Response**:
+```json
+{
+  "success": true,
+  "results": {
+    "model": "string",
+    "params": {/* best parameters */},
+    "mse_train": "number",
+    "mae_train": "number",
+    "r2_train": "number",
+    "mse_test": "number",
+    "mae_test": "number",
+    "r2_test": "number"
+  }
+}
+```
+
+### GET /api/logs/:taskId
+Fetch real-time logs for a task (OpenTelemetry-compliant).
+
+**Response**:
+```json
+{
+  "success": true,
+  "logs": [
+    {
+      "id": 1,
+      "timestamp": 1734675467000000000,
+      "severity": "INFO",
+      "message": "Starting hyperparameter tuning",
+      "attributes": {}
+    }
+  ]
 }
 ```
 
