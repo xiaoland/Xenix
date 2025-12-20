@@ -27,13 +27,8 @@ export const modelResults = pgTable('model_results', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const comparisonResults = pgTable('comparison_results', {
-  id: serial('id').primaryKey(),
-  taskId: varchar('task_id', { length: 255 }).notNull(),
-  results: jsonb('results').notNull(), // array of model comparison results
-  bestModel: varchar('best_model', { length: 100 }),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+// Comparison results table removed - evaluation metrics from tuning are sufficient
+// All model evaluation results are stored in modelResults table during hyperparameter tuning
 
 // OpenTelemetry-compliant logs table
 export const logs = pgTable('logs', {
