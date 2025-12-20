@@ -82,6 +82,7 @@ const availableModels = [
 const selectedModels = ref<string[]>([]);
 const tuningStatus = ref<Record<string, string>>({});
 const tuningTasks = ref<Record<string, string>>({});
+const uploadedFilePath = ref<string>(''); // Store uploaded file path
 const isTuning = ref(false);
 const isComparing = ref(false);
 const isPredicting = ref(false);
@@ -155,6 +156,12 @@ const startTuning = async () => {
         tuningTasks.value[modelValue] = response.taskId;
         tuningStatus.value[modelValue] = 'running';
         activeLogTab.value = response.taskId; // Set first task as active
+        
+        // Store uploaded file path from first successful upload
+        if (!uploadedFilePath.value && response.inputFile) {
+          uploadedFilePath.value = response.inputFile;
+        }
+        
         pollTaskStatus(response.taskId, modelValue);
         pollTaskLogs(response.taskId); // Start polling logs
       }
@@ -197,11 +204,39 @@ const pollTaskStatus = async (taskId: string, modelValue?: string) => {
 };
 
 const startComparison = async () => {
+  if (!uploadedFilePath.value) {
+    message.error('No uploaded file found. Please upload training data first.');
+    return;
+  }
+  
+  // Get list of models that have completed tuning
+  const tunedModels = Object.keys(tuningStatus.value).filter(
+    model => tuningStatus.value[model] === 'completed'
+  );
+  
+  if (tunedModels.length === 0) {
+    message.error('No models have completed tuning yet');
+    return;
+  }
+  
   isComparing.value = true;
   
   try {
+    // Build task IDs mapping
+    const taskIds: Record<string, string> = {};
+    tunedModels.forEach(model => {
+      if (tuningTasks.value[model]) {
+        taskIds[model] = tuningTasks.value[model];
+      }
+    });
+    
     const response = await $fetch('/api/compare', {
       method: 'POST',
+      body: {
+        inputFile: uploadedFilePath.value,
+        models: tunedModels,
+        taskIds,
+      },
     });
 
     if (response.success) {
@@ -330,7 +365,10 @@ const reset = () => {
   selectedModels.value = [];
   tuningStatus.value = {};
   tuningTasks.value = {};
+  uploadedFilePath.value = ''; // Clear uploaded file path
   comparisonResults.value = null;
+  comparisonTaskId.value = null;
   predictionTask.value = null;
+  taskLogs.value = {};
 };
 </script>

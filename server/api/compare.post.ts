@@ -5,6 +5,24 @@ import path from 'path';
 
 export default defineEventHandler(async (event) => {
   try {
+    // Read request body
+    const body = await readBody(event);
+    const { inputFile, models, taskIds } = body;
+
+    if (!inputFile) {
+      throw createError({
+        statusCode: 400,
+        message: 'Input file path is required',
+      });
+    }
+
+    if (!models || !Array.isArray(models) || models.length === 0) {
+      throw createError({
+        statusCode: 400,
+        message: 'Models array is required',
+      });
+    }
+
     // Generate task ID
     const taskId = generateTaskId();
 
@@ -13,16 +31,31 @@ export default defineEventHandler(async (event) => {
       taskId,
       type: 'comparison',
       status: 'pending',
+      inputFile,
     });
 
     // Get Python script path for model comparison
     const scriptPath = path.join(process.cwd(), 'app', 'models', 'regression', 'compare_models.py');
     
+    // Build arguments
+    const args = [
+      '--input', inputFile,
+      '--models', models.join(',')
+    ];
+    
+    // Add task IDs mapping if provided
+    if (taskIds && Object.keys(taskIds).length > 0) {
+      const taskIdMappings = Object.entries(taskIds)
+        .map(([model, tid]) => `${model}=${tid}`)
+        .join(',');
+      args.push('--task-ids', taskIdMappings);
+    }
+    
     // Execute Python task in background
     setImmediate(() => {
       executePythonTask({
         script: scriptPath,
-        args: ['--output-db', taskId],
+        args,
         taskId,
         cwd: path.join(process.cwd(), 'app', 'models', 'regression'),
       }).catch(error => {

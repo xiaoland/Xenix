@@ -64,6 +64,7 @@ export default defineEventHandler(async (event) => {
     return {
       success: true,
       taskId,
+      inputFile, // Return the file path so UI can use it for comparison
       message: 'Model tuning started',
     };
   } catch (error) {

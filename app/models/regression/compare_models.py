@@ -45,17 +45,44 @@ except ImportError:
     print("Warning: LightGBM not available. LightGBM model will be skipped.", file=sys.stderr)
 
 
-def load_params(json_filename, logger=None):
-    """Load params from JSON file; return empty dict if not found"""
-    if os.path.exists(json_filename):
-        with open(json_filename, "r", encoding="utf-8") as f:
-            return json.load(f)
-    else:
-        msg = f"⚠️ JSON file not found, using default params: {json_filename}"
-        if logger:
-            logger.warning(msg)
+def load_params_from_db(task_id, logger=None):
+    """Load params from database using task ID"""
+    if not task_id:
+        return {}
+    
+    try:
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        # Get database URL from environment
+        db_url = os.environ.get('DATABASE_URL')
+        if not db_url:
+            if logger:
+                logger.warning("DATABASE_URL not set, using default params")
+            return {}
+        
+        # Connect and query
+        conn = psycopg2.connect(db_url)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cursor.execute(
+            "SELECT params FROM model_results WHERE task_id = %s ORDER BY created_at DESC LIMIT 1",
+            (task_id,)
+        )
+        result = cursor.fetchone()
+        
+        cursor.close()
+        conn.close()
+        
+        if result and result['params']:
+            return result['params']
         else:
-            print(msg)
+            if logger:
+                logger.info(f"No params found in DB for task {task_id}, using defaults")
+            return {}
+    except Exception as e:
+        if logger:
+            logger.warning(f"Failed to load params from DB for task {task_id}: {e}")
         return {}
 
 
@@ -74,37 +101,45 @@ def add_prefix_for_pipeline(params, prefix="model"):
 
 def main():
     parser = argparse.ArgumentParser(description='Compare regression models')
-    parser.add_argument('--input', default='Customer Value Data Table.xlsx', 
-                       help='Input Excel file path (default: Customer Value Data Table.xlsx)')
+    parser.add_argument('--input', required=True, 
+                       help='Input Excel file path')
+    parser.add_argument('--models', required=True,
+                       help='Comma-separated list of models to compare')
+    parser.add_argument('--task-ids', required=False, default='',
+                       help='Comma-separated model=taskId mappings (e.g., Ridge=task_001,Lasso=task_002)')
     parser.add_argument('--output-db', required=False, help='Task ID for database output (deprecated)')
     
     args = parser.parse_args()
+    
+    # Parse models list
+    models_to_compare = [m.strip() for m in args.models.split(',') if m.strip()]
+    
+    # Parse task IDs mapping
+    task_id_map = {}
+    if args.task_ids:
+        for mapping in args.task_ids.split(','):
+            if '=' in mapping:
+                model_name, task_id = mapping.split('=', 1)
+                task_id_map[model_name.strip()] = task_id.strip()
     
     # Get logger
     logger = get_logger(__name__)
     
     try:
-        logger.info("Starting model comparison")
+        logger.info(f"Starting model comparison for models: {', '.join(models_to_compare)}")
         
-        # JSON files mapping
-        json_files = {
-            "LinearRegression": "Linear_Regression_Hyperparameter_Tuning_Params.json",
-            "Ridge": "Ridge_Params.json",
-            "Lasso": "Lasso_Params.json",
-            "BayesianRidge": "Bayesian_Ridge_Regression_Params.json",
-            "KNN": "K-Nearest_Neighbors_Params.json",
-            "DecisionTree": "Regression_Decision_Tree_Params.json",
-            "RandomForest": "Random_Forest_Params.json",
-            "GBDT": "GBDT_Params.json",
-            "AdaBoost": "AdaBoost_Params.json",
-            "XGBoost": "XGBoost_Params.json",
-            "LightGBM": "LightGBM_Params.json",
-            "PolynomialRegression": "Polynomial_Regression_Params.json"
-        }
-        
-        # Load all JSON parameter files
-        logger.info("Loading model parameters from JSON files")
-        model_params = {name: load_params(path, logger) for name, path in json_files.items()}
+        # Load parameters from database using task IDs
+        logger.info("Loading model parameters from database")
+        model_params = {}
+        for model_name in models_to_compare:
+            task_id = task_id_map.get(model_name)
+            if task_id:
+                logger.info(f"Loading params for {model_name} from task {task_id}")
+                params = load_params_from_db(task_id, logger)
+            else:
+                logger.info(f"No task ID provided for {model_name}, using default params")
+                params = {}
+            model_params[model_name] = params
         
         # Read data
         logger.info(f"Loading training data from {args.input}")
@@ -122,124 +157,119 @@ def main():
             X, y, test_size=0.2, random_state=42
         )
         
-        # Build models
+        # Build models (only for selected models)
         models = {}
         
-        # 1. Linear Regression
-        params = add_prefix_for_pipeline(model_params["LinearRegression"])
-        lin_model = Pipeline([
-            ("scaler", StandardScaler()),
-            ("model", LinearRegression())
-        ])
-        lin_model.set_params(**params)
-        models["LinearRegression"] = lin_model
-        
-        # 2. Ridge Regression
-        params = add_prefix_for_pipeline(model_params["Ridge"])
-        ridge_model = Pipeline([
-            ("scaler", StandardScaler()),
-            ("model", Ridge(random_state=42))
-        ])
-        ridge_model.set_params(**params)
-        models["Ridge"] = ridge_model
-        
-        # 3. Lasso Regression
-        params = add_prefix_for_pipeline(model_params["Lasso"])
-        lasso_model = Pipeline([
-            ("scaler", StandardScaler()),
-            ("model", Lasso(random_state=42))
-        ])
-        lasso_model.set_params(**params)
-        models["Lasso"] = lasso_model
-        
-        # 4. Bayesian Ridge Regression
-        params = add_prefix_for_pipeline(model_params["BayesianRidge"])
-        bayes_model = Pipeline([
-            ("scaler", StandardScaler()),
-            ("model", BayesianRidge())
-        ])
-        bayes_model.set_params(**params)
-        models["BayesianRidge"] = bayes_model
-        
-        # 5. KNN Regression
-        params = add_prefix_for_pipeline(model_params["KNN"])
-        knn_model = Pipeline([
-            ("scaler", StandardScaler()),
-            ("model", KNeighborsRegressor())
-        ])
-        knn_model.set_params(**params)
-        models["KNN"] = knn_model
-        
-        # 6. Decision Tree
-        models["DecisionTree"] = DecisionTreeRegressor(
-            **model_params["DecisionTree"],
-            random_state=42
-        )
-        
-        # 7. Random Forest
-        models["RandomForest"] = RandomForestRegressor(
-            **model_params["RandomForest"],
-            random_state=42,
-            n_jobs=-1
-        )
-        
-        # 8. GBDT (Gradient Boosting)
-        models["GBDT"] = GradientBoostingRegressor(
-            **model_params["GBDT"],
-            random_state=42
-        )
-        
-        # 9. AdaBoost
-        ada_json = model_params["AdaBoost"]
-        tree_params = {}
-        ada_params_clean = {}
-        
-        for k, v in ada_json.items():
-            if k.startswith("estimator__"):
-                tree_params[k.replace("estimator__", "")] = v
-            else:
-                ada_params_clean[k] = v
-        
-        models["AdaBoost"] = AdaBoostRegressor(
-            estimator=DecisionTreeRegressor(**tree_params) if tree_params else None,
-            **ada_params_clean,
-            random_state=42
-        )
-        
-        # 10. XGBoost
-        if HAS_XGB:
-            xgb_params = model_params["XGBoost"]
-            models["XGBoost"] = XGBRegressor(
-                **xgb_params,
-                objective="reg:squarederror",
-                random_state=42,
-                n_jobs=-1
-            )
-        
-        # 11. LightGBM
-        if HAS_LGBM:
-            lgb_params = model_params["LightGBM"]
-            models["LightGBM"] = LGBMRegressor(
-                **lgb_params,
-                objective="regression",
-                random_state=42,
-                n_jobs=-1,
-                verbose=-1,
-                verbosity=-1,
-                force_row_wise=True
-            )
-        
-        # 12. Polynomial Regression
-        poly_params = model_params["PolynomialRegression"]
-        degree = poly_params.get("degree", 2)
-        
-        poly_model = Pipeline([
-            ("poly", PolynomialFeatures(degree=degree, include_bias=False)),
-            ("scaler", StandardScaler()),
-            ("model", LinearRegression())
-        ])
-        
-        models["PolynomialRegression"] = poly_model
+        for model_name in models_to_compare:
+            params = model_params.get(model_name, {})
+            
+            if model_name == "Linear_Regression_Hyperparameter_Tuning" or model_name == "LinearRegression":
+                params_pipeline = add_prefix_for_pipeline(params)
+                lin_model = Pipeline([
+                    ("scaler", StandardScaler()),
+                    ("model", LinearRegression())
+                ])
+                lin_model.set_params(**params_pipeline)
+                models["LinearRegression"] = lin_model
+            
+            elif model_name == "Ridge":
+                params_pipeline = add_prefix_for_pipeline(params)
+                ridge_model = Pipeline([
+                    ("scaler", StandardScaler()),
+                    ("model", Ridge(random_state=42))
+                ])
+                ridge_model.set_params(**params_pipeline)
+                models["Ridge"] = ridge_model
+            
+            elif model_name == "Lasso":
+                params_pipeline = add_prefix_for_pipeline(params)
+                lasso_model = Pipeline([
+                    ("scaler", StandardScaler()),
+                    ("model", Lasso(random_state=42))
+                ])
+                lasso_model.set_params(**params_pipeline)
+                models["Lasso"] = lasso_model
+            
+            elif model_name == "Bayesian_Ridge_Regression" or model_name == "BayesianRidge":
+                params_pipeline = add_prefix_for_pipeline(params)
+                bayes_model = Pipeline([
+                    ("scaler", StandardScaler()),
+                    ("model", BayesianRidge())
+                ])
+                bayes_model.set_params(**params_pipeline)
+                models["BayesianRidge"] = bayes_model
+            
+            elif model_name == "K-Nearest_Neighbors" or model_name == "KNN":
+                params_pipeline = add_prefix_for_pipeline(params)
+                knn_model = Pipeline([
+                    ("scaler", StandardScaler()),
+                    ("model", KNeighborsRegressor())
+                ])
+                knn_model.set_params(**params_pipeline)
+                models["KNN"] = knn_model
+            
+            elif model_name == "Regression_Decision_Tree" or model_name == "DecisionTree":
+                models["DecisionTree"] = DecisionTreeRegressor(
+                    **params,
+                    random_state=42
+                )
+            
+            elif model_name == "Random_Forest" or model_name == "RandomForest":
+                models["RandomForest"] = RandomForestRegressor(
+                    **params,
+                    random_state=42,
+                    n_jobs=-1
+                )
+            
+            elif model_name == "GBDT":
+                models["GBDT"] = GradientBoostingRegressor(
+                    **params,
+                    random_state=42
+                )
+            
+            elif model_name == "AdaBoost":
+                tree_params = {}
+                ada_params_clean = {}
+                
+                for k, v in params.items():
+                    if k.startswith("estimator__"):
+                        tree_params[k.replace("estimator__", "")] = v
+                    else:
+                        ada_params_clean[k] = v
+                
+                models["AdaBoost"] = AdaBoostRegressor(
+                    estimator=DecisionTreeRegressor(**tree_params) if tree_params else None,
+                    **ada_params_clean,
+                    random_state=42
+                )
+            
+            elif model_name == "XGBoost" and HAS_XGB:
+                models["XGBoost"] = XGBRegressor(
+                    **params,
+                    objective="reg:squarederror",
+                    random_state=42,
+                    n_jobs=-1
+                )
+            
+            elif model_name == "LightGBM" and HAS_LGBM:
+                models["LightGBM"] = LGBMRegressor(
+                    **params,
+                    objective="regression",
+                    random_state=42,
+                    n_jobs=-1,
+                    verbose=-1,
+                    verbosity=-1,
+                    force_row_wise=True
+                )
+            
+            elif model_name == "Polynomial_Regression" or model_name == "PolynomialRegression":
+                degree = params.get("poly__degree") or params.get("degree", 2)
+                poly_model = Pipeline([
+                    ("poly", PolynomialFeatures(degree=degree, include_bias=False)),
+                    ("scaler", StandardScaler()),
+                    ("model", LinearRegression())
+                ])
+                models["PolynomialRegression"] = poly_model
         
         # Train & evaluate models
         logger.info(f"Building {len(models)} models for comparison")
