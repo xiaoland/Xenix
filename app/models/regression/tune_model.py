@@ -2,6 +2,7 @@
 """
 Generic hyperparameter tuning script that works with CLI arguments.
 This script can be used for any regression model with GridSearchCV.
+Outputs structured JSON to stdout for the Node.js executor to parse.
 """
 import argparse
 import json
@@ -17,22 +18,8 @@ warnings.filterwarnings("ignore")
 # Add current directory to path
 sys.path.append(str(Path(__file__).parent))
 
-# Import database utilities
-try:
-    from db_utils import update_task_status, store_model_result
-    HAS_DB = True
-except ImportError:
-    HAS_DB = False
-    print("Warning: Database utilities not available")
-
-# Import logging setup
-try:
-    from log_handler import setup_logger
-    HAS_LOGGING = True
-except ImportError:
-    HAS_LOGGING = False
-    import logging
-    print("Warning: Custom logging handler not available, using default")
+# Import structured output utilities
+from structured_output import get_logger, emit_result
 
 # Import ML libraries
 from sklearn.model_selection import train_test_split, GridSearchCV
@@ -49,14 +36,14 @@ try:
     HAS_XGB = True
 except ImportError:
     HAS_XGB = False
-    print("Warning: XGBoost not available. XGBoost model will be skipped.")
+    print("Warning: XGBoost not available. XGBoost model will be skipped.", file=sys.stderr)
 
 try:
     from lightgbm import LGBMRegressor
     HAS_LGBM = True
 except ImportError:
     HAS_LGBM = False
-    print("Warning: LightGBM not available. LightGBM model will be skipped.")
+    print("Warning: LightGBM not available. LightGBM model will be skipped.", file=sys.stderr)
 
 
 def get_model_and_param_grid(model_name):
@@ -191,7 +178,7 @@ def get_model_and_param_grid(model_name):
 def main():
     parser = argparse.ArgumentParser(description='Hyperparameter tuning for regression models')
     parser.add_argument('--input', required=True, help='Input Excel file path')
-    parser.add_argument('--output-db', required=False, help='Task ID for database output')
+    parser.add_argument('--output-db', required=False, help='Task ID for database output (deprecated)')
     parser.add_argument('--model', required=False, help='Model name (optional, can be inferred from script)')
     
     args = parser.parse_args()
@@ -203,21 +190,11 @@ def main():
         # Get model name from the calling script or default
         model_name = os.environ.get('MODEL_NAME', 'Linear_Regression_Hyperparameter_Tuning')
     
-    task_id = args.output_db
-    
-    # Setup logger with trace ID
-    if HAS_LOGGING and task_id:
-        logger = setup_logger(__name__, task_id)
-    else:
-        import logging
-        logging.basicConfig(level=logging.INFO)
-        logger = logging.getLogger(__name__)
+    # Get logger
+    logger = get_logger(__name__)
     
     try:
         logger.info(f"Starting hyperparameter tuning for {model_name}")
-        
-        if task_id and HAS_DB:
-            update_task_status(task_id, 'running')
         
         # Load data
         logger.info(f"Loading training data from {args.input}")
@@ -270,12 +247,12 @@ def main():
         y_test_pred = best_model.predict(X_test)
         
         metrics = {
-            'mse_train': mean_squared_error(y_train, y_train_pred),
-            'mae_train': mean_absolute_error(y_train, y_train_pred),
-            'r2_train': r2_score(y_train, y_train_pred),
-            'mse_test': mean_squared_error(y_test, y_test_pred),
-            'mae_test': mean_absolute_error(y_test, y_test_pred),
-            'r2_test': r2_score(y_test, y_test_pred)
+            'mse_train': float(mean_squared_error(y_train, y_train_pred)),
+            'mae_train': float(mean_absolute_error(y_train, y_train_pred)),
+            'r2_train': float(r2_score(y_train, y_train_pred)),
+            'mse_test': float(mean_squared_error(y_test, y_test_pred)),
+            'mae_test': float(mean_absolute_error(y_test, y_test_pred)),
+            'r2_test': float(r2_score(y_test, y_test_pred))
         }
         
         logger.info("Model evaluation completed")
@@ -288,21 +265,14 @@ def main():
             json.dump(best_params, f, indent=4)
         logger.info(f"Parameters saved to {json_filename}")
         
-        # Store in database
-        if task_id and HAS_DB:
-            logger.info("Storing results in database")
-            store_model_result(task_id, model_name, best_params, metrics)
-            update_task_status(task_id, 'completed')
+        # Emit result as structured JSON
+        emit_result(model_name, best_params, metrics)
         
         logger.info("Hyperparameter tuning completed successfully!")
         
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Error during tuning: {error_msg}", exc_info=True)
-        
-        if task_id and HAS_DB:
-            update_task_status(task_id, 'failed', error_msg)
-        
         sys.exit(1)
 
 

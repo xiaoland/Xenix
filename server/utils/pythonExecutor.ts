@@ -9,6 +9,12 @@ export interface PythonTaskOptions {
   cwd?: string;
 }
 
+// Pattern for structured output from Python scripts
+interface StructuredOutput {
+  type: 'log' | 'status' | 'result' | 'comparison_result';
+  data: any;
+}
+
 export async function executePythonTask(options: PythonTaskOptions): Promise<void> {
   const { script, args, taskId, cwd } = options;
   
@@ -32,17 +38,51 @@ export async function executePythonTask(options: PythonTaskOptions): Promise<voi
       env: process.env,
     });
 
-    let stdout = '';
-    let stderr = '';
+    let stdoutBuffer = '';
+    let stderrBuffer = '';
 
-    pythonProcess.stdout.on('data', (data) => {
-      stdout += data.toString();
-      console.log(`[${taskId}] ${data}`);
+    pythonProcess.stdout.on('data', async (data) => {
+      const output = data.toString();
+      stdoutBuffer += output;
+      
+      // Process line by line
+      const lines = stdoutBuffer.split('\n');
+      stdoutBuffer = lines.pop() || ''; // Keep incomplete line in buffer
+      
+      for (const line of lines) {
+        if (line.trim()) {
+          try {
+            // Try to parse as JSON structured output
+            const parsed: StructuredOutput = JSON.parse(line);
+            await handleStructuredOutput(parsed, taskId);
+          } catch {
+            // Not JSON, just log as plain text
+            console.log(`[${taskId}] ${line}`);
+          }
+        }
+      }
     });
 
-    pythonProcess.stderr.on('data', (data) => {
-      stderr += data.toString();
-      console.error(`[${taskId}] ${data}`);
+    pythonProcess.stderr.on('data', async (data) => {
+      const output = data.toString();
+      stderrBuffer += output;
+      
+      // Process line by line
+      const lines = stderrBuffer.split('\n');
+      stderrBuffer = lines.pop() || ''; // Keep incomplete line in buffer
+      
+      for (const line of lines) {
+        if (line.trim()) {
+          try {
+            // Try to parse as JSON structured output (logs can come from stderr)
+            const parsed: StructuredOutput = JSON.parse(line);
+            await handleStructuredOutput(parsed, taskId);
+          } catch {
+            // Not JSON, just log as error
+            console.error(`[${taskId}] ${line}`);
+          }
+        }
+      }
     });
 
     pythonProcess.on('close', async (code) => {
@@ -64,7 +104,7 @@ export async function executePythonTask(options: PythonTaskOptions): Promise<voi
         await db.update(schema.tasks)
           .set({ 
             status: 'failed',
-            error: stderr || `Process exited with code ${code}`,
+            error: stderrBuffer || `Process exited with code ${code}`,
             updatedAt: new Date()
           })
           .where(eq(schema.tasks.taskId, taskId));
@@ -103,5 +143,74 @@ export async function executePythonTask(options: PythonTaskOptions): Promise<voi
       .where(eq(schema.tasks.taskId, taskId));
     
     throw error;
+  }
+}
+
+async function handleStructuredOutput(output: StructuredOutput, taskId: string) {
+  try {
+    switch (output.type) {
+      case 'log':
+        // Store log in database
+        await storeLog(output.data, taskId);
+        break;
+      
+      case 'status':
+        // Update task status
+        await db.update(schema.tasks)
+          .set({
+            status: output.data.status,
+            error: output.data.error || null,
+            updatedAt: new Date()
+          })
+          .where(eq(schema.tasks.taskId, taskId));
+        break;
+      
+      case 'result':
+        // Store model result
+        await db.insert(schema.modelResults).values({
+          taskId: taskId,
+          model: output.data.model,
+          params: output.data.params,
+          mse_train: output.data.metrics.mse_train?.toString(),
+          mae_train: output.data.metrics.mae_train?.toString(),
+          r2_train: output.data.metrics.r2_train?.toString(),
+          mse_test: output.data.metrics.mse_test?.toString(),
+          mae_test: output.data.metrics.mae_test?.toString(),
+          r2_test: output.data.metrics.r2_test?.toString(),
+          createdAt: new Date()
+        });
+        break;
+      
+      case 'comparison_result':
+        // Store comparison result
+        await db.insert(schema.comparisonResults).values({
+          taskId: taskId,
+          results: output.data.results,
+          bestModel: output.data.best_model,
+          createdAt: new Date()
+        });
+        break;
+    }
+  } catch (error) {
+    console.error(`[${taskId}] Error handling structured output:`, error);
+  }
+}
+
+async function storeLog(logData: any, taskId: string) {
+  try {
+    await db.insert(schema.logs).values({
+      timestamp: logData.timestamp,
+      observedTimestamp: logData.observed_timestamp,
+      traceId: taskId,
+      spanId: logData.span_id || null,
+      severityText: logData.severity_text,
+      severityNumber: logData.severity_number,
+      body: logData.body,
+      resource: logData.resource || null,
+      attributes: logData.attributes || null,
+      createdAt: new Date()
+    });
+  } catch (error) {
+    console.error(`[${taskId}] Error storing log:`, error);
   }
 }

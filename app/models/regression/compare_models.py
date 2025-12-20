@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Model comparison script that loads parameters from JSON files and compares models.
-This version supports CLI arguments and database output.
+Outputs structured JSON to stdout for the Node.js executor to parse.
 """
 import argparse
 import json
@@ -17,22 +17,8 @@ warnings.filterwarnings("ignore")
 # Add current directory to path
 sys.path.append(str(Path(__file__).parent))
 
-# Import database utilities
-try:
-    from db_utils import update_task_status, store_comparison_result
-    HAS_DB = True
-except ImportError:
-    HAS_DB = False
-    print("Warning: Database utilities not available")
-
-# Import logging setup
-try:
-    from log_handler import setup_logger
-    HAS_LOGGING = True
-except ImportError:
-    HAS_LOGGING = False
-    import logging
-    print("Warning: Custom logging handler not available, using default")
+# Import structured output utilities
+from structured_output import get_logger, emit_comparison_result
 
 # Import ML libraries
 from sklearn.model_selection import train_test_split
@@ -49,14 +35,14 @@ try:
     HAS_XGB = True
 except ImportError:
     HAS_XGB = False
-    print("Warning: XGBoost not available. XGBoost model will be skipped.")
+    print("Warning: XGBoost not available. XGBoost model will be skipped.", file=sys.stderr)
 
 try:
     from lightgbm import LGBMRegressor
     HAS_LGBM = True
 except ImportError:
     HAS_LGBM = False
-    print("Warning: LightGBM not available. LightGBM model will be skipped.")
+    print("Warning: LightGBM not available. LightGBM model will be skipped.", file=sys.stderr)
 
 
 def load_params(json_filename, logger=None):
@@ -90,24 +76,15 @@ def main():
     parser = argparse.ArgumentParser(description='Compare regression models')
     parser.add_argument('--input', default='Customer Value Data Table.xlsx', 
                        help='Input Excel file path (default: Customer Value Data Table.xlsx)')
-    parser.add_argument('--output-db', required=False, help='Task ID for database output')
+    parser.add_argument('--output-db', required=False, help='Task ID for database output (deprecated)')
     
     args = parser.parse_args()
-    task_id = args.output_db
     
-    # Setup logger with trace ID
-    if HAS_LOGGING and task_id:
-        logger = setup_logger(__name__, task_id)
-    else:
-        import logging
-        logging.basicConfig(level=logging.INFO)
-        logger = logging.getLogger(__name__)
+    # Get logger
+    logger = get_logger(__name__)
     
     try:
         logger.info("Starting model comparison")
-        
-        if task_id and HAS_DB:
-            update_task_status(task_id, 'running')
         
         # JSON files mapping
         json_files = {
@@ -310,21 +287,14 @@ def main():
         results_df.to_excel(output_file, index=False)
         logger.info(f"Results saved to {output_file}")
         
-        # Store in database
-        if task_id and HAS_DB:
-            logger.info("Storing comparison results in database")
-            store_comparison_result(task_id, results, best_model)
-            update_task_status(task_id, 'completed')
+        # Emit comparison result as structured JSON
+        emit_comparison_result(results, best_model)
         
         logger.info("Model comparison completed successfully!")
         
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Error during comparison: {error_msg}", exc_info=True)
-        
-        if task_id and HAS_DB:
-            update_task_status(task_id, 'failed', error_msg)
-        
         sys.exit(1)
 
 
