@@ -243,13 +243,26 @@ const startPrediction = async () => {
     return;
   }
 
+  if (!uploadedFilePath.value) {
+    message.error('Training data path not found. Please retrain models first.');
+    return;
+  }
+
+  // Find the task ID for the selected model
+  const selectedModelTaskId = tuningTasks.value[selectedBestModel.value];
+  if (!selectedModelTaskId) {
+    message.error('Could not find tuning task for selected model. Please retrain.');
+    return;
+  }
+
   isPredicting.value = true;
 
   try {
     const formData = new FormData();
     formData.append('file', predictionFileList.value[0].originFileObj);
     formData.append('model', selectedBestModel.value);
-    formData.append('outputFile', `predictions_${Date.now()}.xlsx`);
+    formData.append('tuningTaskId', selectedModelTaskId);
+    formData.append('trainingDataPath', uploadedFilePath.value);
 
     const response = await $fetch('/api/predict', {
       method: 'POST',
@@ -263,9 +276,11 @@ const startPrediction = async () => {
       const result = await pollTaskStatus(response.taskId);
       if (result && result.task.status === 'completed') {
         predictionTask.value.status = 'completed';
-        message.success('Prediction completed!');
+        predictionTask.value.outputFile = response.outputFile;
+        message.success('Prediction completed! Results saved to: ' + response.outputFile);
       } else if (result && result.task.status === 'failed') {
         predictionTask.value.status = 'failed';
+        predictionTask.value.error = result.task.error;
         message.error('Prediction failed: ' + result.task.error);
       }
     }

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Batch prediction script using the best model from hyperparameter tuning.
-This script loads the trained model parameters, trains the model on all available data,
+This script loads the trained model parameters from database, trains the model on training data,
 and makes predictions on new data.
 """
 import argparse
@@ -18,7 +18,7 @@ warnings.filterwarnings("ignore")
 # Add parent directory to path to import from other modules
 sys.path.append(str(Path(__file__).parent))
 
-# Import ML libraries
+# Import basic ML libraries
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, BayesianRidge
 from sklearn.tree import DecisionTreeRegressor
@@ -26,16 +26,52 @@ from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, A
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
-from xgboost import XGBRegressor
-from lightgbm import LGBMRegressor
+
+# Import optional libraries with error handling
+try:
+    from xgboost import XGBRegressor
+    XGBOOST_AVAILABLE = True
+except ImportError:
+    XGBOOST_AVAILABLE = False
+    
+try:
+    from lightgbm import LGBMRegressor
+    LIGHTGBM_AVAILABLE = True
+except ImportError:
+    LIGHTGBM_AVAILABLE = False
 
 
-def load_params_from_json(json_filename):
-    """Load parameters from JSON file"""
-    if os.path.exists(json_filename):
-        with open(json_filename, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
+def load_params_from_db(task_id):
+    """Load parameters from database"""
+    try:
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        # Get database URL from environment
+        db_url = os.environ.get('DATABASE_URL')
+        if not db_url:
+            print("⚠️ DATABASE_URL not set, using default parameters", file=sys.stderr)
+            return {}
+        
+        conn = psycopg2.connect(db_url)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Query model_results table for parameters
+        cursor.execute(
+            "SELECT params FROM model_results WHERE task_id = %s LIMIT 1",
+            (task_id,)
+        )
+        result = cursor.fetchone()
+        
+        cursor.close()
+        conn.close()
+        
+        if result and result['params']:
+            return result['params']
+        return {}
+    except Exception as e:
+        print(f"⚠️ Failed to load params from database: {e}", file=sys.stderr)
+        return {}
 
 
 def add_prefix_for_pipeline(params, prefix="model"):
@@ -118,6 +154,8 @@ def build_model(model_name, params):
         )
         
     elif model_name == "XGBoost":
+        if not XGBOOST_AVAILABLE:
+            raise ValueError("XGBoost is not installed. Please install it with: pip install xgboost")
         model = XGBRegressor(
             **params,
             objective="reg:squarederror",
@@ -126,6 +164,8 @@ def build_model(model_name, params):
         )
         
     elif model_name == "LightGBM":
+        if not LIGHTGBM_AVAILABLE:
+            raise ValueError("LightGBM is not installed. Please install it with: pip install lightgbm")
         model = LGBMRegressor(
             **params,
             objective="regression",
@@ -155,46 +195,31 @@ def main():
     parser.add_argument('--input', required=True, help='Input Excel file for prediction')
     parser.add_argument('--output', required=True, help='Output Excel file with predictions')
     parser.add_argument('--model', required=True, help='Model name to use')
-    parser.add_argument('--task-id', required=False, help='Task ID for database tracking')
-    parser.add_argument('--training-data', default='Customer Value Data Table.xlsx', 
-                       help='Training data file (default: Customer Value Data Table.xlsx)')
+    parser.add_argument('--task-id', required=True, help='Task ID from tuning to load parameters')
+    parser.add_argument('--training-data', required=True, help='Training data file path')
     
     args = parser.parse_args()
     
     try:
-        # Map model names to JSON files
-        json_files = {
-            "Linear_Regression_Hyperparameter_Tuning": "Linear_Regression_Hyperparameter_Tuning_Params.json",
-            "LinearRegression": "Linear_Regression_Hyperparameter_Tuning_Params.json",
-            "Ridge": "Ridge_Params.json",
-            "Lasso": "Lasso_Params.json",
-            "BayesianRidge": "Bayesian_Ridge_Regression_Params.json",
-            "Bayesian_Ridge_Regression": "Bayesian_Ridge_Regression_Params.json",
-            "KNN": "K-Nearest_Neighbors_Params.json",
-            "K-Nearest_Neighbors": "K-Nearest_Neighbors_Params.json",
-            "DecisionTree": "Regression_Decision_Tree_Params.json",
-            "Regression_Decision_Tree": "Regression_Decision_Tree_Params.json",
-            "RandomForest": "Random_Forest_Params.json",
-            "Random_Forest": "Random_Forest_Params.json",
-            "GBDT": "GBDT_Params.json",
-            "AdaBoost": "AdaBoost_Params.json",
-            "XGBoost": "XGBoost_Params.json",
-            "LightGBM": "LightGBM_Params.json",
-            "PolynomialRegression": "Polynomial_Regression_Params.json",
-            "Polynomial_Regression": "Polynomial_Regression_Params.json",
-        }
+        print(f"Starting prediction with model: {args.model}")
         
-        # Load model parameters
-        json_file = json_files.get(args.model)
-        if not json_file:
-            raise ValueError(f"Unknown model: {args.model}")
+        # Load model parameters from database using task ID
+        print(f"Loading parameters from database for task: {args.task_id}")
+        params = load_params_from_db(args.task_id)
         
-        params = load_params_from_json(json_file)
-        print(f"Loaded parameters for {args.model}: {params}")
+        if not params:
+            print(f"⚠️ No parameters found in database for task {args.task_id}, using default parameters")
+            params = {}
+        else:
+            print(f"Loaded parameters: {params}")
         
         # Load training data
         print(f"Loading training data from {args.training_data}")
+        if not os.path.exists(args.training_data):
+            raise FileNotFoundError(f"Training data file not found: {args.training_data}")
+        
         df = pd.read_excel(args.training_data)
+        print(f"Training data loaded: {len(df)} rows")
         
         # Import configuration
         from config import FEATURE_COLUMNS, TARGET_COLUMN, PREDICTION_COLUMN
@@ -207,10 +232,15 @@ def main():
         print(f"Training {args.model} on all data...")
         model = build_model(args.model, params)
         model.fit(X, y)
+        print("Model training completed")
         
         # Load prediction data
         print(f"Loading prediction data from {args.input}")
+        if not os.path.exists(args.input):
+            raise FileNotFoundError(f"Prediction data file not found: {args.input}")
+        
         pred_df = pd.read_excel(args.input)
+        print(f"Prediction data loaded: {len(pred_df)} rows")
         
         # Extract features
         X_pred = pred_df[FEATURE_COLUMNS]
@@ -226,10 +256,12 @@ def main():
         print(f"Saving predictions to {args.output}")
         pred_df.to_excel(args.output, index=False)
         
-        print("Prediction completed successfully!")
+        print("✅ Prediction completed successfully!")
         
     except Exception as e:
-        print(f"Error during prediction: {str(e)}", file=sys.stderr)
+        print(f"❌ Error during prediction: {str(e)}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 

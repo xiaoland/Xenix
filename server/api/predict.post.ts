@@ -8,6 +8,8 @@ export default defineEventHandler(async (event) => {
     const formData = await readFormData(event);
     const file = formData.get('file') as File;
     const model = formData.get('model') as string;
+    const tuningTaskId = formData.get('tuningTaskId') as string;
+    const trainingDataPath = formData.get('trainingDataPath') as string;
 
     if (!file) {
       throw createError({
@@ -30,14 +32,28 @@ export default defineEventHandler(async (event) => {
       });
     }
 
-    // Save uploaded file
+    if (!tuningTaskId) {
+      throw createError({
+        statusCode: 400,
+        message: 'Tuning task ID is required (must select a trained model)',
+      });
+    }
+
+    if (!trainingDataPath) {
+      throw createError({
+        statusCode: 400,
+        message: 'Training data path is required',
+      });
+    }
+
+    // Save uploaded prediction file
     const uploadDir = path.join(process.cwd(), 'uploads');
     const inputFile = await saveUploadedFile(file, uploadDir);
     
     // Generate output file path
     const outputFile = inputFile.replace(/\.(xlsx|xls)$/i, '_predicted.xlsx');
 
-    // Generate task ID
+    // Generate task ID for prediction
     const taskId = generateTaskId();
 
     // Create task record
@@ -57,7 +73,13 @@ export default defineEventHandler(async (event) => {
     setImmediate(() => {
       executePythonTask({
         script: scriptPath,
-        args: ['--input', inputFile, '--output', outputFile, '--model', model, '--task-id', taskId],
+        args: [
+          '--input', inputFile,
+          '--output', outputFile,
+          '--model', model,
+          '--task-id', tuningTaskId,  // Use tuning task ID to load params from DB
+          '--training-data', trainingDataPath
+        ],
         taskId,
         cwd: path.join(process.cwd(), 'app', 'models', 'regression'),
       }).catch(error => {
@@ -69,6 +91,7 @@ export default defineEventHandler(async (event) => {
       success: true,
       taskId,
       message: 'Prediction started',
+      outputFile,
     };
   } catch (error) {
     console.error('Predict error:', error);
