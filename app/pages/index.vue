@@ -14,7 +14,7 @@
 
         <!-- Step 1: Upload & Train -->
         <div v-if="currentStep === 0">
-          <!-- Upload Section -->
+          <!-- Upload Section (shown first) -->
           <UploadStep
             v-if="!hasUploadedData"
             v-model="trainingFileList"
@@ -56,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { message } from 'ant-design-vue';
 
 const currentStep = ref(0);
@@ -83,11 +83,11 @@ const availableModels = [
 const selectedModels = ref<string[]>([]);
 const tuningStatus = ref<Record<string, string>>({});
 const tuningTasks = ref<Record<string, string>>({});
-const tuningResults = ref<any[]>([]); // Store evaluation metrics from tuning
-const uploadedFilePath = ref<string>(''); // Store uploaded file path
+const tuningResults = ref<any[]>([]);
+const uploadedFilePath = ref<string>('');
 const isTuning = ref(false);
 const isPredicting = ref(false);
-const selectedBestModel = ref<string | null>(null); // User-selected model for prediction
+const selectedBestModel = ref<string | null>(null);
 const predictionTask = ref<any>(null);
 
 // Logs state
@@ -98,7 +98,6 @@ const fetchTaskLogs = async (taskId: string) => {
   try {
     const response = await $fetch(`/api/logs/${taskId}`);
     if (response.success) {
-      // Reverse to show newest first
       taskLogs.value[taskId] = response.logs.reverse();
     }
   } catch (error) {
@@ -107,14 +106,11 @@ const fetchTaskLogs = async (taskId: string) => {
 };
 
 const pollTaskLogs = (taskId: string) => {
-  // Initial fetch
   fetchTaskLogs(taskId);
   
-  // Poll every 3 seconds
   const interval = setInterval(async () => {
     await fetchTaskLogs(taskId);
     
-    // Stop polling if all tuning tasks are complete
     const isComplete = Object.values(tuningStatus.value).every(
       status => status === 'completed' || status === 'failed'
     );
@@ -135,6 +131,7 @@ const resetUpload = () => {
   tuningStatus.value = {};
   tuningTasks.value = {};
   tuningResults.value = [];
+  selectedBestModel.value = null;
 };
 
 const startTuning = async () => {
@@ -161,15 +158,14 @@ const startTuning = async () => {
       if (response.success) {
         tuningTasks.value[modelValue] = response.taskId;
         tuningStatus.value[modelValue] = 'running';
-        activeLogTab.value = response.taskId; // Set first task as active
+        activeLogTab.value = response.taskId;
         
-        // Store uploaded file path from first successful upload
         if (!uploadedFilePath.value && response.inputFile) {
           uploadedFilePath.value = response.inputFile;
         }
         
         pollTaskStatus(response.taskId, modelValue);
-        pollTaskLogs(response.taskId); // Start polling logs
+        pollTaskLogs(response.taskId);
       }
     }
     
@@ -182,7 +178,7 @@ const startTuning = async () => {
 };
 
 const pollTaskStatus = async (taskId: string, modelValue?: string) => {
-  const maxAttempts = 120; // 10 minutes with 5-second intervals
+  const maxAttempts = 120;
   let attempts = 0;
 
   const poll = async () => {
@@ -193,7 +189,6 @@ const pollTaskStatus = async (taskId: string, modelValue?: string) => {
         tuningStatus.value[modelValue] = response.task.status;
       }
 
-      // If task completed, fetch the results from model_results table
       if (response.task.status === 'completed') {
         await fetchTuningResults();
         return response;
@@ -205,7 +200,7 @@ const pollTaskStatus = async (taskId: string, modelValue?: string) => {
 
       attempts++;
       if (attempts < maxAttempts) {
-        setTimeout(poll, 5000); // Poll every 5 seconds
+        setTimeout(poll, 5000);
       }
     } catch (error) {
       console.error('Failed to poll task status:', error);
@@ -217,7 +212,6 @@ const pollTaskStatus = async (taskId: string, modelValue?: string) => {
 
 const fetchTuningResults = async () => {
   try {
-    // Fetch model results for all completed tuning tasks
     const taskIds = Object.values(tuningTasks.value);
     const results = await Promise.all(
       taskIds.map(taskId =>
@@ -225,112 +219,37 @@ const fetchTuningResults = async () => {
       )
     );
     
-    tuningResults.value = results.filter(r => r !== null);
+    const validResults = results
+      .filter(r => r !== null && r.success && r.results)
+      .map(r => ({
+        ...r.results,
+        status: tuningStatus.value[Object.keys(tuningTasks.value).find(k => tuningTasks.value[k] === r.results.taskId) || ''] || 'completed'
+      }));
+    
+    tuningResults.value = validResults;
   } catch (error) {
     console.error('Failed to fetch tuning results:', error);
   }
 };
 
-const startComparison = async () => {
-  if (!uploadedFilePath.value) {
-    message.error('No uploaded file found. Please upload training data first.');
-    return;
-  }
-  
-  // Get list of models that have completed tuning
-  const tunedModels = Object.keys(tuningStatus.value).filter(
-    model => tuningStatus.value[model] === 'completed'
-  );
-  
-  if (tunedModels.length === 0) {
-    message.error('No models have completed tuning yet');
-    return;
-  }
-  
-  isComparing.value = true;
-  
-  try {
-    // Build task IDs mapping
-    const taskIds: Record<string, string> = {};
-    tunedModels.forEach(model => {
-      if (tuningTasks.value[model]) {
-        taskIds[model] = tuningTasks.value[model];
-      }
-    });
-    
-    const response = await $fetch('/api/compare', {
-      method: 'POST',
-      body: {
-        inputFile: uploadedFilePath.value,
-        models: tunedModels,
-        taskIds,
-      },
-    });
-
-    if (response.success) {
-      comparisonTaskId.value = response.taskId;
-      activeLogTab.value = 'comparison'; // Switch to comparison tab
-      message.success('Model comparison started');
-      
-      // Start polling logs for comparison task
-      pollTaskLogs(response.taskId);
-      
-      // Poll for results
-      const result = await pollComparisonStatus(response.taskId);
-      if (result && result.results) {
-        comparisonResults.value = result.results;
-      }
-    }
-  } catch (error) {
-    message.error('Failed to start comparison: ' + error.message);
-  } finally {
-    isComparing.value = false;
-  }
-};
-
-const pollComparisonStatus = async (taskId: string) => {
-  const maxAttempts = 60;
-  let attempts = 0;
-
-  const poll = async (): Promise<any> => {
-    try {
-      const response = await $fetch(`/api/task/${taskId}`);
-
-      if (response.task.status === 'completed') {
-        return response.results;
-      }
-
-      if (response.task.status === 'failed') {
-        message.error('Comparison failed: ' + response.task.error);
-        return null;
-      }
-
-      attempts++;
-      if (attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        return poll();
-      }
-    } catch (error) {
-      console.error('Failed to poll comparison status:', error);
-    }
-    return null;
-  };
-
-  return poll();
-};
-
 const startPrediction = async () => {
-  if (!comparisonResults.value || !comparisonResults.value.bestModel) {
-    message.error('Please complete model comparison first');
+  if (!selectedBestModel.value) {
+    message.error('Please select a model from the tuning results first');
+    return;
+  }
+
+  if (predictionFileList.value.length === 0) {
+    message.error('Please upload prediction data');
     return;
   }
 
   isPredicting.value = true;
-  
+
   try {
     const formData = new FormData();
     formData.append('file', predictionFileList.value[0].originFileObj);
-    formData.append('model', comparisonResults.value.bestModel);
+    formData.append('model', selectedBestModel.value);
+    formData.append('outputFile', `predictions_${Date.now()}.xlsx`);
 
     const response = await $fetch('/api/predict', {
       method: 'POST',
@@ -338,11 +257,17 @@ const startPrediction = async () => {
     });
 
     if (response.success) {
+      predictionTask.value = { taskId: response.taskId, status: 'running' };
       message.success('Prediction started');
-      predictionTask.value = { status: 'running' };
       
-      // Poll for results
-      await pollPredictionStatus(response.taskId);
+      const result = await pollTaskStatus(response.taskId);
+      if (result && result.task.status === 'completed') {
+        predictionTask.value.status = 'completed';
+        message.success('Prediction completed!');
+      } else if (result && result.task.status === 'failed') {
+        predictionTask.value.status = 'failed';
+        message.error('Prediction failed: ' + result.task.error);
+      }
     }
   } catch (error) {
     message.error('Failed to start prediction: ' + error.message);
@@ -351,31 +276,8 @@ const startPrediction = async () => {
   }
 };
 
-const pollPredictionStatus = async (taskId: string) => {
-  const maxAttempts = 60;
-  let attempts = 0;
-
-  const poll = async () => {
-    try {
-      const response = await $fetch(`/api/task/${taskId}`);
-      predictionTask.value = response.task;
-
-      if (response.task.status !== 'completed' && response.task.status !== 'failed') {
-        attempts++;
-        if (attempts < maxAttempts) {
-          setTimeout(poll, 5000);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to poll prediction status:', error);
-    }
-  };
-
-  return poll();
-};
-
 const nextStep = () => {
-  if (currentStep.value < 2) {
+  if (currentStep.value < 1) {
     currentStep.value++;
   }
 };
@@ -390,13 +292,17 @@ const reset = () => {
   currentStep.value = 0;
   trainingFileList.value = [];
   predictionFileList.value = [];
+  hasUploadedData.value = false;
   selectedModels.value = [];
   tuningStatus.value = {};
   tuningTasks.value = {};
-  uploadedFilePath.value = ''; // Clear uploaded file path
-  comparisonResults.value = null;
-  comparisonTaskId.value = null;
+  tuningResults.value = [];
+  uploadedFilePath.value = '';
+  isTuning.value = false;
+  isPredicting.value = false;
+  selectedBestModel.value = null;
   predictionTask.value = null;
   taskLogs.value = {};
+  activeLogTab.value = '';
 };
 </script>
