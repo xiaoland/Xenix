@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@iconify-json/mdi": "^1.2.3",
+    "@types/node": "^25.0.3",
     "@unocss/nuxt": "^66.5.10",
     "@unocss/preset-icons": "^66.5.10",
     "sass": "^1.97.0",
