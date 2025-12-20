@@ -25,6 +25,15 @@ except ImportError:
     HAS_DB = False
     print("Warning: Database utilities not available")
 
+# Import logging setup
+try:
+    from log_handler import setup_logger
+    HAS_LOGGING = True
+except ImportError:
+    HAS_LOGGING = False
+    import logging
+    print("Warning: Custom logging handler not available, using default")
+
 # Import ML libraries
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, BayesianRidge
@@ -196,13 +205,24 @@ def main():
     
     task_id = args.output_db
     
+    # Setup logger with trace ID
+    if HAS_LOGGING and task_id:
+        logger = setup_logger(__name__, task_id)
+    else:
+        import logging
+        logging.basicConfig(level=logging.INFO)
+        logger = logging.getLogger(__name__)
+    
     try:
+        logger.info(f"Starting hyperparameter tuning for {model_name}")
+        
         if task_id and HAS_DB:
             update_task_status(task_id, 'running')
         
         # Load data
-        print(f"Loading data from {args.input}")
+        logger.info(f"Loading training data from {args.input}")
         df = pd.read_excel(args.input)
+        logger.info(f"Data loaded: {len(df)} rows, {len(df.columns)} columns")
         
         # Import configuration
         from config import FEATURE_COLUMNS, TARGET_COLUMN
@@ -210,18 +230,22 @@ def main():
         # Define features and target
         X = df[FEATURE_COLUMNS]
         y = df[TARGET_COLUMN]
+        logger.info(f"Features: {FEATURE_COLUMNS}")
+        logger.info(f"Target: {TARGET_COLUMN}")
         
         # Train-test split
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, random_state=42
         )
+        logger.info(f"Train set: {len(X_train)} samples, Test set: {len(X_test)} samples")
         
         # Get model and parameter grid
-        print(f"Setting up {model_name} for hyperparameter tuning")
+        logger.info(f"Setting up {model_name} for hyperparameter tuning")
         base_model, param_grid = get_model_and_param_grid(model_name)
+        logger.info(f"Parameter grid: {param_grid}")
         
         # Grid search
-        print("Running grid search...")
+        logger.info("Starting GridSearchCV with 5-fold cross-validation")
         grid_search = GridSearchCV(
             estimator=base_model,
             param_grid=param_grid,
@@ -231,12 +255,15 @@ def main():
         )
         
         grid_search.fit(X_train, y_train)
+        logger.info("GridSearchCV completed")
         
         # Best parameters
         best_params = grid_search.best_params_
-        print(f"Best parameters: {best_params}")
+        logger.info(f"Best parameters found: {best_params}")
+        logger.info(f"Best CV score: {grid_search.best_score_}")
         
         # Evaluate on train and test
+        logger.info("Evaluating best model on train and test sets")
         best_model = grid_search.best_estimator_
         
         y_train_pred = best_model.predict(X_train)
@@ -251,26 +278,27 @@ def main():
             'r2_test': r2_score(y_test, y_test_pred)
         }
         
-        print("Metrics:")
+        logger.info("Model evaluation completed")
         for key, value in metrics.items():
-            print(f"  {key}: {value}")
+            logger.info(f"  {key}: {value:.4f}")
         
         # Save parameters to JSON
         json_filename = f"{model_name}_Params.json"
         with open(json_filename, 'w', encoding='utf-8') as f:
             json.dump(best_params, f, indent=4)
-        print(f"Parameters saved to {json_filename}")
+        logger.info(f"Parameters saved to {json_filename}")
         
         # Store in database
         if task_id and HAS_DB:
+            logger.info("Storing results in database")
             store_model_result(task_id, model_name, best_params, metrics)
             update_task_status(task_id, 'completed')
         
-        print("Tuning completed successfully!")
+        logger.info("Hyperparameter tuning completed successfully!")
         
     except Exception as e:
         error_msg = str(e)
-        print(f"Error during tuning: {error_msg}", file=sys.stderr)
+        logger.error(f"Error during tuning: {error_msg}", exc_info=True)
         
         if task_id and HAS_DB:
             update_task_status(task_id, 'failed', error_msg)

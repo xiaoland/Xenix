@@ -96,6 +96,71 @@
             </a-button>
           </div>
 
+          <!-- Task Logs Viewer -->
+          <div v-if="Object.keys(tuningTasks).length > 0 || comparisonTaskId" class="mt-6">
+            <h3 class="text-lg font-medium mb-3">Task Logs</h3>
+            <a-tabs v-model:activeKey="activeLogTab">
+              <a-tab-pane 
+                v-for="(taskId, modelName) in tuningTasks"
+                :key="taskId"
+                :tab="modelName"
+              >
+                <div class="bg-gray-900 rounded-lg p-4 max-h-96 overflow-y-auto">
+                  <div v-if="taskLogs[taskId] && taskLogs[taskId].length > 0">
+                    <div 
+                      v-for="log in taskLogs[taskId]" 
+                      :key="log.id"
+                      class="mb-2 font-mono text-sm"
+                      :class="{
+                        'text-gray-400': log.severity === 'DEBUG',
+                        'text-white': log.severity === 'INFO',
+                        'text-yellow-400': log.severity === 'WARNING',
+                        'text-red-400': log.severity === 'ERROR',
+                        'text-red-600': log.severity === 'CRITICAL'
+                      }"
+                    >
+                      <span class="text-gray-500">[{{ formatTimestamp(log.timestamp) }}]</span>
+                      <span class="font-bold ml-2">[{{ log.severity }}]</span>
+                      <span class="ml-2">{{ log.message }}</span>
+                    </div>
+                  </div>
+                  <div v-else class="text-gray-500 text-center py-4">
+                    No logs available yet...
+                  </div>
+                </div>
+              </a-tab-pane>
+              <a-tab-pane 
+                v-if="comparisonTaskId" 
+                key="comparison" 
+                tab="Comparison"
+              >
+                <div class="bg-gray-900 rounded-lg p-4 max-h-96 overflow-y-auto">
+                  <div v-if="taskLogs[comparisonTaskId] && taskLogs[comparisonTaskId].length > 0">
+                    <div 
+                      v-for="log in taskLogs[comparisonTaskId]" 
+                      :key="log.id"
+                      class="mb-2 font-mono text-sm"
+                      :class="{
+                        'text-gray-400': log.severity === 'DEBUG',
+                        'text-white': log.severity === 'INFO',
+                        'text-yellow-400': log.severity === 'WARNING',
+                        'text-red-400': log.severity === 'ERROR',
+                        'text-red-600': log.severity === 'CRITICAL'
+                      }"
+                    >
+                      <span class="text-gray-500">[{{ formatTimestamp(log.timestamp) }}]</span>
+                      <span class="font-bold ml-2">[{{ log.severity }}]</span>
+                      <span class="ml-2">{{ log.message }}</span>
+                    </div>
+                  </div>
+                  <div v-else class="text-gray-500 text-center py-4">
+                    No logs available yet...
+                  </div>
+                </div>
+              </a-tab-pane>
+            </a-tabs>
+          </div>
+
           <!-- Comparison Results -->
           <div v-if="comparisonResults" class="mt-6">
             <h3 class="text-lg font-medium mb-3">Model Comparison Results</h3>
@@ -223,6 +288,10 @@ const comparisonResults = ref<any>(null);
 const comparisonTaskId = ref<string | null>(null);
 const predictionTask = ref<any>(null);
 
+// Logs state
+const taskLogs = ref<Record<string, any[]>>({});
+const activeLogTab = ref<string>('');
+
 // Comparison table columns
 const comparisonColumns = [
   { title: 'Model', dataIndex: 'Model', key: 'Model' },
@@ -298,6 +367,49 @@ const getStatusColor = (status: string) => {
   }
 };
 
+const formatTimestamp = (timestamp: number) => {
+  // Convert nanoseconds to milliseconds
+  const date = new Date(timestamp / 1000000);
+  return date.toLocaleTimeString();
+};
+
+const fetchTaskLogs = async (taskId: string) => {
+  try {
+    const response = await $fetch(`/api/logs/${taskId}`);
+    if (response.success) {
+      // Reverse to show newest first
+      taskLogs.value[taskId] = response.logs.reverse();
+    }
+  } catch (error) {
+    console.error(`Failed to fetch logs for ${taskId}:`, error);
+  }
+};
+
+const pollTaskLogs = (taskId: string) => {
+  // Initial fetch
+  fetchTaskLogs(taskId);
+  
+  // Poll every 3 seconds
+  const interval = setInterval(async () => {
+    await fetchTaskLogs(taskId);
+    
+    // Stop polling if task is complete
+    const isComplete = Object.values(tuningStatus.value).every(
+      status => status === 'completed' || status === 'failed'
+    );
+    if (comparisonTaskId.value) {
+      const comparisonComplete = await $fetch(`/api/task/${comparisonTaskId.value}`)
+        .then(r => r.task.status === 'completed' || r.task.status === 'failed')
+        .catch(() => true);
+      if (isComplete && comparisonComplete) {
+        clearInterval(interval);
+      }
+    } else if (isComplete) {
+      clearInterval(interval);
+    }
+  }, 3000);
+};
+
 const startTuning = async () => {
   if (trainingFileList.value.length === 0) {
     message.error('Please upload training data first');
@@ -322,7 +434,9 @@ const startTuning = async () => {
       if (response.success) {
         tuningTasks.value[modelValue] = response.taskId;
         tuningStatus.value[modelValue] = 'running';
+        activeLogTab.value = response.taskId; // Set first task as active
         pollTaskStatus(response.taskId, modelValue);
+        pollTaskLogs(response.taskId); // Start polling logs
       }
     }
     
@@ -372,7 +486,11 @@ const startComparison = async () => {
 
     if (response.success) {
       comparisonTaskId.value = response.taskId;
+      activeLogTab.value = 'comparison'; // Switch to comparison tab
       message.success('Model comparison started');
+      
+      // Start polling logs for comparison task
+      pollTaskLogs(response.taskId);
       
       // Poll for results
       const result = await pollComparisonStatus(response.taskId);

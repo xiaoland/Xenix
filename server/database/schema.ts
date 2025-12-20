@@ -1,4 +1,4 @@
-import { pgTable, serial, text, varchar, timestamp, jsonb, integer } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, varchar, timestamp, jsonb, integer, bigint } from 'drizzle-orm/pg-core';
 
 export const tasks = pgTable('tasks', {
   id: serial('id').primaryKey(),
@@ -32,5 +32,20 @@ export const comparisonResults = pgTable('comparison_results', {
   taskId: varchar('task_id', { length: 255 }).notNull(),
   results: jsonb('results').notNull(), // array of model comparison results
   bestModel: varchar('best_model', { length: 100 }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// OpenTelemetry-compliant logs table
+export const logs = pgTable('logs', {
+  id: serial('id').primaryKey(),
+  timestamp: bigint('timestamp', { mode: 'number' }).notNull(), // Unix timestamp in nanoseconds
+  observedTimestamp: bigint('observed_timestamp', { mode: 'number' }).notNull(), // When log was observed
+  traceId: varchar('trace_id', { length: 255 }).notNull(), // task_id as trace ID
+  spanId: varchar('span_id', { length: 255 }), // Optional span ID
+  severityText: varchar('severity_text', { length: 20 }).notNull(), // DEBUG, INFO, WARNING, ERROR, CRITICAL
+  severityNumber: integer('severity_number').notNull(), // 1-24 per OpenTelemetry spec
+  body: text('body').notNull(), // Log message
+  resource: jsonb('resource'), // Resource attributes (e.g., service.name)
+  attributes: jsonb('attributes'), // Additional attributes
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });

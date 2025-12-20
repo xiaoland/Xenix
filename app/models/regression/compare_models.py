@@ -25,6 +25,15 @@ except ImportError:
     HAS_DB = False
     print("Warning: Database utilities not available")
 
+# Import logging setup
+try:
+    from log_handler import setup_logger
+    HAS_LOGGING = True
+except ImportError:
+    HAS_LOGGING = False
+    import logging
+    print("Warning: Custom logging handler not available, using default")
+
 # Import ML libraries
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, BayesianRidge
@@ -50,13 +59,17 @@ except ImportError:
     print("Warning: LightGBM not available. LightGBM model will be skipped.")
 
 
-def load_params(json_filename):
+def load_params(json_filename, logger=None):
     """Load params from JSON file; return empty dict if not found"""
     if os.path.exists(json_filename):
         with open(json_filename, "r", encoding="utf-8") as f:
             return json.load(f)
     else:
-        print(f"⚠️ JSON file not found, using default params: {json_filename}")
+        msg = f"⚠️ JSON file not found, using default params: {json_filename}"
+        if logger:
+            logger.warning(msg)
+        else:
+            print(msg)
         return {}
 
 
@@ -82,7 +95,17 @@ def main():
     args = parser.parse_args()
     task_id = args.output_db
     
+    # Setup logger with trace ID
+    if HAS_LOGGING and task_id:
+        logger = setup_logger(__name__, task_id)
+    else:
+        import logging
+        logging.basicConfig(level=logging.INFO)
+        logger = logging.getLogger(__name__)
+    
     try:
+        logger.info("Starting model comparison")
+        
         if task_id and HAS_DB:
             update_task_status(task_id, 'running')
         
@@ -103,11 +126,13 @@ def main():
         }
         
         # Load all JSON parameter files
-        model_params = {name: load_params(path) for name, path in json_files.items()}
+        logger.info("Loading model parameters from JSON files")
+        model_params = {name: load_params(path, logger) for name, path in json_files.items()}
         
         # Read data
-        print(f"Loading data from {args.input}")
+        logger.info(f"Loading training data from {args.input}")
         df = pd.read_excel(args.input)
+        logger.info(f"Data loaded: {len(df)} rows")
         
         # Import configuration
         from config import FEATURE_COLUMNS, TARGET_COLUMN
@@ -240,17 +265,19 @@ def main():
         models["PolynomialRegression"] = poly_model
         
         # Train & evaluate models
+        logger.info(f"Building {len(models)} models for comparison")
         results = []
         
         for name, model in models.items():
-            print(f"\nTraining model: {name} ...")
+            logger.info(f"Training model: {name}")
             try:
                 model.fit(X_train, y_train)
+                logger.info(f"{name} training completed")
                 
                 y_train_pred = model.predict(X_train)
                 y_test_pred = model.predict(X_test)
                 
-                results.append({
+                result = {
                     "Model": name,
                     "MSE_train": float(mean_squared_error(y_train, y_train_pred)),
                     "MAE_train": float(mean_absolute_error(y_train, y_train_pred)),
@@ -258,9 +285,11 @@ def main():
                     "MSE_test": float(mean_squared_error(y_test, y_test_pred)),
                     "MAE_test": float(mean_absolute_error(y_test, y_test_pred)),
                     "R2_test": float(r2_score(y_test, y_test_pred))
-                })
+                }
+                results.append(result)
+                logger.info(f"{name} - R²_test: {result['R2_test']:.4f}")
             except Exception as e:
-                print(f"Failed to train {name}: {e}")
+                logger.warning(f"Failed to train {name}: {e}")
         
         # Sort by R2_test (descending)
         results.sort(key=lambda x: x["R2_test"], reverse=True)
@@ -268,29 +297,30 @@ def main():
         # Best model
         best_model = results[0]["Model"] if results else None
         
-        print("\n=== Regression Models Comparison ===")
+        logger.info("=== Regression Models Comparison ===")
         for result in results:
-            print(f"{result['Model']}: R2_test={result['R2_test']:.4f}")
+            logger.info(f"{result['Model']}: R²_test={result['R2_test']:.4f}")
         
         if best_model:
-            print(f"\nBest Model: {best_model}")
+            logger.info(f"Best Model: {best_model}")
         
         # Save to Excel
         results_df = pd.DataFrame(results)
         output_file = "Model_Comparison_Results.xlsx"
         results_df.to_excel(output_file, index=False)
-        print(f"\nResults saved to {output_file}")
+        logger.info(f"Results saved to {output_file}")
         
         # Store in database
         if task_id and HAS_DB:
+            logger.info("Storing comparison results in database")
             store_comparison_result(task_id, results, best_model)
             update_task_status(task_id, 'completed')
         
-        print("Comparison completed successfully!")
+        logger.info("Model comparison completed successfully!")
         
     except Exception as e:
         error_msg = str(e)
-        print(f"Error during comparison: {error_msg}", file=sys.stderr)
+        logger.error(f"Error during comparison: {error_msg}", exc_info=True)
         
         if task_id and HAS_DB:
             update_task_status(task_id, 'failed', error_msg)
