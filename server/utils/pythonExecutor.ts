@@ -187,15 +187,8 @@ async function handleStructuredOutput(output: StructuredOutput, taskId: string) 
         });
         break;
       
-      case 'comparison_result':
-        // Store comparison result (if needed for future use)
-        await db.insert(schema.comparisonResults).values({
-          taskId: taskId,
-          results: output.data.results,
-          bestModel: output.data.best_model,
-          createdAt: new Date()
-        });
-        break;
+      // Note: comparison_result is deprecated (no longer used)
+      // Evaluation metrics are now stored directly from tuning
         
       case 'prediction_result':
         // Log prediction completion (file already saved by Python script)

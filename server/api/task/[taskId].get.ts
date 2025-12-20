@@ -33,12 +33,8 @@ export default defineEventHandler(async (event) => {
           .from(schema.modelResults)
           .where(eq(schema.modelResults.taskId, taskId));
         results = modelResults[0] || null;
-      } else if (task.type === 'comparison') {
-        const comparisonResults = await db.select()
-          .from(schema.comparisonResults)
-          .where(eq(schema.comparisonResults.taskId, taskId));
-        results = comparisonResults[0] || null;
       }
+      // Note: comparison type is deprecated (no longer used)
     }
 
     return {

@@ -18,7 +18,7 @@
           <UploadStep
             v-if="!hasUploadedData"
             v-model="trainingFileList"
-            @continue="handleUpload"
+            @continue="handleColumnSelection"
           />
 
           <!-- Training Section (shown after upload) -->
@@ -85,6 +85,8 @@ const tuningStatus = ref<Record<string, string>>({});
 const tuningTasks = ref<Record<string, string>>({});
 const tuningResults = ref<any[]>([]);
 const uploadedFilePath = ref<string>('');
+const selectedFeatureColumns = ref<string[]>([]);
+const selectedTargetColumn = ref<string>('');
 const isTuning = ref(false);
 const isPredicting = ref(false);
 const selectedBestModel = ref<string | null>(null);
@@ -120,14 +122,19 @@ const pollTaskLogs = (taskId: string) => {
   }, 3000);
 };
 
-const handleUpload = () => {
+const handleColumnSelection = ({ featureColumns, targetColumn }: { featureColumns: string[]; targetColumn: string }) => {
+  selectedFeatureColumns.value = featureColumns;
+  selectedTargetColumn.value = targetColumn;
   hasUploadedData.value = true;
+  message.success(`Ready to train with ${featureColumns.length} features`);
 };
 
 const resetUpload = () => {
   hasUploadedData.value = false;
   trainingFileList.value = [];
   selectedModels.value = [];
+  selectedFeatureColumns.value = [];
+  selectedTargetColumn.value = '';
   tuningStatus.value = {};
   tuningTasks.value = {};
   tuningResults.value = [];
@@ -140,6 +147,11 @@ const startTuning = async () => {
     return;
   }
 
+  if (selectedFeatureColumns.value.length === 0 || !selectedTargetColumn.value) {
+    message.error('Please select feature columns and target column');
+    return;
+  }
+
   isTuning.value = true;
   
   try {
@@ -149,6 +161,8 @@ const startTuning = async () => {
       const formData = new FormData();
       formData.append('file', trainingFileList.value[0].originFileObj);
       formData.append('model', modelValue);
+      formData.append('featureColumns', JSON.stringify(selectedFeatureColumns.value));
+      formData.append('targetColumn', selectedTargetColumn.value);
 
       const response = await $fetch('/api/upload', {
         method: 'POST',
@@ -263,6 +277,8 @@ const startPrediction = async () => {
     formData.append('model', selectedBestModel.value);
     formData.append('tuningTaskId', selectedModelTaskId);
     formData.append('trainingDataPath', uploadedFilePath.value);
+    formData.append('featureColumns', JSON.stringify(selectedFeatureColumns.value));
+    formData.append('targetColumn', selectedTargetColumn.value);
 
     const response = await $fetch('/api/predict', {
       method: 'POST',
@@ -309,6 +325,8 @@ const reset = () => {
   predictionFileList.value = [];
   hasUploadedData.value = false;
   selectedModels.value = [];
+  selectedFeatureColumns.value = [];
+  selectedTargetColumn.value = '';
   tuningStatus.value = {};
   tuningTasks.value = {};
   tuningResults.value = [];
