@@ -2,11 +2,13 @@
   <div class="min-h-screen bg-gray-50 py-8">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <PageHeader />
-      
+
       <div class="text-center mb-8">
-        <h1 class="text-4xl font-bold text-gray-900 mb-2">{{ $t('app.title') }}</h1>
+        <h1 class="text-4xl font-bold text-gray-900 mb-2">
+          {{ $t("app.title") }}
+        </h1>
         <p class="text-lg text-gray-600">
-          {{ $t('app.subtitle') }}
+          {{ $t("app.subtitle") }}
         </p>
       </div>
 
@@ -153,7 +155,7 @@ const handleColumnSelection = ({
   selectedTargetColumn.value = targetColumn;
   uploadedDatasetId.value = datasetId || "";
   hasUploadedData.value = true;
-  message.success(t('messages.readyToTrain', { count: featureColumns.length }));
+  message.success(t("messages.readyToTrain", { count: featureColumns.length }));
 };
 
 const resetUpload = () => {
@@ -171,7 +173,7 @@ const resetUpload = () => {
 
 const startTuning = async () => {
   if (!uploadedDatasetId.value && trainingFileList.value.length === 0) {
-    message.error(t('messages.uploadError'));
+    message.error(t("messages.uploadError"));
     return;
   }
 
@@ -179,7 +181,7 @@ const startTuning = async () => {
     selectedFeatureColumns.value.length === 0 ||
     !selectedTargetColumn.value
   ) {
-    message.error(t('messages.columnSelectionError'));
+    message.error(t("messages.columnSelectionError"));
     return;
   }
 
@@ -188,47 +190,47 @@ const startTuning = async () => {
   try {
     // If uploading a new file, first register it as a dataset
     let datasetIdToUse = uploadedDatasetId.value;
-    
+
     if (!uploadedDatasetId.value && trainingFileList.value.length > 0) {
       // Auto-register the uploaded file as a dataset
       const file = trainingFileList.value[0].originFileObj;
       const timestamp = Date.now();
       const datasetName = `Training Data - ${new Date().toLocaleString()}`;
-      
+
       const datasetFormData = new FormData();
-      datasetFormData.append('file', file);
-      datasetFormData.append('name', datasetName);
-      datasetFormData.append('description', 'Auto-registered during training');
-      
+      datasetFormData.append("file", file);
+      datasetFormData.append("name", datasetName);
+      datasetFormData.append("description", "Auto-registered during training");
+
       try {
-        const datasetResponse = await $fetch('/api/data', {
-          method: 'POST',
+        const datasetResponse = await $fetch("/api/data", {
+          method: "POST",
           body: datasetFormData,
         });
-        
+
         if (datasetResponse.success) {
           datasetIdToUse = datasetResponse.dataset.datasetId;
           uploadedDatasetId.value = datasetIdToUse;
-          message.success('Training data registered as reusable dataset');
+          message.success("Training data registered as reusable dataset");
         }
       } catch (error) {
-        console.error('Failed to register dataset:', error);
+        console.error("Failed to register dataset:", error);
         // Continue with file upload if dataset registration fails
       }
     }
-    
+
     for (const modelValue of selectedModels.value) {
       tuningStatus.value[modelValue] = "pending";
 
       const formData = new FormData();
-      
+
       // Use dataset ID if available, otherwise upload file
       if (datasetIdToUse) {
         formData.append("datasetId", datasetIdToUse);
       } else {
         formData.append("file", trainingFileList.value[0].originFileObj);
       }
-      
+
       formData.append("model", modelValue);
       formData.append(
         "featureColumns",
@@ -255,9 +257,9 @@ const startTuning = async () => {
       }
     }
 
-    message.success(t('messages.tuningStarted'));
+    message.success(t("messages.tuningStarted"));
   } catch (error) {
-    message.error(t('messages.tuningFailed') + ': ' + error.message);
+    message.error(t("messages.tuningFailed") + ": " + error.message);
   } finally {
     isTuning.value = false;
   }
@@ -265,7 +267,7 @@ const startTuning = async () => {
 
 const startSingleModelTuning = async (modelValue: string) => {
   if (!uploadedDatasetId.value && trainingFileList.value.length === 0) {
-    message.error(t('messages.uploadError'));
+    message.error(t("messages.uploadError"));
     return;
   }
 
@@ -273,7 +275,7 @@ const startSingleModelTuning = async (modelValue: string) => {
     selectedFeatureColumns.value.length === 0 ||
     !selectedTargetColumn.value
   ) {
-    message.error(t('messages.columnSelectionError'));
+    message.error(t("messages.columnSelectionError"));
     return;
   }
 
@@ -283,41 +285,41 @@ const startSingleModelTuning = async (modelValue: string) => {
   try {
     // If uploading a new file, first register it as a dataset
     let datasetIdToUse = uploadedDatasetId.value;
-    
+
     if (!uploadedDatasetId.value && trainingFileList.value.length > 0) {
       // Auto-register the uploaded file as a dataset
       const file = trainingFileList.value[0].originFileObj;
       const datasetName = `Training Data - ${new Date().toLocaleString()}`;
-      
+
       const datasetFormData = new FormData();
-      datasetFormData.append('file', file);
-      datasetFormData.append('name', datasetName);
-      datasetFormData.append('description', 'Auto-registered during training');
-      
+      datasetFormData.append("file", file);
+      datasetFormData.append("name", datasetName);
+      datasetFormData.append("description", "Auto-registered during training");
+
       try {
-        const datasetResponse = await $fetch('/api/data', {
-          method: 'POST',
+        const datasetResponse = await $fetch("/api/data", {
+          method: "POST",
           body: datasetFormData,
         });
-        
+
         if (datasetResponse.success) {
           datasetIdToUse = datasetResponse.dataset.datasetId;
           uploadedDatasetId.value = datasetIdToUse;
         }
       } catch (error) {
-        console.error('Failed to register dataset:', error);
+        console.error("Failed to register dataset:", error);
       }
     }
 
     const formData = new FormData();
-    
+
     // Use dataset ID if available, otherwise upload file
     if (datasetIdToUse) {
       formData.append("datasetId", datasetIdToUse);
     } else {
       formData.append("file", trainingFileList.value[0].originFileObj);
     }
-    
+
     formData.append("model", modelValue);
     formData.append(
       "featureColumns",
@@ -342,10 +344,10 @@ const startSingleModelTuning = async (modelValue: string) => {
       pollTaskStatus(response.taskId, modelValue);
       pollTaskLogs(response.taskId);
 
-      message.success(t('messages.tuningStarted'));
+      message.success(t("messages.tuningStarted"));
     }
   } catch (error) {
-    message.error(t('messages.tuningFailed') + ': ' + error.message);
+    message.error(t("messages.tuningFailed") + ": " + error.message);
     tuningStatus.value[modelValue] = "failed";
   } finally {
     isTuning.value = false;
@@ -423,24 +425,24 @@ const fetchTuningResults = async () => {
 
 const startPrediction = async () => {
   if (!selectedBestModel.value) {
-    message.error(t('messages.selectModelError'));
+    message.error(t("messages.selectModelError"));
     return;
   }
 
   if (predictionFileList.value.length === 0) {
-    message.error(t('messages.uploadPredictionError'));
+    message.error(t("messages.uploadPredictionError"));
     return;
   }
 
   if (!uploadedFilePath.value) {
-    message.error(t('messages.trainingPathError'));
+    message.error(t("messages.trainingPathError"));
     return;
   }
 
   // Find the task ID for the selected model
   const selectedModelTaskId = tuningTasks.value[selectedBestModel.value];
   if (!selectedModelTaskId) {
-    message.error(t('messages.tuningTaskError'));
+    message.error(t("messages.tuningTaskError"));
     return;
   }
 
@@ -465,7 +467,7 @@ const startPrediction = async () => {
 
     if (response.success) {
       predictionTask.value = { taskId: response.taskId, status: "running" };
-      message.success(t('messages.predictionStarted'));
+      message.success(t("messages.predictionStarted"));
 
       const result = await pollTaskStatus(response.taskId);
       console.log("Polling result:", result);
@@ -477,18 +479,20 @@ const startPrediction = async () => {
         predictionTask.value.taskId = result.task.taskId;
         console.log("Updated predictionTask:", predictionTask.value);
         message.success(
-          t('messages.predictionCompleted', { 
-            path: result.task.outputFile || response.outputFile 
+          t("messages.predictionCompleted", {
+            path: result.task.outputFile || response.outputFile,
           })
         );
       } else if (result && result.task.status === "failed") {
         predictionTask.value.status = "failed";
         predictionTask.value.error = result.task.error;
-        message.error(t('messages.predictionFailed', { error: result.task.error }));
+        message.error(
+          t("messages.predictionFailed", { error: result.task.error })
+        );
       }
     }
   } catch (error) {
-    message.error(t('messages.predictionError') + ': ' + error.message);
+    message.error(t("messages.predictionError") + ": " + error.message);
   } finally {
     isPredicting.value = false;
   }

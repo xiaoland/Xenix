@@ -6,6 +6,16 @@ export default defineNuxtConfig({
   devServer: {
     port: 3005,
   },
+  vite: {
+    optimizeDeps: {
+      include: ["xlsx"],
+    },
+  },
+  nitro: {
+    externals: {
+      inline: ["xlsx"],
+    },
+  },
   antd: {},
   i18n: {
     locales: [

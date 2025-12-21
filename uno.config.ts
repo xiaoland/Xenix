@@ -1,9 +1,9 @@
-import { defineConfig, presetWind3 } from "unocss";
+import { defineConfig, presetWind } from "unocss";
 import presetIcons from "@unocss/preset-icons";
 
 export default defineConfig({
   presets: [
-    presetWind3(),
+    presetWind(),
     presetIcons({
       collections: {
         mdi: () => import("@iconify-json/mdi").then((i) => i.default),
