@@ -22,14 +22,21 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+interface LocaleObject {
+  code: string;
+  name: string;
+  iso?: string;
+  file?: string;
+}
+
 const { locale, locales, setLocale } = useI18n();
 
-const availableLocales = computed(() => locales.value);
+const availableLocales = computed(() => locales.value as LocaleObject[]);
 
 const currentLocale = computed(() => locale.value);
 
 const currentLocaleName = computed(() => {
-  const current = availableLocales.value.find((l: any) => l.code === currentLocale.value);
+  const current = availableLocales.value.find((l) => l.code === currentLocale.value);
   return current?.name || currentLocale.value;
 });
 
