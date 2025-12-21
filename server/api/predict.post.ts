@@ -1,6 +1,6 @@
 import { db, schema } from '../database';
 import { generateTaskId, validateExcelFile, saveUploadedFile } from '../utils/taskUtils';
-import { predict } from '../utils/mlPipeline';
+import { predict } from '../business/mlPipeline';
 import { eq } from 'drizzle-orm';
 import path from 'path';
 

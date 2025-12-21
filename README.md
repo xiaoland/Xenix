@@ -71,7 +71,15 @@ cd Xenix
 ```bash
 # Install Node.js dependencies
 pnpm install
+```
 
+**Note:** Python dependencies (PDM and packages) are automatically installed on first use. The ML pipeline will:
+1. Check if PDM is installed, and install it if missing
+2. Check if Python dependencies are installed, and run `pdm install` if needed
+
+You can also manually install Python dependencies:
+
+```bash
 # Install PDM (Python package manager)
 pip install --user pdm
 
@@ -102,27 +110,6 @@ cp .env.example .env
 ```
 
 The default configuration connects to the local PostgreSQL instance started by Docker Compose.
-
-#### Python Execution Mode
-
-Xenix supports two modes for running Python ML scripts:
-
-- **Local Mode** (default): Runs Python scripts directly on your host machine
-  - Set `PYTHON_EXECUTION_MODE=local` in `.env`
-  - Requires Python 3.12 and dependencies installed locally
-  - Faster for development and small datasets
-
-- **Docker Mode**: Runs Python scripts in an isolated Docker container
-  - Set `PYTHON_EXECUTION_MODE=docker` in `.env`
-  - No local Python installation required
-  - Ensures consistent environment across different machines
-  - Better for production deployments
-
-To use **Docker mode**, build and start the Python ML container:
-
-```bash
-docker compose up -d python-ml
-```
 
 ### 5. Start the development server
 
@@ -193,16 +180,16 @@ Xenix/
 │   │   ├── task/[taskId].get.ts # Task status polling
 │   │   ├── results/[taskId].get.ts # Fetch model metrics
 │   │   └── logs/[taskId].get.ts # Fetch task logs
+│   ├── business/                # Core business logic
+│   │   └── mlPipeline.ts        # ML operations (tune, predict) with auto PDM setup
 │   ├── database/
 │   │   ├── schema.ts            # Database schema (tasks, model_results, logs)
 │   │   ├── index.ts             # Database client
 │   │   └── migrations/          # SQL migrations
 │   └── utils/
 │       ├── taskUtils.ts         # Task utilities
-│       ├── pythonExecutor.ts    # Python process manager & JSON parser
-│       └── mlPipeline.ts        # High-level ML wrappers (tune, predict)
-├── docker-compose.yml           # PostgreSQL & Python ML containers
-├── Dockerfile.python            # Python ML Docker image
+│       └── pythonExecutor.ts    # Python process manager & JSON parser
+├── docker-compose.yml           # PostgreSQL container
 ├── drizzle.config.ts            # DrizzleORM configuration
 ├── pyproject.toml               # Python dependencies
 └── package.json                 # Node.js dependencies
@@ -341,60 +328,6 @@ cp .env.example .env
 Available variables:
 - `DATABASE_URL` - PostgreSQL connection string (required)
 - `PYTHON_EXECUTABLE` - Python command to use (default: `python3`)
-- `PYTHON_EXECUTION_MODE` - Execution mode for Python scripts: `local` or `docker` (default: `local`)
-- `PYTHON_CONTAINER_NAME` - Docker container name for Python ML execution (default: `xenix-python-ml`, only used in Docker mode)
-
-## Architecture
-
-### ML Pipeline Wrapper Functions
-
-The application provides high-level TypeScript wrapper functions that abstract the Python ML execution:
-
-#### `tune(options: TuneOptions): Promise<void>`
-
-Performs hyperparameter tuning for a machine learning model.
-
-```typescript
-import { tune } from '~/server/utils/mlPipeline';
-
-await tune({
-  inputFile: '/path/to/training_data.xlsx',
-  model: 'Ridge',
-  featureColumns: ['feature1', 'feature2', 'feature3'],
-  targetColumn: 'target',
-  taskId: 'unique-task-id'
-});
-```
-
-#### `predict(options: PredictOptions): Promise<void>`
-
-Makes batch predictions using a trained model.
-
-```typescript
-import { predict } from '~/server/utils/mlPipeline';
-
-await predict({
-  trainingDataPath: '/path/to/training_data.xlsx',
-  predictionDataPath: '/path/to/prediction_data.xlsx',
-  outputPath: '/path/to/output.xlsx',
-  model: 'Ridge',
-  params: { 'model__alpha': 1.0 },
-  featureColumns: ['feature1', 'feature2', 'feature3'],
-  targetColumn: 'target',
-  taskId: 'unique-task-id'
-});
-```
-
-Both functions automatically detect the execution mode (`local` or `docker`) from the `PYTHON_EXECUTION_MODE` environment variable and execute the Python scripts accordingly.
-
-### Execution Flow
-
-1. **API Endpoint** receives request
-2. **Wrapper Function** (`tune` or `predict`) prepares configuration
-3. **Python Executor** determines execution mode and spawns process
-4. **Python Script** executes ML operations and outputs structured JSON
-5. **Result Handler** parses JSON and stores results in PostgreSQL
-6. **Client** polls for status updates and retrieves results
 
 ## Development
 
