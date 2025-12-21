@@ -8,23 +8,75 @@ export default defineEventHandler(async (event) => {
   try {
     const formData = await readFormData(event);
     const file = formData.get('file') as File;
+    const datasetId = formData.get('datasetId') as string;
     const model = formData.get('model') as string;
     const tuningTaskId = formData.get('tuningTaskId') as string;
     const trainingDataPath = formData.get('trainingDataPath') as string;
+    const trainingDatasetId = formData.get('trainingDatasetId') as string;
     const featureColumns = formData.get('featureColumns') as string; // JSON string
     const targetColumn = formData.get('targetColumn') as string;
 
-    if (!file) {
+    let inputFile: string;
+    let actualTrainingDataPath: string;
+
+    // Support both file upload and dataset reference for prediction data
+    if (datasetId) {
+      // Use existing dataset for prediction
+      const [dataset] = await db
+        .select()
+        .from(schema.datasets)
+        .where(eq(schema.datasets.datasetId, datasetId))
+        .limit(1);
+
+      if (!dataset) {
+        throw createError({
+          statusCode: 404,
+          message: 'Prediction dataset not found',
+        });
+      }
+
+      inputFile = dataset.filePath;
+    } else if (file) {
+      // Upload new file (backward compatibility)
+      if (!validateExcelFile(file.name)) {
+        throw createError({
+          statusCode: 400,
+          message: 'Invalid file type. Only Excel files (.xlsx, .xls) are allowed.',
+        });
+      }
+
+      const uploadDir = path.join(process.cwd(), 'uploads');
+      inputFile = await saveUploadedFile(file, uploadDir);
+    } else {
       throw createError({
         statusCode: 400,
-        message: 'No file uploaded',
+        message: 'Either file or datasetId is required for prediction data',
       });
     }
 
-    if (!validateExcelFile(file.name)) {
+    // Support dataset reference for training data
+    if (trainingDatasetId) {
+      const [dataset] = await db
+        .select()
+        .from(schema.datasets)
+        .where(eq(schema.datasets.datasetId, trainingDatasetId))
+        .limit(1);
+
+      if (!dataset) {
+        throw createError({
+          statusCode: 404,
+          message: 'Training dataset not found',
+        });
+      }
+
+      actualTrainingDataPath = dataset.filePath;
+    } else if (trainingDataPath) {
+      // Use provided training data path (backward compatibility)
+      actualTrainingDataPath = trainingDataPath;
+    } else {
       throw createError({
         statusCode: 400,
-        message: 'Invalid file type. Only Excel files (.xlsx, .xls) are allowed.',
+        message: 'Either trainingDataPath or trainingDatasetId is required',
       });
     }
 
@@ -39,13 +91,6 @@ export default defineEventHandler(async (event) => {
       throw createError({
         statusCode: 400,
         message: 'Tuning task ID is required (must select a trained model)',
-      });
-    }
-
-    if (!trainingDataPath) {
-      throw createError({
-        statusCode: 400,
-        message: 'Training data path is required',
       });
     }
 
@@ -70,10 +115,6 @@ export default defineEventHandler(async (event) => {
         message: 'Tuning results not found for the specified task ID',
       });
     }
-
-    // Save uploaded prediction file
-    const uploadDir = path.join(process.cwd(), 'uploads');
-    const inputFile = await saveUploadedFile(file, uploadDir);
     
     // Generate output file path
     const outputFile = inputFile.replace(/\.(xlsx|xls)$/i, '_predicted.xlsx');
@@ -96,7 +137,7 @@ export default defineEventHandler(async (event) => {
     
     // Prepare stdin data (includes params from database)
     const stdinData = {
-      trainingDataPath: trainingDataPath,
+      trainingDataPath: actualTrainingDataPath,
       predictionDataPath: inputFile,
       outputPath: outputFile,
       model: model,
