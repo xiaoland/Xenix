@@ -1,16 +1,16 @@
 <template>
   <div class="space-y-4">
-    <h2 class="text-2xl font-semibold mb-4">Make Predictions</h2>
+    <h2 class="text-2xl font-semibold mb-4">{{ t("prediction.title") }}</h2>
 
     <a-alert
       v-if="bestModel"
-      :message="`Best Model: ${bestModel}`"
+      :message="t('prediction.bestModel', { model: bestModel })"
       type="success"
       show-icon
-      class="mb-4"
     />
 
     <a-upload-dragger
+      class="mt-4"
       v-model:file-list="fileList"
       name="file"
       :before-upload="beforeUpload"
@@ -20,13 +20,14 @@
       <p class="ant-upload-drag-icon">
         <i class="i-mdi-file-table text-6xl text-green-500"></i>
       </p>
-      <p class="ant-upload-text">Upload data for prediction</p>
+      <p class="ant-upload-text">{{ t("prediction.uploadData") }}</p>
       <p class="ant-upload-hint">
-        The file should have the same features as the training data.
+        {{ t("prediction.uploadHint") }}
       </p>
     </a-upload-dragger>
 
     <a-button
+      class="mt-4"
       type="primary"
       size="large"
       block
@@ -35,7 +36,7 @@
       @click="$emit('predict')"
     >
       <i class="i-mdi-chart-line mr-2"></i>
-      Generate Predictions
+      {{ t("prediction.startPrediction") }}
     </a-button>
 
     <div v-if="predictionTask" class="mt-4">
@@ -50,13 +51,13 @@
         @click="downloadResults"
       >
         <i class="i-mdi-download mr-2"></i>
-        Download Prediction Results
+        {{ t("prediction.downloadResults") }}
       </a-button>
     </div>
 
     <div class="flex gap-4 mt-6">
-      <a-button @click="$emit('back')">Back</a-button>
-      <a-button @click="$emit('reset')">Start Over</a-button>
+      <a-button @click="$emit('back')">{{ t("prediction.back") }}</a-button>
+      <a-button @click="$emit('reset')">{{ t("prediction.reset") }}</a-button>
     </div>
   </div>
 </template>
@@ -65,6 +66,9 @@
 import { computed } from "vue";
 import type { UploadProps } from "ant-design-vue";
 import { message } from "ant-design-vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   bestModel: string | null;
@@ -85,15 +89,15 @@ const predictionMessage = computed(() => {
 
   switch (props.predictionTask.status) {
     case "pending":
-      return "Prediction task queued...";
+      return t("prediction.taskQueued");
     case "running":
-      return "Generating predictions...";
+      return t("prediction.generating");
     case "completed":
-      return "Predictions completed successfully!";
+      return t("prediction.completed");
     case "failed":
-      return `Prediction failed: ${
-        props.predictionTask.error || "Unknown error"
-      }`;
+      return t("prediction.failed", {
+        error: props.predictionTask.error || "Unknown error",
+      });
     default:
       return "";
   }
@@ -115,7 +119,7 @@ const predictionType = computed(() => {
 const beforeUpload: UploadProps["beforeUpload"] = (file) => {
   const isExcel = file.name.endsWith(".xlsx") || file.name.endsWith(".xls");
   if (!isExcel) {
-    message.error("You can only upload Excel files!");
+    message.error(t("prediction.excelOnly"));
   }
   return false; // Prevent auto upload
 };
@@ -133,7 +137,7 @@ const downloadResults = () => {
     link.click();
     document.body.removeChild(link);
 
-    message.success("Downloading prediction results...");
+    message.success(t("prediction.downloading"));
   }
 };
 </script>

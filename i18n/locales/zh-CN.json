@@ -17,29 +17,61 @@
     "title": "上传训练数据",
     "dragHint": "点击或拖拽文件上传训练数据",
     "hint": "支持Excel文件（.xlsx, .xls）。数据应包含特征和目标变量。",
-    "nextButton": "下一步：选择列"
+    "nextButton": "下一步：选择特征与目标"
   },
   "columns": {
-    "selectFeatures": "选择特征列",
-    "selectTarget": "选择目标列",
-    "back": "返回",
-    "confirm": "确认选择"
+    "title": "选择列",
+    "description": "选择用于训练的特征列以及目标（预测）列。",
+    "featureColumns": "特征列",
+    "featureDescription": "选择用作模型训练输入特征的列。",
+    "selectedFeatures": "已选择：{count} 列",
+    "targetColumn": "目标列",
+    "targetDescription": "选择您要预测的列（目标变量）。",
+    "targetSelected": "目标：{column}",
+    "backToUpload": "返回上传",
+    "featuresTag": "{count} 个特征",
+    "targetSetTag": "目标已设置",
+    "confirmSelection": "确认选择"
   },
   "training": {
+    "title": "模型训练",
+    "modelSelectionAndTuning": "模型选择与调整",
+    "back": "返回上传",
+    "continue": "前往预测",
+    "model": "模型",
+    "tuning": "调整",
+    "metrics": "指标",
+    "startTune": "开始调整",
+    "viewLogs": "查看日志",
     "selectModels": "选择要调整的模型",
     "startTuning": "开始超参数调整",
     "viewResults": "查看调整结果",
     "selectBest": "选择最佳模型",
-    "continue": "继续预测",
-    "back": "返回上传"
+    "selectBestForPrediction": "选择最佳模型进行预测",
+    "tuningResults": "调整结果",
+    "modelColumn": "模型",
+    "r2Test": "R² (测试)",
+    "mseTest": "MSE (测试)",
+    "maeTest": "MAE (测试)",
+    "statusColumn": "状态",
+    "selectModelInstruction": "从上方表格中选择一个模型用于预测",
+    "selectModelPlaceholder": "选择用于预测的模型"
   },
   "prediction": {
     "title": "进行预测",
-    "uploadData": "上传预测数据",
+    "bestModel": "基于模型：{model}",
+    "uploadData": "上传要预测的数据",
+    "uploadHint": "文件应与训练数据有相同的特征列。",
     "startPrediction": "开始预测",
-    "downloadResults": "下载结果",
-    "back": "返回训练",
-    "reset": "重新开始"
+    "downloadResults": "下载预测结果",
+    "back": "返回",
+    "reset": "重新开始",
+    "taskQueued": "预测任务已排队...",
+    "generating": "正在预测...",
+    "completed": "预测成功！",
+    "failed": "预测失败：{error}",
+    "excelOnly": "只能上传 Excel 文件！",
+    "downloading": "正在下载预测结果..."
   },
   "models": {
     "linearRegression": "线性回归",
@@ -77,14 +109,19 @@
     "readyToTrain": "准备使用 {count} 个特征进行训练"
   },
   "metrics": {
-    "mse": "均方误差",
-    "mae": "平均绝对误差",
+    "mse": "(MSE)均方误差",
+    "mae": "(MAE)平均绝对误差",
     "r2": "R²",
     "train": "训练",
     "test": "测试"
   },
   "logs": {
     "title": "任务日志",
+    "titleWithModel": "日志 - {model}",
+    "comparison": "比较",
     "noLogs": "无可用日志"
+  },
+  "common": {
+    "na": "不可用"
   }
 }

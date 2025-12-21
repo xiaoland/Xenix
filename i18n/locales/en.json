@@ -20,26 +20,56 @@
     "nextButton": "Next: Select Columns"
   },
   "columns": {
-    "selectFeatures": "Select Feature Columns",
-    "selectTarget": "Select Target Column",
-    "back": "Back",
-    "confirm": "Confirm Selection"
+    "title": "Select Columns",
+    "description": "Choose which columns to use as features for training and which one is the target (prediction) column.",
+    "featureColumns": "Feature Columns",
+    "featureDescription": "Select columns to use as input features for model training.",
+    "selectedFeatures": "Selected: {count} column(s)",
+    "targetColumn": "Target Column",
+    "targetDescription": "Select the column you want to predict (target variable).",
+    "targetSelected": "Target: {column}",
+    "backToUpload": "Back to Upload",
+    "featuresTag": "{count} Features",
+    "targetSetTag": "Target Set",
+    "confirmSelection": "Confirm Selection"
   },
   "training": {
+    "title": "Model Training",
+    "modelSelectionAndTuning": "Model Selection and Tuning",
+    "model": "Model",
+    "tuning": "Tuning",
+    "metrics": "Metrics",
+    "startTune": "Start Tune",
+    "viewLogs": "View Logs",
     "selectModels": "Select Models to Tune",
     "startTuning": "Start Hyperparameter Tuning",
     "viewResults": "View Tuning Results",
     "selectBest": "Select Best Model",
-    "continue": "Continue to Prediction",
-    "back": "Back to Upload"
+    "selectBestForPrediction": "Select Best Model for Prediction",
+    "tuningResults": "Tuning Results",
+    "modelColumn": "Model",
+    "r2Test": "R² (Test)",
+    "mseTest": "MSE (Test)",
+    "maeTest": "MAE (Test)",
+    "statusColumn": "Status",
+    "selectModelInstruction": "Select a model from the table above to use for predictions",
+    "selectModelPlaceholder": "Select model for prediction"
   },
   "prediction": {
     "title": "Make Predictions",
-    "uploadData": "Upload Prediction Data",
-    "startPrediction": "Start Prediction",
-    "downloadResults": "Download Results",
-    "back": "Back to Training",
-    "reset": "Start Over"
+    "bestModel": "Best Model: {model}",
+    "uploadData": "Upload data for prediction",
+    "uploadHint": "The file should have the same features as the training data.",
+    "startPrediction": "Generate Predictions",
+    "downloadResults": "Download Prediction Results",
+    "back": "Back",
+    "reset": "Start Over",
+    "taskQueued": "Prediction task queued...",
+    "generating": "Generating predictions...",
+    "completed": "Predictions completed successfully!",
+    "failed": "Prediction failed: {error}",
+    "excelOnly": "You can only upload Excel files!",
+    "downloading": "Downloading prediction results..."
   },
   "models": {
     "linearRegression": "Linear Regression",
@@ -85,6 +115,11 @@
   },
   "logs": {
     "title": "Task Logs",
+    "titleWithModel": "Logs - {model}",
+    "comparison": "Comparison",
     "noLogs": "No logs available"
+  },
+  "common": {
+    "na": "N/A"
   }
 }

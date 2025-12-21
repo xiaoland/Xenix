@@ -1,6 +1,8 @@
 <template>
   <div>
-    <h3 class="text-lg font-medium mb-3">Model Selection and Tuning</h3>
+    <h3 class="text-lg font-medium mb-3">
+      {{ $t("training.modelSelectionAndTuning") }}
+    </h3>
     <a-table
       :dataSource="tableData"
       :columns="columns"
@@ -21,7 +23,7 @@
             @click="handleStartTune(record.model)"
           >
             <i class="i-mdi-tune mr-1"></i>
-            Start Tune
+            {{ t("training.startTune") }}
           </a-button>
           <a-button
             v-else
@@ -29,7 +31,7 @@
             @click="handleViewLogs(record.taskId, record.label)"
           >
             <i class="i-mdi-text-box-outline mr-1"></i>
-            View Logs
+            {{ t("training.viewLogs") }}
           </a-button>
           <a-tag
             v-if="record.status && record.status !== 'pending'"
@@ -42,19 +44,19 @@
         <template v-else-if="column.key === 'metrics'">
           <div v-if="record.metrics" class="text-sm">
             <div>
-              <span class="font-medium">R²:</span>
+              <span class="font-medium">{{ t("metrics.r2") }}:</span>
               {{ formatMetric(record.metrics.r2_test) }}
             </div>
             <div>
-              <span class="font-medium">MSE:</span>
+              <span class="font-medium">{{ t("metrics.mse") }}:</span>
               {{ formatMetric(record.metrics.mse_test) }}
             </div>
             <div>
-              <span class="font-medium">MAE:</span>
+              <span class="font-medium">{{ t("metrics.mae") }}:</span>
               {{ formatMetric(record.metrics.mae_test) }}
             </div>
           </div>
-          <span v-else class="text-gray-400">-</span>
+          <span v-else class="text-gray-400">{{ t("common.na") }}</span>
         </template>
       </template>
     </a-table>
@@ -62,7 +64,7 @@
     <!-- Log Viewer Modal -->
     <a-modal
       v-model:open="logModalVisible"
-      :title="`Logs - ${currentLogModelName}`"
+      :title="t('logs.titleWithModel', { model: currentLogModelName })"
       width="800px"
       :footer="null"
     >
@@ -73,6 +75,8 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   availableModels: Array<{ label: string; value: string }>;
@@ -92,11 +96,11 @@ const logModalVisible = ref(false);
 const currentLogTaskId = ref<string>("");
 const currentLogModelName = ref<string>("");
 
-const columns = [
-  { title: "Model", key: "model", dataIndex: "model" },
-  { title: "Tuning", key: "action", width: 280 },
-  { title: "Metrics", key: "metrics", width: 200 },
-];
+const columns = computed(() => [
+  { title: t("training.model"), key: "model", dataIndex: "model" },
+  { title: t("training.tuning"), key: "action", width: 280 },
+  { title: t("training.metrics"), key: "metrics", width: 320 },
+]);
 
 // Combine all data sources into a single table data structure
 const tableData = computed(() => {
@@ -126,7 +130,7 @@ const formatModelName = (name: string) => {
 };
 
 const formatMetric = (value: string | number) => {
-  if (!value) return "N/A";
+  if (!value) return t("common.na");
   const num = typeof value === "string" ? parseFloat(value) : value;
   return num.toFixed(4);
 };

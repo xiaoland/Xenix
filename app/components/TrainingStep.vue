@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-6">
-    <h2 class="text-2xl font-semibold mb-4">Model Training</h2>
+    <h2 class="text-2xl font-semibold mb-4">{{ $t("training.title") }}</h2>
 
     <!-- Integrated Model Tuning Table -->
     <ModelTuningTable
@@ -18,10 +18,12 @@
 
     <!-- Best Model Selection -->
     <div v-if="tuningResults.length > 0" class="mt-6">
-      <h3 class="text-lg font-medium mb-3">Select Best Model for Prediction</h3>
+      <h3 class="text-lg font-medium mb-3">
+        {{ $t("training.selectBestForPrediction") }}
+      </h3>
       <a-select
         v-model:value="localSelectedBestModel"
-        placeholder="Select a model for prediction"
+        :placeholder="$t('training.selectModelPlaceholder')"
         class="w-full max-w-md"
         :dropdownMatchSelectWidth="false"
       >
@@ -38,13 +40,13 @@
 
     <!-- Navigation -->
     <div class="flex gap-4 mt-6">
-      <a-button @click="emit('back')">Back to Upload</a-button>
+      <a-button @click="emit('back')">{{ $t("training.back") }}</a-button>
       <a-button
         type="primary"
         :disabled="!localSelectedBestModel"
         @click="emit('continue')"
       >
-        Continue to Prediction
+        {{ $t("training.continue") }}
       </a-button>
     </div>
   </div>

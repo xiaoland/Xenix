@@ -1,8 +1,8 @@
 <template>
   <div class="space-y-4">
     <a-alert
-      message="Select Columns"
-      description="Choose which columns to use as features for training and which one is the target (prediction) column."
+      :message="$t('columns.title')"
+      :description="$t('columns.description')"
       type="info"
       show-icon
       class="mb-4"
@@ -13,13 +13,13 @@
       <div>
         <h3 class="text-lg font-semibold mb-3 flex items-center">
           <i class="i-mdi-table-column text-blue-500 mr-2"></i>
-          Feature Columns
+          {{ $t("columns.featureColumns") }}
         </h3>
         <p class="text-sm text-gray-600 mb-3">
-          Select columns to use as input features for model training.
+          {{ $t("columns.featureDescription") }}
         </p>
-        <a-checkbox-group 
-          v-model:value="localFeatureColumns" 
+        <a-checkbox-group
+          v-model:value="localFeatureColumns"
           class="w-full"
           @change="handleFeatureColumnsChange"
         >
@@ -36,7 +36,11 @@
           </div>
         </a-checkbox-group>
         <div class="mt-3 text-sm text-gray-500">
-          Selected: {{ localFeatureColumns.length }} column(s)
+          {{
+            $t("columns.selectedFeatures", {
+              count: localFeatureColumns.length,
+            })
+          }}
         </div>
       </div>
 
@@ -44,13 +48,13 @@
       <div>
         <h3 class="text-lg font-semibold mb-3 flex items-center">
           <i class="i-mdi-target text-green-500 mr-2"></i>
-          Target Column
+          {{ $t("columns.targetColumn") }}
         </h3>
         <p class="text-sm text-gray-600 mb-3">
-          Select the column you want to predict (target variable).
+          {{ $t("columns.targetDescription") }}
         </p>
-        <a-radio-group 
-          v-model:value="localTargetColumn" 
+        <a-radio-group
+          v-model:value="localTargetColumn"
           class="w-full"
           @change="handleTargetColumnChange"
         >
@@ -68,7 +72,7 @@
         </a-radio-group>
         <div v-if="localTargetColumn" class="mt-3 text-sm text-green-600">
           <i class="i-mdi-check-circle mr-1"></i>
-          Target: <span class="font-mono">{{ localTargetColumn }}</span>
+          {{ $t("columns.targetSelected", { column: localTargetColumn }) }}
         </div>
       </div>
     </div>
@@ -78,24 +82,29 @@
     <div class="flex justify-between items-center">
       <a-button @click="$emit('back')">
         <i class="i-mdi-arrow-left mr-1"></i>
-        Back to Upload
+        {{ $t("columns.backToUpload") }}
       </a-button>
-      
+
       <a-space>
         <a-tag v-if="localFeatureColumns.length > 0" color="blue">
-          {{ localFeatureColumns.length }} Features
+          {{ $t("columns.featuresTag", { count: localFeatureColumns.length }) }}
         </a-tag>
         <a-tag v-if="localTargetColumn" color="green">
-          Target Set
+          {{ $t("columns.targetSetTag") }}
         </a-tag>
       </a-space>
 
-      <a-button 
+      <a-button
         type="primary"
         :disabled="!isValid"
-        @click="$emit('confirm', { featureColumns: localFeatureColumns, targetColumn: localTargetColumn })"
+        @click="
+          $emit('confirm', {
+            featureColumns: localFeatureColumns,
+            targetColumn: localTargetColumn,
+          })
+        "
       >
-        Confirm Selection
+        {{ $t("columns.confirmSelection") }}
         <i class="i-mdi-arrow-right ml-1"></i>
       </a-button>
     </div>
@@ -103,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch } from "vue";
 
 const props = defineProps<{
   columns: string[];
@@ -122,33 +131,50 @@ const localTargetColumn = ref<string | undefined>(props.targetColumn);
 const availableColumns = computed(() => props.columns);
 
 const isValid = computed(() => {
-  return localFeatureColumns.value.length > 0 && localTargetColumn.value !== undefined;
+  return (
+    localFeatureColumns.value.length > 0 &&
+    localTargetColumn.value !== undefined
+  );
 });
 
 const handleFeatureColumnsChange = () => {
   // If target column is selected in features, deselect it
-  if (localTargetColumn.value && localFeatureColumns.value.includes(localTargetColumn.value)) {
+  if (
+    localTargetColumn.value &&
+    localFeatureColumns.value.includes(localTargetColumn.value)
+  ) {
     localTargetColumn.value = undefined;
   }
 };
 
 const handleTargetColumnChange = () => {
   // If target column was in features, remove it
-  if (localTargetColumn.value && localFeatureColumns.value.includes(localTargetColumn.value)) {
-    localFeatureColumns.value = localFeatureColumns.value.filter(c => c !== localTargetColumn.value);
+  if (
+    localTargetColumn.value &&
+    localFeatureColumns.value.includes(localTargetColumn.value)
+  ) {
+    localFeatureColumns.value = localFeatureColumns.value.filter(
+      (c) => c !== localTargetColumn.value
+    );
   }
 };
 
 // Watch for prop changes
-watch(() => props.columns, () => {
-  // Reset selections if columns change
-  if (localFeatureColumns.value.some(col => !props.columns.includes(col))) {
-    localFeatureColumns.value = [];
+watch(
+  () => props.columns,
+  () => {
+    // Reset selections if columns change
+    if (localFeatureColumns.value.some((col) => !props.columns.includes(col))) {
+      localFeatureColumns.value = [];
+    }
+    if (
+      localTargetColumn.value &&
+      !props.columns.includes(localTargetColumn.value)
+    ) {
+      localTargetColumn.value = undefined;
+    }
   }
-  if (localTargetColumn.value && !props.columns.includes(localTargetColumn.value)) {
-    localTargetColumn.value = undefined;
-  }
-});
+);
 </script>
 
 <style scoped>
