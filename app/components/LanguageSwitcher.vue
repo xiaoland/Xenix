@@ -21,9 +21,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useI18n } from 'vue-i18n';
 
-const { locale, locales } = useI18n();
+const { locale, locales, setLocale } = useI18n();
 
 const availableLocales = computed(() => locales.value);
 
@@ -34,7 +33,7 @@ const currentLocaleName = computed(() => {
   return current?.name || currentLocale.value;
 });
 
-const handleLocaleChange = ({ key }: { key: string }) => {
-  locale.value = key;
+const handleLocaleChange = async ({ key }: { key: string }) => {
+  await setLocale(key);
 };
 </script>

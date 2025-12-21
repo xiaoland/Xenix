@@ -13,11 +13,13 @@ export default defineNuxtConfig({
         code: "en",
         name: "English",
         file: "en.json",
+        iso: "en-US",
       },
       {
         code: "zh-CN",
         name: "简体中文",
         file: "zh-CN.json",
+        iso: "zh-CN",
       },
     ],
     lazy: true,
