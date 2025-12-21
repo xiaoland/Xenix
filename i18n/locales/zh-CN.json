@@ -123,5 +123,46 @@
   },
   "common": {
     "na": "不可用"
+  },
+  "navigation": {
+    "home": "首页",
+    "datasets": "数据集"
+  },
+  "datasets": {
+    "title": "数据集管理",
+    "subtitle": "管理并在多个任务中重用您的数据文件",
+    "uploadNew": "上传新数据集",
+    "name": "数据集名称",
+    "namePlaceholder": "为您的数据集输入一个描述性名称",
+    "description": "描述",
+    "descriptionPlaceholder": "可选描述",
+    "file": "数据文件",
+    "dragHint": "点击或拖拽 Excel 文件上传",
+    "hint": "支持 Excel 文件（.xlsx, .xls）",
+    "uploadButton": "上传数据集",
+    "availableDatasets": "可用数据集",
+    "refresh": "刷新",
+    "noDatasets": "暂无数据集。请在上方上传您的第一个数据集。",
+    "viewDetails": "查看详情",
+    "delete": "删除",
+    "deleteConfirm": "您确定要删除此数据集吗？",
+    "rows": "行",
+    "fileName": "文件",
+    "fileSize": "大小",
+    "columns": "列数",
+    "uploaded": "上传时间",
+    "datasetId": "数据集 ID",
+    "rowCount": "行数",
+    "columnsTitle": "可用列",
+    "invalidFileType": "只能上传 Excel 文件！",
+    "fetchError": "获取数据集失败",
+    "uploadSuccess": "数据集上传成功",
+    "uploadError": "数据集上传失败",
+    "deleteSuccess": "数据集删除成功",
+    "deleteError": "数据集删除失败",
+    "selectDataset": "从现有数据集中选择",
+    "selectDatasetPlaceholder": "选择数据集",
+    "useExistingDataset": "使用现有数据集",
+    "orUploadNew": "或上传新文件"
   }
 }

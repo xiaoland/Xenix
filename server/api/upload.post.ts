@@ -1,27 +1,54 @@
 import { db, schema } from '../database';
 import { generateTaskId, validateExcelFile, saveUploadedFile } from '../utils/taskUtils';
 import { executePythonTask } from '../utils/pythonExecutor';
+import { eq } from 'drizzle-orm';
 import path from 'path';
 
 export default defineEventHandler(async (event) => {
   try {
     const formData = await readFormData(event);
     const file = formData.get('file') as File;
+    const datasetId = formData.get('datasetId') as string;
     const model = formData.get('model') as string;
     const featureColumns = formData.get('featureColumns') as string; // JSON string
     const targetColumn = formData.get('targetColumn') as string;
 
-    if (!file) {
-      throw createError({
-        statusCode: 400,
-        message: 'No file uploaded',
-      });
-    }
+    let inputFile: string;
+    let usedDatasetId: string | null = null;
 
-    if (!validateExcelFile(file.name)) {
+    // Support both file upload and dataset reference
+    if (datasetId) {
+      // Use existing dataset
+      const [dataset] = await db
+        .select()
+        .from(schema.datasets)
+        .where(eq(schema.datasets.datasetId, datasetId))
+        .limit(1);
+
+      if (!dataset) {
+        throw createError({
+          statusCode: 404,
+          message: 'Dataset not found',
+        });
+      }
+
+      inputFile = dataset.filePath;
+      usedDatasetId = datasetId;
+    } else if (file) {
+      // Upload new file (backward compatibility)
+      if (!validateExcelFile(file.name)) {
+        throw createError({
+          statusCode: 400,
+          message: 'Invalid file type. Only Excel files (.xlsx, .xls) are allowed.',
+        });
+      }
+
+      const uploadDir = path.join(process.cwd(), 'uploads');
+      inputFile = await saveUploadedFile(file, uploadDir);
+    } else {
       throw createError({
         statusCode: 400,
-        message: 'Invalid file type. Only Excel files (.xlsx, .xls) are allowed.',
+        message: 'Either file or datasetId is required',
       });
     }
 
@@ -42,10 +69,6 @@ export default defineEventHandler(async (event) => {
     // Parse feature columns
     const parsedFeatureColumns = JSON.parse(featureColumns);
 
-    // Save uploaded file
-    const uploadDir = path.join(process.cwd(), 'uploads');
-    const inputFile = await saveUploadedFile(file, uploadDir);
-
     // Generate task ID
     const taskId = generateTaskId();
 
@@ -55,6 +78,7 @@ export default defineEventHandler(async (event) => {
       type: 'tuning',
       status: 'pending',
       model,
+      datasetId: usedDatasetId,
       inputFile,
     });
 

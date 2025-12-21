@@ -1,12 +1,28 @@
 import { pgTable, serial, text, varchar, timestamp, jsonb, integer, bigint } from 'drizzle-orm/pg-core';
 
+// Datasets table for data manager - stores uploaded data files for reuse
+export const datasets = pgTable('datasets', {
+  id: serial('id').primaryKey(),
+  datasetId: varchar('dataset_id', { length: 255 }).notNull().unique(),
+  name: varchar('name', { length: 255 }).notNull(), // User-friendly name
+  description: text('description'), // Optional description
+  filePath: text('file_path').notNull(), // Path to the uploaded file
+  fileName: varchar('file_name', { length: 255 }).notNull(), // Original filename
+  fileSize: bigint('file_size', { mode: 'number' }), // File size in bytes
+  columns: jsonb('columns'), // Array of column names from the dataset
+  rowCount: integer('row_count'), // Number of data rows (excluding header)
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 export const tasks = pgTable('tasks', {
   id: serial('id').primaryKey(),
   taskId: varchar('task_id', { length: 255 }).notNull().unique(),
   type: varchar('type', { length: 50 }).notNull(), // 'tuning', 'comparison', 'prediction'
   status: varchar('status', { length: 50 }).notNull().default('pending'), // 'pending', 'running', 'completed', 'failed'
   model: varchar('model', { length: 100 }), // model name for tuning
-  inputFile: text('input_file'),
+  datasetId: varchar('dataset_id', { length: 255 }), // Reference to dataset (for data manager)
+  inputFile: text('input_file'), // Direct file path (for backward compatibility)
   outputFile: text('output_file'),
   error: text('error'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
