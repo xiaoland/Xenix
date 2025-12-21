@@ -9,6 +9,7 @@ Xenix provides an interface for teachers and mid-small enterprises to analyze th
 ## Features
 
 - **2-Step Workflow**: Upload & Train → View Results & Predict
+- **Data Manager**: Upload and reuse datasets across multiple tasks without duplication
 - **Automated Hyperparameter Tuning**: GridSearchCV-based optimization for 12 regression models
 - **Evaluation Metrics Display**: Real-time display of MSE, MAE, and R² scores from tuning
 - **Background Task Processing**: Long-running tasks execute asynchronously with status polling
@@ -186,16 +187,49 @@ Xenix/
 
 ## API Endpoints
 
+### Data Manager
+
+#### POST /api/data
+Upload and register a dataset for reuse across tasks.
+
+**Request**: FormData with `file`, `name`, and optional `description` fields
+**Response**: `{ success: true, dataset: {...}, message: string }`
+
+#### GET /api/data
+List all available datasets.
+
+**Response**: `{ success: true, datasets: [...] }`
+
+#### GET /api/data/:id
+Get details of a specific dataset.
+
+**Response**: `{ success: true, dataset: {...} }`
+
+#### DELETE /api/data/:id
+Delete a dataset.
+
+**Response**: `{ success: true, message: string }`
+
+See [Data Manager Documentation](docs/data-manager.md) for detailed usage.
+
+### Training & Prediction
+
 ### POST /api/upload
 Upload training data and start hyperparameter tuning for a specific model.
 
-**Request**: FormData with `file` and `model` fields
+**Request**: FormData with either:
+- `file` and `model` fields (direct upload)
+- `datasetId` and `model` fields (use existing dataset)
+
 **Response**: `{ success: true, taskId: string, inputFile: string, message: string }`
 
 ### POST /api/predict
 Generate predictions using a selected model.
 
-**Request**: FormData with `file`, `model`, and `outputFile` fields
+**Request**: FormData with either:
+- `file`, `trainingDataPath`, `model`, and `outputFile` fields (direct upload)
+- `datasetId`, `trainingDatasetId`, `model`, and `tuningTaskId` fields (use datasets)
+
 **Response**: `{ success: true, taskId: string, message: string }`
 
 ### GET /api/task/:taskId
