@@ -73,6 +73,10 @@ export default defineEventHandler(async (event) => {
     };
   } catch (error) {
     console.error('Dataset upload error:', error);
+    // Re-throw createError objects directly
+    if (error && typeof error === 'object' && 'statusCode' in error) {
+      throw error;
+    }
     throw createError({
       statusCode: 500,
       message: error instanceof Error ? error.message : 'Failed to upload dataset',

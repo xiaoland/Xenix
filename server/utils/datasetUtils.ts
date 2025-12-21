@@ -28,7 +28,16 @@ export async function analyzeExcelFile(filePath: string): Promise<{
     throw new Error('Excel file contains no data rows (only header or empty)');
   }
   
-  const columns = Object.keys(data[0]);
+  const firstRow = data[0];
+  if (!firstRow || typeof firstRow !== 'object') {
+    throw new Error('Invalid Excel file format');
+  }
+  
+  const columns = Object.keys(firstRow);
+  if (columns.length === 0) {
+    throw new Error('Excel file has no columns');
+  }
+  
   const rowCount = data.length; // Number of data rows (excluding header)
   
   return { columns, rowCount };
