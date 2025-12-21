@@ -1,4 +1,5 @@
 import { db, schema } from '../../database';
+import { parseDatasetColumns } from '../../utils/datasetUtils';
 import { desc } from 'drizzle-orm';
 
 export default defineEventHandler(async (event) => {
@@ -9,12 +10,10 @@ export default defineEventHandler(async (event) => {
       .from(schema.datasets)
       .orderBy(desc(schema.datasets.createdAt));
 
-    // Parse JSON columns field for each dataset
+    // Parse columns field for each dataset using utility function
     const datasetsWithParsedColumns = datasets.map(dataset => ({
       ...dataset,
-      columns: typeof dataset.columns === 'string' 
-        ? JSON.parse(dataset.columns) 
-        : dataset.columns,
+      columns: parseDatasetColumns(dataset.columns),
     }));
 
     return {

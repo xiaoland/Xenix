@@ -9,8 +9,8 @@ export const datasets = pgTable('datasets', {
   filePath: text('file_path').notNull(), // Path to the uploaded file
   fileName: varchar('file_name', { length: 255 }).notNull(), // Original filename
   fileSize: bigint('file_size', { mode: 'number' }), // File size in bytes
-  columns: jsonb('columns'), // Array of column names
-  rowCount: integer('row_count'), // Number of rows
+  columns: jsonb('columns'), // Array of column names from the dataset
+  rowCount: integer('row_count'), // Number of data rows (excluding header)
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

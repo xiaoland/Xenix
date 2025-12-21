@@ -27,12 +27,13 @@ export default defineEventHandler(async (event) => {
       });
     }
 
-    // Delete the file from filesystem
+    // Delete the file from filesystem if it exists
     try {
+      await fs.access(dataset.filePath);
       await fs.unlink(dataset.filePath);
     } catch (fileError) {
-      console.warn('Failed to delete file:', fileError);
-      // Continue even if file deletion fails
+      // File doesn't exist or can't be accessed, continue with database deletion
+      console.warn('File not found or cannot be accessed:', fileError);
     }
 
     // Delete dataset record from database

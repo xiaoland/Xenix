@@ -46,7 +46,7 @@ export default defineEventHandler(async (event) => {
     // Generate dataset ID
     const datasetId = generateDatasetId();
 
-    // Create dataset record
+    // Create dataset record - store columns directly as JSONB
     await db.insert(schema.datasets).values({
       datasetId,
       name,
@@ -54,7 +54,7 @@ export default defineEventHandler(async (event) => {
       filePath,
       fileName: file.name,
       fileSize,
-      columns: JSON.stringify(columns),
+      columns: columns, // Store as JSONB directly
       rowCount,
     });
 

@@ -10,12 +10,33 @@ export async function analyzeExcelFile(filePath: string): Promise<{
   rowCount: number;
 }> {
   const workbook = XLSX.readFile(filePath);
+  
+  if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+    throw new Error('Excel file contains no sheets');
+  }
+  
   const firstSheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[firstSheetName];
+  
+  if (!worksheet) {
+    throw new Error('Unable to read worksheet');
+  }
+  
   const data = XLSX.utils.sheet_to_json(worksheet);
   
   const columns = data.length > 0 ? Object.keys(data[0]) : [];
-  const rowCount = data.length;
+  const rowCount = data.length; // Number of data rows (excluding header)
   
   return { columns, rowCount };
+}
+
+export function parseDatasetColumns(columns: any): string[] {
+  if (typeof columns === 'string') {
+    try {
+      return JSON.parse(columns);
+    } catch {
+      return [];
+    }
+  }
+  return Array.isArray(columns) ? columns : [];
 }
