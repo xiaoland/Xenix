@@ -118,10 +118,5 @@ export function getAvailableModels(): string[] {
   ];
 }
 
-/**
- * Get the current execution mode
- */
-export function getExecutionMode(): 'local' | 'docker' {
-  const mode = process.env.PYTHON_EXECUTION_MODE?.toLowerCase();
-  return mode === 'docker' ? 'docker' : 'local';
-}
+// Re-export getExecutionMode from pythonExecutor for convenience
+export { getExecutionMode } from './pythonExecutor';

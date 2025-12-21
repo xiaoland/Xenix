@@ -18,7 +18,7 @@ interface StructuredOutput {
 /**
  * Get the execution mode from environment variable
  */
-function getExecutionMode(): 'local' | 'docker' {
+export function getExecutionMode(): 'local' | 'docker' {
   const mode = process.env.PYTHON_EXECUTION_MODE?.toLowerCase();
   return mode === 'docker' ? 'docker' : 'local';
 }
@@ -87,12 +87,21 @@ function adjustPathsForDocker(data: any): any {
 
   const adjusted = { ...data };
   const pathKeys = ['inputFile', 'trainingDataPath', 'predictionDataPath', 'outputPath'];
+  const hostRoot = process.cwd();
+  const containerRoot = '/app';
   
   for (const key of pathKeys) {
     if (adjusted[key] && typeof adjusted[key] === 'string') {
-      // Convert host path to container path
-      // /home/runner/work/Xenix/Xenix/uploads/... -> /app/uploads/...
-      adjusted[key] = adjusted[key].replace(process.cwd(), '/app');
+      const originalPath = adjusted[key];
+      
+      // Only replace if the path starts with the host root
+      if (originalPath.startsWith(hostRoot)) {
+        // Convert host path to container path
+        adjusted[key] = originalPath.replace(hostRoot, containerRoot);
+      } else {
+        // Log warning if path doesn't match expected pattern
+        console.warn(`[Docker] Path ${key} does not start with expected root: ${originalPath}`);
+      }
     }
   }
 
