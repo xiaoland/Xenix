@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-4">
-    <h2 class="text-2xl font-semibold mb-4">Upload Training Data</h2>
+    <h2 class="text-2xl font-semibold mb-4">{{ $t('upload.title') }}</h2>
     
     <!-- File Upload Section -->
     <div v-if="!showColumnSelection">
@@ -14,9 +14,9 @@
         <p class="ant-upload-drag-icon">
           <i class="i-mdi-cloud-upload text-6xl text-blue-500"></i>
         </p>
-        <p class="ant-upload-text">Click or drag file to upload training data</p>
+        <p class="ant-upload-text">{{ $t('upload.dragHint') }}</p>
         <p class="ant-upload-hint">
-          Support for Excel files (.xlsx, .xls). Data should contain features and target variable.
+          {{ $t('upload.hint') }}
         </p>
       </a-upload-dragger>
 
@@ -28,7 +28,7 @@
         :loading="isLoadingColumns"
         @click="handleFileUploaded"
       >
-        Next: Select Columns
+        {{ $t('upload.nextButton') }}
       </a-button>
     </div>
 
