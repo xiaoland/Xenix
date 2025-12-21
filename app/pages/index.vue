@@ -1,9 +1,8 @@
 <template>
   <div class="min-h-screen bg-gray-50 py-8">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-end mb-4">
-        <LanguageSwitcher />
-      </div>
+      <PageHeader />
+      
       <div class="text-center mb-8">
         <h1 class="text-4xl font-bold text-gray-900 mb-2">{{ $t('app.title') }}</h1>
         <p class="text-lg text-gray-600">
@@ -103,6 +102,7 @@ const tuningStatus = ref<Record<string, string>>({});
 const tuningTasks = ref<Record<string, string>>({});
 const tuningResults = ref<any[]>([]);
 const uploadedFilePath = ref<string>("");
+const uploadedDatasetId = ref<string>("");
 const selectedFeatureColumns = ref<string[]>([]);
 const selectedTargetColumn = ref<string>("");
 const isTuning = ref(false);
@@ -143,12 +143,15 @@ const pollTaskLogs = (taskId: string) => {
 const handleColumnSelection = ({
   featureColumns,
   targetColumn,
+  datasetId,
 }: {
   featureColumns: string[];
   targetColumn: string;
+  datasetId?: string;
 }) => {
   selectedFeatureColumns.value = featureColumns;
   selectedTargetColumn.value = targetColumn;
+  uploadedDatasetId.value = datasetId || "";
   hasUploadedData.value = true;
   message.success(t('messages.readyToTrain', { count: featureColumns.length }));
 };
@@ -159,6 +162,7 @@ const resetUpload = () => {
   selectedModels.value = [];
   selectedFeatureColumns.value = [];
   selectedTargetColumn.value = "";
+  uploadedDatasetId.value = "";
   tuningStatus.value = {};
   tuningTasks.value = {};
   tuningResults.value = [];
@@ -166,7 +170,7 @@ const resetUpload = () => {
 };
 
 const startTuning = async () => {
-  if (trainingFileList.value.length === 0) {
+  if (!uploadedDatasetId.value && trainingFileList.value.length === 0) {
     message.error(t('messages.uploadError'));
     return;
   }
@@ -182,11 +186,49 @@ const startTuning = async () => {
   isTuning.value = true;
 
   try {
+    // If uploading a new file, first register it as a dataset
+    let datasetIdToUse = uploadedDatasetId.value;
+    
+    if (!uploadedDatasetId.value && trainingFileList.value.length > 0) {
+      // Auto-register the uploaded file as a dataset
+      const file = trainingFileList.value[0].originFileObj;
+      const timestamp = Date.now();
+      const datasetName = `Training Data - ${new Date().toLocaleString()}`;
+      
+      const datasetFormData = new FormData();
+      datasetFormData.append('file', file);
+      datasetFormData.append('name', datasetName);
+      datasetFormData.append('description', 'Auto-registered during training');
+      
+      try {
+        const datasetResponse = await $fetch('/api/data', {
+          method: 'POST',
+          body: datasetFormData,
+        });
+        
+        if (datasetResponse.success) {
+          datasetIdToUse = datasetResponse.dataset.datasetId;
+          uploadedDatasetId.value = datasetIdToUse;
+          message.success('Training data registered as reusable dataset');
+        }
+      } catch (error) {
+        console.error('Failed to register dataset:', error);
+        // Continue with file upload if dataset registration fails
+      }
+    }
+    
     for (const modelValue of selectedModels.value) {
       tuningStatus.value[modelValue] = "pending";
 
       const formData = new FormData();
-      formData.append("file", trainingFileList.value[0].originFileObj);
+      
+      // Use dataset ID if available, otherwise upload file
+      if (datasetIdToUse) {
+        formData.append("datasetId", datasetIdToUse);
+      } else {
+        formData.append("file", trainingFileList.value[0].originFileObj);
+      }
+      
       formData.append("model", modelValue);
       formData.append(
         "featureColumns",
@@ -222,7 +264,7 @@ const startTuning = async () => {
 };
 
 const startSingleModelTuning = async (modelValue: string) => {
-  if (trainingFileList.value.length === 0) {
+  if (!uploadedDatasetId.value && trainingFileList.value.length === 0) {
     message.error(t('messages.uploadError'));
     return;
   }
@@ -239,8 +281,43 @@ const startSingleModelTuning = async (modelValue: string) => {
   tuningStatus.value[modelValue] = "pending";
 
   try {
+    // If uploading a new file, first register it as a dataset
+    let datasetIdToUse = uploadedDatasetId.value;
+    
+    if (!uploadedDatasetId.value && trainingFileList.value.length > 0) {
+      // Auto-register the uploaded file as a dataset
+      const file = trainingFileList.value[0].originFileObj;
+      const datasetName = `Training Data - ${new Date().toLocaleString()}`;
+      
+      const datasetFormData = new FormData();
+      datasetFormData.append('file', file);
+      datasetFormData.append('name', datasetName);
+      datasetFormData.append('description', 'Auto-registered during training');
+      
+      try {
+        const datasetResponse = await $fetch('/api/data', {
+          method: 'POST',
+          body: datasetFormData,
+        });
+        
+        if (datasetResponse.success) {
+          datasetIdToUse = datasetResponse.dataset.datasetId;
+          uploadedDatasetId.value = datasetIdToUse;
+        }
+      } catch (error) {
+        console.error('Failed to register dataset:', error);
+      }
+    }
+
     const formData = new FormData();
-    formData.append("file", trainingFileList.value[0].originFileObj);
+    
+    // Use dataset ID if available, otherwise upload file
+    if (datasetIdToUse) {
+      formData.append("datasetId", datasetIdToUse);
+    } else {
+      formData.append("file", trainingFileList.value[0].originFileObj);
+    }
+    
     formData.append("model", modelValue);
     formData.append(
       "featureColumns",
@@ -437,6 +514,7 @@ const reset = () => {
   selectedModels.value = [];
   selectedFeatureColumns.value = [];
   selectedTargetColumn.value = "";
+  uploadedDatasetId.value = "";
   tuningStatus.value = {};
   tuningTasks.value = {};
   tuningResults.value = [];

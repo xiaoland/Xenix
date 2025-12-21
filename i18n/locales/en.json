@@ -121,5 +121,46 @@
   },
   "common": {
     "na": "N/A"
+  },
+  "navigation": {
+    "home": "Home",
+    "datasets": "Datasets"
+  },
+  "datasets": {
+    "title": "Dataset Manager",
+    "subtitle": "Manage and reuse your data files across multiple tasks",
+    "uploadNew": "Upload New Dataset",
+    "name": "Dataset Name",
+    "namePlaceholder": "Enter a descriptive name for your dataset",
+    "description": "Description",
+    "descriptionPlaceholder": "Optional description",
+    "file": "Data File",
+    "dragHint": "Click or drag Excel file to upload",
+    "hint": "Support for Excel files (.xlsx, .xls)",
+    "uploadButton": "Upload Dataset",
+    "availableDatasets": "Available Datasets",
+    "refresh": "Refresh",
+    "noDatasets": "No datasets available. Upload your first dataset above.",
+    "viewDetails": "View Details",
+    "delete": "Delete",
+    "deleteConfirm": "Are you sure you want to delete this dataset?",
+    "rows": "rows",
+    "fileName": "File",
+    "fileSize": "Size",
+    "columns": "Columns",
+    "uploaded": "Uploaded",
+    "datasetId": "Dataset ID",
+    "rowCount": "Row Count",
+    "columnsTitle": "Available Columns",
+    "invalidFileType": "You can only upload Excel files!",
+    "fetchError": "Failed to fetch datasets",
+    "uploadSuccess": "Dataset uploaded successfully",
+    "uploadError": "Failed to upload dataset",
+    "deleteSuccess": "Dataset deleted successfully",
+    "deleteError": "Failed to delete dataset",
+    "selectDataset": "Select from Existing Datasets",
+    "selectDatasetPlaceholder": "Choose a dataset",
+    "useExistingDataset": "Use Existing Dataset",
+    "orUploadNew": "Or upload a new file"
   }
 }
