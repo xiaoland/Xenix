@@ -1,6 +1,6 @@
 import { db, schema } from '../database';
 import { generateTaskId, validateExcelFile, saveUploadedFile } from '../utils/taskUtils';
-import { executePythonTask } from '../utils/pythonExecutor';
+import { tune } from '../utils/mlPipeline';
 import { eq } from 'drizzle-orm';
 import path from 'path';
 
@@ -82,24 +82,14 @@ export default defineEventHandler(async (event) => {
       inputFile,
     });
 
-    // Get Python script path for generic tuning script
-    const scriptPath = path.join(process.cwd(), 'app', 'models', 'regression', 'tune_model.py');
-    
-    // Prepare stdin data
-    const stdinData = {
-      inputFile: inputFile,
-      model: model,
-      featureColumns: parsedFeatureColumns,
-      targetColumn: targetColumn
-    };
-    
-    // Execute Python task in background
+    // Execute tuning task in background using high-level wrapper
     setImmediate(() => {
-      executePythonTask({
-        script: scriptPath,
-        stdinData: stdinData,
-        taskId,
-        cwd: path.join(process.cwd(), 'app', 'models', 'regression'),
+      tune({
+        inputFile,
+        model,
+        featureColumns: parsedFeatureColumns,
+        targetColumn,
+        taskId
       }).catch(error => {
         console.error(`Failed to execute task ${taskId}:`, error);
       });

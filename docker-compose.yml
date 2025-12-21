@@ -19,5 +19,19 @@ services:
       timeout: 5s
       retries: 5
 
+  python-ml:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: xenix-python-ml
+    restart: unless-stopped
+    volumes:
+      - ./uploads:/app/uploads
+      - ./app/models:/app/app/models
+    stdin_open: true
+    tty: false
+    # Keep container running for docker exec commands
+    command: tail -f /dev/null
+
 volumes:
   postgres_data:

@@ -15,8 +15,92 @@ interface StructuredOutput {
   data: any;
 }
 
+/**
+ * Get the execution mode from environment variable
+ */
+function getExecutionMode(): 'local' | 'docker' {
+  const mode = process.env.PYTHON_EXECUTION_MODE?.toLowerCase();
+  return mode === 'docker' ? 'docker' : 'local';
+}
+
+/**
+ * Execute Python task in local mode (direct Python execution)
+ */
+function executeLocalPython(options: PythonTaskOptions) {
+  const { script, stdinData, cwd } = options;
+  const pythonCmd = process.env.PYTHON_EXECUTABLE || 'python3';
+  
+  const pythonProcess = spawn(pythonCmd, [script], {
+    cwd: cwd || process.cwd(),
+    env: process.env,
+  });
+
+  // Write JSON data to stdin
+  if (stdinData) {
+    pythonProcess.stdin.write(JSON.stringify(stdinData));
+    pythonProcess.stdin.end();
+  }
+
+  return pythonProcess;
+}
+
+/**
+ * Execute Python task in Docker mode (run Python in Docker container)
+ */
+function executeDockerPython(options: PythonTaskOptions) {
+  const { script, stdinData, cwd } = options;
+  
+  // Convert absolute path to container path
+  // Assuming script is in /app/models/regression/script.py format
+  const scriptInContainer = script.replace(process.cwd(), '/app');
+  
+  // Use docker exec to run Python script in the running container
+  const dockerProcess = spawn('docker', [
+    'exec',
+    '-i', // Keep stdin open
+    'xenix-python-ml',
+    'pdm', 'run', 'python3',
+    scriptInContainer
+  ], {
+    cwd: cwd || process.cwd(),
+    env: process.env,
+  });
+
+  // Write JSON data to stdin
+  if (stdinData) {
+    // Need to adjust file paths in stdinData to container paths
+    const adjustedData = adjustPathsForDocker(stdinData);
+    dockerProcess.stdin.write(JSON.stringify(adjustedData));
+    dockerProcess.stdin.end();
+  }
+
+  return dockerProcess;
+}
+
+/**
+ * Adjust file paths in data object for Docker container
+ */
+function adjustPathsForDocker(data: any): any {
+  if (!data || typeof data !== 'object') {
+    return data;
+  }
+
+  const adjusted = { ...data };
+  const pathKeys = ['inputFile', 'trainingDataPath', 'predictionDataPath', 'outputPath'];
+  
+  for (const key of pathKeys) {
+    if (adjusted[key] && typeof adjusted[key] === 'string') {
+      // Convert host path to container path
+      // /home/runner/work/Xenix/Xenix/uploads/... -> /app/uploads/...
+      adjusted[key] = adjusted[key].replace(process.cwd(), '/app');
+    }
+  }
+
+  return adjusted;
+}
+
 export async function executePythonTask(options: PythonTaskOptions): Promise<void> {
-  const { script, stdinData, taskId, cwd } = options;
+  const { taskId } = options;
   
   let taskCompleted = false; // Flag to prevent race conditions
   
@@ -29,20 +113,14 @@ export async function executePythonTask(options: PythonTaskOptions): Promise<voi
       })
       .where(eq(schema.tasks.taskId, taskId));
 
-    // Use python3 explicitly or from environment variable
-    const pythonCmd = process.env.PYTHON_EXECUTABLE || 'python3';
-    
-    // Execute Python script (no CLI args, use stdin instead)
-    const pythonProcess = spawn(pythonCmd, [script], {
-      cwd: cwd || process.cwd(),
-      env: process.env,
-    });
+    // Determine execution mode
+    const executionMode = getExecutionMode();
+    console.log(`[${taskId}] Execution mode: ${executionMode}`);
 
-    // Write JSON data to stdin
-    if (stdinData) {
-      pythonProcess.stdin.write(JSON.stringify(stdinData));
-      pythonProcess.stdin.end();
-    }
+    // Execute Python script based on mode
+    const pythonProcess = executionMode === 'docker' 
+      ? executeDockerPython(options)
+      : executeLocalPython(options);
 
     let stdoutBuffer = '';
     let stderrBuffer = '';

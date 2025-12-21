@@ -1,6 +1,6 @@
 import { db, schema } from '../database';
 import { generateTaskId, validateExcelFile, saveUploadedFile } from '../utils/taskUtils';
-import { executePythonTask } from '../utils/pythonExecutor';
+import { predict } from '../utils/mlPipeline';
 import { eq } from 'drizzle-orm';
 import path from 'path';
 
@@ -132,27 +132,17 @@ export default defineEventHandler(async (event) => {
       outputFile,
     });
 
-    // Get Python script path for prediction
-    const scriptPath = path.join(process.cwd(), 'app', 'models', 'regression', 'predict.py');
-    
-    // Prepare stdin data (includes params from database)
-    const stdinData = {
-      trainingDataPath: actualTrainingDataPath,
-      predictionDataPath: inputFile,
-      outputPath: outputFile,
-      model: model,
-      params: modelResult.params, // Parameters from database (not from Python)
-      featureColumns: parsedFeatureColumns,
-      targetColumn: targetColumn
-    };
-    
-    // Execute Python task in background
+    // Execute prediction task in background using high-level wrapper
     setImmediate(() => {
-      executePythonTask({
-        script: scriptPath,
-        stdinData: stdinData,
-        taskId,
-        cwd: path.join(process.cwd(), 'app', 'models', 'regression'),
+      predict({
+        trainingDataPath: actualTrainingDataPath,
+        predictionDataPath: inputFile,
+        outputPath: outputFile,
+        model,
+        params: modelResult.params,
+        featureColumns: parsedFeatureColumns,
+        targetColumn,
+        taskId
       }).catch(error => {
         console.error(`Failed to execute task ${taskId}:`, error);
       });
