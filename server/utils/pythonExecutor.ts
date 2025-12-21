@@ -3,6 +3,9 @@ import path from 'path';
 import { db, schema } from '../database';
 import { eq } from 'drizzle-orm';
 
+// Constants for Docker configuration
+const CONTAINER_ROOT_PATH = '/app';
+
 export interface PythonTaskOptions {
   script: string;
   stdinData: any; // JSON data to pass via stdin
@@ -64,7 +67,7 @@ function executeDockerPython(options: PythonTaskOptions) {
   
   // Convert to container path using proper path operations
   const relativePath = path.relative(hostRoot, scriptPath);
-  const scriptInContainer = path.join('/app', relativePath).replace(/\\/g, '/'); // Normalize for Unix
+  const scriptInContainer = path.join(CONTAINER_ROOT_PATH, relativePath).replace(/\\/g, '/'); // Normalize for Unix
   
   // Use docker exec to run Python script in the running container
   const dockerProcess = spawn('docker', [
@@ -100,7 +103,6 @@ function adjustPathsForDocker(data: any): any {
   const adjusted = { ...data };
   const pathKeys = ['inputFile', 'trainingDataPath', 'predictionDataPath', 'outputPath'];
   const hostRoot = process.cwd();
-  const containerRoot = '/app';
   
   for (const key of pathKeys) {
     if (adjusted[key] && typeof adjusted[key] === 'string') {
@@ -110,7 +112,7 @@ function adjustPathsForDocker(data: any): any {
       if (originalPath.startsWith(hostRoot)) {
         // Convert host path to container path using proper path operations
         const relativePath = path.relative(hostRoot, originalPath);
-        adjusted[key] = path.join(containerRoot, relativePath).replace(/\\/g, '/'); // Normalize for Unix
+        adjusted[key] = path.join(CONTAINER_ROOT_PATH, relativePath).replace(/\\/g, '/'); // Normalize for Unix
       } else {
         // Log warning if path doesn't match expected pattern
         console.warn(`[Docker] Path ${key} does not start with expected root: ${originalPath}`);

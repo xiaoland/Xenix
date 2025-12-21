@@ -1,6 +1,23 @@
 import path from 'path';
 import { executePythonTask } from './pythonExecutor';
 
+// Constants for ML script paths
+const ML_MODELS_DIR = path.join('app', 'models', 'regression');
+
+/**
+ * Helper function to get script path
+ */
+function getScriptPath(scriptName: string): string {
+  return path.join(process.cwd(), ML_MODELS_DIR, scriptName);
+}
+
+/**
+ * Helper function to get working directory
+ */
+function getWorkingDirectory(): string {
+  return path.join(process.cwd(), ML_MODELS_DIR);
+}
+
 /**
  * Options for hyperparameter tuning
  */
@@ -36,9 +53,6 @@ export interface PredictOptions {
 export async function tune(options: TuneOptions): Promise<void> {
   const { inputFile, model, featureColumns, targetColumn, taskId } = options;
 
-  // Get Python script path for tuning
-  const scriptPath = path.join(process.cwd(), 'app', 'models', 'regression', 'tune_model.py');
-  
   // Prepare stdin data for Python script
   const stdinData = {
     inputFile,
@@ -49,10 +63,10 @@ export async function tune(options: TuneOptions): Promise<void> {
   
   // Execute Python task (mode is determined automatically by pythonExecutor)
   await executePythonTask({
-    script: scriptPath,
+    script: getScriptPath('tune_model.py'),
     stdinData,
     taskId,
-    cwd: path.join(process.cwd(), 'app', 'models', 'regression'),
+    cwd: getWorkingDirectory(),
   });
 }
 
@@ -75,9 +89,6 @@ export async function predict(options: PredictOptions): Promise<void> {
     taskId
   } = options;
 
-  // Get Python script path for prediction
-  const scriptPath = path.join(process.cwd(), 'app', 'models', 'regression', 'predict.py');
-  
   // Prepare stdin data for Python script
   const stdinData = {
     trainingDataPath,
@@ -91,10 +102,10 @@ export async function predict(options: PredictOptions): Promise<void> {
   
   // Execute Python task (mode is determined automatically by pythonExecutor)
   await executePythonTask({
-    script: scriptPath,
+    script: getScriptPath('predict.py'),
     stdinData,
     taskId,
-    cwd: path.join(process.cwd(), 'app', 'models', 'regression'),
+    cwd: getWorkingDirectory(),
   });
 }
 
