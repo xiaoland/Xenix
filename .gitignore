@@ -59,6 +59,7 @@ uploads/
 !package.json
 !tsconfig.json
 !drizzle.config.ts
+!locales/*.json
 *_Params.json
 Model_Comparison_*.xlsx
 output.xlsx

@@ -1,0 +1,90 @@
+{
+  "app": {
+    "title": "Xenix",
+    "subtitle": "机器学习模型训练与预测平台"
+  },
+  "steps": {
+    "uploadTrain": {
+      "title": "上传与训练",
+      "description": "上传数据并调整模型"
+    },
+    "predict": {
+      "title": "预测",
+      "description": "选择模型并进行预测"
+    }
+  },
+  "upload": {
+    "title": "上传训练数据",
+    "dragHint": "点击或拖拽文件上传训练数据",
+    "hint": "支持Excel文件（.xlsx, .xls）。数据应包含特征和目标变量。",
+    "nextButton": "下一步：选择列"
+  },
+  "columns": {
+    "selectFeatures": "选择特征列",
+    "selectTarget": "选择目标列",
+    "back": "返回",
+    "confirm": "确认选择"
+  },
+  "training": {
+    "selectModels": "选择要调整的模型",
+    "startTuning": "开始超参数调整",
+    "viewResults": "查看调整结果",
+    "selectBest": "选择最佳模型",
+    "continue": "继续预测",
+    "back": "返回上传"
+  },
+  "prediction": {
+    "title": "进行预测",
+    "uploadData": "上传预测数据",
+    "startPrediction": "开始预测",
+    "downloadResults": "下载结果",
+    "back": "返回训练",
+    "reset": "重新开始"
+  },
+  "models": {
+    "linearRegression": "线性回归",
+    "ridge": "岭回归",
+    "lasso": "套索回归",
+    "bayesianRidge": "贝叶斯岭回归",
+    "knn": "K近邻",
+    "decisionTree": "决策树",
+    "randomForest": "随机森林",
+    "gbdt": "梯度提升决策树",
+    "adaboost": "AdaBoost",
+    "xgboost": "XGBoost",
+    "lightgbm": "LightGBM",
+    "polynomial": "多项式回归"
+  },
+  "status": {
+    "pending": "待处理",
+    "running": "运行中",
+    "completed": "已完成",
+    "failed": "失败"
+  },
+  "messages": {
+    "uploadError": "请先上传训练数据",
+    "columnSelectionError": "请选择特征列和目标列",
+    "tuningStarted": "已开始为选定模型进行超参数调整",
+    "tuningFailed": "启动调整失败",
+    "selectModelError": "请先从调整结果中选择一个模型",
+    "uploadPredictionError": "请上传预测数据",
+    "trainingPathError": "未找到训练数据路径。请重新训练模型。",
+    "tuningTaskError": "无法找到所选模型的调整任务。请重新训练。",
+    "predictionStarted": "预测已开始",
+    "predictionCompleted": "预测完成！结果已保存至：{path}",
+    "predictionFailed": "预测失败：{error}",
+    "predictionError": "启动预测失败",
+    "readyToTrain": "准备使用 {count} 个特征进行训练"
+  },
+  "metrics": {
+    "mse": "均方误差",
+    "mae": "平均绝对误差",
+    "r2": "R²",
+    "train": "训练",
+    "test": "测试"
+  },
+  "logs": {
+    "title": "任务日志",
+    "noLogs": "无可用日志"
+  }
+}

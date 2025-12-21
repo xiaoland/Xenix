@@ -1,0 +1,90 @@
+{
+  "app": {
+    "title": "Xenix",
+    "subtitle": "Machine Learning Model Training and Prediction Platform"
+  },
+  "steps": {
+    "uploadTrain": {
+      "title": "Upload & Train",
+      "description": "Upload data and tune models"
+    },
+    "predict": {
+      "title": "Predict",
+      "description": "Select model and make predictions"
+    }
+  },
+  "upload": {
+    "title": "Upload Training Data",
+    "dragHint": "Click or drag file to upload training data",
+    "hint": "Support for Excel files (.xlsx, .xls). Data should contain features and target variable.",
+    "nextButton": "Next: Select Columns"
+  },
+  "columns": {
+    "selectFeatures": "Select Feature Columns",
+    "selectTarget": "Select Target Column",
+    "back": "Back",
+    "confirm": "Confirm Selection"
+  },
+  "training": {
+    "selectModels": "Select Models to Tune",
+    "startTuning": "Start Hyperparameter Tuning",
+    "viewResults": "View Tuning Results",
+    "selectBest": "Select Best Model",
+    "continue": "Continue to Prediction",
+    "back": "Back to Upload"
+  },
+  "prediction": {
+    "title": "Make Predictions",
+    "uploadData": "Upload Prediction Data",
+    "startPrediction": "Start Prediction",
+    "downloadResults": "Download Results",
+    "back": "Back to Training",
+    "reset": "Start Over"
+  },
+  "models": {
+    "linearRegression": "Linear Regression",
+    "ridge": "Ridge",
+    "lasso": "Lasso",
+    "bayesianRidge": "Bayesian Ridge",
+    "knn": "KNN",
+    "decisionTree": "Decision Tree",
+    "randomForest": "Random Forest",
+    "gbdt": "GBDT",
+    "adaboost": "AdaBoost",
+    "xgboost": "XGBoost",
+    "lightgbm": "LightGBM",
+    "polynomial": "Polynomial"
+  },
+  "status": {
+    "pending": "Pending",
+    "running": "Running",
+    "completed": "Completed",
+    "failed": "Failed"
+  },
+  "messages": {
+    "uploadError": "Please upload training data first",
+    "columnSelectionError": "Please select feature columns and target column",
+    "tuningStarted": "Hyperparameter tuning started for selected models",
+    "tuningFailed": "Failed to start tuning",
+    "selectModelError": "Please select a model from the tuning results first",
+    "uploadPredictionError": "Please upload prediction data",
+    "trainingPathError": "Training data path not found. Please retrain models first.",
+    "tuningTaskError": "Could not find tuning task for selected model. Please retrain.",
+    "predictionStarted": "Prediction started",
+    "predictionCompleted": "Prediction completed! Results saved to: {path}",
+    "predictionFailed": "Prediction failed: {error}",
+    "predictionError": "Failed to start prediction",
+    "readyToTrain": "Ready to train with {count} features"
+  },
+  "metrics": {
+    "mse": "MSE",
+    "mae": "MAE",
+    "r2": "R²",
+    "train": "Train",
+    "test": "Test"
+  },
+  "logs": {
+    "title": "Task Logs",
+    "noLogs": "No logs available"
+  }
+}
