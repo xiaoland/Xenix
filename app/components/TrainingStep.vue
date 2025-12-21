@@ -16,20 +16,6 @@
       @view-logs="handleViewLogs"
     />
 
-    <!-- Tuning Action Button -->
-    <div class="flex gap-4">
-      <a-button
-        type="primary"
-        size="large"
-        :loading="isTuning"
-        :disabled="localSelectedModels.length === 0 || isTuning"
-        @click="emit('start-tuning')"
-      >
-        <i class="i-mdi-tune mr-2"></i>
-        Start Tuning Selected Models
-      </a-button>
-    </div>
-
     <!-- Best Model Selection -->
     <div v-if="tuningResults.length > 0" class="mt-6">
       <h3 class="text-lg font-medium mb-3">Select Best Model for Prediction</h3>
@@ -37,13 +23,15 @@
         v-model:value="localSelectedBestModel"
         placeholder="Select a model for prediction"
         class="w-full max-w-md"
+        :dropdownMatchSelectWidth="false"
       >
         <a-select-option
           v-for="result in tuningResults"
           :key="result.model"
           :value="result.model"
         >
-          {{ formatModelName(result.model) }} (R²: {{ formatMetric(result.r2_test) }})
+          {{ formatModelName(result.model) }} (R²:
+          {{ formatMetric(result.r2_test) }})
         </a-select-option>
       </a-select>
     </div>
@@ -63,7 +51,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed } from "vue";
 
 const props = defineProps<{
   availableModels: Array<{ label: string; value: string }>;
@@ -78,47 +66,47 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  'start-tuning': [];
-  'start-single-tune': [model: string];
-  'back': [];
-  'continue': [];
-  'update:selectedModels': [models: string[]];
-  'update:activeLogTab': [tab: string];
-  'update:selected-best-model': [model: string];
+  "start-tuning": [];
+  "start-single-tune": [model: string];
+  back: [];
+  continue: [];
+  "update:selectedModels": [models: string[]];
+  "update:activeLogTab": [tab: string];
+  "update:selected-best-model": [model: string];
 }>();
 
 const localSelectedModels = computed({
   get: () => props.selectedModels,
-  set: (value) => emit('update:selectedModels', value)
+  set: (value) => emit("update:selectedModels", value),
 });
 
 const localActiveLogTab = computed({
   get: () => props.activeLogTab,
-  set: (value) => emit('update:activeLogTab', value)
+  set: (value) => emit("update:activeLogTab", value),
 });
 
 const localSelectedBestModel = computed({
   get: () => props.selectedBestModel,
-  set: (value) => emit('update:selected-best-model', value || '')
+  set: (value) => emit("update:selected-best-model", value || ""),
 });
 
 const handleStartTune = (model: string) => {
   // Emit the single tune event for this specific model
-  emit('start-single-tune', model);
+  emit("start-single-tune", model);
 };
 
 const handleViewLogs = (taskId: string, modelName: string) => {
   // Update the active log tab
-  emit('update:activeLogTab', taskId);
+  emit("update:activeLogTab", taskId);
 };
 
 const formatModelName = (name: string) => {
-  return name.replace(/_/g, ' ');
+  return name.replace(/_/g, " ");
 };
 
 const formatMetric = (value: string | number) => {
-  if (!value) return 'N/A';
-  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (!value) return "N/A";
+  const num = typeof value === "string" ? parseFloat(value) : value;
   return num.toFixed(4);
 };
 </script>
