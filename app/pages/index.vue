@@ -1,22 +1,25 @@
 <template>
   <div class="min-h-screen bg-gray-50 py-8">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-end mb-4">
+        <LanguageSwitcher />
+      </div>
       <div class="text-center mb-8">
-        <h1 class="text-4xl font-bold text-gray-900 mb-2">Xenix</h1>
+        <h1 class="text-4xl font-bold text-gray-900 mb-2">{{ $t('app.title') }}</h1>
         <p class="text-lg text-gray-600">
-          Machine Learning Model Training and Prediction Platform
+          {{ $t('app.subtitle') }}
         </p>
       </div>
 
       <a-card class="mb-6">
         <a-steps :current="currentStep" class="mb-8">
           <a-step
-            title="Upload & Train"
-            description="Upload data and tune models"
+            :title="$t('steps.uploadTrain.title')"
+            :description="$t('steps.uploadTrain.description')"
           />
           <a-step
-            title="Predict"
-            description="Select model and make predictions"
+            :title="$t('steps.predict.title')"
+            :description="$t('steps.predict.description')"
           />
         </a-steps>
 
@@ -67,6 +70,9 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { message } from "ant-design-vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const currentStep = ref(0);
 const trainingFileList = ref([]);
@@ -144,7 +150,7 @@ const handleColumnSelection = ({
   selectedFeatureColumns.value = featureColumns;
   selectedTargetColumn.value = targetColumn;
   hasUploadedData.value = true;
-  message.success(`Ready to train with ${featureColumns.length} features`);
+  message.success(t('messages.readyToTrain', { count: featureColumns.length }));
 };
 
 const resetUpload = () => {
@@ -161,7 +167,7 @@ const resetUpload = () => {
 
 const startTuning = async () => {
   if (trainingFileList.value.length === 0) {
-    message.error("Please upload training data first");
+    message.error(t('messages.uploadError'));
     return;
   }
 
@@ -169,7 +175,7 @@ const startTuning = async () => {
     selectedFeatureColumns.value.length === 0 ||
     !selectedTargetColumn.value
   ) {
-    message.error("Please select feature columns and target column");
+    message.error(t('messages.columnSelectionError'));
     return;
   }
 
@@ -207,9 +213,9 @@ const startTuning = async () => {
       }
     }
 
-    message.success("Hyperparameter tuning started for selected models");
+    message.success(t('messages.tuningStarted'));
   } catch (error) {
-    message.error("Failed to start tuning: " + error.message);
+    message.error(t('messages.tuningFailed') + ': ' + error.message);
   } finally {
     isTuning.value = false;
   }
@@ -217,7 +223,7 @@ const startTuning = async () => {
 
 const startSingleModelTuning = async (modelValue: string) => {
   if (trainingFileList.value.length === 0) {
-    message.error("Please upload training data first");
+    message.error(t('messages.uploadError'));
     return;
   }
 
@@ -225,7 +231,7 @@ const startSingleModelTuning = async (modelValue: string) => {
     selectedFeatureColumns.value.length === 0 ||
     !selectedTargetColumn.value
   ) {
-    message.error("Please select feature columns and target column");
+    message.error(t('messages.columnSelectionError'));
     return;
   }
 
@@ -259,12 +265,10 @@ const startSingleModelTuning = async (modelValue: string) => {
       pollTaskStatus(response.taskId, modelValue);
       pollTaskLogs(response.taskId);
 
-      message.success(
-        `Hyperparameter tuning started for ${modelValue.replace(/_/g, " ")}`
-      );
+      message.success(t('messages.tuningStarted'));
     }
   } catch (error) {
-    message.error("Failed to start tuning: " + error.message);
+    message.error(t('messages.tuningFailed') + ': ' + error.message);
     tuningStatus.value[modelValue] = "failed";
   } finally {
     isTuning.value = false;
@@ -342,26 +346,24 @@ const fetchTuningResults = async () => {
 
 const startPrediction = async () => {
   if (!selectedBestModel.value) {
-    message.error("Please select a model from the tuning results first");
+    message.error(t('messages.selectModelError'));
     return;
   }
 
   if (predictionFileList.value.length === 0) {
-    message.error("Please upload prediction data");
+    message.error(t('messages.uploadPredictionError'));
     return;
   }
 
   if (!uploadedFilePath.value) {
-    message.error("Training data path not found. Please retrain models first.");
+    message.error(t('messages.trainingPathError'));
     return;
   }
 
   // Find the task ID for the selected model
   const selectedModelTaskId = tuningTasks.value[selectedBestModel.value];
   if (!selectedModelTaskId) {
-    message.error(
-      "Could not find tuning task for selected model. Please retrain."
-    );
+    message.error(t('messages.tuningTaskError'));
     return;
   }
 
@@ -386,7 +388,7 @@ const startPrediction = async () => {
 
     if (response.success) {
       predictionTask.value = { taskId: response.taskId, status: "running" };
-      message.success("Prediction started");
+      message.success(t('messages.predictionStarted'));
 
       const result = await pollTaskStatus(response.taskId);
       console.log("Polling result:", result);
@@ -398,17 +400,18 @@ const startPrediction = async () => {
         predictionTask.value.taskId = result.task.taskId;
         console.log("Updated predictionTask:", predictionTask.value);
         message.success(
-          "Prediction completed! Results saved to: " +
-            (result.task.outputFile || response.outputFile)
+          t('messages.predictionCompleted', { 
+            path: result.task.outputFile || response.outputFile 
+          })
         );
       } else if (result && result.task.status === "failed") {
         predictionTask.value.status = "failed";
         predictionTask.value.error = result.task.error;
-        message.error("Prediction failed: " + result.task.error);
+        message.error(t('messages.predictionFailed', { error: result.task.error }));
       }
     }
   } catch (error) {
-    message.error("Failed to start prediction: " + error.message);
+    message.error(t('messages.predictionError') + ': ' + error.message);
   } finally {
     isPredicting.value = false;
   }

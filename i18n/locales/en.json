@@ -1,0 +1,125 @@
+{
+  "app": {
+    "title": "Xenix",
+    "subtitle": "Machine Learning Model Training and Prediction Platform"
+  },
+  "steps": {
+    "uploadTrain": {
+      "title": "Upload & Train",
+      "description": "Upload data and tune models"
+    },
+    "predict": {
+      "title": "Predict",
+      "description": "Select model and make predictions"
+    }
+  },
+  "upload": {
+    "title": "Upload Training Data",
+    "dragHint": "Click or drag file to upload training data",
+    "hint": "Support for Excel files (.xlsx, .xls). Data should contain features and target variable.",
+    "nextButton": "Next: Select Columns"
+  },
+  "columns": {
+    "title": "Select Columns",
+    "description": "Choose which columns to use as features for training and which one is the target (prediction) column.",
+    "featureColumns": "Feature Columns",
+    "featureDescription": "Select columns to use as input features for model training.",
+    "selectedFeatures": "Selected: {count} column(s)",
+    "targetColumn": "Target Column",
+    "targetDescription": "Select the column you want to predict (target variable).",
+    "targetSelected": "Target: {column}",
+    "backToUpload": "Back to Upload",
+    "featuresTag": "{count} Features",
+    "targetSetTag": "Target Set",
+    "confirmSelection": "Confirm Selection"
+  },
+  "training": {
+    "title": "Model Training",
+    "modelSelectionAndTuning": "Model Selection and Tuning",
+    "model": "Model",
+    "tuning": "Tuning",
+    "metrics": "Metrics",
+    "startTune": "Start Tune",
+    "viewLogs": "View Logs",
+    "selectModels": "Select Models to Tune",
+    "startTuning": "Start Hyperparameter Tuning",
+    "viewResults": "View Tuning Results",
+    "selectBest": "Select Best Model",
+    "selectBestForPrediction": "Select Best Model for Prediction",
+    "tuningResults": "Tuning Results",
+    "modelColumn": "Model",
+    "r2Test": "R² (Test)",
+    "mseTest": "MSE (Test)",
+    "maeTest": "MAE (Test)",
+    "statusColumn": "Status",
+    "selectModelInstruction": "Select a model from the table above to use for predictions",
+    "selectModelPlaceholder": "Select model for prediction"
+  },
+  "prediction": {
+    "title": "Make Predictions",
+    "bestModel": "Best Model: {model}",
+    "uploadData": "Upload data for prediction",
+    "uploadHint": "The file should have the same features as the training data.",
+    "startPrediction": "Generate Predictions",
+    "downloadResults": "Download Prediction Results",
+    "back": "Back",
+    "reset": "Start Over",
+    "taskQueued": "Prediction task queued...",
+    "generating": "Generating predictions...",
+    "completed": "Predictions completed successfully!",
+    "failed": "Prediction failed: {error}",
+    "excelOnly": "You can only upload Excel files!",
+    "downloading": "Downloading prediction results..."
+  },
+  "models": {
+    "linearRegression": "Linear Regression",
+    "ridge": "Ridge",
+    "lasso": "Lasso",
+    "bayesianRidge": "Bayesian Ridge",
+    "knn": "KNN",
+    "decisionTree": "Decision Tree",
+    "randomForest": "Random Forest",
+    "gbdt": "GBDT",
+    "adaboost": "AdaBoost",
+    "xgboost": "XGBoost",
+    "lightgbm": "LightGBM",
+    "polynomial": "Polynomial"
+  },
+  "status": {
+    "pending": "Pending",
+    "running": "Running",
+    "completed": "Completed",
+    "failed": "Failed"
+  },
+  "messages": {
+    "uploadError": "Please upload training data first",
+    "columnSelectionError": "Please select feature columns and target column",
+    "tuningStarted": "Hyperparameter tuning started for selected models",
+    "tuningFailed": "Failed to start tuning",
+    "selectModelError": "Please select a model from the tuning results first",
+    "uploadPredictionError": "Please upload prediction data",
+    "trainingPathError": "Training data path not found. Please retrain models first.",
+    "tuningTaskError": "Could not find tuning task for selected model. Please retrain.",
+    "predictionStarted": "Prediction started",
+    "predictionCompleted": "Prediction completed! Results saved to: {path}",
+    "predictionFailed": "Prediction failed: {error}",
+    "predictionError": "Failed to start prediction",
+    "readyToTrain": "Ready to train with {count} features"
+  },
+  "metrics": {
+    "mse": "MSE",
+    "mae": "MAE",
+    "r2": "R²",
+    "train": "Train",
+    "test": "Test"
+  },
+  "logs": {
+    "title": "Task Logs",
+    "titleWithModel": "Logs - {model}",
+    "comparison": "Comparison",
+    "noLogs": "No logs available"
+  },
+  "common": {
+    "na": "N/A"
+  }
+}
