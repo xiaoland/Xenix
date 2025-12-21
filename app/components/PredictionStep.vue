@@ -39,11 +39,19 @@
     </a-button>
 
     <div v-if="predictionTask" class="mt-4">
-      <a-alert
-        :message="predictionMessage"
-        :type="predictionType"
-        show-icon
-      />
+      <a-alert :message="predictionMessage" :type="predictionType" show-icon />
+
+      <a-button
+        v-if="predictionTask.status === 'completed' && predictionTask.taskId"
+        type="primary"
+        size="large"
+        block
+        class="mt-4"
+        @click="downloadResults"
+      >
+        <i class="i-mdi-download mr-2"></i>
+        Download Prediction Results
+      </a-button>
     </div>
 
     <div class="flex gap-4 mt-6">
@@ -54,9 +62,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import type { UploadProps } from 'ant-design-vue';
-import { message } from 'ant-design-vue';
+import { computed } from "vue";
+import type { UploadProps } from "ant-design-vue";
+import { message } from "ant-design-vue";
 
 const props = defineProps<{
   bestModel: string | null;
@@ -73,41 +81,60 @@ defineEmits<{
 }>();
 
 const predictionMessage = computed(() => {
-  if (!props.predictionTask) return '';
-  
+  if (!props.predictionTask) return "";
+
   switch (props.predictionTask.status) {
-    case 'pending':
-      return 'Prediction task queued...';
-    case 'running':
-      return 'Generating predictions...';
-    case 'completed':
-      return 'Predictions completed successfully!';
-    case 'failed':
-      return `Prediction failed: ${props.predictionTask.error || 'Unknown error'}`;
+    case "pending":
+      return "Prediction task queued...";
+    case "running":
+      return "Generating predictions...";
+    case "completed":
+      return "Predictions completed successfully!";
+    case "failed":
+      return `Prediction failed: ${
+        props.predictionTask.error || "Unknown error"
+      }`;
     default:
-      return '';
+      return "";
   }
 });
 
 const predictionType = computed(() => {
-  if (!props.predictionTask) return 'info';
-  
+  if (!props.predictionTask) return "info";
+
   switch (props.predictionTask.status) {
-    case 'completed':
-      return 'success';
-    case 'failed':
-      return 'error';
+    case "completed":
+      return "success";
+    case "failed":
+      return "error";
     default:
-      return 'info';
+      return "info";
   }
 });
 
-const beforeUpload: UploadProps['beforeUpload'] = (file) => {
-  const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+const beforeUpload: UploadProps["beforeUpload"] = (file) => {
+  const isExcel = file.name.endsWith(".xlsx") || file.name.endsWith(".xls");
   if (!isExcel) {
-    message.error('You can only upload Excel files!');
+    message.error("You can only upload Excel files!");
   }
   return false; // Prevent auto upload
+};
+
+const downloadResults = () => {
+  if (props.predictionTask?.taskId) {
+    // Use the download API endpoint
+    const downloadUrl = `/api/download/${props.predictionTask.taskId}`;
+
+    // Create a link element and trigger download
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = ""; // Let the server specify the filename
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    message.success("Downloading prediction results...");
+  }
 };
 </script>
 

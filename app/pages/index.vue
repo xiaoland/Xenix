@@ -275,7 +275,7 @@ const pollTaskStatus = async (taskId: string, modelValue?: string) => {
   const maxAttempts = 120;
   let attempts = 0;
 
-  const poll = async () => {
+  while (attempts < maxAttempts) {
     try {
       const response = await $fetch(`/api/task/${taskId}`);
 
@@ -297,14 +297,20 @@ const pollTaskStatus = async (taskId: string, modelValue?: string) => {
 
       attempts++;
       if (attempts < maxAttempts) {
-        setTimeout(poll, 5000);
+        // Wait 5 seconds before next poll
+        await new Promise((resolve) => setTimeout(resolve, 5000));
       }
     } catch (error) {
       console.error("Failed to poll task status:", error);
+      attempts++;
+      if (attempts < maxAttempts) {
+        // Wait 5 seconds before retry on error
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      }
     }
-  };
+  }
 
-  return poll();
+  return null; // Return null if max attempts reached
 };
 
 const fetchTuningResults = async () => {
@@ -383,11 +389,17 @@ const startPrediction = async () => {
       message.success("Prediction started");
 
       const result = await pollTaskStatus(response.taskId);
+      console.log("Polling result:", result);
+
       if (result && result.task.status === "completed") {
         predictionTask.value.status = "completed";
-        predictionTask.value.outputFile = response.outputFile;
+        predictionTask.value.outputFile =
+          result.task.outputFile || response.outputFile;
+        predictionTask.value.taskId = result.task.taskId;
+        console.log("Updated predictionTask:", predictionTask.value);
         message.success(
-          "Prediction completed! Results saved to: " + response.outputFile
+          "Prediction completed! Results saved to: " +
+            (result.task.outputFile || response.outputFile)
         );
       } else if (result && result.task.status === "failed") {
         predictionTask.value.status = "failed";
