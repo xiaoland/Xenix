@@ -342,6 +342,7 @@ Available variables:
 - `DATABASE_URL` - PostgreSQL connection string (required)
 - `PYTHON_EXECUTABLE` - Python command to use (default: `python3`)
 - `PYTHON_EXECUTION_MODE` - Execution mode for Python scripts: `local` or `docker` (default: `local`)
+- `PYTHON_CONTAINER_NAME` - Docker container name for Python ML execution (default: `xenix-python-ml`, only used in Docker mode)
 
 ## Architecture
 

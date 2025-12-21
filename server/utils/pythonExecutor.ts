@@ -1,4 +1,5 @@
 import { spawn } from 'child_process';
+import path from 'path';
 import { db, schema } from '../database';
 import { eq } from 'drizzle-orm';
 
@@ -50,15 +51,26 @@ function executeLocalPython(options: PythonTaskOptions) {
 function executeDockerPython(options: PythonTaskOptions) {
   const { script, stdinData, cwd } = options;
   
+  // Get container name from environment or use default
+  const containerName = process.env.PYTHON_CONTAINER_NAME || 'xenix-python-ml';
+  
   // Convert absolute path to container path
-  // Assuming script is in /app/models/regression/script.py format
-  const scriptInContainer = script.replace(process.cwd(), '/app');
+  const scriptPath = path.resolve(script);
+  const hostRoot = process.cwd();
+  
+  if (!scriptPath.startsWith(hostRoot)) {
+    throw new Error(`Script path ${scriptPath} is not within project directory ${hostRoot}`);
+  }
+  
+  // Convert to container path using proper path operations
+  const relativePath = path.relative(hostRoot, scriptPath);
+  const scriptInContainer = path.join('/app', relativePath).replace(/\\/g, '/'); // Normalize for Unix
   
   // Use docker exec to run Python script in the running container
   const dockerProcess = spawn('docker', [
     'exec',
     '-i', // Keep stdin open
-    'xenix-python-ml',
+    containerName,
     'pdm', 'run', 'python3',
     scriptInContainer
   ], {
@@ -92,12 +104,13 @@ function adjustPathsForDocker(data: any): any {
   
   for (const key of pathKeys) {
     if (adjusted[key] && typeof adjusted[key] === 'string') {
-      const originalPath = adjusted[key];
+      const originalPath = path.resolve(adjusted[key]);
       
       // Only replace if the path starts with the host root
       if (originalPath.startsWith(hostRoot)) {
-        // Convert host path to container path
-        adjusted[key] = originalPath.replace(hostRoot, containerRoot);
+        // Convert host path to container path using proper path operations
+        const relativePath = path.relative(hostRoot, originalPath);
+        adjusted[key] = path.join(containerRoot, relativePath).replace(/\\/g, '/'); // Normalize for Unix
       } else {
         // Log warning if path doesn't match expected pattern
         console.warn(`[Docker] Path ${key} does not start with expected root: ${originalPath}`);
