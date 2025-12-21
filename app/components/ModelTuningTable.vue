@@ -125,7 +125,7 @@ const isModelSelected = (model: string) => {
 };
 
 const formatModelName = (name: string) => {
-  return name;
+  return name.replace(/_/g, ' ');
 };
 
 const formatMetric = (value: string | number) => {
@@ -160,13 +160,6 @@ const handleViewLogs = (taskId: string, modelName: string) => {
 const handleStartTune = (model: string) => {
   emit('start-tune', model);
 };
-
-// Expose handleViewLogs for parent component
-defineExpose({
-  showLogs: (taskId: string, modelName: string) => {
-    handleViewLogs(taskId, modelName);
-  }
-});
 </script>
 
 <style scoped>
