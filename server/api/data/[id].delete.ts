@@ -29,11 +29,12 @@ export default defineEventHandler(async (event) => {
 
     // Delete the file from filesystem if it exists
     try {
-      await fs.access(dataset.filePath);
       await fs.unlink(dataset.filePath);
-    } catch (fileError) {
-      // File doesn't exist or can't be accessed, continue with database deletion
-      console.warn('File not found or cannot be accessed:', fileError);
+    } catch (fileError: any) {
+      // Ignore ENOENT (file not found) errors, but log others
+      if (fileError.code !== 'ENOENT') {
+        console.warn('Failed to delete file:', fileError);
+      }
     }
 
     // Delete dataset record from database
@@ -47,8 +48,12 @@ export default defineEventHandler(async (event) => {
     };
   } catch (error) {
     console.error('Dataset deletion error:', error);
+    // Re-throw createError objects directly
+    if (error && typeof error === 'object' && 'statusCode' in error) {
+      throw error;
+    }
     throw createError({
-      statusCode: error.statusCode || 500,
+      statusCode: 500,
       message: error instanceof Error ? error.message : 'Failed to delete dataset',
     });
   }

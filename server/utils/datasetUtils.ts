@@ -24,7 +24,11 @@ export async function analyzeExcelFile(filePath: string): Promise<{
   
   const data = XLSX.utils.sheet_to_json(worksheet);
   
-  const columns = data.length > 0 ? Object.keys(data[0]) : [];
+  if (data.length === 0) {
+    throw new Error('Excel file contains no data rows (only header or empty)');
+  }
+  
+  const columns = Object.keys(data[0]);
   const rowCount = data.length; // Number of data rows (excluding header)
   
   return { columns, rowCount };

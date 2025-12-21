@@ -39,8 +39,12 @@ export default defineEventHandler(async (event) => {
     };
   } catch (error) {
     console.error('Dataset fetch error:', error);
+    // Re-throw createError objects directly
+    if (error && typeof error === 'object' && 'statusCode' in error) {
+      throw error;
+    }
     throw createError({
-      statusCode: error.statusCode || 500,
+      statusCode: 500,
       message: error instanceof Error ? error.message : 'Failed to fetch dataset',
     });
   }
