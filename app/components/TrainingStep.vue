@@ -2,14 +2,21 @@
   <div class="space-y-6">
     <h2 class="text-2xl font-semibold mb-4">Model Training</h2>
 
-    <!-- Model Selector -->
-    <ModelSelector
-      v-model="localSelectedModels"
+    <!-- Integrated Model Tuning Table -->
+    <ModelTuningTable
       :available-models="availableModels"
+      :selected-models="localSelectedModels"
       :tuning-status="tuningStatus"
+      :tuning-tasks="tuningTasks"
+      :tuning-results="tuningResults"
+      :task-logs="taskLogs"
+      :is-tuning="isTuning"
+      @update:selected-models="localSelectedModels = $event"
+      @start-tune="handleStartTune"
+      @view-logs="handleViewLogs"
     />
 
-    <!-- Tuning Action -->
+    <!-- Tuning Action Button -->
     <div class="flex gap-4">
       <a-button
         type="primary"
@@ -19,24 +26,27 @@
         @click="emit('start-tuning')"
       >
         <i class="i-mdi-tune mr-2"></i>
-        Start Hyperparameter Tuning
+        Start Tuning Selected Models
       </a-button>
     </div>
 
-    <!-- Task Logs Viewer -->
-    <TaskLogViewer
-      v-if="Object.keys(tuningTasks).length > 0"
-      v-model="localActiveLogTab"
-      :tuning-tasks="tuningTasks"
-      :task-logs="taskLogs"
-    />
-
-    <!-- Tuning Results -->
-    <TuningResults
-      :results="tuningResults"
-      :selected-model="localSelectedBestModel"
-      @update:selected-model="emit('update:selected-best-model', $event)"
-    />
+    <!-- Best Model Selection -->
+    <div v-if="tuningResults.length > 0" class="mt-6">
+      <h3 class="text-lg font-medium mb-3">Select Best Model for Prediction</h3>
+      <a-select
+        v-model:value="localSelectedBestModel"
+        placeholder="Select a model for prediction"
+        class="w-full max-w-md"
+      >
+        <a-select-option
+          v-for="result in tuningResults"
+          :key="result.model"
+          :value="result.model"
+        >
+          {{ formatModelName(result.model) }} (R²: {{ formatMetric(result.r2_test) }})
+        </a-select-option>
+      </a-select>
+    </div>
 
     <!-- Navigation -->
     <div class="flex gap-4 mt-6">
@@ -69,6 +79,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'start-tuning': [];
+  'start-single-tune': [model: string];
   'back': [];
   'continue': [];
   'update:selectedModels': [models: string[]];
@@ -90,4 +101,24 @@ const localSelectedBestModel = computed({
   get: () => props.selectedBestModel,
   set: (value) => emit('update:selected-best-model', value || '')
 });
+
+const handleStartTune = (model: string) => {
+  // Emit the single tune event for this specific model
+  emit('start-single-tune', model);
+};
+
+const handleViewLogs = (taskId: string, modelName: string) => {
+  // Update the active log tab
+  emit('update:activeLogTab', taskId);
+};
+
+const formatModelName = (name: string) => {
+  return name.replace(/_/g, ' ');
+};
+
+const formatMetric = (value: string | number) => {
+  if (!value) return 'N/A';
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  return num.toFixed(4);
+};
 </script>

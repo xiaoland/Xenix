@@ -34,6 +34,7 @@
             :tuning-results="tuningResults"
             :task-logs="taskLogs"
             @start-tuning="startTuning"
+            @start-single-tune="startSingleModelTuning"
             @continue="nextStep"
             @back="resetUpload"
           />
@@ -186,6 +187,54 @@ const startTuning = async () => {
     message.success('Hyperparameter tuning started for selected models');
   } catch (error) {
     message.error('Failed to start tuning: ' + error.message);
+  } finally {
+    isTuning.value = false;
+  }
+};
+
+const startSingleModelTuning = async (modelValue: string) => {
+  if (trainingFileList.value.length === 0) {
+    message.error('Please upload training data first');
+    return;
+  }
+
+  if (selectedFeatureColumns.value.length === 0 || !selectedTargetColumn.value) {
+    message.error('Please select feature columns and target column');
+    return;
+  }
+
+  isTuning.value = true;
+  tuningStatus.value[modelValue] = 'pending';
+  
+  try {
+    const formData = new FormData();
+    formData.append('file', trainingFileList.value[0].originFileObj);
+    formData.append('model', modelValue);
+    formData.append('featureColumns', JSON.stringify(selectedFeatureColumns.value));
+    formData.append('targetColumn', selectedTargetColumn.value);
+
+    const response = await $fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (response.success) {
+      tuningTasks.value[modelValue] = response.taskId;
+      tuningStatus.value[modelValue] = 'running';
+      activeLogTab.value = response.taskId;
+      
+      if (!uploadedFilePath.value && response.inputFile) {
+        uploadedFilePath.value = response.inputFile;
+      }
+      
+      pollTaskStatus(response.taskId, modelValue);
+      pollTaskLogs(response.taskId);
+      
+      message.success(`Hyperparameter tuning started for ${modelValue.replace(/_/g, ' ')}`);
+    }
+  } catch (error) {
+    message.error('Failed to start tuning: ' + error.message);
+    tuningStatus.value[modelValue] = 'failed';
   } finally {
     isTuning.value = false;
   }
