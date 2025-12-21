@@ -123,23 +123,36 @@ async function ensurePythonEnvironment(): Promise<void> {
   }
 }
 
-// Initialize environment on module load (async, non-blocking)
+// Initialize environment on module load with proper mutex
 let environmentInitialized = false;
-let environmentInitializing = false;
-const initPromise = (async () => {
-  if (environmentInitialized || environmentInitializing) return;
-  environmentInitializing = true;
-  
-  try {
-    await ensurePythonEnvironment();
-    environmentInitialized = true;
-  } catch (error) {
-    console.error('Failed to initialize Python environment:', error);
-    // Don't throw, allow the system to try again on next request
-  } finally {
-    environmentInitializing = false;
+let environmentInitPromise: Promise<void> | null = null;
+
+/**
+ * Get or create the initialization promise (prevents race conditions)
+ */
+async function getInitPromise(): Promise<void> {
+  if (environmentInitialized) {
+    return Promise.resolve();
   }
-})();
+  
+  if (environmentInitPromise) {
+    return environmentInitPromise;
+  }
+  
+  environmentInitPromise = (async () => {
+    try {
+      await ensurePythonEnvironment();
+      environmentInitialized = true;
+    } catch (error) {
+      console.error('Failed to initialize Python environment:', error);
+      // Reset promise so it can be retried
+      environmentInitPromise = null;
+      throw error;
+    }
+  })();
+  
+  return environmentInitPromise;
+}
 
 /**
  * Options for hyperparameter tuning
@@ -174,12 +187,8 @@ export interface PredictOptions {
  * @returns Promise that resolves when tuning task is started
  */
 export async function tune(options: TuneOptions): Promise<void> {
-  // Ensure environment is ready
-  await initPromise;
-  if (!environmentInitialized) {
-    await ensurePythonEnvironment();
-    environmentInitialized = true;
-  }
+  // Ensure environment is ready (with proper mutex to prevent race conditions)
+  await getInitPromise();
 
   const { inputFile, model, featureColumns, targetColumn, taskId } = options;
 
@@ -208,12 +217,8 @@ export async function tune(options: TuneOptions): Promise<void> {
  * @returns Promise that resolves when prediction task is started
  */
 export async function predict(options: PredictOptions): Promise<void> {
-  // Ensure environment is ready
-  await initPromise;
-  if (!environmentInitialized) {
-    await ensurePythonEnvironment();
-    environmentInitialized = true;
-  }
+  // Ensure environment is ready (with proper mutex to prevent race conditions)
+  await getInitPromise();
 
   const {
     trainingDataPath,
