@@ -7,15 +7,20 @@ if (!process.env.DATABASE_URL) {
 
 // Determine database type from environment variable or DATABASE_URL
 const databaseType = process.env.DATABASE_TYPE || 
-  (process.env.DATABASE_URL.startsWith('sqlite') ? 'sqlite' : 'postgresql');
+  (process.env.DATABASE_URL.startsWith('sqlite') || process.env.DATABASE_URL.endsWith('.db') ? 'sqlite' : 'postgresql');
 
 const dialect = databaseType === 'sqlite' ? 'sqlite' : 'postgresql';
+
+// For SQLite, remove the sqlite:// prefix if present for drizzle-kit
+const dbUrl = databaseType === 'sqlite' 
+  ? process.env.DATABASE_URL.replace(/^sqlite:\/\//, '')
+  : process.env.DATABASE_URL;
 
 export default defineConfig({
   schema: './server/database/schema.ts',
   out: './server/database/migrations',
   dialect,
   dbCredentials: {
-    url: process.env.DATABASE_URL,
+    url: dbUrl,
   },
 });
