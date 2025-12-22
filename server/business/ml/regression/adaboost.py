@@ -11,14 +11,14 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from typing import Dict, Any, Union, Optional, Callable
 from sklearn.base import BaseEstimator
 
-from .base import RegressionModel
+from .base import RegressionModel, ProgressInfo
 
 
-class AdaBoostRegressionModel(RegressionModel):
+class AdaBoostRegressionModel(RegressionModel[AdaBoostRegressor]):
     """AdaBoost Regression model implementation."""
     
     @staticmethod
-    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[float, int, int, Dict[str, float], Dict[str, Any]], None]] = None) -> Dict[str, Any]:
+    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> Dict[str, Any]:
         base_model = AdaBoostRegressor(
             estimator=DecisionTreeRegressor(max_depth=3),
             random_state=42
@@ -49,7 +49,7 @@ class AdaBoostRegressionModel(RegressionModel):
 
     
     @staticmethod
-    def evaluate(model: Union[BaseEstimator, AdaBoostRegressor], X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
+    def evaluate(model: AdaBoostRegressor, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
         y_pred = model.predict(X)
         return {
             'mse': float(mean_squared_error(y, y_pred)),
@@ -60,7 +60,7 @@ class AdaBoostRegressionModel(RegressionModel):
 
     
     @staticmethod
-    def predict(model: Union[BaseEstimator, AdaBoostRegressor], X: pd.DataFrame) -> pd.Series:
+    def predict(model: AdaBoostRegressor, X: pd.DataFrame) -> pd.Series:
         predictions = model.predict(X)
         return pd.Series(predictions, index=X.index, name='predictions')
 

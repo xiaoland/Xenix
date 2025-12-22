@@ -14,14 +14,14 @@ except ImportError:
 from typing import Dict, Any, Union, Optional, Callable
 from sklearn.base import BaseEstimator
 
-from .base import RegressionModel
+from .base import RegressionModel, ProgressInfo
 
 
-class XGBoostRegressionModel(RegressionModel):
+class XGBoostRegressionModel(RegressionModel[XGBRegressor]):
     """XGBoost Regression model implementation."""
     
     @staticmethod
-    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[float, int, int, Dict[str, float], Dict[str, Any]], None]] = None) -> Dict[str, Any]:
+    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> Dict[str, Any]:
         base_model = XGBRegressor(
             objective="reg:squarederror",
             random_state=42,
@@ -53,7 +53,7 @@ class XGBoostRegressionModel(RegressionModel):
 
     
     @staticmethod
-    def evaluate(model: Union[BaseEstimator, XGBRegressor], X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
+    def evaluate(model: XGBRegressor, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
         y_pred = model.predict(X)
         return {
             'mse': float(mean_squared_error(y, y_pred)),
@@ -64,7 +64,7 @@ class XGBoostRegressionModel(RegressionModel):
 
     
     @staticmethod
-    def predict(model: Union[BaseEstimator, XGBRegressor], X: pd.DataFrame) -> pd.Series:
+    def predict(model: XGBRegressor, X: pd.DataFrame) -> pd.Series:
         predictions = model.predict(X)
         return pd.Series(predictions, index=X.index, name='predictions')
 

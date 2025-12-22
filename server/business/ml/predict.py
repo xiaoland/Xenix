@@ -71,9 +71,17 @@ def main():
         logger.info(f"Starting batch prediction using {model_name}")
         logger.info(f"Parameters: {params}")
         
-        # Import Model class directly
+        # Import Model class directly based on model type
         logger.info(f"Importing model for {model_name}")
-        Model = import_model(model_name)
+        if model_name.startswith('regression.'):
+            Model = import_model(model_name)
+        # Future: Add support for other model types
+        # elif model_name.startswith('classification.'):
+        #     Model = import_model(model_name)
+        # elif model_name.startswith('association.'):
+        #     Model = import_model(model_name)
+        else:
+            raise ValueError(f"Unknown model type for '{model_name}'. Model name should start with 'regression.', 'classification.', etc.")
         
         # Load training data and train model with best parameters
         logger.info(f"Loading training data from {training_data_path}")

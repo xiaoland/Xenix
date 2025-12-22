@@ -5,10 +5,20 @@ This module defines the common interface that all regression models must impleme
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Union, Optional, Callable, TypeVar, Generic
+from typing import Dict, Any, Union, Optional, Callable, TypeVar, Generic, TypedDict
 import pandas as pd
 from sklearn.base import BaseEstimator
 from sklearn.pipeline import Pipeline
+
+
+class ProgressInfo(TypedDict):
+    """Progress information for hyperparameter tuning callbacks."""
+    percentage: float
+    round: int
+    total_rounds: int
+    metrics: Dict[str, float]
+    params: Dict[str, Any]
+
 
 # Type variable for model type
 ModelType = TypeVar('ModelType', bound=Union[BaseEstimator, Pipeline])
@@ -27,7 +37,7 @@ class RegressionModel(ABC, Generic[ModelType]):
     
     @staticmethod
     @abstractmethod
-    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[float, int, int, Dict[str, float], Dict[str, Any]], None]] = None) -> Dict[str, Any]:
+    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> Dict[str, Any]:
         """
         Perform hyperparameter tuning for the regression model.
         
@@ -35,7 +45,7 @@ class RegressionModel(ABC, Generic[ModelType]):
             X_train: Training features as DataFrame
             y_train: Training target as Series
             progress_callback: Optional callback function for progress updates.
-                Signature: (percentage: float, round: int, total_rounds: int, metrics: dict, params: dict) -> None
+                Called with a ProgressInfo dict containing:
                 - percentage: Progress percentage (0-100)
                 - round: Current round/iteration number
                 - total_rounds: Total number of rounds

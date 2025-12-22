@@ -14,14 +14,14 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.base import BaseEstimator
 
-from .base import RegressionModel
+from .base import RegressionModel, ProgressInfo
 
 
-class LinearRegressionModel(RegressionModel):
+class LinearRegressionModel(RegressionModel[Pipeline]):
     """Linear Regression model implementation."""
     
     @staticmethod
-    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[float, int, int, Dict[str, float], Dict[str, Any]], None]] = None) -> Dict[str, Any]:
+    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> Dict[str, Any]:
         """
         Perform hyperparameter tuning for Linear regression.
         
@@ -59,7 +59,7 @@ class LinearRegressionModel(RegressionModel):
         }
     
     @staticmethod
-    def evaluate(model: Union[BaseEstimator, Pipeline], X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
+    def evaluate(model: Pipeline, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
         """
         Evaluate model performance on given data.
         
@@ -80,7 +80,7 @@ class LinearRegressionModel(RegressionModel):
         }
     
     @staticmethod
-    def predict(model: Union[BaseEstimator, Pipeline], X: pd.DataFrame) -> pd.Series:
+    def predict(model: Pipeline, X: pd.DataFrame) -> pd.Series:
         """
         Make predictions using trained model.
         

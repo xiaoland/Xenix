@@ -12,14 +12,14 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from typing import Dict, Any, Union, Optional, Callable
 from sklearn.base import BaseEstimator
 
-from .base import RegressionModel
+from .base import RegressionModel, ProgressInfo
 
 
-class KNNRegressionModel(RegressionModel):
+class KNNRegressionModel(RegressionModel[Pipeline]):
     """KNN Regression model implementation."""
     
     @staticmethod
-    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[float, int, int, Dict[str, float], Dict[str, Any]], None]] = None) -> Dict[str, Any]:
+    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> Dict[str, Any]:
         base_model = Pipeline([
             ("scaler", StandardScaler()),
             ("model", KNeighborsRegressor())
@@ -49,7 +49,7 @@ class KNNRegressionModel(RegressionModel):
 
     
     @staticmethod
-    def evaluate(model: Union[BaseEstimator, Pipeline], X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
+    def evaluate(model: Pipeline, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
         y_pred = model.predict(X)
         return {
             'mse': float(mean_squared_error(y, y_pred)),
@@ -60,7 +60,7 @@ class KNNRegressionModel(RegressionModel):
 
     
     @staticmethod
-    def predict(model: Union[BaseEstimator, Pipeline], X: pd.DataFrame) -> pd.Series:
+    def predict(model: Pipeline, X: pd.DataFrame) -> pd.Series:
         predictions = model.predict(X)
         return pd.Series(predictions, index=X.index, name='predictions')
 

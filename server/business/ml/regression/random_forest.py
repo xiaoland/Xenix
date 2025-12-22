@@ -12,14 +12,14 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.base import BaseEstimator
 
-from .base import RegressionModel
+from .base import RegressionModel, ProgressInfo
 
 
-class RandomForestRegressionModel(RegressionModel):
+class RandomForestRegressionModel(RegressionModel[RandomForestRegressor]):
     """Random Forest Regression model implementation."""
     
     @staticmethod
-    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[float, int, int, Dict[str, float], Dict[str, Any]], None]] = None) -> Dict[str, Any]:
+    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> Dict[str, Any]:
         """
         Perform hyperparameter tuning for Random Forest regression.
         
@@ -55,7 +55,7 @@ class RandomForestRegressionModel(RegressionModel):
         }
     
     @staticmethod
-    def evaluate(model: Union[BaseEstimator, RandomForestRegressor], X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
+    def evaluate(model: RandomForestRegressor, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
         """
         Evaluate model performance on given data.
         
@@ -76,7 +76,7 @@ class RandomForestRegressionModel(RegressionModel):
         }
     
     @staticmethod
-    def predict(model: Union[BaseEstimator, RandomForestRegressor], X: pd.DataFrame) -> pd.Series:
+    def predict(model: RandomForestRegressor, X: pd.DataFrame) -> pd.Series:
         """
         Make predictions using trained model.
         

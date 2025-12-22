@@ -14,14 +14,14 @@ except ImportError:
 from typing import Dict, Any, Union, Optional, Callable
 from sklearn.base import BaseEstimator
 
-from .base import RegressionModel
+from .base import RegressionModel, ProgressInfo
 
 
-class LightGBMRegressionModel(RegressionModel):
+class LightGBMRegressionModel(RegressionModel[LGBMRegressor]):
     """LightGBM Regression model implementation."""
     
     @staticmethod
-    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[float, int, int, Dict[str, float], Dict[str, Any]], None]] = None) -> Dict[str, Any]:
+    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> Dict[str, Any]:
         base_model = LGBMRegressor(
             objective="regression",
             random_state=42,
@@ -55,7 +55,7 @@ class LightGBMRegressionModel(RegressionModel):
 
     
     @staticmethod
-    def evaluate(model: Union[BaseEstimator, LGBMRegressor], X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
+    def evaluate(model: LGBMRegressor, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
         y_pred = model.predict(X)
         return {
             'mse': float(mean_squared_error(y, y_pred)),
@@ -66,7 +66,7 @@ class LightGBMRegressionModel(RegressionModel):
 
     
     @staticmethod
-    def predict(model: Union[BaseEstimator, LGBMRegressor], X: pd.DataFrame) -> pd.Series:
+    def predict(model: LGBMRegressor, X: pd.DataFrame) -> pd.Series:
         predictions = model.predict(X)
         return pd.Series(predictions, index=X.index, name='predictions')
 
