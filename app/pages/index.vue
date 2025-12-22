@@ -84,19 +84,19 @@ const hasUploadedData = ref(false);
 const availableModels = [
   {
     label: "Linear Regression",
-    value: "Linear_Regression_Hyperparameter_Tuning",
+    value: "regression.linear_regression_hyperparameter_tuning",
   },
-  { label: "Ridge", value: "Ridge" },
-  { label: "Lasso", value: "Lasso" },
-  { label: "Bayesian Ridge", value: "Bayesian_Ridge_Regression" },
-  { label: "KNN", value: "K-Nearest_Neighbors" },
-  { label: "Decision Tree", value: "Regression_Decision_Tree" },
-  { label: "Random Forest", value: "Random_Forest" },
-  { label: "GBDT", value: "GBDT" },
-  { label: "AdaBoost", value: "AdaBoost" },
-  { label: "XGBoost", value: "XGBoost" },
-  { label: "LightGBM", value: "LightGBM" },
-  { label: "Polynomial", value: "Polynomial_Regression" },
+  { label: "Ridge", value: "regression.ridge" },
+  { label: "Lasso", value: "regression.lasso" },
+  { label: "Bayesian Ridge", value: "regression.bayesian_ridge_regression" },
+  { label: "KNN", value: "regression.k_nearest_neighbors" },
+  { label: "Decision Tree", value: "regression.regression_decision_tree" },
+  { label: "Random Forest", value: "regression.random_forest" },
+  { label: "GBDT", value: "regression.gbdt" },
+  { label: "AdaBoost", value: "regression.adaboost" },
+  { label: "XGBoost", value: "regression.xgboost" },
+  { label: "LightGBM", value: "regression.lightgbm" },
+  { label: "Polynomial", value: "regression.polynomial_regression" },
 ];
 
 const selectedModels = ref<string[]>([]);

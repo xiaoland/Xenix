@@ -19,33 +19,38 @@ Xenix provides an interface for teachers and mid-small enterprises to analyze th
 
 ## Supported Models
 
-- Linear Regression
-- Ridge Regression
-- Lasso Regression
-- Bayesian Ridge Regression
-- K-Nearest Neighbors (KNN)
-- Decision Tree
-- Random Forest
-- Gradient Boosting (GBDT)
-- AdaBoost
-- XGBoost
-- LightGBM
-- Polynomial Regression
+- Linear Regression (`regression.linear_regression_hyperparameter_tuning`)
+- Ridge Regression (`regression.ridge`)
+- Lasso Regression (`regression.lasso`)
+- Bayesian Ridge Regression (`regression.bayesian_ridge_regression`)
+- K-Nearest Neighbors (`regression.k_nearest_neighbors`)
+- Decision Tree (`regression.regression_decision_tree`)
+- Random Forest (`regression.random_forest`)
+- Gradient Boosting (`regression.gbdt`)
+- AdaBoost (`regression.adaboost`)
+- XGBoost (`regression.xgboost`)
+- LightGBM (`regression.lightgbm`)
+- Polynomial Regression (`regression.polynomial_regression`)
+
+**Note**: Model values use dotted notation with type prefix for API requests.
 
 ## Tech Stack
 
 ### Frontend
+
 - **Framework**: Nuxt.js 4.2.2
 - **UI Library**: Ant Design Vue
 - **Styling**: UnoCSS + SCSS
 
 ### Backend
+
 - **Runtime**: Node.js with Nitro
 - **Database**: PostgreSQL 16
 - **ORM**: DrizzleORM
 - **Container**: Docker Compose
 
 ### Data Processing
+
 - **Language**: Python 3.12
 - **Package Manager**: PDM
 - **Libraries**: scikit-learn, pandas, statsmodels, XGBoost, LightGBM
@@ -71,7 +76,16 @@ cd Xenix
 ```bash
 # Install Node.js dependencies
 pnpm install
+```
 
+**Note:** Python dependencies (PDM and packages) are automatically installed on first use. The ML pipeline will:
+
+1. Check if PDM is installed, and install it if missing
+2. Check if Python dependencies are installed, and run `pdm install` if needed
+
+You can also manually install Python dependencies:
+
+```bash
 # Install PDM (Python package manager)
 pip install --user pdm
 
@@ -172,6 +186,8 @@ Xenix/
 │   │   ├── task/[taskId].get.ts # Task status polling
 │   │   ├── results/[taskId].get.ts # Fetch model metrics
 │   │   └── logs/[taskId].get.ts # Fetch task logs
+│   ├── business/                # Core business logic
+│   │   └── mlPipeline.ts        # ML operations (tune, predict) with auto PDM setup
 │   ├── database/
 │   │   ├── schema.ts            # Database schema (tasks, model_results, logs)
 │   │   ├── index.ts             # Database client
@@ -190,22 +206,26 @@ Xenix/
 ### Data Manager
 
 #### POST /api/data
+
 Upload and register a dataset for reuse across tasks.
 
 **Request**: FormData with `file`, `name`, and optional `description` fields
 **Response**: `{ success: true, dataset: {...}, message: string }`
 
 #### GET /api/data
+
 List all available datasets.
 
 **Response**: `{ success: true, datasets: [...] }`
 
 #### GET /api/data/:id
+
 Get details of a specific dataset.
 
 **Response**: `{ success: true, dataset: {...} }`
 
 #### DELETE /api/data/:id
+
 Delete a dataset.
 
 **Response**: `{ success: true, message: string }`
@@ -215,27 +235,33 @@ See [Data Manager Documentation](docs/data-manager.md) for detailed usage.
 ### Training & Prediction
 
 ### POST /api/upload
+
 Upload training data and start hyperparameter tuning for a specific model.
 
 **Request**: FormData with either:
+
 - `file` and `model` fields (direct upload)
 - `datasetId` and `model` fields (use existing dataset)
 
 **Response**: `{ success: true, taskId: string, inputFile: string, message: string }`
 
 ### POST /api/predict
+
 Generate predictions using a selected model.
 
 **Request**: FormData with either:
+
 - `file`, `trainingDataPath`, `model`, and `outputFile` fields (direct upload)
 - `datasetId`, `trainingDatasetId`, `model`, and `tuningTaskId` fields (use datasets)
 
 **Response**: `{ success: true, taskId: string, message: string }`
 
 ### GET /api/task/:taskId
+
 Check the status and results of a background task.
 
-**Response**: 
+**Response**:
+
 ```json
 {
   "success": true,
@@ -249,9 +275,11 @@ Check the status and results of a background task.
 ```
 
 ### GET /api/results/:taskId
+
 Fetch evaluation metrics for a completed tuning task.
 
 **Response**:
+
 ```json
 {
   "success": true,
@@ -269,9 +297,11 @@ Fetch evaluation metrics for a completed tuning task.
 ```
 
 ### GET /api/logs/:taskId
+
 Fetch real-time logs for a task (OpenTelemetry-compliant).
 
 **Response**:
+
 ```json
 {
   "success": true,
@@ -289,24 +319,6 @@ Fetch real-time logs for a task (OpenTelemetry-compliant).
 
 ## Configuration
 
-### Data Column Configuration
-
-The default configuration is set up for customer value prediction with the following columns:
-
-```python
-# app/models/regression/config.py
-FEATURE_COLUMNS = [
-    'Historical Loan Amount',
-    'Number of Loans',
-    'Education',
-    'Monthly Income',
-    'Gender'
-]
-TARGET_COLUMN = 'Customer Value'
-```
-
-To use different column names, edit `app/models/regression/config.py` and update the `FEATURE_COLUMNS` and `TARGET_COLUMN` constants.
-
 ### Environment Variables
 
 Create a `.env` file from the example:
@@ -316,6 +328,7 @@ cp .env.example .env
 ```
 
 Available variables:
+
 - `DATABASE_URL` - PostgreSQL connection string (required)
 - `PYTHON_EXECUTABLE` - Python command to use (default: `python3`)
 
@@ -353,5 +366,4 @@ MIT
 
 ## Author
 
-Lanzhijiang (lanzhijiang@foxmail.com)
-
+Lanzhijiang (<lanzhijiang@foxmail.com>)

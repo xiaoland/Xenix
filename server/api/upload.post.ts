@@ -1,17 +1,21 @@
-import { db, schema } from '../database';
-import { generateTaskId, validateExcelFile, saveUploadedFile } from '../utils/taskUtils';
-import { executePythonTask } from '../utils/pythonExecutor';
-import { eq } from 'drizzle-orm';
-import path from 'path';
+import { db, schema } from "../database";
+import {
+  generateTaskId,
+  validateExcelFile,
+  saveUploadedFile,
+} from "../utils/taskUtils";
+import { tune } from "../business/ml";
+import { eq } from "drizzle-orm";
+import path from "path";
 
 export default defineEventHandler(async (event) => {
   try {
     const formData = await readFormData(event);
-    const file = formData.get('file') as File;
-    const datasetId = formData.get('datasetId') as string;
-    const model = formData.get('model') as string;
-    const featureColumns = formData.get('featureColumns') as string; // JSON string
-    const targetColumn = formData.get('targetColumn') as string;
+    const file = formData.get("file") as File;
+    const datasetId = formData.get("datasetId") as string;
+    const model = formData.get("model") as string;
+    const featureColumns = formData.get("featureColumns") as string; // JSON string
+    const targetColumn = formData.get("targetColumn") as string;
 
     let inputFile: string;
     let usedDatasetId: string | null = null;
@@ -28,7 +32,7 @@ export default defineEventHandler(async (event) => {
       if (!dataset) {
         throw createError({
           statusCode: 404,
-          message: 'Dataset not found',
+          message: "Dataset not found",
         });
       }
 
@@ -39,30 +43,31 @@ export default defineEventHandler(async (event) => {
       if (!validateExcelFile(file.name)) {
         throw createError({
           statusCode: 400,
-          message: 'Invalid file type. Only Excel files (.xlsx, .xls) are allowed.',
+          message:
+            "Invalid file type. Only Excel files (.xlsx, .xls) are allowed.",
         });
       }
 
-      const uploadDir = path.join(process.cwd(), 'uploads');
+      const uploadDir = path.join(process.cwd(), "uploads");
       inputFile = await saveUploadedFile(file, uploadDir);
     } else {
       throw createError({
         statusCode: 400,
-        message: 'Either file or datasetId is required',
+        message: "Either file or datasetId is required",
       });
     }
 
     if (!model) {
       throw createError({
         statusCode: 400,
-        message: 'Model name is required',
+        message: "Model name is required",
       });
     }
 
     if (!featureColumns || !targetColumn) {
       throw createError({
         statusCode: 400,
-        message: 'Feature columns and target column are required',
+        message: "Feature columns and target column are required",
       });
     }
 
@@ -75,32 +80,22 @@ export default defineEventHandler(async (event) => {
     // Create task record
     await db.insert(schema.tasks).values({
       taskId,
-      type: 'tuning',
-      status: 'pending',
+      type: "tuning",
+      status: "pending",
       model,
       datasetId: usedDatasetId,
       inputFile,
     });
 
-    // Get Python script path for generic tuning script
-    const scriptPath = path.join(process.cwd(), 'app', 'models', 'regression', 'tune_model.py');
-    
-    // Prepare stdin data
-    const stdinData = {
-      inputFile: inputFile,
-      model: model,
-      featureColumns: parsedFeatureColumns,
-      targetColumn: targetColumn
-    };
-    
-    // Execute Python task in background
+    // Execute tuning task in background using high-level wrapper
     setImmediate(() => {
-      executePythonTask({
-        script: scriptPath,
-        stdinData: stdinData,
+      tune({
+        inputFile,
+        model,
+        featureColumns: parsedFeatureColumns,
+        targetColumn,
         taskId,
-        cwd: path.join(process.cwd(), 'app', 'models', 'regression'),
-      }).catch(error => {
+      }).catch((error) => {
         console.error(`Failed to execute task ${taskId}:`, error);
       });
     });
@@ -111,13 +106,13 @@ export default defineEventHandler(async (event) => {
       inputFile, // Return the file path so UI can use it later
       featureColumns: parsedFeatureColumns,
       targetColumn: targetColumn,
-      message: 'Model tuning started',
+      message: "Model tuning started",
     };
   } catch (error) {
-    console.error('Upload error:', error);
+    console.error("Upload error:", error);
     throw createError({
       statusCode: 500,
-      message: error instanceof Error ? error.message : 'Failed to upload file',
+      message: error instanceof Error ? error.message : "Failed to upload file",
     });
   }
 });
