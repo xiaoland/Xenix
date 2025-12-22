@@ -9,30 +9,47 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 from typing import Dict, Any, Union, Optional, Callable
+from pydantic import BaseModel
 from sklearn.base import BaseEstimator
 
-from .base import RegressionModel, ProgressInfo
+from .base import RegressionModel, ProgressInfo, TuneResult
 
 
-class AdaBoostRegressionModel(RegressionModel[AdaBoostRegressor]):
+
+class AdaBoostParamGrid(BaseModel):
+    """Parameter grid for AdaBoostRegressionModel."""
+    n_estimators: list[int] = [50, 100, 150]
+    learning_rate: list[float] = [0.01, 0.1, 1.0]
+    estimator__max_depth: list[int] = [3, 5, 7]
+
+
+class AdaBoostRegressionModel(RegressionModel[AdaBoostRegressor, AdaBoostParamGrid]):
     """AdaBoost Regression model implementation."""
     
     @staticmethod
-    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> Dict[str, Any]:
+    def tune(X_train: pd.DataFrame, y_train: pd.Series, param_grid: Optional[AdaBoostParamGrid] = None, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> TuneResult:
         base_model = AdaBoostRegressor(
             estimator=DecisionTreeRegressor(max_depth=3),
             random_state=42
         )
     
-        param_grid = {
+        # Use provided param_grid or default
+        if param_grid is None:
+            param_grid_dict = {
             'n_estimators': [50, 100, 150],
             'learning_rate': [0.01, 0.1, 1.0],
             'estimator__max_depth': [3, 5, 7]
         }
+        else:
+            # Convert pydantic model to dict, excluding None values
+
+    
+            param_grid_dict = param_grid.model_dump(exclude_none=True)
+
     
         grid_search = GridSearchCV(
             estimator=base_model,
-            param_grid=param_grid,
+            param_grid=param_grid_dict,
             cv=5,
             scoring='neg_mean_squared_error',
             n_jobs=-1

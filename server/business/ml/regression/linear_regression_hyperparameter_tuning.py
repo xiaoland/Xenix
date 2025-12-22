@@ -6,6 +6,7 @@ All functions accept pandas DataFrames instead of file paths.
 """
 
 from typing import Dict, Any, Union, Optional, Callable
+from pydantic import BaseModel
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import GridSearchCV
@@ -14,14 +15,21 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.base import BaseEstimator
 
-from .base import RegressionModel, ProgressInfo
+from .base import RegressionModel, ProgressInfo, TuneResult
 
 
-class LinearRegressionModel(RegressionModel[Pipeline]):
+
+class LinearRegressionParamGrid(BaseModel):
+    """Parameter grid for LinearRegressionModel."""
+    model__fit_intercept: list[bool] = [True, False]
+    model__copy_X: list[bool] = [True, False]
+
+
+class LinearRegressionModel(RegressionModel[Pipeline, LinearRegressionParamGrid]):
     """Linear Regression model implementation."""
     
     @staticmethod
-    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> Dict[str, Any]:
+    def tune(X_train: pd.DataFrame, y_train: pd.Series, param_grid: Optional[LinearRegressionParamGrid] = None, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> TuneResult:
         """
         Perform hyperparameter tuning for Linear regression.
         
@@ -37,14 +45,22 @@ class LinearRegressionModel(RegressionModel[Pipeline]):
             ("model", LinearRegression())
         ])
         
-        param_grid = {
+        # Use provided param_grid or default
+        if param_grid is None:
+            param_grid_dict = {
             'model__fit_intercept': [True, False],
             'model__copy_X': [True, False]
         }
+        else:
+            # Convert pydantic model to dict, excluding None values
+
+        
+            param_grid_dict = param_grid.model_dump(exclude_none=True)
+
         
         grid_search = GridSearchCV(
             estimator=base_model,
-            param_grid=param_grid,
+            param_grid=param_grid_dict,
             cv=5,
             scoring='neg_mean_squared_error',
             n_jobs=-1

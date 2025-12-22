@@ -6,20 +6,29 @@ All functions accept pandas DataFrames instead of file paths.
 """
 
 from typing import Dict, Any, Union, Optional, Callable
+from pydantic import BaseModel
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.base import BaseEstimator
 
-from .base import RegressionModel, ProgressInfo
+from .base import RegressionModel, ProgressInfo, TuneResult
 
 
-class RandomForestRegressionModel(RegressionModel[RandomForestRegressor]):
+
+class RandomForestParamGrid(BaseModel):
+    """Parameter grid for RandomForestRegressionModel."""
+    n_estimators: list[int] = [50, 100, 200]
+    max_depth: list[int | None] = [5, 10, None]
+    min_samples_split: list[int] = [2, 5]
+
+
+class RandomForestRegressionModel(RegressionModel[RandomForestRegressor, RandomForestParamGrid]):
     """Random Forest Regression model implementation."""
     
     @staticmethod
-    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> Dict[str, Any]:
+    def tune(X_train: pd.DataFrame, y_train: pd.Series, param_grid: Optional[RandomForestParamGrid] = None, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> TuneResult:
         """
         Perform hyperparameter tuning for Random Forest regression.
         
@@ -32,15 +41,23 @@ class RandomForestRegressionModel(RegressionModel[RandomForestRegressor]):
         """
         base_model = RandomForestRegressor(random_state=42, n_jobs=-1)
         
-        param_grid = {
+        # Use provided param_grid or default
+        if param_grid is None:
+            param_grid_dict = {
             'n_estimators': [50, 100, 200],
             'max_depth': [5, 10, None],
             'min_samples_split': [2, 5]
         }
+        else:
+            # Convert pydantic model to dict, excluding None values
+
+        
+            param_grid_dict = param_grid.model_dump(exclude_none=True)
+
         
         grid_search = GridSearchCV(
             estimator=base_model,
-            param_grid=param_grid,
+            param_grid=param_grid_dict,
             cv=5,
             scoring='neg_mean_squared_error',
             n_jobs=-1

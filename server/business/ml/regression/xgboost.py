@@ -12,31 +12,48 @@ except ImportError:
     raise ImportError("XGBoost is not installed. Please install it with: pip install xgboost")
 
 from typing import Dict, Any, Union, Optional, Callable
+from pydantic import BaseModel
 from sklearn.base import BaseEstimator
 
-from .base import RegressionModel, ProgressInfo
+from .base import RegressionModel, ProgressInfo, TuneResult
 
 
-class XGBoostRegressionModel(RegressionModel[XGBRegressor]):
+
+class XGBoostParamGrid(BaseModel):
+    """Parameter grid for XGBoostRegressionModel."""
+    n_estimators: list[int] = [50, 100, 150]
+    learning_rate: list[float] = [0.01, 0.1, 0.2]
+    max_depth: list[int] = [3, 5, 7]
+
+
+class XGBoostRegressionModel(RegressionModel[XGBRegressor, XGBoostParamGrid]):
     """XGBoost Regression model implementation."""
     
     @staticmethod
-    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> Dict[str, Any]:
+    def tune(X_train: pd.DataFrame, y_train: pd.Series, param_grid: Optional[XGBoostParamGrid] = None, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> TuneResult:
         base_model = XGBRegressor(
             objective="reg:squarederror",
             random_state=42,
             n_jobs=-1
         )
     
-        param_grid = {
+        # Use provided param_grid or default
+        if param_grid is None:
+            param_grid_dict = {
             'n_estimators': [50, 100, 150],
             'learning_rate': [0.01, 0.1, 0.2],
             'max_depth': [3, 5, 7]
         }
+        else:
+            # Convert pydantic model to dict, excluding None values
+
+    
+            param_grid_dict = param_grid.model_dump(exclude_none=True)
+
     
         grid_search = GridSearchCV(
             estimator=base_model,
-            param_grid=param_grid,
+            param_grid=param_grid_dict,
             cv=5,
             scoring='neg_mean_squared_error',
             n_jobs=-1

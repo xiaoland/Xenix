@@ -8,27 +8,44 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 from typing import Dict, Any, Union, Optional, Callable
+from pydantic import BaseModel
 from sklearn.base import BaseEstimator
 
-from .base import RegressionModel, ProgressInfo
+from .base import RegressionModel, ProgressInfo, TuneResult
 
 
-class DecisionTreeRegressionModel(RegressionModel[DecisionTreeRegressor]):
+
+class DecisionTreeParamGrid(BaseModel):
+    """Parameter grid for DecisionTreeRegressionModel."""
+    max_depth: list[int | None] = [5, 10, 20, None]
+    min_samples_split: list[int] = [2, 5, 10]
+    min_samples_leaf: list[int] = [1, 2, 4]
+
+
+class DecisionTreeRegressionModel(RegressionModel[DecisionTreeRegressor, DecisionTreeParamGrid]):
     """DecisionTree Regression model implementation."""
     
     @staticmethod
-    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> Dict[str, Any]:
+    def tune(X_train: pd.DataFrame, y_train: pd.Series, param_grid: Optional[DecisionTreeParamGrid] = None, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> TuneResult:
         base_model = DecisionTreeRegressor(random_state=42)
     
-        param_grid = {
+        # Use provided param_grid or default
+        if param_grid is None:
+            param_grid_dict = {
             'max_depth': [3, 5, 7, 10, None],
             'min_samples_split': [2, 5, 10],
             'min_samples_leaf': [1, 2, 4]
         }
+        else:
+            # Convert pydantic model to dict, excluding None values
+
+    
+            param_grid_dict = param_grid.model_dump(exclude_none=True)
+
     
         grid_search = GridSearchCV(
             estimator=base_model,
-            param_grid=param_grid,
+            param_grid=param_grid_dict,
             cv=5,
             scoring='neg_mean_squared_error',
             n_jobs=-1

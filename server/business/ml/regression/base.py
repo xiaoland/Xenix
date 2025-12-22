@@ -9,6 +9,7 @@ from typing import Dict, Any, Union, Optional, Callable, TypeVar, Generic, Typed
 import pandas as pd
 from sklearn.base import BaseEstimator
 from sklearn.pipeline import Pipeline
+from pydantic import BaseModel
 
 
 class ProgressInfo(TypedDict):
@@ -31,8 +32,11 @@ class TuneResult(TypedDict):
 # Type variable for model type
 ModelType = TypeVar("ModelType", bound=Union[BaseEstimator, Pipeline])
 
+# Type variable for parameter grid type
+ParamGridType = TypeVar("ParamGridType", bound=BaseModel)
 
-class RegressionModel(ABC, Generic[ModelType]):
+
+class RegressionModel(ABC, Generic[ModelType, ParamGridType]):
     """
     Abstract base class for regression models.
 
@@ -41,6 +45,7 @@ class RegressionModel(ABC, Generic[ModelType]):
 
     Type Parameters:
         ModelType: The specific sklearn model type (Pipeline or BaseEstimator subclass)
+        ParamGridType: The parameter grid model type (pydantic BaseModel subclass)
     """
 
     @staticmethod
@@ -48,7 +53,8 @@ class RegressionModel(ABC, Generic[ModelType]):
     def tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
-        upd_pg: Callable[[ProgressInfo], None],
+        param_grid: Optional[ParamGridType] = None,
+        upd_pg: Optional[Callable[[ProgressInfo], None]] = None,
     ) -> TuneResult:
         """
         Perform hyperparameter tuning for the regression model.
@@ -56,7 +62,9 @@ class RegressionModel(ABC, Generic[ModelType]):
         Args:
             X_train: Training features as DataFrame
             y_train: Training target as Series
-            upd_pg: Callback function for progress updates.
+            param_grid: Optional parameter grid as pydantic BaseModel instance
+                If None, uses default parameter grid for the model
+            upd_pg: Optional callback function for progress updates.
                 Called with a ProgressInfo dict containing:
                 - percentage: Progress percentage (0-100)
                 - round: Current round/iteration number

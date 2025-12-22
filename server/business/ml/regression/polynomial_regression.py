@@ -10,29 +10,44 @@ from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 from typing import Dict, Any, Union, Optional, Callable
+from pydantic import BaseModel
 from sklearn.base import BaseEstimator
 
-from .base import RegressionModel, ProgressInfo
+from .base import RegressionModel, ProgressInfo, TuneResult
 
 
-class PolynomialRegressionModel(RegressionModel[Pipeline]):
+
+class PolynomialParamGrid(BaseModel):
+    """Parameter grid for PolynomialRegressionModel."""
+    poly__degree: list[int] = [2, 3, 4]
+
+
+class PolynomialRegressionModel(RegressionModel[Pipeline, PolynomialParamGrid]):
     """Polynomial Regression model implementation."""
     
     @staticmethod
-    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> Dict[str, Any]:
+    def tune(X_train: pd.DataFrame, y_train: pd.Series, param_grid: Optional[PolynomialParamGrid] = None, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> TuneResult:
         base_model = Pipeline([
             ("poly", PolynomialFeatures(degree=2, include_bias=False)),
             ("scaler", StandardScaler()),
             ("model", LinearRegression())
         ])
     
-        param_grid = {
+        # Use provided param_grid or default
+        if param_grid is None:
+            param_grid_dict = {
             'poly__degree': [2, 3, 4]
         }
+        else:
+            # Convert pydantic model to dict, excluding None values
+
+    
+            param_grid_dict = param_grid.model_dump(exclude_none=True)
+
     
         grid_search = GridSearchCV(
             estimator=base_model,
-            param_grid=param_grid,
+            param_grid=param_grid_dict,
             cv=5,
             scoring='neg_mean_squared_error',
             n_jobs=-1
