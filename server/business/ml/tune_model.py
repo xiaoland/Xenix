@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generic hyperparameter tuning script using modular model definitions.
-Each model is imported as a module with tune(), evaluate(), and predict() functions.
+Each model is imported as a module with a Model class providing tune(), evaluate(), and predict() methods.
 Outputs structured JSON to stdout for the Node.js executor to parse.
 """
 import json
@@ -79,13 +79,14 @@ def main():
         )
         logger.info(f"Train set: {len(X_train)} samples, Test set: {len(X_test)} samples")
         
-        # Import model module
+        # Import model module and get Model class
         logger.info(f"Importing model module for {model_name}")
         model_module = import_model_module(model_name)
+        Model = model_module.Model
         
         # Perform hyperparameter tuning using the model's tune function
         logger.info(f"Starting hyperparameter tuning with GridSearchCV")
-        tune_result = model_module.tune(X_train, y_train)
+        tune_result = Model.tune(X_train, y_train)
         
         best_params = tune_result['best_params']
         best_model = tune_result['model']
@@ -94,8 +95,8 @@ def main():
         
         # Evaluate on train and test sets using the model's evaluate function
         logger.info("Evaluating best model on train and test sets")
-        train_metrics = model_module.evaluate(best_model, X_train, y_train)
-        test_metrics = model_module.evaluate(best_model, X_test, y_test)
+        train_metrics = Model.evaluate(best_model, X_train, y_train)
+        test_metrics = Model.evaluate(best_model, X_test, y_test)
         
         # Combine metrics
         metrics = {

@@ -70,22 +70,5 @@ class DecisionTreeRegressionModel(RegressionModel):
         return model
 
 
-# Provide module-level functions for backward compatibility
-def tune(X_train: pd.DataFrame, y_train: pd.Series) -> Dict[str, Any]:
-    """Module-level tune function for backward compatibility."""
-    return DecisionTreeRegressionModel.tune(X_train, y_train)
-
-
-def evaluate(model: Union[BaseEstimator, DecisionTreeRegressor], X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
-    """Module-level evaluate function for backward compatibility."""
-    return DecisionTreeRegressionModel.evaluate(model, X, y)
-
-
-def predict(model: Union[BaseEstimator, DecisionTreeRegressor], X: pd.DataFrame) -> pd.Series:
-    """Module-level predict function for backward compatibility."""
-    return DecisionTreeRegressionModel.predict(model, X)
-
-
-def create_model(params: Optional[Dict[str, Any]] = None) -> DecisionTreeRegressor:
-    """Module-level create_model function for backward compatibility."""
-    return DecisionTreeRegressionModel.create_model(params)
+# Alias for the model class
+Model = DecisionTreeRegressionModel

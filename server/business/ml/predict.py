@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Batch prediction script using modular model definitions.
-Each model is imported as a module with tune(), evaluate(), and predict() functions.
+Each model is imported as a module with a Model class providing tune(), evaluate(), and predict() methods.
 Reads all configuration from stdin JSON (no database interactions).
 Outputs structured JSON to stdout.
 """
@@ -71,9 +71,10 @@ def main():
         logger.info(f"Starting batch prediction using {model_name}")
         logger.info(f"Parameters: {params}")
         
-        # Import model module
+        # Import model module and get Model class
         logger.info(f"Importing model module for {model_name}")
         model_module = import_model_module(model_name)
+        Model = model_module.Model
         
         # Load training data and train model with best parameters
         logger.info(f"Loading training data from {training_data_path}")
@@ -83,9 +84,9 @@ def main():
         X_train = training_df[feature_columns]
         y_train = training_df[target_column]
         
-        # Create model with tuned parameters using the module's create_model function
+        # Create model with tuned parameters using the Model class's create_model method
         logger.info(f"Creating {model_name} with tuned parameters")
-        model = model_module.create_model(params)
+        model = Model.create_model(params)
         
         # Train the model on full training dataset
         logger.info("Training model on full training dataset")
@@ -97,10 +98,10 @@ def main():
         prediction_df = pd.read_excel(prediction_data_path)
         logger.info(f"Prediction data loaded: {len(prediction_df)} rows")
         
-        # Make predictions using the model's predict function
+        # Make predictions using the Model class's predict method
         logger.info("Generating predictions")
         X_pred = prediction_df[feature_columns]
-        predictions = model_module.predict(model, X_pred)
+        predictions = Model.predict(model, X_pred)
         
         # Add predictions to dataframe
         prediction_df['Predicted_Value'] = predictions.values

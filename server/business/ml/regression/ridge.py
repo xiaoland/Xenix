@@ -119,22 +119,5 @@ class RidgeRegression(RegressionModel):
         return model
 
 
-# Provide module-level functions for backward compatibility
-def tune(X_train: pd.DataFrame, y_train: pd.Series) -> Dict[str, Any]:
-    """Module-level tune function for backward compatibility."""
-    return RidgeRegression.tune(X_train, y_train)
-
-
-def evaluate(model: Union[BaseEstimator, Pipeline], X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
-    """Module-level evaluate function for backward compatibility."""
-    return RidgeRegression.evaluate(model, X, y)
-
-
-def predict(model: Union[BaseEstimator, Pipeline], X: pd.DataFrame) -> pd.Series:
-    """Module-level predict function for backward compatibility."""
-    return RidgeRegression.predict(model, X)
-
-
-def create_model(params: Optional[Dict[str, Any]] = None) -> Pipeline:
-    """Module-level create_model function for backward compatibility."""
-    return RidgeRegression.create_model(params)
+# Alias for the model class
+Model = RidgeRegression
