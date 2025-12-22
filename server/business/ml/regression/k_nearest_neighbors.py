@@ -9,7 +9,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
-from typing import Dict, Any, Union, Optional
+from typing import Dict, Any, Union, Optional, Callable
 from sklearn.base import BaseEstimator
 
 from .base import RegressionModel
@@ -19,7 +19,7 @@ class KNNRegressionModel(RegressionModel):
     """KNN Regression model implementation."""
     
     @staticmethod
-    def tune(X_train: pd.DataFrame, y_train: pd.Series) -> Dict[str, Any]:
+    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[float, int, int, Dict[str, float], Dict[str, Any]], None]] = None) -> Dict[str, Any]:
         base_model = Pipeline([
             ("scaler", StandardScaler()),
             ("model", KNeighborsRegressor())

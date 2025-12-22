@@ -7,7 +7,7 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
-from typing import Dict, Any, Union, Optional
+from typing import Dict, Any, Union, Optional, Callable
 from sklearn.base import BaseEstimator
 
 from .base import RegressionModel
@@ -17,7 +17,7 @@ class DecisionTreeRegressionModel(RegressionModel):
     """DecisionTree Regression model implementation."""
     
     @staticmethod
-    def tune(X_train: pd.DataFrame, y_train: pd.Series) -> Dict[str, Any]:
+    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[float, int, int, Dict[str, float], Dict[str, Any]], None]] = None) -> Dict[str, Any]:
         base_model = DecisionTreeRegressor(random_state=42)
     
         param_grid = {

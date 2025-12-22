@@ -20,7 +20,7 @@ sys.path.append(str(Path(__file__).parent))
 from structured_output import get_logger, emit_result
 
 # Import base utilities
-from base import import_model_module
+from base import import_model
 
 # Import basic sklearn libraries
 from sklearn.model_selection import train_test_split
@@ -79,14 +79,22 @@ def main():
         )
         logger.info(f"Train set: {len(X_train)} samples, Test set: {len(X_test)} samples")
         
-        # Import model module and get Model class
-        logger.info(f"Importing model module for {model_name}")
-        model_module = import_model_module(model_name)
-        Model = model_module.Model
+        # Import Model class directly
+        logger.info(f"Importing model for {model_name}")
+        Model = import_model(model_name)
+        
+        # Define progress callback
+        def progress_callback(percentage: float, round: int, total_rounds: int, metrics: dict, params: dict) -> None:
+            """Log progress during hyperparameter tuning"""
+            logger.info(f"Progress: {percentage:.1f}% - Round {round}/{total_rounds}")
+            if metrics:
+                logger.info(f"  Current metrics: {metrics}")
+            if params:
+                logger.info(f"  Current params: {params}")
         
         # Perform hyperparameter tuning using the model's tune function
         logger.info(f"Starting hyperparameter tuning with GridSearchCV")
-        tune_result = Model.tune(X_train, y_train)
+        tune_result = Model.tune(X_train, y_train, progress_callback=progress_callback)
         
         best_params = tune_result['best_params']
         best_model = tune_result['model']

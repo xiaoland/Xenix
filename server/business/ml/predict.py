@@ -21,7 +21,7 @@ sys.path.append(str(Path(__file__).parent))
 from structured_output import get_logger, emit_log
 
 # Import base utilities
-from base import import_model_module
+from base import import_model
 
 
 def main():
@@ -71,10 +71,9 @@ def main():
         logger.info(f"Starting batch prediction using {model_name}")
         logger.info(f"Parameters: {params}")
         
-        # Import model module and get Model class
-        logger.info(f"Importing model module for {model_name}")
-        model_module = import_model_module(model_name)
-        Model = model_module.Model
+        # Import Model class directly
+        logger.info(f"Importing model for {model_name}")
+        Model = import_model(model_name)
         
         # Load training data and train model with best parameters
         logger.info(f"Loading training data from {training_data_path}")

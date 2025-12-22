@@ -5,7 +5,7 @@ This module provides tune, evaluate, and predict functions for Random Forest reg
 All functions accept pandas DataFrames instead of file paths.
 """
 
-from typing import Dict, Any, Union, Optional
+from typing import Dict, Any, Union, Optional, Callable
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import GridSearchCV
@@ -19,7 +19,7 @@ class RandomForestRegressionModel(RegressionModel):
     """Random Forest Regression model implementation."""
     
     @staticmethod
-    def tune(X_train: pd.DataFrame, y_train: pd.Series) -> Dict[str, Any]:
+    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[float, int, int, Dict[str, float], Dict[str, Any]], None]] = None) -> Dict[str, Any]:
         """
         Perform hyperparameter tuning for Random Forest regression.
         

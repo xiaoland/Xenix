@@ -11,7 +11,7 @@ try:
 except ImportError:
     raise ImportError("XGBoost is not installed. Please install it with: pip install xgboost")
 
-from typing import Dict, Any, Union, Optional
+from typing import Dict, Any, Union, Optional, Callable
 from sklearn.base import BaseEstimator
 
 from .base import RegressionModel
@@ -21,7 +21,7 @@ class XGBoostRegressionModel(RegressionModel):
     """XGBoost Regression model implementation."""
     
     @staticmethod
-    def tune(X_train: pd.DataFrame, y_train: pd.Series) -> Dict[str, Any]:
+    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[float, int, int, Dict[str, float], Dict[str, Any]], None]] = None) -> Dict[str, Any]:
         base_model = XGBRegressor(
             objective="reg:squarederror",
             random_state=42,
