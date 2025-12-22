@@ -6,14 +6,16 @@ if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL environment variable is required. Please set it in your .env file.');
 }
 
+const databaseUrl = process.env.DATABASE_URL;
+
 // Determine database type
 const databaseType = getDatabaseType();
 const dialect = databaseType === 'sqlite' ? 'sqlite' : 'postgresql';
 
-// For SQLite, remove the sqlite:// prefix if present for drizzle-kit
+// For SQLite, remove the sqlite:// or file: prefix if present for drizzle-kit
 const dbUrl = databaseType === 'sqlite' 
-  ? process.env.DATABASE_URL.replace(/^sqlite:\/\//, '')
-  : process.env.DATABASE_URL;
+  ? databaseUrl.replace(/^(sqlite:\/\/|file:)/, '')
+  : databaseUrl;
 
 export default defineConfig({
   schema: './server/database/schema.ts',

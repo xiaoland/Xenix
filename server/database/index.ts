@@ -16,8 +16,8 @@ if (databaseType === 'sqlite') {
   const { drizzle } = await import('drizzle-orm/better-sqlite3');
   const Database = (await import('better-sqlite3')).default;
   
-  // Extract database path from sqlite://path format
-  const dbPath = connectionString.replace(/^sqlite:\/\//, '');
+  // Extract database path from sqlite:// or file: prefix
+  const dbPath = connectionString.replace(/^(sqlite:\/\/|file:)/, '');
   const sqlite = new Database(dbPath);
   
   db = drizzle(sqlite, { schema });
