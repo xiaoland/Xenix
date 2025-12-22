@@ -67,3 +67,9 @@ output.xlsx
 
 # Database migrations
 server/database/migrations/
+
+# SQLite database files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

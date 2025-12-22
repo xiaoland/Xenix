@@ -1,5 +1,3 @@
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
 import * as schema from './schema';
 
 // Ensure DATABASE_URL is provided
@@ -9,10 +7,29 @@ if (!process.env.DATABASE_URL) {
 
 const connectionString = process.env.DATABASE_URL;
 
-// Create postgres client
-const client = postgres(connectionString);
+// Determine database type from environment variable or DATABASE_URL
+const databaseType = process.env.DATABASE_TYPE || 
+  (connectionString.startsWith('sqlite') ? 'sqlite' : 'postgresql');
 
-// Create drizzle instance
-export const db = drizzle(client, { schema });
+let db: any;
 
-export { schema };
+if (databaseType === 'sqlite') {
+  // Use SQLite
+  const { drizzle } = await import('drizzle-orm/better-sqlite3');
+  const Database = (await import('better-sqlite3')).default;
+  
+  // Extract database path from sqlite://path format
+  const dbPath = connectionString.replace(/^sqlite:\/\//, '');
+  const sqlite = new Database(dbPath);
+  
+  db = drizzle(sqlite, { schema });
+} else {
+  // Use PostgreSQL
+  const { drizzle } = await import('drizzle-orm/postgres-js');
+  const postgres = (await import('postgres')).default;
+  
+  const client = postgres(connectionString);
+  db = drizzle(client, { schema });
+}
+
+export { db, schema };
