@@ -1,4 +1,5 @@
 import * as schema from './schema';
+import { getDatabaseType } from './utils';
 
 // Ensure DATABASE_URL is provided
 if (!process.env.DATABASE_URL) {
@@ -6,10 +7,7 @@ if (!process.env.DATABASE_URL) {
 }
 
 const connectionString = process.env.DATABASE_URL;
-
-// Determine database type from environment variable or DATABASE_URL
-const databaseType = process.env.DATABASE_TYPE || 
-  (connectionString.startsWith('sqlite') ? 'sqlite' : 'postgresql');
+const databaseType = getDatabaseType();
 
 let db: any;
 

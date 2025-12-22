@@ -3,11 +3,9 @@
 
 import { pgTable, serial, text as pgText, varchar as pgVarchar, timestamp, jsonb, integer as pgInteger, bigint } from 'drizzle-orm/pg-core';
 import { sqliteTable, text as sqliteText, integer as sqliteInteger } from 'drizzle-orm/sqlite-core';
+import { getDatabaseType } from './utils';
 
-const databaseType = process.env.DATABASE_TYPE || 
-  (process.env.DATABASE_URL?.startsWith('sqlite') ? 'sqlite' : 'postgresql');
-
-const isPostgres = databaseType === 'postgresql';
+const isPostgres = getDatabaseType() === 'postgresql';
 
 // For PostgreSQL
 const pgDatasets = pgTable('datasets', {
