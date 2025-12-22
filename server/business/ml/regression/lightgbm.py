@@ -41,15 +41,9 @@ class LightGBMRegressionModel(RegressionModel[LGBMRegressor, LightGBMParamGrid])
     
         # Use provided param_grid or default
         if param_grid is None:
-            param_grid_dict = {
-            'n_estimators': [50, 100, 150],
-            'learning_rate': [0.01, 0.1, 0.2],
-            'max_depth': [3, 5, 7]
-        }
+            param_grid_dict = LightGBMParamGrid().model_dump()
         else:
             # Convert pydantic model to dict, excluding None values
-
-    
             param_grid_dict = param_grid.model_dump(exclude_none=True)
 
     

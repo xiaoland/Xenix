@@ -47,9 +47,7 @@ class RidgeRegression(RegressionModel[Pipeline, RidgeParamGrid]):
         
         # Use provided param_grid or default
         if param_grid is None:
-            param_grid_dict = {
-                'model__alpha': [0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 100.0]
-            }
+            param_grid_dict = RidgeParamGrid().model_dump()
         else:
             # Convert pydantic model to dict, excluding None values
             param_grid_dict = param_grid.model_dump(exclude_none=True)

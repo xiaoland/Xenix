@@ -43,15 +43,9 @@ class RandomForestRegressionModel(RegressionModel[RandomForestRegressor, RandomF
         
         # Use provided param_grid or default
         if param_grid is None:
-            param_grid_dict = {
-            'n_estimators': [50, 100, 200],
-            'max_depth': [5, 10, None],
-            'min_samples_split': [2, 5]
-        }
+            param_grid_dict = RandomForestParamGrid().model_dump()
         else:
             # Convert pydantic model to dict, excluding None values
-
-        
             param_grid_dict = param_grid.model_dump(exclude_none=True)
 
         

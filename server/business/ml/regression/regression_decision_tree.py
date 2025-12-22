@@ -31,15 +31,9 @@ class DecisionTreeRegressionModel(RegressionModel[DecisionTreeRegressor, Decisio
     
         # Use provided param_grid or default
         if param_grid is None:
-            param_grid_dict = {
-            'max_depth': [3, 5, 7, 10, None],
-            'min_samples_split': [2, 5, 10],
-            'min_samples_leaf': [1, 2, 4]
-        }
+            param_grid_dict = DecisionTreeParamGrid().model_dump()
         else:
             # Convert pydantic model to dict, excluding None values
-
-    
             param_grid_dict = param_grid.model_dump(exclude_none=True)
 
     

@@ -35,17 +35,10 @@ class AdaBoostRegressionModel(RegressionModel[AdaBoostRegressor, AdaBoostParamGr
     
         # Use provided param_grid or default
         if param_grid is None:
-            param_grid_dict = {
-            'n_estimators': [50, 100, 150],
-            'learning_rate': [0.01, 0.1, 1.0],
-            'estimator__max_depth': [3, 5, 7]
-        }
+            param_grid_dict = AdaBoostParamGrid().model_dump()
         else:
             # Convert pydantic model to dict, excluding None values
-
-    
             param_grid_dict = param_grid.model_dump(exclude_none=True)
-
     
         grid_search = GridSearchCV(
             estimator=base_model,

@@ -35,13 +35,9 @@ class PolynomialRegressionModel(RegressionModel[Pipeline, PolynomialParamGrid]):
     
         # Use provided param_grid or default
         if param_grid is None:
-            param_grid_dict = {
-            'poly__degree': [2, 3, 4]
-        }
+            param_grid_dict = PolynomialParamGrid().model_dump()
         else:
             # Convert pydantic model to dict, excluding None values
-
-    
             param_grid_dict = param_grid.model_dump(exclude_none=True)
 
     

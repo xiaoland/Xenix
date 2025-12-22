@@ -47,14 +47,9 @@ class LinearRegressionModel(RegressionModel[Pipeline, LinearRegressionParamGrid]
         
         # Use provided param_grid or default
         if param_grid is None:
-            param_grid_dict = {
-            'model__fit_intercept': [True, False],
-            'model__copy_X': [True, False]
-        }
+            param_grid_dict = LinearRegressionParamGrid().model_dump()
         else:
             # Convert pydantic model to dict, excluding None values
-
-        
             param_grid_dict = param_grid.model_dump(exclude_none=True)
 
         

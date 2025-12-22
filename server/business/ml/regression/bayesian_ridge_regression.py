@@ -35,16 +35,9 @@ class BayesianRidgeRegressionModel(RegressionModel[Pipeline, BayesianRidgeParamG
     
         # Use provided param_grid or default
         if param_grid is None:
-            param_grid_dict = {
-            'model__alpha_1': [1e-6, 1e-5, 1e-4],
-            'model__alpha_2': [1e-6, 1e-5, 1e-4],
-            'model__lambda_1': [1e-6, 1e-5, 1e-4],
-            'model__lambda_2': [1e-6, 1e-5, 1e-4]
-        }
+            param_grid_dict = BayesianRidgeParamGrid().model_dump()
         else:
             # Convert pydantic model to dict, excluding None values
-
-    
             param_grid_dict = param_grid.model_dump(exclude_none=True)
 
     

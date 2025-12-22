@@ -35,14 +35,9 @@ class KNNRegressionModel(RegressionModel[Pipeline, KNNParamGrid]):
     
         # Use provided param_grid or default
         if param_grid is None:
-            param_grid_dict = {
-            'model__n_neighbors': [3, 5, 7, 9, 11],
-            'model__weights': ['uniform', 'distance']
-        }
+            param_grid_dict = KNNParamGrid().model_dump()
         else:
             # Convert pydantic model to dict, excluding None values
-
-    
             param_grid_dict = param_grid.model_dump(exclude_none=True)
 
     
