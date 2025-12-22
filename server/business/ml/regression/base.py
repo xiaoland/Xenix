@@ -37,14 +37,14 @@ class RegressionModel(ABC, Generic[ModelType]):
     
     @staticmethod
     @abstractmethod
-    def tune(X_train: pd.DataFrame, y_train: pd.Series, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> Dict[str, Any]:
+    def tune(X_train: pd.DataFrame, y_train: pd.Series, upd_pg: Callable[[ProgressInfo], None]) -> Dict[str, Any]:
         """
         Perform hyperparameter tuning for the regression model.
         
         Args:
             X_train: Training features as DataFrame
             y_train: Training target as Series
-            progress_callback: Optional callback function for progress updates.
+            upd_pg: Callback function for progress updates.
                 Called with a ProgressInfo dict containing:
                 - percentage: Progress percentage (0-100)
                 - round: Current round/iteration number
