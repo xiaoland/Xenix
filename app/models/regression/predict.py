@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Batch prediction script using trained model parameters.
+Batch prediction script using modular model definitions.
+Each model is imported as a module with tune(), evaluate(), and predict() functions.
 Reads all configuration from stdin JSON (no database interactions).
 Outputs structured JSON to stdout.
 """
@@ -8,6 +9,7 @@ import json
 import sys
 import warnings
 import pandas as pd
+import importlib
 from pathlib import Path
 
 # Suppress warnings
@@ -19,96 +21,35 @@ sys.path.append(str(Path(__file__).parent))
 # Import structured output utilities
 from structured_output import get_logger, emit_log
 
-# Import basic sklearn libraries
-from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler, PolynomialFeatures
+
+def get_model_module_name(model_name: str) -> str:
+    """Convert model name to module name"""
+    model_module_map = {
+        "Linear_Regression_Hyperparameter_Tuning": "linear_regression_hyperparameter_tuning_module",
+        "Ridge": "ridge_module",
+        "Lasso": "lasso_module",
+        "Bayesian_Ridge_Regression": "bayesian_ridge_regression_module",
+        "K-Nearest_Neighbors": "k_nearest_neighbors_module",
+        "Regression_Decision_Tree": "regression_decision_tree_module",
+        "Random_Forest": "random_forest_module",
+        "GBDT": "gbdt_module",
+        "AdaBoost": "adaboost_module",
+        "XGBoost": "xgboost_module",
+        "LightGBM": "lightgbm_module",
+        "Polynomial_Regression": "polynomial_regression_module"
+    }
+    
+    return model_module_map.get(model_name, model_name.lower().replace("-", "_").replace(" ", "_") + "_module")
 
 
-def import_model_class(model_name):
-    """Lazy import model classes only when needed"""
-    if model_name == "Linear_Regression_Hyperparameter_Tuning":
-        from sklearn.linear_model import LinearRegression
-        return LinearRegression
-    elif model_name == "Ridge":
-        from sklearn.linear_model import Ridge
-        return Ridge
-    elif model_name == "Lasso":
-        from sklearn.linear_model import Lasso
-        return Lasso
-    elif model_name == "Bayesian_Ridge_Regression":
-        from sklearn.linear_model import BayesianRidge
-        return BayesianRidge
-    elif model_name == "K-Nearest_Neighbors":
-        from sklearn.neighbors import KNeighborsRegressor
-        return KNeighborsRegressor
-    elif model_name == "Regression_Decision_Tree":
-        from sklearn.tree import DecisionTreeRegressor
-        return DecisionTreeRegressor
-    elif model_name == "Random_Forest":
-        from sklearn.ensemble import RandomForestRegressor
-        return RandomForestRegressor
-    elif model_name == "GBDT":
-        from sklearn.ensemble import GradientBoostingRegressor
-        return GradientBoostingRegressor
-    elif model_name == "AdaBoost":
-        from sklearn.ensemble import AdaBoostRegressor
-        return AdaBoostRegressor
-    elif model_name == "XGBoost":
-        try:
-            from xgboost import XGBRegressor
-            return XGBRegressor
-        except ImportError:
-            raise ImportError("XGBoost is not installed. Please install it with: pip install xgboost")
-    elif model_name == "LightGBM":
-        try:
-            from lightgbm import LGBMRegressor
-            return LGBMRegressor
-        except ImportError:
-            raise ImportError("LightGBM is not installed. Please install it with: pip install lightgbm")
-    elif model_name == "Polynomial_Regression":
-        from sklearn.linear_model import LinearRegression
-        return LinearRegression
-    else:
-        raise ValueError(f"Unknown model: {model_name}")
-
-
-def build_model_from_params(model_name, params):
-    """Build a model instance with the given parameters"""
-    ModelClass = import_model_class(model_name)
+def import_model_module(model_name: str):
+    """Dynamically import model module"""
+    module_name = get_model_module_name(model_name)
     
-    # Extract parameters based on model type
-    if model_name in ["Linear_Regression_Hyperparameter_Tuning", "Ridge", "Lasso", "Bayesian_Ridge_Regression", "K-Nearest_Neighbors"]:
-        # These use pipeline with scaler
-        model_params = {k.replace('model__', ''): v for k, v in params.items() if k.startswith('model__')}
-        base_model = ModelClass(**model_params) if model_params else ModelClass()
-        return Pipeline([
-            ("scaler", StandardScaler()),
-            ("model", base_model)
-        ])
-    
-    elif model_name == "Polynomial_Regression":
-        # Polynomial regression with pipeline
-        poly_degree = params.get('poly__degree', 2)
-        return Pipeline([
-            ("poly", PolynomialFeatures(degree=poly_degree, include_bias=False)),
-            ("scaler", StandardScaler()),
-            ("model", LinearRegression())
-        ])
-    
-    elif model_name == "AdaBoost":
-        # AdaBoost with DecisionTree estimator
-        from sklearn.tree import DecisionTreeRegressor
-        estimator_depth = params.get('estimator__max_depth', 3)
-        ada_params = {k: v for k, v in params.items() if not k.startswith('estimator__')}
-        return ModelClass(
-            estimator=DecisionTreeRegressor(max_depth=estimator_depth),
-            **ada_params
-        )
-    
-    else:
-        # Other models (Decision Tree, Random Forest, GBDT, XGBoost, LightGBM)
-        return ModelClass(**params)
+    try:
+        return importlib.import_module(module_name)
+    except ImportError as e:
+        raise ImportError(f"Model module '{module_name}' not found for model '{model_name}': {e}")
 
 
 def main():
@@ -158,6 +99,10 @@ def main():
         logger.info(f"Starting batch prediction using {model_name}")
         logger.info(f"Parameters: {params}")
         
+        # Import model module
+        logger.info(f"Importing model module for {model_name}")
+        model_module = import_model_module(model_name)
+        
         # Load training data and train model with best parameters
         logger.info(f"Loading training data from {training_data_path}")
         training_df = pd.read_excel(training_data_path)
@@ -166,11 +111,11 @@ def main():
         X_train = training_df[feature_columns]
         y_train = training_df[target_column]
         
-        # Build model with tuned parameters
-        logger.info(f"Building {model_name} with tuned parameters")
-        model = build_model_from_params(model_name, params)
+        # Create model with tuned parameters using the module's create_model function
+        logger.info(f"Creating {model_name} with tuned parameters")
+        model = model_module.create_model(params)
         
-        # Train the model
+        # Train the model on full training dataset
         logger.info("Training model on full training dataset")
         model.fit(X_train, y_train)
         logger.info("Model training completed")
@@ -180,13 +125,13 @@ def main():
         prediction_df = pd.read_excel(prediction_data_path)
         logger.info(f"Prediction data loaded: {len(prediction_df)} rows")
         
-        # Make predictions
+        # Make predictions using the model's predict function
         logger.info("Generating predictions")
         X_pred = prediction_df[feature_columns]
-        predictions = model.predict(X_pred)
+        predictions = model_module.predict(model, X_pred)
         
         # Add predictions to dataframe
-        prediction_df['Predicted_Value'] = predictions
+        prediction_df['Predicted_Value'] = predictions.values
         logger.info(f"Predictions generated for {len(predictions)} samples")
         
         # Save results
