@@ -11,57 +11,87 @@ try:
 except ImportError:
     raise ImportError("XGBoost is not installed. Please install it with: pip install xgboost")
 
+from typing import Dict, Any, Union, Optional, Callable
+from pydantic import BaseModel
+from sklearn.base import BaseEstimator
 
-def tune(X_train: pd.DataFrame, y_train: pd.Series) -> dict:
-    base_model = XGBRegressor(
-        objective="reg:squarederror",
-        random_state=42,
-        n_jobs=-1
-    )
+from .base import RegressionModel, ProgressInfo, TuneResult
+
+
+
+class XGBoostParamGrid(BaseModel):
+    """Parameter grid for XGBoostRegressionModel."""
+    n_estimators: list[int] = [50, 100, 150]
+    learning_rate: list[float] = [0.01, 0.1, 0.2]
+    max_depth: list[int] = [3, 5, 7]
+
+
+class XGBoostRegressionModel(RegressionModel[XGBRegressor, XGBoostParamGrid]):
+    """XGBoost Regression model implementation."""
     
-    param_grid = {
-        'n_estimators': [50, 100, 150],
-        'learning_rate': [0.01, 0.1, 0.2],
-        'max_depth': [3, 5, 7]
-    }
+    @staticmethod
+    def tune(X_train: pd.DataFrame, y_train: pd.Series, param_grid: Optional[XGBoostParamGrid] = None, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> TuneResult:
+        base_model = XGBRegressor(
+            objective="reg:squarederror",
+            random_state=42,
+            n_jobs=-1
+        )
     
-    grid_search = GridSearchCV(
-        estimator=base_model,
-        param_grid=param_grid,
-        cv=5,
-        scoring='neg_mean_squared_error',
-        n_jobs=-1
-    )
+        # Use provided param_grid or default
+        if param_grid is None:
+            param_grid_dict = XGBoostParamGrid().model_dump()
+        else:
+            # Convert pydantic model to dict, excluding None values
+            param_grid_dict = param_grid.model_dump(exclude_none=True)
+
     
-    grid_search.fit(X_train, y_train)
+        grid_search = GridSearchCV(
+            estimator=base_model,
+            param_grid=param_grid_dict,
+            cv=5,
+            scoring='neg_mean_squared_error',
+            n_jobs=-1
+        )
     
-    return {
-        'best_params': grid_search.best_params_,
-        'best_score': float(grid_search.best_score_),
-        'model': grid_search.best_estimator_
-    }
+        grid_search.fit(X_train, y_train)
+    
+        return {
+            'best_params': grid_search.best_params_,
+            'best_score': float(grid_search.best_score_),
+            'model': grid_search.best_estimator_
+        }
 
 
-def evaluate(model, X: pd.DataFrame, y: pd.Series) -> dict:
-    y_pred = model.predict(X)
-    return {
-        'mse': float(mean_squared_error(y, y_pred)),
-        'mae': float(mean_absolute_error(y, y_pred)),
-        'r2': float(r2_score(y, y_pred))
-    }
+    
+    @staticmethod
+    def evaluate(model: XGBRegressor, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
+        y_pred = model.predict(X)
+        return {
+            'mse': float(mean_squared_error(y, y_pred)),
+            'mae': float(mean_absolute_error(y, y_pred)),
+            'r2': float(r2_score(y, y_pred))
+        }
 
 
-def predict(model, X: pd.DataFrame) -> pd.Series:
-    predictions = model.predict(X)
-    return pd.Series(predictions, index=X.index, name='predictions')
+    
+    @staticmethod
+    def predict(model: XGBRegressor, X: pd.DataFrame) -> pd.Series:
+        predictions = model.predict(X)
+        return pd.Series(predictions, index=X.index, name='predictions')
 
 
-def create_model(params: dict = None):
-    model = XGBRegressor(
-        objective="reg:squarederror",
-        random_state=42,
-        n_jobs=-1
-    )
-    if params:
-        model.set_params(**params)
-    return model
+    
+    @staticmethod
+    def create_model(params: Optional[Dict[str, Any]] = None) -> XGBRegressor:
+        model = XGBRegressor(
+            objective="reg:squarederror",
+            random_state=42,
+            n_jobs=-1
+        )
+        if params:
+            model.set_params(**params)
+        return model
+
+
+# Alias for the model class
+Model = XGBoostRegressionModel
