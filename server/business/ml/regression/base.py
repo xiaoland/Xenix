@@ -26,6 +26,7 @@ class TuneResult(TypedDict):
     """Result of model tuning."""
 
     best_params: Dict[str, Any]
+    best_score: float
     model: Union[BaseEstimator, Pipeline]
 
 
