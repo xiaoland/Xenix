@@ -9,7 +9,6 @@ import json
 import sys
 import warnings
 import pandas as pd
-import importlib
 from pathlib import Path
 
 # Suppress warnings
@@ -21,35 +20,8 @@ sys.path.append(str(Path(__file__).parent))
 # Import structured output utilities
 from structured_output import get_logger, emit_log
 
-
-def get_model_module_name(model_name: str) -> str:
-    """Convert model name to module name"""
-    model_module_map = {
-        "Linear_Regression_Hyperparameter_Tuning": "linear_regression_hyperparameter_tuning_module",
-        "Ridge": "ridge_module",
-        "Lasso": "lasso_module",
-        "Bayesian_Ridge_Regression": "bayesian_ridge_regression_module",
-        "K-Nearest_Neighbors": "k_nearest_neighbors_module",
-        "Regression_Decision_Tree": "regression_decision_tree_module",
-        "Random_Forest": "random_forest_module",
-        "GBDT": "gbdt_module",
-        "AdaBoost": "adaboost_module",
-        "XGBoost": "xgboost_module",
-        "LightGBM": "lightgbm_module",
-        "Polynomial_Regression": "polynomial_regression_module"
-    }
-    
-    return model_module_map.get(model_name, model_name.lower().replace("-", "_").replace(" ", "_") + "_module")
-
-
-def import_model_module(model_name: str):
-    """Dynamically import model module"""
-    module_name = get_model_module_name(model_name)
-    
-    try:
-        return importlib.import_module(module_name)
-    except ImportError as e:
-        raise ImportError(f"Model module '{module_name}' not found for model '{model_name}': {e}")
+# Import base utilities
+from base import import_model_module
 
 
 def main():
@@ -60,7 +32,7 @@ def main():
         "trainingDataPath": "/path/to/training_data.xlsx",
         "predictionDataPath": "/path/to/prediction_data.xlsx",
         "outputPath": "/path/to/output.xlsx",
-        "model": "Ridge",
+        "model": "ridge",
         "params": {"model__alpha": 1.0},
         "featureColumns": ["col1", "col2", "col3"],
         "targetColumn": "target"

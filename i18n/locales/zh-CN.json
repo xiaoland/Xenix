@@ -74,18 +74,18 @@
     "downloading": "正在下载预测结果..."
   },
   "models": {
-    "linearRegression": "线性回归",
-    "ridge": "岭回归",
-    "lasso": "套索回归",
-    "bayesianRidge": "贝叶斯岭回归",
-    "knn": "K近邻",
-    "decisionTree": "决策树",
-    "randomForest": "随机森林",
-    "gbdt": "梯度提升决策树",
-    "adaboost": "AdaBoost",
-    "xgboost": "XGBoost",
-    "lightgbm": "LightGBM",
-    "polynomial": "多项式回归"
+    "regression.linear_regression_hyperparameter_tuning": "线性回归",
+    "regression.ridge": "岭回归",
+    "regression.lasso": "套索回归",
+    "regression.bayesian_ridge_regression": "贝叶斯岭回归",
+    "regression.k_nearest_neighbors": "K近邻",
+    "regression.regression_decision_tree": "决策树",
+    "regression.random_forest": "随机森林",
+    "regression.gbdt": "梯度提升决策树",
+    "regression.adaboost": "AdaBoost",
+    "regression.xgboost": "XGBoost",
+    "regression.lightgbm": "LightGBM",
+    "regression.polynomial_regression": "多项式回归"
   },
   "status": {
     "pending": "待处理",
@@ -164,5 +164,6 @@
     "selectDatasetPlaceholder": "选择数据集",
     "useExistingDataset": "使用现有数据集",
     "orUploadNew": "或上传新文件"
-  }
+  },
+  "navigation.pythonEnv": "Python环境"
 }

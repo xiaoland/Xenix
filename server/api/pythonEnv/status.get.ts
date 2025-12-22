@@ -1,18 +1,25 @@
-import { getPythonEnvStatus, setupEnvironment, reinstallEnvironment } from '../../business/mlPipeline';
+import {
+  getPythonEnvStatus,
+  setupEnvironment,
+  reinstallEnvironment,
+} from "../../business/ml";
 
 export default defineEventHandler(async (event) => {
   try {
     const status = await getPythonEnvStatus();
-    
+
     return {
       success: true,
-      status
+      status,
     };
   } catch (error) {
-    console.error('Error getting Python environment status:', error);
+    console.error("Error getting Python environment status:", error);
     throw createError({
       statusCode: 500,
-      message: error instanceof Error ? error.message : 'Failed to get environment status',
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to get environment status",
     });
   }
 });

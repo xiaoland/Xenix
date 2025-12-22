@@ -1,10 +1,10 @@
-import path from 'path';
-import { spawn } from 'child_process';
-import { existsSync } from 'fs';
-import { executePythonTask } from '../utils/pythonExecutor';
+import path from "path";
+import { spawn } from "child_process";
+import { existsSync } from "fs";
+import { executePythonTask } from "../../utils/pythonExecutor";
 
 // Constants for ML script paths
-const ML_MODELS_DIR = path.join('app', 'models', 'regression');
+const ML_MODELS_DIR = path.join("server", "business", "ml");
 
 /**
  * Helper function to get script path
@@ -25,11 +25,11 @@ function getWorkingDirectory(): string {
  */
 async function isPdmInstalled(): Promise<boolean> {
   return new Promise((resolve) => {
-    const pdmCheck = spawn('pdm', ['--version']);
-    pdmCheck.on('close', (code) => {
+    const pdmCheck = spawn("pdm", ["--version"]);
+    pdmCheck.on("close", (code) => {
       resolve(code === 0);
     });
-    pdmCheck.on('error', () => {
+    pdmCheck.on("error", () => {
       resolve(false);
     });
   });
@@ -40,47 +40,51 @@ async function isPdmInstalled(): Promise<boolean> {
  * Supports installation without pip using curl/wget
  */
 async function installPdm(): Promise<void> {
-  console.log('PDM not found. Installing PDM...');
-  
+  console.log("PDM not found. Installing PDM...");
+
   // Try official PDM installer first (works without pip)
   // https://pdm-project.org/latest/#installation
   return new Promise((resolve, reject) => {
     // Use curl to download and execute the official installer
-    const installer = spawn('curl', ['-sSL', 'https://pdm-project.org/install-pdm.py'], {
-      shell: true
+    const installer = spawn(
+      "curl",
+      ["-sSL", "https://pdm-project.org/install-pdm.py"],
+      {
+        shell: true,
+      }
+    );
+
+    const python = spawn("python3", ["-"], {
+      shell: true,
     });
-    
-    const python = spawn('python3', ['-'], {
-      shell: true
-    });
-    
+
     installer.stdout.pipe(python.stdin);
-    
-    installer.stderr.on('data', (data) => {
+
+    installer.stderr.on("data", (data) => {
       console.error(`[PDM Install - Curl] ${data.toString()}`);
     });
-    
-    python.stdout.on('data', (data) => {
+
+    python.stdout.on("data", (data) => {
       console.log(`[PDM Install] ${data.toString()}`);
     });
-    
-    python.stderr.on('data', (data) => {
+
+    python.stderr.on("data", (data) => {
       console.error(`[PDM Install] ${data.toString()}`);
     });
-    
-    python.on('close', (code) => {
+
+    python.on("close", (code) => {
       if (code === 0) {
-        console.log('PDM installed successfully using official installer');
+        console.log("PDM installed successfully using official installer");
         resolve();
       } else {
-        console.log('Official installer failed, trying pip fallback...');
+        console.log("Official installer failed, trying pip fallback...");
         // Fallback to pip if available
         installPdmViaPip().then(resolve).catch(reject);
       }
     });
-    
-    python.on('error', (error) => {
-      console.error('Failed to run Python for PDM installation:', error);
+
+    python.on("error", (error) => {
+      console.error("Failed to run Python for PDM installation:", error);
       // Fallback to pip if available
       installPdmViaPip().then(resolve).catch(reject);
     });
@@ -92,26 +96,26 @@ async function installPdm(): Promise<void> {
  */
 async function installPdmViaPip(): Promise<void> {
   return new Promise((resolve, reject) => {
-    const pip = spawn('pip', ['install', '--user', 'pdm']);
-    
-    pip.stdout.on('data', (data) => {
+    const pip = spawn("pip", ["install", "--user", "pdm"]);
+
+    pip.stdout.on("data", (data) => {
       console.log(`[PDM Install - Pip] ${data.toString()}`);
     });
-    
-    pip.stderr.on('data', (data) => {
+
+    pip.stderr.on("data", (data) => {
       console.error(`[PDM Install - Pip] ${data.toString()}`);
     });
-    
-    pip.on('close', (code) => {
+
+    pip.on("close", (code) => {
       if (code === 0) {
-        console.log('PDM installed successfully via pip');
+        console.log("PDM installed successfully via pip");
         resolve();
       } else {
         reject(new Error(`Failed to install PDM via pip: exit code ${code}`));
       }
     });
-    
-    pip.on('error', (error) => {
+
+    pip.on("error", (error) => {
       reject(new Error(`Pip not available: ${error.message}`));
     });
   });
@@ -122,9 +126,9 @@ async function installPdmViaPip(): Promise<void> {
  */
 function isPythonEnvReady(): boolean {
   // Check if __pypackages__ directory exists (PDM's local package directory)
-  const pyPackagesDir = path.join(process.cwd(), '__pypackages__');
-  const pdmLockFile = path.join(process.cwd(), 'pdm.lock');
-  
+  const pyPackagesDir = path.join(process.cwd(), "__pypackages__");
+  const pdmLockFile = path.join(process.cwd(), "pdm.lock");
+
   return existsSync(pyPackagesDir) && existsSync(pdmLockFile);
 }
 
@@ -132,27 +136,29 @@ function isPythonEnvReady(): boolean {
  * Install Python dependencies using PDM
  */
 async function setupPythonEnvironment(): Promise<void> {
-  console.log('Setting up Python environment with PDM...');
+  console.log("Setting up Python environment with PDM...");
   return new Promise((resolve, reject) => {
-    const pdmInstall = spawn('pdm', ['install'], {
+    const pdmInstall = spawn("pdm", ["install"], {
       cwd: process.cwd(),
       env: process.env,
     });
-    
-    pdmInstall.stdout.on('data', (data) => {
+
+    pdmInstall.stdout.on("data", (data) => {
       console.log(`[PDM Install] ${data.toString()}`);
     });
-    
-    pdmInstall.stderr.on('data', (data) => {
+
+    pdmInstall.stderr.on("data", (data) => {
       console.error(`[PDM Install] ${data.toString()}`);
     });
-    
-    pdmInstall.on('close', (code) => {
+
+    pdmInstall.on("close", (code) => {
       if (code === 0) {
-        console.log('Python environment setup completed');
+        console.log("Python environment setup completed");
         resolve();
       } else {
-        reject(new Error(`Failed to setup Python environment: exit code ${code}`));
+        reject(
+          new Error(`Failed to setup Python environment: exit code ${code}`)
+        );
       }
     });
   });
@@ -165,16 +171,16 @@ async function setupPythonEnvironment(): Promise<void> {
 async function ensurePythonEnvironment(): Promise<void> {
   // Check if PDM is installed
   const pdmAvailable = await isPdmInstalled();
-  
+
   if (!pdmAvailable) {
     await installPdm();
   }
-  
+
   // Check if environment is ready
   if (!isPythonEnvReady()) {
     await setupPythonEnvironment();
   } else {
-    console.log('Python environment already configured');
+    console.log("Python environment already configured");
   }
 }
 
@@ -189,23 +195,23 @@ async function getInitPromise(): Promise<void> {
   if (environmentInitialized) {
     return Promise.resolve();
   }
-  
+
   if (environmentInitPromise) {
     return environmentInitPromise;
   }
-  
+
   environmentInitPromise = (async () => {
     try {
       await ensurePythonEnvironment();
       environmentInitialized = true;
     } catch (error) {
-      console.error('Failed to initialize Python environment:', error);
+      console.error("Failed to initialize Python environment:", error);
       // Reset promise so it can be retried
       environmentInitPromise = null;
       throw error;
     }
   })();
-  
+
   return environmentInitPromise;
 }
 
@@ -237,7 +243,7 @@ export interface PredictOptions {
 /**
  * High-level function to tune a machine learning model
  * Automatically ensures Python environment is ready before execution
- * 
+ *
  * @param options - Tuning configuration options
  * @returns Promise that resolves when tuning task is started
  */
@@ -250,14 +256,14 @@ export async function tune(options: TuneOptions): Promise<void> {
   // Prepare stdin data for Python script
   const stdinData = {
     inputFile,
-    model,
+    model: model.toLowerCase(),
     featureColumns,
-    targetColumn
+    targetColumn,
   };
-  
+
   // Execute Python task
   await executePythonTask({
-    script: getScriptPath('tune_model.py'),
+    script: getScriptPath("tune_model.py"),
     stdinData,
     taskId,
     cwd: getWorkingDirectory(),
@@ -267,7 +273,7 @@ export async function tune(options: TuneOptions): Promise<void> {
 /**
  * High-level function to make predictions using a trained model
  * Automatically ensures Python environment is ready before execution
- * 
+ *
  * @param options - Prediction configuration options
  * @returns Promise that resolves when prediction task is started
  */
@@ -283,7 +289,7 @@ export async function predict(options: PredictOptions): Promise<void> {
     params,
     featureColumns,
     targetColumn,
-    taskId
+    taskId,
   } = options;
 
   // Prepare stdin data for Python script
@@ -291,15 +297,15 @@ export async function predict(options: PredictOptions): Promise<void> {
     trainingDataPath,
     predictionDataPath,
     outputPath,
-    model,
+    model: model.toLowerCase(),
     params,
     featureColumns,
-    targetColumn
+    targetColumn,
   };
-  
+
   // Execute Python task
   await executePythonTask({
-    script: getScriptPath('predict.py'),
+    script: getScriptPath("predict.py"),
     stdinData,
     taskId,
     cwd: getWorkingDirectory(),
@@ -311,18 +317,18 @@ export async function predict(options: PredictOptions): Promise<void> {
  */
 export function getAvailableModels(): string[] {
   return [
-    'Linear_Regression_Hyperparameter_Tuning',
-    'Ridge',
-    'Lasso',
-    'Bayesian_Ridge_Regression',
-    'K-Nearest_Neighbors',
-    'Regression_Decision_Tree',
-    'Random_Forest',
-    'GBDT',
-    'AdaBoost',
-    'XGBoost',
-    'LightGBM',
-    'Polynomial_Regression'
+    "regression.linear_regression_hyperparameter_tuning",
+    "regression.ridge",
+    "regression.lasso",
+    "regression.bayesian_ridge_regression",
+    "regression.k_nearest_neighbors",
+    "regression.regression_decision_tree",
+    "regression.random_forest",
+    "regression.gbdt",
+    "regression.adaboost",
+    "regression.xgboost",
+    "regression.lightgbm",
+    "regression.polynomial_regression",
   ];
 }
 
@@ -332,13 +338,13 @@ export function getAvailableModels(): string[] {
 export async function getPythonEnvStatus() {
   const pdmInstalled = await isPdmInstalled();
   const envReady = isPythonEnvReady();
-  
+
   return {
     pdmInstalled,
     envReady,
     initialized: environmentInitialized,
-    pyPackagesExists: existsSync(path.join(process.cwd(), '__pypackages__')),
-    pdmLockExists: existsSync(path.join(process.cwd(), 'pdm.lock'))
+    pyPackagesExists: existsSync(path.join(process.cwd(), "__pypackages__")),
+    pdmLockExists: existsSync(path.join(process.cwd(), "pdm.lock")),
   };
 }
 

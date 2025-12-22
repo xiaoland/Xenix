@@ -72,18 +72,18 @@
     "downloading": "Downloading prediction results..."
   },
   "models": {
-    "linearRegression": "Linear Regression",
-    "ridge": "Ridge",
-    "lasso": "Lasso",
-    "bayesianRidge": "Bayesian Ridge",
-    "knn": "KNN",
-    "decisionTree": "Decision Tree",
-    "randomForest": "Random Forest",
-    "gbdt": "GBDT",
-    "adaboost": "AdaBoost",
-    "xgboost": "XGBoost",
-    "lightgbm": "LightGBM",
-    "polynomial": "Polynomial"
+    "regression.linear_regression_hyperparameter_tuning": "Linear Regression",
+    "regression.ridge": "Ridge",
+    "regression.lasso": "Lasso",
+    "regression.bayesian_ridge_regression": "Bayesian Ridge",
+    "regression.k_nearest_neighbors": "KNN",
+    "regression.regression_decision_tree": "Decision Tree",
+    "regression.random_forest": "Random Forest",
+    "regression.gbdt": "GBDT",
+    "regression.adaboost": "AdaBoost",
+    "regression.xgboost": "XGBoost",
+    "regression.lightgbm": "LightGBM",
+    "regression.polynomial_regression": "Polynomial"
   },
   "status": {
     "pending": "Pending",
@@ -162,5 +162,6 @@
     "selectDatasetPlaceholder": "Choose a dataset",
     "useExistingDataset": "Use Existing Dataset",
     "orUploadNew": "Or upload a new file"
-  }
+  },
+  "navigation.pythonEnv": "PyEnv"
 }

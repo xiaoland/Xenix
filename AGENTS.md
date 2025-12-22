@@ -17,15 +17,27 @@ Xenix provides an interface for teachers, mid-small enterprises to analysis thei
 
 - docs/
 - app/
-  - models/ : python script, application to run data processing, analysis; subfolder by type
-    - regression/
-    - classification/
-    - association/
-    - recommendations/
-    - clsutering-segmentation/
+- server/
+  - business/
+    - ml/ : python script, application to run data processing, analysis; subfolder by type
+      - regression/
+      - classification/
+      - association/
+      - recommendations/
+      - clustering-segmentation/
   - pages/
   - styles/
   - app.vue
+
+## Business
+
+- Workbench
+  - Common Workflow
+    - Upload data
+    - Tune model parameters
+    - Predict
+- Datasets
+- Python environment
 
 ## Development
 

@@ -2,24 +2,35 @@
   <div class="flex justify-between items-center mb-6">
     <div class="flex gap-4">
       <NuxtLink to="/">
-        <a-button 
-          type="text" 
+        <a-button
+          type="text"
           size="large"
           :class="{ 'bg-blue-50': isCurrentRoute('/') }"
         >
           <template #icon><i class="i-mdi-home"></i></template>
-          {{ $t('navigation.home') }}
+          {{ $t("navigation.home") }}
         </a-button>
       </NuxtLink>
-      
+
       <NuxtLink to="/datasets">
-        <a-button 
-          type="text" 
+        <a-button
+          type="text"
           size="large"
           :class="{ 'bg-blue-50': isCurrentRoute('/datasets') }"
         >
           <template #icon><i class="i-mdi-database"></i></template>
-          {{ $t('navigation.datasets') }}
+          {{ $t("navigation.datasets") }}
+        </a-button>
+      </NuxtLink>
+
+      <NuxtLink to="/python-env">
+        <a-button
+          type="text"
+          size="large"
+          :class="{ 'bg-blue-50': isCurrentRoute('/python-env') }"
+        >
+          <template #icon><i class="i-mdi-snake"></i></template>
+          {{ $t("navigation.pythonEnv") }}
         </a-button>
       </NuxtLink>
     </div>
@@ -29,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { useRoute } from 'vue-router';
+import { useRoute } from "vue-router";
 
 const route = useRoute();
 
