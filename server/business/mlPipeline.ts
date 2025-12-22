@@ -36,28 +36,83 @@ async function isPdmInstalled(): Promise<boolean> {
 }
 
 /**
- * Install PDM if not available
+ * Install PDM if not available using official installation script
+ * Supports installation without pip using curl/wget
  */
 async function installPdm(): Promise<void> {
   console.log('PDM not found. Installing PDM...');
+  
+  // Try official PDM installer first (works without pip)
+  // https://pdm-project.org/latest/#installation
+  return new Promise((resolve, reject) => {
+    // Use curl to download and execute the official installer
+    const installer = spawn('curl', ['-sSL', 'https://pdm-project.org/install-pdm.py'], {
+      shell: true
+    });
+    
+    const python = spawn('python3', ['-'], {
+      shell: true
+    });
+    
+    installer.stdout.pipe(python.stdin);
+    
+    installer.stderr.on('data', (data) => {
+      console.error(`[PDM Install - Curl] ${data.toString()}`);
+    });
+    
+    python.stdout.on('data', (data) => {
+      console.log(`[PDM Install] ${data.toString()}`);
+    });
+    
+    python.stderr.on('data', (data) => {
+      console.error(`[PDM Install] ${data.toString()}`);
+    });
+    
+    python.on('close', (code) => {
+      if (code === 0) {
+        console.log('PDM installed successfully using official installer');
+        resolve();
+      } else {
+        console.log('Official installer failed, trying pip fallback...');
+        // Fallback to pip if available
+        installPdmViaPip().then(resolve).catch(reject);
+      }
+    });
+    
+    python.on('error', (error) => {
+      console.error('Failed to run Python for PDM installation:', error);
+      // Fallback to pip if available
+      installPdmViaPip().then(resolve).catch(reject);
+    });
+  });
+}
+
+/**
+ * Fallback: Install PDM via pip
+ */
+async function installPdmViaPip(): Promise<void> {
   return new Promise((resolve, reject) => {
     const pip = spawn('pip', ['install', '--user', 'pdm']);
     
     pip.stdout.on('data', (data) => {
-      console.log(`[PDM Install] ${data.toString()}`);
+      console.log(`[PDM Install - Pip] ${data.toString()}`);
     });
     
     pip.stderr.on('data', (data) => {
-      console.error(`[PDM Install] ${data.toString()}`);
+      console.error(`[PDM Install - Pip] ${data.toString()}`);
     });
     
     pip.on('close', (code) => {
       if (code === 0) {
-        console.log('PDM installed successfully');
+        console.log('PDM installed successfully via pip');
         resolve();
       } else {
-        reject(new Error(`Failed to install PDM: exit code ${code}`));
+        reject(new Error(`Failed to install PDM via pip: exit code ${code}`));
       }
+    });
+    
+    pip.on('error', (error) => {
+      reject(new Error(`Pip not available: ${error.message}`));
     });
   });
 }
@@ -269,4 +324,39 @@ export function getAvailableModels(): string[] {
     'LightGBM',
     'Polynomial_Regression'
   ];
+}
+
+/**
+ * Get Python environment status
+ */
+export async function getPythonEnvStatus() {
+  const pdmInstalled = await isPdmInstalled();
+  const envReady = isPythonEnvReady();
+  
+  return {
+    pdmInstalled,
+    envReady,
+    initialized: environmentInitialized,
+    pyPackagesExists: existsSync(path.join(process.cwd(), '__pypackages__')),
+    pdmLockExists: existsSync(path.join(process.cwd(), 'pdm.lock'))
+  };
+}
+
+/**
+ * Manually trigger environment setup
+ */
+export async function setupEnvironment() {
+  await getInitPromise();
+  return getPythonEnvStatus();
+}
+
+/**
+ * Force reinstall of Python environment
+ */
+export async function reinstallEnvironment() {
+  environmentInitialized = false;
+  environmentInitPromise = null;
+  await setupPythonEnvironment();
+  environmentInitialized = true;
+  return getPythonEnvStatus();
 }
