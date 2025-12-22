@@ -6,6 +6,11 @@ import pandas as pd
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
+try:
+    from lightgbm import LGBMRegressor
+except ImportError:
+    raise ImportError("LightGBM is not installed. Please install it with: pip install lightgbm")
+
 from typing import Dict, Any, Union, Optional
 from sklearn.base import BaseEstimator
 
