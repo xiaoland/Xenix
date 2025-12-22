@@ -8,59 +8,95 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
+from typing import Dict, Any, Union, Optional
+from sklearn.base import BaseEstimator
 
-def tune(X_train: pd.DataFrame, y_train: pd.Series) -> dict:
-    base_model = AdaBoostRegressor(
-        estimator=DecisionTreeRegressor(max_depth=3),
-        random_state=42
-    )
+from .base import RegressionModel
+
+
+class AdaBoostRegressionModel(RegressionModel):
+    """AdaBoost Regression model implementation."""
     
-    param_grid = {
-        'n_estimators': [50, 100, 150],
-        'learning_rate': [0.01, 0.1, 1.0],
-        'estimator__max_depth': [3, 5, 7]
-    }
+    @staticmethod
+    def tune(X_train: pd.DataFrame, y_train: pd.Series) -> Dict[str, Any]:
+        base_model = AdaBoostRegressor(
+            estimator=DecisionTreeRegressor(max_depth=3),
+            random_state=42
+        )
     
-    grid_search = GridSearchCV(
-        estimator=base_model,
-        param_grid=param_grid,
-        cv=5,
-        scoring='neg_mean_squared_error',
-        n_jobs=-1
-    )
+        param_grid = {
+            'n_estimators': [50, 100, 150],
+            'learning_rate': [0.01, 0.1, 1.0],
+            'estimator__max_depth': [3, 5, 7]
+        }
     
-    grid_search.fit(X_train, y_train)
+        grid_search = GridSearchCV(
+            estimator=base_model,
+            param_grid=param_grid,
+            cv=5,
+            scoring='neg_mean_squared_error',
+            n_jobs=-1
+        )
     
-    return {
-        'best_params': grid_search.best_params_,
-        'best_score': float(grid_search.best_score_),
-        'model': grid_search.best_estimator_
-    }
-
-
-def evaluate(model, X: pd.DataFrame, y: pd.Series) -> dict:
-    y_pred = model.predict(X)
-    return {
-        'mse': float(mean_squared_error(y, y_pred)),
-        'mae': float(mean_absolute_error(y, y_pred)),
-        'r2': float(r2_score(y, y_pred))
-    }
-
-
-def predict(model, X: pd.DataFrame) -> pd.Series:
-    predictions = model.predict(X)
-    return pd.Series(predictions, index=X.index, name='predictions')
-
-
-def create_model(params: dict = None):
-    estimator_depth = 3
-    if params and 'estimator__max_depth' in params:
-        estimator_depth = params.pop('estimator__max_depth')
+        grid_search.fit(X_train, y_train)
     
-    model = AdaBoostRegressor(
-        estimator=DecisionTreeRegressor(max_depth=estimator_depth),
-        random_state=42
-    )
-    if params:
-        model.set_params(**params)
-    return model
+        return {
+            'best_params': grid_search.best_params_,
+            'best_score': float(grid_search.best_score_),
+            'model': grid_search.best_estimator_
+        }
+
+
+    
+    @staticmethod
+    def evaluate(model: Union[BaseEstimator, AdaBoostRegressor], X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
+        y_pred = model.predict(X)
+        return {
+            'mse': float(mean_squared_error(y, y_pred)),
+            'mae': float(mean_absolute_error(y, y_pred)),
+            'r2': float(r2_score(y, y_pred))
+        }
+
+
+    
+    @staticmethod
+    def predict(model: Union[BaseEstimator, AdaBoostRegressor], X: pd.DataFrame) -> pd.Series:
+        predictions = model.predict(X)
+        return pd.Series(predictions, index=X.index, name='predictions')
+
+
+    
+    @staticmethod
+    def create_model(params: Optional[Dict[str, Any]] = None) -> AdaBoostRegressor:
+        estimator_depth = 3
+        if params and 'estimator__max_depth' in params:
+            estimator_depth = params.pop('estimator__max_depth')
+    
+        model = AdaBoostRegressor(
+            estimator=DecisionTreeRegressor(max_depth=estimator_depth),
+            random_state=42
+        )
+        if params:
+            model.set_params(**params)
+        return model
+
+
+# Provide module-level functions for backward compatibility
+def tune(X_train: pd.DataFrame, y_train: pd.Series) -> Dict[str, Any]:
+    """Module-level tune function for backward compatibility."""
+    return AdaBoostRegressionModel.tune(X_train, y_train)
+
+
+def evaluate(model: Union[BaseEstimator, AdaBoostRegressor], X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
+    """Module-level evaluate function for backward compatibility."""
+    return AdaBoostRegressionModel.evaluate(model, X, y)
+
+
+def predict(model: Union[BaseEstimator, AdaBoostRegressor], X: pd.DataFrame) -> pd.Series:
+    """Module-level predict function for backward compatibility."""
+    return AdaBoostRegressionModel.predict(model, X)
+
+
+def create_model(params: Optional[Dict[str, Any]] = None) -> AdaBoostRegressor:
+    """Module-level create_model function for backward compatibility."""
+    return AdaBoostRegressionModel.create_model(params)
