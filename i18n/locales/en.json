@@ -77,7 +77,17 @@
     "selectModelInstruction": "Select a model from the table above to use for predictions",
     "selectModelPlaceholder": "Select model for prediction",
     "back": "Back",
-    "continue": "Continue to Prediction"
+    "continue": "Continue to Prediction",
+    "paramGrid": {
+      "title": "Edit Parameter Grid - {model}",
+      "description": "Configure the hyperparameter search space for this model. Each field accepts a list of values to try.",
+      "loading": "Loading parameter schema...",
+      "noDescription": "No description available",
+      "defaultValue": "Default",
+      "arrayPlaceholder": "Enter value and press Add",
+      "emptyArray": "No values. Add values using the input above.",
+      "editButton": "Edit Grid"
+    }
   },
   "prediction": {
     "title": "Make Predictions",
@@ -144,7 +154,8 @@
     "noLogs": "No logs available"
   },
   "common": {
-    "na": "N/A"
+    "na": "N/A",
+    "add": "Add"
   },
   "navigation": {
     "home": "Home",

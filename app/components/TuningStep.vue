@@ -69,7 +69,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   "start-tuning": [];
-  "start-single-tune": [model: string];
+  "start-single-tune": [model: string, paramGrid?: Record<string, any>];
   back: [];
   continue: [];
   "update:selectedModels": [models: string[]];
@@ -92,9 +92,9 @@ const localSelectedBestModel = computed({
   set: (value) => emit("update:selected-best-model", value || ""),
 });
 
-const handleStartTune = (model: string) => {
-  // Emit the single tune event for this specific model
-  emit("start-single-tune", model);
+const handleStartTune = (model: string, paramGrid?: Record<string, any>) => {
+  // Emit the single tune event for this specific model with optional param grid
+  emit("start-single-tune", model, paramGrid);
 };
 
 const handleViewLogs = (taskId: string, modelName: string) => {

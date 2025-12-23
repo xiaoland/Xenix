@@ -16,6 +16,7 @@ export default defineEventHandler(async (event) => {
     const model = formData.get("model") as string;
     const featureColumns = formData.get("featureColumns") as string; // JSON string
     const targetColumn = formData.get("targetColumn") as string;
+    const paramGrid = formData.get("paramGrid") as string; // JSON string, optional
 
     let inputFile: string;
     let usedDatasetId: string | null = null;
@@ -74,6 +75,9 @@ export default defineEventHandler(async (event) => {
     // Parse feature columns
     const parsedFeatureColumns = JSON.parse(featureColumns);
 
+    // Parse param grid if provided
+    const parsedParamGrid = paramGrid ? JSON.parse(paramGrid) : undefined;
+
     // Generate task ID
     const taskId = generateTaskId();
 
@@ -95,6 +99,7 @@ export default defineEventHandler(async (event) => {
         featureColumns: parsedFeatureColumns,
         targetColumn,
         taskId,
+        paramGrid: parsedParamGrid,
       }).catch((error) => {
         console.error(`Failed to execute task ${taskId}:`, error);
       });

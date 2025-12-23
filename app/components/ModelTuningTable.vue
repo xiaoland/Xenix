@@ -14,6 +14,15 @@
         <template v-if="column.key === 'model'">
           <span class="font-medium">{{ formatModelName(record.label) }}</span>
         </template>
+        <template v-else-if="column.key === 'paramGrid'">
+          <a-button
+            size="small"
+            @click="handleEditParamGrid(record.model, record.label)"
+          >
+            <i class="i-mdi-tune-variant mr-1"></i>
+            {{ t("tuning.paramGrid.editButton") }}
+          </a-button>
+        </template>
         <template v-else-if="column.key === 'action'">
           <a-button
             v-if="!record.status || record.status === 'pending'"
@@ -70,11 +79,21 @@
     >
       <LogPanel :logs="currentLogs" />
     </a-modal>
+
+    <!-- ParamGrid Editor Dialog -->
+    <ParamGridDialog
+      v-model="paramGridDialogVisible"
+      :model-name="currentEditModel"
+      :model-label="currentEditModelLabel"
+      :schema="currentModelSchema"
+      :initial-values="paramGridValues[currentEditModel]"
+      @save="handleSaveParamGrid"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, onMounted } from "vue";
 
 const { t } = useI18n();
 
@@ -88,7 +107,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  "start-tune": [model: string];
+  "start-tune": [model: string, paramGrid?: Record<string, any>];
   "view-logs": [taskId: string, modelName: string];
 }>();
 
@@ -96,11 +115,39 @@ const logModalVisible = ref(false);
 const currentLogTaskId = ref<string>("");
 const currentLogModelName = ref<string>("");
 
+// ParamGrid dialog state
+const paramGridDialogVisible = ref(false);
+const currentEditModel = ref<string>("");
+const currentEditModelLabel = ref<string>("");
+const modelMetadata = ref<any[]>([]);
+const paramGridValues = ref<Record<string, Record<string, any>>>({});
+
 const columns = computed(() => [
   { title: t("tuning.model"), key: "model", dataIndex: "model" },
+  { title: "ParamGrid", key: "paramGrid", width: 150 },
   { title: t("tuning.tuning"), key: "action", width: 280 },
   { title: t("tuning.metrics"), key: "metrics", width: 320 },
 ]);
+
+// Fetch model metadata on mount
+onMounted(async () => {
+  try {
+    const response = await $fetch("/api/models");
+    if (response.success) {
+      modelMetadata.value = response.models;
+    }
+  } catch (error) {
+    console.error("Failed to fetch model metadata:", error);
+  }
+});
+
+// Get schema for current model being edited
+const currentModelSchema = computed(() => {
+  const metadata = modelMetadata.value.find(
+    (m) => m.name === currentEditModel.value
+  );
+  return metadata?.paramGridSchema || null;
+});
 
 // Combine all data sources into a single table data structure
 const tableData = computed(() => {
@@ -158,8 +205,22 @@ const handleViewLogs = (taskId: string, modelName: string) => {
   emit("view-logs", taskId, modelName);
 };
 
+// Handle edit param grid
+const handleEditParamGrid = (modelName: string, modelLabel: string) => {
+  currentEditModel.value = modelName;
+  currentEditModelLabel.value = modelLabel;
+  paramGridDialogVisible.value = true;
+};
+
+// Handle save param grid
+const handleSaveParamGrid = (values: Record<string, any>) => {
+  paramGridValues.value[currentEditModel.value] = values;
+};
+
 const handleStartTune = (model: string) => {
-  emit("start-tune", model);
+  // Pass param grid if it exists for this model
+  const paramGrid = paramGridValues.value[model];
+  emit("start-tune", model, paramGrid);
 };
 </script>
 

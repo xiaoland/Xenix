@@ -265,7 +265,10 @@ const startTuning = async () => {
   }
 };
 
-const startSingleModelTuning = async (modelValue: string) => {
+const startSingleModelTuning = async (
+  modelValue: string,
+  paramGrid?: Record<string, any>
+) => {
   if (!uploadedDatasetId.value && trainingFileList.value.length === 0) {
     message.error(t("messages.uploadError"));
     return;
@@ -326,6 +329,11 @@ const startSingleModelTuning = async (modelValue: string) => {
       JSON.stringify(selectedFeatureColumns.value)
     );
     formData.append("targetColumn", selectedTargetColumn.value);
+
+    // Add param grid if provided
+    if (paramGrid) {
+      formData.append("paramGrid", JSON.stringify(paramGrid));
+    }
 
     const response = await $fetch("/api/upload", {
       method: "POST",

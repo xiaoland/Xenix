@@ -79,7 +79,17 @@
     "maeTest": "MAE (测试)",
     "statusColumn": "状态",
     "selectModelInstruction": "从上方表格中选择一个模型用于预测",
-    "selectModelPlaceholder": "选择用于预测的模型"
+    "selectModelPlaceholder": "选择用于预测的模型",
+    "paramGrid": {
+      "title": "编辑参数网格 - {model}",
+      "description": "配置此模型的超参数搜索空间。每个字段接受一个要尝试的值列表。",
+      "loading": "加载参数模式...",
+      "noDescription": "无可用描述",
+      "defaultValue": "默认值",
+      "arrayPlaceholder": "输入值并按添加",
+      "emptyArray": "无值。使用上方输入添加值。",
+      "editButton": "编辑网格"
+    }
   },
   "prediction": {
     "title": "进行预测",
@@ -146,7 +156,8 @@
     "noLogs": "无可用日志"
   },
   "common": {
-    "na": "不可用"
+    "na": "不可用",
+    "add": "添加"
   },
   "navigation": {
     "home": "首页",

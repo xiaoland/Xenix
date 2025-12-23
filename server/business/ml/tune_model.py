@@ -26,7 +26,7 @@ from base import import_model
 from sklearn.model_selection import train_test_split
 
 
-def tune_regression_model(model_name: str, input_file: str, feature_columns: list, target_column: str, logger):
+def tune_regression_model(model_name: str, input_file: str, feature_columns: list, target_column: str, logger, param_grid_dict: dict = None):
     """
     Tune a regression model using hyperparameter search.
     
@@ -36,6 +36,7 @@ def tune_regression_model(model_name: str, input_file: str, feature_columns: lis
         feature_columns: List of feature column names
         target_column: Target column name
         logger: Logger instance for logging progress
+        param_grid_dict: Optional custom parameter grid dictionary
         
     Returns:
         Tuple of (best_params, metrics) where metrics contains train and test scores
@@ -78,7 +79,23 @@ def tune_regression_model(model_name: str, input_file: str, feature_columns: lis
     
     # Perform hyperparameter tuning using the model's tune function
     logger.info(f"Starting hyperparameter tuning with GridSearchCV")
-    tune_result = Model.tune(X_train, y_train, progress_callback=progress_callback)
+    
+    # Convert param_grid_dict to pydantic model instance if provided
+    param_grid_instance = None
+    if param_grid_dict:
+        logger.info(f"Using custom parameter grid: {param_grid_dict}")
+        # Get the ParamGrid class from the Model
+        if hasattr(Model, '__orig_bases__'):
+            for base in Model.__orig_bases__:
+                if hasattr(base, '__args__') and len(base.__args__) >= 2:
+                    ParamGridClass = base.__args__[1]
+                    try:
+                        param_grid_instance = ParamGridClass(**param_grid_dict)
+                        logger.info(f"Created param grid instance: {param_grid_instance}")
+                    except Exception as e:
+                        logger.warning(f"Failed to create param grid instance: {e}. Using provided dict directly.")
+    
+    tune_result = Model.tune(X_train, y_train, param_grid=param_grid_instance, progress_callback=progress_callback)
     
     best_params = tune_result['best_params']
     best_model = tune_result['model']
@@ -130,6 +147,7 @@ def main():
         model_name = input_data.get('model')
         feature_columns = input_data.get('featureColumns')
         target_column = input_data.get('targetColumn')
+        param_grid = input_data.get('paramGrid')  # Optional custom param grid
         
         # Validate required parameters
         if not input_file:
@@ -146,7 +164,7 @@ def main():
         # Determine model type and call appropriate tuning function
         if model_name.startswith('regression.'):
             best_params, metrics = tune_regression_model(
-                model_name, input_file, feature_columns, target_column, logger
+                model_name, input_file, feature_columns, target_column, logger, param_grid
             )
         # Future: Add support for other model types
         # elif model_name.startswith('classification.'):
