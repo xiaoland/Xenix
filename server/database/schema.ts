@@ -2,6 +2,17 @@
 
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 
+// Model metadata table for storing model information and ParamGrid schemas
+export const modelMetadata = sqliteTable('model_metadata', {
+  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+  category: text('category').notNull(), // e.g., 'regression', 'classification'
+  name: text('name').notNull().unique(), // e.g., 'regression.adaboost'
+  label: text('label').notNull(), // Human-readable name, e.g., 'AdaBoost'
+  paramGridSchema: text('param_grid_schema', { mode: 'json' }), // JSON schema from pydantic model
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+});
+
 // Datasets table for data manager - stores uploaded data files for reuse
 export const datasets = sqliteTable('datasets', {
   id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
