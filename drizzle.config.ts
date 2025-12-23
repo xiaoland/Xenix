@@ -1,5 +1,4 @@
 import { defineConfig } from 'drizzle-kit';
-import { getDatabaseType } from './server/database/utils';
 
 // Ensure DATABASE_URL is provided
 if (!process.env.DATABASE_URL) {
@@ -8,20 +7,15 @@ if (!process.env.DATABASE_URL) {
 
 const databaseUrl = process.env.DATABASE_URL;
 
-// Determine database type
-const databaseType = getDatabaseType();
-const dialect = databaseType === 'sqlite' ? 'sqlite' : 'postgresql';
-
 // For SQLite, remove the sqlite:// or file: prefix if present for drizzle-kit
-const dbUrl = databaseType === 'sqlite' 
-  ? databaseUrl.replace(/^(sqlite:\/\/|file:)/, '')
-  : databaseUrl;
+const dbUrl = databaseUrl.replace(/^(sqlite:\/\/|file:)/, '');
 
 export default defineConfig({
   schema: './server/database/schema.ts',
   out: './server/database/migrations',
-  dialect,
+  dialect: 'sqlite',
   dbCredentials: {
     url: dbUrl,
   },
 });
+
