@@ -7,7 +7,7 @@ Xenix provides an interface for teachers, mid-small enterprises to analysis thei
 - Framework: Nuxt.js
 - UI Library: AntDesign
 - Style management: UnoCSS (iconfont and simple styles) + SCSS (complex styles)
-- Database: DrizzleORM + PostgreSQL
+- Database: DrizzleORM + SQLite
 - Automation testing:
   - Unit testing: Vitest (with `@vue/test-utils`)
 - Data processing, model fit and prefiction: Python
@@ -42,6 +42,5 @@ Xenix provides an interface for teachers, mid-small enterprises to analysis thei
 ## Development
 
 1. Config `.env`
-2. Setup your local PostgreSQL using docker compose.
-3. Run `pnpm run db:generate`
-4. Run `pnpm run db:migrate`
+2. Run `pnpm run db:generate`
+3. Run `pnpm run db:migrate`

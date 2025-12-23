@@ -14,7 +14,7 @@ Xenix provides an interface for teachers and mid-small enterprises to analyze th
 - **Evaluation Metrics Display**: Real-time display of MSE, MAE, and R² scores from tuning
 - **Background Task Processing**: Long-running tasks execute asynchronously with status polling
 - **Real-Time Logs**: OpenTelemetry-compliant logging with structured JSON output
-- **Database Persistence**: All tasks, parameters, metrics, and results stored in PostgreSQL
+- **Database Persistence**: All tasks, parameters, metrics, and results stored in SQLite
 - **Modern UI**: Built with Nuxt.js and Ant Design Vue with modular components
 
 ## Supported Models
@@ -45,9 +45,8 @@ Xenix provides an interface for teachers and mid-small enterprises to analyze th
 ### Backend
 
 - **Runtime**: Node.js with Nitro
-- **Database**: PostgreSQL 16
+- **Database**: SQLite
 - **ORM**: DrizzleORM
-- **Container**: Docker Compose
 
 ### Data Processing
 
@@ -59,8 +58,6 @@ Xenix provides an interface for teachers and mid-small enterprises to analyze th
 
 - Node.js 18+ and pnpm
 - Python 3.12
-- Docker and Docker Compose
-- PostgreSQL client tools (for migrations)
 
 ## Setup
 
@@ -93,31 +90,26 @@ pip install --user pdm
 pdm install
 ```
 
-### 3. Start PostgreSQL database
+### 3. Configure Database
 
 ```bash
-docker compose up -d
+# Copy environment file
+cp .env.example .env
+
+# The default configuration uses SQLite with DATABASE_URL=./xenix.db
 ```
 
-Wait a few seconds for PostgreSQL to be ready, then run migrations:
+Generate and apply migrations:
 
 ```bash
-# Generate migrations
+# Generate SQLite migrations
 pnpm db:generate
 
-# Apply migrations
-PGPASSWORD=xenix_password psql -h localhost -U xenix -d xenix_db -f server/database/migrations/0000_*.sql
+# Apply migrations (SQLite will auto-create the database)
+pnpm db:migrate
 ```
 
-### 4. Configure environment
-
-```bash
-cp .env.example .env
-```
-
-The default configuration connects to the local PostgreSQL instance started by Docker Compose.
-
-### 5. Start the development server
+### 4. Start the development server
 
 ```bash
 pnpm dev
@@ -329,7 +321,8 @@ cp .env.example .env
 
 Available variables:
 
-- `DATABASE_URL` - PostgreSQL connection string (required)
+- `DATABASE_URL` - SQLite database file path (required)
+  - Example: `./xenix.db` or `sqlite://./xenix.db`
 - `PYTHON_EXECUTABLE` - Python command to use (default: `python3`)
 
 ## Development
