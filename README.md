@@ -156,7 +156,7 @@ Xenix/
 ├── app/
 │   ├── components/               # Vue components
 │   │   ├── UploadStep.vue       # Upload interface
-│   │   ├── TrainingStep.vue     # Model selection & tuning
+│   │   ├── TuningStep.vue       # Model selection & tuning
 │   │   ├── PredictionStep.vue   # Prediction interface
 │   │   ├── ModelSelector.vue    # Model selection grid
 │   │   ├── TuningResults.vue    # Results table with selection

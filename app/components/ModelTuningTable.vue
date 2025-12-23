@@ -1,7 +1,7 @@
 <template>
   <div>
     <h3 class="text-lg font-medium mb-3">
-      {{ $t("training.modelSelectionAndTuning") }}
+      {{ $t("tuning.modelSelectionAndTuning") }}
     </h3>
     <a-table
       :dataSource="tableData"
@@ -23,7 +23,7 @@
             @click="handleStartTune(record.model)"
           >
             <i class="i-mdi-tune mr-1"></i>
-            {{ t("training.startTune") }}
+            {{ t("tuning.startTune") }}
           </a-button>
           <a-button
             v-else
@@ -31,7 +31,7 @@
             @click="handleViewLogs(record.taskId, record.label)"
           >
             <i class="i-mdi-text-box-outline mr-1"></i>
-            {{ t("training.viewLogs") }}
+            {{ t("tuning.viewLogs") }}
           </a-button>
           <a-tag
             v-if="record.status && record.status !== 'pending'"
@@ -97,9 +97,9 @@ const currentLogTaskId = ref<string>("");
 const currentLogModelName = ref<string>("");
 
 const columns = computed(() => [
-  { title: t("training.model"), key: "model", dataIndex: "model" },
-  { title: t("training.tuning"), key: "action", width: 280 },
-  { title: t("training.metrics"), key: "metrics", width: 320 },
+  { title: t("tuning.model"), key: "model", dataIndex: "model" },
+  { title: t("tuning.tuning"), key: "action", width: 280 },
+  { title: t("tuning.metrics"), key: "metrics", width: 320 },
 ]);
 
 // Combine all data sources into a single table data structure

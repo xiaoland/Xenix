@@ -33,8 +33,8 @@
             @continue="handleColumnSelection"
           />
 
-          <!-- Training Section (shown after upload) -->
-          <TrainingStep
+          <!-- Tuning Section (shown after upload) -->
+          <TuningStep
             v-else
             v-model:selected-models="selectedModels"
             v-model:active-log-tab="activeLogTab"
