@@ -14,7 +14,7 @@ Xenix provides an interface for teachers and mid-small enterprises to analyze th
 - **Evaluation Metrics Display**: Real-time display of MSE, MAE, and R² scores from tuning
 - **Background Task Processing**: Long-running tasks execute asynchronously with status polling
 - **Real-Time Logs**: OpenTelemetry-compliant logging with structured JSON output
-- **Database Persistence**: All tasks, parameters, metrics, and results stored in PostgreSQL or SQLite
+- **Database Persistence**: All tasks, parameters, metrics, and results stored in SQLite (PostgreSQL optional)
 - **Modern UI**: Built with Nuxt.js and Ant Design Vue with modular components
 
 ## Supported Models
@@ -45,9 +45,9 @@ Xenix provides an interface for teachers and mid-small enterprises to analyze th
 ### Backend
 
 - **Runtime**: Node.js with Nitro
-- **Database**: PostgreSQL 16 or SQLite (configurable)
+- **Database**: SQLite (PostgreSQL optional for production)
 - **ORM**: DrizzleORM
-- **Container**: Docker Compose (for PostgreSQL)
+- **Container**: Docker Compose (optional, for PostgreSQL)
 
 ### Data Processing
 
@@ -59,8 +59,7 @@ Xenix provides an interface for teachers and mid-small enterprises to analyze th
 
 - Node.js 18+ and pnpm
 - Python 3.12
-- For PostgreSQL: Docker and Docker Compose, PostgreSQL client tools (for migrations)
-- For SQLite: No additional requirements
+- Optional (for PostgreSQL): Docker and Docker Compose, PostgreSQL client tools (for migrations)
 
 ## Setup
 
@@ -95,16 +94,37 @@ pdm install
 
 ### 3. Configure Database
 
-You can choose between PostgreSQL or SQLite:
+The default configuration uses SQLite, which requires no additional setup. For production deployments, you can optionally use PostgreSQL.
 
-#### Option A: PostgreSQL (Recommended for production)
+#### Option A: SQLite (Default - recommended for development)
 
 ```bash
 # Copy environment file
 cp .env.example .env
 
-# The default configuration uses PostgreSQL
-# Make sure DATABASE_TYPE=postgresql and DATABASE_URL points to PostgreSQL
+# The default configuration uses SQLite
+# DATABASE_TYPE=sqlite and DATABASE_URL=./xenix.db
+```
+
+Generate and apply migrations:
+
+```bash
+# Generate SQLite migrations
+pnpm db:generate
+
+# Apply migrations (SQLite will auto-create the database)
+pnpm db:migrate
+```
+
+#### Option B: PostgreSQL (Optional - for production)
+
+```bash
+# Copy environment file
+cp .env.example .env
+
+# Edit .env and uncomment/set:
+# DATABASE_TYPE=postgresql
+# DATABASE_URL=postgresql://xenix:xenix_password@localhost:5435/xenix_db
 ```
 
 Start PostgreSQL database:
@@ -121,28 +141,6 @@ pnpm db:generate
 
 # Apply migrations
 PGPASSWORD=xenix_password psql -h localhost -U xenix -d xenix_db -f server/database/migrations/0000_*.sql
-```
-
-#### Option B: SQLite (Easy setup for development/testing)
-
-```bash
-# Copy environment file
-cp .env.example .env
-
-# Edit .env and change:
-# DATABASE_TYPE=sqlite
-# DATABASE_URL=./xenix.db
-# (and comment out the PostgreSQL DATABASE_URL)
-```
-
-Generate and apply migrations:
-
-```bash
-# Generate SQLite migrations
-pnpm db:generate
-
-# Apply migrations (SQLite will auto-create the database)
-pnpm db:migrate
 ```
 
 ### 4. Start the development server
@@ -357,10 +355,10 @@ cp .env.example .env
 
 Available variables:
 
-- `DATABASE_TYPE` - Database type: `postgresql` or `sqlite` (default: auto-detected from DATABASE_URL)
+- `DATABASE_TYPE` - Database type: `sqlite` or `postgresql` (default: `sqlite`, auto-detected from DATABASE_URL)
 - `DATABASE_URL` - Database connection string (required)
+  - SQLite (default): `./path/to/database.db` (or `sqlite://./path/to/database.db`)
   - PostgreSQL: `postgresql://user:password@host:port/database`
-  - SQLite: `./path/to/database.db` (or `sqlite://./path/to/database.db`)
 - `PYTHON_EXECUTABLE` - Python command to use (default: `python3`)
 
 ## Development

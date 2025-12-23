@@ -33,8 +33,17 @@ export function getDatabaseType(): 'postgresql' | 'sqlite' {
     return 'sqlite';
   }
   
-  // Default to PostgreSQL for postgresql:// or any other format
-  cachedDatabaseType = 'postgresql';
-  return 'postgresql';
+  // PostgreSQL URLs: postgresql:// or postgres://
+  if (
+    databaseUrl.startsWith('postgresql://') ||
+    databaseUrl.startsWith('postgres://')
+  ) {
+    cachedDatabaseType = 'postgresql';
+    return 'postgresql';
+  }
+  
+  // Default to SQLite for simple paths or unknown formats
+  cachedDatabaseType = 'sqlite';
+  return 'sqlite';
 }
 
