@@ -2,9 +2,9 @@
  * Server plugin to synchronize model metadata on application startup
  * This ensures the model metadata table is always up-to-date with available models
  */
-import { db } from '~/server/database';
-import { modelMetadata } from '~/server/database/schema';
-import { executePythonScript } from '~/server/utils/pythonExecutor';
+import { db } from '../database';
+import { modelMetadata } from '../database/schema';
+import { executePythonScript } from '../utils/pythonExecutor';
 import { eq } from 'drizzle-orm';
 
 export default defineNitroPlugin(async (nitroApp) => {

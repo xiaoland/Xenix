@@ -2,9 +2,9 @@
  * API endpoint to synchronize model metadata from Python scripts
  * Scans the business/ml directory and updates the database with model information
  */
-import { db } from '~/server/database';
-import { modelMetadata } from '~/server/database/schema';
-import { executePythonScript } from '~/server/utils/pythonExecutor';
+import { db } from '../../database';
+import { modelMetadata } from '../../database/schema';
+import { executePythonScript } from '../../utils/pythonExecutor';
 import { eq } from 'drizzle-orm';
 
 export default defineEventHandler(async (event) => {

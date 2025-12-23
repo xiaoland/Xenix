@@ -1,8 +1,8 @@
 /**
  * API endpoint to retrieve all model metadata from database
  */
-import { db } from '~/server/database';
-import { modelMetadata } from '~/server/database/schema';
+import { db } from '../../database';
+import { modelMetadata } from '../../database/schema';
 
 export default defineEventHandler(async (event) => {
   try {
