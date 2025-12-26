@@ -67,7 +67,11 @@ const formattedLogs = computed(() => {
           extraInfo = relevantAttrs;
         }
       } catch (e) {
-        // If parsing fails, use as-is
+        // If parsing fails, log the error and use attributes as-is
+        console.warn(`Failed to parse log attributes for log ${log.id}:`, e);
+        if (typeof log.attributes === 'string') {
+          extraInfo = log.attributes;
+        }
       }
     }
     

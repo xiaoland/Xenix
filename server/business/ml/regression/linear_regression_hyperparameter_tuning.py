@@ -16,6 +16,7 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.base import BaseEstimator
 
 from .base import RegressionModel, ProgressInfo, TuneResult
+from .progress_utils import create_progress_scorer
 
 
 
@@ -58,34 +59,18 @@ class LinearRegressionModel(RegressionModel[Pipeline, LinearRegressionParamGrid]
         param_combinations = list(ParameterGrid(param_grid_dict))
         total_fits = len(param_combinations) * 5  # 5-fold CV
         
-        # Create a custom scorer that tracks progress
-        current_fit = [0]  # Use list to allow mutation in nested function
+        # Create progress scorer
+        progress_scorer = create_progress_scorer(progress_callback, total_fits)
         
-        def progress_scorer(estimator, X, y):
-            """Custom scorer that reports progress"""
-            from sklearn.metrics import mean_squared_error
-            current_fit[0] += 1
-            
-            if progress_callback:
-                percentage = (current_fit[0] / total_fits) * 100
-                progress_callback({
-                    'percentage': percentage,
-                    'round': current_fit[0],
-                    'total_rounds': total_fits,
-                    'metrics': {},
-                    'params': estimator.get_params()
-                })
-            
-            # Return the actual score
-            y_pred = estimator.predict(X)
-            return -mean_squared_error(y, y_pred)
+        # Grid Search with 5-fold cross validation
+        # Note: n_jobs=1 is required for progress tracking to work correctly
         
         grid_search = GridSearchCV(
             estimator=base_model,
             param_grid=param_grid_dict,
             cv=5,
             scoring=progress_scorer,
-            n_jobs=1,  # Must be 1 to ensure sequential execution for progress tracking
+            n_jobs=1,  # Required for progress tracking
             verbose=0
         )
         
