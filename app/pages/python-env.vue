@@ -33,20 +33,30 @@
 
         <div class="actions" style="margin-top: 24px">
           <a-space>
-            <a-button type="primary" :loading="loading" @click="refreshStatus">
-              <template #icon><i class="i-mdi-refresh"></i></template>
+            <a-button
+              type="primary"
+              :loading="loading"
+              @click="refreshStatus"
+              class="inline-flex items-center"
+            >
+              <template #icon><span class="i-mdi-refresh" /></template>
               Refresh Status
             </a-button>
-            <a-button :loading="setupLoading" @click="setupEnvironment">
-              <template #icon><i class="i-mdi-cog"></i></template>
+            <a-button
+              :loading="setupLoading"
+              @click="setupEnvironment"
+              class="inline-flex items-center"
+            >
+              <template #icon><span class="i-mdi-cog" /></template>
               Setup Environment
             </a-button>
             <a-button
               danger
               :loading="reinstallLoading"
               @click="reinstallEnvironment"
+              class="inline-flex items-center"
             >
-              <template #icon><i class="i-mdi-download"></i></template>
+              <template #icon><span class="i-mdi-download" /></template>
               Reinstall Dependencies
             </a-button>
           </a-space>

@@ -218,3 +218,52 @@ async function storeLog(logData: any, taskId: string) {
     console.error(`[${taskId}] Error storing log:`, error);
   }
 }
+
+/**
+ * Execute a Python script synchronously and return the result
+ * Used for scripts that don't need task tracking (like model scanning)
+ */
+export async function executePythonScript(scriptPath: string, stdinData: any): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const pythonCmd = process.env.PYTHON_EXECUTABLE || 'python3';
+    
+    const pythonProcess = spawn(pythonCmd, [scriptPath], {
+      cwd: process.cwd(),
+      env: process.env,
+    });
+
+    // Write JSON data to stdin
+    if (stdinData) {
+      pythonProcess.stdin.write(JSON.stringify(stdinData));
+      pythonProcess.stdin.end();
+    }
+
+    let stdoutBuffer = '';
+    let stderrBuffer = '';
+
+    pythonProcess.stdout.on('data', (data) => {
+      stdoutBuffer += data.toString();
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+      stderrBuffer += data.toString();
+    });
+
+    pythonProcess.on('close', (code) => {
+      if (code === 0) {
+        try {
+          const result = JSON.parse(stdoutBuffer);
+          resolve(result);
+        } catch (error) {
+          reject(new Error(`Failed to parse JSON output: ${stdoutBuffer}`));
+        }
+      } else {
+        reject(new Error(`Python script failed with code ${code}: ${stderrBuffer}`));
+      }
+    });
+
+    pythonProcess.on('error', (error) => {
+      reject(new Error(`Failed to execute Python script: ${error.message}`));
+    });
+  });
+}

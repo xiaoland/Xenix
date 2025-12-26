@@ -224,6 +224,7 @@ export interface TuneOptions {
   featureColumns: string[];
   targetColumn: string;
   taskId: string;
+  paramGrid?: Record<string, any>;
 }
 
 /**
@@ -251,7 +252,7 @@ export async function tune(options: TuneOptions): Promise<void> {
   // Ensure environment is ready (with proper mutex to prevent race conditions)
   await getInitPromise();
 
-  const { inputFile, model, featureColumns, targetColumn, taskId } = options;
+  const { inputFile, model, featureColumns, targetColumn, taskId, paramGrid } = options;
 
   // Prepare stdin data for Python script
   const stdinData = {
@@ -259,6 +260,7 @@ export async function tune(options: TuneOptions): Promise<void> {
     model: model.toLowerCase(),
     featureColumns,
     targetColumn,
+    ...(paramGrid && { paramGrid }), // Include paramGrid if provided
   };
 
   // Execute Python task

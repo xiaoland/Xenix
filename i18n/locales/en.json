@@ -55,6 +55,40 @@
     "selectModelInstruction": "Select a model from the table above to use for predictions",
     "selectModelPlaceholder": "Select model for prediction"
   },
+  "tuning": {
+    "title": "Model Tuning",
+    "modelSelectionAndTuning": "Model Selection and Tuning",
+    "model": "Model",
+    "tuning": "Tuning",
+    "metrics": "Metrics",
+    "startTune": "Start Tune",
+    "viewLogs": "View Logs",
+    "selectModels": "Select Models to Tune",
+    "startTuning": "Start Hyperparameter Tuning",
+    "viewResults": "View Tuning Results",
+    "selectBest": "Select Best Model",
+    "selectBestForPrediction": "Select Best Model for Prediction",
+    "tuningResults": "Tuning Results",
+    "modelColumn": "Model",
+    "r2Test": "R² (Test)",
+    "mseTest": "MSE (Test)",
+    "maeTest": "MAE (Test)",
+    "statusColumn": "Status",
+    "selectModelInstruction": "Select a model from the table above to use for predictions",
+    "selectModelPlaceholder": "Select model for prediction",
+    "back": "Back",
+    "continue": "Continue to Prediction",
+    "paramGrid": {
+      "title": "Edit Parameter Grid - {model}",
+      "description": "Configure the hyperparameter search space for this model. Each field accepts a list of values to try.",
+      "loading": "Loading parameter schema...",
+      "noDescription": "No description available",
+      "defaultValue": "Default",
+      "arrayPlaceholder": "Enter value and press Add",
+      "emptyArray": "No values. Add values using the input above.",
+      "editButton": "Edit Grid"
+    }
+  },
   "prediction": {
     "title": "Make Predictions",
     "bestModel": "Best Model: {model}",
@@ -120,7 +154,8 @@
     "noLogs": "No logs available"
   },
   "common": {
-    "na": "N/A"
+    "na": "N/A",
+    "add": "Add"
   },
   "navigation": {
     "home": "Home",
@@ -163,5 +198,6 @@
     "useExistingDataset": "Use Existing Dataset",
     "orUploadNew": "Or upload a new file"
   },
-  "navigation.pythonEnv": "PyEnv"
+  "navigation.pythonEnv": "PyEnv",
+  "tuning.paramGridColumn": "Param Grid"
 }

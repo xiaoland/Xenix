@@ -1,9 +1,9 @@
 <template>
   <a-dropdown>
-    <a-button>
-      <i class="i-mdi-translate mr-2"></i>
+    <a-button class="inline-flex items-center">
+      <span class="i-mdi-translate mr-2" />
       {{ currentLocaleName }}
-      <i class="i-mdi-chevron-down ml-2"></i>
+      <span class="i-mdi-chevron-down ml-2" />
     </a-button>
     <template #overlay>
       <a-menu @click="handleLocaleChange">
@@ -20,7 +20,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed } from "vue";
 
 interface LocaleObject {
   code: string;
@@ -36,7 +36,9 @@ const availableLocales = computed(() => locales.value as LocaleObject[]);
 const currentLocale = computed(() => locale.value);
 
 const currentLocaleName = computed(() => {
-  const current = availableLocales.value.find((l) => l.code === currentLocale.value);
+  const current = availableLocales.value.find(
+    (l) => l.code === currentLocale.value
+  );
   return current?.name || currentLocale.value;
 });
 

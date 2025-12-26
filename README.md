@@ -156,7 +156,7 @@ Xenix/
 ├── app/
 │   ├── components/               # Vue components
 │   │   ├── UploadStep.vue       # Upload interface
-│   │   ├── TrainingStep.vue     # Model selection & tuning
+│   │   ├── TuningStep.vue       # Model selection & tuning
 │   │   ├── PredictionStep.vue   # Prediction interface
 │   │   ├── ModelSelector.vue    # Model selection grid
 │   │   ├── TuningResults.vue    # Results table with selection
@@ -347,15 +347,14 @@ pnpm db:studio
 
 # Generate new migration
 pnpm db:generate
+
+# Apply migration
+pnpm db:migrate
 ```
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-MIT
 
 ## Author
 

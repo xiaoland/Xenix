@@ -5,9 +5,12 @@
         <a-button
           type="text"
           size="large"
-          :class="{ 'bg-blue-50': isCurrentRoute('/') }"
+          :class="[
+            { 'bg-blue-50': isCurrentRoute('/') },
+            'inline-flex items-center',
+          ]"
         >
-          <template #icon><i class="i-mdi-home"></i></template>
+          <template #icon><span class="i-mdi-home" /></template>
           {{ $t("navigation.home") }}
         </a-button>
       </NuxtLink>
@@ -16,9 +19,12 @@
         <a-button
           type="text"
           size="large"
-          :class="{ 'bg-blue-50': isCurrentRoute('/datasets') }"
+          :class="[
+            { 'bg-blue-50': isCurrentRoute('/datasets') },
+            'inline-flex items-center',
+          ]"
         >
-          <template #icon><i class="i-mdi-database"></i></template>
+          <template #icon><span class="i-mdi-database" /></template>
           {{ $t("navigation.datasets") }}
         </a-button>
       </NuxtLink>
@@ -27,9 +33,12 @@
         <a-button
           type="text"
           size="large"
-          :class="{ 'bg-blue-50': isCurrentRoute('/python-env') }"
+          :class="[
+            { 'bg-blue-50': isCurrentRoute('/python-env') },
+            'inline-flex items-center',
+          ]"
         >
-          <template #icon><i class="i-mdi-snake"></i></template>
+          <template #icon><span class="i-mdi-snake" /></template>
           {{ $t("navigation.pythonEnv") }}
         </a-button>
       </NuxtLink>

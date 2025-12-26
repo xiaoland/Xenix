@@ -12,7 +12,7 @@
       <!-- Feature Columns Selection -->
       <div>
         <h3 class="text-lg font-semibold mb-3 flex items-center">
-          <i class="i-mdi-table-column text-blue-500 mr-2"></i>
+          <span class="i-mdi-table-column text-blue-500 mr-2" />
           {{ $t("columns.featureColumns") }}
         </h3>
         <p class="text-sm text-gray-600 mb-3">
@@ -47,7 +47,7 @@
       <!-- Target Column Selection -->
       <div>
         <h3 class="text-lg font-semibold mb-3 flex items-center">
-          <i class="i-mdi-target text-green-500 mr-2"></i>
+          <span class="i-mdi-target text-green-500 mr-2" />
           {{ $t("columns.targetColumn") }}
         </h3>
         <p class="text-sm text-gray-600 mb-3">
@@ -70,8 +70,11 @@
             </a-radio>
           </div>
         </a-radio-group>
-        <div v-if="localTargetColumn" class="mt-3 text-sm text-green-600">
-          <i class="i-mdi-check-circle mr-1"></i>
+        <div
+          v-if="localTargetColumn"
+          class="mt-3 text-sm text-green-600 flex items-center"
+        >
+          <span class="i-mdi-check-circle mr-1"></span>
           {{ $t("columns.targetSelected", { column: localTargetColumn }) }}
         </div>
       </div>
@@ -81,7 +84,9 @@
 
     <div class="flex justify-between items-center">
       <a-button @click="$emit('back')">
-        <i class="i-mdi-arrow-left mr-1"></i>
+        <template #icon>
+          <span class="i-mdi-arrow-left" />
+        </template>
         {{ $t("columns.backToUpload") }}
       </a-button>
 
@@ -103,9 +108,10 @@
             targetColumn: localTargetColumn,
           })
         "
+        class="inline-flex items-center"
       >
         {{ $t("columns.confirmSelection") }}
-        <i class="i-mdi-arrow-right ml-1"></i>
+        <span class="i-mdi-arrow-right ml-1" />
       </a-button>
     </div>
   </div>
