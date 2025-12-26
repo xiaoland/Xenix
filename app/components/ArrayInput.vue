@@ -8,8 +8,13 @@
         @keydown.enter="handleAdd"
         class="flex-1"
       />
-      <a-button type="primary" @click="handleAdd" :disabled="!inputValue">
-        <i class="i-mdi-plus mr-1"></i>
+      <a-button
+        type="primary"
+        @click="handleAdd"
+        :disabled="!inputValue"
+        class="inline-flex items-center"
+      >
+        <span class="i-mdi-plus mr-1" />
         {{ t("common.add") }}
       </a-button>
     </div>

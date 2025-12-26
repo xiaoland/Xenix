@@ -65,9 +65,6 @@ datasets/
 Model_Comparison_*.xlsx
 output.xlsx
 
-# Database (not migrations - migrations should be tracked)
-# server/database/migrations/
-
 # SQLite database files
 *.db
 *.db-journal

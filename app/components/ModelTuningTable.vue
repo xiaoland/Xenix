@@ -18,8 +18,9 @@
           <a-button
             size="small"
             @click="handleEditParamGrid(record.model, record.label)"
+            class="inline-flex items-center"
           >
-            <i class="i-mdi-tune-variant mr-1"></i>
+            <span class="i-mdi-tune-variant mr-1" />
             {{ t("tuning.paramGrid.editButton") }}
           </a-button>
         </template>
@@ -30,16 +31,18 @@
             size="small"
             :disabled="isTuning"
             @click="handleStartTune(record.model)"
+            class="inline-flex items-center"
           >
-            <i class="i-mdi-tune mr-1"></i>
+            <span class="i-mdi-tune mr-1" />
             {{ t("tuning.startTune") }}
           </a-button>
           <a-button
             v-else
             size="small"
             @click="handleViewLogs(record.taskId, record.label)"
+            class="inline-flex items-center"
           >
-            <i class="i-mdi-text-box-outline mr-1"></i>
+            <span class="i-mdi-text-box-outline mr-1" />
             {{ t("tuning.viewLogs") }}
           </a-button>
           <a-tag
@@ -124,7 +127,7 @@ const paramGridValues = ref<Record<string, Record<string, any>>>({});
 
 const columns = computed(() => [
   { title: t("tuning.model"), key: "model", dataIndex: "model" },
-  { title: "ParamGrid", key: "paramGrid", width: 150 },
+  { title: t("tuning.paramGridColumn"), key: "paramGrid", width: 150 },
   { title: t("tuning.tuning"), key: "action", width: 280 },
   { title: t("tuning.metrics"), key: "metrics", width: 320 },
 ]);

@@ -347,15 +347,14 @@ pnpm db:studio
 
 # Generate new migration
 pnpm db:generate
+
+# Apply migration
+pnpm db:migrate
 ```
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-MIT
 
 ## Author
 

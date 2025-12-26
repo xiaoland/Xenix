@@ -16,17 +16,23 @@
           :filter-option="filterDatasetOption"
           @change="handleDatasetSelected"
         >
-          <a-select-option v-for="dataset in datasets" :key="dataset.datasetId" :value="dataset.datasetId">
+          <a-select-option
+            v-for="dataset in datasets"
+            :key="dataset.datasetId"
+            :value="dataset.datasetId"
+          >
             <div class="flex justify-between items-center">
               <span>{{ dataset.name }}</span>
-              <a-tag color="blue" class="ml-2">{{ dataset.rowCount }} {{ $t('datasets.rows') }}</a-tag>
+              <a-tag color="blue" class="ml-2"
+                >{{ dataset.rowCount }} {{ $t("datasets.rows") }}</a-tag
+              >
             </div>
           </a-select-option>
         </a-select>
       </a-card>
 
       <!-- Divider -->
-      <a-divider>{{ $t('datasets.orUploadNew') }}</a-divider>
+      <a-divider>{{ $t("datasets.orUploadNew") }}</a-divider>
 
       <!-- File Upload -->
       <a-upload-dragger
@@ -38,7 +44,9 @@
         :disabled="!!selectedDatasetId"
       >
         <p class="ant-upload-drag-icon">
-          <i class="i-mdi-cloud-upload text-6xl text-blue-500"></i>
+          <span
+            class="i-mdi-cloud-upload text-6xl text-blue-500 inline-block"
+          ></span>
         </p>
         <p class="ant-upload-text">{{ $t("upload.dragHint") }}</p>
         <p class="ant-upload-hint">
@@ -82,11 +90,13 @@ const { t } = useI18n();
 const fileList = defineModel<any[]>({ required: true });
 
 const emit = defineEmits<{
-  continue: [{ 
-    featureColumns: string[]; 
-    targetColumn: string;
-    datasetId?: string;
-  }];
+  continue: [
+    {
+      featureColumns: string[];
+      targetColumn: string;
+      datasetId?: string;
+    }
+  ];
 }>();
 
 interface Dataset {
@@ -126,25 +136,26 @@ const beforeUpload: UploadProps["beforeUpload"] = (file) => {
 const fetchDatasets = async () => {
   isLoadingDatasets.value = true;
   try {
-    const response = await $fetch('/api/data');
+    const response = await $fetch("/api/data");
     if (response.success) {
       datasets.value = response.datasets;
     }
   } catch (error) {
-    console.error('Failed to fetch datasets:', error);
+    console.error("Failed to fetch datasets:", error);
   } finally {
     isLoadingDatasets.value = false;
   }
 };
 
 const filterDatasetOption = (input: string, option: any) => {
-  const dataset = datasets.value.find(d => d.datasetId === option.value);
+  const dataset = datasets.value.find((d) => d.datasetId === option.value);
   if (!dataset) return false;
   return dataset.name.toLowerCase().includes(input.toLowerCase());
 };
 
 const handleDatasetSelected = (datasetId: string) => {
-  selectedDataset.value = datasets.value.find(d => d.datasetId === datasetId) || null;
+  selectedDataset.value =
+    datasets.value.find((d) => d.datasetId === datasetId) || null;
   // Clear file upload if dataset is selected
   fileList.value = [];
 };
@@ -171,7 +182,9 @@ const handleDatasetContinue = async () => {
   try {
     excelColumns.value = selectedDataset.value.columns;
     showColumnSelection.value = true;
-    message.success(`Found ${selectedDataset.value.columns.length} columns in the dataset`);
+    message.success(
+      `Found ${selectedDataset.value.columns.length} columns in the dataset`
+    );
   } catch (error) {
     console.error("Error loading dataset columns:", error);
     message.error("Failed to load dataset columns");
@@ -251,10 +264,10 @@ const handleColumnSelection = ({
   );
 
   // Emit the selection to parent, including datasetId if using existing dataset
-  emit("continue", { 
-    featureColumns, 
+  emit("continue", {
+    featureColumns,
     targetColumn,
-    datasetId: selectedDatasetId.value 
+    datasetId: selectedDatasetId.value,
   });
 };
 

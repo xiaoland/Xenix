@@ -198,5 +198,6 @@
     "useExistingDataset": "Use Existing Dataset",
     "orUploadNew": "Or upload a new file"
   },
-  "navigation.pythonEnv": "PyEnv"
+  "navigation.pythonEnv": "PyEnv",
+  "tuning.paramGridColumn": "Param Grid"
 }

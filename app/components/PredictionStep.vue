@@ -18,7 +18,9 @@
       accept=".xlsx,.xls"
     >
       <p class="ant-upload-drag-icon">
-        <i class="i-mdi-file-table text-6xl text-green-500"></i>
+        <span
+          class="i-mdi-file-table text-6xl text-green-500 inline-block"
+        ></span>
       </p>
       <p class="ant-upload-text">{{ t("prediction.uploadData") }}</p>
       <p class="ant-upload-hint">
@@ -27,7 +29,7 @@
     </a-upload-dragger>
 
     <a-button
-      class="mt-4"
+      class="mt-4 inline-flex items-center justify-center"
       type="primary"
       size="large"
       block
@@ -35,7 +37,7 @@
       :disabled="fileList.length === 0"
       @click="$emit('predict')"
     >
-      <i class="i-mdi-chart-line mr-2"></i>
+      <span class="i-mdi-chart-line mr-2" />
       {{ t("prediction.startPrediction") }}
     </a-button>
 
@@ -47,10 +49,10 @@
         type="primary"
         size="large"
         block
-        class="mt-4"
+        class="mt-4 inline-flex items-center justify-center"
         @click="downloadResults"
       >
-        <i class="i-mdi-download mr-2"></i>
+        <span class="i-mdi-download mr-2" />
         {{ t("prediction.downloadResults") }}
       </a-button>
     </div>
