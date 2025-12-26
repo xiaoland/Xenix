@@ -71,6 +71,10 @@ def tune_regression_model(model_name: str, input_file: str, feature_columns: lis
         metrics = progress_info.get('metrics', {})
         params = progress_info.get('params', {})
         
+        # Emit progress update as structured JSON
+        logger.progress(percentage, round_num, total_rounds, f"Tuning progress: {percentage:.1f}%")
+        
+        # Also log info for detailed view
         logger.info(f"Progress: {percentage:.1f}% - Round {round_num}/{total_rounds}")
         if metrics:
             logger.info(f"  Current metrics: {metrics}")

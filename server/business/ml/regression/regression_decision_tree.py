@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from sklearn.base import BaseEstimator
 
 from .base import RegressionModel, ProgressInfo, TuneResult
+from .progress_utils import create_progress_scorer
 
 
 
@@ -36,13 +37,24 @@ class DecisionTreeRegressionModel(RegressionModel[DecisionTreeRegressor, Decisio
             # Convert pydantic model to dict, excluding None values
             param_grid_dict = param_grid.model_dump(exclude_none=True)
 
+        # Calculate total number of fits
+        from sklearn.model_selection import ParameterGrid
+        param_combinations = list(ParameterGrid(param_grid_dict))
+        total_fits = len(param_combinations) * 5  # 5-fold CV
+        
+        # Create progress scorer
+        progress_scorer = create_progress_scorer(progress_callback, total_fits)
+        
+        # Grid Search with 5-fold cross validation
+        # Note: n_jobs=1 is required for progress tracking to work correctly
     
         grid_search = GridSearchCV(
             estimator=base_model,
             param_grid=param_grid_dict,
             cv=5,
-            scoring='neg_mean_squared_error',
-            n_jobs=-1
+            scoring=progress_scorer,
+            n_jobs=1,  # Required for progress tracking
+            verbose=0
         )
     
         grid_search.fit(X_train, y_train)

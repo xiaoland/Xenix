@@ -11,7 +11,7 @@ export interface PythonTaskOptions {
 
 // Pattern for structured output from Python scripts
 interface StructuredOutput {
-  type: 'log' | 'status' | 'result' | 'comparison_result' | 'prediction_result';
+  type: 'log' | 'status' | 'result' | 'comparison_result' | 'prediction_result' | 'progress';
   data: any;
 }
 
@@ -166,6 +166,19 @@ async function handleStructuredOutput(output: StructuredOutput, taskId: string) 
           .set({
             status: output.data.status,
             error: output.data.error || null,
+            updatedAt: new Date()
+          })
+          .where(eq(schema.tasks.taskId, taskId));
+        break;
+      
+      case 'progress':
+        // Update task progress
+        await db.update(schema.tasks)
+          .set({
+            progress: Math.round(output.data.percentage),
+            progressCurrent: output.data.current,
+            progressTotal: output.data.total,
+            progressMessage: output.data.message || null,
             updatedAt: new Date()
           })
           .where(eq(schema.tasks.taskId, taskId));

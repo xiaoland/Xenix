@@ -38,6 +38,10 @@ export const tasks = sqliteTable('tasks', {
   inputFile: text('input_file'),
   outputFile: text('output_file'),
   error: text('error'),
+  progress: integer('progress'),  // Progress percentage (0-100)
+  progressCurrent: integer('progress_current'),  // Current iteration
+  progressTotal: integer('progress_total'),  // Total iterations
+  progressMessage: text('progress_message'),  // Progress message
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 });

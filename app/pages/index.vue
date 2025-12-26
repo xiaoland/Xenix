@@ -45,6 +45,7 @@
             :is-tuning="isTuning"
             :tuning-results="tuningResults"
             :task-logs="taskLogs"
+            :task-progress="taskProgress"
             @start-tuning="startTuning"
             @start-single-tune="startSingleModelTuning"
             @continue="nextStep"
@@ -115,6 +116,7 @@ const predictionTask = ref<any>(null);
 // Logs state
 const taskLogs = ref<Record<string, any[]>>({});
 const activeLogTab = ref<string>("");
+const taskProgress = ref<Record<string, { percentage: number; current: number; total: number; message?: string }>>({});
 
 const fetchTaskLogs = async (taskId: string) => {
   try {
@@ -375,6 +377,16 @@ const pollTaskStatus = async (taskId: string, modelValue?: string) => {
         response.task.status !== tuningStatus.value[modelValue]
       ) {
         tuningStatus.value[modelValue] = response.task.status;
+      }
+
+      // Update progress data
+      if (response.task.progress !== undefined) {
+        taskProgress.value[taskId] = {
+          percentage: response.task.progress,
+          current: response.task.progressCurrent || 0,
+          total: response.task.progressTotal || 100,
+          message: response.task.progressMessage || undefined,
+        };
       }
 
       if (response.task.status === "completed") {
