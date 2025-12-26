@@ -17,6 +17,8 @@ export default defineEventHandler(async (event) => {
     const featureColumns = formData.get("featureColumns") as string; // JSON string
     const targetColumn = formData.get("targetColumn") as string;
     const paramGrid = formData.get("paramGrid") as string; // JSON string, optional
+    const trainingType = formData.get("trainingType") as string || "auto"; // 'auto' or 'manual'
+    const parentTaskId = formData.get("parentTaskId") as string; // For manual training, reference to auto-tune task
 
     let inputFile: string;
     let usedDatasetId: string | null = null;
@@ -100,6 +102,8 @@ export default defineEventHandler(async (event) => {
         targetColumn,
         taskId,
         paramGrid: parsedParamGrid,
+        trainingType,
+        parentTaskId,
       }).catch((error) => {
         console.error(`Failed to execute task ${taskId}:`, error);
       });

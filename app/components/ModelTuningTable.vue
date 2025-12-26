@@ -6,45 +6,61 @@
     <a-table
       :dataSource="tableData"
       :columns="columns"
-      :row-key="(record) => record.model"
+      :row-key="getRowKey"
       :pagination="false"
+      :expandedRowKeys="expandedKeys"
+      @expand="handleExpand"
       class="model-tuning-table"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'model'">
-          <span class="font-medium">{{ formatModelName(record.label) }}</span>
-        </template>
-        <template v-else-if="column.key === 'paramGrid'">
-          <a-button
-            size="small"
-            @click="handleEditParamGrid(record.model, record.label)"
-            class="inline-flex items-center"
-          >
-            <span class="i-mdi-tune-variant mr-1" />
-            {{ t("tuning.paramGrid.editButton") }}
-          </a-button>
+          <span class="font-medium" :class="{ 'pl-8': record.isHistory }">
+            {{ record.isHistory ? `└─ ${formatTimestamp(record.createdAt)}` : formatModelName(record.label) }}
+          </span>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-button
-            v-if="!record.status || record.status === 'pending'"
-            type="primary"
-            size="small"
-            :disabled="isTuning"
-            @click="handleStartTune(record.model)"
-            class="inline-flex items-center"
-          >
-            <span class="i-mdi-tune mr-1" />
-            {{ t("tuning.startTune") }}
-          </a-button>
-          <a-button
-            v-else
-            size="small"
-            @click="handleViewLogs(record.taskId, record.label)"
-            class="inline-flex items-center"
-          >
-            <span class="i-mdi-text-box-outline mr-1" />
-            {{ t("tuning.viewLogs") }}
-          </a-button>
+          <!-- Show action buttons only for parent rows -->
+          <div v-if="!record.isHistory" class="flex gap-2">
+            <a-button
+              type="primary"
+              size="small"
+              :disabled="isTuning"
+              @click="handleAutoTune(record.model, record.label)"
+              class="inline-flex items-center"
+            >
+              <span class="i-mdi-tune mr-1" />
+              {{ t("tuning.autoTune") }}
+            </a-button>
+            <a-button
+              size="small"
+              :disabled="isTuning"
+              @click="handleManualTrain(record.model, record.label)"
+              class="inline-flex items-center"
+            >
+              <span class="i-mdi-pencil mr-1" />
+              {{ t("tuning.manualTrain") }}
+            </a-button>
+            <a-button
+              v-if="record.status && record.status !== 'pending'"
+              size="small"
+              @click="handleViewLogs(record.taskId, record.label)"
+              class="inline-flex items-center"
+            >
+              <span class="i-mdi-text-box-outline mr-1" />
+              {{ t("tuning.viewLogs") }}
+            </a-button>
+          </div>
+          <div v-else class="flex gap-2">
+            <a-button
+              v-if="record.taskId"
+              size="small"
+              @click="handleViewLogs(record.taskId, record.label)"
+              class="inline-flex items-center"
+            >
+              <span class="i-mdi-text-box-outline mr-1" />
+              {{ t("tuning.viewLogs") }}
+            </a-button>
+          </div>
           <a-tag
             v-if="record.status && record.status !== 'pending'"
             :color="getStatusColor(record.status)"
@@ -83,20 +99,30 @@
       <LogPanel :logs="currentLogs" />
     </a-modal>
 
-    <!-- ParamGrid Editor Dialog -->
+    <!-- ParamGrid Editor Dialog (for auto-tune) -->
     <ParamGridDialog
       v-model="paramGridDialogVisible"
       :model-name="currentEditModel"
       :model-label="currentEditModelLabel"
       :schema="currentModelSchema"
       :initial-values="paramGridValues[currentEditModel]"
-      @save="handleSaveParamGrid"
+      @save="handleSaveAutoTune"
+    />
+
+    <!-- Manual Train Dialog -->
+    <ManualTrainDialog
+      v-model="manualTrainDialogVisible"
+      :model-name="currentEditModel"
+      :model-label="currentEditModelLabel"
+      :schema="currentModelSchema"
+      :initial-values="manualTrainValues[currentEditModel]"
+      @train="handleSaveManualTrain"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from "vue";
+import { computed, ref, onMounted, watch } from "vue";
 
 const { t } = useI18n();
 
@@ -110,7 +136,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  "start-tune": [model: string, paramGrid?: Record<string, any>];
+  "start-tune": [model: string, paramGrid?: Record<string, any>, trainingType?: string, parentTaskId?: string];
   "view-logs": [taskId: string, modelName: string];
 }>();
 
@@ -118,17 +144,22 @@ const logModalVisible = ref(false);
 const currentLogTaskId = ref<string>("");
 const currentLogModelName = ref<string>("");
 
-// ParamGrid dialog state
+// ParamGrid dialog state (for auto-tune)
 const paramGridDialogVisible = ref(false);
+const manualTrainDialogVisible = ref(false);
 const currentEditModel = ref<string>("");
 const currentEditModelLabel = ref<string>("");
 const modelMetadata = ref<any[]>([]);
 const paramGridValues = ref<Record<string, Record<string, any>>>({});
+const manualTrainValues = ref<Record<string, Record<string, any>>>({});
+
+// Training history
+const trainingHistory = ref<Record<string, any[]>>({});
+const expandedKeys = ref<string[]>([]);
 
 const columns = computed(() => [
   { title: t("tuning.model"), key: "model", dataIndex: "model" },
-  { title: t("tuning.paramGridColumn"), key: "paramGrid", width: 150 },
-  { title: t("tuning.tuning"), key: "action", width: 280 },
+  { title: t("tuning.tuning"), key: "action", width: 350 },
   { title: t("tuning.metrics"), key: "metrics", width: 320 },
 ]);
 
@@ -144,6 +175,18 @@ onMounted(async () => {
   }
 });
 
+// Fetch training history when results change
+watch(
+  () => props.tuningResults,
+  async () => {
+    // Fetch history for each model that has results
+    for (const result of props.tuningResults) {
+      await fetchTrainingHistory(result.model);
+    }
+  },
+  { immediate: true, deep: true }
+);
+
 // Get schema for current model being edited
 const currentModelSchema = computed(() => {
   const metadata = modelMetadata.value.find(
@@ -152,14 +195,45 @@ const currentModelSchema = computed(() => {
   return metadata?.paramGridSchema || null;
 });
 
-// Combine all data sources into a single table data structure
+// Fetch training history for a specific model
+const fetchTrainingHistory = async (model: string) => {
+  try {
+    const response = await $fetch(`/api/results/history/${model}`);
+    if (response.success && response.results) {
+      trainingHistory.value[model] = response.results;
+    }
+  } catch (error) {
+    console.error(`Failed to fetch training history for ${model}:`, error);
+  }
+};
+
+// Get row key for table
+const getRowKey = (record: any) => {
+  return record.isHistory ? `${record.model}-${record.taskId}` : record.model;
+};
+
+// Handle row expansion
+const handleExpand = (expanded: boolean, record: any) => {
+  if (expanded) {
+    expandedKeys.value.push(record.model);
+    // Fetch history when expanding
+    fetchTrainingHistory(record.model);
+  } else {
+    expandedKeys.value = expandedKeys.value.filter((key) => key !== record.model);
+  }
+};
+
+// Combine all data sources into a single table data structure with expandable rows
 const tableData = computed(() => {
-  return props.availableModels.map((model) => {
+  const data: any[] = [];
+  
+  for (const model of props.availableModels) {
     const status = props.tuningStatus[model.value];
     const taskId = props.tuningTasks[model.value];
     const result = props.tuningResults.find((r) => r.model === model.value);
 
-    return {
+    // Parent row
+    const parentRow = {
       model: model.value,
       label: model.label,
       status: status,
@@ -171,12 +245,45 @@ const tableData = computed(() => {
             mae_test: result.mae_test,
           }
         : null,
+      isHistory: false,
     };
-  });
+    
+    data.push(parentRow);
+
+    // Add history rows if expanded
+    if (expandedKeys.value.includes(model.value)) {
+      const history = trainingHistory.value[model.value] || [];
+      for (const historyItem of history) {
+        data.push({
+          model: model.value,
+          label: model.label,
+          taskId: historyItem.taskId,
+          status: "completed", // History items are always completed
+          metrics: {
+            r2_test: historyItem.r2_test,
+            mse_test: historyItem.mse_test,
+            mae_test: historyItem.mae_test,
+          },
+          params: historyItem.params,
+          trainingType: historyItem.trainingType || "auto",
+          createdAt: historyItem.createdAt,
+          isHistory: true,
+        });
+      }
+    }
+  }
+
+  return data;
 });
 
 const formatModelName = (name: string) => {
   return name.replace(/_/g, " ");
+};
+
+const formatTimestamp = (timestamp: any) => {
+  if (!timestamp) return "";
+  const date = new Date(timestamp);
+  return date.toLocaleString();
 };
 
 const formatMetric = (value: string | number) => {
@@ -208,22 +315,34 @@ const handleViewLogs = (taskId: string, modelName: string) => {
   emit("view-logs", taskId, modelName);
 };
 
-// Handle edit param grid
-const handleEditParamGrid = (modelName: string, modelLabel: string) => {
+// Handle auto tune (with param grid editing)
+const handleAutoTune = (modelName: string, modelLabel: string) => {
   currentEditModel.value = modelName;
   currentEditModelLabel.value = modelLabel;
   paramGridDialogVisible.value = true;
 };
 
-// Handle save param grid
-const handleSaveParamGrid = (values: Record<string, any>) => {
-  paramGridValues.value[currentEditModel.value] = values;
+// Handle manual train
+const handleManualTrain = (modelName: string, modelLabel: string) => {
+  currentEditModel.value = modelName;
+  currentEditModelLabel.value = modelLabel;
+  manualTrainDialogVisible.value = true;
 };
 
-const handleStartTune = (model: string) => {
-  // Pass param grid if it exists for this model
-  const paramGrid = paramGridValues.value[model];
-  emit("start-tune", model, paramGrid);
+// Handle save auto tune (with param grid)
+const handleSaveAutoTune = (values: Record<string, any>) => {
+  paramGridValues.value[currentEditModel.value] = values;
+  // Start auto-tune with param grid
+  emit("start-tune", currentEditModel.value, values, "auto");
+};
+
+// Handle save manual train
+const handleSaveManualTrain = (values: Record<string, any>) => {
+  manualTrainValues.value[currentEditModel.value] = values;
+  // Find the parent task ID (the most recent auto-tune task for this model)
+  const parentTaskId = props.tuningTasks[currentEditModel.value] || null;
+  // Start manual train with single values
+  emit("start-tune", currentEditModel.value, values, "manual", parentTaskId);
 };
 </script>
 
@@ -231,4 +350,13 @@ const handleStartTune = (model: string) => {
 .model-tuning-table :deep(.ant-table-row:hover) {
   background-color: #f5f5f5;
 }
+
+.model-tuning-table :deep(.ant-table-expanded-row) {
+  background-color: #fafafa;
+}
+
+.model-tuning-table :deep(.ant-table-expanded-row > td) {
+  border-bottom: 1px solid #e8e8e8;
+}
 </style>
+

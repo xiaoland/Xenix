@@ -225,6 +225,8 @@ export interface TuneOptions {
   targetColumn: string;
   taskId: string;
   paramGrid?: Record<string, any>;
+  trainingType?: string; // 'auto' or 'manual'
+  parentTaskId?: string; // For manual training, reference to auto-tune task
 }
 
 /**
@@ -252,7 +254,7 @@ export async function tune(options: TuneOptions): Promise<void> {
   // Ensure environment is ready (with proper mutex to prevent race conditions)
   await getInitPromise();
 
-  const { inputFile, model, featureColumns, targetColumn, taskId, paramGrid } = options;
+  const { inputFile, model, featureColumns, targetColumn, taskId, paramGrid, trainingType, parentTaskId } = options;
 
   // Prepare stdin data for Python script
   const stdinData = {
@@ -261,6 +263,8 @@ export async function tune(options: TuneOptions): Promise<void> {
     featureColumns,
     targetColumn,
     ...(paramGrid && { paramGrid }), // Include paramGrid if provided
+    ...(trainingType && { trainingType }),
+    ...(parentTaskId && { parentTaskId }),
   };
 
   // Execute Python task

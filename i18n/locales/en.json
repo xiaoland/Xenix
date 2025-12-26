@@ -62,6 +62,8 @@
     "tuning": "Tuning",
     "metrics": "Metrics",
     "startTune": "Start Tune",
+    "autoTune": "Auto Tune",
+    "manualTrain": "Train",
     "viewLogs": "View Logs",
     "selectModels": "Select Models to Tune",
     "startTuning": "Start Hyperparameter Tuning",
@@ -78,6 +80,8 @@
     "selectModelPlaceholder": "Select model for prediction",
     "back": "Back",
     "continue": "Continue to Prediction",
+    "trainingHistory": "Training History",
+    "noHistory": "No training history yet",
     "paramGrid": {
       "title": "Edit Parameter Grid - {model}",
       "description": "Configure the hyperparameter search space for this model. Each field accepts a list of values to try.",
@@ -87,6 +91,14 @@
       "arrayPlaceholder": "Enter value and press Add",
       "emptyArray": "No values. Add values using the input above.",
       "editButton": "Edit Grid"
+    },
+    "manualTrainDialog": {
+      "title": "Manual Training - {model}",
+      "description": "Enter specific parameter values to train the model manually.",
+      "loading": "Loading parameter schema...",
+      "noDescription": "No description available",
+      "defaultValue": "Default",
+      "trainButton": "Train Model"
     }
   },
   "prediction": {

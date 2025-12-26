@@ -47,6 +47,8 @@ export const modelResults = sqliteTable('model_results', {
   taskId: text('task_id').notNull(),
   model: text('model').notNull(),
   params: text('params', { mode: 'json' }),
+  parentTaskId: text('parent_task_id'), // Reference to parent auto-tune task (null for auto-tune, set for manual trains)
+  trainingType: text('training_type').default('auto'), // 'auto' or 'manual'
   mse_train: text('mse_train'),
   mae_train: text('mae_train'),
   r2_train: text('r2_train'),

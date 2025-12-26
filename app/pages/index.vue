@@ -267,7 +267,9 @@ const startTuning = async () => {
 
 const startSingleModelTuning = async (
   modelValue: string,
-  paramGrid?: Record<string, any>
+  paramGrid?: Record<string, any>,
+  trainingType?: string,
+  parentTaskId?: string
 ) => {
   if (!uploadedDatasetId.value && trainingFileList.value.length === 0) {
     message.error(t("messages.uploadError"));
@@ -333,6 +335,14 @@ const startSingleModelTuning = async (
     // Add param grid if provided
     if (paramGrid) {
       formData.append("paramGrid", JSON.stringify(paramGrid));
+    }
+
+    // Add training type and parent task ID
+    if (trainingType) {
+      formData.append("trainingType", trainingType);
+    }
+    if (parentTaskId) {
+      formData.append("parentTaskId", parentTaskId);
     }
 
     const response = await $fetch("/api/upload", {

@@ -177,6 +177,8 @@ async function handleStructuredOutput(output: StructuredOutput, taskId: string) 
           taskId: taskId,
           model: output.data.model,
           params: output.data.params,
+          parentTaskId: output.data.parentTaskId || null,
+          trainingType: output.data.trainingType || 'auto',
           mse_train: output.data.metrics.mse_train?.toString(),
           mae_train: output.data.metrics.mae_train?.toString(),
           r2_train: output.data.metrics.r2_train?.toString(),
