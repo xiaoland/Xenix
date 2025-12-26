@@ -40,13 +40,40 @@ class KNNRegressionModel(RegressionModel[Pipeline, KNNParamGrid]):
             # Convert pydantic model to dict, excluding None values
             param_grid_dict = param_grid.model_dump(exclude_none=True)
 
+        # Calculate total number of fits
+        from sklearn.model_selection import ParameterGrid
+        param_combinations = list(ParameterGrid(param_grid_dict))
+        total_fits = len(param_combinations) * 5  # 5-fold CV
+        
+        # Create a custom scorer that tracks progress
+        current_fit = [0]  # Use list to allow mutation in nested function
+        
+        def progress_scorer(estimator, X, y):
+            """Custom scorer that reports progress"""
+            from sklearn.metrics import mean_squared_error
+            current_fit[0] += 1
+            
+            if progress_callback:
+                percentage = (current_fit[0] / total_fits) * 100
+                progress_callback({
+                    'percentage': percentage,
+                    'round': current_fit[0],
+                    'total_rounds': total_fits,
+                    'metrics': {},
+                    'params': estimator.get_params()
+                })
+            
+            # Return the actual score
+            y_pred = estimator.predict(X)
+            return -mean_squared_error(y, y_pred)
     
         grid_search = GridSearchCV(
             estimator=base_model,
             param_grid=param_grid_dict,
             cv=5,
-            scoring='neg_mean_squared_error',
-            n_jobs=-1
+            scoring=progress_scorer,
+            n_jobs=1,  # Must be 1 to ensure sequential execution for progress tracking
+            verbose=0
         )
     
         grid_search.fit(X_train, y_train)
