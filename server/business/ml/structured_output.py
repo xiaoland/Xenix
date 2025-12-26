@@ -114,6 +114,29 @@ def emit_status(status: str, error: str = None):
     print(json.dumps(status_data), flush=True)
 
 
+def emit_progress(percentage: float, current: int, total: int, message: str = None):
+    """
+    Emit progress update as JSON to stdout.
+    
+    Args:
+        percentage: Progress percentage (0-100)
+        current: Current iteration/round number
+        total: Total iterations/rounds
+        message: Optional progress message
+    """
+    progress_data = {
+        'type': 'progress',
+        'data': {
+            'percentage': percentage,
+            'current': current,
+            'total': total,
+            'message': message
+        }
+    }
+    
+    print(json.dumps(progress_data), flush=True)
+
+
 class StructuredLogger:
     """
     Logger that emits structured JSON logs to stdout.
@@ -144,6 +167,10 @@ class StructuredLogger:
     def critical(self, message: str, **kwargs):
         """Log critical message"""
         emit_log(message, logging.CRITICAL, logger_name=self.name, **kwargs)
+    
+    def progress(self, percentage: float, current: int, total: int, message: str = None):
+        """Emit progress update"""
+        emit_progress(percentage, current, total, message)
 
 
 def get_logger(name: str = __name__) -> StructuredLogger:

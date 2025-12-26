@@ -11,6 +11,7 @@
       :tuning-results="tuningResults"
       :task-logs="taskLogs"
       :is-tuning="isTuning"
+      :task-progress="taskProgress"
       @update:selected-models="localSelectedModels = $event"
       @start-tune="handleStartTune"
       @view-logs="handleViewLogs"
@@ -65,6 +66,7 @@ const props = defineProps<{
   taskLogs: Record<string, any[]>;
   activeLogTab: string;
   selectedBestModel: string | null;
+  taskProgress?: Record<string, { percentage: number; current: number; total: number; message?: string }>;
 }>();
 
 const emit = defineEmits<{

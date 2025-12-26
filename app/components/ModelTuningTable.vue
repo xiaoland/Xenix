@@ -36,22 +36,33 @@
             <span class="i-mdi-tune mr-1" />
             {{ t("tuning.startTune") }}
           </a-button>
-          <a-button
-            v-else
-            size="small"
-            @click="handleViewLogs(record.taskId, record.label)"
-            class="inline-flex items-center"
-          >
-            <span class="i-mdi-text-box-outline mr-1" />
-            {{ t("tuning.viewLogs") }}
-          </a-button>
-          <a-tag
-            v-if="record.status && record.status !== 'pending'"
-            :color="getStatusColor(record.status)"
-            class="ml-2"
-          >
-            {{ record.status }}
-          </a-tag>
+          <div v-else class="flex items-center gap-2">
+            <a-button
+              size="small"
+              @click="handleViewLogs(record.taskId, record.label)"
+              class="inline-flex items-center"
+            >
+              <span class="i-mdi-text-box-outline mr-1" />
+              {{ t("tuning.viewLogs") }}
+            </a-button>
+            <!-- Show progress bar when running -->
+            <div v-if="record.status === 'running' && record.progress" class="flex-1 min-w-[120px]">
+              <a-progress
+                :percent="record.progress.percentage"
+                :status="record.progress.percentage >= 100 ? 'success' : 'active'"
+                :show-info="true"
+                size="small"
+              />
+            </div>
+            <!-- Show status tag when not running or no progress data -->
+            <a-tag
+              v-else
+              :color="getStatusColor(record.status)"
+              class="ml-2"
+            >
+              {{ record.status }}
+            </a-tag>
+          </div>
         </template>
         <template v-else-if="column.key === 'metrics'">
           <div v-if="record.metrics" class="text-sm">
@@ -107,6 +118,7 @@ const props = defineProps<{
   tuningResults: any[];
   taskLogs: Record<string, any[]>;
   isTuning: boolean;
+  taskProgress?: Record<string, { percentage: number; current: number; total: number; message?: string }>;
 }>();
 
 const emit = defineEmits<{
@@ -158,12 +170,14 @@ const tableData = computed(() => {
     const status = props.tuningStatus[model.value];
     const taskId = props.tuningTasks[model.value];
     const result = props.tuningResults.find((r) => r.model === model.value);
+    const progress = props.taskProgress?.[taskId];
 
     return {
       model: model.value,
       label: model.label,
       status: status,
       taskId: taskId,
+      progress: progress,
       metrics: result
         ? {
             r2_test: result.r2_test,
