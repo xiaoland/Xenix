@@ -115,7 +115,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, watch } from "vue";
+import { computed, toRef } from "vue";
+import { useI18n } from "vue-i18n";
+import { useTrainingHistory } from "../composables/useTrainingHistory";
+import { useTableData } from "../composables/useTableData";
+import { useDialogManagement } from "../composables/useDialogManagement";
+import { useFormatters } from "../composables/useFormatters";
 
 const { t } = useI18n();
 
@@ -133,233 +138,68 @@ const emit = defineEmits<{
   "view-logs": [taskId: number, modelName: string];
 }>();
 
-const logModalVisible = ref(false);
-const currentLogTaskId = ref<number>(0);
-const currentLogModelName = ref<string>("");
+// Use composables
+const { trainingHistory, expandedKeys, handleExpand } = useTrainingHistory(toRef(props, "tuningResults"));
 
-// ParamGrid dialog state (for auto-tune)
-const paramGridDialogVisible = ref(false);
-const manualTrainDialogVisible = ref(false);
-const currentEditModel = ref<string>("");
-const currentEditModelLabel = ref<string>("");
-const modelMetadata = ref<any[]>([]);
-const paramGridValues = ref<Record<string, Record<string, any>>>({});
-const manualTrainValues = ref<Record<string, Record<string, any>>>({});
+const { tableData, getRowKey } = useTableData(
+  toRef(props, "availableModels"),
+  toRef(props, "tuningStatus"),
+  toRef(props, "tuningTasks"),
+  toRef(props, "tuningResults"),
+  trainingHistory
+);
 
-// Training history
-const trainingHistory = ref<Record<string, any[]>>({});
-const expandedKeys = ref<string[]>([]);
+const {
+  logModalVisible,
+  paramGridDialogVisible,
+  manualTrainDialogVisible,
+  currentLogTaskId,
+  currentLogModelName,
+  currentEditModel,
+  currentEditModelLabel,
+  currentModelSchema,
+  paramGridValues,
+  manualTrainValues,
+  openAutoTuneDialog,
+  openManualTrainDialog,
+  openLogModal,
+} = useDialogManagement();
 
+const { formatModelName, formatTimestamp, formatMetric, getStatusColor } = useFormatters();
+
+// Table columns
 const columns = computed(() => [
   { title: t("tuning.model"), key: "model", dataIndex: "model" },
   { title: t("tuning.tuning"), key: "action", width: 350 },
   { title: t("tuning.metrics"), key: "metrics", width: 320 },
 ]);
 
-// Fetch model metadata on mount
-onMounted(async () => {
-  try {
-    const response = await $fetch("/api/models");
-    if (response.success) {
-      modelMetadata.value = response.models;
-    }
-  } catch (error) {
-    console.error("Failed to fetch model metadata:", error);
-  }
-});
-
-// Fetch training history when results change
-watch(
-  () => props.tuningResults,
-  async () => {
-    // Fetch history for each model that has results
-    for (const result of props.tuningResults) {
-      await fetchTrainingHistory(result.model);
-    }
-  },
-  { immediate: true, deep: true }
-);
-
-// Get schema for current model being edited
-const currentModelSchema = computed(() => {
-  const metadata = modelMetadata.value.find(
-    (m) => m.name === currentEditModel.value
-  );
-  return metadata?.paramGridSchema || null;
-});
-
-// Fetch training history for a specific model
-const fetchTrainingHistory = async (model: string) => {
-  try {
-    const response = await $fetch(`/api/results/history/${model}`);
-    if (response.success && response.results) {
-      trainingHistory.value[model] = response.results;
-    }
-  } catch (error) {
-    console.error(`Failed to fetch training history for ${model}:`, error);
-  }
-};
-
-// Get row key for table
-const getRowKey = (record: any) => {
-  return record.isHistory ? `${record.model}-${record.taskId}` : record.model;
-};
-
-// Handle row expansion
-const handleExpand = (expanded: boolean, record: any) => {
-  if (expanded) {
-    if (!expandedKeys.value.includes(record.model)) {
-      expandedKeys.value.push(record.model);
-    }
-    // Fetch history when expanding
-    fetchTrainingHistory(record.model);
-  } else {
-    expandedKeys.value = expandedKeys.value.filter((key) => key !== record.model);
-  }
-};
-
-// Combine all data sources into a single table data structure with expandable rows
-const tableData = computed(() => {
-  const data: any[] = [];
-  
-  for (const model of props.availableModels) {
-    const status = props.tuningStatus[model.value];
-    const taskId = props.tuningTasks[model.value];
-    const result = props.tuningResults.find((r) => r.model === model.value);
-
-    // Build children array for expandable rows
-    const children: any[] = [];
-    
-    // Then add historical tasks
-    const history = trainingHistory.value[model.value] || [];
-    for (const historyItem of history) {
-      children.push({
-        model: model.value,
-        label: model.label,
-        taskId: historyItem.taskId,
-        status: historyItem.status || "completed", // Use status from API, fallback to completed
-        metrics: {
-          r2_test: historyItem.r2_test,
-          mse_test: historyItem.mse_test,
-          mae_test: historyItem.mae_test,
-        },
-        params: historyItem.params,
-        trainingType: historyItem.trainingType || "auto",
-        createdAt: historyItem.createdAt,
-        isHistory: true,
-      });
-    }
-    
-    // Add the current active task ONLY if it's not already in history
-    // (i.e., it's still running/pending and hasn't been saved to database yet)
-    if (status && taskId) {
-      const existsInHistory = history.some(h => h.taskId === taskId);
-      if (!existsInHistory) {
-        children.push({
-          model: model.value,
-          label: model.label,
-          taskId: taskId,
-          status: status,
-          metrics: result
-            ? {
-                r2_test: result.r2_test,
-                mse_test: result.mse_test,
-                mae_test: result.mae_test,
-              }
-            : null,
-          params: result?.params,
-          trainingType: result?.trainingType || "auto",
-          createdAt: result?.createdAt || new Date(),
-          isHistory: true,
-          isCurrent: true, // Mark this as the current active task
-        });
-      }
-    }
-
-    // Parent row with children
-    const parentRow = {
-      model: model.value,
-      label: model.label,
-      status: status,
-      taskId: taskId,
-      metrics: result
-        ? {
-            r2_test: result.r2_test,
-            mse_test: result.mse_test,
-            mae_test: result.mae_test,
-          }
-        : null,
-      isHistory: false,
-      children: children, // Always set children array, even if empty (for expand icon)
-    };
-    
-    data.push(parentRow);
-  }
-
-  return data;
-});
-
-const formatModelName = (name: string) => {
-  return name.replace(/_/g, " ");
-};
-
-const formatTimestamp = (timestamp: any) => {
-  if (!timestamp) return "";
-  const date = new Date(timestamp);
-  return date.toLocaleString();
-};
-
-const formatMetric = (value: string | number) => {
-  if (!value) return t("common.na");
-  const num = typeof value === "string" ? parseFloat(value) : value;
-  return num.toFixed(4);
-};
-
-const getStatusColor = (status: string) => {
-  const colors: Record<string, string> = {
-    completed: "green",
-    running: "blue",
-    pending: "orange",
-    failed: "red",
-  };
-  return colors[status?.toLowerCase()] || "default";
-};
-
+// Current logs computed property
 const currentLogs = computed(() => {
   if (!currentLogTaskId.value) return [];
   return props.taskLogs[currentLogTaskId.value] || [];
 });
 
-// Handle view logs event
+// Event handlers
 const handleViewLogs = (taskId: number, modelName: string) => {
-  currentLogTaskId.value = taskId;
-  currentLogModelName.value = modelName;
-  logModalVisible.value = true;
+  openLogModal(taskId, modelName);
   emit("view-logs", taskId, modelName);
 };
 
-// Handle auto tune (with param grid editing)
 const handleAutoTune = (modelName: string, modelLabel: string) => {
-  currentEditModel.value = modelName;
-  currentEditModelLabel.value = modelLabel;
-  paramGridDialogVisible.value = true;
+  openAutoTuneDialog(modelName, modelLabel);
 };
 
-// Handle manual train
 const handleManualTrain = (modelName: string, modelLabel: string) => {
-  currentEditModel.value = modelName;
-  currentEditModelLabel.value = modelLabel;
-  manualTrainDialogVisible.value = true;
+  openManualTrainDialog(modelName, modelLabel);
 };
 
-// Handle save auto tune (with param grid)
 const handleSaveAutoTune = (values: Record<string, any>) => {
   paramGridValues.value[currentEditModel.value] = values;
   // Start auto-tune with param grid
   emit("start-tune", currentEditModel.value, values, "auto");
 };
 
-// Handle save manual train
 const handleSaveManualTrain = (values: Record<string, any>) => {
   manualTrainValues.value[currentEditModel.value] = values;
   // Find the parent task ID (the most recent auto-tune task for this model)
