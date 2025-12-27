@@ -29,28 +29,36 @@ export default defineEventHandler(async (event) => {
     if (manualInput) {
       // Create temporary Excel file from manual input
       isManualInput = true;
-      const manualValues = JSON.parse(manualInput);
-      const parsedFeatureColumns = JSON.parse(featureColumns);
       
-      // Import xlsx library dynamically
-      const XLSX = await import('xlsx');
-      
-      // Create a single-row dataframe with the manual input values
-      const rowData: any = {};
-      parsedFeatureColumns.forEach((col: string) => {
-        rowData[col] = manualValues[col];
-      });
-      
-      // Create worksheet and workbook
-      const worksheet = XLSX.utils.json_to_sheet([rowData]);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Prediction');
-      
-      // Save to temporary file
-      const uploadDir = path.join(process.cwd(), "uploads");
-      const timestamp = Date.now();
-      inputFile = path.join(uploadDir, `manual_input_${timestamp}.xlsx`);
-      XLSX.writeFile(workbook, inputFile);
+      try {
+        const manualValues = JSON.parse(manualInput);
+        const parsedFeatureColumns = JSON.parse(featureColumns);
+        
+        // Import xlsx library dynamically
+        const XLSX = await import('xlsx');
+        
+        // Create a single-row dataframe with the manual input values
+        const rowData: any = {};
+        parsedFeatureColumns.forEach((col: string) => {
+          rowData[col] = manualValues[col];
+        });
+        
+        // Create worksheet and workbook
+        const worksheet = XLSX.utils.json_to_sheet([rowData]);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Prediction');
+        
+        // Save to temporary file
+        const uploadDir = path.join(process.cwd(), "uploads");
+        const timestamp = Date.now();
+        inputFile = path.join(uploadDir, `manual_input_${timestamp}.xlsx`);
+        XLSX.writeFile(workbook, inputFile);
+      } catch (error) {
+        throw createError({
+          statusCode: 400,
+          message: "Failed to parse manual input data: " + (error instanceof Error ? error.message : "Invalid JSON"),
+        });
+      }
     } else if (datasetId) {
       // Use existing dataset for prediction
       const [dataset] = await db
@@ -165,19 +173,42 @@ export default defineEventHandler(async (event) => {
     });
 
     // Execute prediction task in background using high-level wrapper
-    setImmediate(() => {
-      predict({
-        trainingDataPath: actualTrainingDataPath,
-        predictionDataPath: inputFile,
-        outputPath: outputFile,
-        model,
-        params: modelResult.params,
-        featureColumns: parsedFeatureColumns,
-        targetColumn,
-        taskId,
-      }).catch((error) => {
+    setImmediate(async () => {
+      try {
+        await predict({
+          trainingDataPath: actualTrainingDataPath,
+          predictionDataPath: inputFile,
+          outputPath: outputFile,
+          model,
+          params: modelResult.params,
+          featureColumns: parsedFeatureColumns,
+          targetColumn,
+          taskId,
+        });
+        
+        // Clean up temporary manual input file after successful prediction
+        if (isManualInput) {
+          try {
+            const fs = await import('fs/promises');
+            await fs.unlink(inputFile);
+            console.log(`Cleaned up temporary file: ${inputFile}`);
+          } catch (cleanupError) {
+            console.error(`Failed to cleanup temporary file ${inputFile}:`, cleanupError);
+          }
+        }
+      } catch (error) {
         console.error(`Failed to execute task ${taskId}:`, error);
-      });
+        
+        // Clean up temporary manual input file even on error
+        if (isManualInput) {
+          try {
+            const fs = await import('fs/promises');
+            await fs.unlink(inputFile);
+          } catch (cleanupError) {
+            console.error(`Failed to cleanup temporary file ${inputFile}:`, cleanupError);
+          }
+        }
+      }
     });
 
     return {

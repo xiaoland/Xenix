@@ -450,9 +450,19 @@ const startPrediction = async (payload: { inputMode: string; manualInputValues: 
     return;
   }
 
-  if (!uploadedFilePath.value && !uploadedDatasetId.value) {
-    message.error(t("messages.trainingPathError"));
-    return;
+  // For manual input, we only need training data (either dataset ID or file path)
+  // For file upload, we need both training data and the prediction file
+  if (inputMode === "file") {
+    if (!uploadedFilePath.value && !uploadedDatasetId.value) {
+      message.error(t("messages.trainingPathError"));
+      return;
+    }
+  } else if (inputMode === "manual") {
+    // Manual input mode - just need training data
+    if (!uploadedDatasetId.value && !uploadedFilePath.value) {
+      message.error(t("messages.trainingPathError"));
+      return;
+    }
   }
 
   // Find the task ID for the selected model

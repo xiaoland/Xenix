@@ -128,7 +128,8 @@ watch(() => props.featureColumns, (features) => {
   if (features && features.length > 0) {
     const initialValues: Record<string, number> = {};
     features.forEach(feature => {
-      initialValues[feature] = 0;
+      // Initialize with undefined to indicate values need to be entered
+      initialValues[feature] = undefined as any;
     });
     manualInputValues.value = initialValues;
   }
