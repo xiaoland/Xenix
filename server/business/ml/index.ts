@@ -223,8 +223,10 @@ export interface TuneOptions {
   model: string;
   featureColumns: string[];
   targetColumn: string;
-  taskId: string;
+  taskId: number; // Changed from string to number
   paramGrid?: Record<string, any>;
+  trainingType?: string; // 'auto' or 'manual'
+  parentTaskId?: number; // Changed from string to number
 }
 
 /**
@@ -238,7 +240,7 @@ export interface PredictOptions {
   params: Record<string, any>;
   featureColumns: string[];
   targetColumn: string;
-  taskId: string;
+  taskId: number; // Changed from string to number
 }
 
 /**
@@ -252,7 +254,7 @@ export async function tune(options: TuneOptions): Promise<void> {
   // Ensure environment is ready (with proper mutex to prevent race conditions)
   await getInitPromise();
 
-  const { inputFile, model, featureColumns, targetColumn, taskId, paramGrid } = options;
+  const { inputFile, model, featureColumns, targetColumn, taskId, paramGrid, trainingType, parentTaskId } = options;
 
   // Prepare stdin data for Python script
   const stdinData = {
@@ -261,6 +263,8 @@ export async function tune(options: TuneOptions): Promise<void> {
     featureColumns,
     targetColumn,
     ...(paramGrid && { paramGrid }), // Include paramGrid if provided
+    ...(trainingType && { trainingType }),
+    ...(parentTaskId && { parentTaskId }),
   };
 
   // Execute Python task

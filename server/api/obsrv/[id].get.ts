@@ -1,10 +1,11 @@
 import { db, schema } from "../../database";
 import { eq, desc } from "drizzle-orm";
+import { generateTraceId } from "../../utils/taskUtils";
 
 export default defineEventHandler(async (event) => {
-  const taskId = getRouterParam(event, "taskId");
+  const id = getRouterParam(event, "id");
 
-  if (!taskId) {
+  if (!id) {
     throw createError({
       statusCode: 400,
       message: "Task ID is required",
@@ -12,11 +13,14 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    // Get logs for this task (using trace_id)
+    const taskId = parseInt(id);
+    const traceId = generateTraceId(taskId);
+    
+    // Get logs for this task (using trace_id format: task.{id})
     const logs = await db
       .select()
       .from(schema.logs)
-      .where(eq(schema.logs.traceId, taskId))
+      .where(eq(schema.logs.traceId, traceId))
       .orderBy(desc(schema.logs.timestamp))
       .limit(500); // Limit to last 500 logs
 

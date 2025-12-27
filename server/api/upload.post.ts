@@ -1,9 +1,5 @@
 import { db, schema } from "../database";
-import {
-  generateTaskId,
-  validateExcelFile,
-  saveUploadedFile,
-} from "../utils/taskUtils";
+import { validateExcelFile, saveUploadedFile } from "../utils/taskUtils";
 import { tune } from "../business/ml";
 import { eq } from "drizzle-orm";
 import path from "path";
@@ -17,11 +13,12 @@ export default defineEventHandler(async (event) => {
     const featureColumns = formData.get("featureColumns") as string; // JSON string
     const targetColumn = formData.get("targetColumn") as string;
     const paramGrid = formData.get("paramGrid") as string; // JSON string, optional
+    const trainingType = formData.get("trainingType") as string || "auto"; // 'auto' or 'manual'
+    const parentTaskId = formData.get("parentTaskId") as string; // For manual training, reference to auto-tune task
 
-    let inputFile: string;
-    let usedDatasetId: string | null = null;
+    let actualDatasetId: string;
 
-    // Support both file upload and dataset reference
+    // Upload is for datasets - must provide either datasetId or file
     if (datasetId) {
       // Use existing dataset
       const [dataset] = await db
@@ -37,10 +34,9 @@ export default defineEventHandler(async (event) => {
         });
       }
 
-      inputFile = dataset.filePath;
-      usedDatasetId = datasetId;
+      actualDatasetId = datasetId;
     } else if (file) {
-      // Upload new file (backward compatibility)
+      // Upload new file and create dataset
       if (!validateExcelFile(file.name)) {
         throw createError({
           statusCode: 400,
@@ -50,7 +46,20 @@ export default defineEventHandler(async (event) => {
       }
 
       const uploadDir = path.join(process.cwd(), "uploads");
-      inputFile = await saveUploadedFile(file, uploadDir);
+      const filePath = await saveUploadedFile(file, uploadDir);
+      
+      // Create dataset record
+      const newDatasetId = `ds_${Date.now()}`;
+      await db.insert(schema.datasets).values({
+        datasetId: newDatasetId,
+        name: file.name,
+        description: `Uploaded for ${trainingType} training`,
+        filePath: filePath,
+        fileName: file.name,
+        fileSize: file.size,
+      });
+      
+      actualDatasetId = newDatasetId;
     } else {
       throw createError({
         statusCode: 400,
@@ -78,28 +87,42 @@ export default defineEventHandler(async (event) => {
     // Parse param grid if provided
     const parsedParamGrid = paramGrid ? JSON.parse(paramGrid) : undefined;
 
-    // Generate task ID
-    const taskId = generateTaskId();
-
-    // Create task record
-    await db.insert(schema.tasks).values({
-      taskId,
-      type: "tuning",
+    // Create task record with new schema
+    const taskType = trainingType === "auto" ? "auto-tune" : "train";
+    const [insertedTask] = await db.insert(schema.tasks).values({
+      type: taskType,
       status: "pending",
-      model,
-      datasetId: usedDatasetId,
-      inputFile,
-    });
+      parameter: {
+        model,
+        datasetId: actualDatasetId,
+        featureColumns: parsedFeatureColumns,
+        targetColumn,
+        paramGrid: parsedParamGrid,
+        trainingType,
+        parentTaskId: parentTaskId ? parseInt(parentTaskId) : undefined,
+      },
+    }).returning();
+
+    const taskId = insertedTask.id;
+
+    // Get dataset file path for execution
+    const [dataset] = await db
+      .select()
+      .from(schema.datasets)
+      .where(eq(schema.datasets.datasetId, actualDatasetId))
+      .limit(1);
 
     // Execute tuning task in background using high-level wrapper
     setImmediate(() => {
       tune({
-        inputFile,
+        inputFile: dataset!.filePath,
         model,
         featureColumns: parsedFeatureColumns,
         targetColumn,
         taskId,
         paramGrid: parsedParamGrid,
+        trainingType,
+        parentTaskId: parentTaskId ? parseInt(parentTaskId) : undefined,
       }).catch((error) => {
         console.error(`Failed to execute task ${taskId}:`, error);
       });
@@ -108,16 +131,16 @@ export default defineEventHandler(async (event) => {
     return {
       success: true,
       taskId,
-      inputFile, // Return the file path so UI can use it later
+      datasetId: actualDatasetId,
       featureColumns: parsedFeatureColumns,
       targetColumn: targetColumn,
-      message: "Model tuning started",
+      message: trainingType === "auto" ? "Auto-tune started" : "Training started",
     };
   } catch (error) {
     console.error("Upload error:", error);
     throw createError({
       statusCode: 500,
-      message: error instanceof Error ? error.message : "Failed to upload file",
+      message: error instanceof Error ? error.message : "Failed to process request",
     });
   }
 });

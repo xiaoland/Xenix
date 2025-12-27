@@ -59,6 +59,8 @@
   },
   "tuning": {
     "title": "模型调优",
+    "autoTune": "超参数训练",
+    "manualTrain": "手动调优",
     "modelSelectionAndTuning": "调优模型参数，基于最佳参数进行预测",
     "back": "重选数据",
     "continue": "预测",

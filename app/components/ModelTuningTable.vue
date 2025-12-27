@@ -6,52 +6,61 @@
     <a-table
       :dataSource="tableData"
       :columns="columns"
-      :row-key="(record) => record.model"
+      :row-key="getRowKey"
       :pagination="false"
+      :expandable="{
+        expandedRowKeys: expandedKeys,
+        onExpand: handleExpand,
+      }"
       class="model-tuning-table"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'model'">
-          <span class="font-medium">{{ formatModelName(record.label) }}</span>
-        </template>
-        <template v-else-if="column.key === 'paramGrid'">
-          <a-button
-            size="small"
-            @click="handleEditParamGrid(record.model, record.label)"
-            class="inline-flex items-center"
-          >
-            <span class="i-mdi-tune-variant mr-1" />
-            {{ t("tuning.paramGrid.editButton") }}
-          </a-button>
+          <span class="font-medium" :class="{ 'pl-8': record.isHistory }">
+            {{ record.isHistory ? `└─ ${formatTimestamp(record.createdAt)}` : formatModelName(record.label) }}
+          </span>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-button
-            v-if="!record.status || record.status === 'pending'"
-            type="primary"
-            size="small"
-            :disabled="isTuning"
-            @click="handleStartTune(record.model)"
-            class="inline-flex items-center"
-          >
-            <span class="i-mdi-tune mr-1" />
-            {{ t("tuning.startTune") }}
-          </a-button>
-          <a-button
-            v-else
-            size="small"
-            @click="handleViewLogs(record.taskId, record.label)"
-            class="inline-flex items-center"
-          >
-            <span class="i-mdi-text-box-outline mr-1" />
-            {{ t("tuning.viewLogs") }}
-          </a-button>
-          <a-tag
-            v-if="record.status && record.status !== 'pending'"
-            :color="getStatusColor(record.status)"
-            class="ml-2"
-          >
-            {{ record.status }}
-          </a-tag>
+          <!-- Parent row: Only show Auto Tune and Train buttons -->
+          <div v-if="!record.isHistory" class="flex gap-2">
+            <a-button
+              type="primary"
+              size="small"
+              :disabled="isTuning"
+              @click="handleAutoTune(record.model, record.label)"
+              class="inline-flex items-center"
+            >
+              <span class="i-mdi-tune mr-1" />
+              {{ t("tuning.autoTune") }}
+            </a-button>
+            <a-button
+              size="small"
+              :disabled="isTuning"
+              @click="handleManualTrain(record.model, record.label)"
+              class="inline-flex items-center"
+            >
+              <span class="i-mdi-pencil mr-1" />
+              {{ t("tuning.manualTrain") }}
+            </a-button>
+          </div>
+          <!-- Sub-row: Show View Logs button and status tag for each training task -->
+          <div v-else class="flex gap-2 items-center">
+            <a-button
+              v-if="record.taskId"
+              size="small"
+              @click="handleViewLogs(record.taskId, record.label)"
+              class="inline-flex items-center"
+            >
+              <span class="i-mdi-text-box-outline mr-1" />
+              {{ t("tuning.viewLogs") }}
+            </a-button>
+            <a-tag
+              v-if="record.status"
+              :color="getStatusColor(record.status)"
+            >
+              {{ record.status }}
+            </a-tag>
+          </div>
         </template>
         <template v-else-if="column.key === 'metrics'">
           <div v-if="record.metrics" class="text-sm">
@@ -83,147 +92,120 @@
       <LogPanel :logs="currentLogs" />
     </a-modal>
 
-    <!-- ParamGrid Editor Dialog -->
+    <!-- ParamGrid Editor Dialog (for auto-tune) -->
     <ParamGridDialog
       v-model="paramGridDialogVisible"
       :model-name="currentEditModel"
       :model-label="currentEditModelLabel"
       :schema="currentModelSchema"
       :initial-values="paramGridValues[currentEditModel]"
-      @save="handleSaveParamGrid"
+      @save="handleSaveAutoTune"
+    />
+
+    <!-- Manual Train Dialog -->
+    <ManualTrainDialog
+      v-model="manualTrainDialogVisible"
+      :model-name="currentEditModel"
+      :model-label="currentEditModelLabel"
+      :schema="currentModelSchema"
+      :initial-values="manualTrainValues[currentEditModel]"
+      @train="handleSaveManualTrain"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from "vue";
+import { computed, toRef } from "vue";
+import { useI18n } from "vue-i18n";
+import { useTrainingHistory } from "../composables/useTrainingHistory";
+import { useTableData } from "../composables/useTableData";
+import { useDialogManagement } from "../composables/useDialogManagement";
+import { useFormatters } from "../composables/useFormatters";
 
 const { t } = useI18n();
 
 const props = defineProps<{
   availableModels: Array<{ label: string; value: string }>;
   tuningStatus: Record<string, string>;
-  tuningTasks: Record<string, string>;
+  tuningTasks: Record<string, number>;
   tuningResults: any[];
   taskLogs: Record<string, any[]>;
   isTuning: boolean;
 }>();
 
 const emit = defineEmits<{
-  "start-tune": [model: string, paramGrid?: Record<string, any>];
-  "view-logs": [taskId: string, modelName: string];
+  "start-tune": [model: string, paramGrid?: Record<string, any>, trainingType?: string, parentTaskId?: number];
+  "view-logs": [taskId: number, modelName: string];
 }>();
 
-const logModalVisible = ref(false);
-const currentLogTaskId = ref<string>("");
-const currentLogModelName = ref<string>("");
+// Use composables
+const { trainingHistory, expandedKeys, handleExpand } = useTrainingHistory(toRef(props, "tuningResults"));
 
-// ParamGrid dialog state
-const paramGridDialogVisible = ref(false);
-const currentEditModel = ref<string>("");
-const currentEditModelLabel = ref<string>("");
-const modelMetadata = ref<any[]>([]);
-const paramGridValues = ref<Record<string, Record<string, any>>>({});
+const { tableData, getRowKey } = useTableData(
+  toRef(props, "availableModels"),
+  toRef(props, "tuningStatus"),
+  toRef(props, "tuningTasks"),
+  toRef(props, "tuningResults"),
+  trainingHistory
+);
 
+const {
+  logModalVisible,
+  paramGridDialogVisible,
+  manualTrainDialogVisible,
+  currentLogTaskId,
+  currentLogModelName,
+  currentEditModel,
+  currentEditModelLabel,
+  currentModelSchema,
+  paramGridValues,
+  manualTrainValues,
+  openAutoTuneDialog,
+  openManualTrainDialog,
+  openLogModal,
+} = useDialogManagement();
+
+const { formatModelName, formatTimestamp, formatMetric, getStatusColor } = useFormatters();
+
+// Table columns
 const columns = computed(() => [
   { title: t("tuning.model"), key: "model", dataIndex: "model" },
-  { title: t("tuning.paramGridColumn"), key: "paramGrid", width: 150 },
-  { title: t("tuning.tuning"), key: "action", width: 280 },
+  { title: t("tuning.tuning"), key: "action", width: 350 },
   { title: t("tuning.metrics"), key: "metrics", width: 320 },
 ]);
 
-// Fetch model metadata on mount
-onMounted(async () => {
-  try {
-    const response = await $fetch("/api/models");
-    if (response.success) {
-      modelMetadata.value = response.models;
-    }
-  } catch (error) {
-    console.error("Failed to fetch model metadata:", error);
-  }
-});
-
-// Get schema for current model being edited
-const currentModelSchema = computed(() => {
-  const metadata = modelMetadata.value.find(
-    (m) => m.name === currentEditModel.value
-  );
-  return metadata?.paramGridSchema || null;
-});
-
-// Combine all data sources into a single table data structure
-const tableData = computed(() => {
-  return props.availableModels.map((model) => {
-    const status = props.tuningStatus[model.value];
-    const taskId = props.tuningTasks[model.value];
-    const result = props.tuningResults.find((r) => r.model === model.value);
-
-    return {
-      model: model.value,
-      label: model.label,
-      status: status,
-      taskId: taskId,
-      metrics: result
-        ? {
-            r2_test: result.r2_test,
-            mse_test: result.mse_test,
-            mae_test: result.mae_test,
-          }
-        : null,
-    };
-  });
-});
-
-const formatModelName = (name: string) => {
-  return name.replace(/_/g, " ");
-};
-
-const formatMetric = (value: string | number) => {
-  if (!value) return t("common.na");
-  const num = typeof value === "string" ? parseFloat(value) : value;
-  return num.toFixed(4);
-};
-
-const getStatusColor = (status: string) => {
-  const colors: Record<string, string> = {
-    completed: "green",
-    running: "blue",
-    pending: "orange",
-    failed: "red",
-  };
-  return colors[status?.toLowerCase()] || "default";
-};
-
+// Current logs computed property
 const currentLogs = computed(() => {
   if (!currentLogTaskId.value) return [];
   return props.taskLogs[currentLogTaskId.value] || [];
 });
 
-// Handle view logs event
-const handleViewLogs = (taskId: string, modelName: string) => {
-  currentLogTaskId.value = taskId;
-  currentLogModelName.value = modelName;
-  logModalVisible.value = true;
+// Event handlers
+const handleViewLogs = (taskId: number, modelName: string) => {
+  openLogModal(taskId, modelName);
   emit("view-logs", taskId, modelName);
 };
 
-// Handle edit param grid
-const handleEditParamGrid = (modelName: string, modelLabel: string) => {
-  currentEditModel.value = modelName;
-  currentEditModelLabel.value = modelLabel;
-  paramGridDialogVisible.value = true;
+const handleAutoTune = (modelName: string, modelLabel: string) => {
+  openAutoTuneDialog(modelName, modelLabel);
 };
 
-// Handle save param grid
-const handleSaveParamGrid = (values: Record<string, any>) => {
+const handleManualTrain = (modelName: string, modelLabel: string) => {
+  openManualTrainDialog(modelName, modelLabel);
+};
+
+const handleSaveAutoTune = (values: Record<string, any>) => {
   paramGridValues.value[currentEditModel.value] = values;
+  // Start auto-tune with param grid
+  emit("start-tune", currentEditModel.value, values, "auto");
 };
 
-const handleStartTune = (model: string) => {
-  // Pass param grid if it exists for this model
-  const paramGrid = paramGridValues.value[model];
-  emit("start-tune", model, paramGrid);
+const handleSaveManualTrain = (values: Record<string, any>) => {
+  manualTrainValues.value[currentEditModel.value] = values;
+  // Find the parent task ID (the most recent auto-tune task for this model)
+  const parentTaskId = props.tuningTasks[currentEditModel.value] || null;
+  // Start manual train with single values
+  emit("start-tune", currentEditModel.value, values, "manual", parentTaskId);
 };
 </script>
 
@@ -231,4 +213,13 @@ const handleStartTune = (model: string) => {
 .model-tuning-table :deep(.ant-table-row:hover) {
   background-color: #f5f5f5;
 }
+
+.model-tuning-table :deep(.ant-table-expanded-row) {
+  background-color: #fafafa;
+}
+
+.model-tuning-table :deep(.ant-table-expanded-row > td) {
+  border-bottom: 1px solid #e8e8e8;
+}
 </style>
+
