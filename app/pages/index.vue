@@ -59,6 +59,7 @@
           :best-model="selectedBestModel"
           :is-predicting="isPredicting"
           :prediction-task="predictionTask"
+          :feature-columns="selectedFeatureColumns"
           @predict="startPrediction"
           @back="prevStep"
           @reset="reset"
@@ -431,20 +432,37 @@ const fetchTuningResults = async () => {
   }
 };
 
-const startPrediction = async () => {
+const startPrediction = async (payload: { inputMode: string; manualInputValues: Record<string, number> }) => {
   if (!selectedBestModel.value) {
     message.error(t("messages.selectModelError"));
     return;
   }
 
-  if (predictionFileList.value.length === 0) {
+  const { inputMode, manualInputValues } = payload;
+
+  if (inputMode === "file" && predictionFileList.value.length === 0) {
     message.error(t("messages.uploadPredictionError"));
     return;
   }
 
-  if (!uploadedFilePath.value) {
-    message.error(t("messages.trainingPathError"));
+  if (inputMode === "manual" && !manualInputValues) {
+    message.error(t("messages.manualInputError"));
     return;
+  }
+
+  // For manual input, we only need training data (either dataset ID or file path)
+  // For file upload, we need both training data and the prediction file
+  if (inputMode === "file") {
+    if (!uploadedFilePath.value && !uploadedDatasetId.value) {
+      message.error(t("messages.trainingPathError"));
+      return;
+    }
+  } else if (inputMode === "manual") {
+    // Manual input mode - just need training data
+    if (!uploadedDatasetId.value && !uploadedFilePath.value) {
+      message.error(t("messages.trainingPathError"));
+      return;
+    }
   }
 
   // Find the task ID for the selected model
@@ -458,10 +476,24 @@ const startPrediction = async () => {
 
   try {
     const formData = new FormData();
-    formData.append("file", predictionFileList.value[0].originFileObj);
+    
+    // Handle different input modes
+    if (inputMode === "file") {
+      formData.append("file", predictionFileList.value[0].originFileObj);
+    } else if (inputMode === "manual") {
+      formData.append("manualInput", JSON.stringify(manualInputValues));
+    }
+    
     formData.append("model", selectedBestModel.value);
     formData.append("tuningTaskId", selectedModelTaskId);
-    formData.append("trainingDataPath", uploadedFilePath.value);
+    
+    // Use dataset ID if available, otherwise fall back to file path
+    if (uploadedDatasetId.value) {
+      formData.append("trainingDatasetId", uploadedDatasetId.value);
+    } else {
+      formData.append("trainingDataPath", uploadedFilePath.value);
+    }
+    
     formData.append(
       "featureColumns",
       JSON.stringify(selectedFeatureColumns.value)
