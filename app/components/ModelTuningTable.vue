@@ -8,8 +8,10 @@
       :columns="columns"
       :row-key="getRowKey"
       :pagination="false"
-      :expandedRowKeys="expandedKeys"
-      @expand="handleExpand"
+      :expandable="{
+        expandedRowKeys: expandedKeys,
+        onExpand: handleExpand,
+      }"
       class="model-tuning-table"
     >
       <template #bodyCell="{ column, record }">
@@ -206,7 +208,9 @@ const getRowKey = (record: any) => {
 // Handle row expansion
 const handleExpand = (expanded: boolean, record: any) => {
   if (expanded) {
-    expandedKeys.value.push(record.model);
+    if (!expandedKeys.value.includes(record.model)) {
+      expandedKeys.value.push(record.model);
+    }
     // Fetch history when expanding
     fetchTrainingHistory(record.model);
   } else {
@@ -223,7 +227,55 @@ const tableData = computed(() => {
     const taskId = props.tuningTasks[model.value];
     const result = props.tuningResults.find((r) => r.model === model.value);
 
-    // Parent row
+    // Build children array for expandable rows
+    const children: any[] = [];
+    
+    // First, add the current active task if it exists
+    if (status && taskId) {
+      children.push({
+        model: model.value,
+        label: model.label,
+        taskId: taskId,
+        status: status,
+        metrics: result
+          ? {
+              r2_test: result.r2_test,
+              mse_test: result.mse_test,
+              mae_test: result.mae_test,
+            }
+          : null,
+        params: result?.params,
+        trainingType: result?.trainingType || "auto",
+        createdAt: result?.createdAt || new Date(),
+        isHistory: true,
+        isCurrent: true, // Mark this as the current active task
+      });
+    }
+    
+    // Then add historical tasks
+    const history = trainingHistory.value[model.value] || [];
+    for (const historyItem of history) {
+      // Skip if this is the current task (already added above)
+      if (historyItem.taskId === taskId) continue;
+      
+      children.push({
+        model: model.value,
+        label: model.label,
+        taskId: historyItem.taskId,
+        status: historyItem.status || "completed", // Use status from API, fallback to completed
+        metrics: {
+          r2_test: historyItem.r2_test,
+          mse_test: historyItem.mse_test,
+          mae_test: historyItem.mae_test,
+        },
+        params: historyItem.params,
+        trainingType: historyItem.trainingType || "auto",
+        createdAt: historyItem.createdAt,
+        isHistory: true,
+      });
+    }
+
+    // Parent row with children
     const parentRow = {
       model: model.value,
       label: model.label,
@@ -237,57 +289,10 @@ const tableData = computed(() => {
           }
         : null,
       isHistory: false,
+      children: children, // Always set children array, even if empty (for expand icon)
     };
     
     data.push(parentRow);
-
-    // Add history rows if expanded
-    if (expandedKeys.value.includes(model.value)) {
-      // First, add the current active task if it exists
-      if (status && taskId) {
-        data.push({
-          model: model.value,
-          label: model.label,
-          taskId: taskId,
-          status: status,
-          metrics: result
-            ? {
-                r2_test: result.r2_test,
-                mse_test: result.mse_test,
-                mae_test: result.mae_test,
-              }
-            : null,
-          params: result?.params,
-          trainingType: result?.trainingType || "auto",
-          createdAt: result?.createdAt || new Date(),
-          isHistory: true,
-          isCurrent: true, // Mark this as the current active task
-        });
-      }
-      
-      // Then add historical tasks
-      const history = trainingHistory.value[model.value] || [];
-      for (const historyItem of history) {
-        // Skip if this is the current task (already added above)
-        if (historyItem.taskId === taskId) continue;
-        
-        data.push({
-          model: model.value,
-          label: model.label,
-          taskId: historyItem.taskId,
-          status: historyItem.status || "completed", // Use status from API, fallback to completed
-          metrics: {
-            r2_test: historyItem.r2_test,
-            mse_test: historyItem.mse_test,
-            mae_test: historyItem.mae_test,
-          },
-          params: historyItem.params,
-          trainingType: historyItem.trainingType || "auto",
-          createdAt: historyItem.createdAt,
-          isHistory: true,
-        });
-      }
-    }
   }
 
   return data;
