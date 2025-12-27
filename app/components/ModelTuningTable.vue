@@ -16,8 +16,12 @@
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'model'">
-          <span class="font-medium" :class="{ 'pl-8': record.isHistory }">
-            {{ record.isHistory ? `└─ ${formatTimestamp(record.createdAt)}` : formatModelName(record.label) }}
+          <span class="font-medium" :class="{ 'pl-2': record.isHistory }">
+            {{
+              record.isHistory
+                ? `${formatTimestamp(record.createdAt)}`
+                : formatModelName(record.label)
+            }}
           </span>
         </template>
         <template v-else-if="column.key === 'action'">
@@ -54,10 +58,7 @@
               <span class="i-mdi-text-box-outline mr-1" />
               {{ t("tuning.viewLogs") }}
             </a-button>
-            <a-tag
-              v-if="record.status"
-              :color="getStatusColor(record.status)"
-            >
+            <a-tag v-if="record.status" :color="getStatusColor(record.status)">
               {{ record.status }}
             </a-tag>
           </div>
@@ -129,7 +130,12 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  "start-tune": [model: string, paramGrid?: Record<string, any>, trainingType?: string, parentTaskId?: string];
+  "start-tune": [
+    model: string,
+    paramGrid?: Record<string, any>,
+    trainingType?: string,
+    parentTaskId?: string
+  ];
   "view-logs": [taskId: string, modelName: string];
 }>();
 
@@ -214,14 +220,16 @@ const handleExpand = (expanded: boolean, record: any) => {
     // Fetch history when expanding
     fetchTrainingHistory(record.model);
   } else {
-    expandedKeys.value = expandedKeys.value.filter((key) => key !== record.model);
+    expandedKeys.value = expandedKeys.value.filter(
+      (key) => key !== record.model
+    );
   }
 };
 
 // Combine all data sources into a single table data structure with expandable rows
 const tableData = computed(() => {
   const data: any[] = [];
-  
+
   for (const model of props.availableModels) {
     const status = props.tuningStatus[model.value];
     const taskId = props.tuningTasks[model.value];
@@ -229,7 +237,7 @@ const tableData = computed(() => {
 
     // Build children array for expandable rows
     const children: any[] = [];
-    
+
     // Then add historical tasks
     const history = trainingHistory.value[model.value] || [];
     for (const historyItem of history) {
@@ -249,11 +257,11 @@ const tableData = computed(() => {
         isHistory: true,
       });
     }
-    
+
     // Add the current active task ONLY if it's not already in history
     // (i.e., it's still running/pending and hasn't been saved to database yet)
     if (status && taskId) {
-      const existsInHistory = history.some(h => h.taskId === taskId);
+      const existsInHistory = history.some((h) => h.taskId === taskId);
       if (!existsInHistory) {
         children.push({
           model: model.value,
@@ -292,7 +300,7 @@ const tableData = computed(() => {
       isHistory: false,
       children: children, // Always set children array, even if empty (for expand icon)
     };
-    
+
     data.push(parentRow);
   }
 
@@ -382,4 +390,3 @@ const handleSaveManualTrain = (values: Record<string, any>) => {
   border-bottom: 1px solid #e8e8e8;
 }
 </style>
-
