@@ -19,7 +19,7 @@
           </span>
         </template>
         <template v-else-if="column.key === 'action'">
-          <!-- Show action buttons only for parent rows -->
+          <!-- Parent row: Only show Auto Tune and Train buttons -->
           <div v-if="!record.isHistory" class="flex gap-2">
             <a-button
               type="primary"
@@ -40,17 +40,9 @@
               <span class="i-mdi-pencil mr-1" />
               {{ t("tuning.manualTrain") }}
             </a-button>
-            <a-button
-              v-if="record.status && record.status !== 'pending'"
-              size="small"
-              @click="handleViewLogs(record.taskId, record.label)"
-              class="inline-flex items-center"
-            >
-              <span class="i-mdi-text-box-outline mr-1" />
-              {{ t("tuning.viewLogs") }}
-            </a-button>
           </div>
-          <div v-else class="flex gap-2">
+          <!-- Sub-row: Show View Logs button and status tag for each training task -->
+          <div v-else class="flex gap-2 items-center">
             <a-button
               v-if="record.taskId"
               size="small"
@@ -60,14 +52,13 @@
               <span class="i-mdi-text-box-outline mr-1" />
               {{ t("tuning.viewLogs") }}
             </a-button>
+            <a-tag
+              v-if="record.status"
+              :color="getStatusColor(record.status)"
+            >
+              {{ record.status }}
+            </a-tag>
           </div>
-          <a-tag
-            v-if="record.status && record.status !== 'pending'"
-            :color="getStatusColor(record.status)"
-            class="ml-2"
-          >
-            {{ record.status }}
-          </a-tag>
         </template>
         <template v-else-if="column.key === 'metrics'">
           <div v-if="record.metrics" class="text-sm">
@@ -252,13 +243,39 @@ const tableData = computed(() => {
 
     // Add history rows if expanded
     if (expandedKeys.value.includes(model.value)) {
+      // First, add the current active task if it exists
+      if (status && taskId) {
+        data.push({
+          model: model.value,
+          label: model.label,
+          taskId: taskId,
+          status: status,
+          metrics: result
+            ? {
+                r2_test: result.r2_test,
+                mse_test: result.mse_test,
+                mae_test: result.mae_test,
+              }
+            : null,
+          params: result?.params,
+          trainingType: result?.trainingType || "auto",
+          createdAt: result?.createdAt || new Date(),
+          isHistory: true,
+          isCurrent: true, // Mark this as the current active task
+        });
+      }
+      
+      // Then add historical tasks
       const history = trainingHistory.value[model.value] || [];
       for (const historyItem of history) {
+        // Skip if this is the current task (already added above)
+        if (historyItem.taskId === taskId) continue;
+        
         data.push({
           model: model.value,
           label: model.label,
           taskId: historyItem.taskId,
-          status: "completed", // History items are always completed
+          status: historyItem.status || "completed", // Use status from API, fallback to completed
           metrics: {
             r2_test: historyItem.r2_test,
             mse_test: historyItem.mse_test,
