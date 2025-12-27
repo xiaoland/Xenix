@@ -122,19 +122,19 @@ const { t } = useI18n();
 const props = defineProps<{
   availableModels: Array<{ label: string; value: string }>;
   tuningStatus: Record<string, string>;
-  tuningTasks: Record<string, string>;
+  tuningTasks: Record<string, number>;
   tuningResults: any[];
   taskLogs: Record<string, any[]>;
   isTuning: boolean;
 }>();
 
 const emit = defineEmits<{
-  "start-tune": [model: string, paramGrid?: Record<string, any>, trainingType?: string, parentTaskId?: string];
-  "view-logs": [taskId: string, modelName: string];
+  "start-tune": [model: string, paramGrid?: Record<string, any>, trainingType?: string, parentTaskId?: number];
+  "view-logs": [taskId: number, modelName: string];
 }>();
 
 const logModalVisible = ref(false);
-const currentLogTaskId = ref<string>("");
+const currentLogTaskId = ref<number>(0);
 const currentLogModelName = ref<string>("");
 
 // ParamGrid dialog state (for auto-tune)
@@ -331,7 +331,7 @@ const currentLogs = computed(() => {
 });
 
 // Handle view logs event
-const handleViewLogs = (taskId: string, modelName: string) => {
+const handleViewLogs = (taskId: number, modelName: string) => {
   currentLogTaskId.value = taskId;
   currentLogModelName.value = modelName;
   logModalVisible.value = true;

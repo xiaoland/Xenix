@@ -101,7 +101,7 @@ const availableModels = [
 
 const selectedModels = ref<string[]>([]);
 const tuningStatus = ref<Record<string, string>>({});
-const tuningTasks = ref<Record<string, string>>({});
+const tuningTasks = ref<Record<string, number>>({});
 const tuningResults = ref<any[]>([]);
 const uploadedFilePath = ref<string>("");
 const uploadedDatasetId = ref<string>("");
@@ -116,7 +116,7 @@ const predictionTask = ref<any>(null);
 const taskLogs = ref<Record<string, any[]>>({});
 const activeLogTab = ref<string>("");
 
-const fetchTaskLogs = async (taskId: string) => {
+const fetchTaskLogs = async (taskId: number) => {
   try {
     const response = await $fetch(`/api/obsrv/${taskId}`);
     if (response.success) {
@@ -127,7 +127,7 @@ const fetchTaskLogs = async (taskId: string) => {
   }
 };
 
-const pollTaskLogs = (taskId: string) => {
+const pollTaskLogs = (taskId: number) => {
   fetchTaskLogs(taskId);
 
   const interval = setInterval(async () => {
@@ -246,11 +246,7 @@ const startTuning = async () => {
       if (response.success) {
         tuningTasks.value[modelValue] = response.taskId;
         tuningStatus.value[modelValue] = "running";
-        activeLogTab.value = response.taskId;
-
-        if (!uploadedFilePath.value && response.inputFile) {
-          uploadedFilePath.value = response.inputFile;
-        }
+        activeLogTab.value = response.taskId.toString();
 
         pollTaskStatus(response.taskId, modelValue);
         pollTaskLogs(response.taskId);
@@ -269,7 +265,7 @@ const startSingleModelTuning = async (
   modelValue: string,
   paramGrid?: Record<string, any>,
   trainingType?: string,
-  parentTaskId?: string
+  parentTaskId?: number
 ) => {
   if (!uploadedDatasetId.value && trainingFileList.value.length === 0) {
     message.error(t("messages.uploadError"));
@@ -342,7 +338,7 @@ const startSingleModelTuning = async (
       formData.append("trainingType", trainingType);
     }
     if (parentTaskId) {
-      formData.append("parentTaskId", parentTaskId);
+      formData.append("parentTaskId", parentTaskId.toString());
     }
 
     const response = await $fetch("/api/upload", {
@@ -353,11 +349,7 @@ const startSingleModelTuning = async (
     if (response.success) {
       tuningTasks.value[modelValue] = response.taskId;
       tuningStatus.value[modelValue] = "running";
-      activeLogTab.value = response.taskId;
-
-      if (!uploadedFilePath.value && response.inputFile) {
-        uploadedFilePath.value = response.inputFile;
-      }
+      activeLogTab.value = response.taskId.toString();
 
       pollTaskStatus(response.taskId, modelValue);
       pollTaskLogs(response.taskId);
@@ -372,7 +364,7 @@ const startSingleModelTuning = async (
   }
 };
 
-const pollTaskStatus = async (taskId: string, modelValue?: string) => {
+const pollTaskStatus = async (taskId: number, modelValue?: string) => {
   const maxAttempts = 120;
   let attempts = 0;
 
@@ -425,15 +417,25 @@ const fetchTuningResults = async () => {
 
     const validResults = results
       .filter((r) => r !== null && r.success && r.results)
-      .map((r) => ({
-        ...r.results,
-        status:
-          tuningStatus.value[
-            Object.keys(tuningTasks.value).find(
-              (k) => tuningTasks.value[k] === r.results.taskId
-            ) || ""
-          ] || "completed",
-      }));
+      .map((r) => {
+        const result = r.results;
+        // Extract model from result
+        const model = result.model || Object.keys(tuningTasks.value).find(
+          (k) => tuningTasks.value[k] === taskIds[results.indexOf(r)]
+        );
+        
+        return {
+          model: model,
+          params: result.params,
+          mse_train: result.metrics?.mse_train,
+          mae_train: result.metrics?.mae_train,
+          r2_train: result.metrics?.r2_train,
+          mse_test: result.metrics?.mse_test,
+          mae_test: result.metrics?.mae_test,
+          r2_test: result.metrics?.r2_test,
+          status: tuningStatus.value[model] || "completed",
+        };
+      });
 
     tuningResults.value = validResults;
   } catch (error) {
@@ -452,8 +454,8 @@ const startPrediction = async () => {
     return;
   }
 
-  if (!uploadedFilePath.value) {
-    message.error(t("messages.trainingPathError"));
+  if (!uploadedDatasetId.value) {
+    message.error(t("messages.trainingDatasetError"));
     return;
   }
 
@@ -470,8 +472,8 @@ const startPrediction = async () => {
     const formData = new FormData();
     formData.append("file", predictionFileList.value[0].originFileObj);
     formData.append("model", selectedBestModel.value);
-    formData.append("tuningTaskId", selectedModelTaskId);
-    formData.append("trainingDataPath", uploadedFilePath.value);
+    formData.append("tuningTaskId", selectedModelTaskId.toString());
+    formData.append("trainingDatasetId", uploadedDatasetId.value);
     formData.append(
       "featureColumns",
       JSON.stringify(selectedFeatureColumns.value)
@@ -492,13 +494,15 @@ const startPrediction = async () => {
 
       if (result && result.task.status === "completed") {
         predictionTask.value.status = "completed";
-        predictionTask.value.outputFile =
-          result.task.outputFile || response.outputFile;
-        predictionTask.value.taskId = result.task.taskId;
+        // Get output file from task result or parameter
+        const taskResult: any = result.task.result || {};
+        const taskParameter: any = result.task.parameter || {};
+        predictionTask.value.outputFile = taskResult.outputFile || taskParameter.outputFile || response.outputFile;
+        predictionTask.value.taskId = result.task.id;
         console.log("Updated predictionTask:", predictionTask.value);
         message.success(
           t("messages.predictionCompleted", {
-            path: result.task.outputFile || response.outputFile,
+            path: predictionTask.value.outputFile,
           })
         );
       } else if (result && result.task.status === "failed") {
