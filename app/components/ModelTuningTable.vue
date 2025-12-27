@@ -230,34 +230,9 @@ const tableData = computed(() => {
     // Build children array for expandable rows
     const children: any[] = [];
     
-    // First, add the current active task if it exists
-    if (status && taskId) {
-      children.push({
-        model: model.value,
-        label: model.label,
-        taskId: taskId,
-        status: status,
-        metrics: result
-          ? {
-              r2_test: result.r2_test,
-              mse_test: result.mse_test,
-              mae_test: result.mae_test,
-            }
-          : null,
-        params: result?.params,
-        trainingType: result?.trainingType || "auto",
-        createdAt: result?.createdAt || new Date(),
-        isHistory: true,
-        isCurrent: true, // Mark this as the current active task
-      });
-    }
-    
     // Then add historical tasks
     const history = trainingHistory.value[model.value] || [];
     for (const historyItem of history) {
-      // Skip if this is the current task (already added above)
-      if (historyItem.taskId === taskId) continue;
-      
       children.push({
         model: model.value,
         label: model.label,
@@ -273,6 +248,32 @@ const tableData = computed(() => {
         createdAt: historyItem.createdAt,
         isHistory: true,
       });
+    }
+    
+    // Add the current active task ONLY if it's not already in history
+    // (i.e., it's still running/pending and hasn't been saved to database yet)
+    if (status && taskId) {
+      const existsInHistory = history.some(h => h.taskId === taskId);
+      if (!existsInHistory) {
+        children.push({
+          model: model.value,
+          label: model.label,
+          taskId: taskId,
+          status: status,
+          metrics: result
+            ? {
+                r2_test: result.r2_test,
+                mse_test: result.mse_test,
+                mae_test: result.mae_test,
+              }
+            : null,
+          params: result?.params,
+          trainingType: result?.trainingType || "auto",
+          createdAt: result?.createdAt || new Date(),
+          isHistory: true,
+          isCurrent: true, // Mark this as the current active task
+        });
+      }
     }
 
     // Parent row with children
