@@ -9,7 +9,17 @@
       show-icon
     />
 
+    <!-- Input Mode Toggle -->
+    <div class="mt-4">
+      <a-radio-group v-model:value="inputMode" button-style="solid">
+        <a-radio-button value="file">{{ t("prediction.fileMode") }}</a-radio-button>
+        <a-radio-button value="manual">{{ t("prediction.manualMode") }}</a-radio-button>
+      </a-radio-group>
+    </div>
+
+    <!-- File Upload Mode -->
     <a-upload-dragger
+      v-if="inputMode === 'file'"
       class="mt-4"
       v-model:file-list="fileList"
       name="file"
@@ -28,14 +38,37 @@
       </p>
     </a-upload-dragger>
 
+    <!-- Manual Input Mode -->
+    <div v-if="inputMode === 'manual'" class="mt-4">
+      <a-alert
+        :message="t('prediction.manualInputHint')"
+        type="info"
+        show-icon
+        class="mb-4"
+      />
+      <a-form layout="vertical">
+        <a-form-item
+          v-for="feature in featureColumns"
+          :key="feature"
+          :label="feature"
+        >
+          <a-input-number
+            v-model:value="manualInputValues[feature]"
+            :placeholder="t('prediction.enterValue')"
+            class="w-full"
+          />
+        </a-form-item>
+      </a-form>
+    </div>
+
     <a-button
       class="mt-4 inline-flex items-center justify-center"
       type="primary"
       size="large"
       block
       :loading="isPredicting"
-      :disabled="fileList.length === 0"
-      @click="$emit('predict')"
+      :disabled="!canPredict"
+      @click="$emit('predict', { inputMode, manualInputValues: manualInputValues })"
     >
       <span class="i-mdi-chart-line mr-2" />
       {{ t("prediction.startPrediction") }}
@@ -65,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import type { UploadProps } from "ant-design-vue";
 import { message } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
@@ -76,15 +109,42 @@ const props = defineProps<{
   bestModel: string | null;
   isPredicting: boolean;
   predictionTask: any;
+  featureColumns: string[];
 }>();
 
 const fileList = defineModel<any[]>({ required: true });
 
 defineEmits<{
-  predict: [];
+  predict: [payload: { inputMode: string; manualInputValues: Record<string, number> }];
   back: [];
   reset: [];
 }>();
+
+const inputMode = ref<"file" | "manual">("file");
+const manualInputValues = ref<Record<string, number>>({});
+
+// Initialize manual input values when feature columns change
+watch(() => props.featureColumns, (features) => {
+  if (features && features.length > 0) {
+    const initialValues: Record<string, number> = {};
+    features.forEach(feature => {
+      initialValues[feature] = 0;
+    });
+    manualInputValues.value = initialValues;
+  }
+}, { immediate: true });
+
+const canPredict = computed(() => {
+  if (inputMode.value === "file") {
+    return fileList.value.length > 0;
+  } else {
+    // Check if all manual input values are provided
+    return props.featureColumns.every(feature => 
+      manualInputValues.value[feature] !== undefined && 
+      manualInputValues.value[feature] !== null
+    );
+  }
+});
 
 const predictionMessage = computed(() => {
   if (!props.predictionTask) return "";

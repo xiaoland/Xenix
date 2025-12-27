@@ -13,6 +13,7 @@ export default defineEventHandler(async (event) => {
     const formData = await readFormData(event);
     const file = formData.get("file") as File;
     const datasetId = formData.get("datasetId") as string;
+    const manualInput = formData.get("manualInput") as string;
     const model = formData.get("model") as string;
     const tuningTaskId = formData.get("tuningTaskId") as string;
     const trainingDataPath = formData.get("trainingDataPath") as string;
@@ -22,9 +23,35 @@ export default defineEventHandler(async (event) => {
 
     let inputFile: string;
     let actualTrainingDataPath: string;
+    let isManualInput = false;
 
-    // Support both file upload and dataset reference for prediction data
-    if (datasetId) {
+    // Support manual input, file upload, or dataset reference for prediction data
+    if (manualInput) {
+      // Create temporary Excel file from manual input
+      isManualInput = true;
+      const manualValues = JSON.parse(manualInput);
+      const parsedFeatureColumns = JSON.parse(featureColumns);
+      
+      // Import xlsx library dynamically
+      const XLSX = await import('xlsx');
+      
+      // Create a single-row dataframe with the manual input values
+      const rowData: any = {};
+      parsedFeatureColumns.forEach((col: string) => {
+        rowData[col] = manualValues[col];
+      });
+      
+      // Create worksheet and workbook
+      const worksheet = XLSX.utils.json_to_sheet([rowData]);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Prediction');
+      
+      // Save to temporary file
+      const uploadDir = path.join(process.cwd(), "uploads");
+      const timestamp = Date.now();
+      inputFile = path.join(uploadDir, `manual_input_${timestamp}.xlsx`);
+      XLSX.writeFile(workbook, inputFile);
+    } else if (datasetId) {
       // Use existing dataset for prediction
       const [dataset] = await db
         .select()
@@ -55,7 +82,7 @@ export default defineEventHandler(async (event) => {
     } else {
       throw createError({
         statusCode: 400,
-        message: "Either file or datasetId is required for prediction data",
+        message: "Either file, datasetId, or manualInput is required for prediction data",
       });
     }
 
