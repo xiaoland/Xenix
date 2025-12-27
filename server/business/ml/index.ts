@@ -223,10 +223,10 @@ export interface TuneOptions {
   model: string;
   featureColumns: string[];
   targetColumn: string;
-  taskId: string;
+  taskId: number; // Changed from string to number
   paramGrid?: Record<string, any>;
   trainingType?: string; // 'auto' or 'manual'
-  parentTaskId?: string; // For manual training, reference to auto-tune task
+  parentTaskId?: number; // Changed from string to number
 }
 
 /**
@@ -240,7 +240,7 @@ export interface PredictOptions {
   params: Record<string, any>;
   featureColumns: string[];
   targetColumn: string;
-  taskId: string;
+  taskId: number; // Changed from string to number
 }
 
 /**

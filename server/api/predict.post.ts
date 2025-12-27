@@ -1,9 +1,5 @@
 import { db, schema } from "../database";
-import {
-  generateTaskId,
-  validateExcelFile,
-  saveUploadedFile,
-} from "../utils/taskUtils";
+import { validateExcelFile, saveUploadedFile } from "../utils/taskUtils";
 import { predict } from "../business/ml";
 import { eq } from "drizzle-orm";
 import path from "path";
@@ -15,13 +11,12 @@ export default defineEventHandler(async (event) => {
     const datasetId = formData.get("datasetId") as string;
     const model = formData.get("model") as string;
     const tuningTaskId = formData.get("tuningTaskId") as string;
-    const trainingDataPath = formData.get("trainingDataPath") as string;
     const trainingDatasetId = formData.get("trainingDatasetId") as string;
     const featureColumns = formData.get("featureColumns") as string; // JSON string
     const targetColumn = formData.get("targetColumn") as string;
 
-    let inputFile: string;
-    let actualTrainingDataPath: string;
+    let predictionDatasetId: string;
+    let trainingDataPath: string;
 
     // Support both file upload and dataset reference for prediction data
     if (datasetId) {
@@ -39,9 +34,9 @@ export default defineEventHandler(async (event) => {
         });
       }
 
-      inputFile = dataset.filePath;
+      predictionDatasetId = datasetId;
     } else if (file) {
-      // Upload new file (backward compatibility)
+      // Upload new file and create dataset
       if (!validateExcelFile(file.name)) {
         throw createError({
           statusCode: 400,
@@ -51,7 +46,20 @@ export default defineEventHandler(async (event) => {
       }
 
       const uploadDir = path.join(process.cwd(), "uploads");
-      inputFile = await saveUploadedFile(file, uploadDir);
+      const filePath = await saveUploadedFile(file, uploadDir);
+      
+      // Create dataset record
+      const newDatasetId = `ds_${Date.now()}`;
+      await db.insert(schema.datasets).values({
+        datasetId: newDatasetId,
+        name: file.name,
+        description: "Uploaded for prediction",
+        filePath: filePath,
+        fileName: file.name,
+        fileSize: file.size,
+      });
+      
+      predictionDatasetId = newDatasetId;
     } else {
       throw createError({
         statusCode: 400,
@@ -59,31 +67,28 @@ export default defineEventHandler(async (event) => {
       });
     }
 
-    // Support dataset reference for training data
-    if (trainingDatasetId) {
-      const [dataset] = await db
-        .select()
-        .from(schema.datasets)
-        .where(eq(schema.datasets.datasetId, trainingDatasetId))
-        .limit(1);
-
-      if (!dataset) {
-        throw createError({
-          statusCode: 404,
-          message: "Training dataset not found",
-        });
-      }
-
-      actualTrainingDataPath = dataset.filePath;
-    } else if (trainingDataPath) {
-      // Use provided training data path (backward compatibility)
-      actualTrainingDataPath = trainingDataPath;
-    } else {
+    // Get training dataset
+    if (!trainingDatasetId) {
       throw createError({
         statusCode: 400,
-        message: "Either trainingDataPath or trainingDatasetId is required",
+        message: "trainingDatasetId is required",
       });
     }
+
+    const [trainingDataset] = await db
+      .select()
+      .from(schema.datasets)
+      .where(eq(schema.datasets.datasetId, trainingDatasetId))
+      .limit(1);
+
+    if (!trainingDataset) {
+      throw createError({
+        statusCode: 404,
+        message: "Training dataset not found",
+      });
+    }
+
+    trainingDataPath = trainingDataset.filePath;
 
     if (!model) {
       throw createError({
@@ -109,42 +114,57 @@ export default defineEventHandler(async (event) => {
     // Parse feature columns
     const parsedFeatureColumns = JSON.parse(featureColumns);
 
-    // Load tuned parameters from database
-    const modelResult = await db.query.modelResults.findFirst({
-      where: eq(schema.modelResults.taskId, tuningTaskId),
-    });
+    // Load tuned parameters from database (task.result field)
+    const [tuningTask] = await db
+      .select()
+      .from(schema.tasks)
+      .where(eq(schema.tasks.id, parseInt(tuningTaskId)))
+      .limit(1);
 
-    if (!modelResult) {
+    if (!tuningTask || !tuningTask.result) {
       throw createError({
         statusCode: 404,
         message: "Tuning results not found for the specified task ID",
       });
     }
 
+    const result: any = tuningTask.result;
+
+    // Get prediction dataset file path
+    const [predictionDataset] = await db
+      .select()
+      .from(schema.datasets)
+      .where(eq(schema.datasets.datasetId, predictionDatasetId))
+      .limit(1);
+
     // Generate output file path
-    const outputFile = inputFile.replace(/\.(xlsx|xls)$/i, "_predicted.xlsx");
+    const outputFile = predictionDataset!.filePath.replace(/\.(xlsx|xls)$/i, "_predicted.xlsx");
 
-    // Generate task ID for prediction
-    const taskId = generateTaskId();
-
-    // Create task record
-    await db.insert(schema.tasks).values({
-      taskId,
-      type: "prediction",
+    // Create task record with new schema
+    const [insertedTask] = await db.insert(schema.tasks).values({
+      type: "predict",
       status: "pending",
-      model,
-      inputFile,
-      outputFile,
-    });
+      parameter: {
+        model,
+        predictionDatasetId,
+        trainingDatasetId,
+        featureColumns: parsedFeatureColumns,
+        targetColumn,
+        tuningTaskId: parseInt(tuningTaskId),
+        outputFile,
+      },
+    }).returning();
+
+    const taskId = insertedTask.id;
 
     // Execute prediction task in background using high-level wrapper
     setImmediate(() => {
       predict({
-        trainingDataPath: actualTrainingDataPath,
-        predictionDataPath: inputFile,
+        trainingDataPath,
+        predictionDataPath: predictionDataset!.filePath,
         outputPath: outputFile,
         model,
-        params: modelResult.params,
+        params: result.params,
         featureColumns: parsedFeatureColumns,
         targetColumn,
         taskId,
