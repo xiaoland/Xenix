@@ -56,6 +56,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useFormatters } from "../composables/useFormatters";
 
 const props = defineProps<{
   availableModels: Array<{ label: string; value: string }>;
@@ -80,6 +81,9 @@ const emit = defineEmits<{
   "update:selected-best-model": [model: string];
   "update:selected-task-id": [taskId: number | null, model: string];
 }>();
+
+// Use formatters composable
+const { formatModelName, formatMetric } = useFormatters();
 
 const localSelectedModels = computed({
   get: () => props.selectedModels,
@@ -108,15 +112,5 @@ const handleViewLogs = (taskId: number, modelName: string) => {
 
 const handleSelectTask = (taskId: number, model: string) => {
   emit("update:selected-task-id", taskId, model);
-};
-
-const formatModelName = (name: string) => {
-  return name.replace(/_/g, " ");
-};
-
-const formatMetric = (value: string | number) => {
-  if (!value) return "N/A";
-  const num = typeof value === "string" ? parseFloat(value) : value;
-  return num.toFixed(4);
 };
 </script>

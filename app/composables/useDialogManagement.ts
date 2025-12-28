@@ -1,4 +1,5 @@
 import { ref, computed, onMounted } from "vue";
+import { ApiService } from "~/services/apiService";
 
 /**
  * Composable for managing dialog states and model metadata
@@ -23,7 +24,7 @@ export function useDialogManagement() {
   // Fetch model metadata on mount
   onMounted(async () => {
     try {
-      const response = await $fetch("/api/models");
+      const response = await ApiService.fetchModelMetadata();
       if (response.success) {
         modelMetadata.value = response.models;
       }
