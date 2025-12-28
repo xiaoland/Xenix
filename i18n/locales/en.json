@@ -59,6 +59,7 @@
     "title": "Model Tuning",
     "modelSelectionAndTuning": "Model Selection and Tuning",
     "model": "Model",
+    "tuneType": "Tune Type & Parameters",
     "tuning": "Tuning",
     "metrics": "Metrics",
     "startTune": "Start Tune",
@@ -168,6 +169,12 @@
   "common": {
     "na": "N/A",
     "add": "Add"
+  },
+  "autoForm": {
+    "loading": "Loading form schema...",
+    "noDescription": "No description available",
+    "defaultValue": "Default",
+    "arrayPlaceholder": "Enter value and press Add"
   },
   "navigation": {
     "home": "Home",

@@ -39,6 +39,7 @@
             v-model:selected-models="selectedModels"
             v-model:active-log-tab="activeLogTab"
             v-model:selected-best-model="selectedBestModel"
+            v-model:selected-task-id="selectedTaskId"
             :available-models="availableModels"
             :tuning-status="tuningStatus"
             :tuning-tasks="tuningTasks"
@@ -110,6 +111,7 @@ const selectedTargetColumn = ref<string>("");
 const isTuning = ref(false);
 const isPredicting = ref(false);
 const selectedBestModel = ref<string | null>(null);
+const selectedTaskId = ref<number | null>(null);
 const predictionTask = ref<any>(null);
 
 // Logs state
@@ -194,7 +196,6 @@ const startTuning = async () => {
     if (!uploadedDatasetId.value && trainingFileList.value.length > 0) {
       // Auto-register the uploaded file as a dataset
       const file = trainingFileList.value[0].originFileObj;
-      const timestamp = Date.now();
       const datasetName = `Training Data - ${new Date().toLocaleString()}`;
 
       const datasetFormData = new FormData();
@@ -222,25 +223,15 @@ const startTuning = async () => {
     for (const modelValue of selectedModels.value) {
       tuningStatus.value[modelValue] = "pending";
 
-      const formData = new FormData();
-
-      // Use dataset ID if available, otherwise upload file
-      if (datasetIdToUse) {
-        formData.append("datasetId", datasetIdToUse);
-      } else {
-        formData.append("file", trainingFileList.value[0].originFileObj);
-      }
-
-      formData.append("model", modelValue);
-      formData.append(
-        "featureColumns",
-        JSON.stringify(selectedFeatureColumns.value)
-      );
-      formData.append("targetColumn", selectedTargetColumn.value);
-
-      const response = await $fetch("/api/upload", {
+      // Use tune endpoint for auto-tuning with default parameters
+      const response = await $fetch("/api/tune", {
         method: "POST",
-        body: formData,
+        body: {
+          datasetId: datasetIdToUse,
+          features: selectedFeatureColumns.value,
+          target: selectedTargetColumn.value,
+          model: modelValue,
+        },
       });
 
       if (response.success) {
@@ -312,39 +303,33 @@ const startSingleModelTuning = async (
       }
     }
 
-    const formData = new FormData();
-
-    // Use dataset ID if available, otherwise upload file
-    if (datasetIdToUse) {
-      formData.append("datasetId", datasetIdToUse);
+    // Use appropriate endpoint based on training type
+    let response;
+    if (trainingType === "auto" || !trainingType) {
+      // Auto-tune endpoint
+      response = await $fetch("/api/tune", {
+        method: "POST",
+        body: {
+          datasetId: datasetIdToUse,
+          features: selectedFeatureColumns.value,
+          target: selectedTargetColumn.value,
+          model: modelValue,
+          paramGrid: paramGrid || undefined,
+        },
+      });
     } else {
-      formData.append("file", trainingFileList.value[0].originFileObj);
+      // Manual train endpoint
+      response = await $fetch("/api/train", {
+        method: "POST",
+        body: {
+          datasetId: datasetIdToUse,
+          features: selectedFeatureColumns.value,
+          target: selectedTargetColumn.value,
+          model: modelValue,
+          parameters: paramGrid || {}, // paramGrid contains single values for manual train
+        },
+      });
     }
-
-    formData.append("model", modelValue);
-    formData.append(
-      "featureColumns",
-      JSON.stringify(selectedFeatureColumns.value)
-    );
-    formData.append("targetColumn", selectedTargetColumn.value);
-
-    // Add param grid if provided
-    if (paramGrid) {
-      formData.append("paramGrid", JSON.stringify(paramGrid));
-    }
-
-    // Add training type and parent task ID
-    if (trainingType) {
-      formData.append("trainingType", trainingType);
-    }
-    if (parentTaskId) {
-      formData.append("parentTaskId", parentTaskId.toString());
-    }
-
-    const response = await $fetch("/api/upload", {
-      method: "POST",
-      body: formData,
-    });
 
     if (response.success) {
       tuningTasks.value[modelValue] = response.taskId;

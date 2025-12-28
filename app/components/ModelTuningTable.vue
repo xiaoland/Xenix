@@ -15,7 +15,15 @@
       class="model-tuning-table"
     >
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'model'">
+        <template v-if="column.key === 'select'">
+          <!-- Only show radio button in sub-rows (history items) -->
+          <a-radio
+            v-if="record.isHistory"
+            :checked="selectedTaskId === record.taskId"
+            @click="handleSelectTask(record.taskId, record.model)"
+          />
+        </template>
+        <template v-else-if="column.key === 'model'">
           <span class="font-medium" :class="{ 'pl-2': record.isHistory }">
             {{
               record.isHistory
@@ -23,6 +31,26 @@
                 : formatModelName(record.label)
             }}
           </span>
+        </template>
+        <template v-else-if="column.key === 'tuneType'">
+          <!-- Show tune type and parameters for sub-rows -->
+          <div v-if="record.isHistory" class="text-sm">
+            <div class="font-medium mb-1">
+              <a-tag :color="record.trainingType === 'auto' ? 'blue' : 'green'">
+                {{ record.trainingType === 'auto' ? t('tuning.autoTune') : t('tuning.manualTrain') }}
+              </a-tag>
+            </div>
+            <div v-if="record.params" class="text-xs text-gray-600">
+              <div
+                v-for="(value, key) in record.params"
+                :key="key"
+                class="truncate"
+              >
+                <span class="font-medium">{{ key }}:</span>
+                {{ formatParamValue(value) }}
+              </div>
+            </div>
+          </div>
         </template>
         <template v-else-if="column.key === 'action'">
           <!-- Parent row: Only show Auto Tune and Train buttons -->
@@ -132,6 +160,7 @@ const props = defineProps<{
   tuningResults: any[];
   taskLogs: Record<string, any[]>;
   isTuning: boolean;
+  selectedTaskId?: number | null;
 }>();
 
 const emit = defineEmits<{
@@ -142,6 +171,7 @@ const emit = defineEmits<{
     parentTaskId?: number
   ];
   "view-logs": [taskId: number, modelName: string];
+  "select-task": [taskId: number, model: string];
 }>();
 
 // Use composables
@@ -176,9 +206,27 @@ const {
 const { formatModelName, formatTimestamp, formatMetric, getStatusColor } =
   useFormatters();
 
+// Format parameter values for display
+const formatParamValue = (value: any): string => {
+  if (Array.isArray(value)) {
+    return `[${value.join(", ")}]`;
+  }
+  if (typeof value === "object" && value !== null) {
+    return JSON.stringify(value);
+  }
+  return String(value);
+};
+
+// Handle task selection
+const handleSelectTask = (taskId: number, model: string) => {
+  emit("select-task", taskId, model);
+};
+
 // Table columns
 const columns = computed(() => [
+  { title: "", key: "select", width: 50 },
   { title: t("tuning.model"), key: "model", dataIndex: "model" },
+  { title: t("tuning.tuneType"), key: "tuneType", width: 200 },
   { title: t("tuning.tuning"), key: "action", width: 350 },
   { title: t("tuning.metrics"), key: "metrics", width: 320 },
 ]);
