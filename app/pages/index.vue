@@ -39,6 +39,7 @@
             v-model:selected-models="selectedModels"
             v-model:active-log-tab="activeLogTab"
             v-model:selected-best-model="selectedBestModel"
+            v-model:selected-task-id="selectedTaskId"
             :available-models="availableModels"
             :tuning-status="tuningStatus"
             :tuning-tasks="tuningTasks"
@@ -57,6 +58,7 @@
           v-if="currentStep === 1"
           v-model="predictionFileList"
           :best-model="selectedBestModel"
+          :selected-task-id="selectedTaskId"
           :is-predicting="isPredicting"
           :prediction-task="predictionTask"
           @predict="startPrediction"
@@ -110,6 +112,7 @@ const selectedTargetColumn = ref<string>("");
 const isTuning = ref(false);
 const isPredicting = ref(false);
 const selectedBestModel = ref<string | null>(null);
+const selectedTaskId = ref<number | null>(null); // Selected result task ID
 const predictionTask = ref<any>(null);
 
 // Logs state
@@ -169,6 +172,7 @@ const resetUpload = () => {
   tuningTasks.value = {};
   tuningResults.value = [];
   selectedBestModel.value = null;
+  selectedTaskId.value = null;
 };
 
 const startTuning = async () => {
@@ -444,7 +448,10 @@ const fetchTuningResults = async () => {
 };
 
 const startPrediction = async () => {
-  if (!selectedBestModel.value) {
+  // Use selectedTaskId if available, otherwise fall back to the old behavior
+  const taskIdToUse = selectedTaskId.value || tuningTasks.value[selectedBestModel.value];
+  
+  if (!taskIdToUse) {
     message.error(t("messages.selectModelError"));
     return;
   }
@@ -459,20 +466,13 @@ const startPrediction = async () => {
     return;
   }
 
-  // Find the task ID for the selected model
-  const selectedModelTaskId = tuningTasks.value[selectedBestModel.value];
-  if (!selectedModelTaskId) {
-    message.error(t("messages.tuningTaskError"));
-    return;
-  }
-
   isPredicting.value = true;
 
   try {
     const formData = new FormData();
     formData.append("file", predictionFileList.value[0].originFileObj);
     formData.append("model", selectedBestModel.value);
-    formData.append("tuningTaskId", selectedModelTaskId.toString());
+    formData.append("tuningTaskId", taskIdToUse.toString());
     formData.append("trainingDatasetId", uploadedDatasetId.value);
     formData.append(
       "featureColumns",
@@ -548,6 +548,7 @@ const reset = () => {
   isTuning.value = false;
   isPredicting.value = false;
   selectedBestModel.value = null;
+  selectedTaskId.value = null;
   predictionTask.value = null;
   taskLogs.value = {};
   activeLogTab.value = "";

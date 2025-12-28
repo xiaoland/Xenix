@@ -59,6 +59,8 @@
     "title": "Model Tuning",
     "modelSelectionAndTuning": "Model Selection and Tuning",
     "model": "Model",
+    "trainType": "Train Type",
+    "parameters": "Parameters",
     "tuning": "Tuning",
     "metrics": "Metrics",
     "startTune": "Start Tune",
@@ -70,6 +72,8 @@
     "viewResults": "View Tuning Results",
     "selectBest": "Select Best Model",
     "selectBestForPrediction": "Select Best Model for Prediction",
+    "selectResultNote": "Select a specific tuning result by clicking the radio button in the table above",
+    "noResultSelected": "Please select a tuning result to use for prediction",
     "tuningResults": "Tuning Results",
     "modelColumn": "Model",
     "r2Test": "R² (Test)",
@@ -167,7 +171,8 @@
   },
   "common": {
     "na": "N/A",
-    "add": "Add"
+    "add": "Add",
+    "loading": "Loading..."
   },
   "navigation": {
     "home": "Home",

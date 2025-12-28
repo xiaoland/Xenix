@@ -11,7 +11,9 @@
       :tuning-results="tuningResults"
       :task-logs="taskLogs"
       :is-tuning="isTuning"
+      :selected-task-id="localSelectedTaskId"
       @update:selected-models="localSelectedModels = $event"
+      @update:selectedTaskId="localSelectedTaskId = $event"
       @start-tune="handleStartTune"
       @view-logs="handleViewLogs"
     />
@@ -21,21 +23,16 @@
       <h3 class="text-lg font-medium mb-3">
         {{ $t("tuning.selectBestForPrediction") }}
       </h3>
-      <a-select
-        v-model:value="localSelectedBestModel"
-        :placeholder="$t('tuning.selectModelPlaceholder')"
-        class="w-full max-w-md"
-        :dropdownMatchSelectWidth="false"
-      >
-        <a-select-option
-          v-for="result in tuningResults"
-          :key="result.model"
-          :value="result.model"
-        >
-          {{ formatModelName(result.model) }} (R²:
-          {{ formatMetric(result.r2_test) }})
-        </a-select-option>
-      </a-select>
+      <p class="text-sm text-gray-600 mb-2">
+        {{ $t("tuning.selectResultNote") }}
+      </p>
+      <a-alert
+        v-if="!localSelectedTaskId"
+        type="warning"
+        :message="$t('tuning.noResultSelected')"
+        show-icon
+        class="mb-3"
+      />
     </div>
 
     <!-- Navigation -->
@@ -43,7 +40,7 @@
       <a-button @click="emit('back')">{{ $t("tuning.back") }}</a-button>
       <a-button
         type="primary"
-        :disabled="!localSelectedBestModel"
+        :disabled="!localSelectedTaskId"
         @click="emit('continue')"
       >
         {{ $t("tuning.continue") }}
@@ -65,6 +62,7 @@ const props = defineProps<{
   taskLogs: Record<string, any[]>;
   activeLogTab: string;
   selectedBestModel: string | null;
+  selectedTaskId?: number | null; // Selected result task ID
 }>();
 
 const emit = defineEmits<{
@@ -75,6 +73,7 @@ const emit = defineEmits<{
   "update:selectedModels": [models: string[]];
   "update:activeLogTab": [tab: string];
   "update:selected-best-model": [model: string];
+  "update:selectedTaskId": [taskId: number | null];
 }>();
 
 const localSelectedModels = computed({
@@ -90,6 +89,11 @@ const localActiveLogTab = computed({
 const localSelectedBestModel = computed({
   get: () => props.selectedBestModel,
   set: (value) => emit("update:selected-best-model", value || ""),
+});
+
+const localSelectedTaskId = computed({
+  get: () => props.selectedTaskId,
+  set: (value) => emit("update:selectedTaskId", value),
 });
 
 const handleStartTune = (model: string, paramGrid?: Record<string, any>, trainingType?: string, parentTaskId?: string) => {

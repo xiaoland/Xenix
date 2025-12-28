@@ -9,6 +9,23 @@
         class="flex-1"
       />
       <a-button
+        v-if="props.itemType === 'boolean'"
+        @click="addBoolean(true)"
+        :disabled="false"
+        class="inline-flex items-center"
+      >
+        True
+      </a-button>
+      <a-button
+        v-if="props.itemType === 'boolean'"
+        @click="addBoolean(false)"
+        :disabled="false"
+        class="inline-flex items-center"
+      >
+        False
+      </a-button>
+      <a-button
+        v-if="props.itemType !== 'boolean'"
         type="primary"
         @click="handleAdd"
         :disabled="!inputValue"
@@ -69,7 +86,7 @@ const inputType = computed(() => {
 });
 
 const handleAdd = () => {
-  if (!inputValue.value) return;
+  if (!inputValue.value && props.itemType !== "boolean") return;
 
   let parsedValue: any;
   try {
@@ -99,6 +116,10 @@ const handleAdd = () => {
   } catch (error) {
     console.error("Failed to parse value:", error);
   }
+};
+
+const addBoolean = (value: boolean) => {
+  localValues.value = [...localValues.value, value];
 };
 
 const handleRemove = (index: number) => {

@@ -65,6 +65,8 @@
     "back": "重选数据",
     "continue": "预测",
     "model": "模型",
+    "trainType": "训练类型",
+    "parameters": "参数",
     "tuning": "调整",
     "metrics": "指标",
     "startTune": "开始调整",
@@ -74,6 +76,8 @@
     "viewResults": "查看调整结果",
     "selectBest": "选择最佳模型",
     "selectBestForPrediction": "选择最佳模型进行预测",
+    "selectResultNote": "通过点击上表中的单选按钮选择特定的调优结果",
+    "noResultSelected": "请选择一个调优结果用于预测",
     "tuningResults": "调整结果",
     "modelColumn": "模型",
     "paramGridColumn": "参数网格",
@@ -92,6 +96,14 @@
       "arrayPlaceholder": "输入值并按添加",
       "emptyArray": "无值。使用上方输入添加值。",
       "editButton": "编辑"
+    },
+    "manualTrainDialog": {
+      "title": "手动训练 - {model}",
+      "description": "输入特定的参数值以手动训练模型。",
+      "loading": "加载参数模式...",
+      "noDescription": "无可用描述",
+      "defaultValue": "默认值",
+      "trainButton": "训练模型"
     }
   },
   "prediction": {
@@ -160,7 +172,8 @@
   },
   "common": {
     "na": "不可用",
-    "add": "添加"
+    "add": "添加",
+    "loading": "加载中..."
   },
   "navigation": {
     "home": "首页",

@@ -15,6 +15,14 @@
       class="model-tuning-table"
     >
       <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'selection'">
+          <!-- Only show radio for sub-rows with completed status -->
+          <a-radio
+            v-if="record.isHistory && record.status === 'completed'"
+            :checked="props.selectedTaskId === record.taskId"
+            @click="handleSelectResult(record.taskId)"
+          />
+        </template>
         <template v-if="column.key === 'model'">
           <span class="font-medium" :class="{ 'pl-2': record.isHistory }">
             {{
@@ -23,6 +31,28 @@
                 : formatModelName(record.label)
             }}
           </span>
+        </template>
+        <template v-else-if="column.key === 'trainType'">
+          <!-- Show training type only for sub-rows -->
+          <span v-if="record.isHistory" class="text-sm">
+            <a-tag :color="record.trainingType === 'auto' ? 'blue' : 'green'">
+              {{ record.trainingType === 'auto' ? t('tuning.autoTune') : t('tuning.manualTrain') }}
+            </a-tag>
+          </span>
+        </template>
+        <template v-else-if="column.key === 'parameters'">
+          <!-- Show parameters only for sub-rows -->
+          <div v-if="record.isHistory && record.params" class="text-xs">
+            <div
+              v-for="(value, key) in record.params"
+              :key="key"
+              class="truncate"
+              :title="`${key}: ${JSON.stringify(value)}`"
+            >
+              <span class="font-medium">{{ key }}:</span>
+              <span class="ml-1 text-gray-600">{{ formatParamValue(value) }}</span>
+            </div>
+          </div>
         </template>
         <template v-else-if="column.key === 'action'">
           <!-- Parent row: Only show Auto Tune and Train buttons -->
@@ -132,6 +162,7 @@ const props = defineProps<{
   tuningResults: any[];
   taskLogs: Record<string, any[]>;
   isTuning: boolean;
+  selectedTaskId?: number | null; // Selected result task ID for prediction
 }>();
 
 const emit = defineEmits<{
@@ -142,6 +173,7 @@ const emit = defineEmits<{
     parentTaskId?: number
   ];
   "view-logs": [taskId: number, modelName: string];
+  "update:selectedTaskId": [taskId: number | null];
 }>();
 
 // Use composables
@@ -178,9 +210,12 @@ const { formatModelName, formatTimestamp, formatMetric, getStatusColor } =
 
 // Table columns
 const columns = computed(() => [
+  { title: "", key: "selection", width: 50 }, // Radio selection column
   { title: t("tuning.model"), key: "model", dataIndex: "model" },
-  { title: t("tuning.tuning"), key: "action", width: 350 },
-  { title: t("tuning.metrics"), key: "metrics", width: 320 },
+  { title: t("tuning.trainType"), key: "trainType", width: 100 },
+  { title: t("tuning.parameters"), key: "parameters", width: 250 },
+  { title: t("tuning.tuning"), key: "action", width: 250 },
+  { title: t("tuning.metrics"), key: "metrics", width: 250 },
 ]);
 
 // Current logs computed property
@@ -215,6 +250,20 @@ const handleSaveManualTrain = (values: Record<string, any>) => {
   const parentTaskId = props.tuningTasks[currentEditModel.value] || null;
   // Start manual train with single values
   emit("start-tune", currentEditModel.value, values, "manual", parentTaskId);
+};
+
+const handleSelectResult = (taskId: number) => {
+  emit("update:selectedTaskId", taskId);
+};
+
+const formatParamValue = (value: any): string => {
+  if (typeof value === 'object') {
+    return JSON.stringify(value);
+  }
+  if (typeof value === 'string' && value.length > 30) {
+    return value.substring(0, 27) + '...';
+  }
+  return String(value);
 };
 </script>
 
