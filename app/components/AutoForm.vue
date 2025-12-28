@@ -85,72 +85,7 @@ const emit = defineEmits<{
 const formRef = ref();
 const formData = ref<Record<string, any>>({});
 
-// Initialize form data when schema or initial values change
-watch(
-  () => [props.modelValue, props.schema, props.mode],
-  () => {
-    if (props.schema) {
-      initializeFormData();
-    }
-  },
-  { immediate: true, deep: true }
-);
-
-// Emit changes to parent
-watch(
-  formData,
-  (newValue) => {
-    emit("update:modelValue", newValue);
-  },
-  { deep: true }
-);
-
-const initializeFormData = () => {
-  const data: Record<string, any> = {};
-
-  if (props.schema && props.schema.properties) {
-    for (const [propName, propSchema] of Object.entries(
-      props.schema.properties
-    )) {
-      const schema = propSchema as any;
-
-      // Check if there's a value in modelValue
-      if (props.modelValue && props.modelValue[propName] !== undefined) {
-        data[propName] = props.modelValue[propName];
-      } else if (schema.default !== undefined) {
-        // Use schema defaults based on mode
-        if (props.mode === "paramGrid") {
-          // For paramGrid mode, expect arrays
-          data[propName] = Array.isArray(schema.default)
-            ? [...schema.default]
-            : [schema.default];
-        } else {
-          // For parameters mode, extract single values
-          data[propName] = Array.isArray(schema.default)
-            ? schema.default[0]
-            : schema.default;
-        }
-      } else {
-        // Create default value based on mode and type
-        if (props.mode === "paramGrid") {
-          data[propName] = [];
-        } else {
-          const itemType = getItemType(schema);
-          if (itemType === "boolean") {
-            data[propName] = false;
-          } else if (itemType === "number" || itemType === "integer") {
-            data[propName] = 0;
-          } else {
-            data[propName] = "";
-          }
-        }
-      }
-    }
-  }
-
-  formData.value = data;
-};
-
+// Helper functions - must be defined before use
 const formatFieldLabel = (fieldName: string): string => {
   // Convert snake_case or camelCase to Title Case
   return fieldName
@@ -203,6 +138,72 @@ const getDefaultValue = (propSchema: any): any => {
   }
   return "";
 };
+
+const initializeFormData = () => {
+  const data: Record<string, any> = {};
+
+  if (props.schema && props.schema.properties) {
+    for (const [propName, propSchema] of Object.entries(
+      props.schema.properties
+    )) {
+      const schema = propSchema as any;
+
+      // Check if there's a value in modelValue
+      if (props.modelValue && props.modelValue[propName] !== undefined) {
+        data[propName] = props.modelValue[propName];
+      } else if (schema.default !== undefined) {
+        // Use schema defaults based on mode
+        if (props.mode === "paramGrid") {
+          // For paramGrid mode, expect arrays
+          data[propName] = Array.isArray(schema.default)
+            ? [...schema.default]
+            : [schema.default];
+        } else {
+          // For parameters mode, extract single values
+          data[propName] = Array.isArray(schema.default)
+            ? schema.default[0]
+            : schema.default;
+        }
+      } else {
+        // Create default value based on mode and type
+        if (props.mode === "paramGrid") {
+          data[propName] = [];
+        } else {
+          const itemType = getItemType(schema);
+          if (itemType === "boolean") {
+            data[propName] = false;
+          } else if (itemType === "number" || itemType === "integer") {
+            data[propName] = 0;
+          } else {
+            data[propName] = "";
+          }
+        }
+      }
+    }
+  }
+
+  formData.value = data;
+};
+
+// Initialize form data when schema or initial values change
+watch(
+  () => [props.modelValue, props.schema, props.mode],
+  () => {
+    if (props.schema) {
+      initializeFormData();
+    }
+  },
+  { immediate: true, deep: true }
+);
+
+// Emit changes to parent
+watch(
+  formData,
+  (newValue) => {
+    emit("update:modelValue", newValue);
+  },
+  { deep: true }
+);
 
 const validate = async () => {
   return await formRef.value?.validate();
