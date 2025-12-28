@@ -4,9 +4,9 @@ import { readFile } from "fs/promises";
 import { resolve } from "path";
 
 export default defineEventHandler(async (event) => {
-  const taskId = getRouterParam(event, "taskId");
+  const id = getRouterParam(event, "id");
 
-  if (!taskId) {
+  if (!id) {
     throw createError({
       statusCode: 400,
       message: "Task ID is required",
@@ -14,11 +14,13 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
+    const taskId = parseInt(id);
+    
     // Get task info
     const [task] = await db
       .select()
       .from(schema.tasks)
-      .where(eq(schema.tasks.taskId, taskId))
+      .where(eq(schema.tasks.id, taskId))
       .limit(1);
 
     if (!task) {
@@ -29,7 +31,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // Only allow downloading completed prediction tasks
-    if (task.type !== "prediction") {
+    if (task.type !== "predict") {
       throw createError({
         statusCode: 400,
         message: "Only prediction task results can be downloaded",
@@ -43,7 +45,10 @@ export default defineEventHandler(async (event) => {
       });
     }
 
-    if (!task.outputFile) {
+    const result: any = task.result || {};
+    const outputFile = result.outputFile || (task.parameter as any)?.outputFile;
+
+    if (!outputFile) {
       throw createError({
         statusCode: 404,
         message: "Output file not found",
@@ -51,9 +56,9 @@ export default defineEventHandler(async (event) => {
     }
 
     // Read the file
-    const filePath = resolve(task.outputFile);
+    const filePath = resolve(outputFile);
     const fileBuffer = await readFile(filePath);
-    const fileName = task.outputFile.split(/[\\/]/).pop() || "predictions.xlsx";
+    const fileName = outputFile.split(/[\\/]/).pop() || "predictions.xlsx";
 
     // Set response headers for file download
     setResponseHeaders(event, {
