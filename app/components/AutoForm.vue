@@ -66,7 +66,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 
 const { t } = useI18n();
 
@@ -84,6 +84,7 @@ const emit = defineEmits<{
 
 const formRef = ref();
 const formData = ref<Record<string, any>>({});
+const isInitializing = ref(false);
 
 // Helper functions - must be defined before use
 const formatFieldLabel = (fieldName: string): string => {
@@ -140,6 +141,7 @@ const getDefaultValue = (propSchema: any): any => {
 };
 
 const initializeFormData = () => {
+  isInitializing.value = true;
   const data: Record<string, any> = {};
 
   if (props.schema && props.schema.properties) {
@@ -183,6 +185,10 @@ const initializeFormData = () => {
   }
 
   formData.value = data;
+  // Use nextTick to ensure the update is complete before allowing emissions
+  nextTick(() => {
+    isInitializing.value = false;
+  });
 };
 
 // Initialize form data when schema or initial values change
@@ -196,11 +202,13 @@ watch(
   { immediate: true, deep: true }
 );
 
-// Emit changes to parent
+// Emit changes to parent (only when not initializing)
 watch(
   formData,
   (newValue) => {
-    emit("update:modelValue", newValue);
+    if (!isInitializing.value) {
+      emit("update:modelValue", newValue);
+    }
   },
   { deep: true }
 );

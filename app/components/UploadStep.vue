@@ -6,29 +6,31 @@
     <div v-if="!showColumnSelection" class="flex flex-col gap-4">
       <!-- Dataset Selection -->
       <a-card :title="$t('datasets.useExistingDataset')" class="mb-4">
-        <a-select
-          v-model:value="selectedDatasetId"
-          :placeholder="$t('datasets.selectDatasetPlaceholder')"
-          size="large"
-          style="width: 100%"
-          :loading="isLoadingDatasets"
-          show-search
-          :filter-option="filterDatasetOption"
-          @change="handleDatasetSelected"
-        >
-          <a-select-option
-            v-for="dataset in datasets"
-            :key="dataset.datasetId"
-            :value="dataset.datasetId"
+        <ClientOnly>
+          <a-select
+            v-model:value="selectedDatasetId"
+            :placeholder="$t('datasets.selectDatasetPlaceholder')"
+            size="large"
+            style="width: 100%"
+            :loading="isLoadingDatasets"
+            show-search
+            :filter-option="filterDatasetOption"
+            @change="handleDatasetSelected"
           >
-            <div class="flex justify-between items-center">
-              <span>{{ dataset.name }}</span>
-              <a-tag color="blue" class="ml-2"
-                >{{ dataset.rowCount }} {{ $t("datasets.rows") }}</a-tag
-              >
-            </div>
-          </a-select-option>
-        </a-select>
+            <a-select-option
+              v-for="dataset in datasets"
+              :key="dataset.datasetId"
+              :value="dataset.datasetId"
+            >
+              <div class="flex justify-between items-center">
+                <span>{{ dataset.name }}</span>
+                <a-tag color="blue" class="ml-2"
+                  >{{ dataset.rowCount }} {{ $t("datasets.rows") }}</a-tag
+                >
+              </div>
+            </a-select-option>
+          </a-select>
+        </ClientOnly>
       </a-card>
 
       <!-- Divider -->
