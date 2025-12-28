@@ -2,6 +2,7 @@
   <div class="array-input">
     <div class="flex gap-2 mb-2">
       <a-input
+        v-if="props.itemType !== 'boolean'"
         v-model:value="inputValue"
         :placeholder="placeholder"
         :type="inputType"
@@ -86,7 +87,7 @@ const inputType = computed(() => {
 });
 
 const handleAdd = () => {
-  if (!inputValue.value && props.itemType !== "boolean") return;
+  if (!inputValue.value) return;
 
   let parsedValue: any;
   try {
@@ -102,9 +103,6 @@ const handleAdd = () => {
         if (props.itemType === "integer") {
           parsedValue = Math.floor(parsedValue);
         }
-        break;
-      case "boolean":
-        parsedValue = inputValue.value.toLowerCase() === "true";
         break;
       default:
         parsedValue = inputValue.value;

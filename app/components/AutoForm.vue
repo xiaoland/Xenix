@@ -112,9 +112,10 @@ const initializeFormData = () => {
     )) {
       const schema = propSchema as any;
       
-      // Use existing value if available
-      if (formData.value[propName] !== undefined) {
-        data[propName] = formData.value[propName];
+      // Use existing value if available (but not if it's explicitly undefined or null)
+      const existingValue = formData.value[propName];
+      if (existingValue !== undefined && existingValue !== null) {
+        data[propName] = existingValue;
         continue;
       }
       
