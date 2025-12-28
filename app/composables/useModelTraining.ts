@@ -54,6 +54,12 @@ class ManualTrainStrategy implements TrainingStrategy {
   }
 }
 
+/**
+ * Training strategy instances (singleton pattern)
+ */
+const autoTuneStrategy = new AutoTuneStrategy();
+const manualTrainStrategy = new ManualTrainStrategy();
+
 export function useModelTraining() {
   const { t } = useI18n();
   const isTuning = ref(false);
@@ -62,9 +68,7 @@ export function useModelTraining() {
    * Get the appropriate training strategy
    */
   const getTrainingStrategy = (trainingType: TrainingType): TrainingStrategy => {
-    return trainingType === "auto" 
-      ? new AutoTuneStrategy() 
-      : new ManualTrainStrategy();
+    return trainingType === "auto" ? autoTuneStrategy : manualTrainStrategy;
   };
 
   /**

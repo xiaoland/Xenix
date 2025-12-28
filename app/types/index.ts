@@ -32,8 +32,8 @@ export interface TuningResult {
   model: string;
   params?: Record<string, any>;
   metrics?: TuningMetrics;
-  status?: string;
-  trainingType?: string;
+  status?: TaskStatus;
+  trainingType?: TrainingType;
   createdAt?: string | Date;
 }
 

@@ -238,15 +238,20 @@ const fetchTuningResults = async () => {
     );
 
     const validResults = results
-      .filter((r) => r !== null && r.success && r.results)
+      .filter((r): r is NonNullable<typeof r> => r !== null && r.success && r.results)
       .map((r) => {
-        const result = r!.results;
+        const result = r.results;
         const model = result.model || Object.keys(tuningTasks.value).find(
           (k) => tuningTasks.value[k] === taskIds[results.indexOf(r)]
         );
         
+        if (!model) {
+          console.warn("Model not found for result:", result);
+          return null;
+        }
+        
         return {
-          model: model!,
+          model,
           params: result.params,
           metrics: {
             mse_train: result.metrics?.mse_train,
@@ -256,9 +261,10 @@ const fetchTuningResults = async () => {
             mae_test: result.metrics?.mae_test,
             r2_test: result.metrics?.r2_test,
           },
-          status: tuningStatus.value[model!] || "completed",
+          status: tuningStatus.value[model] || "completed",
         };
-      });
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
 
     tuningResults.value = validResults;
   } catch (error) {

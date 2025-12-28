@@ -61,7 +61,7 @@ export class ApiService {
     return await $fetch(`/api/task/${taskId}`);
   }
 
-  static async fetchTaskLogs(taskId: number): Promise<{ success: boolean; logs: any[] }> {
+  static async fetchTaskLogs(taskId: number): Promise<{ success: boolean; logs: TaskLog[] }> {
     return await $fetch(`/api/obsrv/${taskId}`);
   }
 
