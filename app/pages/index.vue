@@ -49,7 +49,7 @@
             @start-tuning="startTuning"
             @start-single-tune="startSingleModelTuning"
             @continue="nextStep"
-            @back="resetUpload"
+            @back="resetUploadAndClearData"
           />
         </div>
 
@@ -70,60 +70,42 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
 import { message } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
+import { useWorkflowState } from "../composables/useWorkflowState";
 import { useTaskPolling } from "../composables/useTaskPolling";
 import { useDatasetRegistration } from "../composables/useDatasetRegistration";
 import { useModelTraining } from "../composables/useModelTraining";
 import { ApiService } from "../services/apiService";
-import type { ModelOption, TuningResult, PredictionTask } from "../types";
+import { AVAILABLE_MODELS } from "../constants/models";
 
 const { t } = useI18n();
 
-// Step management
-const currentStep = ref(0);
-const trainingFileList = ref([]);
-const predictionFileList = ref([]);
-const hasUploadedData = ref(false);
-
 // Available regression models
-const availableModels: ModelOption[] = [
-  {
-    label: "Linear Regression",
-    value: "regression.linear_regression_hyperparameter_tuning",
-  },
-  { label: "Ridge", value: "regression.ridge" },
-  { label: "Lasso", value: "regression.lasso" },
-  { label: "Bayesian Ridge", value: "regression.bayesian_ridge_regression" },
-  { label: "KNN", value: "regression.k_nearest_neighbors" },
-  { label: "Decision Tree", value: "regression.regression_decision_tree" },
-  { label: "Random Forest", value: "regression.random_forest" },
-  { label: "GBDT", value: "regression.gbdt" },
-  { label: "AdaBoost", value: "regression.adaboost" },
-  { label: "XGBoost", value: "regression.xgboost" },
-  { label: "LightGBM", value: "regression.lightgbm" },
-  { label: "Polynomial", value: "regression.polynomial_regression" },
-];
+const availableModels = AVAILABLE_MODELS;
 
-// Model and column selection
-const selectedModels = ref<string[]>([]);
-const selectedFeatureColumns = ref<string[]>([]);
-const selectedTargetColumn = ref<string>("");
-const selectedBestModel = ref<string | null>(null);
-const selectedTaskId = ref<number | null>(null);
+// Workflow state
+const {
+  currentStep,
+  trainingFileList,
+  predictionFileList,
+  hasUploadedData,
+  selectedModels,
+  selectedFeatureColumns,
+  selectedTargetColumn,
+  selectedBestModel,
+  selectedTaskId,
+  isPredicting,
+  predictionTask,
+  activeLogTab,
+  tuningResults,
+  nextStep,
+  prevStep,
+  resetAll,
+  resetUpload,
+} = useWorkflowState();
 
-// Prediction state
-const isPredicting = ref(false);
-const predictionTask = ref<PredictionTask | null>(null);
-
-// Logs state
-const activeLogTab = ref<string>("");
-
-// Tuning results
-const tuningResults = ref<TuningResult[]>([]);
-
-// Use composables
+// Task polling
 const {
   tuningStatus,
   tuningTasks,
@@ -134,9 +116,11 @@ const {
   clearTasks,
 } = useTaskPolling();
 
+// Dataset registration
 const { uploadedDatasetId, registerFileAsDataset, clearDatasetId } =
   useDatasetRegistration();
 
+// Model training
 const { isTuning, executeTrain } = useModelTraining();
 
 const handleColumnSelection = ({
@@ -155,16 +139,10 @@ const handleColumnSelection = ({
   message.success(t("messages.readyToTrain", { count: featureColumns.length }));
 };
 
-const resetUpload = () => {
-  hasUploadedData.value = false;
-  trainingFileList.value = [];
-  selectedModels.value = [];
-  selectedFeatureColumns.value = [];
-  selectedTargetColumn.value = "";
+const resetUploadAndClearData = () => {
+  resetUpload();
   clearDatasetId();
   clearTasks();
-  tuningResults.value = [];
-  selectedBestModel.value = null;
 };
 
 const startTuning = async () => {
@@ -354,32 +332,9 @@ const startPrediction = async () => {
   }
 };
 
-const nextStep = () => {
-  if (currentStep.value < 1) {
-    currentStep.value++;
-  }
-};
-
-const prevStep = () => {
-  if (currentStep.value > 0) {
-    currentStep.value--;
-  }
-};
-
 const reset = () => {
-  currentStep.value = 0;
-  trainingFileList.value = [];
-  predictionFileList.value = [];
-  hasUploadedData.value = false;
-  selectedModels.value = [];
-  selectedFeatureColumns.value = [];
-  selectedTargetColumn.value = "";
+  resetAll();
   clearDatasetId();
   clearTasks();
-  tuningResults.value = [];
-  isPredicting.value = false;
-  selectedBestModel.value = null;
-  predictionTask.value = null;
-  activeLogTab.value = "";
 };
 </script>
