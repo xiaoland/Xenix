@@ -3,31 +3,35 @@ import { eq } from 'drizzle-orm';
 
 export default defineEventHandler(async (event) => {
   try {
-    const taskId = getRouterParam(event, 'taskId');
+    const id = getRouterParam(event, 'id');
 
-    if (!taskId) {
+    if (!id) {
       throw createError({
         statusCode: 400,
         message: 'Task ID is required',
       });
     }
 
-    // Fetch model results for this task
-    const results = await db
-      .select()
-      .from(schema.modelResults)
-      .where(eq(schema.modelResults.taskId, taskId));
+    const taskId = parseInt(id);
 
-    if (results.length === 0) {
+    // Fetch task with results
+    const [task] = await db
+      .select()
+      .from(schema.tasks)
+      .where(eq(schema.tasks.id, taskId))
+      .limit(1);
+
+    if (!task) {
       return {
         success: true,
         results: null,
       };
     }
 
+    // Return task result field
     return {
       success: true,
-      results: results[0], // Return first result (should only be one per task)
+      results: task.result || null,
     };
   } catch (error) {
     console.error('Results fetch error:', error);

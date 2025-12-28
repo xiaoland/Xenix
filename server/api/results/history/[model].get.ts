@@ -1,9 +1,9 @@
 import { db, schema } from '../../../database';
-import { eq } from 'drizzle-orm';
+import { eq, and, or } from 'drizzle-orm';
 
 /**
  * API endpoint to fetch all training history for a specific model
- * Includes both auto-tune results and manual training results with task status
+ * Queries tasks table where type is 'auto-tune' or 'train' and parameter.model matches
  */
 export default defineEventHandler(async (event) => {
   try {
@@ -16,29 +16,48 @@ export default defineEventHandler(async (event) => {
       });
     }
 
-    // Fetch all results for this model with task status, ordered by creation time
-    const results = await db
-      .select({
-        id: schema.modelResults.id,
-        taskId: schema.modelResults.taskId,
-        model: schema.modelResults.model,
-        params: schema.modelResults.params,
-        parentTaskId: schema.modelResults.parentTaskId,
-        trainingType: schema.modelResults.trainingType,
-        mse_train: schema.modelResults.mse_train,
-        mae_train: schema.modelResults.mae_train,
-        r2_train: schema.modelResults.r2_train,
-        mse_test: schema.modelResults.mse_test,
-        mae_test: schema.modelResults.mae_test,
-        r2_test: schema.modelResults.r2_test,
-        createdAt: schema.modelResults.createdAt,
-        status: schema.tasks.status,
-      })
-      .from(schema.modelResults)
-      .leftJoin(schema.tasks, eq(schema.modelResults.taskId, schema.tasks.taskId))
-      .where(eq(schema.modelResults.model, model))
-      .orderBy(schema.modelResults.createdAt)
+    // Fetch all training tasks for this model, ordered by creation time
+    const tasks = await db
+      .select()
+      .from(schema.tasks)
+      .where(
+        and(
+          or(
+            eq(schema.tasks.type, 'auto-tune'),
+            eq(schema.tasks.type, 'train')
+          )
+        )
+      )
+      .orderBy(schema.tasks.createdAt)
       .all();
+
+    // Filter by model in parameter field and format results
+    const results = tasks
+      .filter((task) => {
+        const param: any = task.parameter || {};
+        return param.model === model;
+      })
+      .map((task) => {
+        const param: any = task.parameter || {};
+        const result: any = task.result || {};
+        
+        return {
+          id: task.id,
+          taskId: task.id, // For backward compatibility
+          model: param.model,
+          params: result.params,
+          parentTaskId: param.parentTaskId,
+          trainingType: param.trainingType || 'auto',
+          mse_train: result.metrics?.mse_train,
+          mae_train: result.metrics?.mae_train,
+          r2_train: result.metrics?.r2_train,
+          mse_test: result.metrics?.mse_test,
+          mae_test: result.metrics?.mae_test,
+          r2_test: result.metrics?.r2_test,
+          createdAt: task.createdAt,
+          status: task.status,
+        };
+      });
 
     return {
       success: true,

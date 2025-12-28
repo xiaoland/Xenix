@@ -59,7 +59,7 @@ const props = defineProps<{
   availableModels: Array<{ label: string; value: string }>;
   selectedModels: string[];
   tuningStatus: Record<string, string>;
-  tuningTasks: Record<string, string>;
+  tuningTasks: Record<string, number>;
   isTuning: boolean;
   tuningResults: any[];
   taskLogs: Record<string, any[]>;
@@ -69,7 +69,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   "start-tuning": [];
-  "start-single-tune": [model: string, paramGrid?: Record<string, any>, trainingType?: string, parentTaskId?: string];
+  "start-single-tune": [model: string, paramGrid?: Record<string, any>, trainingType?: string, parentTaskId?: number];
   back: [];
   continue: [];
   "update:selectedModels": [models: string[]];

@@ -28,42 +28,27 @@ export const datasets = sqliteTable('datasets', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 });
 
+// Consolidated tasks table
+// Type values: 'auto-tune', 'train', 'predict'
 export const tasks = sqliteTable('tasks', {
   id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
-  taskId: text('task_id').notNull().unique(),
-  type: text('type').notNull(),
+  type: text('type').notNull(), // 'auto-tune', 'train', 'predict'
+  parameter: text('parameter', { mode: 'json' }), // Task parameters as JSON object
+  result: text('result', { mode: 'json' }), // Task results/metrics as JSON object
   status: text('status').notNull().default('pending'),
-  model: text('model'),
-  datasetId: text('dataset_id'),
-  inputFile: text('input_file'),
-  outputFile: text('output_file'),
   error: text('error'),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
-});
-
-export const modelResults = sqliteTable('model_results', {
-  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
-  taskId: text('task_id').notNull(),
-  model: text('model').notNull(),
-  params: text('params', { mode: 'json' }),
-  parentTaskId: text('parent_task_id'), // Reference to parent auto-tune task (null for auto-tune, set for manual trains)
-  trainingType: text('training_type').default('auto'), // 'auto' or 'manual'
-  mse_train: text('mse_train'),
-  mae_train: text('mae_train'),
-  r2_train: text('r2_train'),
-  mse_test: text('mse_test'),
-  mae_test: text('mae_test'),
-  r2_test: text('r2_test'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  startedAt: integer('started_at', { mode: 'timestamp' }),
+  endAt: integer('end_at', { mode: 'timestamp' }),
 });
 
 // OpenTelemetry-compliant logs table
+// trace_id format: task.{task.id} for task-related logs
 export const logs = sqliteTable('logs', {
   id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
   timestamp: integer('timestamp', { mode: 'number' }).notNull(),
   observedTimestamp: integer('observed_timestamp', { mode: 'number' }).notNull(),
-  traceId: text('trace_id').notNull(),
+  traceId: text('trace_id').notNull(), // Format: task.{task.id}
   spanId: text('span_id'),
   severityText: text('severity_text').notNull(),
   severityNumber: integer('severity_number').notNull(),

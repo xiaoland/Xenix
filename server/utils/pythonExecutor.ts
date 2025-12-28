@@ -1,11 +1,12 @@
 import { spawn } from 'child_process';
 import { db, schema } from '../database';
 import { eq } from 'drizzle-orm';
+import { generateTraceId } from './taskUtils';
 
 export interface PythonTaskOptions {
   script: string;
   stdinData: any; // JSON data to pass via stdin
-  taskId: string;
+  taskId: number; // Changed from string to number (tasks.id)
   cwd?: string;
 }
 
@@ -19,15 +20,16 @@ export async function executePythonTask(options: PythonTaskOptions): Promise<voi
   const { script, stdinData, taskId, cwd } = options;
   
   let taskCompleted = false; // Flag to prevent race conditions
+  const traceId = generateTraceId(taskId);
   
   try {
-    // Update task status to running
+    // Update task status to running and set startedAt
     await db.update(schema.tasks)
       .set({ 
         status: 'running',
-        updatedAt: new Date()
+        startedAt: new Date()
       })
-      .where(eq(schema.tasks.taskId, taskId));
+      .where(eq(schema.tasks.id, taskId));
 
     // Use python3 explicitly or from environment variable
     const pythonCmd = process.env.PYTHON_EXECUTABLE || 'python3';
@@ -63,7 +65,7 @@ export async function executePythonTask(options: PythonTaskOptions): Promise<voi
             await handleStructuredOutput(parsed, taskId);
           } catch {
             // Not JSON, just log as plain text
-            console.log(`[${taskId}] ${line}`);
+            console.log(`[${traceId}] ${line}`);
           }
         }
       }
@@ -85,7 +87,7 @@ export async function executePythonTask(options: PythonTaskOptions): Promise<voi
             await handleStructuredOutput(parsed, taskId);
           } catch {
             // Not JSON, just log as error
-            console.error(`[${taskId}] ${line}`);
+            console.error(`[${traceId}] ${line}`);
           }
         }
       }
@@ -100,22 +102,22 @@ export async function executePythonTask(options: PythonTaskOptions): Promise<voi
         await db.update(schema.tasks)
           .set({ 
             status: 'completed',
-            updatedAt: new Date()
+            endAt: new Date()
           })
-          .where(eq(schema.tasks.taskId, taskId));
+          .where(eq(schema.tasks.id, taskId));
         
-        console.log(`[${taskId}] Task completed successfully`);
+        console.log(`[${traceId}] Task completed successfully`);
       } else {
         // Task failed
         await db.update(schema.tasks)
           .set({ 
             status: 'failed',
             error: stderrBuffer || `Process exited with code ${code}`,
-            updatedAt: new Date()
+            endAt: new Date()
           })
-          .where(eq(schema.tasks.taskId, taskId));
+          .where(eq(schema.tasks.id, taskId));
         
-        console.error(`[${taskId}] Task failed with code ${code}`);
+        console.error(`[${traceId}] Task failed with code ${code}`);
       }
     });
 
@@ -128,11 +130,11 @@ export async function executePythonTask(options: PythonTaskOptions): Promise<voi
         .set({ 
           status: 'failed',
           error: error.message,
-          updatedAt: new Date()
+          endAt: new Date()
         })
-        .where(eq(schema.tasks.taskId, taskId));
+        .where(eq(schema.tasks.id, taskId));
       
-      console.error(`[${taskId}] Failed to start task:`, error);
+      console.error(`[${traceId}] Failed to start task:`, error);
     });
 
   } catch (error) {
@@ -144,19 +146,21 @@ export async function executePythonTask(options: PythonTaskOptions): Promise<voi
       .set({ 
         status: 'failed',
         error: error instanceof Error ? error.message : 'Unknown error',
-        updatedAt: new Date()
+        endAt: new Date()
       })
-      .where(eq(schema.tasks.taskId, taskId));
+      .where(eq(schema.tasks.id, taskId));
     
     throw error;
   }
 }
 
-async function handleStructuredOutput(output: StructuredOutput, taskId: string) {
+async function handleStructuredOutput(output: StructuredOutput, taskId: number) {
+  const traceId = generateTraceId(taskId);
+  
   try {
     switch (output.type) {
       case 'log':
-        // Store log in database
+        // Store log in database with task.{id} trace format
         await storeLog(output.data, taskId);
         break;
       
@@ -165,49 +169,56 @@ async function handleStructuredOutput(output: StructuredOutput, taskId: string) 
         await db.update(schema.tasks)
           .set({
             status: output.data.status,
-            error: output.data.error || null,
-            updatedAt: new Date()
+            error: output.data.error || null
           })
-          .where(eq(schema.tasks.taskId, taskId));
+          .where(eq(schema.tasks.id, taskId));
         break;
       
       case 'result':
-        // Store model result
-        await db.insert(schema.modelResults).values({
-          taskId: taskId,
-          model: output.data.model,
-          params: output.data.params,
-          parentTaskId: output.data.parentTaskId || null,
-          trainingType: output.data.trainingType || 'auto',
-          mse_train: output.data.metrics.mse_train?.toString(),
-          mae_train: output.data.metrics.mae_train?.toString(),
-          r2_train: output.data.metrics.r2_train?.toString(),
-          mse_test: output.data.metrics.mse_test?.toString(),
-          mae_test: output.data.metrics.mae_test?.toString(),
-          r2_test: output.data.metrics.r2_test?.toString(),
-          createdAt: new Date()
-        });
+        // Store result in tasks.result field as JSON
+        await db.update(schema.tasks)
+          .set({
+            result: {
+              model: output.data.model,
+              params: output.data.params,
+              metrics: output.data.metrics,
+              parentTaskId: output.data.parentTaskId || null,
+              trainingType: output.data.trainingType || 'auto'
+            }
+          })
+          .where(eq(schema.tasks.id, taskId));
         break;
       
       // Note: comparison_result is deprecated (no longer used)
       // Evaluation metrics are now stored directly from tuning
         
       case 'prediction_result':
-        // Log prediction completion (file already saved by Python script)
-        console.log(`[${taskId}] Prediction completed: ${output.data.num_predictions} predictions`);
+        // Store prediction result in tasks.result field
+        await db.update(schema.tasks)
+          .set({
+            result: {
+              num_predictions: output.data.num_predictions,
+              outputFile: output.data.output_file
+            }
+          })
+          .where(eq(schema.tasks.id, taskId));
+        
+        console.log(`[${traceId}] Prediction completed: ${output.data.num_predictions} predictions`);
         break;
     }
   } catch (error) {
-    console.error(`[${taskId}] Error handling structured output:`, error);
+    console.error(`[${traceId}] Error handling structured output:`, error);
   }
 }
 
-async function storeLog(logData: any, taskId: string) {
+async function storeLog(logData: any, taskId: number) {
+  const traceId = generateTraceId(taskId);
+  
   try {
     await db.insert(schema.logs).values({
       timestamp: logData.timestamp,
       observedTimestamp: logData.observed_timestamp,
-      traceId: taskId,
+      traceId: traceId, // Use task.{id} format
       spanId: logData.span_id || null,
       severityText: logData.severity_text,
       severityNumber: logData.severity_number,
@@ -217,7 +228,7 @@ async function storeLog(logData: any, taskId: string) {
       createdAt: new Date()
     });
   } catch (error) {
-    console.error(`[${taskId}] Error storing log:`, error);
+    console.error(`[${traceId}] Error storing log:`, error);
   }
 }
 
