@@ -65,6 +65,7 @@
     "back": "重选数据",
     "continue": "预测",
     "model": "模型",
+    "tuneType": "调优类型及参数",
     "tuning": "调整",
     "metrics": "指标",
     "startTune": "开始调整",
@@ -92,6 +93,14 @@
       "arrayPlaceholder": "输入值并按添加",
       "emptyArray": "无值。使用上方输入添加值。",
       "editButton": "编辑"
+    },
+    "manualTrainDialog": {
+      "title": "手动训练 - {model}",
+      "description": "输入特定参数值以手动训练模型。",
+      "loading": "加载参数模式...",
+      "noDescription": "无可用描述",
+      "defaultValue": "默认值",
+      "trainButton": "训练模型"
     }
   },
   "prediction": {
@@ -161,6 +170,12 @@
   "common": {
     "na": "不可用",
     "add": "添加"
+  },
+  "autoForm": {
+    "loading": "加载表单模式...",
+    "noDescription": "无可用描述",
+    "defaultValue": "默认值",
+    "arrayPlaceholder": "输入值并按添加"
   },
   "navigation": {
     "home": "首页",
