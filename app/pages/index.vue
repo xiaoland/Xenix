@@ -40,14 +40,15 @@
             v-model:active-log-tab="activeLogTab"
             v-model:selected-best-model="selectedBestModel"
             v-model:selected-task-id="selectedTaskId"
+            v-model:tuning-status="tuningStatus"
+            v-model:tuning-tasks="tuningTasks"
+            v-model:tuning-results="tuningResults"
+            v-model:is-tuning="isTuning"
             :available-models="availableModels"
-            :tuning-status="tuningStatus"
-            :tuning-tasks="tuningTasks"
-            :is-tuning="isTuning"
-            :tuning-results="tuningResults"
             :task-logs="taskLogs"
-            @start-tuning="startTuning"
-            @start-single-tune="startSingleModelTuning"
+            :uploaded-dataset-id="uploadedDatasetId"
+            :feature-columns="selectedFeatureColumns"
+            :target-column="selectedTargetColumn"
             @continue="nextStep"
             @back="resetUpload"
           />
@@ -57,11 +58,13 @@
         <PredictionStep
           v-if="currentStep === 1"
           v-model="predictionFileList"
+          v-model:is-predicting="isPredicting"
+          v-model:prediction-task="predictionTask"
           :best-model="selectedBestModel"
           :selected-task-id="selectedTaskId"
-          :is-predicting="isPredicting"
-          :prediction-task="predictionTask"
-          @predict="startPrediction"
+          :training-dataset-id="uploadedDatasetId"
+          :feature-columns="selectedFeatureColumns"
+          :target-column="selectedTargetColumn"
           @back="prevStep"
           @reset="reset"
         />
@@ -112,38 +115,12 @@ const selectedTargetColumn = ref<string>("");
 const isTuning = ref(false);
 const isPredicting = ref(false);
 const selectedBestModel = ref<string | null>(null);
-const selectedTaskId = ref<number | null>(null); // Selected result task ID
+const selectedTaskId = ref<number | null>(null);
 const predictionTask = ref<any>(null);
 
 // Logs state
 const taskLogs = ref<Record<string, any[]>>({});
 const activeLogTab = ref<string>("");
-
-const fetchTaskLogs = async (taskId: number) => {
-  try {
-    const response = await $fetch(`/api/obsrv/${taskId}`);
-    if (response.success) {
-      taskLogs.value[taskId] = response.logs.reverse();
-    }
-  } catch (error) {
-    console.error(`Failed to fetch logs for ${taskId}:`, error);
-  }
-};
-
-const pollTaskLogs = (taskId: number) => {
-  fetchTaskLogs(taskId);
-
-  const interval = setInterval(async () => {
-    await fetchTaskLogs(taskId);
-
-    const isComplete = Object.values(tuningStatus.value).every(
-      (status) => status === "completed" || status === "failed"
-    );
-    if (isComplete) {
-      clearInterval(interval);
-    }
-  }, 3000);
-};
 
 const handleColumnSelection = ({
   featureColumns,
@@ -173,351 +150,6 @@ const resetUpload = () => {
   tuningResults.value = [];
   selectedBestModel.value = null;
   selectedTaskId.value = null;
-};
-
-const startTuning = async () => {
-  if (!uploadedDatasetId.value && trainingFileList.value.length === 0) {
-    message.error(t("messages.uploadError"));
-    return;
-  }
-
-  if (
-    selectedFeatureColumns.value.length === 0 ||
-    !selectedTargetColumn.value
-  ) {
-    message.error(t("messages.columnSelectionError"));
-    return;
-  }
-
-  isTuning.value = true;
-
-  try {
-    // If uploading a new file, first register it as a dataset
-    let datasetIdToUse = uploadedDatasetId.value;
-
-    if (!uploadedDatasetId.value && trainingFileList.value.length > 0) {
-      // Auto-register the uploaded file as a dataset
-      const file = trainingFileList.value[0].originFileObj;
-      const timestamp = Date.now();
-      const datasetName = `Training Data - ${new Date().toLocaleString()}`;
-
-      const datasetFormData = new FormData();
-      datasetFormData.append("file", file);
-      datasetFormData.append("name", datasetName);
-      datasetFormData.append("description", "Auto-registered during training");
-
-      try {
-        const datasetResponse = await $fetch("/api/data", {
-          method: "POST",
-          body: datasetFormData,
-        });
-
-        if (datasetResponse.success) {
-          datasetIdToUse = datasetResponse.dataset.datasetId;
-          uploadedDatasetId.value = datasetIdToUse;
-          message.success("Training data registered as reusable dataset");
-        }
-      } catch (error) {
-        console.error("Failed to register dataset:", error);
-        // Continue with file upload if dataset registration fails
-      }
-    }
-
-    for (const modelValue of selectedModels.value) {
-      tuningStatus.value[modelValue] = "pending";
-
-      const formData = new FormData();
-
-      // Use dataset ID if available, otherwise upload file
-      if (datasetIdToUse) {
-        formData.append("datasetId", datasetIdToUse);
-      } else {
-        formData.append("file", trainingFileList.value[0].originFileObj);
-      }
-
-      formData.append("model", modelValue);
-      formData.append(
-        "featureColumns",
-        JSON.stringify(selectedFeatureColumns.value)
-      );
-      formData.append("targetColumn", selectedTargetColumn.value);
-
-      const response = await $fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (response.success) {
-        tuningTasks.value[modelValue] = response.taskId;
-        tuningStatus.value[modelValue] = "running";
-        activeLogTab.value = response.taskId.toString();
-
-        pollTaskStatus(response.taskId, modelValue);
-        pollTaskLogs(response.taskId);
-      }
-    }
-
-    message.success(t("messages.tuningStarted"));
-  } catch (error) {
-    message.error(t("messages.tuningFailed") + ": " + error.message);
-  } finally {
-    isTuning.value = false;
-  }
-};
-
-const startSingleModelTuning = async (
-  modelValue: string,
-  paramGrid?: Record<string, any>,
-  trainingType?: string,
-  parentTaskId?: number
-) => {
-  if (!uploadedDatasetId.value && trainingFileList.value.length === 0) {
-    message.error(t("messages.uploadError"));
-    return;
-  }
-
-  if (
-    selectedFeatureColumns.value.length === 0 ||
-    !selectedTargetColumn.value
-  ) {
-    message.error(t("messages.columnSelectionError"));
-    return;
-  }
-
-  isTuning.value = true;
-  tuningStatus.value[modelValue] = "pending";
-
-  try {
-    // If uploading a new file, first register it as a dataset
-    let datasetIdToUse = uploadedDatasetId.value;
-
-    if (!uploadedDatasetId.value && trainingFileList.value.length > 0) {
-      // Auto-register the uploaded file as a dataset
-      const file = trainingFileList.value[0].originFileObj;
-      const datasetName = `Training Data - ${new Date().toLocaleString()}`;
-
-      const datasetFormData = new FormData();
-      datasetFormData.append("file", file);
-      datasetFormData.append("name", datasetName);
-      datasetFormData.append("description", "Auto-registered during training");
-
-      try {
-        const datasetResponse = await $fetch("/api/data", {
-          method: "POST",
-          body: datasetFormData,
-        });
-
-        if (datasetResponse.success) {
-          datasetIdToUse = datasetResponse.dataset.datasetId;
-          uploadedDatasetId.value = datasetIdToUse;
-        }
-      } catch (error) {
-        console.error("Failed to register dataset:", error);
-      }
-    }
-
-    const formData = new FormData();
-
-    // Use dataset ID if available, otherwise upload file
-    if (datasetIdToUse) {
-      formData.append("datasetId", datasetIdToUse);
-    } else {
-      formData.append("file", trainingFileList.value[0].originFileObj);
-    }
-
-    formData.append("model", modelValue);
-    formData.append(
-      "featureColumns",
-      JSON.stringify(selectedFeatureColumns.value)
-    );
-    formData.append("targetColumn", selectedTargetColumn.value);
-
-    // Add param grid if provided
-    if (paramGrid) {
-      formData.append("paramGrid", JSON.stringify(paramGrid));
-    }
-
-    // Add training type and parent task ID
-    if (trainingType) {
-      formData.append("trainingType", trainingType);
-    }
-    if (parentTaskId) {
-      formData.append("parentTaskId", parentTaskId.toString());
-    }
-
-    const response = await $fetch("/api/upload", {
-      method: "POST",
-      body: formData,
-    });
-
-    if (response.success) {
-      tuningTasks.value[modelValue] = response.taskId;
-      tuningStatus.value[modelValue] = "running";
-      activeLogTab.value = response.taskId.toString();
-
-      pollTaskStatus(response.taskId, modelValue);
-      pollTaskLogs(response.taskId);
-
-      message.success(t("messages.tuningStarted"));
-    }
-  } catch (error) {
-    message.error(t("messages.tuningFailed") + ": " + error.message);
-    tuningStatus.value[modelValue] = "failed";
-  } finally {
-    isTuning.value = false;
-  }
-};
-
-const pollTaskStatus = async (taskId: number, modelValue?: string) => {
-  const maxAttempts = 120;
-  let attempts = 0;
-
-  while (attempts < maxAttempts) {
-    try {
-      const response = await $fetch(`/api/task/${taskId}`);
-
-      if (
-        modelValue &&
-        response.task.status !== tuningStatus.value[modelValue]
-      ) {
-        tuningStatus.value[modelValue] = response.task.status;
-      }
-
-      if (response.task.status === "completed") {
-        await fetchTuningResults();
-        return response;
-      }
-
-      if (response.task.status === "failed") {
-        return response;
-      }
-
-      attempts++;
-      if (attempts < maxAttempts) {
-        // Wait 5 seconds before next poll
-        await new Promise((resolve) => setTimeout(resolve, 5000));
-      }
-    } catch (error) {
-      console.error("Failed to poll task status:", error);
-      attempts++;
-      if (attempts < maxAttempts) {
-        // Wait 5 seconds before retry on error
-        await new Promise((resolve) => setTimeout(resolve, 5000));
-      }
-    }
-  }
-
-  return null; // Return null if max attempts reached
-};
-
-const fetchTuningResults = async () => {
-  try {
-    const taskIds = Object.values(tuningTasks.value);
-    const results = await Promise.all(
-      taskIds.map((taskId) =>
-        $fetch(`/api/results/${taskId}`).catch(() => null)
-      )
-    );
-
-    const validResults = results
-      .filter((r) => r !== null && r.success && r.results)
-      .map((r) => {
-        const result = r.results;
-        // Extract model from result
-        const model = result.model || Object.keys(tuningTasks.value).find(
-          (k) => tuningTasks.value[k] === taskIds[results.indexOf(r)]
-        );
-        
-        return {
-          model: model,
-          params: result.params,
-          mse_train: result.metrics?.mse_train,
-          mae_train: result.metrics?.mae_train,
-          r2_train: result.metrics?.r2_train,
-          mse_test: result.metrics?.mse_test,
-          mae_test: result.metrics?.mae_test,
-          r2_test: result.metrics?.r2_test,
-          status: tuningStatus.value[model] || "completed",
-        };
-      });
-
-    tuningResults.value = validResults;
-  } catch (error) {
-    console.error("Failed to fetch tuning results:", error);
-  }
-};
-
-const startPrediction = async () => {
-  // Use selectedTaskId if available, otherwise fall back to the old behavior
-  const taskIdToUse = selectedTaskId.value || tuningTasks.value[selectedBestModel.value];
-  
-  if (!taskIdToUse) {
-    message.error(t("messages.selectModelError"));
-    return;
-  }
-
-  if (predictionFileList.value.length === 0) {
-    message.error(t("messages.uploadPredictionError"));
-    return;
-  }
-
-  if (!uploadedDatasetId.value) {
-    message.error(t("messages.trainingDatasetError"));
-    return;
-  }
-
-  isPredicting.value = true;
-
-  try {
-    const formData = new FormData();
-    formData.append("file", predictionFileList.value[0].originFileObj);
-    formData.append("model", selectedBestModel.value);
-    formData.append("tuningTaskId", taskIdToUse.toString());
-    formData.append("trainingDatasetId", uploadedDatasetId.value);
-    formData.append(
-      "featureColumns",
-      JSON.stringify(selectedFeatureColumns.value)
-    );
-    formData.append("targetColumn", selectedTargetColumn.value);
-
-    const response = await $fetch("/api/predict", {
-      method: "POST",
-      body: formData,
-    });
-
-    if (response.success) {
-      predictionTask.value = { taskId: response.taskId, status: "running" };
-      message.success(t("messages.predictionStarted"));
-
-      const result = await pollTaskStatus(response.taskId);
-      console.log("Polling result:", result);
-
-      if (result && result.task.status === "completed") {
-        predictionTask.value.status = "completed";
-        // Get output file from task result or parameter
-        const taskResult: any = result.task.result || {};
-        const taskParameter: any = result.task.parameter || {};
-        predictionTask.value.outputFile = taskResult.outputFile || taskParameter.outputFile || response.outputFile;
-        predictionTask.value.taskId = result.task.id;
-        console.log("Updated predictionTask:", predictionTask.value);
-        message.success(
-          t("messages.predictionCompleted", {
-            path: predictionTask.value.outputFile,
-          })
-        );
-      } else if (result && result.task.status === "failed") {
-        predictionTask.value.status = "failed";
-        predictionTask.value.error = result.task.error;
-        message.error(
-          t("messages.predictionFailed", { error: result.task.error })
-        );
-      }
-    }
-  } catch (error) {
-    message.error(t("messages.predictionError") + ": " + error.message);
-  } finally {
-    isPredicting.value = false;
-  }
 };
 
 const nextStep = () => {

@@ -35,7 +35,7 @@
       block
       :loading="isPredicting"
       :disabled="fileList.length === 0"
-      @click="$emit('predict')"
+      @click="startPrediction"
     >
       <span class="i-mdi-chart-line mr-2" />
       {{ t("prediction.startPrediction") }}
@@ -65,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import type { UploadProps } from "ant-design-vue";
 import { message } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
@@ -74,17 +74,23 @@ const { t } = useI18n();
 
 const props = defineProps<{
   bestModel: string | null;
+  selectedTaskId: number | null;
   isPredicting: boolean;
   predictionTask: any;
+  trainingDatasetId: string;
+  featureColumns: string[];
+  targetColumn: string;
 }>();
 
-const fileList = defineModel<any[]>({ required: true });
-
-defineEmits<{
+const emit = defineEmits<{
   predict: [];
   back: [];
   reset: [];
+  "update:isPredicting": [value: boolean];
+  "update:predictionTask": [task: any];
 }>();
+
+const fileList = defineModel<any[]>({ required: true });
 
 const predictionMessage = computed(() => {
   if (!props.predictionTask) return "";
@@ -126,19 +132,145 @@ const beforeUpload: UploadProps["beforeUpload"] = (file) => {
   return false; // Prevent auto upload
 };
 
+// Business logic: Start prediction
+const startPrediction = async () => {
+  if (!props.selectedTaskId) {
+    message.error(t("messages.selectModelError"));
+    return;
+  }
+
+  if (fileList.value.length === 0) {
+    message.error(t("messages.uploadPredictionError"));
+    return;
+  }
+
+  if (!props.trainingDatasetId) {
+    message.error(t("messages.trainingDatasetError"));
+    return;
+  }
+
+  emit("update:isPredicting", true);
+
+  try {
+    // First, fetch the trained parameters from the selected task
+    const taskResponse = await $fetch(`/api/results/${props.selectedTaskId}`);
+    
+    if (!taskResponse.success || !taskResponse.results) {
+      message.error("Failed to fetch training results");
+      emit("update:isPredicting", false);
+      return;
+    }
+
+    const trainedParams = taskResponse.results.params;
+    
+    // Upload prediction dataset
+    const file = fileList.value[0].originFileObj;
+    const uploadFormData = new FormData();
+    uploadFormData.append("file", file);
+    uploadFormData.append("name", `Prediction Data - ${new Date().toLocaleString()}`);
+    uploadFormData.append("description", "Uploaded for prediction");
+
+    const datasetResponse = await $fetch("/api/data", {
+      method: "POST",
+      body: uploadFormData,
+    });
+
+    if (!datasetResponse.success) {
+      message.error("Failed to upload prediction dataset");
+      emit("update:isPredicting", false);
+      return;
+    }
+
+    const predictionDatasetId = datasetResponse.dataset.datasetId;
+
+    // Call simplified predict API
+    const formData = new FormData();
+    formData.append("model", props.bestModel);
+    formData.append("parameters", JSON.stringify(trainedParams));
+    formData.append("trainingDatasetId", props.trainingDatasetId);
+    formData.append("predictionDatasetId", predictionDatasetId);
+    formData.append("featureColumns", JSON.stringify(props.featureColumns));
+    formData.append("targetColumn", props.targetColumn);
+
+    const response = await $fetch("/api/predict", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (response.success) {
+      emit("update:predictionTask", { taskId: response.taskId, status: "running" });
+      message.success(t("messages.predictionStarted"));
+
+      const result = await pollTaskStatus(response.taskId);
+
+      if (result && result.task.status === "completed") {
+        const taskResult: any = result.task.result || {};
+        const taskParameter: any = result.task.parameter || {};
+        emit("update:predictionTask", {
+          status: "completed",
+          outputFile: taskResult.outputFile || taskParameter.outputFile || response.outputFile,
+          taskId: result.task.id,
+        });
+        message.success(
+          t("messages.predictionCompleted", {
+            path: taskResult.outputFile || taskParameter.outputFile || response.outputFile,
+          })
+        );
+      } else if (result && result.task.status === "failed") {
+        emit("update:predictionTask", {
+          status: "failed",
+          error: result.task.error,
+        });
+        message.error(
+          t("messages.predictionFailed", { error: result.task.error })
+        );
+      }
+    }
+  } catch (error) {
+    message.error(t("messages.predictionError") + ": " + error.message);
+  } finally {
+    emit("update:isPredicting", false);
+  }
+};
+
+// Poll task status
+const pollTaskStatus = async (taskId: number) => {
+  const maxAttempts = 120;
+  let attempts = 0;
+
+  while (attempts < maxAttempts) {
+    try {
+      const response = await $fetch(`/api/task/${taskId}`);
+
+      if (response.task.status === "completed" || response.task.status === "failed") {
+        return response;
+      }
+
+      attempts++;
+      if (attempts < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      }
+    } catch (error) {
+      console.error("Failed to poll task status:", error);
+      attempts++;
+      if (attempts < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      }
+    }
+  }
+
+  return null;
+};
+
 const downloadResults = () => {
   if (props.predictionTask?.taskId) {
-    // Use the download API endpoint
     const downloadUrl = `/api/download/${props.predictionTask.taskId}`;
-
-    // Create a link element and trigger download
     const link = document.createElement("a");
     link.href = downloadUrl;
-    link.download = ""; // Let the server specify the filename
+    link.download = "";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-
     message.success(t("prediction.downloading"));
   }
 };
