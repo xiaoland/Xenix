@@ -65,9 +65,8 @@ def train_regression_model(model_name: str, input_file: str, feature_columns: li
     # Train model with specific parameters
     logger.info(f"Training model with parameters: {parameters}")
     
-    # Get the estimator class and create instance with parameters
-    estimator_class = Model.get_estimator()
-    model_instance = estimator_class(**parameters)
+    # Create model instance with parameters using the model's create_model method
+    model_instance = Model.create_model(parameters)
     
     # Fit the model
     logger.info("Fitting model to training data")
