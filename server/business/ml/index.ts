@@ -230,6 +230,18 @@ export interface TuneOptions {
 }
 
 /**
+ * Options for training with specific parameters
+ */
+export interface TrainOptions {
+  inputFile: string;
+  model: string;
+  featureColumns: string[];
+  targetColumn: string;
+  taskId: number;
+  parameters: Record<string, any>;
+}
+
+/**
  * Options for prediction
  */
 export interface PredictOptions {
@@ -270,6 +282,38 @@ export async function tune(options: TuneOptions): Promise<void> {
   // Execute Python task
   await executePythonTask({
     script: getScriptPath("tune_model.py"),
+    stdinData,
+    taskId,
+    cwd: getWorkingDirectory(),
+  });
+}
+
+/**
+ * High-level function to train a machine learning model with specific parameters
+ * Automatically ensures Python environment is ready before execution
+ *
+ * @param options - Training configuration options
+ * @returns Promise that resolves when training task is started
+ */
+export async function train(options: TrainOptions): Promise<void> {
+  // Ensure environment is ready (with proper mutex to prevent race conditions)
+  await getInitPromise();
+
+  const { inputFile, model, featureColumns, targetColumn, taskId, parameters } = options;
+
+  // Prepare stdin data for Python script
+  const stdinData = {
+    inputFile,
+    model: model.toLowerCase(),
+    featureColumns,
+    targetColumn,
+    parameters, // Single parameter values instead of paramGrid
+    trainingType: "manual",
+  };
+
+  // Execute Python task
+  await executePythonTask({
+    script: getScriptPath("train_model.py"),
     stdinData,
     taskId,
     cwd: getWorkingDirectory(),

@@ -6,48 +6,21 @@
     @ok="handleOk"
     @cancel="handleCancel"
   >
-    <a-form
-      ref="formRef"
-      :model="formData"
-      layout="vertical"
-      class="param-grid-form"
-    >
-      <div v-if="!schema || !schema.properties" class="text-center py-4">
-        <a-spin />
-        <p class="mt-2">{{ t("tuning.paramGrid.loading") }}</p>
-      </div>
-      <div v-else>
-        <p class="mb-4 text-gray-600">
-          {{ t("tuning.paramGrid.description") }}
-        </p>
-        <template
-          v-for="(propSchema, propName) in schema.properties"
-          :key="propName"
-        >
-          <a-form-item
-            :label="formatFieldLabel(propName as string)"
-            :name="propName"
-          >
-            <template #extra>
-              <div class="text-xs text-gray-500">
-                {{ propSchema.description || t("tuning.paramGrid.noDescription") }}
-              </div>
-              <div class="text-xs text-gray-400">
-                {{ t("tuning.paramGrid.defaultValue") }}:
-                <code class="bg-gray-100 px-1 py-0.5 rounded">{{
-                  JSON.stringify(propSchema.default)
-                }}</code>
-              </div>
-            </template>
-            <ArrayInput
-              v-model="formData[propName as string]"
-              :item-type="getArrayItemType(propSchema)"
-              :placeholder="t('tuning.paramGrid.arrayPlaceholder')"
-            />
-          </a-form-item>
-        </template>
-      </div>
-    </a-form>
+    <div v-if="!schema || !schema.properties" class="text-center py-4">
+      <a-spin />
+      <p class="mt-2">{{ t("tuning.paramGrid.loading") }}</p>
+    </div>
+    <div v-else>
+      <p class="mb-4 text-gray-600">
+        {{ t("tuning.paramGrid.description") }}
+      </p>
+      <AutoForm
+        ref="autoFormRef"
+        v-model="formData"
+        :schema="schema"
+        mode="paramGrid"
+      />
+    </div>
   </a-modal>
 </template>
 
@@ -76,7 +49,7 @@ const visible = computed({
   set: (value) => emit("update:modelValue", value),
 });
 
-const formRef = ref();
+const autoFormRef = ref();
 const formData = ref<Record<string, any>>({});
 
 // Initialize form data when dialog opens or initial values change
@@ -115,31 +88,9 @@ const initializeFormData = () => {
   formData.value = data;
 };
 
-const formatFieldLabel = (fieldName: string): string => {
-  // Convert snake_case or camelCase to Title Case
-  return fieldName
-    .replace(/_/g, " ")
-    .replace(/([A-Z])/g, " $1")
-    .replace(/^./, (str) => str.toUpperCase())
-    .trim();
-};
-
-const getArrayItemType = (propSchema: any): string => {
-  // Determine the type of items in the array
-  if (propSchema.items) {
-    return propSchema.items.type || "string";
-  }
-  // Try to infer from default values
-  if (Array.isArray(propSchema.default) && propSchema.default.length > 0) {
-    const firstItem = propSchema.default[0];
-    return typeof firstItem;
-  }
-  return "string";
-};
-
 const handleOk = async () => {
   try {
-    await formRef.value?.validate();
+    await autoFormRef.value?.validate();
     emit("save", formData.value);
     visible.value = false;
   } catch (error) {
@@ -153,11 +104,4 @@ const handleCancel = () => {
 </script>
 
 <style scoped>
-.param-grid-form :deep(.ant-form-item) {
-  margin-bottom: 16px;
-}
-
-.param-grid-form :deep(.ant-form-item-label) {
-  font-weight: 500;
-}
 </style>

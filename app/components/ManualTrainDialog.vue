@@ -6,54 +6,21 @@
     @ok="handleOk"
     @cancel="handleCancel"
   >
-    <a-form
-      ref="formRef"
-      :model="formData"
-      layout="vertical"
-      class="manual-train-form"
-    >
-      <div v-if="!schema || !schema.properties" class="text-center py-4">
-        <a-spin />
-        <p class="mt-2">{{ t("tuning.manualTrainDialog.loading") }}</p>
-      </div>
-      <div v-else>
-        <p class="mb-4 text-gray-600">
-          {{ t("tuning.manualTrainDialog.description") }}
-        </p>
-        <template
-          v-for="(propSchema, propName) in schema.properties"
-          :key="propName"
-        >
-          <a-form-item
-            :label="formatFieldLabel(propName as string)"
-            :name="propName"
-          >
-            <template #extra>
-              <div class="text-xs text-gray-500">
-                {{ propSchema.description || t("tuning.manualTrainDialog.noDescription") }}
-              </div>
-              <div class="text-xs text-gray-400">
-                {{ t("tuning.manualTrainDialog.defaultValue") }}:
-                <code class="bg-gray-100 px-1 py-0.5 rounded">{{
-                  getDefaultValue(propSchema)
-                }}</code>
-              </div>
-            </template>
-            <a-input-number
-              v-if="getItemType(propSchema) === 'number' || getItemType(propSchema) === 'integer'"
-              v-model:value="formData[propName as string]"
-              :placeholder="getDefaultValue(propSchema).toString()"
-              class="w-full"
-            />
-            <a-input
-              v-else
-              v-model:value="formData[propName as string]"
-              :placeholder="getDefaultValue(propSchema).toString()"
-            />
-          </a-form-item>
-        </template>
-      </div>
-    </a-form>
+    <div v-if="!schema || !schema.properties" class="text-center py-4">
+      <a-spin />
+      <p class="mt-2">{{ t("tuning.manualTrainDialog.loading") }}</p>
+    </div>
+    <div v-else>
+      <p class="mb-4 text-gray-600">
+        {{ t("tuning.manualTrainDialog.description") }}
+      </p>
+      <AutoForm
+        ref="autoFormRef"
+        v-model="formData"
+        :schema="schema"
+        mode="parameters"
+      />
+    </div>
   </a-modal>
 </template>
 
@@ -82,7 +49,7 @@ const visible = computed({
   set: (value) => emit("update:modelValue", value),
 });
 
-const formRef = ref();
+const autoFormRef = ref();
 const formData = ref<Record<string, any>>({});
 
 // Initialize form data when dialog opens or initial values change
@@ -115,21 +82,18 @@ const initializeFormData = () => {
       } else {
         // Create default value based on type
         const itemType = getItemType(schema);
-        data[propName] = itemType === "number" || itemType === "integer" ? 0 : "";
+        if (itemType === "boolean") {
+          data[propName] = false;
+        } else if (itemType === "number" || itemType === "integer") {
+          data[propName] = 0;
+        } else {
+          data[propName] = "";
+        }
       }
     }
   }
 
   formData.value = data;
-};
-
-const formatFieldLabel = (fieldName: string): string => {
-  // Convert snake_case or camelCase to Title Case
-  return fieldName
-    .replace(/_/g, " ")
-    .replace(/([A-Z])/g, " $1")
-    .replace(/^./, (str) => str.toUpperCase())
-    .trim();
 };
 
 const getItemType = (propSchema: any): string => {
@@ -145,19 +109,9 @@ const getItemType = (propSchema: any): string => {
   return "string";
 };
 
-const getDefaultValue = (propSchema: any): any => {
-  if (propSchema.default !== undefined) {
-    // For manual training, show first value from array
-    return Array.isArray(propSchema.default)
-      ? propSchema.default[0]
-      : propSchema.default;
-  }
-  return "";
-};
-
 const handleOk = async () => {
   try {
-    await formRef.value?.validate();
+    await autoFormRef.value?.validate();
     emit("train", formData.value);
     visible.value = false;
   } catch (error) {
@@ -171,11 +125,4 @@ const handleCancel = () => {
 </script>
 
 <style scoped>
-.manual-train-form :deep(.ant-form-item) {
-  margin-bottom: 16px;
-}
-
-.manual-train-form :deep(.ant-form-item-label) {
-  font-weight: 500;
-}
 </style>

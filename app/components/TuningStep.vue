@@ -11,9 +11,11 @@
       :tuning-results="tuningResults"
       :task-logs="taskLogs"
       :is-tuning="isTuning"
+      :selected-task-id="selectedTaskId"
       @update:selected-models="localSelectedModels = $event"
       @start-tune="handleStartTune"
       @view-logs="handleViewLogs"
+      @select-task="handleSelectTask"
     />
 
     <!-- Best Model Selection -->
@@ -65,6 +67,7 @@ const props = defineProps<{
   taskLogs: Record<string, any[]>;
   activeLogTab: string;
   selectedBestModel: string | null;
+  selectedTaskId?: number | null;
 }>();
 
 const emit = defineEmits<{
@@ -75,6 +78,7 @@ const emit = defineEmits<{
   "update:selectedModels": [models: string[]];
   "update:activeLogTab": [tab: string];
   "update:selected-best-model": [model: string];
+  "update:selected-task-id": [taskId: number | null, model: string];
 }>();
 
 const localSelectedModels = computed({
@@ -92,14 +96,18 @@ const localSelectedBestModel = computed({
   set: (value) => emit("update:selected-best-model", value || ""),
 });
 
-const handleStartTune = (model: string, paramGrid?: Record<string, any>, trainingType?: string, parentTaskId?: string) => {
+const handleStartTune = (model: string, paramGrid?: Record<string, any>, trainingType?: string, parentTaskId?: number) => {
   // Emit the single tune event for this specific model with optional param grid, training type, and parent task
   emit("start-single-tune", model, paramGrid, trainingType, parentTaskId);
 };
 
-const handleViewLogs = (taskId: string, modelName: string) => {
+const handleViewLogs = (taskId: number, modelName: string) => {
   // Update the active log tab
-  emit("update:activeLogTab", taskId);
+  emit("update:activeLogTab", taskId.toString());
+};
+
+const handleSelectTask = (taskId: number, model: string) => {
+  emit("update:selected-task-id", taskId, model);
 };
 
 const formatModelName = (name: string) => {
