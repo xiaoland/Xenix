@@ -58,3 +58,31 @@ export const logs = sqliteTable('logs', {
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 });
 
+// Work items table - maintains array of task IDs
+// Groups related tasks together so different work items' tasks don't get mixed up
+export const workItems = sqliteTable('work_items', {
+  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+  workItemId: text('work_item_id').notNull().unique(),
+  name: text('name').notNull(),
+  description: text('description'),
+  projectId: text('project_id'), // Reference to parent project
+  taskIds: text('task_ids', { mode: 'json' }).$defaultFn(() => []), // Array of task IDs
+  status: text('status').notNull().default('active'), // 'active', 'completed', 'archived'
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+});
+
+// Projects table - stores array of dataset IDs and work item IDs
+// Organizes datasets and work items for better project management
+export const projects = sqliteTable('projects', {
+  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+  projectId: text('project_id').notNull().unique(),
+  name: text('name').notNull(),
+  description: text('description'),
+  datasetIds: text('dataset_ids', { mode: 'json' }).$defaultFn(() => []), // Array of dataset IDs
+  workItemIds: text('work_item_ids', { mode: 'json' }).$defaultFn(() => []), // Array of work item IDs
+  status: text('status').notNull().default('active'), // 'active', 'completed', 'archived'
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+});
+

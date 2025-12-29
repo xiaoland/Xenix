@@ -1,6 +1,7 @@
 import { db, schema } from "../../database";
 import { generateDatasetId, analyzeExcelFile } from "../../utils/datasetUtils";
 import { validateExcelFile, saveUploadedFile } from "../../utils/taskUtils";
+import { eq } from "drizzle-orm";
 import path from "path";
 import fs from "fs/promises";
 
@@ -10,6 +11,7 @@ export default defineEventHandler(async (event) => {
     const file = formData.get("file") as File;
     const name = formData.get("name") as string;
     const description = (formData.get("description") as string) || null;
+    const projectId = (formData.get("projectId") as string) || null;
 
     if (!file) {
       throw createError({
@@ -58,6 +60,30 @@ export default defineEventHandler(async (event) => {
       columns: columns, // Store as JSONB directly
       rowCount,
     });
+
+    // If projectId is provided, add dataset to project
+    if (projectId) {
+      const projects = await db
+        .select()
+        .from(schema.projects)
+        .where(eq(schema.projects.projectId, projectId))
+        .limit(1);
+
+      if (projects.length > 0) {
+        const project = projects[0];
+        const currentDatasetIds = Array.isArray(project.datasetIds) 
+          ? project.datasetIds 
+          : JSON.parse(project.datasetIds || '[]');
+        
+        await db
+          .update(schema.projects)
+          .set({
+            datasetIds: [...currentDatasetIds, datasetId],
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.projects.projectId, projectId));
+      }
+    }
 
     return {
       success: true,

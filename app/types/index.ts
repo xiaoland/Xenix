@@ -67,3 +67,27 @@ export interface ColumnSelection {
 export type TrainingType = "auto" | "manual";
 
 export type TaskStatus = "pending" | "running" | "completed" | "failed";
+
+export interface WorkItem {
+  id: number;
+  workItemId: string;
+  name: string;
+  description?: string;
+  projectId?: string;
+  taskIds: number[];
+  status: 'active' | 'completed' | 'archived';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Project {
+  id: number;
+  projectId: string;
+  name: string;
+  description?: string;
+  datasetIds: string[];
+  workItemIds: string[];
+  status: 'active' | 'completed' | 'archived';
+  createdAt: string;
+  updatedAt: string;
+}
