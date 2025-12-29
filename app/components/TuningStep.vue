@@ -4,18 +4,10 @@
 
     <!-- Integrated Model Tuning Table -->
     <ModelTuningTable
-      :available-models="availableModels"
-      :selected-models="localSelectedModels"
-      :tuning-status="tuningStatus"
-      :tuning-tasks="tuningTasks"
-      :tuning-results="tuningResults"
-      :task-logs="taskLogs"
-      :is-tuning="isTuning"
-      :selected-task-id="selectedTaskId"
-      @update:selected-models="localSelectedModels = $event"
+      :work-item-id="workItemId"
+      v-model:selected-task-id="localSelectedTaskId"
       @start-tune="handleStartTune"
       @view-logs="handleViewLogs"
-      @select-task="handleSelectTask"
     />
 
     <!-- Best Model Selection -->
@@ -24,10 +16,11 @@
         {{ $t("tuning.selectBestForPrediction") }}
       </h3>
       <a-select
-        v-model:value="localSelectedBestModel"
+        :value="localSelectedBestModel || undefined"
         :placeholder="$t('tuning.selectModelPlaceholder')"
         class="w-full max-w-md"
         :dropdownMatchSelectWidth="false"
+        @change="(val: any) => { localSelectedBestModel = val || null }"
       >
         <a-select-option
           v-for="result in tuningResults"
@@ -59,58 +52,51 @@ import { computed } from "vue";
 import { useFormatters } from "../composables/useFormatters";
 
 const props = defineProps<{
-  availableModels: Array<{ label: string; value: string }>;
-  selectedModels: string[];
-  tuningStatus: Record<string, string>;
-  tuningTasks: Record<string, number>;
-  isTuning: boolean;
-  tuningResults: any[];
-  taskLogs: Record<string, any[]>;
-  activeLogTab: string;
+  workItemId: number;
   selectedBestModel: string | null;
   selectedTaskId?: number | null;
+  tuningResults: any[];
 }>();
 
 const emit = defineEmits<{
-  "start-tuning": [];
-  "start-single-tune": [model: string, paramGrid?: Record<string, any>, trainingType?: string, parentTaskId?: number];
   back: [];
   continue: [];
-  "update:selectedModels": [models: string[]];
-  "update:activeLogTab": [tab: string];
   "update:selected-best-model": [model: string];
-  "update:selected-task-id": [taskId: number | null, model: string];
+  "update:selected-task-id": [taskId: number | null];
+  "start-tune": [
+    model: string,
+    paramGrid?: Record<string, any>,
+    trainingType?: string,
+    parentTaskId?: number
+  ];
+  "view-logs": [taskId: number, modelName: string];
 }>();
 
 // Use formatters composable
 const { formatModelName, formatMetric } = useFormatters();
-
-const localSelectedModels = computed({
-  get: () => props.selectedModels,
-  set: (value) => emit("update:selectedModels", value),
-});
-
-const localActiveLogTab = computed({
-  get: () => props.activeLogTab,
-  set: (value) => emit("update:activeLogTab", value),
-});
 
 const localSelectedBestModel = computed({
   get: () => props.selectedBestModel,
   set: (value) => emit("update:selected-best-model", value || ""),
 });
 
-const handleStartTune = (model: string, paramGrid?: Record<string, any>, trainingType?: string, parentTaskId?: number) => {
-  // Emit the single tune event for this specific model with optional param grid, training type, and parent task
-  emit("start-single-tune", model, paramGrid, trainingType, parentTaskId);
+const localSelectedTaskId = computed({
+  get: () => props.selectedTaskId || null,
+  set: (value) => emit("update:selected-task-id", value),
+});
+
+const handleStartTune = (
+  model: string,
+  paramGrid?: Record<string, any>,
+  trainingType?: string,
+  parentTaskId?: number
+) => {
+  // Emit the tune event
+  emit("start-tune", model, paramGrid, trainingType, parentTaskId);
 };
 
 const handleViewLogs = (taskId: number, modelName: string) => {
-  // Update the active log tab
-  emit("update:activeLogTab", taskId.toString());
-};
-
-const handleSelectTask = (taskId: number, model: string) => {
-  emit("update:selected-task-id", taskId, model);
+  // Handle view logs event
+  console.log("View logs for task:", taskId, modelName);
 };
 </script>

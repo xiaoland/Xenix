@@ -75,18 +75,11 @@
           <!-- Step 1: Tuning -->
           <div v-if="currentStep === 1">
             <TuningStep
-              v-model:selected-models="selectedModels"
-              v-model:active-log-tab="activeLogTab"
+              :work-item-id="workItem.id"
               v-model:selected-best-model="selectedBestModel"
               v-model:selected-task-id="selectedTaskId"
-              :available-models="availableModels"
-              :tuning-status="tuningStatus"
-              :tuning-tasks="tuningTasks"
-              :is-tuning="isTuning"
               :tuning-results="tuningResults"
-              :task-logs="taskLogs"
-              @start-tuning="handleStartBatchTuning"
-              @start-single-tune="handleStartSingleModelTuning"
+              @start-tune="handleStartSingleModelTuning"
               @continue="nextStep"
               @back="goToUploadStep"
             />
@@ -149,17 +142,11 @@ const { uploadedDatasetId, clearDatasetId } = useDatasetRegistration();
 
 // Tuning step logic
 const {
-  selectedModels,
-  activeLogTab,
   selectedBestModel,
   selectedTaskId,
   tuningResults,
-  tuningStatus,
   tuningTasks,
-  taskLogs,
-  isTuning,
   fetchTuningResults,
-  startBatchTuning,
   startSingleModelTuning,
   resetTuningStep,
 } = useTuningStep();
@@ -226,16 +213,6 @@ const handleColumnSelection = async ({
 
 const goToUploadStep = () => {
   currentStep.value = 0;
-};
-
-const handleStartBatchTuning = async () => {
-  await startBatchTuning({
-    uploadedDatasetId: uploadedDatasetId.value,
-    trainingFileList: trainingFileList.value,
-    selectedFeatureColumns: selectedFeatureColumns.value,
-    selectedTargetColumn: selectedTargetColumn.value,
-    workItemId: workItem.value?.id,
-  });
 };
 
 const handleStartSingleModelTuning = async (
