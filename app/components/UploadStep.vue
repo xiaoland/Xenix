@@ -81,18 +81,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from "vue";
-import type { UploadProps } from "ant-design-vue";
+import { onMounted, watch } from "vue";
 import { message } from "ant-design-vue";
-import { useI18n } from "vue-i18n";
-import { useFileUpload } from "../composables/useFileUpload";
-import { DatasetService } from "../services";
-import type { Dataset, Project } from "../types";
-
-const { t } = useI18n();
-const { isLoadingColumns, readExcelColumns, validateExcelFile } = useFileUpload();
-
-const fileList = defineModel<any[]>({ required: true });
+import { useUploadStep } from "../composables/useUploadStep";
 
 const props = defineProps<{
   projectId?: number;
@@ -108,111 +99,26 @@ const emit = defineEmits<{
   ];
 }>();
 
-const datasets = ref<Dataset[]>([]);
-const project = ref<Project | null>(null);
-const isLoadingDatasets = ref(false);
-const isLoadingProject = ref(false);
-const selectedDatasetId = ref<number | undefined>(undefined);
-const selectedDataset = ref<Dataset | null>(null);
+// Use upload step composable
+const {
+  datasets,
+  isLoadingDatasets,
+  selectedDatasetId,
+  fileList,
+  showColumnSelection,
+  excelColumns,
+  selectedFeatureColumns,
+  selectedTargetColumn,
+  isLoadingColumns,
+  fetchDatasets,
+  filterDatasetOption,
+  handleDatasetSelected,
+  beforeUpload,
+  handleContinue,
+  handleBackToUpload,
+} = useUploadStep(props.projectId);
 
-const showColumnSelection = ref(false);
-const excelColumns = ref<string[]>([]);
-const selectedFeatureColumns = ref<string[]>([]);
-const selectedTargetColumn = ref<string | undefined>(undefined);
-
-const beforeUpload: UploadProps["beforeUpload"] = (file) => {
-  if (!validateExcelFile(file)) {
-    return false;
-  }
-  // Clear dataset selection if uploading file
-  selectedDatasetId.value = undefined;
-  selectedDataset.value = null;
-  return false; // Prevent auto upload
-};
-
-const fetchDatasets = async () => {
-  isLoadingDatasets.value = true;
-  try {
-    // If projectId is provided, fetch project and filter datasets
-    if (props.projectId) {
-      const projectResponse = await $fetch(`/api/projects/${props.projectId}`);
-      if (projectResponse.success) {
-        project.value = projectResponse.project;
-        datasets.value = projectResponse.project.datasets || [];
-      }
-    } else {
-      // No project context, show all datasets
-      const response = await DatasetService.fetchAll();
-      if (response.success) {
-        datasets.value = response.datasets;
-      }
-    }
-  } catch (error) {
-    console.error("Failed to fetch datasets:", error);
-  } finally {
-    isLoadingDatasets.value = false;
-  }
-};
-
-const filterDatasetOption = (input: string, option: any) => {
-  const dataset = datasets.value.find((d) => d.id === option.value);
-  if (!dataset) return false;
-  return dataset.name.toLowerCase().includes(input.toLowerCase());
-};
-
-const handleDatasetSelected = (datasetId: number) => {
-  selectedDataset.value =
-    datasets.value.find((d) => d.id === datasetId) || null;
-  // Clear file upload if dataset is selected
-  fileList.value = [];
-};
-
-const handleContinue = async () => {
-  if (selectedDatasetId.value) {
-    // Use selected dataset
-    await handleDatasetContinue();
-  } else if (fileList.value.length > 0) {
-    // Use uploaded file
-    await handleFileUploaded();
-  } else {
-    message.error("Please select a dataset or upload a file");
-  }
-};
-
-const handleDatasetContinue = async () => {
-  if (!selectedDataset.value) {
-    message.error("Please select a dataset");
-    return;
-  }
-
-  excelColumns.value = selectedDataset.value.columns;
-  showColumnSelection.value = true;
-  message.success(
-    `Found ${selectedDataset.value.columns.length} columns in the dataset`
-  );
-};
-
-const handleFileUploaded = async () => {
-  if (fileList.value.length === 0) {
-    message.error("Please upload a file first");
-    return;
-  }
-
-  const file = fileList.value[0].originFileObj;
-  const columns = await readExcelColumns(file);
-  
-  if (columns.length > 0) {
-    excelColumns.value = columns;
-    showColumnSelection.value = true;
-  }
-};
-
-const handleBackToUpload = () => {
-  showColumnSelection.value = false;
-  selectedFeatureColumns.value = [];
-  selectedTargetColumn.value = undefined;
-};
-
+// Handle column selection confirmation
 const handleColumnSelection = ({
   featureColumns,
   targetColumn,
