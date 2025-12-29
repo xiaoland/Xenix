@@ -58,3 +58,21 @@ export function parseDatasetColumns(columns: any): string[] {
   }
   return Array.isArray(columns) ? columns : [];
 }
+
+/**
+ * Safely parse JSON string array, returning default value on error
+ */
+export function safeParseJsonArray(value: any, defaultValue: any[] = []): any[] {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : defaultValue;
+    } catch {
+      return defaultValue;
+    }
+  }
+  return defaultValue;
+}

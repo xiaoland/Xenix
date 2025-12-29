@@ -1,5 +1,6 @@
 import { db, schema } from '../../database';
 import { eq } from 'drizzle-orm';
+import { safeParseJsonArray } from '../../utils/datasetUtils';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -31,8 +32,8 @@ export default defineEventHandler(async (event) => {
       success: true,
       project: {
         ...project,
-        datasetIds: Array.isArray(project.datasetIds) ? project.datasetIds : JSON.parse(project.datasetIds || '[]'),
-        workItemIds: Array.isArray(project.workItemIds) ? project.workItemIds : JSON.parse(project.workItemIds || '[]'),
+        datasetIds: safeParseJsonArray(project.datasetIds, []),
+        workItemIds: safeParseJsonArray(project.workItemIds, []),
       },
     };
   } catch (error) {

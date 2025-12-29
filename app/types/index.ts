@@ -73,7 +73,7 @@ export interface WorkItem {
   workItemId: string;
   name: string;
   description?: string;
-  projectId?: string;
+  projectId: string; // Required - work items must belong to a project
   taskIds: number[];
   status: 'active' | 'completed' | 'archived';
   createdAt: string;

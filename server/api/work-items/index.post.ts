@@ -1,6 +1,7 @@
 import { db, schema } from '../../database';
 import { nanoid } from 'nanoid';
 import { eq } from 'drizzle-orm';
+import { safeParseJsonArray } from '../../utils/datasetUtils';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -50,9 +51,7 @@ export default defineEventHandler(async (event) => {
 
     // Update project to include this work item
     const project = projects[0];
-    const currentWorkItemIds = Array.isArray(project.workItemIds) 
-      ? project.workItemIds 
-      : JSON.parse(project.workItemIds || '[]');
+    const currentWorkItemIds = safeParseJsonArray(project.workItemIds, []);
     
     await db
       .update(schema.projects)

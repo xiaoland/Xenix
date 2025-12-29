@@ -306,7 +306,7 @@
                 {{ datasetId }}
               </a-tag>
             </div>
-            <div v-else class="text-gray-400">{{ $t("datasets.noDatasets") }}</div>
+            <div v-else class="text-gray-400">{{ $t("home.noProjects") }}</div>
           </div>
 
           <div>

@@ -65,7 +65,7 @@ export const workItems = sqliteTable('work_items', {
   workItemId: text('work_item_id').notNull().unique(),
   name: text('name').notNull(),
   description: text('description'),
-  projectId: text('project_id'), // Reference to parent project
+  projectId: text('project_id').notNull(), // Reference to parent project - required
   taskIds: text('task_ids', { mode: 'json' }).$defaultFn(() => []), // Array of task IDs
   status: text('status').notNull().default('active'), // 'active', 'completed', 'archived'
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),

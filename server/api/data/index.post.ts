@@ -1,5 +1,5 @@
 import { db, schema } from "../../database";
-import { generateDatasetId, analyzeExcelFile } from "../../utils/datasetUtils";
+import { generateDatasetId, analyzeExcelFile, safeParseJsonArray } from "../../utils/datasetUtils";
 import { validateExcelFile, saveUploadedFile } from "../../utils/taskUtils";
 import { eq } from "drizzle-orm";
 import path from "path";
@@ -71,9 +71,7 @@ export default defineEventHandler(async (event) => {
 
       if (projects.length > 0) {
         const project = projects[0];
-        const currentDatasetIds = Array.isArray(project.datasetIds) 
-          ? project.datasetIds 
-          : JSON.parse(project.datasetIds || '[]');
+        const currentDatasetIds = safeParseJsonArray(project.datasetIds, []);
         
         await db
           .update(schema.projects)

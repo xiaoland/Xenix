@@ -1,5 +1,6 @@
 import { db, schema } from '../../database';
 import { desc } from 'drizzle-orm';
+import { safeParseJsonArray } from '../../utils/datasetUtils';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -9,11 +10,11 @@ export default defineEventHandler(async (event) => {
       .from(schema.projects)
       .orderBy(desc(schema.projects.createdAt));
 
-    // Parse JSON fields
+    // Parse JSON fields safely
     const projectsWithParsedFields = projects.map(project => ({
       ...project,
-      datasetIds: Array.isArray(project.datasetIds) ? project.datasetIds : JSON.parse(project.datasetIds || '[]'),
-      workItemIds: Array.isArray(project.workItemIds) ? project.workItemIds : JSON.parse(project.workItemIds || '[]'),
+      datasetIds: safeParseJsonArray(project.datasetIds, []),
+      workItemIds: safeParseJsonArray(project.workItemIds, []),
     }));
 
     return {

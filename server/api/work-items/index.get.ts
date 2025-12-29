@@ -1,5 +1,6 @@
 import { db, schema } from '../../database';
 import { desc, eq } from 'drizzle-orm';
+import { safeParseJsonArray } from '../../utils/datasetUtils';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -15,10 +16,10 @@ export default defineEventHandler(async (event) => {
 
     const workItems = await workItemsQuery.orderBy(desc(schema.workItems.createdAt));
 
-    // Parse JSON fields
+    // Parse JSON fields safely
     const workItemsWithParsedFields = workItems.map(item => ({
       ...item,
-      taskIds: Array.isArray(item.taskIds) ? item.taskIds : JSON.parse(item.taskIds || '[]'),
+      taskIds: safeParseJsonArray(item.taskIds, []),
     }));
 
     return {
