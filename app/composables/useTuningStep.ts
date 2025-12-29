@@ -24,7 +24,7 @@ export function useTuningStep() {
     registerTask,
     clearTasks,
   } = useTaskPolling();
-  const { uploadedDatasetId, registerFileAsDataset } = useDatasetRegistration();
+  const { registerFileAsDataset } = useDatasetRegistration();
 
   // Local state
   const selectedModels = ref<string[]>([]);
@@ -79,8 +79,11 @@ export function useTuningStep() {
   /**
    * Get or register dataset ID
    */
-  const getDatasetId = async (trainingFileList: any[]): Promise<string | null> => {
-    let datasetIdToUse = uploadedDatasetId.value;
+  const getDatasetId = async (
+    uploadedDatasetIdValue: string,
+    trainingFileList: any[]
+  ): Promise<string | null> => {
+    let datasetIdToUse = uploadedDatasetIdValue;
 
     if (!datasetIdToUse && trainingFileList.length > 0) {
       const file = trainingFileList[0].originFileObj;
@@ -102,17 +105,21 @@ export function useTuningStep() {
    * Start tuning all selected models
    */
   const startBatchTuning = async (params: {
+    uploadedDatasetId: string;
     trainingFileList: any[];
     selectedFeatureColumns: string[];
     selectedTargetColumn: string;
     workItemId?: number;
   }) => {
-    if (!uploadedDatasetId.value && params.trainingFileList.length === 0) {
+    if (!params.uploadedDatasetId && params.trainingFileList.length === 0) {
       message.error(t("messages.uploadError"));
       return;
     }
 
-    const datasetIdToUse = await getDatasetId(params.trainingFileList);
+    const datasetIdToUse = await getDatasetId(
+      params.uploadedDatasetId,
+      params.trainingFileList
+    );
     if (!datasetIdToUse) return;
 
     // Train all selected models
@@ -144,6 +151,7 @@ export function useTuningStep() {
    */
   const startSingleModelTuning = async (
     params: {
+      uploadedDatasetId: string;
       trainingFileList: any[];
       selectedFeatureColumns: string[];
       selectedTargetColumn: string;
@@ -154,7 +162,10 @@ export function useTuningStep() {
     trainingType?: string,
     parentTaskId?: number
   ) => {
-    const datasetIdToUse = await getDatasetId(params.trainingFileList);
+    const datasetIdToUse = await getDatasetId(
+      params.uploadedDatasetId,
+      params.trainingFileList
+    );
     if (!datasetIdToUse) return;
 
     const response = await executeTrain(

@@ -230,6 +230,7 @@ const goToUploadStep = () => {
 
 const handleStartBatchTuning = async () => {
   await startBatchTuning({
+    uploadedDatasetId: uploadedDatasetId.value,
     trainingFileList: trainingFileList.value,
     selectedFeatureColumns: selectedFeatureColumns.value,
     selectedTargetColumn: selectedTargetColumn.value,
@@ -245,6 +246,7 @@ const handleStartSingleModelTuning = async (
 ) => {
   await startSingleModelTuning(
     {
+      uploadedDatasetId: uploadedDatasetId.value,
       trainingFileList: trainingFileList.value,
       selectedFeatureColumns: selectedFeatureColumns.value,
       selectedTargetColumn: selectedTargetColumn.value,
