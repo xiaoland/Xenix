@@ -205,7 +205,8 @@
     "title": "Task Logs",
     "titleWithModel": "Logs - {model}",
     "comparison": "Comparison",
-    "noLogs": "No logs available"
+    "noLogs": "No logs available",
+    "titleWithTask": "Logs - Task #{taskId}"
   },
   "common": {
     "na": "N/A",

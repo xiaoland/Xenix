@@ -230,6 +230,31 @@ export interface TuneOptions {
 }
 
 /**
+ * Options for auto-tuning with parameter grid
+ */
+export interface AutoTuneOptions {
+  inputFile: string;
+  model: string;
+  featureColumns: string[];
+  targetColumn: string;
+  taskId: number;
+  paramGrid?: Record<string, any[]>; // Grid with arrays of values
+}
+
+/**
+ * Options for manual tuning with specific parameters
+ */
+export interface ManualTuneOptions {
+  inputFile: string;
+  model: string;
+  featureColumns: string[];
+  targetColumn: string;
+  taskId: number;
+  parameters: Record<string, any>; // Single parameter values
+  parentTaskId?: number;
+}
+
+/**
  * Options for training with specific parameters
  */
 export interface TrainOptions {
@@ -256,17 +281,17 @@ export interface PredictOptions {
 }
 
 /**
- * High-level function to tune a machine learning model
+ * High-level function to auto-tune a machine learning model
  * Automatically ensures Python environment is ready before execution
  *
- * @param options - Tuning configuration options
- * @returns Promise that resolves when tuning task is started
+ * @param options - Auto-tuning configuration options
+ * @returns Promise that resolves when auto-tuning task is started
  */
-export async function tune(options: TuneOptions): Promise<void> {
+export async function autoTune(options: AutoTuneOptions): Promise<void> {
   // Ensure environment is ready (with proper mutex to prevent race conditions)
   await getInitPromise();
 
-  const { inputFile, model, featureColumns, targetColumn, taskId, paramGrid, trainingType, parentTaskId } = options;
+  const { inputFile, model, featureColumns, targetColumn, taskId, paramGrid } = options;
 
   // Prepare stdin data for Python script
   const stdinData = {
@@ -275,17 +300,59 @@ export async function tune(options: TuneOptions): Promise<void> {
     featureColumns,
     targetColumn,
     ...(paramGrid && { paramGrid }), // Include paramGrid if provided
-    ...(trainingType && { trainingType }),
-    ...(parentTaskId && { parentTaskId }),
   };
 
-  // Execute Python task
+  // Execute Python task with auto_tune_model.py
   await executePythonTask({
-    script: getScriptPath("tune_model.py"),
+    script: getScriptPath("auto_tune_model.py"),
     stdinData,
     taskId,
     cwd: getWorkingDirectory(),
   });
+}
+
+/**
+ * High-level function to manually tune a machine learning model with specific parameters
+ * Automatically ensures Python environment is ready before execution
+ *
+ * @param options - Manual tuning configuration options
+ * @returns Promise that resolves when manual tuning task is started
+ */
+export async function manualTune(options: ManualTuneOptions): Promise<void> {
+  // Ensure environment is ready (with proper mutex to prevent race conditions)
+  await getInitPromise();
+
+  const { inputFile, model, featureColumns, targetColumn, taskId, parameters, parentTaskId } = options;
+
+  // Prepare stdin data for Python script
+  const stdinData = {
+    inputFile,
+    model: model.toLowerCase(),
+    featureColumns,
+    targetColumn,
+    parameters, // Single parameter values
+    ...(parentTaskId && { parentTaskId }),
+  };
+
+  // Execute Python task with manual_tune_model.py
+  await executePythonTask({
+    script: getScriptPath("manual_tune_model.py"),
+    stdinData,
+    taskId,
+    cwd: getWorkingDirectory(),
+  });
+}
+
+/**
+ * High-level function to tune a machine learning model
+ * Automatically ensures Python environment is ready before execution
+ *
+ * @param options - Tuning configuration options
+ * @returns Promise that resolves when tuning task is started
+ * @deprecated Use autoTune() instead
+ */
+export async function tune(options: TuneOptions): Promise<void> {
+  return autoTune(options);
 }
 
 /**
@@ -294,30 +361,10 @@ export async function tune(options: TuneOptions): Promise<void> {
  *
  * @param options - Training configuration options
  * @returns Promise that resolves when training task is started
+ * @deprecated Use manualTune() instead  
  */
 export async function train(options: TrainOptions): Promise<void> {
-  // Ensure environment is ready (with proper mutex to prevent race conditions)
-  await getInitPromise();
-
-  const { inputFile, model, featureColumns, targetColumn, taskId, parameters } = options;
-
-  // Prepare stdin data for Python script
-  const stdinData = {
-    inputFile,
-    model: model.toLowerCase(),
-    featureColumns,
-    targetColumn,
-    parameters, // Single parameter values instead of paramGrid
-    trainingType: "manual",
-  };
-
-  // Execute Python task
-  await executePythonTask({
-    script: getScriptPath("train_model.py"),
-    stdinData,
-    taskId,
-    cwd: getWorkingDirectory(),
-  });
+  return manualTune(options);
 }
 
 /**

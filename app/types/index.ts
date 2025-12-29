@@ -37,13 +37,49 @@ export interface TuningResult {
   createdAt?: string | Date;
 }
 
+// Auto-tune task parameter type
+export interface AutoTuneTaskParameter {
+  model: string;
+  datasetId: number;
+  featureColumns: string[];
+  targetColumn: string;
+  paramGrid?: Record<string, any[]>; // Parameter grid with arrays of values
+  trainingType: "auto";
+}
+
+// Manual-tune task parameter type
+export interface ManualTuneTaskParameter {
+  model: string;
+  datasetId: number;
+  featureColumns: string[];
+  targetColumn: string;
+  parameters: Record<string, any>; // Single parameter values
+  trainingType: "manual";
+  parentTaskId?: number; // Optional parent auto-tune task
+}
+
+// Auto-tune task result type
+export interface AutoTuneTaskResult {
+  params: Record<string, any>; // Best parameters found
+  metrics: TuningMetrics;
+  bestScore?: number;
+}
+
+// Manual-tune task result type  
+export interface ManualTuneTaskResult {
+  params: Record<string, any>; // Parameters used
+  metrics: TuningMetrics;
+}
+
 export interface TaskInfo {
   id: number;
   workItemId?: number;
+  type: string; // 'auto-tune', 'tune', 'predict', etc.
   status: string;
-  result?: any;
-  parameter?: any;
+  result?: AutoTuneTaskResult | ManualTuneTaskResult | any;
+  parameter?: AutoTuneTaskParameter | ManualTuneTaskParameter | any;
   error?: string;
+  createdAt?: string;
 }
 
 export interface TaskLog {

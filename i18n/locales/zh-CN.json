@@ -207,7 +207,8 @@
     "title": "任务日志",
     "titleWithModel": "日志 - {model}",
     "comparison": "比较",
-    "noLogs": "无可用日志"
+    "noLogs": "无可用日志",
+    "titleWithTask": "日志 - 任务 #{taskId}"
   },
   "common": {
     "na": "不可用",
