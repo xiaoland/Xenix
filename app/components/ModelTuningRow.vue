@@ -40,7 +40,7 @@
           class="inline-flex items-center"
         >
           <span class="i-mdi-pencil mr-1" />
-          {{ t("tuning.manualTrain") }}
+          {{ t("tuning.manualTune") }}
         </a-button>
       </div>
     </td>
@@ -77,8 +77,8 @@
           <a-tag v-if="task.trainingType === 'auto-tune'" color="blue">
             {{ t("tuning.autoTune") }}
           </a-tag>
-          <a-tag v-else-if="task.trainingType === 'train'" color="green">
-            {{ t("tuning.manualTrain") }}
+          <a-tag v-else-if="task.trainingType === 'tune'" color="green">
+            {{ t("tuning.manualTune") }}
           </a-tag>
         </div>
         <div v-if="task.params" class="text-xs text-gray-600">
@@ -134,22 +134,18 @@
 
   <!-- Dialogs (using teleport to move them outside the table) -->
   <teleport to="body">
-    <ParamGridDialog
-      v-model="paramGridDialogVisible"
+    <AutoTuneDialog
+      v-model="autoTuneDialogVisible"
       :model-name="modelName"
       :model-label="modelLabel"
-      :schema="currentModelSchema"
-      :initial-values="paramGridValues"
-      @save="handleSaveAutoTune"
+      @create-task="handleCreateAutoTuneTask"
     />
 
-    <ManualTrainDialog
-      v-model="manualTrainDialogVisible"
+    <ManualTuneDialog
+      v-model="manualTuneDialogVisible"
       :model-name="modelName"
       :model-label="modelLabel"
-      :schema="currentModelSchema"
-      :initial-values="manualTrainValues"
-      @train="handleSaveManualTrain"
+      @tune="handleManualTune"
     />
 
     <a-modal
@@ -198,20 +194,11 @@ const taskLogs = ref<Record<string, any[]>>({});
 const currentTaskId = ref<number | null>(null);
 
 // Dialog states
-const paramGridDialogVisible = ref(false);
-const manualTrainDialogVisible = ref(false);
+const autoTuneDialogVisible = ref(false);
+const manualTuneDialogVisible = ref(false);
 const logModalVisible = ref(false);
 
-// Model metadata
-const modelMetadata = ref<any>(null);
-const paramGridValues = ref<Record<string, any>>({});
-const manualTrainValues = ref<Record<string, any>>({});
-
 // Computed properties
-const currentModelSchema = computed(() => {
-  return modelMetadata.value?.paramGridSchema || null;
-});
-
 const currentLogs = computed(() => {
   if (!currentTaskId.value) return [];
   return taskLogs.value[currentTaskId.value] || [];
@@ -221,19 +208,9 @@ const displayedHistory = computed(() => {
   return props.isExpanded ? trainingHistory.value : [];
 });
 
-// Fetch model metadata
+// Fetch model metadata (no longer needed as forms handle this)
 const fetchModelMetadata = async () => {
-  try {
-    const response = await ModelService.fetchMetadata();
-    if (response.success && response.models) {
-      const metadata = response.models.find((m: any) => m.name === props.modelName);
-      if (metadata) {
-        modelMetadata.value = metadata;
-      }
-    }
-  } catch (error) {
-    console.error(`Failed to fetch metadata for ${props.modelName}:`, error);
-  }
+  // Metadata fetching is now handled by the form components
 };
 
 // Fetch training history
@@ -262,11 +239,11 @@ const fetchTaskLogs = async (taskId: number) => {
 
 // Event handlers
 const handleAutoTune = () => {
-  paramGridDialogVisible.value = true;
+  autoTuneDialogVisible.value = true;
 };
 
 const handleManualTrain = () => {
-  manualTrainDialogVisible.value = true;
+  manualTuneDialogVisible.value = true;
 };
 
 const handleViewLogs = (taskId: number) => {
@@ -275,13 +252,11 @@ const handleViewLogs = (taskId: number) => {
   fetchTaskLogs(taskId);
 };
 
-const handleSaveAutoTune = (values: Record<string, any>) => {
-  paramGridValues.value = values;
+const handleCreateAutoTuneTask = (values: Record<string, any>) => {
   emit("start-tune", props.modelName, values, "auto");
 };
 
-const handleSaveManualTrain = (values: Record<string, any>) => {
-  manualTrainValues.value = values;
+const handleManualTune = (values: Record<string, any>) => {
   // Find the most recent task for this model as parent
   const parentTaskId = trainingHistory.value[0]?.taskId || null;
   emit("start-tune", props.modelName, values, "manual", parentTaskId || undefined);
@@ -310,7 +285,6 @@ watch(
 
 // Initialize
 onMounted(() => {
-  fetchModelMetadata();
   if (props.isExpanded) {
     fetchTrainingHistory();
   }

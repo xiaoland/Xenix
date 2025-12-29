@@ -3,6 +3,24 @@
     <h3 class="text-lg font-medium mb-3">
       {{ $t("tuning.modelSelectionAndTuning") }}
     </h3>
+    
+    <!-- Model Selector and Add Button -->
+    <div class="mb-4 flex gap-2 items-center">
+      <a-select
+        v-model:value="selectedModelToAdd"
+        :placeholder="t('tuning.selectModelToAdd')"
+        class="w-64"
+        :options="availableModelOptions"
+      />
+      <a-button
+        type="primary"
+        :disabled="!selectedModelToAdd || availableModels.some(m => m.value === selectedModelToAdd)"
+        @click="handleAddModel"
+      >
+        {{ t("tuning.addModel") }}
+      </a-button>
+    </div>
+    
     <table class="w-full border-collapse model-tuning-table">
       <thead>
         <tr class="border-b bg-gray-50">
@@ -26,16 +44,22 @@
             @toggle-expand="toggleExpand"
           />
         </template>
+        <tr v-if="availableModels.length === 0">
+          <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+            {{ t("tuning.noModelsAdded") }}
+          </td>
+        </tr>
       </tbody>
     </table>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, toRef } from "vue";
+import { ref, watch, toRef, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { WorkItemService } from "~/services";
 import ModelTuningRow from "./ModelTuningRow.vue";
+import { AVAILABLE_MODELS } from "~/constants/models";
 
 const { t } = useI18n();
 
@@ -62,9 +86,18 @@ const workItemIdRef = toRef(() => props.workItemId);
 // Data states
 const availableModels = ref<Array<{ label: string; value: string }>>([]);
 const isTuning = ref(false);
+const selectedModelToAdd = ref<string | undefined>(undefined);
 
 // UI states
 const expandedKeys = ref<string[]>([]);
+
+// Available model options (all models from constants)
+const availableModelOptions = computed(() => {
+  return AVAILABLE_MODELS.map(m => ({
+    label: m.label,
+    value: m.value,
+  }));
+});
 
 // Fetch available models from work item
 const fetchAvailableModels = async () => {
@@ -87,8 +120,11 @@ const fetchAvailableModels = async () => {
 
       // Build available models list (use i18n translation if available)
       const modelsList = Array.from(models).map((model) => {
-        const translated = t(`models.${model.replace(".", "_")}`);
-        return { label: translated, value: model };
+        const found = AVAILABLE_MODELS.find(m => m.value === model);
+        return { 
+          label: found?.label || t(`models.${model.replace(".", "_")}`),
+          value: model 
+        };
       });
       availableModels.value = modelsList;
 
@@ -109,6 +145,28 @@ const fetchAvailableModels = async () => {
   } catch (error) {
     console.error("Failed to fetch available models:", error);
   }
+};
+
+// Add a new model to the table
+const handleAddModel = () => {
+  if (!selectedModelToAdd.value) return;
+  
+  // Check if already added
+  if (availableModels.value.some(m => m.value === selectedModelToAdd.value)) {
+    return;
+  }
+  
+  // Find the model from constants
+  const modelToAdd = AVAILABLE_MODELS.find(m => m.value === selectedModelToAdd.value);
+  if (modelToAdd) {
+    availableModels.value.push({
+      label: modelToAdd.label,
+      value: modelToAdd.value,
+    });
+  }
+  
+  // Clear selection
+  selectedModelToAdd.value = undefined;
 };
 
 // Toggle expand/collapse
