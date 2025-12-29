@@ -204,7 +204,7 @@
     "downloading": "Downloading prediction results..."
   },
   "models": {
-    "linear_regression_hyperparameter_tuning": "Linear Regression",
+    "regression_linear_regression_hyperparameter_tuning": "Linear Regression",
     "regression.ridge": "Ridge",
     "regression.lasso": "Lasso",
     "regression.bayesian_ridge_regression": "Bayesian Ridge",

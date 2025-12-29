@@ -41,7 +41,7 @@ export async function syncModelMetadata() {
             .set({
               category: model.category,
               label: model.label,
-              paramGridSchema: model.param_grid_schema,
+              paramSchema: model.param_schema,
               updatedAt: new Date(),
             })
             .where(eq(modelMetadata.name, model.name))
@@ -55,7 +55,7 @@ export async function syncModelMetadata() {
               category: model.category,
               name: model.name,
               label: model.label,
-              paramGridSchema: model.param_grid_schema,
+              paramSchema: model.param_schema,
             })
             .run();
           syncedCount++;

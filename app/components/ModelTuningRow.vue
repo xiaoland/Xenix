@@ -105,11 +105,8 @@
 
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
-import { useFormatters } from "../composables/useFormatters";
 
 const { t } = useI18n();
-const { formatModelName, formatTimestamp, formatMetric, getStatusColor } =
-  useFormatters();
 
 const props = defineProps<{
   column: any;
@@ -124,6 +121,32 @@ const emit = defineEmits<{
   (e: "manual-train", modelName: string, modelLabel: string): void;
   (e: "view-logs", taskId: number, modelName: string): void;
 }>();
+
+const formatModelName = (name: string) => {
+  return name.replace(/_/g, " ");
+};
+
+const formatTimestamp = (timestamp: any) => {
+  if (!timestamp) return "";
+  const date = new Date(timestamp);
+  return date.toLocaleString();
+};
+
+const formatMetric = (value: string | number) => {
+  if (!value) return t("common.na");
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  return num.toFixed(4);
+};
+
+const getStatusColor = (status: string) => {
+  const colors: Record<string, string> = {
+    completed: "green",
+    running: "blue",
+    pending: "orange",
+    failed: "red",
+  };
+  return colors[status?.toLowerCase()] || "default";
+};
 
 const formatParamValue = (value: any): string => {
   if (Array.isArray(value)) {

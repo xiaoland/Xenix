@@ -18,27 +18,27 @@ from sklearn.base import BaseEstimator
 from .base import RegressionModel, ProgressInfo, TuneResult
 
 
-class LassoParamGrid(BaseModel):
-    """Parameter grid for LassoRegression."""
+class LassoModelParam(BaseModel):
+    """Parameters for LassoRegression."""
 
-    model__alpha: list[float] = Field(
-        default=[0.0001, 0.001, 0.01, 0.1, 1.0, 10.0],
-        description="Regularization alpha values to try for Lasso (model__alpha).",
+    model__alpha: float = Field(
+        default=1.0,
+        description="Regularization alpha value for Lasso (model__alpha).",
     )
 
 
-class LassoRegression(RegressionModel[Pipeline, LassoParamGrid]):
+class LassoRegression(RegressionModel[Pipeline, LassoModelParam]):
     """Lasso Regression model implementation."""
 
     @staticmethod
     def tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
-        param_grid: Optional[LassoParamGrid] = None,
+        param_grid: Optional[LassoModelParam] = None,
         progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
     ) -> TuneResult:
         """
-        Perform hyperparameter tuning for Lasso regression.
+        Train Lasso regression with specific parameters.
 
         Args:
             X_train: Training features as DataFrame
@@ -47,31 +47,30 @@ class LassoRegression(RegressionModel[Pipeline, LassoParamGrid]):
         Returns:
             Dictionary with 'best_params', 'best_score', and 'model'
         """
-        base_model = Pipeline(
-            [("scaler", StandardScaler()), ("model", Lasso(random_state=42))]
-        )
-
-        # Use provided param_grid or default
+        # Use provided params or default
         if param_grid is None:
-            param_grid_dict = LassoParamGrid().model_dump()
+            params = LassoModelParam().model_dump()
         else:
-            # Convert pydantic model to dict, excluding None values
-            param_grid_dict = param_grid.model_dump(exclude_none=True)
+            params = param_grid.model_dump(exclude_none=True)
 
-        grid_search = GridSearchCV(
-            estimator=base_model,
-            param_grid=param_grid_dict,
-            cv=5,
-            scoring="neg_mean_squared_error",
-            n_jobs=-1,
+        # Create pipeline model: Standardization + Lasso
+        model = Pipeline(
+            [
+                ("scaler", StandardScaler()),
+                (
+                    "model",
+                    Lasso(random_state=42, alpha=params.get("model__alpha", 1.0)),
+                ),
+            ]
         )
 
-        grid_search.fit(X_train, y_train)
+        # Train the model
+        model.fit(X_train, y_train)
 
         return {
-            "best_params": grid_search.best_params_,
-            "best_score": float(grid_search.best_score_),
-            "model": grid_search.best_estimator_,
+            "best_params": params,
+            "best_score": 0.0,  # Not applicable for single parameter training
+            "model": model,
         }
 
     @staticmethod

@@ -16,54 +16,56 @@ from sklearn.base import BaseEstimator
 from .base import RegressionModel, ProgressInfo, TuneResult
 
 
-class BayesianRidgeParamGrid(BaseModel):
-    """Parameter grid for BayesianRidgeRegressionModel."""
+class BayesianRidgeModelParam(BaseModel):
+    """Parameters for BayesianRidgeRegressionModel."""
 
-    model__alpha_1: list[float] = Field(
-        default=[1e-6, 1e-5, 1e-4],
-        description="Hyperparameter alpha_1 (shape parameter) values to try for BayesianRidge.",
+    model__alpha_1: float = Field(
+        default=1e-6,
+        description="Hyperparameter alpha_1 (shape parameter) for BayesianRidge.",
     )
-    model__alpha_2: list[float] = Field(
-        default=[1e-6, 1e-5, 1e-4],
-        description="Hyperparameter alpha_2 (scale parameter) values to try for BayesianRidge.",
+    model__alpha_2: float = Field(
+        default=1e-6,
+        description="Hyperparameter alpha_2 (scale parameter) for BayesianRidge.",
     )
 
 
-class BayesianRidgeRegressionModel(RegressionModel[Pipeline, BayesianRidgeParamGrid]):
+class BayesianRidgeRegressionModel(RegressionModel[Pipeline, BayesianRidgeModelParam]):
     """BayesianRidge Regression model implementation."""
 
     @staticmethod
     def tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
-        param_grid: Optional[BayesianRidgeParamGrid] = None,
+        param_grid: Optional[BayesianRidgeModelParam] = None,
         progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
     ) -> TuneResult:
-        base_model = Pipeline(
-            [("scaler", StandardScaler()), ("model", BayesianRidge())]
-        )
-
-        # Use provided param_grid or default
+        # Use provided params or default
         if param_grid is None:
-            param_grid_dict = BayesianRidgeParamGrid().model_dump()
+            params = BayesianRidgeModelParam().model_dump()
         else:
-            # Convert pydantic model to dict, excluding None values
-            param_grid_dict = param_grid.model_dump(exclude_none=True)
+            params = param_grid.model_dump(exclude_none=True)
 
-        grid_search = GridSearchCV(
-            estimator=base_model,
-            param_grid=param_grid_dict,
-            cv=5,
-            scoring="neg_mean_squared_error",
-            n_jobs=-1,
+        # Create pipeline model: Standardization + BayesianRidge
+        model = Pipeline(
+            [
+                ("scaler", StandardScaler()),
+                (
+                    "model",
+                    BayesianRidge(
+                        alpha_1=params.get("model__alpha_1", 1e-6),
+                        alpha_2=params.get("model__alpha_2", 1e-6),
+                    ),
+                ),
+            ]
         )
 
-        grid_search.fit(X_train, y_train)
+        # Train the model
+        model.fit(X_train, y_train)
 
         return {
-            "best_params": grid_search.best_params_,
-            "best_score": float(grid_search.best_score_),
-            "model": grid_search.best_estimator_,
+            "best_params": params,
+            "best_score": 0.0,  # Not applicable for single parameter training
+            "model": model,
         }
 
     @staticmethod

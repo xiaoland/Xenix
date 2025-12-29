@@ -16,24 +16,22 @@ from sklearn.base import BaseEstimator
 from .base import RegressionModel, ProgressInfo, TuneResult
 
 
-class RandomForestParamGrid(BaseModel):
-    """Parameter grid for RandomForestRegressionModel."""
+class RandomForestModelParam(BaseModel):
+    """Parameters for RandomForestRegressionModel."""
 
-    n_estimators: list[int] = Field(
-        default=[50, 100, 200], description="Number of trees to try in the forest."
-    )
-    max_depth: list[int | None] = Field(
-        default=[5, 10, None],
+    n_estimators: int = Field(default=100, description="Number of trees in the forest.")
+    max_depth: int | None = Field(
+        default=10,
         description="Maximum depth for each tree (int) or None for no limit.",
     )
-    min_samples_split: list[int] = Field(
-        default=[2, 5],
+    min_samples_split: int = Field(
+        default=2,
         description="Minimum number of samples required to split an internal node.",
     )
 
 
 class RandomForestRegressionModel(
-    RegressionModel[RandomForestRegressor, RandomForestParamGrid]
+    RegressionModel[RandomForestRegressor, RandomForestModelParam]
 ):
     """Random Forest Regression model implementation."""
 
@@ -41,11 +39,11 @@ class RandomForestRegressionModel(
     def tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
-        param_grid: Optional[RandomForestParamGrid] = None,
+        param_grid: Optional[RandomForestModelParam] = None,
         progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
     ) -> TuneResult:
         """
-        Perform hyperparameter tuning for Random Forest regression.
+        Train Random Forest regression with specific parameters.
 
         Args:
             X_train: Training features as DataFrame
@@ -54,29 +52,28 @@ class RandomForestRegressionModel(
         Returns:
             Dictionary with 'best_params', 'best_score', and 'model'
         """
-        base_model = RandomForestRegressor(random_state=42, n_jobs=-1)
-
-        # Use provided param_grid or default
+        # Use provided params or default
         if param_grid is None:
-            param_grid_dict = RandomForestParamGrid().model_dump()
+            params = RandomForestModelParam().model_dump()
         else:
-            # Convert pydantic model to dict, excluding None values
-            param_grid_dict = param_grid.model_dump(exclude_none=True)
+            params = param_grid.model_dump(exclude_none=True)
 
-        grid_search = GridSearchCV(
-            estimator=base_model,
-            param_grid=param_grid_dict,
-            cv=5,
-            scoring="neg_mean_squared_error",
+        # Create model with parameters
+        model = RandomForestRegressor(
+            random_state=42,
             n_jobs=-1,
+            n_estimators=params.get("n_estimators", 100),
+            max_depth=params.get("max_depth"),
+            min_samples_split=params.get("min_samples_split", 2),
         )
 
-        grid_search.fit(X_train, y_train)
+        # Train the model
+        model.fit(X_train, y_train)
 
         return {
-            "best_params": grid_search.best_params_,
-            "best_score": float(grid_search.best_score_),
-            "model": grid_search.best_estimator_,
+            "best_params": params,
+            "best_score": 0.0,  # Not applicable for single parameter training
+            "model": model,
         }
 
     @staticmethod

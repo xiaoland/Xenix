@@ -20,56 +20,54 @@ from sklearn.base import BaseEstimator
 from .base import RegressionModel, ProgressInfo, TuneResult
 
 
-class LightGBMParamGrid(BaseModel):
-    """Parameter grid for LightGBMRegressionModel."""
+class LightGBMModelParam(BaseModel):
+    """Parameters for LightGBMRegressionModel."""
 
-    n_estimators: list[int] = Field(
-        default=[50, 100, 150], description="Number of boosting rounds (trees) to try."
+    n_estimators: int = Field(
+        default=100, description="Number of boosting rounds (trees)."
     )
-    learning_rate: list[float] = Field(
-        default=[0.01, 0.1, 0.2], description="Learning rate values to try."
-    )
-    max_depth: list[int] = Field(
-        default=[3, 5, 7, -1],
+    learning_rate: float = Field(default=0.1, description="Learning rate.")
+    max_depth: int = Field(
+        default=3,
         description="Maximum tree depth (use -1 for no limit in LightGBM).",
     )
 
 
-class LightGBMRegressionModel(RegressionModel[LGBMRegressor, LightGBMParamGrid]):
+class LightGBMRegressionModel(RegressionModel[LGBMRegressor, LightGBMModelParam]):
     """LightGBM Regression model implementation."""
 
     @staticmethod
     def tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
-        param_grid: Optional[LightGBMParamGrid] = None,
+        param_grid: Optional[LightGBMModelParam] = None,
         progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
     ) -> TuneResult:
-        base_model = LGBMRegressor(
-            objective="regression", random_state=42, n_jobs=-1, verbose=-1, verbosity=-1
-        )
-
-        # Use provided param_grid or default
+        # Use provided params or default
         if param_grid is None:
-            param_grid_dict = LightGBMParamGrid().model_dump()
+            params = LightGBMModelParam().model_dump()
         else:
-            # Convert pydantic model to dict, excluding None values
-            param_grid_dict = param_grid.model_dump(exclude_none=True)
+            params = param_grid.model_dump(exclude_none=True)
 
-        grid_search = GridSearchCV(
-            estimator=base_model,
-            param_grid=param_grid_dict,
-            cv=5,
-            scoring="neg_mean_squared_error",
+        # Create model with parameters
+        model = LGBMRegressor(
+            objective="regression",
+            random_state=42,
             n_jobs=-1,
+            verbose=-1,
+            verbosity=-1,
+            n_estimators=params.get("n_estimators", 100),
+            learning_rate=params.get("learning_rate", 0.1),
+            max_depth=params.get("max_depth", 3),
         )
 
-        grid_search.fit(X_train, y_train)
+        # Train the model
+        model.fit(X_train, y_train)
 
         return {
-            "best_params": grid_search.best_params_,
-            "best_score": float(grid_search.best_score_),
-            "model": grid_search.best_estimator_,
+            "best_params": params,
+            "best_score": 0.0,  # Not applicable for single parameter training
+            "model": model,
         }
 
     @staticmethod

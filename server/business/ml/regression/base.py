@@ -34,10 +34,10 @@ class TuneResult(TypedDict):
 ModelType = TypeVar("ModelType", bound=Union[BaseEstimator, Pipeline])
 
 # Type variable for parameter grid type
-ParamGridType = TypeVar("ParamGridType", bound=BaseModel)
+ModelParamType = TypeVar("ModelParamType", bound=BaseModel)
 
 
-class RegressionModel(ABC, Generic[ModelType, ParamGridType]):
+class RegressionModel(ABC, Generic[ModelType, ModelParamType]):
     """
     Abstract base class for regression models.
 
@@ -46,7 +46,7 @@ class RegressionModel(ABC, Generic[ModelType, ParamGridType]):
 
     Type Parameters:
         ModelType: The specific sklearn model type (Pipeline or BaseEstimator subclass)
-        ParamGridType: The parameter grid model type (pydantic BaseModel subclass)
+        ModelParamType: The parameter model type (pydantic BaseModel subclass)
     """
 
     @staticmethod
