@@ -25,7 +25,7 @@
             <div class="text-xs text-gray-400">
               {{ t("autoForm.defaultValue") }}:
               <code class="bg-gray-100 px-1 py-0.5 rounded">{{
-                JSON.stringify(getDefaultValue(propSchema))
+                JSON.stringify(getDefaultValue(propSchema, mode))
               }}</code>
             </div>
           </template>
@@ -49,14 +49,14 @@
             <a-input-number
               v-else-if="getItemType(propSchema) === 'number' || getItemType(propSchema) === 'integer'"
               v-model:value="formData[propName as string]"
-              :placeholder="getDefaultValue(propSchema).toString()"
+              :placeholder="getDefaultValue(propSchema, mode).toString()"
               class="w-full"
             />
             <!-- String input -->
             <a-input
               v-else
               v-model:value="formData[propName as string]"
-              :placeholder="getDefaultValue(propSchema).toString()"
+              :placeholder="getDefaultValue(propSchema, mode).toString()"
             />
           </template>
         </a-form-item>
@@ -66,7 +66,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from "vue";
+import { ref, watch, nextTick } from "vue";
+import {
+  formatFieldLabel,
+  getArrayItemType,
+  getItemType,
+  getDefaultValue,
+  createDefaultValue,
+} from "../utils/schemaHelpers";
 
 const { t } = useI18n();
 
@@ -85,60 +92,6 @@ const emit = defineEmits<{
 const formRef = ref();
 const formData = ref<Record<string, any>>({});
 const isInitializing = ref(false);
-
-// Helper functions - must be defined before use
-const formatFieldLabel = (fieldName: string): string => {
-  // Convert snake_case or camelCase to Title Case
-  return fieldName
-    .replace(/_/g, " ")
-    .replace(/([A-Z])/g, " $1")
-    .replace(/^./, (str) => str.toUpperCase())
-    .trim();
-};
-
-const getArrayItemType = (propSchema: any): string => {
-  // Determine the type of items in the array
-  if (propSchema.items) {
-    return propSchema.items.type || "string";
-  }
-  // Try to infer from default values
-  if (Array.isArray(propSchema.default) && propSchema.default.length > 0) {
-    const firstItem = propSchema.default[0];
-    return typeof firstItem;
-  }
-  return "string";
-};
-
-const getItemType = (propSchema: any): string => {
-  // Determine the type of the item (for parameters mode, extract from array schema)
-  if (propSchema.items) {
-    return propSchema.items.type || "string";
-  }
-  // Try to infer from default values
-  if (Array.isArray(propSchema.default) && propSchema.default.length > 0) {
-    const firstItem = propSchema.default[0];
-    return typeof firstItem;
-  }
-  // Fallback to propSchema type if it's directly specified
-  if (propSchema.type) {
-    return propSchema.type;
-  }
-  return "string";
-};
-
-const getDefaultValue = (propSchema: any): any => {
-  if (propSchema.default !== undefined) {
-    if (props.mode === "paramGrid") {
-      return propSchema.default;
-    } else {
-      // For parameters mode, show first value from array
-      return Array.isArray(propSchema.default)
-        ? propSchema.default[0]
-        : propSchema.default;
-    }
-  }
-  return "";
-};
 
 const initializeFormData = () => {
   isInitializing.value = true;
@@ -168,18 +121,8 @@ const initializeFormData = () => {
         }
       } else {
         // Create default value based on mode and type
-        if (props.mode === "paramGrid") {
-          data[propName] = [];
-        } else {
-          const itemType = getItemType(schema);
-          if (itemType === "boolean") {
-            data[propName] = false;
-          } else if (itemType === "number" || itemType === "integer") {
-            data[propName] = 0;
-          } else {
-            data[propName] = "";
-          }
-        }
+        const itemType = getItemType(schema);
+        data[propName] = createDefaultValue(itemType, props.mode);
       }
     }
   }

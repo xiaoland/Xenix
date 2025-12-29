@@ -49,7 +49,7 @@
             @start-tuning="startTuning"
             @start-single-tune="startSingleModelTuning"
             @continue="nextStep"
-            @back="resetUpload"
+            @back="resetUploadAndClearData"
           />
         </div>
 
@@ -70,79 +70,58 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
 import { message } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
+import { useWorkflowState } from "../composables/useWorkflowState";
+import { useTaskPolling } from "../composables/useTaskPolling";
+import { useDatasetRegistration } from "../composables/useDatasetRegistration";
+import { useModelTraining } from "../composables/useModelTraining";
+import { TaskService, PredictionService } from "../services";
+import { AVAILABLE_MODELS } from "../constants/models";
 
 const { t } = useI18n();
 
-const currentStep = ref(0);
-const trainingFileList = ref([]);
-const predictionFileList = ref([]);
-const hasUploadedData = ref(false);
-
 // Available regression models
-const availableModels = [
-  {
-    label: "Linear Regression",
-    value: "regression.linear_regression_hyperparameter_tuning",
-  },
-  { label: "Ridge", value: "regression.ridge" },
-  { label: "Lasso", value: "regression.lasso" },
-  { label: "Bayesian Ridge", value: "regression.bayesian_ridge_regression" },
-  { label: "KNN", value: "regression.k_nearest_neighbors" },
-  { label: "Decision Tree", value: "regression.regression_decision_tree" },
-  { label: "Random Forest", value: "regression.random_forest" },
-  { label: "GBDT", value: "regression.gbdt" },
-  { label: "AdaBoost", value: "regression.adaboost" },
-  { label: "XGBoost", value: "regression.xgboost" },
-  { label: "LightGBM", value: "regression.lightgbm" },
-  { label: "Polynomial", value: "regression.polynomial_regression" },
-];
+const availableModels = AVAILABLE_MODELS;
 
-const selectedModels = ref<string[]>([]);
-const tuningStatus = ref<Record<string, string>>({});
-const tuningTasks = ref<Record<string, number>>({});
-const tuningResults = ref<any[]>([]);
-const uploadedFilePath = ref<string>("");
-const uploadedDatasetId = ref<string>("");
-const selectedFeatureColumns = ref<string[]>([]);
-const selectedTargetColumn = ref<string>("");
-const isTuning = ref(false);
-const isPredicting = ref(false);
-const selectedBestModel = ref<string | null>(null);
-const selectedTaskId = ref<number | null>(null);
-const predictionTask = ref<any>(null);
+// Workflow state
+const {
+  currentStep,
+  trainingFileList,
+  predictionFileList,
+  hasUploadedData,
+  selectedModels,
+  selectedFeatureColumns,
+  selectedTargetColumn,
+  selectedBestModel,
+  selectedTaskId,
+  isPredicting,
+  predictionTask,
+  activeLogTab,
+  tuningResults,
+  nextStep,
+  prevStep,
+  resetAll,
+  resetUpload,
+} = useWorkflowState();
 
-// Logs state
-const taskLogs = ref<Record<string, any[]>>({});
-const activeLogTab = ref<string>("");
+// Task polling
+const {
+  tuningStatus,
+  tuningTasks,
+  taskLogs,
+  pollTaskLogs,
+  pollTaskStatus,
+  registerTask,
+  clearTasks,
+} = useTaskPolling();
 
-const fetchTaskLogs = async (taskId: number) => {
-  try {
-    const response = await $fetch(`/api/obsrv/${taskId}`);
-    if (response.success) {
-      taskLogs.value[taskId] = response.logs.reverse();
-    }
-  } catch (error) {
-    console.error(`Failed to fetch logs for ${taskId}:`, error);
-  }
-};
+// Dataset registration
+const { uploadedDatasetId, registerFileAsDataset, clearDatasetId } =
+  useDatasetRegistration();
 
-const pollTaskLogs = (taskId: number) => {
-  fetchTaskLogs(taskId);
-
-  const interval = setInterval(async () => {
-    await fetchTaskLogs(taskId);
-
-    const isComplete = Object.values(tuningStatus.value).every(
-      (status) => status === "completed" || status === "failed"
-    );
-    if (isComplete) {
-      clearInterval(interval);
-    }
-  }, 3000);
-};
+// Model training
+const { isTuning, executeTrain } = useModelTraining();
 
 const handleColumnSelection = ({
   featureColumns,
@@ -160,95 +139,52 @@ const handleColumnSelection = ({
   message.success(t("messages.readyToTrain", { count: featureColumns.length }));
 };
 
-const resetUpload = () => {
-  hasUploadedData.value = false;
-  trainingFileList.value = [];
-  selectedModels.value = [];
-  selectedFeatureColumns.value = [];
-  selectedTargetColumn.value = "";
-  uploadedDatasetId.value = "";
-  tuningStatus.value = {};
-  tuningTasks.value = {};
-  tuningResults.value = [];
-  selectedBestModel.value = null;
+const resetUploadAndClearData = () => {
+  resetUpload();
+  clearDatasetId();
+  clearTasks();
 };
 
 const startTuning = async () => {
+  // Validate that we have training data
   if (!uploadedDatasetId.value && trainingFileList.value.length === 0) {
     message.error(t("messages.uploadError"));
     return;
   }
 
-  if (
-    selectedFeatureColumns.value.length === 0 ||
-    !selectedTargetColumn.value
-  ) {
-    message.error(t("messages.columnSelectionError"));
+  // Register file as dataset if needed
+  let datasetIdToUse = uploadedDatasetId.value;
+  if (!datasetIdToUse && trainingFileList.value.length > 0) {
+    const file = trainingFileList.value[0].originFileObj;
+    const registeredId = await registerFileAsDataset(file);
+    if (registeredId) {
+      datasetIdToUse = registeredId;
+    }
+  }
+
+  if (!datasetIdToUse) {
+    message.error(t("messages.datasetRegistrationFailed"));
     return;
   }
 
-  isTuning.value = true;
+  // Train all selected models
+  for (const modelValue of selectedModels.value) {
+    const response = await executeTrain(
+      {
+        datasetId: datasetIdToUse,
+        featureColumns: selectedFeatureColumns.value,
+        targetColumn: selectedTargetColumn.value,
+        model: modelValue,
+      },
+      "auto"
+    );
 
-  try {
-    // If uploading a new file, first register it as a dataset
-    let datasetIdToUse = uploadedDatasetId.value;
-
-    if (!uploadedDatasetId.value && trainingFileList.value.length > 0) {
-      // Auto-register the uploaded file as a dataset
-      const file = trainingFileList.value[0].originFileObj;
-      const datasetName = `Training Data - ${new Date().toLocaleString()}`;
-
-      const datasetFormData = new FormData();
-      datasetFormData.append("file", file);
-      datasetFormData.append("name", datasetName);
-      datasetFormData.append("description", "Auto-registered during training");
-
-      try {
-        const datasetResponse = await $fetch("/api/data", {
-          method: "POST",
-          body: datasetFormData,
-        });
-
-        if (datasetResponse.success) {
-          datasetIdToUse = datasetResponse.dataset.datasetId;
-          uploadedDatasetId.value = datasetIdToUse;
-          message.success("Training data registered as reusable dataset");
-        }
-      } catch (error) {
-        console.error("Failed to register dataset:", error);
-        // Continue with file upload if dataset registration fails
-      }
+    if (response) {
+      registerTask(modelValue, response.taskId);
+      activeLogTab.value = response.taskId.toString();
+      pollTaskStatus(response.taskId, modelValue).then(fetchTuningResults);
+      pollTaskLogs(response.taskId);
     }
-
-    for (const modelValue of selectedModels.value) {
-      tuningStatus.value[modelValue] = "pending";
-
-      // Use tune endpoint for auto-tuning with default parameters
-      const response = await $fetch("/api/tune", {
-        method: "POST",
-        body: {
-          datasetId: datasetIdToUse,
-          features: selectedFeatureColumns.value,
-          target: selectedTargetColumn.value,
-          model: modelValue,
-        },
-      });
-
-      if (response.success) {
-        tuningTasks.value[modelValue] = response.taskId;
-        tuningStatus.value[modelValue] = "running";
-        activeLogTab.value = response.taskId.toString();
-
-        pollTaskStatus(response.taskId, modelValue);
-        pollTaskLogs(response.taskId);
-      }
-    }
-
-    message.success(t("messages.tuningStarted"));
-  } catch (error) {
-    message.error(t("messages.tuningFailed") + ": " + error.message);
-  } finally {
-    isTuning.value = false;
   }
 };
 
@@ -258,137 +194,38 @@ const startSingleModelTuning = async (
   trainingType?: string,
   parentTaskId?: number
 ) => {
-  if (!uploadedDatasetId.value && trainingFileList.value.length === 0) {
-    message.error(t("messages.uploadError"));
+  // Register file as dataset if needed
+  let datasetIdToUse = uploadedDatasetId.value;
+  if (!datasetIdToUse && trainingFileList.value.length > 0) {
+    const file = trainingFileList.value[0].originFileObj;
+    const registeredId = await registerFileAsDataset(file);
+    if (registeredId) {
+      datasetIdToUse = registeredId;
+    }
+  }
+
+  if (!datasetIdToUse) {
+    message.error(t("messages.datasetRegistrationFailed"));
     return;
   }
 
-  if (
-    selectedFeatureColumns.value.length === 0 ||
-    !selectedTargetColumn.value
-  ) {
-    message.error(t("messages.columnSelectionError"));
-    return;
+  const response = await executeTrain(
+    {
+      datasetId: datasetIdToUse,
+      featureColumns: selectedFeatureColumns.value,
+      targetColumn: selectedTargetColumn.value,
+      model: modelValue,
+      paramGrid: paramGrid,
+    },
+    trainingType === "manual" ? "manual" : "auto"
+  );
+
+  if (response) {
+    registerTask(modelValue, response.taskId, "pending");
+    activeLogTab.value = response.taskId.toString();
+    pollTaskStatus(response.taskId, modelValue).then(fetchTuningResults);
+    pollTaskLogs(response.taskId);
   }
-
-  isTuning.value = true;
-  tuningStatus.value[modelValue] = "pending";
-
-  try {
-    // If uploading a new file, first register it as a dataset
-    let datasetIdToUse = uploadedDatasetId.value;
-
-    if (!uploadedDatasetId.value && trainingFileList.value.length > 0) {
-      // Auto-register the uploaded file as a dataset
-      const file = trainingFileList.value[0].originFileObj;
-      const datasetName = `Training Data - ${new Date().toLocaleString()}`;
-
-      const datasetFormData = new FormData();
-      datasetFormData.append("file", file);
-      datasetFormData.append("name", datasetName);
-      datasetFormData.append("description", "Auto-registered during training");
-
-      try {
-        const datasetResponse = await $fetch("/api/data", {
-          method: "POST",
-          body: datasetFormData,
-        });
-
-        if (datasetResponse.success) {
-          datasetIdToUse = datasetResponse.dataset.datasetId;
-          uploadedDatasetId.value = datasetIdToUse;
-        }
-      } catch (error) {
-        console.error("Failed to register dataset:", error);
-      }
-    }
-
-    // Use appropriate endpoint based on training type
-    let response;
-    if (trainingType === "auto" || !trainingType) {
-      // Auto-tune endpoint
-      response = await $fetch("/api/tune", {
-        method: "POST",
-        body: {
-          datasetId: datasetIdToUse,
-          features: selectedFeatureColumns.value,
-          target: selectedTargetColumn.value,
-          model: modelValue,
-          paramGrid: paramGrid || undefined,
-        },
-      });
-    } else {
-      // Manual train endpoint
-      response = await $fetch("/api/train", {
-        method: "POST",
-        body: {
-          datasetId: datasetIdToUse,
-          features: selectedFeatureColumns.value,
-          target: selectedTargetColumn.value,
-          model: modelValue,
-          parameters: paramGrid || {}, // paramGrid contains single values for manual train
-        },
-      });
-    }
-
-    if (response.success) {
-      tuningTasks.value[modelValue] = response.taskId;
-      tuningStatus.value[modelValue] = "running";
-      activeLogTab.value = response.taskId.toString();
-
-      pollTaskStatus(response.taskId, modelValue);
-      pollTaskLogs(response.taskId);
-
-      message.success(t("messages.tuningStarted"));
-    }
-  } catch (error) {
-    message.error(t("messages.tuningFailed") + ": " + error.message);
-    tuningStatus.value[modelValue] = "failed";
-  } finally {
-    isTuning.value = false;
-  }
-};
-
-const pollTaskStatus = async (taskId: number, modelValue?: string) => {
-  const maxAttempts = 120;
-  let attempts = 0;
-
-  while (attempts < maxAttempts) {
-    try {
-      const response = await $fetch(`/api/task/${taskId}`);
-
-      if (
-        modelValue &&
-        response.task.status !== tuningStatus.value[modelValue]
-      ) {
-        tuningStatus.value[modelValue] = response.task.status;
-      }
-
-      if (response.task.status === "completed") {
-        await fetchTuningResults();
-        return response;
-      }
-
-      if (response.task.status === "failed") {
-        return response;
-      }
-
-      attempts++;
-      if (attempts < maxAttempts) {
-        // Wait 5 seconds before next poll
-        await new Promise((resolve) => setTimeout(resolve, 5000));
-      }
-    } catch (error) {
-      console.error("Failed to poll task status:", error);
-      attempts++;
-      if (attempts < maxAttempts) {
-        // Wait 5 seconds before retry on error
-        await new Promise((resolve) => setTimeout(resolve, 5000));
-      }
-    }
-  }
-
-  return null; // Return null if max attempts reached
 };
 
 const fetchTuningResults = async () => {
@@ -396,31 +233,38 @@ const fetchTuningResults = async () => {
     const taskIds = Object.values(tuningTasks.value);
     const results = await Promise.all(
       taskIds.map((taskId) =>
-        $fetch(`/api/results/${taskId}`).catch(() => null)
+        TaskService.fetchResults(taskId).catch(() => null)
       )
     );
 
     const validResults = results
-      .filter((r) => r !== null && r.success && r.results)
+      .filter((r): r is NonNullable<typeof r> => r !== null && r.success && r.results)
       .map((r) => {
         const result = r.results;
-        // Extract model from result
         const model = result.model || Object.keys(tuningTasks.value).find(
           (k) => tuningTasks.value[k] === taskIds[results.indexOf(r)]
         );
         
+        if (!model) {
+          console.warn("Model not found for result:", result);
+          return null;
+        }
+        
         return {
-          model: model,
+          model,
           params: result.params,
-          mse_train: result.metrics?.mse_train,
-          mae_train: result.metrics?.mae_train,
-          r2_train: result.metrics?.r2_train,
-          mse_test: result.metrics?.mse_test,
-          mae_test: result.metrics?.mae_test,
-          r2_test: result.metrics?.r2_test,
+          metrics: {
+            mse_train: result.metrics?.mse_train,
+            mae_train: result.metrics?.mae_train,
+            r2_train: result.metrics?.r2_train,
+            mse_test: result.metrics?.mse_test,
+            mae_test: result.metrics?.mae_test,
+            r2_test: result.metrics?.r2_test,
+          },
           status: tuningStatus.value[model] || "completed",
         };
-      });
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
 
     tuningResults.value = validResults;
   } catch (error) {
@@ -444,7 +288,6 @@ const startPrediction = async () => {
     return;
   }
 
-  // Find the task ID for the selected model
   const selectedModelTaskId = tuningTasks.value[selectedBestModel.value];
   if (!selectedModelTaskId) {
     message.error(t("messages.tuningTaskError"));
@@ -454,20 +297,13 @@ const startPrediction = async () => {
   isPredicting.value = true;
 
   try {
-    const formData = new FormData();
-    formData.append("file", predictionFileList.value[0].originFileObj);
-    formData.append("model", selectedBestModel.value);
-    formData.append("tuningTaskId", selectedModelTaskId.toString());
-    formData.append("trainingDatasetId", uploadedDatasetId.value);
-    formData.append(
-      "featureColumns",
-      JSON.stringify(selectedFeatureColumns.value)
-    );
-    formData.append("targetColumn", selectedTargetColumn.value);
-
-    const response = await $fetch("/api/predict", {
-      method: "POST",
-      body: formData,
+    const response = await PredictionService.start({
+      file: predictionFileList.value[0].originFileObj,
+      model: selectedBestModel.value,
+      tuningTaskId: selectedModelTaskId,
+      trainingDatasetId: uploadedDatasetId.value,
+      featureColumns: selectedFeatureColumns.value,
+      targetColumn: selectedTargetColumn.value,
     });
 
     if (response.success) {
@@ -475,16 +311,13 @@ const startPrediction = async () => {
       message.success(t("messages.predictionStarted"));
 
       const result = await pollTaskStatus(response.taskId);
-      console.log("Polling result:", result);
 
       if (result && result.task.status === "completed") {
         predictionTask.value.status = "completed";
-        // Get output file from task result or parameter
         const taskResult: any = result.task.result || {};
         const taskParameter: any = result.task.parameter || {};
         predictionTask.value.outputFile = taskResult.outputFile || taskParameter.outputFile || response.outputFile;
         predictionTask.value.taskId = result.task.id;
-        console.log("Updated predictionTask:", predictionTask.value);
         message.success(
           t("messages.predictionCompleted", {
             path: predictionTask.value.outputFile,
@@ -498,43 +331,16 @@ const startPrediction = async () => {
         );
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     message.error(t("messages.predictionError") + ": " + error.message);
   } finally {
     isPredicting.value = false;
   }
 };
 
-const nextStep = () => {
-  if (currentStep.value < 1) {
-    currentStep.value++;
-  }
-};
-
-const prevStep = () => {
-  if (currentStep.value > 0) {
-    currentStep.value--;
-  }
-};
-
 const reset = () => {
-  currentStep.value = 0;
-  trainingFileList.value = [];
-  predictionFileList.value = [];
-  hasUploadedData.value = false;
-  selectedModels.value = [];
-  selectedFeatureColumns.value = [];
-  selectedTargetColumn.value = "";
-  uploadedDatasetId.value = "";
-  tuningStatus.value = {};
-  tuningTasks.value = {};
-  tuningResults.value = [];
-  uploadedFilePath.value = "";
-  isTuning.value = false;
-  isPredicting.value = false;
-  selectedBestModel.value = null;
-  predictionTask.value = null;
-  taskLogs.value = {};
-  activeLogTab.value = "";
+  resetAll();
+  clearDatasetId();
+  clearTasks();
 };
 </script>

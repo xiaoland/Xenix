@@ -84,10 +84,13 @@
 import { ref, onMounted } from "vue";
 import type { UploadProps } from "ant-design-vue";
 import { message } from "ant-design-vue";
-import * as XLSX from "xlsx";
 import { useI18n } from "vue-i18n";
+import { useFileUpload } from "../composables/useFileUpload";
+import { DatasetService } from "../services";
+import type { Dataset } from "../types";
 
 const { t } = useI18n();
+const { isLoadingColumns, readExcelColumns, validateExcelFile } = useFileUpload();
 
 const fileList = defineModel<any[]>({ required: true });
 
@@ -101,33 +104,19 @@ const emit = defineEmits<{
   ];
 }>();
 
-interface Dataset {
-  id: number;
-  datasetId: string;
-  name: string;
-  description?: string;
-  fileName: string;
-  fileSize: number;
-  columns: string[];
-  rowCount: number;
-  createdAt: string;
-}
-
 const datasets = ref<Dataset[]>([]);
 const isLoadingDatasets = ref(false);
 const selectedDatasetId = ref<string | undefined>(undefined);
 const selectedDataset = ref<Dataset | null>(null);
 
 const showColumnSelection = ref(false);
-const isLoadingColumns = ref(false);
 const excelColumns = ref<string[]>([]);
 const selectedFeatureColumns = ref<string[]>([]);
 const selectedTargetColumn = ref<string | undefined>(undefined);
 
 const beforeUpload: UploadProps["beforeUpload"] = (file) => {
-  const isExcel = file.name.endsWith(".xlsx") || file.name.endsWith(".xls");
-  if (!isExcel) {
-    message.error("You can only upload Excel files!");
+  if (!validateExcelFile(file)) {
+    return false;
   }
   // Clear dataset selection if uploading file
   selectedDatasetId.value = undefined;
@@ -138,7 +127,7 @@ const beforeUpload: UploadProps["beforeUpload"] = (file) => {
 const fetchDatasets = async () => {
   isLoadingDatasets.value = true;
   try {
-    const response = await $fetch("/api/data");
+    const response = await DatasetService.fetchAll();
     if (response.success) {
       datasets.value = response.datasets;
     }
@@ -180,19 +169,11 @@ const handleDatasetContinue = async () => {
     return;
   }
 
-  isLoadingColumns.value = true;
-  try {
-    excelColumns.value = selectedDataset.value.columns;
-    showColumnSelection.value = true;
-    message.success(
-      `Found ${selectedDataset.value.columns.length} columns in the dataset`
-    );
-  } catch (error) {
-    console.error("Error loading dataset columns:", error);
-    message.error("Failed to load dataset columns");
-  } finally {
-    isLoadingColumns.value = false;
-  }
+  excelColumns.value = selectedDataset.value.columns;
+  showColumnSelection.value = true;
+  message.success(
+    `Found ${selectedDataset.value.columns.length} columns in the dataset`
+  );
 };
 
 const handleFileUploaded = async () => {
@@ -201,47 +182,12 @@ const handleFileUploaded = async () => {
     return;
   }
 
-  isLoadingColumns.value = true;
-
-  try {
-    // Read the Excel file to extract column names
-    const file = fileList.value[0].originFileObj;
-    const arrayBuffer = await file.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: "array" });
-
-    // Get the first sheet
-    const firstSheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[firstSheetName];
-
-    // Convert to JSON to get column names
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-    if (jsonData.length === 0) {
-      message.error("The Excel file appears to be empty");
-      return;
-    }
-
-    // First row contains column names
-    const columns = (jsonData[0] as any[]).filter(
-      (col) => col !== null && col !== undefined && col !== ""
-    );
-
-    if (columns.length === 0) {
-      message.error("No column headers found in the Excel file");
-      return;
-    }
-
-    excelColumns.value = columns.map(String);
+  const file = fileList.value[0].originFileObj;
+  const columns = await readExcelColumns(file);
+  
+  if (columns.length > 0) {
+    excelColumns.value = columns;
     showColumnSelection.value = true;
-
-    message.success(`Found ${columns.length} columns in the Excel file`);
-  } catch (error) {
-    console.error("Error reading Excel file:", error);
-    message.error(
-      "Failed to read Excel file. Please make sure it has a valid format."
-    );
-  } finally {
-    isLoadingColumns.value = false;
   }
 };
 

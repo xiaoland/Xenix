@@ -1,4 +1,5 @@
 import { ref, watch } from "vue";
+import { TaskService } from "~/services";
 
 /**
  * Composable for managing training history data fetching and state
@@ -10,7 +11,7 @@ export function useTrainingHistory(tuningResults: any) {
   // Fetch training history for a specific model
   const fetchTrainingHistory = async (model: string) => {
     try {
-      const response = await $fetch(`/api/results/history/${model}`);
+      const response = await TaskService.fetchTrainingHistory(model);
       if (response.success && response.results) {
         trainingHistory.value[model] = response.results;
       }
