@@ -16,8 +16,8 @@
       <a-card class="mb-6">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-2xl font-semibold">{{ $t("home.projects") }}</h2>
-          <a-button type="primary" @click="showCreateProjectModal = true">
-            <template #icon><span class="i-mdi-plus" /></template>
+          <a-button type="primary" class="inline-flex items-center" @click="showCreateProjectModal = true">
+            <span class="i-mdi-plus mr-1" />
             {{ $t("home.createProject") }}
           </a-button>
         </div>
@@ -56,20 +56,20 @@
                 
                 <!-- Project Actions -->
                 <div class="flex gap-2">
-                  <a-button size="small" @click="manageProjectDatasets(project.id)">
-                    <template #icon><span class="i-mdi-database" /></template>
+                  <a-button size="small" class="inline-flex items-center" @click="manageProjectDatasets(project.id)">
+                    <span class="i-mdi-database mr-1" />
                     Manage Datasets
                   </a-button>
-                  <a-button size="small" @click="viewEditProjectDetails(project)">
-                    <template #icon><span class="i-mdi-information" /></template>
+                  <a-button size="small" class="inline-flex items-center" @click="viewEditProjectDetails(project)">
+                    <span class="i-mdi-information mr-1" />
                     View Details
                   </a-button>
                   <a-popconfirm
                     :title="$t('projects.deleteConfirm')"
                     @confirm="deleteProject(project.id)"
                   >
-                    <a-button size="small" danger>
-                      <template #icon><span class="i-mdi-delete" /></template>
+                    <a-button size="small" danger class="inline-flex items-center">
+                      <span class="i-mdi-delete mr-1" />
                     </a-button>
                   </a-popconfirm>
                 </div>
@@ -91,15 +91,15 @@
                     </a-tag>
                   </div>
                   <div class="flex gap-1" @click.stop>
-                    <a-button size="small" type="text" @click="editWorkItem(workItem)">
-                      <template #icon><span class="i-mdi-pencil" /></template>
+                    <a-button size="small" type="text" class="inline-flex items-center" @click="editWorkItem(workItem)">
+                      <span class="i-mdi-pencil mr-1" />
                     </a-button>
                     <a-popconfirm
                       :title="$t('workItems.deleteConfirm')"
                       @confirm="deleteWorkItem(workItem.id)"
                     >
-                      <a-button size="small" type="text" danger>
-                        <template #icon><span class="i-mdi-delete" /></template>
+                      <a-button size="small" type="text" danger class="inline-flex items-center">
+                        <span class="i-mdi-delete mr-1" />
                       </a-button>
                     </a-popconfirm>
                   </div>
@@ -108,8 +108,8 @@
 
               <!-- Add Work Item Button -->
               <div class="ml-7 mt-2">
-                <a-button size="small" type="dashed" @click="showCreateWorkItemModal = true; newWorkItem.projectId = project.id">
-                  <template #icon><span class="i-mdi-plus" /></template>
+                <a-button size="small" type="dashed" class="inline-flex items-center" @click="showCreateWorkItemModal = true; newWorkItem.projectId = project.id">
+                  <span class="i-mdi-plus mr-1" />
                   Add Work Item
                 </a-button>
               </div>

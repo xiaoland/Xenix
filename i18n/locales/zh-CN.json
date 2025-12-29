@@ -9,8 +9,8 @@
     "pythonEnv": "Python环境"
   },
   "home": {
-    "title": "项目与工作项",
-    "subtitle": "管理您的项目和工作项",
+    "title": "Xenix",
+    "subtitle": "机器学习模型训练与预测平台",
     "projects": "项目",
     "workItems": "工作项",
     "createProject": "创建项目",

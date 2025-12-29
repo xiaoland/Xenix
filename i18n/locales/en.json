@@ -9,8 +9,8 @@
     "pythonEnv": "PyEnv"
   },
   "home": {
-    "title": "Projects & Work Items",
-    "subtitle": "Manage your projects and work items",
+    "title": "Xenix",
+    "subtitle": "Machine Learning Model Training and Prediction Platform",
     "projects": "Projects",
     "workItems": "Work Items",
     "createProject": "Create Project",
