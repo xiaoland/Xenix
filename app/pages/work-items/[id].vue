@@ -119,6 +119,7 @@ import { useWorkflowState } from "../../composables/useWorkflowState";
 import { useDatasetRegistration } from "../../composables/useDatasetRegistration";
 import { useTuningStep } from "../../composables/useTuningStep";
 import { usePredictionStep } from "../../composables/usePredictionStep";
+import { WorkItemService } from "../../services";
 import { AVAILABLE_MODELS } from "../../constants/models";
 import type { WorkItem } from "../../types";
 
@@ -188,13 +189,10 @@ const handleColumnSelection = async ({
   // Save upload step results to work item
   if (workItem.value) {
     try {
-      const response = await $fetch(`/api/work-items/${workItem.value.id}`, {
-        method: 'PUT',
-        body: {
-          datasetId: datasetId,
-          featureColumns: featureColumns,
-          targetColumn: targetColumn,
-        },
+      const response = await WorkItemService.update(workItem.value.id, {
+        datasetId: datasetId,
+        featureColumns: featureColumns,
+        targetColumn: targetColumn,
       });
       
       // Update local work item state with saved data
@@ -282,7 +280,7 @@ const fetchWorkItem = async () => {
 
   isLoading.value = true;
   try {
-    const response = await $fetch(`/api/work-items/${workItemId}`);
+    const response = await WorkItemService.fetchById(workItemId);
     if (response.success) {
       workItem.value = response.workItem;
       

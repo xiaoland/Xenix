@@ -9,6 +9,7 @@ import { useI18n } from "vue-i18n";
 import { useModelTraining } from "./useModelTraining";
 import { useTaskPolling } from "./useTaskPolling";
 import { useDatasetRegistration } from "./useDatasetRegistration";
+import { WorkItemService } from "~/services";
 import type { TuningResult } from "~/types";
 
 export function useTuningStep() {
@@ -39,7 +40,7 @@ export function useTuningStep() {
     if (!workItemId) return;
 
     try {
-      const response = await $fetch(`/api/work-items/${workItemId}`);
+      const response = await WorkItemService.fetchById(workItemId);
       if (response.success && response.workItem.tasks) {
         const tasks = response.workItem.tasks.filter(
           (t: any) => t.type === "auto-tune" && t.status === "completed"

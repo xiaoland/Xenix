@@ -6,7 +6,7 @@
 import { ref } from "vue";
 import { message } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
-import { DatasetService } from "~/services";
+import { DatasetService, ProjectService } from "~/services";
 import { useFileUpload } from "./useFileUpload";
 import type { Dataset } from "~/types";
 
@@ -36,7 +36,7 @@ export function useUploadStep(projectId?: number) {
     isLoadingDatasets.value = true;
     try {
       if (projectId) {
-        const projectResponse = await $fetch(`/api/projects/${projectId}`);
+        const projectResponse = await ProjectService.fetchById(projectId);
         if (projectResponse.success) {
           datasets.value = projectResponse.project.datasets || [];
         }
