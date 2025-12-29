@@ -1,25 +1,38 @@
 import { db, schema } from '../../database';
-import { desc } from 'drizzle-orm';
-import { safeParseJsonArray } from '../../utils/datasetUtils';
+import { desc, eq } from 'drizzle-orm';
 
 export default defineEventHandler(async (event) => {
   try {
-    // Fetch all projects, ordered by most recent first
+    // Fetch all projects with their work items, ordered by most recent first
     const projects = await db
       .select()
       .from(schema.projects)
       .orderBy(desc(schema.projects.createdAt));
 
-    // Parse JSON fields safely
-    const projectsWithParsedFields = projects.map(project => ({
-      ...project,
-      datasetIds: safeParseJsonArray(project.datasetIds, []),
-      workItemIds: safeParseJsonArray(project.workItemIds, []),
-    }));
+    // For each project, fetch its work items and datasets
+    const projectsWithRelations = await Promise.all(
+      projects.map(async (project) => {
+        const workItems = await db
+          .select()
+          .from(schema.workItems)
+          .where(eq(schema.workItems.projectId, project.id));
+        
+        const datasets = await db
+          .select()
+          .from(schema.datasets)
+          .where(eq(schema.datasets.projectId, project.id));
+
+        return {
+          ...project,
+          workItems,
+          datasets,
+        };
+      })
+    );
 
     return {
       success: true,
-      projects: projectsWithParsedFields,
+      projects: projectsWithRelations,
     };
   } catch (error) {
     console.error('Projects fetch error:', error);

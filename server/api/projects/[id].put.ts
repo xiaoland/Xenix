@@ -3,13 +3,13 @@ import { eq } from 'drizzle-orm';
 
 export default defineEventHandler(async (event) => {
   try {
-    const projectId = getRouterParam(event, 'id');
+    const id = Number(getRouterParam(event, 'id'));
     const body = await readBody(event);
 
-    if (!projectId) {
+    if (isNaN(id)) {
       throw createError({
         statusCode: 400,
-        message: 'Project ID is required',
+        message: 'Invalid project ID',
       });
     }
 
@@ -23,12 +23,6 @@ export default defineEventHandler(async (event) => {
     if (body.description !== undefined) {
       updateData.description = body.description;
     }
-    if (body.datasetIds !== undefined) {
-      updateData.datasetIds = body.datasetIds;
-    }
-    if (body.workItemIds !== undefined) {
-      updateData.workItemIds = body.workItemIds;
-    }
     if (body.status !== undefined) {
       updateData.status = body.status;
     }
@@ -36,7 +30,7 @@ export default defineEventHandler(async (event) => {
     await db
       .update(schema.projects)
       .set(updateData)
-      .where(eq(schema.projects.projectId, projectId));
+      .where(eq(schema.projects.id, id));
 
     return {
       success: true,

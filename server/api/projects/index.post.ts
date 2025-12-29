@@ -1,5 +1,4 @@
 import { db, schema } from '../../database';
-import { nanoid } from 'nanoid';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -13,29 +12,18 @@ export default defineEventHandler(async (event) => {
       });
     }
 
-    // Generate project ID
-    const projectId = `proj_${nanoid(10)}`;
-
     // Create project record
-    await db.insert(schema.projects).values({
-      projectId,
+    const result = await db.insert(schema.projects).values({
       name,
       description: description || null,
-      datasetIds: [],
-      workItemIds: [],
       status: 'active',
-    });
+    }).returning();
+
+    const project = result[0];
 
     return {
       success: true,
-      project: {
-        projectId,
-        name,
-        description,
-        datasetIds: [],
-        workItemIds: [],
-        status: 'active',
-      },
+      project,
       message: 'Project created successfully',
     };
   } catch (error) {

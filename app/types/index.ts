@@ -4,7 +4,7 @@
 
 export interface Dataset {
   id: number;
-  datasetId: string;
+  projectId?: number;
   name: string;
   description?: string;
   fileName: string;
@@ -39,6 +39,7 @@ export interface TuningResult {
 
 export interface TaskInfo {
   id: number;
+  workItemId?: number;
   status: string;
   result?: any;
   parameter?: any;
@@ -61,7 +62,7 @@ export interface PredictionTask {
 export interface ColumnSelection {
   featureColumns: string[];
   targetColumn: string;
-  datasetId?: string;
+  datasetId?: number;
 }
 
 export type TrainingType = "auto" | "manual";
@@ -70,11 +71,9 @@ export type TaskStatus = "pending" | "running" | "completed" | "failed";
 
 export interface WorkItem {
   id: number;
-  workItemId: string;
+  projectId: number; // Required - work items must belong to a project
   name: string;
   description?: string;
-  projectId: string; // Required - work items must belong to a project
-  taskIds: number[];
   status: 'active' | 'completed' | 'archived';
   createdAt: string;
   updatedAt: string;
@@ -82,12 +81,11 @@ export interface WorkItem {
 
 export interface Project {
   id: number;
-  projectId: string;
   name: string;
   description?: string;
-  datasetIds: string[];
-  workItemIds: string[];
   status: 'active' | 'completed' | 'archived';
   createdAt: string;
   updatedAt: string;
+  workItems?: WorkItem[]; // Populated when needed
+  datasets?: Dataset[]; // Populated when needed
 }

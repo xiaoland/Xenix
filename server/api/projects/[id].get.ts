@@ -1,22 +1,21 @@
 import { db, schema } from '../../database';
 import { eq } from 'drizzle-orm';
-import { safeParseJsonArray } from '../../utils/datasetUtils';
 
 export default defineEventHandler(async (event) => {
   try {
-    const projectId = getRouterParam(event, 'id');
+    const id = Number(getRouterParam(event, 'id'));
 
-    if (!projectId) {
+    if (isNaN(id)) {
       throw createError({
         statusCode: 400,
-        message: 'Project ID is required',
+        message: 'Invalid project ID',
       });
     }
 
     const projects = await db
       .select()
       .from(schema.projects)
-      .where(eq(schema.projects.projectId, projectId))
+      .where(eq(schema.projects.id, id))
       .limit(1);
 
     if (projects.length === 0) {
@@ -28,12 +27,23 @@ export default defineEventHandler(async (event) => {
 
     const project = projects[0];
 
+    // Fetch related work items and datasets
+    const workItems = await db
+      .select()
+      .from(schema.workItems)
+      .where(eq(schema.workItems.projectId, id));
+    
+    const datasets = await db
+      .select()
+      .from(schema.datasets)
+      .where(eq(schema.datasets.projectId, id));
+
     return {
       success: true,
       project: {
         ...project,
-        datasetIds: safeParseJsonArray(project.datasetIds, []),
-        workItemIds: safeParseJsonArray(project.workItemIds, []),
+        workItems,
+        datasets,
       },
     };
   } catch (error) {

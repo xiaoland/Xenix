@@ -1,7 +1,5 @@
 import { db, schema } from '../../database';
-import { nanoid } from 'nanoid';
 import { eq } from 'drizzle-orm';
-import { safeParseJsonArray } from '../../utils/datasetUtils';
 
 export default defineEventHandler(async (event) => {
   try {
@@ -15,10 +13,10 @@ export default defineEventHandler(async (event) => {
       });
     }
 
-    if (!projectId) {
+    if (!projectId || isNaN(Number(projectId))) {
       throw createError({
         statusCode: 400,
-        message: 'Project ID is required',
+        message: 'Valid project ID is required',
       });
     }
 
@@ -26,7 +24,7 @@ export default defineEventHandler(async (event) => {
     const projects = await db
       .select()
       .from(schema.projects)
-      .where(eq(schema.projects.projectId, projectId))
+      .where(eq(schema.projects.id, Number(projectId)))
       .limit(1);
 
     if (projects.length === 0) {
@@ -36,41 +34,19 @@ export default defineEventHandler(async (event) => {
       });
     }
 
-    // Generate work item ID
-    const workItemId = `work_${nanoid(10)}`;
-
     // Create work item record
-    await db.insert(schema.workItems).values({
-      workItemId,
+    const result = await db.insert(schema.workItems).values({
+      projectId: Number(projectId),
       name,
       description: description || null,
-      projectId,
-      taskIds: [],
       status: 'active',
-    });
+    }).returning();
 
-    // Update project to include this work item
-    const project = projects[0];
-    const currentWorkItemIds = safeParseJsonArray(project.workItemIds, []);
-    
-    await db
-      .update(schema.projects)
-      .set({
-        workItemIds: [...currentWorkItemIds, workItemId],
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.projects.projectId, projectId));
+    const workItem = result[0];
 
     return {
       success: true,
-      workItem: {
-        workItemId,
-        name,
-        description,
-        projectId,
-        taskIds: [],
-        status: 'active',
-      },
+      workItem,
       message: 'Work item created successfully',
     };
   } catch (error) {
