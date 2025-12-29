@@ -1,60 +1,21 @@
 import { db, schema } from '../../database';
 import { eq } from 'drizzle-orm';
-import { safeParseJsonArray } from '../../utils/datasetUtils';
 
 export default defineEventHandler(async (event) => {
   try {
-    const workItemId = getRouterParam(event, 'id');
+    const id = Number(getRouterParam(event, 'id'));
 
-    if (!workItemId) {
+    if (isNaN(id)) {
       throw createError({
         statusCode: 400,
-        message: 'Work item ID is required',
+        message: 'Invalid work item ID',
       });
     }
 
-    // Get work item to find its project
-    const workItems = await db
-      .select()
-      .from(schema.workItems)
-      .where(eq(schema.workItems.workItemId, workItemId))
-      .limit(1);
-
-    if (workItems.length === 0) {
-      throw createError({
-        statusCode: 404,
-        message: 'Work item not found',
-      });
-    }
-
-    const workItem = workItems[0];
-
-    // Remove work item from project's workItemIds
-    if (workItem.projectId) {
-      const projects = await db
-        .select()
-        .from(schema.projects)
-        .where(eq(schema.projects.projectId, workItem.projectId))
-        .limit(1);
-
-      if (projects.length > 0) {
-        const project = projects[0];
-        const currentWorkItemIds = safeParseJsonArray(project.workItemIds, []);
-        
-        await db
-          .update(schema.projects)
-          .set({
-            workItemIds: currentWorkItemIds.filter((id: string) => id !== workItemId),
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.projects.projectId, workItem.projectId));
-      }
-    }
-
-    // Delete work item
+    // Delete work item (cascades to tasks due to FK if configured)
     await db
       .delete(schema.workItems)
-      .where(eq(schema.workItems.workItemId, workItemId));
+      .where(eq(schema.workItems.id, id));
 
     return {
       success: true,

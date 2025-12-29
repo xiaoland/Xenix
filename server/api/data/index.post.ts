@@ -1,5 +1,5 @@
 import { db, schema } from "../../database";
-import { generateDatasetId, analyzeExcelFile, safeParseJsonArray } from "../../utils/datasetUtils";
+import { analyzeExcelFile } from "../../utils/datasetUtils";
 import { validateExcelFile, saveUploadedFile } from "../../utils/taskUtils";
 import { eq } from "drizzle-orm";
 import path from "path";
@@ -11,7 +11,8 @@ export default defineEventHandler(async (event) => {
     const file = formData.get("file") as File;
     const name = formData.get("name") as string;
     const description = (formData.get("description") as string) || null;
-    const projectId = (formData.get("projectId") as string) || null;
+    const projectIdStr = (formData.get("projectId") as string) || null;
+    const projectId = projectIdStr ? Number(projectIdStr) : null;
 
     if (!file) {
       throw createError({
@@ -46,12 +47,9 @@ export default defineEventHandler(async (event) => {
     // Analyze the Excel file to get columns and row count
     const { columns, rowCount } = await analyzeExcelFile(filePath);
 
-    // Generate dataset ID
-    const datasetId = generateDatasetId();
-
-    // Create dataset record - store columns directly as JSONB
-    await db.insert(schema.datasets).values({
-      datasetId,
+    // Create dataset record with optional project link
+    const result = await db.insert(schema.datasets).values({
+      projectId: projectId && !isNaN(projectId) ? projectId : null,
       name,
       description,
       filePath,
@@ -59,40 +57,15 @@ export default defineEventHandler(async (event) => {
       fileSize,
       columns: columns, // Store as JSONB directly
       rowCount,
-    });
+    }).returning();
 
-    // If projectId is provided, add dataset to project
-    if (projectId) {
-      const projects = await db
-        .select()
-        .from(schema.projects)
-        .where(eq(schema.projects.projectId, projectId))
-        .limit(1);
-
-      if (projects.length > 0) {
-        const project = projects[0];
-        const currentDatasetIds = safeParseJsonArray(project.datasetIds, []);
-        
-        await db
-          .update(schema.projects)
-          .set({
-            datasetIds: [...currentDatasetIds, datasetId],
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.projects.projectId, projectId));
-      }
-    }
+    const dataset = result[0];
 
     return {
       success: true,
       dataset: {
-        datasetId,
-        name,
-        description,
-        fileName: file.name,
-        fileSize,
+        ...dataset,
         columns,
-        rowCount,
       },
       message: "Dataset uploaded successfully",
     };

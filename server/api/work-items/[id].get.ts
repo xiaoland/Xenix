@@ -1,22 +1,21 @@
 import { db, schema } from '../../database';
 import { eq } from 'drizzle-orm';
-import { safeParseJsonArray } from '../../utils/datasetUtils';
 
 export default defineEventHandler(async (event) => {
   try {
-    const workItemId = getRouterParam(event, 'id');
+    const id = Number(getRouterParam(event, 'id'));
 
-    if (!workItemId) {
+    if (isNaN(id)) {
       throw createError({
         statusCode: 400,
-        message: 'Work item ID is required',
+        message: 'Invalid work item ID',
       });
     }
 
     const workItems = await db
       .select()
       .from(schema.workItems)
-      .where(eq(schema.workItems.workItemId, workItemId))
+      .where(eq(schema.workItems.id, id))
       .limit(1);
 
     if (workItems.length === 0) {
@@ -28,11 +27,17 @@ export default defineEventHandler(async (event) => {
 
     const workItem = workItems[0];
 
+    // Fetch related tasks
+    const tasks = await db
+      .select()
+      .from(schema.tasks)
+      .where(eq(schema.tasks.workItemId, id));
+
     return {
       success: true,
       workItem: {
         ...workItem,
-        taskIds: safeParseJsonArray(workItem.taskIds, []),
+        tasks,
       },
     };
   } catch (error) {

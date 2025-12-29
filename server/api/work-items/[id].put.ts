@@ -3,13 +3,13 @@ import { eq } from 'drizzle-orm';
 
 export default defineEventHandler(async (event) => {
   try {
-    const workItemId = getRouterParam(event, 'id');
+    const id = Number(getRouterParam(event, 'id'));
     const body = await readBody(event);
 
-    if (!workItemId) {
+    if (isNaN(id)) {
       throw createError({
         statusCode: 400,
-        message: 'Work item ID is required',
+        message: 'Invalid work item ID',
       });
     }
 
@@ -23,9 +23,6 @@ export default defineEventHandler(async (event) => {
     if (body.description !== undefined) {
       updateData.description = body.description;
     }
-    if (body.taskIds !== undefined) {
-      updateData.taskIds = body.taskIds;
-    }
     if (body.status !== undefined) {
       updateData.status = body.status;
     }
@@ -33,7 +30,7 @@ export default defineEventHandler(async (event) => {
     await db
       .update(schema.workItems)
       .set(updateData)
-      .where(eq(schema.workItems.workItemId, workItemId));
+      .where(eq(schema.workItems.id, id));
 
     return {
       success: true,
