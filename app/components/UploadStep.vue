@@ -19,8 +19,8 @@
           >
             <a-select-option
               v-for="dataset in datasets"
-              :key="dataset.datasetId"
-              :value="dataset.datasetId"
+              :key="dataset.id"
+              :value="dataset.id"
             >
               <div class="flex justify-between items-center">
                 <span>{{ dataset.name }}</span>
@@ -81,32 +81,38 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, watch } from "vue";
 import type { UploadProps } from "ant-design-vue";
 import { message } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
 import { useFileUpload } from "../composables/useFileUpload";
 import { DatasetService } from "../services";
-import type { Dataset } from "../types";
+import type { Dataset, Project } from "../types";
 
 const { t } = useI18n();
 const { isLoadingColumns, readExcelColumns, validateExcelFile } = useFileUpload();
 
 const fileList = defineModel<any[]>({ required: true });
 
+const props = defineProps<{
+  projectId?: number;
+}>();
+
 const emit = defineEmits<{
   continue: [
     {
       featureColumns: string[];
       targetColumn: string;
-      datasetId?: string;
+      datasetId?: number;
     }
   ];
 }>();
 
 const datasets = ref<Dataset[]>([]);
+const project = ref<Project | null>(null);
 const isLoadingDatasets = ref(false);
-const selectedDatasetId = ref<string | undefined>(undefined);
+const isLoadingProject = ref(false);
+const selectedDatasetId = ref<number | undefined>(undefined);
 const selectedDataset = ref<Dataset | null>(null);
 
 const showColumnSelection = ref(false);
@@ -127,9 +133,19 @@ const beforeUpload: UploadProps["beforeUpload"] = (file) => {
 const fetchDatasets = async () => {
   isLoadingDatasets.value = true;
   try {
-    const response = await DatasetService.fetchAll();
-    if (response.success) {
-      datasets.value = response.datasets;
+    // If projectId is provided, fetch project and filter datasets
+    if (props.projectId) {
+      const projectResponse = await $fetch(`/api/projects/${props.projectId}`);
+      if (projectResponse.success) {
+        project.value = projectResponse.project;
+        datasets.value = projectResponse.project.datasets || [];
+      }
+    } else {
+      // No project context, show all datasets
+      const response = await DatasetService.fetchAll();
+      if (response.success) {
+        datasets.value = response.datasets;
+      }
     }
   } catch (error) {
     console.error("Failed to fetch datasets:", error);
@@ -139,14 +155,14 @@ const fetchDatasets = async () => {
 };
 
 const filterDatasetOption = (input: string, option: any) => {
-  const dataset = datasets.value.find((d) => d.datasetId === option.value);
+  const dataset = datasets.value.find((d) => d.id === option.value);
   if (!dataset) return false;
   return dataset.name.toLowerCase().includes(input.toLowerCase());
 };
 
-const handleDatasetSelected = (datasetId: string) => {
+const handleDatasetSelected = (datasetId: number) => {
   selectedDataset.value =
-    datasets.value.find((d) => d.datasetId === datasetId) || null;
+    datasets.value.find((d) => d.id === datasetId) || null;
   // Clear file upload if dataset is selected
   fileList.value = [];
 };
@@ -220,6 +236,11 @@ const handleColumnSelection = ({
 };
 
 onMounted(() => {
+  fetchDatasets();
+});
+
+// Watch for projectId changes
+watch(() => props.projectId, () => {
   fetchDatasets();
 });
 </script>

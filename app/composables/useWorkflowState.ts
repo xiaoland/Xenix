@@ -31,7 +31,7 @@ export function useWorkflowState() {
 
   // Navigation
   const nextStep = () => {
-    if (currentStep.value < 1) {
+    if (currentStep.value < 2) {
       currentStep.value++;
     }
   };

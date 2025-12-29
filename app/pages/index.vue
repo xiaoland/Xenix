@@ -5,342 +5,481 @@
 
       <div class="text-center mb-8">
         <h1 class="text-4xl font-bold text-gray-900 mb-2">
-          {{ $t("app.title") }}
+          {{ $t("home.title") }}
         </h1>
         <p class="text-lg text-gray-600">
-          {{ $t("app.subtitle") }}
+          {{ $t("home.subtitle") }}
         </p>
       </div>
 
+      <!-- Projects with Nested Work Items (Tree Structure) -->
       <a-card class="mb-6">
-        <a-steps :current="currentStep" class="mb-8">
-          <a-step
-            :title="$t('steps.uploadTrain.title')"
-            :description="$t('steps.uploadTrain.description')"
-          />
-          <a-step
-            :title="$t('steps.predict.title')"
-            :description="$t('steps.predict.description')"
-          />
-        </a-steps>
-
-        <!-- Step 1: Upload & Train -->
-        <div v-if="currentStep === 0">
-          <!-- Upload Section (shown first) -->
-          <UploadStep
-            v-if="!hasUploadedData"
-            v-model="trainingFileList"
-            @continue="handleColumnSelection"
-          />
-
-          <!-- Tuning Section (shown after upload) -->
-          <TuningStep
-            v-else
-            v-model:selected-models="selectedModels"
-            v-model:active-log-tab="activeLogTab"
-            v-model:selected-best-model="selectedBestModel"
-            v-model:selected-task-id="selectedTaskId"
-            :available-models="availableModels"
-            :tuning-status="tuningStatus"
-            :tuning-tasks="tuningTasks"
-            :is-tuning="isTuning"
-            :tuning-results="tuningResults"
-            :task-logs="taskLogs"
-            @start-tuning="startTuning"
-            @start-single-tune="startSingleModelTuning"
-            @continue="nextStep"
-            @back="resetUploadAndClearData"
-          />
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-2xl font-semibold">{{ $t("home.projects") }}</h2>
+          <a-button type="primary" class="inline-flex items-center" @click="showCreateProjectModal = true">
+            <span class="i-mdi-plus mr-1" />
+            {{ $t("home.createProject") }}
+          </a-button>
         </div>
 
-        <!-- Step 2: Prediction -->
-        <PredictionStep
-          v-if="currentStep === 1"
-          v-model="predictionFileList"
-          :best-model="selectedBestModel"
-          :is-predicting="isPredicting"
-          :prediction-task="predictionTask"
-          @predict="startPrediction"
-          @back="prevStep"
-          @reset="reset"
-        />
+        <a-spin :spinning="isLoadingProjects">
+          <a-empty
+            v-if="projects.length === 0"
+            :description="$t('home.noProjects')"
+          />
+
+          <!-- Tree structure showing projects and nested work items -->
+          <div v-else class="space-y-4">
+            <div
+              v-for="project in projects"
+              :key="project.id"
+              class="border border-gray-200 rounded-lg p-4"
+            >
+              <!-- Project Header -->
+              <div class="flex items-start justify-between mb-2">
+                <div class="flex-1">
+                  <div class="flex items-center gap-2">
+                    <span class="i-mdi-folder text-blue-500 text-xl"></span>
+                    <span class="text-lg font-semibold">{{ project.name }}</span>
+                    <a-tag :color="getStatusColor(project.status)">
+                      {{ $t(`projects.${project.status}`) }}
+                    </a-tag>
+                  </div>
+                  <p v-if="project.description" class="text-sm text-gray-600 mt-1 ml-7">
+                    {{ project.description }}
+                  </p>
+                  <div class="text-xs text-gray-400 mt-1 ml-7">
+                    {{ $t("projects.datasetsCount", { count: project.datasets?.length || 0 }) }} · 
+                    {{ $t("projects.workItemsCount", { count: project.workItems?.length || 0 }) }}
+                  </div>
+                </div>
+                
+                <!-- Project Actions -->
+                <div class="flex gap-2">
+                  <a-button size="small" class="inline-flex items-center" @click="manageProjectDatasets(project.id)">
+                    <span class="i-mdi-database mr-1" />
+                    Manage Datasets
+                  </a-button>
+                  <a-button size="small" class="inline-flex items-center" @click="viewEditProjectDetails(project)">
+                    <span class="i-mdi-information mr-1" />
+                    View Details
+                  </a-button>
+                  <a-popconfirm
+                    :title="$t('projects.deleteConfirm')"
+                    @confirm="deleteProject(project.id)"
+                  >
+                    <a-button size="small" danger class="inline-flex items-center">
+                      <span class="i-mdi-delete mr-1" />
+                    </a-button>
+                  </a-popconfirm>
+                </div>
+              </div>
+
+              <!-- Nested Work Items -->
+              <div v-if="project.workItems && project.workItems.length > 0" class="ml-7 mt-3 space-y-2">
+                <div
+                  v-for="workItem in project.workItems"
+                  :key="workItem.id"
+                  class="flex items-center justify-between p-2 bg-gray-50 rounded hover:bg-gray-100 cursor-pointer"
+                  @click="openWorkItem(workItem.id)"
+                >
+                  <div class="flex items-center gap-2 flex-1">
+                    <span class="i-mdi-file-document-outline text-green-500"></span>
+                    <span class="font-medium">{{ workItem.name }}</span>
+                    <a-tag size="small" :color="getStatusColor(workItem.status)">
+                      {{ $t(`workItems.${workItem.status}`) }}
+                    </a-tag>
+                  </div>
+                  <div class="flex gap-1" @click.stop>
+                    <a-button size="small" type="text" class="inline-flex items-center" @click="editWorkItem(workItem)">
+                      <span class="i-mdi-pencil mr-1" />
+                    </a-button>
+                    <a-popconfirm
+                      :title="$t('workItems.deleteConfirm')"
+                      @confirm="deleteWorkItem(workItem.id)"
+                    >
+                      <a-button size="small" type="text" danger class="inline-flex items-center">
+                        <span class="i-mdi-delete mr-1" />
+                      </a-button>
+                    </a-popconfirm>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Add Work Item Button -->
+              <div class="ml-7 mt-2">
+                <a-button size="small" type="dashed" class="inline-flex items-center" @click="showCreateWorkItemModal = true; newWorkItem.projectId = project.id">
+                  <span class="i-mdi-plus mr-1" />
+                  Add Work Item
+                </a-button>
+              </div>
+            </div>
+          </div>
+        </a-spin>
       </a-card>
+
+      <!-- Create Project Modal -->
+      <a-modal
+        v-model:open="showCreateProjectModal"
+        :title="$t('projects.createNew')"
+        @ok="handleCreateProject"
+        @cancel="resetProjectForm"
+      >
+        <a-form layout="vertical">
+          <a-form-item :label="$t('projects.name')" required>
+            <a-input
+              v-model:value="newProject.name"
+              :placeholder="$t('projects.namePlaceholder')"
+            />
+          </a-form-item>
+          <a-form-item :label="$t('projects.description')">
+            <a-textarea
+              v-model:value="newProject.description"
+              :placeholder="$t('projects.descriptionPlaceholder')"
+              :rows="3"
+            />
+          </a-form-item>
+        </a-form>
+      </a-modal>
+
+      <!-- View/Edit Project Details Modal -->
+      <a-modal
+        v-model:open="showProjectDetailsModal"
+        :title="editingProject.name"
+        @ok="handleUpdateProject"
+        @cancel="showProjectDetailsModal = false"
+      >
+        <div v-if="editingProject.id" class="space-y-4">
+          <a-descriptions bordered :column="1" size="small">
+            <a-descriptions-item :label="$t('projects.projectId')">
+              {{ editingProject.id }}
+            </a-descriptions-item>
+            <a-descriptions-item :label="$t('projects.created')">
+              {{ formatDate(editingProject.createdAt) }}
+            </a-descriptions-item>
+          </a-descriptions>
+
+          <a-form layout="vertical" class="mt-4">
+            <a-form-item :label="$t('projects.name')" required>
+              <a-input v-model:value="editingProject.name" />
+            </a-form-item>
+            <a-form-item :label="$t('projects.description')">
+              <a-textarea v-model:value="editingProject.description" :rows="3" />
+            </a-form-item>
+            <a-form-item :label="$t('projects.status')">
+              <a-select v-model:value="editingProject.status">
+                <a-select-option value="active">{{ $t("projects.active") }}</a-select-option>
+                <a-select-option value="completed">{{ $t("projects.completed") }}</a-select-option>
+                <a-select-option value="archived">{{ $t("projects.archived") }}</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-form>
+        </div>
+      </a-modal>
+
+      <!-- Create Work Item Modal -->
+      <a-modal
+        v-model:open="showCreateWorkItemModal"
+        :title="$t('workItems.createNew')"
+        @ok="handleCreateWorkItem"
+        @cancel="resetWorkItemForm"
+      >
+        <a-form layout="vertical">
+          <a-form-item :label="$t('workItems.selectProject')" required>
+            <a-select
+              v-model:value="newWorkItem.projectId"
+              :placeholder="$t('workItems.selectProjectPlaceholder')"
+            >
+              <a-select-option
+                v-for="project in projects"
+                :key="project.id"
+                :value="project.id"
+              >
+                {{ project.name }}
+              </a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item :label="$t('workItems.name')" required>
+            <a-input
+              v-model:value="newWorkItem.name"
+              :placeholder="$t('workItems.namePlaceholder')"
+            />
+          </a-form-item>
+          <a-form-item :label="$t('workItems.description')">
+            <a-textarea
+              v-model:value="newWorkItem.description"
+              :placeholder="$t('workItems.descriptionPlaceholder')"
+              :rows="3"
+            />
+          </a-form-item>
+        </a-form>
+      </a-modal>
+
+      <!-- Edit Work Item Modal -->
+      <a-modal
+        v-model:open="showEditWorkItemModal"
+        :title="$t('workItems.editWorkItem')"
+        @ok="handleUpdateWorkItem"
+        @cancel="resetWorkItemForm"
+      >
+        <a-form layout="vertical">
+          <a-form-item :label="$t('workItems.name')" required>
+            <a-input
+              v-model:value="editingWorkItem.name"
+              :placeholder="$t('workItems.namePlaceholder')"
+            />
+          </a-form-item>
+          <a-form-item :label="$t('workItems.description')">
+            <a-textarea
+              v-model:value="editingWorkItem.description"
+              :placeholder="$t('workItems.descriptionPlaceholder')"
+              :rows="3"
+            />
+          </a-form-item>
+          <a-form-item :label="$t('workItems.status')">
+            <a-select v-model:value="editingWorkItem.status">
+              <a-select-option value="active">{{ $t("workItems.active") }}</a-select-option>
+              <a-select-option value="completed">{{ $t("workItems.completed") }}</a-select-option>
+              <a-select-option value="archived">{{ $t("workItems.archived") }}</a-select-option>
+            </a-select>
+          </a-form-item>
+        </a-form>
+      </a-modal>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted } from "vue";
 import { message } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
-import { useWorkflowState } from "../composables/useWorkflowState";
-import { useTaskPolling } from "../composables/useTaskPolling";
-import { useDatasetRegistration } from "../composables/useDatasetRegistration";
-import { useModelTraining } from "../composables/useModelTraining";
-import { TaskService, PredictionService } from "../services";
-import { AVAILABLE_MODELS } from "../constants/models";
+import { useRouter } from "vue-router";
+import type { Project, WorkItem } from "../types";
 
 const { t } = useI18n();
+const router = useRouter();
 
-// Available regression models
-const availableModels = AVAILABLE_MODELS;
+const projects = ref<Project[]>([]);
+const isLoadingProjects = ref(false);
 
-// Workflow state
-const {
-  currentStep,
-  trainingFileList,
-  predictionFileList,
-  hasUploadedData,
-  selectedModels,
-  selectedFeatureColumns,
-  selectedTargetColumn,
-  selectedBestModel,
-  selectedTaskId,
-  isPredicting,
-  predictionTask,
-  activeLogTab,
-  tuningResults,
-  nextStep,
-  prevStep,
-  resetAll,
-  resetUpload,
-} = useWorkflowState();
+const showCreateProjectModal = ref(false);
+const showProjectDetailsModal = ref(false);
+const showCreateWorkItemModal = ref(false);
+const showEditWorkItemModal = ref(false);
 
-// Task polling
-const {
-  tuningStatus,
-  tuningTasks,
-  taskLogs,
-  pollTaskLogs,
-  pollTaskStatus,
-  registerTask,
-  clearTasks,
-} = useTaskPolling();
+const newProject = ref({
+  name: "",
+  description: "",
+});
 
-// Dataset registration
-const { uploadedDatasetId, registerFileAsDataset, clearDatasetId } =
-  useDatasetRegistration();
+const editingProject = ref<Partial<Project>>({});
 
-// Model training
-const { isTuning, executeTrain } = useModelTraining();
+const newWorkItem = ref({
+  projectId: 0,
+  name: "",
+  description: "",
+});
 
-const handleColumnSelection = ({
-  featureColumns,
-  targetColumn,
-  datasetId,
-}: {
-  featureColumns: string[];
-  targetColumn: string;
-  datasetId?: string;
-}) => {
-  selectedFeatureColumns.value = featureColumns;
-  selectedTargetColumn.value = targetColumn;
-  uploadedDatasetId.value = datasetId || "";
-  hasUploadedData.value = true;
-  message.success(t("messages.readyToTrain", { count: featureColumns.length }));
-};
+const editingWorkItem = ref<Partial<WorkItem>>({});
 
-const resetUploadAndClearData = () => {
-  resetUpload();
-  clearDatasetId();
-  clearTasks();
-};
-
-const startTuning = async () => {
-  // Validate that we have training data
-  if (!uploadedDatasetId.value && trainingFileList.value.length === 0) {
-    message.error(t("messages.uploadError"));
-    return;
-  }
-
-  // Register file as dataset if needed
-  let datasetIdToUse = uploadedDatasetId.value;
-  if (!datasetIdToUse && trainingFileList.value.length > 0) {
-    const file = trainingFileList.value[0].originFileObj;
-    const registeredId = await registerFileAsDataset(file);
-    if (registeredId) {
-      datasetIdToUse = registeredId;
-    }
-  }
-
-  if (!datasetIdToUse) {
-    message.error(t("messages.datasetRegistrationFailed"));
-    return;
-  }
-
-  // Train all selected models
-  for (const modelValue of selectedModels.value) {
-    const response = await executeTrain(
-      {
-        datasetId: datasetIdToUse,
-        featureColumns: selectedFeatureColumns.value,
-        targetColumn: selectedTargetColumn.value,
-        model: modelValue,
-      },
-      "auto"
-    );
-
-    if (response) {
-      registerTask(modelValue, response.taskId);
-      activeLogTab.value = response.taskId.toString();
-      pollTaskStatus(response.taskId, modelValue).then(fetchTuningResults);
-      pollTaskLogs(response.taskId);
-    }
-  }
-};
-
-const startSingleModelTuning = async (
-  modelValue: string,
-  paramGrid?: Record<string, any>,
-  trainingType?: string,
-  parentTaskId?: number
-) => {
-  // Register file as dataset if needed
-  let datasetIdToUse = uploadedDatasetId.value;
-  if (!datasetIdToUse && trainingFileList.value.length > 0) {
-    const file = trainingFileList.value[0].originFileObj;
-    const registeredId = await registerFileAsDataset(file);
-    if (registeredId) {
-      datasetIdToUse = registeredId;
-    }
-  }
-
-  if (!datasetIdToUse) {
-    message.error(t("messages.datasetRegistrationFailed"));
-    return;
-  }
-
-  const response = await executeTrain(
-    {
-      datasetId: datasetIdToUse,
-      featureColumns: selectedFeatureColumns.value,
-      targetColumn: selectedTargetColumn.value,
-      model: modelValue,
-      paramGrid: paramGrid,
-    },
-    trainingType === "manual" ? "manual" : "auto"
-  );
-
-  if (response) {
-    registerTask(modelValue, response.taskId, "pending");
-    activeLogTab.value = response.taskId.toString();
-    pollTaskStatus(response.taskId, modelValue).then(fetchTuningResults);
-    pollTaskLogs(response.taskId);
-  }
-};
-
-const fetchTuningResults = async () => {
+const fetchProjects = async () => {
+  isLoadingProjects.value = true;
   try {
-    const taskIds = Object.values(tuningTasks.value);
-    const results = await Promise.all(
-      taskIds.map((taskId) =>
-        TaskService.fetchResults(taskId).catch(() => null)
-      )
-    );
-
-    const validResults = results
-      .filter((r): r is NonNullable<typeof r> => r !== null && r.success && r.results)
-      .map((r) => {
-        const result = r.results;
-        const model = result.model || Object.keys(tuningTasks.value).find(
-          (k) => tuningTasks.value[k] === taskIds[results.indexOf(r)]
-        );
-        
-        if (!model) {
-          console.warn("Model not found for result:", result);
-          return null;
-        }
-        
-        return {
-          model,
-          params: result.params,
-          metrics: {
-            mse_train: result.metrics?.mse_train,
-            mae_train: result.metrics?.mae_train,
-            r2_train: result.metrics?.r2_train,
-            mse_test: result.metrics?.mse_test,
-            mae_test: result.metrics?.mae_test,
-            r2_test: result.metrics?.r2_test,
-          },
-          status: tuningStatus.value[model] || "completed",
-        };
-      })
-      .filter((r): r is NonNullable<typeof r> => r !== null);
-
-    tuningResults.value = validResults;
+    const response = await $fetch("/api/projects");
+    if (response.success) {
+      projects.value = response.projects;
+    }
   } catch (error) {
-    console.error("Failed to fetch tuning results:", error);
+    console.error("Failed to fetch projects:", error);
+    message.error(t("projects.fetchError"));
+  } finally {
+    isLoadingProjects.value = false;
   }
 };
 
-const startPrediction = async () => {
-  if (!selectedBestModel.value) {
-    message.error(t("messages.selectModelError"));
+const handleCreateProject = async () => {
+  if (!newProject.value.name.trim()) {
+    message.error(t("projects.createError"));
     return;
   }
-
-  if (predictionFileList.value.length === 0) {
-    message.error(t("messages.uploadPredictionError"));
-    return;
-  }
-
-  if (!uploadedDatasetId.value) {
-    message.error(t("messages.trainingDatasetError"));
-    return;
-  }
-
-  const selectedModelTaskId = tuningTasks.value[selectedBestModel.value];
-  if (!selectedModelTaskId) {
-    message.error(t("messages.tuningTaskError"));
-    return;
-  }
-
-  isPredicting.value = true;
 
   try {
-    const response = await PredictionService.start({
-      file: predictionFileList.value[0].originFileObj,
-      model: selectedBestModel.value,
-      tuningTaskId: selectedModelTaskId,
-      trainingDatasetId: uploadedDatasetId.value,
-      featureColumns: selectedFeatureColumns.value,
-      targetColumn: selectedTargetColumn.value,
+    const response = await $fetch("/api/projects", {
+      method: "POST",
+      body: newProject.value,
     });
 
     if (response.success) {
-      predictionTask.value = { taskId: response.taskId, status: "running" };
-      message.success(t("messages.predictionStarted"));
-
-      const result = await pollTaskStatus(response.taskId);
-
-      if (result && result.task.status === "completed") {
-        predictionTask.value.status = "completed";
-        const taskResult: any = result.task.result || {};
-        const taskParameter: any = result.task.parameter || {};
-        predictionTask.value.outputFile = taskResult.outputFile || taskParameter.outputFile || response.outputFile;
-        predictionTask.value.taskId = result.task.id;
-        message.success(
-          t("messages.predictionCompleted", {
-            path: predictionTask.value.outputFile,
-          })
-        );
-      } else if (result && result.task.status === "failed") {
-        predictionTask.value.status = "failed";
-        predictionTask.value.error = result.task.error;
-        message.error(
-          t("messages.predictionFailed", { error: result.task.error })
-        );
-      }
+      message.success(t("projects.createSuccess"));
+      showCreateProjectModal.value = false;
+      resetProjectForm();
+      await fetchProjects();
     }
-  } catch (error: any) {
-    message.error(t("messages.predictionError") + ": " + error.message);
-  } finally {
-    isPredicting.value = false;
+  } catch (error) {
+    console.error("Failed to create project:", error);
+    message.error(t("projects.createError"));
   }
 };
 
-const reset = () => {
-  resetAll();
-  clearDatasetId();
-  clearTasks();
+const handleCreateWorkItem = async () => {
+  if (!newWorkItem.value.name.trim() || !newWorkItem.value.projectId) {
+    message.error(t("workItems.createError"));
+    return;
+  }
+
+  try {
+    const response = await $fetch("/api/work-items", {
+      method: "POST",
+      body: newWorkItem.value,
+    });
+
+    if (response.success) {
+      message.success(t("workItems.createSuccess"));
+      showCreateWorkItemModal.value = false;
+      resetWorkItemForm();
+      await fetchProjects();
+    }
+  } catch (error) {
+    console.error("Failed to create work item:", error);
+    message.error(t("workItems.createError"));
+  }
 };
+
+const viewEditProjectDetails = (project: Project) => {
+  editingProject.value = { ...project };
+  showProjectDetailsModal.value = true;
+};
+
+const handleUpdateProject = async () => {
+  if (!editingProject.value.id) return;
+
+  try {
+    const response = await $fetch(`/api/projects/${editingProject.value.id}`, {
+      method: "PUT",
+      body: {
+        name: editingProject.value.name,
+        description: editingProject.value.description,
+        status: editingProject.value.status,
+      },
+    });
+
+    if (response.success) {
+      message.success(t("projects.updateSuccess"));
+      showProjectDetailsModal.value = false;
+      await fetchProjects();
+    }
+  } catch (error) {
+    console.error("Failed to update project:", error);
+    message.error(t("projects.updateError"));
+  }
+};
+
+const deleteProject = async (id: number) => {
+  try {
+    const response = await $fetch(`/api/projects/${id}`, {
+      method: "DELETE",
+    });
+
+    if (response.success) {
+      message.success(t("projects.deleteSuccess"));
+      await fetchProjects();
+    }
+  } catch (error) {
+    console.error("Failed to delete project:", error);
+    message.error(t("projects.deleteError"));
+  }
+};
+
+const editWorkItem = (workItem: WorkItem) => {
+  editingWorkItem.value = { ...workItem };
+  showEditWorkItemModal.value = true;
+};
+
+const handleUpdateWorkItem = async () => {
+  if (!editingWorkItem.value.id) return;
+
+  try {
+    const response = await $fetch(`/api/work-items/${editingWorkItem.value.id}`, {
+      method: "PUT",
+      body: {
+        name: editingWorkItem.value.name,
+        description: editingWorkItem.value.description,
+        status: editingWorkItem.value.status,
+      },
+    });
+
+    if (response.success) {
+      message.success(t("workItems.updateSuccess"));
+      showEditWorkItemModal.value = false;
+      await fetchProjects();
+    }
+  } catch (error) {
+    console.error("Failed to update work item:", error);
+    message.error(t("workItems.updateError"));
+  }
+};
+
+const deleteWorkItem = async (id: number) => {
+  try {
+    const response = await $fetch(`/api/work-items/${id}`, {
+      method: "DELETE",
+    });
+
+    if (response.success) {
+      message.success(t("workItems.deleteSuccess"));
+      await fetchProjects();
+    }
+  } catch (error) {
+    console.error("Failed to delete work item:", error);
+    message.error(t("workItems.deleteError"));
+  }
+};
+
+const openWorkItem = (id: number) => {
+  router.push(`/work-items/${id}`);
+};
+
+const manageProjectDatasets = (id: number) => {
+  router.push(`/project/${id}/datasets`);
+};
+
+const resetProjectForm = () => {
+  newProject.value = {
+    name: "",
+    description: "",
+  };
+  editingProject.value = {};
+};
+
+const resetWorkItemForm = () => {
+  newWorkItem.value = {
+    projectId: 0,
+    name: "",
+    description: "",
+  };
+  editingWorkItem.value = {};
+};
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case "active":
+      return "green";
+    case "completed":
+      return "blue";
+    case "archived":
+      return "gray";
+    default:
+      return "default";
+  }
+};
+
+const formatDate = (dateString: string): string => {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  return date.toLocaleString();
+};
+
+onMounted(() => {
+  fetchProjects();
+});
 </script>

@@ -3,12 +3,12 @@ import { parseDatasetColumns } from '../../utils/datasetUtils';
 import { eq } from 'drizzle-orm';
 
 export default defineEventHandler(async (event) => {
-  const datasetId = getRouterParam(event, 'id');
+  const id = Number(getRouterParam(event, 'id'));
 
-  if (!datasetId) {
+  if (isNaN(id)) {
     throw createError({
       statusCode: 400,
-      message: 'Dataset ID is required',
+      message: 'Invalid dataset ID',
     });
   }
 
@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
     const [dataset] = await db
       .select()
       .from(schema.datasets)
-      .where(eq(schema.datasets.datasetId, datasetId))
+      .where(eq(schema.datasets.id, id))
       .limit(1);
 
     if (!dataset) {
