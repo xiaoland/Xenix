@@ -15,6 +15,7 @@ interface TrainingParams {
   targetColumn: string;
   model: string;
   paramGrid?: Record<string, any>;
+  workItemId?: number;
 }
 
 /**
@@ -35,6 +36,7 @@ class AutoTuneStrategy implements TrainingStrategy {
       target: params.targetColumn,
       model: params.model,
       paramGrid: params.paramGrid,
+      workItemId: params.workItemId,
     });
   }
 }
@@ -50,6 +52,7 @@ class ManualTrainStrategy implements TrainingStrategy {
       target: params.targetColumn,
       model: params.model,
       parameters: params.paramGrid || {},
+      workItemId: params.workItemId,
     });
   }
 }
@@ -110,7 +113,12 @@ export function useModelTraining() {
       const response = await strategy.execute(params);
 
       if (response.success) {
-        message.success(t("messages.tuningStarted"));
+        // Show different messages based on training type
+        if (trainingType === "manual") {
+          message.success(t("messages.manualTrainingStarted"));
+        } else {
+          message.success(t("messages.tuningStarted"));
+        }
         return response;
       }
 

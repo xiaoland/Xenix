@@ -13,6 +13,7 @@ export class TrainingService {
     target: string;
     model: string;
     paramGrid?: Record<string, any>;
+    workItemId?: number;
   }): Promise<{ success: boolean; taskId: number }> {
     return await $fetch("/api/tune", {
       method: "POST",
@@ -29,6 +30,7 @@ export class TrainingService {
     target: string;
     model: string;
     parameters: Record<string, any>;
+    workItemId?: number;
   }): Promise<{ success: boolean; taskId: number }> {
     return await $fetch("/api/train", {
       method: "POST",
