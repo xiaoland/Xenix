@@ -48,7 +48,7 @@
         </div>
 
         <a-card class="mb-6">
-          <a-steps :current="currentStep" class="mb-8">
+          <a-steps v-model:current="currentStep" class="mb-8">
             <a-step
               :title="$t('steps.upload.title')"
               :description="$t('steps.upload.description')"
@@ -85,8 +85,8 @@
               :is-tuning="isTuning"
               :tuning-results="tuningResults"
               :task-logs="taskLogs"
-              @start-tuning="startTuning"
-              @start-single-tune="startSingleModelTuning"
+              @start-tuning="handleStartBatchTuning"
+              @start-single-tune="handleStartSingleModelTuning"
               @continue="nextStep"
               @back="goToUploadStep"
             />
@@ -99,7 +99,7 @@
               :best-model="selectedBestModel"
               :is-predicting="isPredicting"
               :prediction-task="predictionTask"
-              @predict="startPrediction"
+              @predict="handleStartPrediction"
               @back="prevStep"
               @reset="reset"
             />
@@ -116,10 +116,10 @@ import { useRoute } from "vue-router";
 import { message } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
 import { useWorkflowState } from "../../composables/useWorkflowState";
-import { useTaskPolling } from "../../composables/useTaskPolling";
 import { useDatasetRegistration } from "../../composables/useDatasetRegistration";
-import { useModelTraining } from "../../composables/useModelTraining";
-import { TaskService, PredictionService } from "../../services";
+import { useTuningStep } from "../../composables/useTuningStep";
+import { usePredictionStep } from "../../composables/usePredictionStep";
+import { WorkItemService } from "../../services";
 import { AVAILABLE_MODELS } from "../../constants/models";
 import type { WorkItem } from "../../types";
 
@@ -137,40 +137,41 @@ const availableModels = AVAILABLE_MODELS;
 const {
   currentStep,
   trainingFileList,
-  predictionFileList,
-  hasUploadedData,
-  selectedModels,
   selectedFeatureColumns,
   selectedTargetColumn,
-  selectedBestModel,
-  selectedTaskId,
-  isPredicting,
-  predictionTask,
-  activeLogTab,
-  tuningResults,
   nextStep,
   prevStep,
   resetAll,
-  resetUpload,
 } = useWorkflowState();
 
-// Task polling
+// Dataset registration
+const { uploadedDatasetId, clearDatasetId } = useDatasetRegistration();
+
+// Tuning step logic
 const {
+  selectedModels,
+  activeLogTab,
+  selectedBestModel,
+  selectedTaskId,
+  tuningResults,
   tuningStatus,
   tuningTasks,
   taskLogs,
-  pollTaskLogs,
-  pollTaskStatus,
-  registerTask,
-  clearTasks,
-} = useTaskPolling();
+  isTuning,
+  fetchTuningResults,
+  startBatchTuning,
+  startSingleModelTuning,
+  resetTuningStep,
+} = useTuningStep();
 
-// Dataset registration
-const { uploadedDatasetId, registerFileAsDataset, clearDatasetId } =
-  useDatasetRegistration();
-
-// Model training
-const { isTuning, executeTrain } = useModelTraining();
+// Prediction step logic
+const {
+  predictionFileList,
+  isPredicting,
+  predictionTask,
+  startPrediction,
+  resetPredictionStep,
+} = usePredictionStep();
 
 const handleColumnSelection = async ({
   featureColumns,
@@ -184,19 +185,16 @@ const handleColumnSelection = async ({
   selectedFeatureColumns.value = featureColumns;
   selectedTargetColumn.value = targetColumn;
   uploadedDatasetId.value = datasetId ? String(datasetId) : "";
-  
+
   // Save upload step results to work item
   if (workItem.value) {
     try {
-      const response = await $fetch(`/api/work-items/${workItem.value.id}`, {
-        method: 'PUT',
-        body: {
-          datasetId: datasetId,
-          featureColumns: featureColumns,
-          targetColumn: targetColumn,
-        },
+      const response = await WorkItemService.update(workItem.value.id, {
+        datasetId: datasetId,
+        featureColumns: featureColumns,
+        targetColumn: targetColumn,
       });
-      
+
       // Update local work item state with saved data
       if (response.success && response.workItem) {
         workItem.value = response.workItem;
@@ -206,7 +204,7 @@ const handleColumnSelection = async ({
         workItem.value.featureColumns = featureColumns;
         workItem.value.targetColumn = targetColumn;
       }
-      
+
       message.success(t("messages.uploadDataSaved"));
     } catch (error) {
       console.error("Failed to save upload data:", error);
@@ -219,10 +217,10 @@ const handleColumnSelection = async ({
 
   // Move to tuning step
   currentStep.value = 1;
-  
+
   // Fetch existing tuning results
-  await fetchTuningResults();
-  
+  await fetchTuningResults(workItem.value?.id);
+
   message.success(t("messages.readyToTrain", { count: featureColumns.length }));
 };
 
@@ -230,209 +228,52 @@ const goToUploadStep = () => {
   currentStep.value = 0;
 };
 
-const resetUploadAndClearData = () => {
-  resetUpload();
-  clearDatasetId();
-  clearTasks();
-  currentStep.value = 0;
+const handleStartBatchTuning = async () => {
+  await startBatchTuning({
+    uploadedDatasetId: uploadedDatasetId.value,
+    trainingFileList: trainingFileList.value,
+    selectedFeatureColumns: selectedFeatureColumns.value,
+    selectedTargetColumn: selectedTargetColumn.value,
+    workItemId: workItem.value?.id,
+  });
 };
 
-const startTuning = async () => {
-  // Validate that we have training data
-  if (!uploadedDatasetId.value && trainingFileList.value.length === 0) {
-    message.error(t("messages.uploadError"));
-    return;
-  }
-
-  // Register file as dataset if needed
-  let datasetIdToUse = uploadedDatasetId.value;
-  if (!datasetIdToUse && trainingFileList.value.length > 0) {
-    const file = trainingFileList.value[0].originFileObj;
-    const registeredId = await registerFileAsDataset(file);
-    if (registeredId) {
-      datasetIdToUse = registeredId;
-    }
-  }
-
-  if (!datasetIdToUse) {
-    message.error(t("messages.datasetRegistrationFailed"));
-    return;
-  }
-
-  // Train all selected models
-  for (const modelValue of selectedModels.value) {
-    const response = await executeTrain(
-      {
-        datasetId: datasetIdToUse,
-        featureColumns: selectedFeatureColumns.value,
-        targetColumn: selectedTargetColumn.value,
-        model: modelValue,
-        workItemId: workItem.value?.id, // Pass work item ID
-      },
-      "auto"
-    );
-
-    if (response) {
-      registerTask(modelValue, response.taskId);
-      activeLogTab.value = response.taskId.toString();
-      pollTaskStatus(response.taskId, modelValue).then(fetchTuningResults);
-      pollTaskLogs(response.taskId);
-    }
-  }
-};
-
-const startSingleModelTuning = async (
+const handleStartSingleModelTuning = async (
   modelValue: string,
   paramGrid?: Record<string, any>,
   trainingType?: string,
   parentTaskId?: number
 ) => {
-  // Register file as dataset if needed
-  let datasetIdToUse = uploadedDatasetId.value;
-  if (!datasetIdToUse && trainingFileList.value.length > 0) {
-    const file = trainingFileList.value[0].originFileObj;
-    const registeredId = await registerFileAsDataset(file);
-    if (registeredId) {
-      datasetIdToUse = registeredId;
-    }
-  }
-
-  if (!datasetIdToUse) {
-    message.error(t("messages.datasetRegistrationFailed"));
-    return;
-  }
-
-  const response = await executeTrain(
+  await startSingleModelTuning(
     {
-      datasetId: datasetIdToUse,
-      featureColumns: selectedFeatureColumns.value,
-      targetColumn: selectedTargetColumn.value,
-      model: modelValue,
-      paramGrid: paramGrid,
-      workItemId: workItem.value?.id, // Pass work item ID
+      uploadedDatasetId: uploadedDatasetId.value,
+      trainingFileList: trainingFileList.value,
+      selectedFeatureColumns: selectedFeatureColumns.value,
+      selectedTargetColumn: selectedTargetColumn.value,
+      workItemId: workItem.value?.id,
     },
-    trainingType === "manual" ? "manual" : "auto"
+    modelValue,
+    paramGrid,
+    trainingType,
+    parentTaskId
   );
-
-  if (response) {
-    registerTask(modelValue, response.taskId, "pending");
-    activeLogTab.value = response.taskId.toString();
-    pollTaskStatus(response.taskId, modelValue).then(fetchTuningResults);
-    pollTaskLogs(response.taskId);
-  }
 };
 
-const fetchTuningResults = async () => {
-  if (!workItem.value) return;
-  
-  try {
-    // Fetch all tasks for this work item
-    const response = await $fetch(`/api/work-items/${workItem.value.id}`);
-    if (response.success && response.workItem.tasks) {
-      const tasks = response.workItem.tasks.filter((t: any) => 
-        t.type === 'auto-tune' && t.status === 'completed'
-      );
-      
-      // Build tuning results from completed tasks
-      tuningResults.value = tasks.map((task: any) => ({
-        model: task.parameter?.model || '',
-        params: task.result?.params || {},
-        metrics: {
-          mse_train: task.result?.mse_train,
-          mae_train: task.result?.mae_train,
-          r2_train: task.result?.r2_train,
-          mse_test: task.result?.mse_test,
-          mae_test: task.result?.mae_test,
-          r2_test: task.result?.r2_test,
-        },
-        status: task.status,
-        trainingType: task.parameter?.trainingType || 'auto',
-        createdAt: task.createdAt,
-        taskId: task.id,
-      }));
-      
-      // Register tasks for polling
-      tasks.forEach((task: any) => {
-        if (task.parameter?.model) {
-          registerTask(task.parameter.model, task.id, task.status);
-        }
-      });
-    }
-  } catch (error) {
-    console.error("Failed to fetch tuning results:", error);
-  }
-};
-
-const startPrediction = async () => {
-  if (!selectedBestModel.value) {
-    message.error(t("messages.selectModelError"));
-    return;
-  }
-
-  if (predictionFileList.value.length === 0) {
-    message.error(t("messages.uploadPredictionError"));
-    return;
-  }
-
-  if (!uploadedDatasetId.value) {
-    message.error(t("messages.trainingDatasetError"));
-    return;
-  }
-
-  const selectedModelTaskId = tuningTasks.value[selectedBestModel.value];
-  if (!selectedModelTaskId) {
-    message.error(t("messages.tuningTaskError"));
-    return;
-  }
-
-  isPredicting.value = true;
-
-  try {
-    const response = await PredictionService.start({
-      file: predictionFileList.value[0].originFileObj,
-      model: selectedBestModel.value,
-      tuningTaskId: selectedModelTaskId,
-      trainingDatasetId: uploadedDatasetId.value,
-      featureColumns: selectedFeatureColumns.value,
-      targetColumn: selectedTargetColumn.value,
-    });
-
-    if (response.success) {
-      predictionTask.value = { taskId: response.taskId, status: "running" };
-      message.success(t("messages.predictionStarted"));
-
-      const result = await pollTaskStatus(response.taskId);
-
-      if (result && result.task.status === "completed") {
-        predictionTask.value.status = "completed";
-        const taskResult: any = result.task.result || {};
-        const taskParameter: any = result.task.parameter || {};
-        predictionTask.value.outputFile = taskResult.outputFile || taskParameter.outputFile || response.outputFile;
-        predictionTask.value.taskId = result.task.id;
-        message.success(
-          t("messages.predictionCompleted", {
-            path: predictionTask.value.outputFile,
-          })
-        );
-      } else if (result && result.task.status === "failed") {
-        predictionTask.value.status = "failed";
-        predictionTask.value.error = result.task.error;
-        message.error(
-          t("messages.predictionFailed", { error: result.task.error })
-        );
-      }
-    }
-  } catch (error: any) {
-    message.error(t("messages.predictionError") + ": " + error.message);
-  } finally {
-    isPredicting.value = false;
-  }
+const handleStartPrediction = async () => {
+  await startPrediction({
+    selectedBestModel: selectedBestModel.value,
+    tuningTasks: tuningTasks.value,
+    uploadedDatasetId: uploadedDatasetId.value,
+    selectedFeatureColumns: selectedFeatureColumns.value,
+    selectedTargetColumn: selectedTargetColumn.value,
+  });
 };
 
 const reset = () => {
   resetAll();
   clearDatasetId();
-  clearTasks();
+  resetTuningStep();
+  resetPredictionStep();
 };
 
 const fetchWorkItem = async () => {
@@ -441,23 +282,27 @@ const fetchWorkItem = async () => {
 
   isLoading.value = true;
   try {
-    const response = await $fetch(`/api/work-items/${workItemId}`);
+    const response = await WorkItemService.fetchById(workItemId);
     if (response.success) {
       workItem.value = response.workItem;
-      
+
       // Check if work item has saved upload data
-      if (workItem.value.datasetId && workItem.value.featureColumns && workItem.value.targetColumn) {
+      if (
+        workItem.value.datasetId &&
+        workItem.value.featureColumns &&
+        workItem.value.targetColumn
+      ) {
         // Restore upload data
         uploadedDatasetId.value = String(workItem.value.datasetId);
         selectedFeatureColumns.value = workItem.value.featureColumns;
         selectedTargetColumn.value = workItem.value.targetColumn;
-        
+
         // Skip upload step, go directly to tuning
         currentStep.value = 1;
-        
+
         // Fetch existing tuning results
-        await fetchTuningResults();
-        
+        await fetchTuningResults(workItem.value.id);
+
         message.info(t("messages.uploadDataRestored"));
       } else {
         // Start from upload step

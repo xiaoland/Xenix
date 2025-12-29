@@ -18,15 +18,17 @@ export function useTableData(
   // Combine all data sources into a single table data structure with expandable rows
   const tableData = computed(() => {
     const data: any[] = [];
-    
+
     for (const model of availableModels.value) {
       const status = tuningStatus.value[model.value];
       const taskId = tuningTasks.value[model.value];
-      const result = tuningResults.value.find((r: any) => r.model === model.value);
+      const result = tuningResults.value.find(
+        (r: any) => r.model === model.value
+      );
 
       // Build children array for expandable rows
       const children: any[] = [];
-      
+
       // Add historical tasks
       const history = trainingHistory.value[model.value] || [];
       for (const historyItem of history) {
@@ -41,12 +43,12 @@ export function useTableData(
             mae_test: historyItem.mae_test,
           },
           params: historyItem.params,
-          trainingType: historyItem.trainingType || "auto",
+          trainingType: historyItem.trainingType,
           createdAt: historyItem.createdAt,
           isHistory: true,
         });
       }
-      
+
       // Add the current active task ONLY if it's not already in history
       if (status && taskId) {
         const existsInHistory = history.some((h: any) => h.taskId === taskId);
@@ -88,7 +90,7 @@ export function useTableData(
         isHistory: false,
         children: children,
       };
-      
+
       data.push(parentRow);
     }
 

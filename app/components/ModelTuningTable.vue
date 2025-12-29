@@ -36,8 +36,11 @@
           <!-- Show tune type and parameters for sub-rows -->
           <div v-if="record.isHistory" class="text-sm">
             <div class="font-medium mb-1">
-              <a-tag :color="record.trainingType === 'auto' ? 'blue' : 'green'">
-                {{ record.trainingType === 'auto' ? t('tuning.autoTune') : t('tuning.manualTrain') }}
+              <a-tag v-if="record.trainingType === 'auto-tune'" color="blue">
+                {{ t("tuning.autoTune") }}
+              </a-tag>
+              <a-tag v-else-if="record.trainingType === 'train'" color="green">
+                {{ t("tuning.manualTrain") }}
               </a-tag>
             </div>
             <div v-if="record.params" class="text-xs text-gray-600">

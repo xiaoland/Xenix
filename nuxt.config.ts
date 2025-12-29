@@ -10,6 +10,9 @@ export default defineNuxtConfig({
     optimizeDeps: {
       include: ["xlsx"],
     },
+    build: {
+      sourcemap: "inline",
+    },
   },
   nitro: {
     externals: {

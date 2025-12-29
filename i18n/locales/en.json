@@ -229,6 +229,7 @@
     "uploadError": "Please upload training data first",
     "columnSelectionError": "Please select feature columns and target column",
     "tuningStarted": "Hyperparameter tuning started for selected models",
+    "manualTrainingStarted": "Manual training started",
     "tuningFailed": "Failed to start tuning",
     "selectModelError": "Please select a model from the tuning results first",
     "uploadPredictionError": "Please upload prediction data",

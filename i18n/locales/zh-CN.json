@@ -230,6 +230,7 @@
     "uploadError": "请先上传训练数据",
     "columnSelectionError": "请选择特征列和目标列",
     "tuningStarted": "已开始为选定模型进行超参数调整",
+    "manualTrainingStarted": "已开始手动训练",
     "tuningFailed": "启动调整失败",
     "selectModelError": "请先从调整结果中选择一个模型",
     "uploadPredictionError": "请上传预测数据",
