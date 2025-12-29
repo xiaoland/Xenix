@@ -6,7 +6,7 @@ All functions accept pandas DataFrames instead of file paths.
 """
 
 from typing import Dict, Any, Union, Optional, Callable
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import GridSearchCV
@@ -16,31 +16,46 @@ from sklearn.base import BaseEstimator
 from .base import RegressionModel, ProgressInfo, TuneResult
 
 
-
 class RandomForestParamGrid(BaseModel):
     """Parameter grid for RandomForestRegressionModel."""
-    n_estimators: list[int] = [50, 100, 200]
-    max_depth: list[int | None] = [5, 10, None]
-    min_samples_split: list[int] = [2, 5]
+
+    n_estimators: list[int] = Field(
+        default=[50, 100, 200], description="Number of trees to try in the forest."
+    )
+    max_depth: list[int | None] = Field(
+        default=[5, 10, None],
+        description="Maximum depth for each tree (int) or None for no limit.",
+    )
+    min_samples_split: list[int] = Field(
+        default=[2, 5],
+        description="Minimum number of samples required to split an internal node.",
+    )
 
 
-class RandomForestRegressionModel(RegressionModel[RandomForestRegressor, RandomForestParamGrid]):
+class RandomForestRegressionModel(
+    RegressionModel[RandomForestRegressor, RandomForestParamGrid]
+):
     """Random Forest Regression model implementation."""
-    
+
     @staticmethod
-    def tune(X_train: pd.DataFrame, y_train: pd.Series, param_grid: Optional[RandomForestParamGrid] = None, progress_callback: Optional[Callable[[ProgressInfo], None]] = None) -> TuneResult:
+    def tune(
+        X_train: pd.DataFrame,
+        y_train: pd.Series,
+        param_grid: Optional[RandomForestParamGrid] = None,
+        progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
+    ) -> TuneResult:
         """
         Perform hyperparameter tuning for Random Forest regression.
-        
+
         Args:
             X_train: Training features as DataFrame
             y_train: Training target as Series
-            
+
         Returns:
             Dictionary with 'best_params', 'best_score', and 'model'
         """
         base_model = RandomForestRegressor(random_state=42, n_jobs=-1)
-        
+
         # Use provided param_grid or default
         if param_grid is None:
             param_grid_dict = RandomForestParamGrid().model_dump()
@@ -48,75 +63,76 @@ class RandomForestRegressionModel(RegressionModel[RandomForestRegressor, RandomF
             # Convert pydantic model to dict, excluding None values
             param_grid_dict = param_grid.model_dump(exclude_none=True)
 
-        
         grid_search = GridSearchCV(
             estimator=base_model,
             param_grid=param_grid_dict,
             cv=5,
-            scoring='neg_mean_squared_error',
-            n_jobs=-1
+            scoring="neg_mean_squared_error",
+            n_jobs=-1,
         )
-        
+
         grid_search.fit(X_train, y_train)
-        
+
         return {
-            'best_params': grid_search.best_params_,
-            'best_score': float(grid_search.best_score_),
-            'model': grid_search.best_estimator_
+            "best_params": grid_search.best_params_,
+            "best_score": float(grid_search.best_score_),
+            "model": grid_search.best_estimator_,
         }
-    
+
     @staticmethod
-    def evaluate(model: RandomForestRegressor, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
+    def evaluate(
+        model: RandomForestRegressor, X: pd.DataFrame, y: pd.Series
+    ) -> Dict[str, float]:
         """
         Evaluate model performance on given data.
-        
+
         Args:
             model: Trained model (sklearn estimator)
             X: Features as DataFrame
             y: Target as Series
-            
+
         Returns:
             Dictionary with MSE, MAE, and R2 scores
         """
         y_pred = model.predict(X)
-        
+
         return {
-            'mse': float(mean_squared_error(y, y_pred)),
-            'mae': float(mean_absolute_error(y, y_pred)),
-            'r2': float(r2_score(y, y_pred))
+            "mse": float(mean_squared_error(y, y_pred)),
+            "mae": float(mean_absolute_error(y, y_pred)),
+            "r2": float(r2_score(y, y_pred)),
         }
-    
+
     @staticmethod
     def predict(model: RandomForestRegressor, X: pd.DataFrame) -> pd.Series:
         """
         Make predictions using trained model.
-        
+
         Args:
             model: Trained model (sklearn estimator)
             X: Features as DataFrame
-            
+
         Returns:
             Predictions as Series
         """
         predictions = model.predict(X)
-        return pd.Series(predictions, index=X.index, name='predictions')
-    
+        return pd.Series(predictions, index=X.index, name="predictions")
+
     @staticmethod
     def create_model(params: Optional[Dict[str, Any]] = None) -> RandomForestRegressor:
         """
         Create a Random Forest model with given parameters.
-        
+
         Args:
             params: Model parameters
-            
+
         Returns:
             RandomForestRegressor model
         """
         model = RandomForestRegressor(random_state=42, n_jobs=-1)
-        
+
         if params:
             model.set_params(**params)
-        
+
         return model
 
 
