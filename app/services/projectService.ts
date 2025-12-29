@@ -37,7 +37,7 @@ export class ProjectService {
    * Update a project
    */
   static async update(
-    id: number,
+    id: number | string,
     updates: {
       name?: string;
       description?: string;
@@ -53,7 +53,7 @@ export class ProjectService {
   /**
    * Delete a project
    */
-  static async delete(id: number): Promise<{ success: boolean }> {
+  static async delete(id: number | string): Promise<{ success: boolean }> {
     return await $fetch(`/api/projects/${id}`, {
       method: "DELETE",
     });

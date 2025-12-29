@@ -38,7 +38,7 @@ export class WorkItemService {
    * Update a work item
    */
   static async update(
-    id: number,
+    id: number | string,
     updates: {
       name?: string;
       description?: string;
@@ -57,7 +57,7 @@ export class WorkItemService {
   /**
    * Delete a work item
    */
-  static async delete(id: number): Promise<{ success: boolean }> {
+  static async delete(id: number | string): Promise<{ success: boolean }> {
     return await $fetch(`/api/work-items/${id}`, {
       method: "DELETE",
     });
