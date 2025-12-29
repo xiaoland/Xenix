@@ -188,7 +188,7 @@ const handleColumnSelection = async ({
   // Save upload step results to work item
   if (workItem.value) {
     try {
-      await $fetch(`/api/work-items/${workItem.value.id}`, {
+      const response = await $fetch(`/api/work-items/${workItem.value.id}`, {
         method: 'PUT',
         body: {
           datasetId: datasetId,
@@ -196,10 +196,24 @@ const handleColumnSelection = async ({
           targetColumn: targetColumn,
         },
       });
+      
+      // Update local work item state with saved data
+      if (response.success && response.workItem) {
+        workItem.value = response.workItem;
+      } else {
+        // Fallback: update local state manually
+        workItem.value.datasetId = datasetId;
+        workItem.value.featureColumns = featureColumns;
+        workItem.value.targetColumn = targetColumn;
+      }
+      
       message.success(t("messages.uploadDataSaved"));
     } catch (error) {
       console.error("Failed to save upload data:", error);
-      // Continue anyway, data is in memory
+      // Update local state anyway so UI works
+      workItem.value.datasetId = datasetId;
+      workItem.value.featureColumns = featureColumns;
+      workItem.value.targetColumn = targetColumn;
     }
   }
 
