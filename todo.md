@@ -15,3 +15,4 @@
 - [x] 重命名“训练”为“调优”，可以自定义 ParamGrid（从 ParamGrid JSON Schema 自动生成表单）
 - [ ] 提供 “训练” 操作，这时候可自定义模型参数进行训练，并取得指标（自动调优则是配置 ParamGrid，不再分列）
 - [ ] 提供在线 Table 编辑，提供 Features ，可单独预测
+- [ ] 添加 Work / Project，保存 task （数组）（ Work -> task 链接，task不应该要求 Work ）
