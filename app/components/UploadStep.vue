@@ -19,8 +19,8 @@
           >
             <a-select-option
               v-for="dataset in datasets"
-              :key="dataset.datasetId"
-              :value="dataset.datasetId"
+              :key="dataset.id"
+              :value="dataset.id"
             >
               <div class="flex justify-between items-center">
                 <span>{{ dataset.name }}</span>
@@ -95,7 +95,7 @@ const { isLoadingColumns, readExcelColumns, validateExcelFile } = useFileUpload(
 const fileList = defineModel<any[]>({ required: true });
 
 const props = defineProps<{
-  projectId?: string;
+  projectId?: number;
 }>();
 
 const emit = defineEmits<{
@@ -103,7 +103,7 @@ const emit = defineEmits<{
     {
       featureColumns: string[];
       targetColumn: string;
-      datasetId?: string;
+      datasetId?: number;
     }
   ];
 }>();
@@ -112,7 +112,7 @@ const datasets = ref<Dataset[]>([]);
 const project = ref<Project | null>(null);
 const isLoadingDatasets = ref(false);
 const isLoadingProject = ref(false);
-const selectedDatasetId = ref<string | undefined>(undefined);
+const selectedDatasetId = ref<number | undefined>(undefined);
 const selectedDataset = ref<Dataset | null>(null);
 
 const showColumnSelection = ref(false);
@@ -138,16 +138,7 @@ const fetchDatasets = async () => {
       const projectResponse = await $fetch(`/api/projects/${props.projectId}`);
       if (projectResponse.success) {
         project.value = projectResponse.project;
-        
-        // Fetch all datasets
-        const datasetsResponse = await DatasetService.fetchAll();
-        if (datasetsResponse.success) {
-          // Filter to only show datasets in this project
-          const projectDatasetIds = project.value.datasetIds || [];
-          datasets.value = datasetsResponse.datasets.filter(
-            (d: Dataset) => projectDatasetIds.includes(d.datasetId)
-          );
-        }
+        datasets.value = projectResponse.project.datasets || [];
       }
     } else {
       // No project context, show all datasets
@@ -164,14 +155,14 @@ const fetchDatasets = async () => {
 };
 
 const filterDatasetOption = (input: string, option: any) => {
-  const dataset = datasets.value.find((d) => d.datasetId === option.value);
+  const dataset = datasets.value.find((d) => d.id === option.value);
   if (!dataset) return false;
   return dataset.name.toLowerCase().includes(input.toLowerCase());
 };
 
-const handleDatasetSelected = (datasetId: string) => {
+const handleDatasetSelected = (datasetId: number) => {
   selectedDataset.value =
-    datasets.value.find((d) => d.datasetId === datasetId) || null;
+    datasets.value.find((d) => d.id === datasetId) || null;
   // Clear file upload if dataset is selected
   fileList.value = [];
 };

@@ -12,7 +12,7 @@
         </p>
       </div>
 
-      <!-- Projects Section -->
+      <!-- Projects with Nested Work Items (Tree Structure) -->
       <a-card class="mb-6">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-2xl font-semibold">{{ $t("home.projects") }}</h2>
@@ -28,121 +28,93 @@
             :description="$t('home.noProjects')"
           />
 
-          <a-list v-else :data-source="projects" item-layout="horizontal">
-            <template #renderItem="{ item }">
-              <a-list-item>
-                <template #actions>
-                  <a-button type="link" @click="viewProjectDetails(item)">
-                    {{ $t("projects.viewDetails") }}
+          <!-- Tree structure showing projects and nested work items -->
+          <div v-else class="space-y-4">
+            <div
+              v-for="project in projects"
+              :key="project.id"
+              class="border border-gray-200 rounded-lg p-4"
+            >
+              <!-- Project Header -->
+              <div class="flex items-start justify-between mb-2">
+                <div class="flex-1">
+                  <div class="flex items-center gap-2">
+                    <span class="i-mdi-folder text-blue-500 text-xl"></span>
+                    <span class="text-lg font-semibold">{{ project.name }}</span>
+                    <a-tag :color="getStatusColor(project.status)">
+                      {{ $t(`projects.${project.status}`) }}
+                    </a-tag>
+                  </div>
+                  <p v-if="project.description" class="text-sm text-gray-600 mt-1 ml-7">
+                    {{ project.description }}
+                  </p>
+                  <div class="text-xs text-gray-400 mt-1 ml-7">
+                    {{ $t("projects.datasetsCount", { count: project.datasets?.length || 0 }) }} · 
+                    {{ $t("projects.workItemsCount", { count: project.workItems?.length || 0 }) }}
+                  </div>
+                </div>
+                
+                <!-- Project Actions -->
+                <div class="flex gap-2">
+                  <a-button size="small" @click="manageProjectDatasets(project.id)">
+                    <template #icon><span class="i-mdi-database" /></template>
+                    Manage Datasets
                   </a-button>
-                  <a-button type="link" @click="editProject(item)">
-                    {{ $t("projects.editProject") }}
+                  <a-button size="small" @click="viewEditProjectDetails(project)">
+                    <template #icon><span class="i-mdi-information" /></template>
+                    View Details
                   </a-button>
                   <a-popconfirm
                     :title="$t('projects.deleteConfirm')"
-                    @confirm="deleteProject(item.projectId)"
+                    @confirm="deleteProject(project.id)"
                   >
-                    <a-button type="link" danger>
-                      {{ $t("projects.deleteProject") }}
+                    <a-button size="small" danger>
+                      <template #icon><span class="i-mdi-delete" /></template>
                     </a-button>
                   </a-popconfirm>
-                </template>
+                </div>
+              </div>
 
-                <a-list-item-meta>
-                  <template #title>
-                    <span class="text-lg font-medium">{{ item.name }}</span>
-                    <a-tag class="ml-2" :color="getStatusColor(item.status)">
-                      {{ $t(`projects.${item.status}`) }}
+              <!-- Nested Work Items -->
+              <div v-if="project.workItems && project.workItems.length > 0" class="ml-7 mt-3 space-y-2">
+                <div
+                  v-for="workItem in project.workItems"
+                  :key="workItem.id"
+                  class="flex items-center justify-between p-2 bg-gray-50 rounded hover:bg-gray-100 cursor-pointer"
+                  @click="openWorkItem(workItem.id)"
+                >
+                  <div class="flex items-center gap-2 flex-1">
+                    <span class="i-mdi-file-document-outline text-green-500"></span>
+                    <span class="font-medium">{{ workItem.name }}</span>
+                    <a-tag size="small" :color="getStatusColor(workItem.status)">
+                      {{ $t(`workItems.${workItem.status}`) }}
                     </a-tag>
-                  </template>
-                  <template #description>
-                    <div class="space-y-1">
-                      <div v-if="item.description">{{ item.description }}</div>
-                      <div class="text-sm text-gray-500">
-                        <span>
-                          {{ $t("projects.datasetsCount", { count: item.datasetIds?.length || 0 }) }}
-                        </span>
-                        <span class="ml-4">
-                          {{ $t("projects.workItemsCount", { count: item.workItemIds?.length || 0 }) }}
-                        </span>
-                      </div>
-                      <div class="text-xs text-gray-400">
-                        {{ $t("projects.created") }}: {{ formatDate(item.createdAt) }}
-                      </div>
-                    </div>
-                  </template>
-                </a-list-item-meta>
-              </a-list-item>
-            </template>
-          </a-list>
-        </a-spin>
-      </a-card>
-
-      <!-- Work Items Section -->
-      <a-card>
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="text-2xl font-semibold">{{ $t("home.workItems") }}</h2>
-          <a-button
-            type="primary"
-            @click="showCreateWorkItemModal = true"
-            :disabled="projects.length === 0"
-          >
-            <template #icon><span class="i-mdi-plus" /></template>
-            {{ $t("workItems.createNew") }}
-          </a-button>
-        </div>
-
-        <a-spin :spinning="isLoadingWorkItems">
-          <a-empty
-            v-if="workItems.length === 0"
-            :description="$t('home.noWorkItems')"
-          />
-
-          <a-list v-else :data-source="workItems" item-layout="horizontal">
-            <template #renderItem="{ item }">
-              <a-list-item>
-                <template #actions>
-                  <a-button type="primary" @click="openWorkItem(item.workItemId)">
-                    {{ $t("workItems.open") }}
-                  </a-button>
-                  <a-button type="link" @click="editWorkItem(item)">
-                    {{ $t("workItems.editWorkItem") }}
-                  </a-button>
-                  <a-popconfirm
-                    :title="$t('workItems.deleteConfirm')"
-                    @confirm="deleteWorkItem(item.workItemId)"
-                  >
-                    <a-button type="link" danger>
-                      {{ $t("workItems.deleteWorkItem") }}
+                  </div>
+                  <div class="flex gap-1" @click.stop>
+                    <a-button size="small" type="text" @click="editWorkItem(workItem)">
+                      <template #icon><span class="i-mdi-pencil" /></template>
                     </a-button>
-                  </a-popconfirm>
-                </template>
+                    <a-popconfirm
+                      :title="$t('workItems.deleteConfirm')"
+                      @confirm="deleteWorkItem(workItem.id)"
+                    >
+                      <a-button size="small" type="text" danger>
+                        <template #icon><span class="i-mdi-delete" /></template>
+                      </a-button>
+                    </a-popconfirm>
+                  </div>
+                </div>
+              </div>
 
-                <a-list-item-meta>
-                  <template #title>
-                    <span class="text-lg font-medium">{{ item.name }}</span>
-                    <a-tag class="ml-2" :color="getStatusColor(item.status)">
-                      {{ $t(`workItems.${item.status}`) }}
-                    </a-tag>
-                  </template>
-                  <template #description>
-                    <div class="space-y-1">
-                      <div v-if="item.description">{{ item.description }}</div>
-                      <div class="text-sm text-gray-500">
-                        <span>{{ getProjectName(item.projectId) }}</span>
-                        <span class="ml-4">
-                          {{ $t("workItems.tasksCount", { count: item.taskIds?.length || 0 }) }}
-                        </span>
-                      </div>
-                      <div class="text-xs text-gray-400">
-                        {{ $t("workItems.created") }}: {{ formatDate(item.createdAt) }}
-                      </div>
-                    </div>
-                  </template>
-                </a-list-item-meta>
-              </a-list-item>
-            </template>
-          </a-list>
+              <!-- Add Work Item Button -->
+              <div class="ml-7 mt-2">
+                <a-button size="small" type="dashed" @click="showCreateWorkItemModal = true; newWorkItem.projectId = project.id">
+                  <template #icon><span class="i-mdi-plus" /></template>
+                  Add Work Item
+                </a-button>
+              </div>
+            </div>
+          </div>
         </a-spin>
       </a-card>
 
@@ -170,35 +142,39 @@
         </a-form>
       </a-modal>
 
-      <!-- Edit Project Modal -->
+      <!-- View/Edit Project Details Modal -->
       <a-modal
-        v-model:open="showEditProjectModal"
-        :title="$t('projects.editProject')"
+        v-model:open="showProjectDetailsModal"
+        :title="editingProject.name"
         @ok="handleUpdateProject"
-        @cancel="resetProjectForm"
+        @cancel="showProjectDetailsModal = false"
       >
-        <a-form layout="vertical">
-          <a-form-item :label="$t('projects.name')" required>
-            <a-input
-              v-model:value="editingProject.name"
-              :placeholder="$t('projects.namePlaceholder')"
-            />
-          </a-form-item>
-          <a-form-item :label="$t('projects.description')">
-            <a-textarea
-              v-model:value="editingProject.description"
-              :placeholder="$t('projects.descriptionPlaceholder')"
-              :rows="3"
-            />
-          </a-form-item>
-          <a-form-item :label="$t('projects.status')">
-            <a-select v-model:value="editingProject.status">
-              <a-select-option value="active">{{ $t("projects.active") }}</a-select-option>
-              <a-select-option value="completed">{{ $t("projects.completed") }}</a-select-option>
-              <a-select-option value="archived">{{ $t("projects.archived") }}</a-select-option>
-            </a-select>
-          </a-form-item>
-        </a-form>
+        <div v-if="editingProject.id" class="space-y-4">
+          <a-descriptions bordered :column="1" size="small">
+            <a-descriptions-item :label="$t('projects.projectId')">
+              {{ editingProject.id }}
+            </a-descriptions-item>
+            <a-descriptions-item :label="$t('projects.created')">
+              {{ formatDate(editingProject.createdAt) }}
+            </a-descriptions-item>
+          </a-descriptions>
+
+          <a-form layout="vertical" class="mt-4">
+            <a-form-item :label="$t('projects.name')" required>
+              <a-input v-model:value="editingProject.name" />
+            </a-form-item>
+            <a-form-item :label="$t('projects.description')">
+              <a-textarea v-model:value="editingProject.description" :rows="3" />
+            </a-form-item>
+            <a-form-item :label="$t('projects.status')">
+              <a-select v-model:value="editingProject.status">
+                <a-select-option value="active">{{ $t("projects.active") }}</a-select-option>
+                <a-select-option value="completed">{{ $t("projects.completed") }}</a-select-option>
+                <a-select-option value="archived">{{ $t("projects.archived") }}</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-form>
+        </div>
       </a-modal>
 
       <!-- Create Work Item Modal -->
@@ -216,8 +192,8 @@
             >
               <a-select-option
                 v-for="project in projects"
-                :key="project.projectId"
-                :value="project.projectId"
+                :key="project.id"
+                :value="project.id"
               >
                 {{ project.name }}
               </a-select-option>
@@ -269,59 +245,6 @@
           </a-form-item>
         </a-form>
       </a-modal>
-
-      <!-- Project Details Modal -->
-      <a-modal
-        v-model:open="showProjectDetailsModal"
-        :title="selectedProject?.name"
-        :footer="null"
-        width="800px"
-      >
-        <div v-if="selectedProject" class="space-y-4">
-          <a-descriptions bordered :column="2">
-            <a-descriptions-item :label="$t('projects.projectId')">
-              {{ selectedProject.projectId }}
-            </a-descriptions-item>
-            <a-descriptions-item :label="$t('projects.status')">
-              {{ $t(`projects.${selectedProject.status}`) }}
-            </a-descriptions-item>
-            <a-descriptions-item :label="$t('projects.created')" :span="2">
-              {{ formatDate(selectedProject.createdAt) }}
-            </a-descriptions-item>
-            <a-descriptions-item
-              v-if="selectedProject.description"
-              :label="$t('projects.description')"
-              :span="2"
-            >
-              {{ selectedProject.description }}
-            </a-descriptions-item>
-          </a-descriptions>
-
-          <div>
-            <h3 class="font-semibold mb-2">
-              {{ $t("projects.datasetsCount", { count: selectedProject.datasetIds?.length || 0 }) }}
-            </h3>
-            <div v-if="selectedProject.datasetIds?.length > 0" class="flex flex-wrap gap-2">
-              <a-tag v-for="datasetId in selectedProject.datasetIds" :key="datasetId" color="blue">
-                {{ datasetId }}
-              </a-tag>
-            </div>
-            <div v-else class="text-gray-400">{{ $t("home.noProjects") }}</div>
-          </div>
-
-          <div>
-            <h3 class="font-semibold mb-2">
-              {{ $t("projects.workItemsCount", { count: selectedProject.workItemIds?.length || 0 }) }}
-            </h3>
-            <div v-if="selectedProject.workItemIds?.length > 0" class="flex flex-wrap gap-2">
-              <a-tag v-for="workItemId in selectedProject.workItemIds" :key="workItemId" color="green">
-                {{ getWorkItemName(workItemId) }}
-              </a-tag>
-            </div>
-            <div v-else class="text-gray-400">{{ $t("home.noWorkItems") }}</div>
-          </div>
-        </div>
-      </a-modal>
     </div>
   </div>
 </template>
@@ -337,15 +260,12 @@ const { t } = useI18n();
 const router = useRouter();
 
 const projects = ref<Project[]>([]);
-const workItems = ref<WorkItem[]>([]);
 const isLoadingProjects = ref(false);
-const isLoadingWorkItems = ref(false);
 
 const showCreateProjectModal = ref(false);
-const showEditProjectModal = ref(false);
+const showProjectDetailsModal = ref(false);
 const showCreateWorkItemModal = ref(false);
 const showEditWorkItemModal = ref(false);
-const showProjectDetailsModal = ref(false);
 
 const newProject = ref({
   name: "",
@@ -353,10 +273,9 @@ const newProject = ref({
 });
 
 const editingProject = ref<Partial<Project>>({});
-const selectedProject = ref<Project | null>(null);
 
 const newWorkItem = ref({
-  projectId: "",
+  projectId: 0,
   name: "",
   description: "",
 });
@@ -375,21 +294,6 @@ const fetchProjects = async () => {
     message.error(t("projects.fetchError"));
   } finally {
     isLoadingProjects.value = false;
-  }
-};
-
-const fetchWorkItems = async () => {
-  isLoadingWorkItems.value = true;
-  try {
-    const response = await $fetch("/api/work-items");
-    if (response.success) {
-      workItems.value = response.workItems;
-    }
-  } catch (error) {
-    console.error("Failed to fetch work items:", error);
-    message.error(t("workItems.fetchError"));
-  } finally {
-    isLoadingWorkItems.value = false;
   }
 };
 
@@ -433,8 +337,7 @@ const handleCreateWorkItem = async () => {
       message.success(t("workItems.createSuccess"));
       showCreateWorkItemModal.value = false;
       resetWorkItemForm();
-      await fetchWorkItems();
-      await fetchProjects(); // Refresh to update work item counts
+      await fetchProjects();
     }
   } catch (error) {
     console.error("Failed to create work item:", error);
@@ -442,16 +345,16 @@ const handleCreateWorkItem = async () => {
   }
 };
 
-const editProject = (project: Project) => {
+const viewEditProjectDetails = (project: Project) => {
   editingProject.value = { ...project };
-  showEditProjectModal.value = true;
+  showProjectDetailsModal.value = true;
 };
 
 const handleUpdateProject = async () => {
-  if (!editingProject.value.projectId) return;
+  if (!editingProject.value.id) return;
 
   try {
-    const response = await $fetch(`/api/projects/${editingProject.value.projectId}`, {
+    const response = await $fetch(`/api/projects/${editingProject.value.id}`, {
       method: "PUT",
       body: {
         name: editingProject.value.name,
@@ -462,7 +365,7 @@ const handleUpdateProject = async () => {
 
     if (response.success) {
       message.success(t("projects.updateSuccess"));
-      showEditProjectModal.value = false;
+      showProjectDetailsModal.value = false;
       await fetchProjects();
     }
   } catch (error) {
@@ -471,16 +374,15 @@ const handleUpdateProject = async () => {
   }
 };
 
-const deleteProject = async (projectId: string) => {
+const deleteProject = async (id: number) => {
   try {
-    const response = await $fetch(`/api/projects/${projectId}`, {
+    const response = await $fetch(`/api/projects/${id}`, {
       method: "DELETE",
     });
 
     if (response.success) {
       message.success(t("projects.deleteSuccess"));
       await fetchProjects();
-      await fetchWorkItems(); // Refresh work items as they might be affected
     }
   } catch (error) {
     console.error("Failed to delete project:", error);
@@ -494,10 +396,10 @@ const editWorkItem = (workItem: WorkItem) => {
 };
 
 const handleUpdateWorkItem = async () => {
-  if (!editingWorkItem.value.workItemId) return;
+  if (!editingWorkItem.value.id) return;
 
   try {
-    const response = await $fetch(`/api/work-items/${editingWorkItem.value.workItemId}`, {
+    const response = await $fetch(`/api/work-items/${editingWorkItem.value.id}`, {
       method: "PUT",
       body: {
         name: editingWorkItem.value.name,
@@ -509,7 +411,7 @@ const handleUpdateWorkItem = async () => {
     if (response.success) {
       message.success(t("workItems.updateSuccess"));
       showEditWorkItemModal.value = false;
-      await fetchWorkItems();
+      await fetchProjects();
     }
   } catch (error) {
     console.error("Failed to update work item:", error);
@@ -517,16 +419,15 @@ const handleUpdateWorkItem = async () => {
   }
 };
 
-const deleteWorkItem = async (workItemId: string) => {
+const deleteWorkItem = async (id: number) => {
   try {
-    const response = await $fetch(`/api/work-items/${workItemId}`, {
+    const response = await $fetch(`/api/work-items/${id}`, {
       method: "DELETE",
     });
 
     if (response.success) {
       message.success(t("workItems.deleteSuccess"));
-      await fetchWorkItems();
-      await fetchProjects(); // Refresh to update work item counts
+      await fetchProjects();
     }
   } catch (error) {
     console.error("Failed to delete work item:", error);
@@ -534,13 +435,12 @@ const deleteWorkItem = async (workItemId: string) => {
   }
 };
 
-const openWorkItem = (workItemId: string) => {
-  router.push(`/work-items/${workItemId}`);
+const openWorkItem = (id: number) => {
+  router.push(`/work-items/${id}`);
 };
 
-const viewProjectDetails = (project: Project) => {
-  selectedProject.value = project;
-  showProjectDetailsModal.value = true;
+const manageProjectDatasets = (id: number) => {
+  router.push(`/project/${id}/datasets`);
 };
 
 const resetProjectForm = () => {
@@ -553,7 +453,7 @@ const resetProjectForm = () => {
 
 const resetWorkItemForm = () => {
   newWorkItem.value = {
-    projectId: "",
+    projectId: 0,
     name: "",
     description: "",
   };
@@ -573,17 +473,6 @@ const getStatusColor = (status: string) => {
   }
 };
 
-const getProjectName = (projectId?: string) => {
-  if (!projectId) return "";
-  const project = projects.value.find((p) => p.projectId === projectId);
-  return project ? project.name : projectId;
-};
-
-const getWorkItemName = (workItemId: string) => {
-  const workItem = workItems.value.find((w) => w.workItemId === workItemId);
-  return workItem ? workItem.name : workItemId;
-};
-
 const formatDate = (dateString: string): string => {
   if (!dateString) return "";
   const date = new Date(dateString);
@@ -592,6 +481,5 @@ const formatDate = (dateString: string): string => {
 
 onMounted(() => {
   fetchProjects();
-  fetchWorkItems();
 });
 </script>
