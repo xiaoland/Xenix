@@ -31,53 +31,49 @@ class LinearRegressionModelParam(BaseModel):
     )
 
 
-class LinearRegressionModel(RegressionModel[Pipeline, LinearRegressionModelParam]):
+class LinearRegressionParamGridModel(BaseModel):
+    """Parameter grid for Linear Regression hyperparameter tuning."""
+
+    model__fit_intercept: List[bool] = Field(
+        default=[True, False], description="Whether to calculate the intercept."
+    )
+    model__copy_X: List[bool] = Field(
+        default=[True, False], description="Whether to copy X before fitting."
+    )
+
+
+class LinearRegressionModel(
+    RegressionModel[
+        Pipeline, LinearRegressionModelParam, LinearRegressionParamGridModel
+    ]
+):
     """Linear Regression model implementation."""
 
     @staticmethod
     def tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
-        param_grid: Optional[LinearRegressionModelParam] = None,
+        param_grid: Optional[LinearRegressionParamGridModel] = None,
         progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
     ) -> TuneResult:
-        """
-        Train Linear regression with specific parameters.
-
-        Args:
-            X_train: Training features as DataFrame
-            y_train: Training target as Series
-
-        Returns:
-            Dictionary with 'best_params', 'best_score', and 'model'
-        """
-        # Use provided params or default
         if param_grid is None:
-            params = LinearRegressionModelParam().model_dump()
+            grid = LinearRegressionParamGridModel().model_dump()
         else:
-            params = param_grid.model_dump(exclude_none=True)
+            grid = param_grid.model_dump()
 
-        # Create pipeline model: Standardization + LinearRegression
-        model = Pipeline(
+        base_model = Pipeline(
             [
                 ("scaler", StandardScaler()),
-                (
-                    "model",
-                    LinearRegression(
-                        fit_intercept=params.get("model__fit_intercept", True),
-                        copy_X=params.get("model__copy_X", True),
-                    ),
-                ),
+                ("model", LinearRegression()),
             ]
         )
-
-        # Train the model
-        model.fit(X_train, y_train)
+        gs = GridSearchCV(base_model, grid, cv=3, scoring="r2")
+        gs.fit(X_train, y_train)
 
         return {
-            "best_params": params,
-            "best_score": 0.0,  # Not applicable for single parameter training
-            "model": model,
+            "best_params": gs.best_params_,
+            "best_score": gs.best_score_,
+            "model": gs.best_estimator_,
         }
 
     @staticmethod
@@ -117,21 +113,11 @@ class LinearRegressionModel(RegressionModel[Pipeline, LinearRegressionModelParam
         return pd.Series(predictions, index=X.index, name="predictions")
 
     @staticmethod
-    def create_model(params: Optional[Dict[str, Any]] = None) -> Pipeline:
-        """
-        Create a Linear Regression model with given parameters.
-
-        Args:
-            params: Model parameters
-
-        Returns:
-            Sklearn Pipeline with StandardScaler and LinearRegression model
-        """
+    def create_model(params: Optional[LinearRegressionModelParam] = None) -> Pipeline:
         model = Pipeline([("scaler", StandardScaler()), ("model", LinearRegression())])
-
         if params:
-            model.set_params(**params)
-
+            p = params.model_dump()
+            model.set_params(**p)
         return model
 
 

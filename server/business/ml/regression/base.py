@@ -5,7 +5,17 @@ This module defines the common interface that all regression models must impleme
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Union, Optional, Callable, TypeVar, Generic, TypedDict
+from typing import (
+    Dict,
+    Any,
+    Union,
+    Optional,
+    Callable,
+    TypeVar,
+    Generic,
+    TypedDict,
+    List,
+)
 import pandas as pd
 from sklearn.base import BaseEstimator
 from sklearn.pipeline import Pipeline
@@ -33,11 +43,14 @@ class TuneResult(TypedDict):
 # Type variable for model type
 ModelType = TypeVar("ModelType", bound=Union[BaseEstimator, Pipeline])
 
-# Type variable for parameter grid type
+# Type variable for parameter type
 ModelParamType = TypeVar("ModelParamType", bound=BaseModel)
 
+# Type variable for parameter grid type
+ParamGridType = TypeVar("ParamGridType", bound=BaseModel)
 
-class RegressionModel(ABC, Generic[ModelType, ModelParamType]):
+
+class RegressionModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]):
     """
     Abstract base class for regression models.
 
@@ -47,6 +60,7 @@ class RegressionModel(ABC, Generic[ModelType, ModelParamType]):
     Type Parameters:
         ModelType: The specific sklearn model type (Pipeline or BaseEstimator subclass)
         ModelParamType: The parameter model type (pydantic BaseModel subclass)
+        ParamGridType: The parameter grid model type (pydantic BaseModel subclass with list fields)
     """
 
     @staticmethod
@@ -116,12 +130,12 @@ class RegressionModel(ABC, Generic[ModelType, ModelParamType]):
 
     @staticmethod
     @abstractmethod
-    def create_model(params: Optional[Dict[str, Any]] = None) -> ModelType:
+    def create_model(params: Optional[ModelParamType] = None) -> ModelType:
         """
         Create a model instance with given parameters.
 
         Args:
-            params: Model parameters (e.g., {'model__alpha': 1.0})
+            params: Model parameters as pydantic BaseModel instance
 
         Returns:
             Sklearn Pipeline or estimator with specified parameters (ModelType)

@@ -9,6 +9,7 @@ export const modelMetadata = sqliteTable("model_metadata", {
   name: text("name").notNull().unique(), // e.g., 'regression.adaboost'
   label: text("label").notNull(), // Human-readable name, e.g., 'AdaBoost'
   paramSchema: text("param_schema", { mode: "json" }), // JSON schema from pydantic model
+  paramGridSchema: text("param_grid_schema", { mode: "json" }), // JSON schema for parameter grid
   createdAt: integer("created_at", { mode: "timestamp" })
     .$defaultFn(() => new Date())
     .notNull(),

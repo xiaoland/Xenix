@@ -8,7 +8,7 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
-from typing import Dict, Any, Union, Optional, Callable
+from typing import Dict, Any, Union, Optional, Callable, List
 from pydantic import BaseModel, Field
 from sklearn.base import BaseEstimator
 
@@ -26,39 +26,47 @@ class AdaBoostModelParam(BaseModel):
     )
 
 
-class AdaBoostRegressionModel(RegressionModel[AdaBoostRegressor, AdaBoostModelParam]):
+class AdaBoostParamGridModel(BaseModel):
+    """Parameter grid for AdaBoost hyperparameter tuning."""
+
+    n_estimators: List[int] = Field(
+        default=[50, 100, 200], description="Number of estimators."
+    )
+    learning_rate: List[float] = Field(
+        default=[0.01, 0.1, 1.0], description="Learning rate."
+    )
+    estimator__max_depth: List[int] = Field(
+        default=[1, 3, 5], description="Max depth for base estimator."
+    )
+
+
+class AdaBoostRegressionModel(
+    RegressionModel[AdaBoostRegressor, AdaBoostModelParam, AdaBoostParamGridModel]
+):
     """AdaBoost Regression model implementation."""
 
     @staticmethod
     def tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
-        param_grid: Optional[AdaBoostModelParam] = None,
+        param_grid: Optional[AdaBoostParamGridModel] = None,
         progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
     ) -> TuneResult:
-        # Use provided params or default
         if param_grid is None:
-            params = AdaBoostModelParam().model_dump()
+            grid = AdaBoostParamGridModel().model_dump()
         else:
-            params = param_grid.model_dump(exclude_none=True)
+            grid = param_grid.model_dump()
 
-        # Create model with parameters
-        model = AdaBoostRegressor(
-            estimator=DecisionTreeRegressor(
-                max_depth=params.get("estimator__max_depth", 3)
-            ),
-            n_estimators=params.get("n_estimators", 100),
-            learning_rate=params.get("learning_rate", 0.1),
-            random_state=42,
+        base_model = AdaBoostRegressor(
+            estimator=DecisionTreeRegressor(), random_state=42
         )
-
-        # Train the model
-        model.fit(X_train, y_train)
+        gs = GridSearchCV(base_model, grid, cv=3, scoring="r2")
+        gs.fit(X_train, y_train)
 
         return {
-            "best_params": params,
-            "best_score": 0.0,  # Not applicable for single parameter training
-            "model": model,
+            "best_params": gs.best_params_,
+            "best_score": gs.best_score_,
+            "model": gs.best_estimator_,
         }
 
     @staticmethod
@@ -78,16 +86,16 @@ class AdaBoostRegressionModel(RegressionModel[AdaBoostRegressor, AdaBoostModelPa
         return pd.Series(predictions, index=X.index, name="predictions")
 
     @staticmethod
-    def create_model(params: Optional[Dict[str, Any]] = None) -> AdaBoostRegressor:
-        estimator_depth = 3
-        if params and "estimator__max_depth" in params:
-            estimator_depth = params.pop("estimator__max_depth")
-
+    def create_model(params: Optional[AdaBoostModelParam] = None) -> AdaBoostRegressor:
+        if params:
+            p = params.model_dump()
+        else:
+            p = {}
+        estimator_depth = p.get("estimator__max_depth", 3)
         model = AdaBoostRegressor(
             estimator=DecisionTreeRegressor(max_depth=estimator_depth), random_state=42
         )
-        if params:
-            model.set_params(**params)
+        model.set_params(**{k: v for k, v in p.items() if k != "estimator__max_depth"})
         return model
 
 

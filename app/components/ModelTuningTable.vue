@@ -232,10 +232,7 @@ const fetchTuningData = async () => {
       // Build available models list (use i18n translation if available)
       const modelsList = Array.from(models).map((model) => {
         const translated = t(`models.${model.replace(".", "_")}`);
-        const base = model.split(".").pop() || model;
-        const label =
-          translated === model ? base.replace(/_/g, " ") : translated;
-        return { label, value: model };
+        return { label: translated, value: model };
       });
       availableModels.value = modelsList;
 

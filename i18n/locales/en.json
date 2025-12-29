@@ -205,17 +205,17 @@
   },
   "models": {
     "regression_linear_regression_hyperparameter_tuning": "Linear Regression",
-    "regression.ridge": "Ridge",
-    "regression.lasso": "Lasso",
-    "regression.bayesian_ridge_regression": "Bayesian Ridge",
-    "regression.k_nearest_neighbors": "KNN",
-    "regression.regression_decision_tree": "Decision Tree",
-    "regression.random_forest": "Random Forest",
-    "regression.gbdt": "GBDT",
-    "regression.adaboost": "AdaBoost",
-    "regression.xgboost": "XGBoost",
-    "regression.lightgbm": "LightGBM",
-    "regression.polynomial_regression": "Polynomial"
+    "regression_ridge": "Ridge",
+    "regression_lasso": "Lasso",
+    "regression_bayesian_ridge_regression": "Bayesian Ridge",
+    "regression_k_nearest_neighbors": "KNN",
+    "regression_regression_decision_tree": "Decision Tree",
+    "regression_random_forest": "Random Forest",
+    "regression_gbdt": "GBDT",
+    "regression_adaboost": "AdaBoost",
+    "regression_xgboost": "XGBoost",
+    "regression_lightgbm": "LightGBM",
+    "regression_polynomial_regression": "Polynomial"
   },
   "status": {
     "pending": "Pending",

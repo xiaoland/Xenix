@@ -9,7 +9,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
-from typing import Dict, Any, Union, Optional, Callable
+from typing import Dict, Any, Union, Optional, Callable, List
 from pydantic import BaseModel, Field
 from sklearn.base import BaseEstimator
 
@@ -29,43 +29,45 @@ class KNNModelParam(BaseModel):
     )
 
 
-class KNNRegressionModel(RegressionModel[Pipeline, KNNModelParam]):
+class KNNParamGridModel(BaseModel):
+    """Parameter grid for KNN hyperparameter tuning."""
+
+    model__n_neighbors: List[int] = Field(
+        default=[3, 5, 7], description="Number of neighbors."
+    )
+    model__weights: List[str] = Field(
+        default=["uniform", "distance"], description="Weight function."
+    )
+
+
+class KNNRegressionModel(RegressionModel[Pipeline, KNNModelParam, KNNParamGridModel]):
     """KNN Regression model implementation."""
 
     @staticmethod
     def tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
-        param_grid: Optional[KNNModelParam] = None,
+        param_grid: Optional[KNNParamGridModel] = None,
         progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
     ) -> TuneResult:
-        # Use provided params or default
         if param_grid is None:
-            params = KNNModelParam().model_dump()
+            grid = KNNParamGridModel().model_dump()
         else:
-            params = param_grid.model_dump(exclude_none=True)
+            grid = param_grid.model_dump()
 
-        # Create pipeline model: Standardization + KNN
-        model = Pipeline(
+        base_model = Pipeline(
             [
                 ("scaler", StandardScaler()),
-                (
-                    "model",
-                    KNeighborsRegressor(
-                        n_neighbors=params.get("model__n_neighbors", 5),
-                        weights=params.get("model__weights", "uniform"),
-                    ),
-                ),
+                ("model", KNeighborsRegressor()),
             ]
         )
-
-        # Train the model
-        model.fit(X_train, y_train)
+        gs = GridSearchCV(base_model, grid, cv=3, scoring="r2")
+        gs.fit(X_train, y_train)
 
         return {
-            "best_params": params,
-            "best_score": 0.0,  # Not applicable for single parameter training
-            "model": model,
+            "best_params": gs.best_params_,
+            "best_score": gs.best_score_,
+            "model": gs.best_estimator_,
         }
 
     @staticmethod
@@ -83,12 +85,13 @@ class KNNRegressionModel(RegressionModel[Pipeline, KNNModelParam]):
         return pd.Series(predictions, index=X.index, name="predictions")
 
     @staticmethod
-    def create_model(params: Optional[Dict[str, Any]] = None) -> Pipeline:
+    def create_model(params: Optional[KNNModelParam] = None) -> Pipeline:
         model = Pipeline(
             [("scaler", StandardScaler()), ("model", KNeighborsRegressor())]
         )
         if params:
-            model.set_params(**params)
+            p = params.model_dump()
+            model.set_params(**p)
         return model
 
 

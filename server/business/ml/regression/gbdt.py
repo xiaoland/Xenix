@@ -7,7 +7,7 @@ from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
-from typing import Dict, Any, Union, Optional, Callable
+from typing import Dict, Any, Union, Optional, Callable, List
 from pydantic import BaseModel, Field
 from sklearn.base import BaseEstimator
 
@@ -26,37 +26,43 @@ class GBDTModelParam(BaseModel):
     )
 
 
-class GBDTRegressionModel(RegressionModel[GradientBoostingRegressor, GBDTModelParam]):
+class GBDTParamGridModel(BaseModel):
+    """Parameter grid for GBDT hyperparameter tuning."""
+
+    n_estimators: List[int] = Field(
+        default=[50, 100, 200], description="Number of boosting rounds."
+    )
+    learning_rate: List[float] = Field(
+        default=[0.01, 0.1, 0.2], description="Learning rate."
+    )
+    max_depth: List[int] = Field(default=[3, 5, 7], description="Maximum tree depth.")
+
+
+class GBDTRegressionModel(
+    RegressionModel[GradientBoostingRegressor, GBDTModelParam, GBDTParamGridModel]
+):
     """GBDT Regression model implementation."""
 
     @staticmethod
     def tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
-        param_grid: Optional[GBDTModelParam] = None,
+        param_grid: Optional[GBDTParamGridModel] = None,
         progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
     ) -> TuneResult:
-        # Use provided params or default
         if param_grid is None:
-            params = GBDTModelParam().model_dump()
+            grid = GBDTParamGridModel().model_dump()
         else:
-            params = param_grid.model_dump(exclude_none=True)
+            grid = param_grid.model_dump()
 
-        # Create model with parameters
-        model = GradientBoostingRegressor(
-            random_state=42,
-            n_estimators=params.get("n_estimators", 100),
-            learning_rate=params.get("learning_rate", 0.1),
-            max_depth=params.get("max_depth", 3),
-        )
-
-        # Train the model
-        model.fit(X_train, y_train)
+        base_model = GradientBoostingRegressor(random_state=42)
+        gs = GridSearchCV(base_model, grid, cv=3, scoring="r2")
+        gs.fit(X_train, y_train)
 
         return {
-            "best_params": params,
-            "best_score": 0.0,  # Not applicable for single parameter training
-            "model": model,
+            "best_params": gs.best_params_,
+            "best_score": gs.best_score_,
+            "model": gs.best_estimator_,
         }
 
     @staticmethod
@@ -77,11 +83,12 @@ class GBDTRegressionModel(RegressionModel[GradientBoostingRegressor, GBDTModelPa
 
     @staticmethod
     def create_model(
-        params: Optional[Dict[str, Any]] = None,
+        params: Optional[GBDTModelParam] = None,
     ) -> GradientBoostingRegressor:
         model = GradientBoostingRegressor(random_state=42)
         if params:
-            model.set_params(**params)
+            p = params.model_dump()
+            model.set_params(**p)
         return model
 
 

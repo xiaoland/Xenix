@@ -7,7 +7,7 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
-from typing import Dict, Any, Union, Optional, Callable
+from typing import Dict, Any, Union, Optional, Callable, List
 from pydantic import BaseModel, Field
 from sklearn.base import BaseEstimator
 
@@ -31,8 +31,25 @@ class DecisionTreeModelParam(BaseModel):
     )
 
 
+class DecisionTreeParamGridModel(BaseModel):
+    """Parameter grid for Decision Tree hyperparameter tuning."""
+
+    max_depth: List[int] = Field(
+        default=[3, 5, 7], description="Maximum depth of the tree."
+    )
+    min_samples_split: List[int] = Field(
+        default=[2, 5, 10], description="Minimum number of samples required to split."
+    )
+    min_samples_leaf: List[int] = Field(
+        default=[1, 2, 4],
+        description="Minimum number of samples required to be at a leaf node.",
+    )
+
+
 class DecisionTreeRegressionModel(
-    RegressionModel[DecisionTreeRegressor, DecisionTreeModelParam]
+    RegressionModel[
+        DecisionTreeRegressor, DecisionTreeModelParam, DecisionTreeParamGridModel
+    ]
 ):
     """DecisionTree Regression model implementation."""
 
@@ -40,30 +57,22 @@ class DecisionTreeRegressionModel(
     def tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
-        param_grid: Optional[DecisionTreeModelParam] = None,
+        param_grid: Optional[DecisionTreeParamGridModel] = None,
         progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
     ) -> TuneResult:
-        # Use provided params or default
         if param_grid is None:
-            params = DecisionTreeModelParam().model_dump()
+            grid = DecisionTreeParamGridModel().model_dump()
         else:
-            params = param_grid.model_dump(exclude_none=True)
+            grid = param_grid.model_dump()
 
-        # Create model with parameters
-        model = DecisionTreeRegressor(
-            random_state=42,
-            max_depth=params.get("max_depth"),
-            min_samples_split=params.get("min_samples_split", 2),
-            min_samples_leaf=params.get("min_samples_leaf", 1),
-        )
-
-        # Train the model
-        model.fit(X_train, y_train)
+        base_model = DecisionTreeRegressor(random_state=42)
+        gs = GridSearchCV(base_model, grid, cv=3, scoring="r2")
+        gs.fit(X_train, y_train)
 
         return {
-            "best_params": params,
-            "best_score": 0.0,  # Not applicable for single parameter training
-            "model": model,
+            "best_params": gs.best_params_,
+            "best_score": gs.best_score_,
+            "model": gs.best_estimator_,
         }
 
     @staticmethod
@@ -83,10 +92,13 @@ class DecisionTreeRegressionModel(
         return pd.Series(predictions, index=X.index, name="predictions")
 
     @staticmethod
-    def create_model(params: Optional[Dict[str, Any]] = None) -> DecisionTreeRegressor:
+    def create_model(
+        params: Optional[DecisionTreeModelParam] = None,
+    ) -> DecisionTreeRegressor:
         model = DecisionTreeRegressor(random_state=42)
         if params:
-            model.set_params(**params)
+            p = params.model_dump()
+            model.set_params(**p)
         return model
 
 

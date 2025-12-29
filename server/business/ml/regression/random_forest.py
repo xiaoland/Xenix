@@ -30,8 +30,24 @@ class RandomForestModelParam(BaseModel):
     )
 
 
+class RandomForestParamGridModel(BaseModel):
+    """Parameter grid for Random Forest hyperparameter tuning."""
+
+    n_estimators: List[int] = Field(
+        default=[50, 100, 200], description="Number of trees in the forest."
+    )
+    max_depth: List[int] = Field(
+        default=[5, 10, 15], description="Maximum depth for each tree."
+    )
+    min_samples_split: List[int] = Field(
+        default=[2, 5, 10], description="Minimum number of samples required to split."
+    )
+
+
 class RandomForestRegressionModel(
-    RegressionModel[RandomForestRegressor, RandomForestModelParam]
+    RegressionModel[
+        RandomForestRegressor, RandomForestModelParam, RandomForestParamGridModel
+    ]
 ):
     """Random Forest Regression model implementation."""
 
@@ -39,41 +55,22 @@ class RandomForestRegressionModel(
     def tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
-        param_grid: Optional[RandomForestModelParam] = None,
+        param_grid: Optional[RandomForestParamGridModel] = None,
         progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
     ) -> TuneResult:
-        """
-        Train Random Forest regression with specific parameters.
-
-        Args:
-            X_train: Training features as DataFrame
-            y_train: Training target as Series
-
-        Returns:
-            Dictionary with 'best_params', 'best_score', and 'model'
-        """
-        # Use provided params or default
         if param_grid is None:
-            params = RandomForestModelParam().model_dump()
+            grid = RandomForestParamGridModel().model_dump()
         else:
-            params = param_grid.model_dump(exclude_none=True)
+            grid = param_grid.model_dump()
 
-        # Create model with parameters
-        model = RandomForestRegressor(
-            random_state=42,
-            n_jobs=-1,
-            n_estimators=params.get("n_estimators", 100),
-            max_depth=params.get("max_depth"),
-            min_samples_split=params.get("min_samples_split", 2),
-        )
-
-        # Train the model
-        model.fit(X_train, y_train)
+        base_model = RandomForestRegressor(random_state=42, n_jobs=-1)
+        gs = GridSearchCV(base_model, grid, cv=3, scoring="r2")
+        gs.fit(X_train, y_train)
 
         return {
-            "best_params": params,
-            "best_score": 0.0,  # Not applicable for single parameter training
-            "model": model,
+            "best_params": gs.best_params_,
+            "best_score": gs.best_score_,
+            "model": gs.best_estimator_,
         }
 
     @staticmethod
@@ -115,21 +112,13 @@ class RandomForestRegressionModel(
         return pd.Series(predictions, index=X.index, name="predictions")
 
     @staticmethod
-    def create_model(params: Optional[Dict[str, Any]] = None) -> RandomForestRegressor:
-        """
-        Create a Random Forest model with given parameters.
-
-        Args:
-            params: Model parameters
-
-        Returns:
-            RandomForestRegressor model
-        """
+    def create_model(
+        params: Optional[RandomForestModelParam] = None,
+    ) -> RandomForestRegressor:
         model = RandomForestRegressor(random_state=42, n_jobs=-1)
-
         if params:
-            model.set_params(**params)
-
+            p = params.model_dump()
+            model.set_params(**p)
         return model
 
 

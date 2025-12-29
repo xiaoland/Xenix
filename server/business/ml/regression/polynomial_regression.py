@@ -9,7 +9,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
-from typing import Dict, Any, Union, Optional, Callable
+from typing import Dict, Any, Union, Optional, Callable, List
 from pydantic import BaseModel, Field
 from sklearn.base import BaseEstimator
 
@@ -25,43 +25,45 @@ class PolynomialModelParam(BaseModel):
     )
 
 
-class PolynomialRegressionModel(RegressionModel[Pipeline, PolynomialModelParam]):
+class PolynomialParamGridModel(BaseModel):
+    """Parameter grid for Polynomial Regression hyperparameter tuning."""
+
+    poly__degree: List[int] = Field(
+        default=[2, 3, 4], description="Degree of polynomial features."
+    )
+
+
+class PolynomialRegressionModel(
+    RegressionModel[Pipeline, PolynomialModelParam, PolynomialParamGridModel]
+):
     """Polynomial Regression model implementation."""
 
     @staticmethod
     def tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
-        param_grid: Optional[PolynomialModelParam] = None,
+        param_grid: Optional[PolynomialParamGridModel] = None,
         progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
     ) -> TuneResult:
-        # Use provided params or default
         if param_grid is None:
-            params = PolynomialModelParam().model_dump()
+            grid = PolynomialParamGridModel().model_dump()
         else:
-            params = param_grid.model_dump(exclude_none=True)
+            grid = param_grid.model_dump()
 
-        # Create pipeline model with parameters
-        model = Pipeline(
+        base_model = Pipeline(
             [
-                (
-                    "poly",
-                    PolynomialFeatures(
-                        degree=params.get("poly__degree", 2), include_bias=False
-                    ),
-                ),
+                ("poly", PolynomialFeatures(include_bias=False)),
                 ("scaler", StandardScaler()),
                 ("model", LinearRegression()),
             ]
         )
-
-        # Train the model
-        model.fit(X_train, y_train)
+        gs = GridSearchCV(base_model, grid, cv=3, scoring="r2")
+        gs.fit(X_train, y_train)
 
         return {
-            "best_params": params,
-            "best_score": 0.0,  # Not applicable for single parameter training
-            "model": model,
+            "best_params": gs.best_params_,
+            "best_score": gs.best_score_,
+            "model": gs.best_estimator_,
         }
 
     @staticmethod
@@ -79,22 +81,17 @@ class PolynomialRegressionModel(RegressionModel[Pipeline, PolynomialModelParam])
         return pd.Series(predictions, index=X.index, name="predictions")
 
     @staticmethod
-    def create_model(params: Optional[Dict[str, Any]] = None) -> Pipeline:
-        poly_degree = 2
-        if params and "poly__degree" in params:
-            poly_degree = params.get("poly__degree", 2)
-
+    def create_model(params: Optional[PolynomialModelParam] = None) -> Pipeline:
         model = Pipeline(
             [
-                ("poly", PolynomialFeatures(degree=poly_degree, include_bias=False)),
+                ("poly", PolynomialFeatures(include_bias=False)),
                 ("scaler", StandardScaler()),
                 ("model", LinearRegression()),
             ]
         )
-
         if params:
-            model.set_params(**params)
-
+            p = params.model_dump()
+            model.set_params(**p)
         return model
 
 

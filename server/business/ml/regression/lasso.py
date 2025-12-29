@@ -5,7 +5,7 @@ This module provides tune, evaluate, and predict functions for Lasso regression.
 All functions accept pandas DataFrames instead of file paths.
 """
 
-from typing import Dict, Any, Union, Optional, Callable
+from typing import Dict, Any, Union, Optional, Callable, List
 from pydantic import BaseModel, Field
 import pandas as pd
 from sklearn.linear_model import Lasso
@@ -27,50 +27,42 @@ class LassoModelParam(BaseModel):
     )
 
 
-class LassoRegression(RegressionModel[Pipeline, LassoModelParam]):
+class LassoParamGridModel(BaseModel):
+    """Parameter grid for Lasso hyperparameter tuning."""
+
+    model__alpha: List[float] = Field(
+        default=[0.001, 0.01, 0.1, 1.0, 10.0], description="Regularization alpha."
+    )
+
+
+class LassoRegression(RegressionModel[Pipeline, LassoModelParam, LassoParamGridModel]):
     """Lasso Regression model implementation."""
 
     @staticmethod
     def tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
-        param_grid: Optional[LassoModelParam] = None,
+        param_grid: Optional[LassoParamGridModel] = None,
         progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
     ) -> TuneResult:
-        """
-        Train Lasso regression with specific parameters.
-
-        Args:
-            X_train: Training features as DataFrame
-            y_train: Training target as Series
-
-        Returns:
-            Dictionary with 'best_params', 'best_score', and 'model'
-        """
-        # Use provided params or default
         if param_grid is None:
-            params = LassoModelParam().model_dump()
+            grid = LassoParamGridModel().model_dump()
         else:
-            params = param_grid.model_dump(exclude_none=True)
+            grid = param_grid.model_dump()
 
-        # Create pipeline model: Standardization + Lasso
-        model = Pipeline(
+        base_model = Pipeline(
             [
                 ("scaler", StandardScaler()),
-                (
-                    "model",
-                    Lasso(random_state=42, alpha=params.get("model__alpha", 1.0)),
-                ),
+                ("model", Lasso(random_state=42)),
             ]
         )
-
-        # Train the model
-        model.fit(X_train, y_train)
+        gs = GridSearchCV(base_model, grid, cv=3, scoring="r2")
+        gs.fit(X_train, y_train)
 
         return {
-            "best_params": params,
-            "best_score": 0.0,  # Not applicable for single parameter training
-            "model": model,
+            "best_params": gs.best_params_,
+            "best_score": gs.best_score_,
+            "model": gs.best_estimator_,
         }
 
     @staticmethod
@@ -110,23 +102,13 @@ class LassoRegression(RegressionModel[Pipeline, LassoModelParam]):
         return pd.Series(predictions, index=X.index, name="predictions")
 
     @staticmethod
-    def create_model(params: Optional[Dict[str, Any]] = None) -> Pipeline:
-        """
-        Create a Lasso model with given parameters.
-
-        Args:
-            params: Model parameters (e.g., {'model__alpha': 1.0})
-
-        Returns:
-            Sklearn Pipeline with StandardScaler and Lasso model
-        """
+    def create_model(params: Optional[LassoModelParam] = None) -> Pipeline:
         model = Pipeline(
             [("scaler", StandardScaler()), ("model", Lasso(random_state=42))]
         )
-
         if params:
-            model.set_params(**params)
-
+            p = params.model_dump()
+            model.set_params(**p)
         return model
 
 

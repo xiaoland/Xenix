@@ -13,7 +13,7 @@ except ImportError:
         "XGBoost is not installed. Please install it with: pip install xgboost"
     )
 
-from typing import Dict, Any, Union, Optional, Callable
+from typing import Dict, Any, Union, Optional, Callable, List
 from pydantic import BaseModel, Field
 from sklearn.base import BaseEstimator
 
@@ -30,39 +30,45 @@ class XGBoostModelParam(BaseModel):
     max_depth: int = Field(default=3, description="Maximum tree depth for the booster.")
 
 
-class XGBoostRegressionModel(RegressionModel[XGBRegressor, XGBoostModelParam]):
+class XGBoostParamGridModel(BaseModel):
+    """Parameter grid for XGBoost hyperparameter tuning."""
+
+    n_estimators: List[int] = Field(
+        default=[50, 100, 200], description="Number of booster rounds."
+    )
+    learning_rate: List[float] = Field(
+        default=[0.01, 0.1, 0.2], description="Learning rate."
+    )
+    max_depth: List[int] = Field(default=[3, 5, 7], description="Maximum tree depth.")
+
+
+class XGBoostRegressionModel(
+    RegressionModel[XGBRegressor, XGBoostModelParam, XGBoostParamGridModel]
+):
     """XGBoost Regression model implementation."""
 
     @staticmethod
     def tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
-        param_grid: Optional[XGBoostModelParam] = None,
+        param_grid: Optional[XGBoostParamGridModel] = None,
         progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
     ) -> TuneResult:
-        # Use provided params or default
         if param_grid is None:
-            params = XGBoostModelParam().model_dump()
+            grid = XGBoostParamGridModel().model_dump()
         else:
-            params = param_grid.model_dump(exclude_none=True)
+            grid = param_grid.model_dump()
 
-        # Create model with parameters
-        model = XGBRegressor(
-            objective="reg:squarederror",
-            random_state=42,
-            n_jobs=-1,
-            n_estimators=params.get("n_estimators", 100),
-            learning_rate=params.get("learning_rate", 0.1),
-            max_depth=params.get("max_depth", 3),
+        base_model = XGBRegressor(
+            objective="reg:squarederror", random_state=42, n_jobs=-1
         )
-
-        # Train the model
-        model.fit(X_train, y_train)
+        gs = GridSearchCV(base_model, grid, cv=3, scoring="r2")
+        gs.fit(X_train, y_train)
 
         return {
-            "best_params": params,
-            "best_score": 0.0,  # Not applicable for single parameter training
-            "model": model,
+            "best_params": gs.best_params_,
+            "best_score": gs.best_score_,
+            "model": gs.best_estimator_,
         }
 
     @staticmethod
@@ -82,10 +88,11 @@ class XGBoostRegressionModel(RegressionModel[XGBRegressor, XGBoostModelParam]):
         return pd.Series(predictions, index=X.index, name="predictions")
 
     @staticmethod
-    def create_model(params: Optional[Dict[str, Any]] = None) -> XGBRegressor:
+    def create_model(params: Optional[XGBoostModelParam] = None) -> XGBRegressor:
         model = XGBRegressor(objective="reg:squarederror", random_state=42, n_jobs=-1)
         if params:
-            model.set_params(**params)
+            p = params.model_dump()
+            model.set_params(**p)
         return model
 
 

@@ -27,50 +27,42 @@ class RidgeModelParam(BaseModel):
     )
 
 
-class RidgeRegression(RegressionModel[Pipeline, RidgeModelParam]):
+class RidgeParamGridModel(BaseModel):
+    """Parameter grid for Ridge hyperparameter tuning."""
+
+    model__alpha: List[float] = Field(
+        default=[0.001, 0.01, 0.1, 1.0, 10.0], description="Regularization alpha."
+    )
+
+
+class RidgeRegression(RegressionModel[Pipeline, RidgeModelParam, RidgeParamGridModel]):
     """Ridge Regression model implementation."""
 
     @staticmethod
     def tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
-        param_grid: Optional[RidgeModelParam] = None,
+        param_grid: Optional[RidgeParamGridModel] = None,
         progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
     ) -> TuneResult:
-        """
-        Train Ridge regression with specific parameters.
-
-        Args:
-            X_train: Training features as DataFrame
-            y_train: Training target as Series
-
-        Returns:
-            Dictionary with 'best_params', 'best_score', and 'model'
-        """
-        # Use provided params or default
         if param_grid is None:
-            params = RidgeModelParam().model_dump()
+            grid = RidgeParamGridModel().model_dump()
         else:
-            params = param_grid.model_dump(exclude_none=True)
+            grid = param_grid.model_dump()
 
-        # Define pipeline model: Standardization + Ridge
-        model = Pipeline(
+        base_model = Pipeline(
             [
                 ("scaler", StandardScaler()),
-                (
-                    "model",
-                    Ridge(random_state=42, alpha=params.get("model__alpha", 1.0)),
-                ),
+                ("model", Ridge(random_state=42)),
             ]
         )
-
-        # Train the model
-        model.fit(X_train, y_train)
+        gs = GridSearchCV(base_model, grid, cv=3, scoring="r2")
+        gs.fit(X_train, y_train)
 
         return {
-            "best_params": params,
-            "best_score": 0.0,  # Not applicable for single parameter training
-            "model": model,
+            "best_params": gs.best_params_,
+            "best_score": gs.best_score_,
+            "model": gs.best_estimator_,
         }
 
     @staticmethod
@@ -110,23 +102,13 @@ class RidgeRegression(RegressionModel[Pipeline, RidgeModelParam]):
         return pd.Series(predictions, index=X.index, name="predictions")
 
     @staticmethod
-    def create_model(params: Optional[Dict[str, Any]] = None) -> Pipeline:
-        """
-        Create a Ridge model with given parameters.
-
-        Args:
-            params: Model parameters (e.g., {'model__alpha': 1.0})
-
-        Returns:
-            Sklearn Pipeline with StandardScaler and Ridge model
-        """
+    def create_model(params: Optional[RidgeModelParam] = None) -> Pipeline:
         model = Pipeline(
             [("scaler", StandardScaler()), ("model", Ridge(random_state=42))]
         )
-
         if params:
-            model.set_params(**params)
-
+            p = params.model_dump()
+            model.set_params(**p)
         return model
 
 
