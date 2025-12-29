@@ -1,23 +1,23 @@
 /**
- * Server plugin to synchronize model metadata on application startup
- * This ensures the model metadata table is always up-to-date with available models
+ * Utility function to synchronize model metadata
+ * This ensures the model metadata table is up-to-date with available models
  */
-import { db } from '../database';
-import { modelMetadata } from '../database/schema';
-import { executePythonScript } from '../utils/pythonExecutor';
-import { eq } from 'drizzle-orm';
+import { db } from "../database";
+import { modelMetadata } from "../database/schema";
+import { executePythonScript } from "./pythonExecutor";
+import { eq } from "drizzle-orm";
 
-export default defineNitroPlugin(async (nitroApp) => {
-  console.log('🔄 Synchronizing model metadata...');
+export async function syncModelMetadata() {
+  console.log("🔄 Synchronizing model metadata...");
 
   try {
     // Execute the Python model scanning script
-    const scriptPath = 'server/business/ml/scan_models.py';
+    const scriptPath = "server/business/ml/scan_models.py";
     const result = await executePythonScript(scriptPath, {});
 
     if (!result.success) {
-      console.error('❌ Model scanning failed:', result.error);
-      return;
+      console.error("❌ Model scanning failed:", result.error);
+      throw new Error(`Model scanning failed: ${result.error}`);
     }
 
     const models = result.models || [];
@@ -65,10 +65,17 @@ export default defineNitroPlugin(async (nitroApp) => {
       }
     }
 
-    console.log(
-      `✅ Model metadata synchronized: ${syncedCount} new, ${updatedCount} updated, ${models.length} total`
-    );
+    const message = `✅ Model metadata synchronized: ${syncedCount} new, ${updatedCount} updated, ${models.length} total`;
+    console.log(message);
+    return {
+      success: true,
+      syncedCount,
+      updatedCount,
+      total: models.length,
+      message,
+    };
   } catch (error: any) {
-    console.error('❌ Failed to sync model metadata on startup:', error);
+    console.error("❌ Failed to sync model metadata:", error);
+    throw error;
   }
-});
+}

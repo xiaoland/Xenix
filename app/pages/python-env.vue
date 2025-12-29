@@ -59,6 +59,15 @@
               <template #icon><span class="i-mdi-download" /></template>
               Reinstall Dependencies
             </a-button>
+            <a-button
+              type="default"
+              :loading="syncLoading"
+              @click="syncModels"
+              class="inline-flex items-center"
+            >
+              <template #icon><span class="i-mdi-sync" /></template>
+              Sync Models
+            </a-button>
           </a-space>
         </div>
 
@@ -108,6 +117,7 @@ const envStatus = ref<EnvStatus>({
 const loading = ref(false);
 const setupLoading = ref(false);
 const reinstallLoading = ref(false);
+const syncLoading = ref(false);
 const message = ref("");
 const messageType = ref<"success" | "info" | "warning" | "error">("info");
 const logs = ref<string[]>([]);
@@ -185,6 +195,30 @@ const reinstallEnvironment = async () => {
   } finally {
     reinstallLoading.value = false;
     await refreshStatus();
+  }
+};
+
+const syncModels = async () => {
+  syncLoading.value = true;
+  message.value = "";
+  logs.value = [];
+
+  try {
+    logs.value.push("[INFO] Starting model metadata synchronization...");
+    const response = await $fetch("/api/sync-models", { method: "POST" });
+
+    if (response.success) {
+      message.value = response.message;
+      messageType.value = "success";
+      logs.value.push(`[SUCCESS] ${response.message}`);
+    }
+  } catch (error) {
+    message.value = `Failed to sync models: ${error.message}`;
+    messageType.value = "error";
+    logs.value.push(`[ERROR] ${error.message}`);
+    console.error("Error syncing models:", error);
+  } finally {
+    syncLoading.value = false;
   }
 };
 
