@@ -67,6 +67,10 @@ export const workItems = sqliteTable('work_items', {
   name: text('name').notNull(),
   description: text('description'),
   status: text('status').notNull().default('active'), // 'active', 'completed', 'archived'
+  // Upload step results - stored to skip upload step on return
+  datasetId: integer('dataset_id', { mode: 'number' }), // Selected dataset from upload step
+  featureColumns: text('feature_columns', { mode: 'json' }), // Selected features as JSON array
+  targetColumn: text('target_column'), // Selected target column
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 });

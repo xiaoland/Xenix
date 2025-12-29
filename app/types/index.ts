@@ -75,8 +75,13 @@ export interface WorkItem {
   name: string;
   description?: string;
   status: 'active' | 'completed' | 'archived';
+  // Upload step results - stored to skip upload step on return
+  datasetId?: number; // Selected dataset from upload step
+  featureColumns?: string[]; // Selected features
+  targetColumn?: string; // Selected target column
   createdAt: string;
   updatedAt: string;
+  tasks?: TaskInfo[]; // Populated when needed
 }
 
 export interface Project {

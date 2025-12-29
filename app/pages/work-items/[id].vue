@@ -50,8 +50,12 @@
         <a-card class="mb-6">
           <a-steps :current="currentStep" class="mb-8">
             <a-step
-              :title="$t('steps.uploadTrain.title')"
-              :description="$t('steps.uploadTrain.description')"
+              :title="$t('steps.upload.title')"
+              :description="$t('steps.upload.description')"
+            />
+            <a-step
+              :title="$t('steps.tune.title')"
+              :description="$t('steps.tune.description')"
             />
             <a-step
               :title="$t('steps.predict.title')"
@@ -59,19 +63,18 @@
             />
           </a-steps>
 
-          <!-- Step 1: Upload & Train -->
+          <!-- Step 0: Upload (skipped if work item has upload data) -->
           <div v-if="currentStep === 0">
-            <!-- Upload Section (shown first) -->
             <UploadStep
-              v-if="!hasUploadedData"
               v-model="trainingFileList"
               :project-id="workItem.projectId"
               @continue="handleColumnSelection"
             />
+          </div>
 
-            <!-- Tuning Section (shown after upload) -->
+          <!-- Step 1: Tuning -->
+          <div v-if="currentStep === 1">
             <TuningStep
-              v-else
               v-model:selected-models="selectedModels"
               v-model:active-log-tab="activeLogTab"
               v-model:selected-best-model="selectedBestModel"
@@ -85,21 +88,22 @@
               @start-tuning="startTuning"
               @start-single-tune="startSingleModelTuning"
               @continue="nextStep"
-              @back="resetUploadAndClearData"
+              @back="goToUploadStep"
             />
           </div>
 
           <!-- Step 2: Prediction -->
-          <PredictionStep
-            v-if="currentStep === 1"
-            v-model="predictionFileList"
-            :best-model="selectedBestModel"
-            :is-predicting="isPredicting"
-            :prediction-task="predictionTask"
-            @predict="startPrediction"
-            @back="prevStep"
-            @reset="reset"
-          />
+          <div v-if="currentStep === 2">
+            <PredictionStep
+              v-model="predictionFileList"
+              :best-model="selectedBestModel"
+              :is-predicting="isPredicting"
+              :prediction-task="predictionTask"
+              @predict="startPrediction"
+              @back="prevStep"
+              @reset="reset"
+            />
+          </div>
         </a-card>
       </div>
     </div>
@@ -168,26 +172,55 @@ const { uploadedDatasetId, registerFileAsDataset, clearDatasetId } =
 // Model training
 const { isTuning, executeTrain } = useModelTraining();
 
-const handleColumnSelection = ({
+const handleColumnSelection = async ({
   featureColumns,
   targetColumn,
   datasetId,
 }: {
   featureColumns: string[];
   targetColumn: string;
-  datasetId?: string;
+  datasetId?: number;
 }) => {
   selectedFeatureColumns.value = featureColumns;
   selectedTargetColumn.value = targetColumn;
-  uploadedDatasetId.value = datasetId || "";
-  hasUploadedData.value = true;
+  uploadedDatasetId.value = datasetId ? String(datasetId) : "";
+  
+  // Save upload step results to work item
+  if (workItem.value) {
+    try {
+      await $fetch(`/api/work-items/${workItem.value.id}`, {
+        method: 'PUT',
+        body: {
+          datasetId: datasetId,
+          featureColumns: featureColumns,
+          targetColumn: targetColumn,
+        },
+      });
+      message.success(t("messages.uploadDataSaved"));
+    } catch (error) {
+      console.error("Failed to save upload data:", error);
+      // Continue anyway, data is in memory
+    }
+  }
+
+  // Move to tuning step
+  currentStep.value = 1;
+  
+  // Fetch existing tuning results
+  await fetchTuningResults();
+  
   message.success(t("messages.readyToTrain", { count: featureColumns.length }));
+};
+
+const goToUploadStep = () => {
+  currentStep.value = 0;
 };
 
 const resetUploadAndClearData = () => {
   resetUpload();
   clearDatasetId();
   clearTasks();
+  currentStep.value = 0;
 };
 
 const startTuning = async () => {
@@ -220,6 +253,7 @@ const startTuning = async () => {
         featureColumns: selectedFeatureColumns.value,
         targetColumn: selectedTargetColumn.value,
         model: modelValue,
+        workItemId: workItem.value?.id, // Pass work item ID
       },
       "auto"
     );
@@ -261,6 +295,7 @@ const startSingleModelTuning = async (
       targetColumn: selectedTargetColumn.value,
       model: modelValue,
       paramGrid: paramGrid,
+      workItemId: workItem.value?.id, // Pass work item ID
     },
     trainingType === "manual" ? "manual" : "auto"
   );
@@ -274,44 +309,41 @@ const startSingleModelTuning = async (
 };
 
 const fetchTuningResults = async () => {
+  if (!workItem.value) return;
+  
   try {
-    const taskIds = Object.values(tuningTasks.value);
-    const results = await Promise.all(
-      taskIds.map((taskId) =>
-        TaskService.fetchResults(taskId).catch(() => null)
-      )
-    );
-
-    const validResults = results
-      .filter((r): r is NonNullable<typeof r> => r !== null && r.success && r.results)
-      .map((r) => {
-        const result = r.results;
-        const model = result.model || Object.keys(tuningTasks.value).find(
-          (k) => tuningTasks.value[k] === taskIds[results.indexOf(r)]
-        );
-        
-        if (!model) {
-          console.warn("Model not found for result:", result);
-          return null;
+    // Fetch all tasks for this work item
+    const response = await $fetch(`/api/work-items/${workItem.value.id}`);
+    if (response.success && response.workItem.tasks) {
+      const tasks = response.workItem.tasks.filter((t: any) => 
+        t.type === 'auto-tune' && t.status === 'completed'
+      );
+      
+      // Build tuning results from completed tasks
+      tuningResults.value = tasks.map((task: any) => ({
+        model: task.parameter?.model || '',
+        params: task.result?.params || {},
+        metrics: {
+          mse_train: task.result?.mse_train,
+          mae_train: task.result?.mae_train,
+          r2_train: task.result?.r2_train,
+          mse_test: task.result?.mse_test,
+          mae_test: task.result?.mae_test,
+          r2_test: task.result?.r2_test,
+        },
+        status: task.status,
+        trainingType: task.parameter?.trainingType || 'auto',
+        createdAt: task.createdAt,
+        taskId: task.id,
+      }));
+      
+      // Register tasks for polling
+      tasks.forEach((task: any) => {
+        if (task.parameter?.model) {
+          registerTask(task.parameter.model, task.id, task.status);
         }
-        
-        return {
-          model,
-          params: result.params,
-          metrics: {
-            mse_train: result.metrics?.mse_train,
-            mae_train: result.metrics?.mae_train,
-            r2_train: result.metrics?.r2_train,
-            mse_test: result.metrics?.mse_test,
-            mae_test: result.metrics?.mae_test,
-            r2_test: result.metrics?.r2_test,
-          },
-          status: tuningStatus.value[model] || "completed",
-        };
-      })
-      .filter((r): r is NonNullable<typeof r> => r !== null);
-
-    tuningResults.value = validResults;
+      });
+    }
   } catch (error) {
     console.error("Failed to fetch tuning results:", error);
   }
@@ -398,6 +430,25 @@ const fetchWorkItem = async () => {
     const response = await $fetch(`/api/work-items/${workItemId}`);
     if (response.success) {
       workItem.value = response.workItem;
+      
+      // Check if work item has saved upload data
+      if (workItem.value.datasetId && workItem.value.featureColumns && workItem.value.targetColumn) {
+        // Restore upload data
+        uploadedDatasetId.value = String(workItem.value.datasetId);
+        selectedFeatureColumns.value = workItem.value.featureColumns;
+        selectedTargetColumn.value = workItem.value.targetColumn;
+        
+        // Skip upload step, go directly to tuning
+        currentStep.value = 1;
+        
+        // Fetch existing tuning results
+        await fetchTuningResults();
+        
+        message.info(t("messages.uploadDataRestored"));
+      } else {
+        // Start from upload step
+        currentStep.value = 0;
+      }
     }
   } catch (error) {
     console.error("Failed to fetch work item:", error);

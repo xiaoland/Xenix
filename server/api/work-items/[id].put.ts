@@ -26,6 +26,16 @@ export default defineEventHandler(async (event) => {
     if (body.status !== undefined) {
       updateData.status = body.status;
     }
+    // Upload step results
+    if (body.datasetId !== undefined) {
+      updateData.datasetId = body.datasetId ? Number(body.datasetId) : null;
+    }
+    if (body.featureColumns !== undefined) {
+      updateData.featureColumns = body.featureColumns;
+    }
+    if (body.targetColumn !== undefined) {
+      updateData.targetColumn = body.targetColumn;
+    }
 
     await db
       .update(schema.workItems)

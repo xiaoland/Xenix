@@ -81,6 +81,14 @@
     "fetchError": "Failed to fetch work items"
   },
   "steps": {
+    "upload": {
+      "title": "Upload Data",
+      "description": "Select or upload your training dataset"
+    },
+    "tune": {
+      "title": "Tune Models",
+      "description": "Train and tune machine learning models"
+    },
     "uploadTrain": {
       "title": "Upload & Train",
       "description": "Upload data and tune models"
@@ -216,6 +224,8 @@
     "failed": "Failed"
   },
   "messages": {
+    "uploadDataSaved": "Upload data saved to work item",
+    "uploadDataRestored": "Previous upload data restored",
     "uploadError": "Please upload training data first",
     "columnSelectionError": "Please select feature columns and target column",
     "tuningStarted": "Hyperparameter tuning started for selected models",

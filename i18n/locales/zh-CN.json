@@ -81,6 +81,14 @@
     "fetchError": "获取工作项失败"
   },
   "steps": {
+    "upload": {
+      "title": "上传数据",
+      "description": "选择或上传训练数据集"
+    },
+    "tune": {
+      "title": "模型调优",
+      "description": "训练和调优机器学习模型"
+    },
     "uploadTrain": {
       "title": "上传与训练",
       "description": "上传数据并调整模型"
@@ -217,6 +225,8 @@
     "failed": "失败"
   },
   "messages": {
+    "uploadDataSaved": "上传数据已保存到工作项",
+    "uploadDataRestored": "已恢复之前的上传数据",
     "uploadError": "请先上传训练数据",
     "columnSelectionError": "请选择特征列和目标列",
     "tuningStarted": "已开始为选定模型进行超参数调整",
