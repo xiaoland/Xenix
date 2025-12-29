@@ -3,6 +3,83 @@
     "title": "Xenix",
     "subtitle": "Machine Learning Model Training and Prediction Platform"
   },
+  "navigation": {
+    "home": "Home",
+    "projects": "Projects",
+    "pythonEnv": "PyEnv"
+  },
+  "home": {
+    "title": "Projects & Work Items",
+    "subtitle": "Manage your projects and work items",
+    "projects": "Projects",
+    "workItems": "Work Items",
+    "createProject": "Create Project",
+    "noProjects": "No projects yet. Create your first project to get started.",
+    "noWorkItems": "No work items yet. Create a work item within a project."
+  },
+  "projects": {
+    "title": "Project Management",
+    "subtitle": "Organize datasets and work items by projects",
+    "createNew": "Create New Project",
+    "name": "Project Name",
+    "namePlaceholder": "Enter project name",
+    "description": "Description",
+    "descriptionPlaceholder": "Optional description",
+    "createButton": "Create Project",
+    "editProject": "Edit Project",
+    "deleteProject": "Delete Project",
+    "deleteConfirm": "Are you sure you want to delete this project?",
+    "viewDetails": "View Details",
+    "manageDatasets": "Manage Datasets",
+    "workItemsCount": "{count} work items",
+    "datasetsCount": "{count} datasets",
+    "created": "Created",
+    "updated": "Updated",
+    "projectId": "Project ID",
+    "status": "Status",
+    "active": "Active",
+    "completed": "Completed",
+    "archived": "Archived",
+    "createSuccess": "Project created successfully",
+    "updateSuccess": "Project updated successfully",
+    "deleteSuccess": "Project deleted successfully",
+    "createError": "Failed to create project",
+    "updateError": "Failed to update project",
+    "deleteError": "Failed to delete project",
+    "fetchError": "Failed to fetch projects"
+  },
+  "workItems": {
+    "title": "Work Item",
+    "subtitle": "Track your ML tasks and experiments",
+    "createNew": "Create New Work Item",
+    "name": "Work Item Name",
+    "namePlaceholder": "Enter work item name",
+    "description": "Description",
+    "descriptionPlaceholder": "Optional description",
+    "selectProject": "Select Project",
+    "selectProjectPlaceholder": "Choose a project",
+    "createButton": "Create Work Item",
+    "editWorkItem": "Edit Work Item",
+    "deleteWorkItem": "Delete Work Item",
+    "deleteConfirm": "Are you sure you want to delete this work item?",
+    "viewWorkItem": "View Work Item",
+    "open": "Open",
+    "tasksCount": "{count} tasks",
+    "created": "Created",
+    "updated": "Updated",
+    "workItemId": "Work Item ID",
+    "status": "Status",
+    "active": "Active",
+    "completed": "Completed",
+    "archived": "Archived",
+    "createSuccess": "Work item created successfully",
+    "updateSuccess": "Work item updated successfully",
+    "deleteSuccess": "Work item deleted successfully",
+    "createError": "Failed to create work item",
+    "updateError": "Failed to update work item",
+    "deleteError": "Failed to delete work item",
+    "fetchError": "Failed to fetch work items"
+  },
   "steps": {
     "uploadTrain": {
       "title": "Upload & Train",
@@ -176,10 +253,6 @@
     "defaultValue": "Default",
     "arrayPlaceholder": "Enter value and press Add"
   },
-  "navigation": {
-    "home": "Home",
-    "datasets": "Datasets"
-  },
   "datasets": {
     "title": "Dataset Manager",
     "subtitle": "Manage and reuse your data files across multiple tasks",
@@ -215,8 +288,7 @@
     "selectDataset": "Select from Existing Datasets",
     "selectDatasetPlaceholder": "Choose a dataset",
     "useExistingDataset": "Use Existing Dataset",
-    "orUploadNew": "Or upload a new file"
-  },
-  "navigation.pythonEnv": "PyEnv",
-  "tuning.paramGridColumn": "Param Grid"
+    "orUploadNew": "Or upload a new file",
+    "paramGridColumn": "Param Grid"
+  }
 }
