@@ -81,18 +81,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, watch } from "vue";
 import type { UploadProps } from "ant-design-vue";
 import { message } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
 import { useFileUpload } from "../composables/useFileUpload";
 import { DatasetService } from "../services";
-import type { Dataset } from "../types";
+import type { Dataset, Project } from "../types";
 
 const { t } = useI18n();
 const { isLoadingColumns, readExcelColumns, validateExcelFile } = useFileUpload();
 
 const fileList = defineModel<any[]>({ required: true });
+
+const props = defineProps<{
+  projectId?: string;
+}>();
 
 const emit = defineEmits<{
   continue: [
@@ -105,7 +109,9 @@ const emit = defineEmits<{
 }>();
 
 const datasets = ref<Dataset[]>([]);
+const project = ref<Project | null>(null);
 const isLoadingDatasets = ref(false);
+const isLoadingProject = ref(false);
 const selectedDatasetId = ref<string | undefined>(undefined);
 const selectedDataset = ref<Dataset | null>(null);
 
@@ -127,9 +133,28 @@ const beforeUpload: UploadProps["beforeUpload"] = (file) => {
 const fetchDatasets = async () => {
   isLoadingDatasets.value = true;
   try {
-    const response = await DatasetService.fetchAll();
-    if (response.success) {
-      datasets.value = response.datasets;
+    // If projectId is provided, fetch project and filter datasets
+    if (props.projectId) {
+      const projectResponse = await $fetch(`/api/projects/${props.projectId}`);
+      if (projectResponse.success) {
+        project.value = projectResponse.project;
+        
+        // Fetch all datasets
+        const datasetsResponse = await DatasetService.fetchAll();
+        if (datasetsResponse.success) {
+          // Filter to only show datasets in this project
+          const projectDatasetIds = project.value.datasetIds || [];
+          datasets.value = datasetsResponse.datasets.filter(
+            (d: Dataset) => projectDatasetIds.includes(d.datasetId)
+          );
+        }
+      }
+    } else {
+      // No project context, show all datasets
+      const response = await DatasetService.fetchAll();
+      if (response.success) {
+        datasets.value = response.datasets;
+      }
     }
   } catch (error) {
     console.error("Failed to fetch datasets:", error);
@@ -220,6 +245,11 @@ const handleColumnSelection = ({
 };
 
 onMounted(() => {
+  fetchDatasets();
+});
+
+// Watch for projectId changes
+watch(() => props.projectId, () => {
   fetchDatasets();
 });
 </script>

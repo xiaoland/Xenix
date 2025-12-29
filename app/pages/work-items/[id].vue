@@ -3,83 +3,128 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <PageHeader />
 
-      <div class="text-center mb-8">
-        <h1 class="text-4xl font-bold text-gray-900 mb-2">
-          {{ $t("app.title") }}
-        </h1>
-        <p class="text-lg text-gray-600">
-          {{ $t("app.subtitle") }}
-        </p>
+      <div class="text-center mb-4">
+        <a-breadcrumb>
+          <a-breadcrumb-item>
+            <NuxtLink to="/">{{ $t("navigation.home") }}</NuxtLink>
+          </a-breadcrumb-item>
+          <a-breadcrumb-item v-if="workItem">
+            {{ workItem.name }}
+          </a-breadcrumb-item>
+        </a-breadcrumb>
       </div>
 
-      <a-card class="mb-6">
-        <a-steps :current="currentStep" class="mb-8">
-          <a-step
-            :title="$t('steps.uploadTrain.title')"
-            :description="$t('steps.uploadTrain.description')"
-          />
-          <a-step
-            :title="$t('steps.predict.title')"
-            :description="$t('steps.predict.description')"
-          />
-        </a-steps>
+      <div v-if="isLoading" class="text-center py-8">
+        <a-spin size="large" />
+      </div>
 
-        <!-- Step 1: Upload & Train -->
-        <div v-if="currentStep === 0">
-          <!-- Upload Section (shown first) -->
-          <UploadStep
-            v-if="!hasUploadedData"
-            v-model="trainingFileList"
-            @continue="handleColumnSelection"
-          />
+      <div v-else-if="!workItem" class="text-center py-8">
+        <a-result
+          status="404"
+          :title="$t('workItems.fetchError')"
+          :sub-title="$t('workItems.fetchError')"
+        >
+          <template #extra>
+            <a-button type="primary" @click="$router.push('/')">
+              {{ $t("navigation.home") }}
+            </a-button>
+          </template>
+        </a-result>
+      </div>
 
-          <!-- Tuning Section (shown after upload) -->
-          <TuningStep
-            v-else
-            v-model:selected-models="selectedModels"
-            v-model:active-log-tab="activeLogTab"
-            v-model:selected-best-model="selectedBestModel"
-            v-model:selected-task-id="selectedTaskId"
-            :available-models="availableModels"
-            :tuning-status="tuningStatus"
-            :tuning-tasks="tuningTasks"
-            :is-tuning="isTuning"
-            :tuning-results="tuningResults"
-            :task-logs="taskLogs"
-            @start-tuning="startTuning"
-            @start-single-tune="startSingleModelTuning"
-            @continue="nextStep"
-            @back="resetUploadAndClearData"
-          />
+      <div v-else>
+        <div class="text-center mb-8">
+          <h1 class="text-4xl font-bold text-gray-900 mb-2">
+            {{ workItem.name }}
+          </h1>
+          <p class="text-lg text-gray-600" v-if="workItem.description">
+            {{ workItem.description }}
+          </p>
+          <div class="mt-2">
+            <a-tag :color="getStatusColor(workItem.status)">
+              {{ $t(`workItems.${workItem.status}`) }}
+            </a-tag>
+          </div>
         </div>
 
-        <!-- Step 2: Prediction -->
-        <PredictionStep
-          v-if="currentStep === 1"
-          v-model="predictionFileList"
-          :best-model="selectedBestModel"
-          :is-predicting="isPredicting"
-          :prediction-task="predictionTask"
-          @predict="startPrediction"
-          @back="prevStep"
-          @reset="reset"
-        />
-      </a-card>
+        <a-card class="mb-6">
+          <a-steps :current="currentStep" class="mb-8">
+            <a-step
+              :title="$t('steps.uploadTrain.title')"
+              :description="$t('steps.uploadTrain.description')"
+            />
+            <a-step
+              :title="$t('steps.predict.title')"
+              :description="$t('steps.predict.description')"
+            />
+          </a-steps>
+
+          <!-- Step 1: Upload & Train -->
+          <div v-if="currentStep === 0">
+            <!-- Upload Section (shown first) -->
+            <UploadStep
+              v-if="!hasUploadedData"
+              v-model="trainingFileList"
+              :project-id="workItem.projectId"
+              @continue="handleColumnSelection"
+            />
+
+            <!-- Tuning Section (shown after upload) -->
+            <TuningStep
+              v-else
+              v-model:selected-models="selectedModels"
+              v-model:active-log-tab="activeLogTab"
+              v-model:selected-best-model="selectedBestModel"
+              v-model:selected-task-id="selectedTaskId"
+              :available-models="availableModels"
+              :tuning-status="tuningStatus"
+              :tuning-tasks="tuningTasks"
+              :is-tuning="isTuning"
+              :tuning-results="tuningResults"
+              :task-logs="taskLogs"
+              @start-tuning="startTuning"
+              @start-single-tune="startSingleModelTuning"
+              @continue="nextStep"
+              @back="resetUploadAndClearData"
+            />
+          </div>
+
+          <!-- Step 2: Prediction -->
+          <PredictionStep
+            v-if="currentStep === 1"
+            v-model="predictionFileList"
+            :best-model="selectedBestModel"
+            :is-predicting="isPredicting"
+            :prediction-task="predictionTask"
+            @predict="startPrediction"
+            @back="prevStep"
+            @reset="reset"
+          />
+        </a-card>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted } from "vue";
+import { useRoute } from "vue-router";
 import { message } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
-import { useWorkflowState } from "../composables/useWorkflowState";
-import { useTaskPolling } from "../composables/useTaskPolling";
-import { useDatasetRegistration } from "../composables/useDatasetRegistration";
-import { useModelTraining } from "../composables/useModelTraining";
-import { TaskService, PredictionService } from "../services";
-import { AVAILABLE_MODELS } from "../constants/models";
+import { useWorkflowState } from "../../composables/useWorkflowState";
+import { useTaskPolling } from "../../composables/useTaskPolling";
+import { useDatasetRegistration } from "../../composables/useDatasetRegistration";
+import { useModelTraining } from "../../composables/useModelTraining";
+import { TaskService, PredictionService } from "../../services";
+import { AVAILABLE_MODELS } from "../../constants/models";
+import type { WorkItem } from "../../types";
 
 const { t } = useI18n();
+const route = useRoute();
+
+// Work item data
+const workItem = ref<WorkItem | null>(null);
+const isLoading = ref(false);
 
 // Available regression models
 const availableModels = AVAILABLE_MODELS;
@@ -343,4 +388,39 @@ const reset = () => {
   clearDatasetId();
   clearTasks();
 };
+
+const fetchWorkItem = async () => {
+  const workItemId = route.params.id as string;
+  if (!workItemId) return;
+
+  isLoading.value = true;
+  try {
+    const response = await $fetch(`/api/work-items/${workItemId}`);
+    if (response.success) {
+      workItem.value = response.workItem;
+    }
+  } catch (error) {
+    console.error("Failed to fetch work item:", error);
+    message.error(t("workItems.fetchError"));
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case "active":
+      return "green";
+    case "completed":
+      return "blue";
+    case "archived":
+      return "gray";
+    default:
+      return "default";
+  }
+};
+
+onMounted(() => {
+  fetchWorkItem();
+});
 </script>
