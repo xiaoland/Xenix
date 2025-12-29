@@ -1,6 +1,6 @@
 CREATE TABLE `datasets` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`dataset_id` text NOT NULL,
+	`project_id` integer,
 	`name` text NOT NULL,
 	`description` text,
 	`file_path` text NOT NULL,
@@ -12,7 +12,6 @@ CREATE TABLE `datasets` (
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `datasets_dataset_id_unique` ON `datasets` (`dataset_id`);--> statement-breakpoint
 CREATE TABLE `logs` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`timestamp` integer NOT NULL,
@@ -38,8 +37,18 @@ CREATE TABLE `model_metadata` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `model_metadata_name_unique` ON `model_metadata` (`name`);--> statement-breakpoint
+CREATE TABLE `projects` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`name` text NOT NULL,
+	`description` text,
+	`status` text DEFAULT 'active' NOT NULL,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE `tasks` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`work_item_id` integer,
 	`type` text NOT NULL,
 	`parameter` text,
 	`result` text,
@@ -48,4 +57,14 @@ CREATE TABLE `tasks` (
 	`created_at` integer NOT NULL,
 	`started_at` integer,
 	`end_at` integer
+);
+--> statement-breakpoint
+CREATE TABLE `work_items` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`project_id` integer NOT NULL,
+	`name` text NOT NULL,
+	`description` text,
+	`status` text DEFAULT 'active' NOT NULL,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL
 );
