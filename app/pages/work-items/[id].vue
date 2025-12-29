@@ -48,7 +48,7 @@
         </div>
 
         <a-card class="mb-6">
-          <a-steps :current="currentStep" class="mb-8">
+          <a-steps v-model:current="currentStep" class="mb-8">
             <a-step
               :title="$t('steps.upload.title')"
               :description="$t('steps.upload.description')"
@@ -185,7 +185,7 @@ const handleColumnSelection = async ({
   selectedFeatureColumns.value = featureColumns;
   selectedTargetColumn.value = targetColumn;
   uploadedDatasetId.value = datasetId ? String(datasetId) : "";
-  
+
   // Save upload step results to work item
   if (workItem.value) {
     try {
@@ -194,7 +194,7 @@ const handleColumnSelection = async ({
         featureColumns: featureColumns,
         targetColumn: targetColumn,
       });
-      
+
       // Update local work item state with saved data
       if (response.success && response.workItem) {
         workItem.value = response.workItem;
@@ -204,7 +204,7 @@ const handleColumnSelection = async ({
         workItem.value.featureColumns = featureColumns;
         workItem.value.targetColumn = targetColumn;
       }
-      
+
       message.success(t("messages.uploadDataSaved"));
     } catch (error) {
       console.error("Failed to save upload data:", error);
@@ -217,10 +217,10 @@ const handleColumnSelection = async ({
 
   // Move to tuning step
   currentStep.value = 1;
-  
+
   // Fetch existing tuning results
   await fetchTuningResults(workItem.value?.id);
-  
+
   message.success(t("messages.readyToTrain", { count: featureColumns.length }));
 };
 
@@ -285,20 +285,24 @@ const fetchWorkItem = async () => {
     const response = await WorkItemService.fetchById(workItemId);
     if (response.success) {
       workItem.value = response.workItem;
-      
+
       // Check if work item has saved upload data
-      if (workItem.value.datasetId && workItem.value.featureColumns && workItem.value.targetColumn) {
+      if (
+        workItem.value.datasetId &&
+        workItem.value.featureColumns &&
+        workItem.value.targetColumn
+      ) {
         // Restore upload data
         uploadedDatasetId.value = String(workItem.value.datasetId);
         selectedFeatureColumns.value = workItem.value.featureColumns;
         selectedTargetColumn.value = workItem.value.targetColumn;
-        
+
         // Skip upload step, go directly to tuning
         currentStep.value = 1;
-        
+
         // Fetch existing tuning results
         await fetchTuningResults(workItem.value.id);
-        
+
         message.info(t("messages.uploadDataRestored"));
       } else {
         // Start from upload step
