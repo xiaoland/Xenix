@@ -3,7 +3,7 @@
  */
 
 import { ref } from "vue";
-import { ApiService } from "~/services/apiService";
+import { DatasetService } from "~/services";
 import { message } from "ant-design-vue";
 
 export function useDatasetRegistration() {
@@ -23,7 +23,7 @@ export function useDatasetRegistration() {
 
     try {
       const datasetName = `Training Data - ${new Date().toLocaleString()}`;
-      const response = await ApiService.registerDataset(
+      const response = await DatasetService.register(
         file,
         datasetName,
         "Auto-registered during training"

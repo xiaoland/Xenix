@@ -3,7 +3,7 @@
  */
 
 import { ref } from "vue";
-import { ApiService } from "~/services/apiService";
+import { TaskService } from "~/services";
 import type { TaskStatus } from "~/types";
 
 export function useTaskPolling() {
@@ -16,7 +16,7 @@ export function useTaskPolling() {
    */
   const fetchTaskLogs = async (taskId: number) => {
     try {
-      const response = await ApiService.fetchTaskLogs(taskId);
+      const response = await TaskService.fetchLogs(taskId);
       if (response.success) {
         taskLogs.value[taskId] = response.logs.reverse();
       }
@@ -55,7 +55,7 @@ export function useTaskPolling() {
 
     while (attempts < maxAttempts) {
       try {
-        const response = await ApiService.fetchTaskStatus(taskId);
+        const response = await TaskService.fetchStatus(taskId);
 
         if (
           modelValue &&

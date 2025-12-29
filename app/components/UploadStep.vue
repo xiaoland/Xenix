@@ -86,7 +86,7 @@ import type { UploadProps } from "ant-design-vue";
 import { message } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
 import { useFileUpload } from "../composables/useFileUpload";
-import { ApiService } from "../services/apiService";
+import { DatasetService } from "../services";
 import type { Dataset } from "../types";
 
 const { t } = useI18n();
@@ -127,7 +127,7 @@ const beforeUpload: UploadProps["beforeUpload"] = (file) => {
 const fetchDatasets = async () => {
   isLoadingDatasets.value = true;
   try {
-    const response = await ApiService.fetchDatasets();
+    const response = await DatasetService.fetchAll();
     if (response.success) {
       datasets.value = response.datasets;
     }

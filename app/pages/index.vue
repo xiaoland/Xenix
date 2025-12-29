@@ -76,7 +76,7 @@ import { useWorkflowState } from "../composables/useWorkflowState";
 import { useTaskPolling } from "../composables/useTaskPolling";
 import { useDatasetRegistration } from "../composables/useDatasetRegistration";
 import { useModelTraining } from "../composables/useModelTraining";
-import { ApiService } from "../services/apiService";
+import { TaskService, PredictionService } from "../services";
 import { AVAILABLE_MODELS } from "../constants/models";
 
 const { t } = useI18n();
@@ -233,7 +233,7 @@ const fetchTuningResults = async () => {
     const taskIds = Object.values(tuningTasks.value);
     const results = await Promise.all(
       taskIds.map((taskId) =>
-        ApiService.fetchTaskResults(taskId).catch(() => null)
+        TaskService.fetchResults(taskId).catch(() => null)
       )
     );
 
@@ -297,7 +297,7 @@ const startPrediction = async () => {
   isPredicting.value = true;
 
   try {
-    const response = await ApiService.startPrediction({
+    const response = await PredictionService.start({
       file: predictionFileList.value[0].originFileObj,
       model: selectedBestModel.value,
       tuningTaskId: selectedModelTaskId,
