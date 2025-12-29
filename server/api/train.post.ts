@@ -9,7 +9,7 @@ import { eq } from "drizzle-orm";
 export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event);
-    const { datasetId, features, target, model, parameters } = body;
+    const { datasetId, features, target, model, parameters, workItemId } = body;
 
     // Validate required parameters
     if (!datasetId) {
@@ -51,7 +51,7 @@ export default defineEventHandler(async (event) => {
     const [dataset] = await db
       .select()
       .from(schema.datasets)
-      .where(eq(schema.datasets.datasetId, datasetId))
+      .where(eq(schema.datasets.id, Number(datasetId)))
       .limit(1);
 
     if (!dataset) {
@@ -65,6 +65,7 @@ export default defineEventHandler(async (event) => {
     const [insertedTask] = await db
       .insert(schema.tasks)
       .values({
+        workItemId: workItemId ? Number(workItemId) : null,
         type: "train",
         status: "pending",
         parameter: {

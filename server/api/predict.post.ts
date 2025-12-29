@@ -14,8 +14,9 @@ export default defineEventHandler(async (event) => {
     const trainingDatasetId = formData.get("trainingDatasetId") as string;
     const featureColumns = formData.get("featureColumns") as string; // JSON string
     const targetColumn = formData.get("targetColumn") as string;
+    const workItemId = formData.get("workItemId") as string;
 
-    let predictionDatasetId: string;
+    let predictionDatasetId: number;
     let trainingDataPath: string;
 
     // Support both file upload and dataset reference for prediction data
@@ -24,7 +25,7 @@ export default defineEventHandler(async (event) => {
       const [dataset] = await db
         .select()
         .from(schema.datasets)
-        .where(eq(schema.datasets.datasetId, datasetId))
+        .where(eq(schema.datasets.id, Number(datasetId)))
         .limit(1);
 
       if (!dataset) {
@@ -34,7 +35,7 @@ export default defineEventHandler(async (event) => {
         });
       }
 
-      predictionDatasetId = datasetId;
+      predictionDatasetId = dataset.id;
     } else if (file) {
       // Upload new file and create dataset
       if (!validateExcelFile(file.name)) {
@@ -49,17 +50,15 @@ export default defineEventHandler(async (event) => {
       const filePath = await saveUploadedFile(file, uploadDir);
       
       // Create dataset record
-      const newDatasetId = `ds_${Date.now()}`;
-      await db.insert(schema.datasets).values({
-        datasetId: newDatasetId,
+      const [newDataset] = await db.insert(schema.datasets).values({
         name: file.name,
         description: "Uploaded for prediction",
         filePath: filePath,
         fileName: file.name,
         fileSize: file.size,
-      });
+      }).returning();
       
-      predictionDatasetId = newDatasetId;
+      predictionDatasetId = newDataset.id;
     } else {
       throw createError({
         statusCode: 400,
@@ -78,7 +77,7 @@ export default defineEventHandler(async (event) => {
     const [trainingDataset] = await db
       .select()
       .from(schema.datasets)
-      .where(eq(schema.datasets.datasetId, trainingDatasetId))
+      .where(eq(schema.datasets.id, Number(trainingDatasetId)))
       .limit(1);
 
     if (!trainingDataset) {
@@ -134,7 +133,7 @@ export default defineEventHandler(async (event) => {
     const [predictionDataset] = await db
       .select()
       .from(schema.datasets)
-      .where(eq(schema.datasets.datasetId, predictionDatasetId))
+      .where(eq(schema.datasets.id, predictionDatasetId))
       .limit(1);
 
     // Generate output file path
@@ -142,6 +141,7 @@ export default defineEventHandler(async (event) => {
 
     // Create task record with new schema
     const [insertedTask] = await db.insert(schema.tasks).values({
+      workItemId: workItemId ? Number(workItemId) : null,
       type: "predict",
       status: "pending",
       parameter: {
