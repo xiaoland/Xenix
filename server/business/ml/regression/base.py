@@ -65,7 +65,7 @@ class RegressionModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]):
 
     @staticmethod
     @abstractmethod
-    def tune(
+    def auto_tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
         param_grid: Optional[ParamGridType] = None,
@@ -93,6 +93,36 @@ class RegressionModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]):
                 - 'model': Trained model with best parameters
         """
         pass
+
+    @classmethod
+    def manual_tune(
+        cls,
+        X_train: pd.DataFrame,
+        y_train: pd.Series,
+        params: Optional[ModelParamType] = None,
+    ) -> ModelType:
+        """
+        Train the regression model with specific parameters.
+        
+        This is a concrete method that all regression models can use.
+        It creates a model with the given parameters and fits it to the training data.
+
+        Args:
+            X_train: Training features as DataFrame
+            y_train: Training target as Series
+            params: Model parameters as pydantic BaseModel instance
+                If None, uses default parameters for the model
+
+        Returns:
+            Trained model (ModelType)
+        """
+        # Create model with specified parameters
+        model = cls.create_model(params)
+        
+        # Fit the model
+        model.fit(X_train, y_train)
+        
+        return model
 
     @staticmethod
     @abstractmethod

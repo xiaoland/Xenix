@@ -85,15 +85,9 @@ def auto_tune_regression_model(
             logger.warning(f"Model {model_name} does not have ParamGrid class, using dict")
             param_grid = param_grid_dict
 
-    # Perform auto-tuning (renamed from tune)
+    # Perform auto-tuning
     logger.info("Starting hyperparameter search...")
-    
-    # Check if model has auto_tune method, fallback to tune for backward compatibility
-    if hasattr(Model, "auto_tune"):
-        tune_result = Model.auto_tune(X_train, y_train, param_grid=param_grid)
-    else:
-        logger.warning(f"Model {model_name} does not have auto_tune method, using tune")
-        tune_result = Model.tune(X_train, y_train, param_grid=param_grid)
+    tune_result = Model.auto_tune(X_train, y_train, param_grid=param_grid)
 
     best_params = tune_result["best_params"]
     logger.info(f"Best parameters found: {best_params}")
@@ -103,14 +97,12 @@ def auto_tune_regression_model(
 
     # Evaluate on training set
     logger.info("Evaluating on training set...")
-    y_train_pred = model.predict(X_train)
-    train_metrics = Model.evaluate(y_train, y_train_pred)
+    train_metrics = Model.evaluate(model, X_train, y_train)
     logger.info(f"Training metrics: {train_metrics}")
 
     # Evaluate on test set
     logger.info("Evaluating on test set...")
-    y_test_pred = model.predict(X_test)
-    test_metrics = Model.evaluate(y_test, y_test_pred)
+    test_metrics = Model.evaluate(model, X_test, y_test)
     logger.info(f"Test metrics: {test_metrics}")
 
     # Combine metrics

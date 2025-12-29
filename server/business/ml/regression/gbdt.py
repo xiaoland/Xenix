@@ -44,7 +44,7 @@ class GBDTRegressionModel(
     """GBDT Regression model implementation."""
 
     @staticmethod
-    def tune(
+    def auto_tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
         param_grid: Optional[GBDTParamGridModel] = None,

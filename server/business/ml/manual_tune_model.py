@@ -85,34 +85,18 @@ def manual_tune_regression_model(
             logger.warning(f"Model {model_name} does not have Params class, using dict")
             params = parameters
 
-    # Perform manual tuning
-    logger.info("Training model with specified parameters...")
-    
-    # Check if model has manual_tune method
-    if hasattr(Model, "manual_tune"):
-        model = Model.manual_tune(X_train, y_train, params=params)
-    else:
-        # Fallback: get_model + fit + evaluate
-        logger.info("Model does not have manual_tune method, using get_model + fit")
-        if hasattr(Model, "get_model"):
-            model = Model.get_model(params)
-        else:
-            raise AttributeError(f"Model {model_name} does not have manual_tune or get_model method")
-        
-        # Fit the model
-        logger.info("Fitting model...")
-        model.fit(X_train, y_train)
+    # Perform manual tuning using the manual_tune method from base class
+    logger.info("Training model with specified parameters using manual_tune method...")
+    model = Model.manual_tune(X_train, y_train, params=params)
 
     # Evaluate on training set
     logger.info("Evaluating on training set...")
-    y_train_pred = model.predict(X_train)
-    train_metrics = Model.evaluate(y_train, y_train_pred)
+    train_metrics = Model.evaluate(model, X_train, y_train)
     logger.info(f"Training metrics: {train_metrics}")
 
     # Evaluate on test set
     logger.info("Evaluating on test set...")
-    y_test_pred = model.predict(X_test)
-    test_metrics = Model.evaluate(y_test, y_test_pred)
+    test_metrics = Model.evaluate(model, X_test, y_test)
     logger.info(f"Test metrics: {test_metrics}")
 
     # Combine metrics
