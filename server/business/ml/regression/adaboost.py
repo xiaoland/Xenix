@@ -100,4 +100,11 @@ class AdaBoostRegressionModel(
 
 
 # Alias for the model class
+
+# Register parameter schemas
+AdaBoostRegressionModel.register_schemas(
+    param_grid_class=AdaBoostRegressionParamGridModel,
+    param_class=AdaBoostRegressionModelParam,
+)
+
 Model = AdaBoostRegressionModel

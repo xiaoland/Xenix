@@ -1,9 +1,9 @@
 /**
- * Training Service
- * Handles model training and tuning operations
+ * Tune Service
+ * Handles all model tuning operations (auto-tune and manual-tune)
  */
 
-export class TrainingService {
+export class TuneService {
   /**
    * Start auto-tune with hyperparameter grid search
    */

@@ -152,12 +152,10 @@ def main():
         )
 
         # Emit result
-        emit_result(
-            {
-                "params": best_params,
-                "metrics": metrics,
-            }
-        )
+        emit_result({
+            "params": best_params,
+            "metrics": metrics,
+        })
 
     except Exception as e:
         logger = get_logger()

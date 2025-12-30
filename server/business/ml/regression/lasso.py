@@ -112,5 +112,11 @@ class LassoRegression(RegressionModel[Pipeline, LassoModelParam, LassoParamGridM
         return model
 
 
+# Register parameter schemas
+LassoRegressionModel.register_schemas(
+    param_grid_class=LassoRegressionParamGridModel,
+    param_class=LassoRegressionModelParam,
+)
+
 # Alias for the model class
 Model = LassoRegression

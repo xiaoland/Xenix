@@ -5,7 +5,7 @@
 
 export { DatasetService } from "./datasetService";
 export { TaskService } from "./taskService";
-export { TrainingService } from "./trainingService";
+export { TuneService } from "./tuneService";
 export { PredictionService } from "./predictionService";
 export { ModelService } from "./modelService";
 export { WorkItemService } from "./workItemService";

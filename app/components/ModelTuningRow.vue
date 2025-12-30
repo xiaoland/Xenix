@@ -73,7 +73,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { WorkItemService, TrainingService } from "~/services";
+import { WorkItemService, TuneService } from "~/services";
 import { useFormatters } from "~/composables/useFormatters";
 import { AVAILABLE_MODELS } from "~/constants/models";
 
@@ -154,7 +154,7 @@ const handleCreateAutoTuneTask = async (paramGrid: Record<string, any>) => {
     if (workItem.success && workItem.workItem) {
       const { datasetId, features, target } = workItem.workItem;
       
-      await TrainingService.startAutoTune({
+      await TuneService.startAutoTune({
         datasetId: String(datasetId),
         features: features || [],
         target: target || '',
@@ -179,7 +179,7 @@ const handleManualTune = async (parameters: Record<string, any>) => {
     if (workItem.success && workItem.workItem) {
       const { datasetId, features, target } = workItem.workItem;
       
-      await TrainingService.startManualTune({
+      await TuneService.startManualTune({
         datasetId: String(datasetId),
         features: features || [],
         target: target || '',

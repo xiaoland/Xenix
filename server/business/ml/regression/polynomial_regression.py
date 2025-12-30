@@ -96,4 +96,11 @@ class PolynomialRegressionModel(
 
 
 # Alias for the model class
+
+# Register parameter schemas
+PolynomialRegressionModel.register_schemas(
+    param_grid_class=PolynomialRegressionParamGridModel,
+    param_class=PolynomialRegressionModelParam,
+)
+
 Model = PolynomialRegressionModel

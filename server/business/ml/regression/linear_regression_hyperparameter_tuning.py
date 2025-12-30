@@ -121,5 +121,11 @@ class LinearRegressionModel(
         return model
 
 
+# Register parameter schemas
+LinearRegressionModel.register_schemas(
+    param_grid_class=LinearRegressionParamGridModel,
+    param_class=LinearRegressionModelParam,
+)
+
 # Alias for the model class
 Model = LinearRegressionModel

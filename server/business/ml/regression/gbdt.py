@@ -93,4 +93,11 @@ class GBDTRegressionModel(
 
 
 # Alias for the model class
+
+# Register parameter schemas
+GBDTRegressionModel.register_schemas(
+    param_grid_class=GBDTRegressionParamGridModel,
+    param_class=GBDTRegressionModelParam,
+)
+
 Model = GBDTRegressionModel

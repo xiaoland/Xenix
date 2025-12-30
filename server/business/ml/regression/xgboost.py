@@ -97,4 +97,11 @@ class XGBoostRegressionModel(
 
 
 # Alias for the model class
+
+# Register parameter schemas
+XGBoostRegressionModel.register_schemas(
+    param_grid_class=XGBoostRegressionParamGridModel,
+    param_class=XGBoostRegressionModelParam,
+)
+
 Model = XGBoostRegressionModel

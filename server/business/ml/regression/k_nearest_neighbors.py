@@ -96,4 +96,11 @@ class KNNRegressionModel(RegressionModel[Pipeline, KNNModelParam, KNNParamGridMo
 
 
 # Alias for the model class
+
+# Register parameter schemas
+KNNRegressionModel.register_schemas(
+    param_grid_class=KNNRegressionParamGridModel,
+    param_class=KNNRegressionModelParam,
+)
+
 Model = KNNRegressionModel

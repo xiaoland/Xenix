@@ -61,12 +61,12 @@ export default defineEventHandler(async (event) => {
       });
     }
 
-    // Create task record with tune type
+    // Create task record with manual-tune type
     const [insertedTask] = await db
       .insert(schema.tasks)
       .values({
         workItemId: workItemId ? Number(workItemId) : null,
-        type: "tune",
+        type: "manual-tune",
         status: "pending",
         parameter: {
           model,

@@ -102,4 +102,11 @@ class LightGBMRegressionModel(
 
 
 # Alias for the model class
+
+# Register parameter schemas
+LightGBMRegressionModel.register_schemas(
+    param_grid_class=LightGBMRegressionParamGridModel,
+    param_class=LightGBMRegressionModelParam,
+)
+
 Model = LightGBMRegressionModel

@@ -112,5 +112,11 @@ class RidgeRegression(RegressionModel[Pipeline, RidgeModelParam, RidgeParamGridM
         return model
 
 
+# Register parameter schemas
+RidgeRegressionModel.register_schemas(
+    param_grid_class=RidgeRegressionParamGridModel,
+    param_class=RidgeRegressionModelParam,
+)
+
 # Alias for the model class
 Model = RidgeRegression

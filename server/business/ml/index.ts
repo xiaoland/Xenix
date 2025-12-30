@@ -344,30 +344,6 @@ export async function manualTune(options: ManualTuneOptions): Promise<void> {
 }
 
 /**
- * High-level function to tune a machine learning model
- * Automatically ensures Python environment is ready before execution
- *
- * @param options - Tuning configuration options
- * @returns Promise that resolves when tuning task is started
- * @deprecated Use autoTune() instead
- */
-export async function tune(options: TuneOptions): Promise<void> {
-  return autoTune(options);
-}
-
-/**
- * High-level function to train a machine learning model with specific parameters
- * Automatically ensures Python environment is ready before execution
- *
- * @param options - Training configuration options
- * @returns Promise that resolves when training task is started
- * @deprecated Use manualTune() instead  
- */
-export async function train(options: TrainOptions): Promise<void> {
-  return manualTune(options);
-}
-
-/**
  * High-level function to make predictions using a trained model
  * Automatically ensures Python environment is ready before execution
  *

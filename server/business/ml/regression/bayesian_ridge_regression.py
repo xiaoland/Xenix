@@ -96,4 +96,11 @@ class BayesianRidgeRegressionModel(
 
 
 # Alias for the model class
+
+# Register parameter schemas
+BayesianRidgeRegressionModel.register_schemas(
+    param_grid_class=BayesianRidgeRegressionParamGridModel,
+    param_class=BayesianRidgeRegressionModelParam,
+)
+
 Model = BayesianRidgeRegressionModel

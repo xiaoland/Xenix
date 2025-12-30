@@ -102,5 +102,11 @@ class DecisionTreeRegressionModel(
         return model
 
 
+# Register parameter schemas
+RegressionDecisionTreeModel.register_schemas(
+    param_grid_class=RegressionDecisionTreeParamGridModel,
+    param_class=RegressionDecisionTreeModelParam,
+)
+
 # Alias for the model class
 Model = DecisionTreeRegressionModel
