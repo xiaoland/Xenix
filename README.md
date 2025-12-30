@@ -8,7 +8,7 @@ Xenix provides an interface for teachers and mid-small enterprises to analyze th
 
 ## Features
 
-- **3-Step Workflow**: Upload Data, Pick Features, Target -> Tune & Train → Predict
+- **3-Step Workflow**: Prepare Data, Pick Features, Target -> Tune & Train → Predict
 - **Data Manager**: Upload and reuse datasets across multiple tasks without duplication
 - **Automated Hyperparameter Tuning**: GridSearchCV-based optimization for 12 regression models
 - **Evaluation Metrics Display**: Real-time display of MSE, MAE, and R² scores from tuning

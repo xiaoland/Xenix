@@ -49,7 +49,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useFormatters } from "../composables/useFormatters";
+import { useFormatters } from "../../../composables/useFormatters";
 
 const props = defineProps<{
   workItemId: number;

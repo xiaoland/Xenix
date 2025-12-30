@@ -3,7 +3,7 @@
     <h3 class="text-lg font-medium mb-3">
       {{ $t("tuning.modelSelectionAndTuning") }}
     </h3>
-    
+
     <!-- Model Selector and Add Button -->
     <div class="mb-4 flex gap-2 items-center">
       <a-select
@@ -14,13 +14,16 @@
       />
       <a-button
         type="primary"
-        :disabled="!selectedModelToAdd || selectedModels.some(m => m.value === selectedModelToAdd)"
+        :disabled="
+          !selectedModelToAdd ||
+          selectedModels.some((m) => m.value === selectedModelToAdd)
+        "
         @click="handleAddModel"
       >
         {{ t("tuning.addModel") }}
       </a-button>
     </div>
-    
+
     <table class="w-full border-collapse model-tuning-table">
       <thead>
         <tr class="border-b bg-gray-50">
@@ -111,9 +114,9 @@ const fetchSelectedModels = async () => {
       // Build selected models list (use i18n translation if available)
       const modelsList = Array.from(models).map((model) => {
         const found = AVAILABLE_MODELS.find(m => m.value === model);
-        return { 
+        return {
           label: found?.label || t(`models.${model.replace(".", "_")}`),
-          value: model 
+          value: model
         };
       });
       selectedModels.value = modelsList;
@@ -140,7 +143,7 @@ const fetchSelectedModels = async () => {
 // Add a new model to the table
 const handleAddModel = () => {
   if (!selectedModelToAdd.value) return;
-  
+
   // Check if already added
   if (availableModels.value.some(m => m.value === selectedModelToAdd.value)) {
     return;
@@ -148,7 +151,7 @@ const handleAddModel = () => {
 // Add a new model to the table
 const handleAddModel = () => {
   if (!selectedModelToAdd.value) return;
-  
+
   // Find the model from constants
   const modelToAdd = AVAILABLE_MODELS.find(m => m.value === selectedModelToAdd.value);
   if (modelToAdd) {
@@ -157,7 +160,7 @@ const handleAddModel = () => {
       value: modelToAdd.value,
     });
   }
-  
+
   // Clear selection
   selectedModelToAdd.value = undefined;
 };

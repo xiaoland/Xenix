@@ -1,5 +1,5 @@
 import { db, schema } from "../database";
-import { tune } from "../business/ml";
+import { autoTune } from "../business/ml";
 import { eq } from "drizzle-orm";
 
 /**
@@ -76,14 +76,13 @@ export default defineEventHandler(async (event) => {
 
     // Execute tuning task in background
     setImmediate(() => {
-      tune({
+      autoTune({
         inputFile: dataset.filePath,
         model,
         featureColumns: features,
         targetColumn: target,
         taskId,
         paramGrid,
-        trainingType: "auto",
       }).catch((error) => {
         console.error(`Failed to execute tune task ${taskId}:`, error);
       });
@@ -98,7 +97,8 @@ export default defineEventHandler(async (event) => {
     console.error("Tune error:", error);
     throw createError({
       statusCode: 500,
-      message: error instanceof Error ? error.message : "Failed to start tuning",
+      message:
+        error instanceof Error ? error.message : "Failed to start tuning",
     });
   }
 });
