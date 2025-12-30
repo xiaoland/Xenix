@@ -100,12 +100,13 @@ class RegressionModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]):
         X_train: pd.DataFrame,
         y_train: pd.Series,
         params: Optional[ModelParamType] = None,
-    ) -> ModelType:
+    ) -> Dict[str, Any]:
         """
         Train the regression model with specific parameters.
         
         This is a concrete method that all regression models can use.
-        It creates a model with the given parameters and fits it to the training data.
+        It creates a model with the given parameters, fits it to the training data,
+        and returns the trained model along with evaluation metrics.
 
         Args:
             X_train: Training features as DataFrame
@@ -114,7 +115,9 @@ class RegressionModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]):
                 If None, uses default parameters for the model
 
         Returns:
-            Trained model (ModelType)
+            Dictionary containing:
+                - 'model': Trained model (ModelType)
+                - 'metrics': Evaluation metrics on training data
         """
         # Create model with specified parameters
         model = cls.create_model(params)
@@ -122,7 +125,13 @@ class RegressionModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]):
         # Fit the model
         model.fit(X_train, y_train)
         
-        return model
+        # Evaluate on training data
+        metrics = cls.evaluate(model, X_train, y_train)
+        
+        return {
+            "model": model,
+            "metrics": metrics,
+        }
 
     @staticmethod
     @abstractmethod
