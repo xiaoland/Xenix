@@ -9,7 +9,6 @@
       ref="formRef"
       v-model="formData"
       :schema="schema"
-      mode="paramGrid"
     />
   </div>
 </template>

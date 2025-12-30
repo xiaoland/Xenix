@@ -80,7 +80,6 @@ const { t } = useI18n();
 interface AutoFormProps {
   modelValue: Record<string, any>;
   schema: any;
-  mode: "paramGrid" | "parameters"; // paramGrid for arrays, parameters for single values
 }
 
 const props = defineProps<AutoFormProps>();
@@ -92,6 +91,18 @@ const emit = defineEmits<{
 const formRef = ref();
 const formData = ref<Record<string, any>>({});
 const isInitializing = ref(false);
+
+// Determine mode based on schema structure
+// If the first property has items (array type), it's paramGrid mode
+const mode = computed(() => {
+  if (props.schema && props.schema.properties) {
+    const firstProp = Object.values(props.schema.properties)[0] as any;
+    if (firstProp && firstProp.items) {
+      return "paramGrid";
+    }
+  }
+  return "parameters";
+});
 
 const initializeFormData = () => {
   isInitializing.value = true;
@@ -108,7 +119,7 @@ const initializeFormData = () => {
         data[propName] = props.modelValue[propName];
       } else if (schema.default !== undefined) {
         // Use schema defaults based on mode
-        if (props.mode === "paramGrid") {
+        if (mode.value === "paramGrid") {
           // For paramGrid mode, expect arrays
           data[propName] = Array.isArray(schema.default)
             ? [...schema.default]
@@ -122,7 +133,7 @@ const initializeFormData = () => {
       } else {
         // Create default value based on mode and type
         const itemType = getItemType(schema);
-        data[propName] = createDefaultValue(itemType, props.mode);
+        data[propName] = createDefaultValue(itemType, mode.value);
       }
     }
   }
@@ -136,7 +147,7 @@ const initializeFormData = () => {
 
 // Initialize form data when schema or initial values change
 watch(
-  () => [props.modelValue, props.schema, props.mode],
+  () => [props.modelValue, props.schema],
   () => {
     if (props.schema) {
       initializeFormData();

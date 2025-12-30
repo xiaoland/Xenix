@@ -43,7 +43,7 @@ class PolynomialRegressionModel(
         X_train: pd.DataFrame,
         y_train: pd.Series,
         param_grid: Optional[PolynomialParamGridModel] = None,
-        progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
+        
     ) -> TuneResult:
         if param_grid is None:
             grid = PolynomialParamGridModel().model_dump()

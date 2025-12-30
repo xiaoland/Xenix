@@ -50,7 +50,7 @@ class AdaBoostRegressionModel(
         X_train: pd.DataFrame,
         y_train: pd.Series,
         param_grid: Optional[AdaBoostParamGridModel] = None,
-        progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
+        
     ) -> TuneResult:
         if param_grid is None:
             grid = AdaBoostParamGridModel().model_dump()

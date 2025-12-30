@@ -69,27 +69,20 @@ class RegressionModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]):
         X_train: pd.DataFrame,
         y_train: pd.Series,
         param_grid: Optional[ParamGridType] = None,
-        upd_pg: Optional[Callable[[ProgressInfo], None]] = None,
     ) -> TuneResult:
         """
-        Perform automatic(hyperparameter) tuning for the regression model.
+        Perform hyperparameter tuning for the regression model.
 
         Args:
             X_train: Training features as DataFrame
             y_train: Training target as Series
             param_grid: Optional parameter grid as pydantic BaseModel instance
                 If None, uses default parameter grid for the model
-            upd_pg: Optional callback function for progress updates.
-                Called with a ProgressInfo dict containing:
-                - percentage: Progress percentage (0-100)
-                - round: Current round/iteration number
-                - total_rounds: Total number of rounds
-                - metrics: Current metrics dictionary
-                - params: Current parameters being evaluated
 
         Returns:
             Dictionary containing:
                 - 'best_params': Best parameters found during tuning
+                - 'best_score': Best score achieved
                 - 'model': Trained model with best parameters
         """
         pass

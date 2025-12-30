@@ -43,7 +43,7 @@ class RidgeRegression(RegressionModel[Pipeline, RidgeModelParam, RidgeParamGridM
         X_train: pd.DataFrame,
         y_train: pd.Series,
         param_grid: Optional[RidgeParamGridModel] = None,
-        progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
+        
     ) -> TuneResult:
         if param_grid is None:
             grid = RidgeParamGridModel().model_dump()

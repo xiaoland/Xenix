@@ -48,7 +48,7 @@ class KNNRegressionModel(RegressionModel[Pipeline, KNNModelParam, KNNParamGridMo
         X_train: pd.DataFrame,
         y_train: pd.Series,
         param_grid: Optional[KNNParamGridModel] = None,
-        progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
+        
     ) -> TuneResult:
         if param_grid is None:
             grid = KNNParamGridModel().model_dump()

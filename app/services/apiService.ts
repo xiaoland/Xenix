@@ -35,7 +35,7 @@ export class ApiService {
     model: string;
     paramGrid?: Record<string, any>;
   }): Promise<{ success: boolean; taskId: number }> {
-    return await $fetch("/api/tune", {
+    return await $fetch("/api/auto-tune", {
       method: "POST",
       body: params,
     });
@@ -48,7 +48,7 @@ export class ApiService {
     model: string;
     parameters: Record<string, any>;
   }): Promise<{ success: boolean; taskId: number }> {
-    return await $fetch("/api/train", {
+    return await $fetch("/api/manual-tune", {
       method: "POST",
       body: params,
     });
