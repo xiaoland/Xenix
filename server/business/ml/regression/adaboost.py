@@ -41,16 +41,18 @@ class AdaBoostParamGridModel(BaseModel):
 
 
 class AdaBoostRegressionModel(
-    RegressionModel[AdaBoostRegressor, AdaBoostModelParam, AdaBoostParamGridModel]
+    RegressionModel[AdaBoostRegressor, AdaBoostModelParam, AdaBoostParamGridModel],
+    param_grid=AdaBoostParamGridModel,
+    model_param=AdaBoostModelParam,
 ):
     """AdaBoost Regression model implementation."""
 
     @staticmethod
-    def tune(
+    def auto_tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
         param_grid: Optional[AdaBoostParamGridModel] = None,
-        progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
+        
     ) -> TuneResult:
         if param_grid is None:
             grid = AdaBoostParamGridModel().model_dump()

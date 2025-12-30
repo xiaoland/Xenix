@@ -1,56 +1,33 @@
 <template>
-  <div>
-    <template v-if="column.key === 'select'">
-      <!-- Only show radio button in sub-rows (history items) -->
-      <a-radio
-        v-if="record.isHistory"
-        :checked="selectedTaskId === record.taskId"
-        @click="$emit('update:selectedTaskId', record.taskId)"
-      />
-    </template>
-
-    <template v-else-if="column.key === 'model'">
-      <span class="font-medium" :class="{ 'pl-2': record.isHistory }">
-        {{
-          record.isHistory
-            ? `${formatTimestamp(record.createdAt)}`
-            : record.label
-        }}
+  <!-- Parent row -->
+  <tr class="border-b hover:bg-gray-50">
+    <!-- Expand icon -->
+    <td class="px-4 py-2">
+      <span
+        class="inline-block transition-transform cursor-pointer"
+        :class="{ 'rotate-90': isExpanded }"
+        @click.stop="$emit('toggle-expand', model)"
+      >
+        ▶
       </span>
-    </template>
+    </td>
 
-    <template v-else-if="column.key === 'tuneType'">
-      <!-- Show tune type and parameters for sub-rows -->
-      <div v-if="record.isHistory" class="text-sm">
-        <div class="font-medium mb-1">
-          <a-tag v-if="record.trainingType === 'auto-tune'" color="blue">
-            {{ t("tuning.autoTune") }}
-          </a-tag>
-          <a-tag v-else-if="record.trainingType === 'train'" color="green">
-            {{ t("tuning.manualTrain") }}
-          </a-tag>
-        </div>
-        <div v-if="record.params" class="text-xs text-gray-600">
-          <div
-            v-for="(value, key) in record.params"
-            :key="key"
-            class="truncate"
-          >
-            <span class="font-medium">{{ key }}:</span>
-            {{ formatParamValue(value) }}
-          </div>
-        </div>
-      </div>
-    </template>
+    <!-- Model Name Column -->
+    <td class="px-4 py-2">
+      <span class="font-medium">{{ modelLabel }}</span>
+    </td>
 
-    <template v-else-if="column.key === 'action'">
-      <!-- Parent row: Only show Auto Tune and Train buttons -->
-      <div v-if="!record.isHistory" class="flex gap-2">
+    <!-- Tune Type Column -->
+    <td class="px-4 py-2"></td>
+
+    <!-- Action Column -->
+    <td class="px-4 py-2">
+      <div class="flex gap-2">
         <a-button
           type="primary"
           size="small"
           :disabled="isTuning"
-          @click="$emit('auto-tune', record.model, record.label)"
+          @click="handleAutoTune"
           class="inline-flex items-center"
         >
           <span class="i-mdi-tune mr-1" />
@@ -59,93 +36,165 @@
         <a-button
           size="small"
           :disabled="isTuning"
-          @click="$emit('manual-train', record.model, record.label)"
+          @click="handleManualTrain"
           class="inline-flex items-center"
         >
           <span class="i-mdi-pencil mr-1" />
-          {{ t("tuning.manualTrain") }}
+          {{ t("tuning.manualTune") }}
         </a-button>
       </div>
-      <!-- Sub-row: Show View Logs button and status tag for each training task -->
-      <div v-else class="flex gap-2 items-center">
-        <a-button
-          v-if="record.taskId"
-          size="small"
-          @click="$emit('view-logs', record.taskId, record.label)"
-          class="inline-flex items-center"
-        >
-          <span class="i-mdi-text-box-outline mr-1" />
-          {{ t("tuning.viewLogs") }}
-        </a-button>
-        <a-tag v-if="record.status" :color="getStatusColor(record.status)">
-          {{ record.status }}
-        </a-tag>
-      </div>
-    </template>
+    </td>
+  </tr>
 
-    <template v-else-if="column.key === 'metrics'">
-      <div v-if="record.metrics" class="text-sm">
-        <div>
-          <span class="font-medium">{{ t("metrics.r2") }}:</span>
-          {{ formatMetric(record.metrics.r2_test) }}
-        </div>
-        <div>
-          <span class="font-medium">{{ t("metrics.mse") }}:</span>
-          {{ formatMetric(record.metrics.mse_test) }}
-        </div>
-        <div>
-          <span class="font-medium">{{ t("metrics.mae") }}:</span>
-          {{ formatMetric(record.metrics.mae_test) }}
-        </div>
-      </div>
-      <span v-else class="text-gray-400">{{ t("common.na") }}</span>
-    </template>
-  </div>
+  <!-- Child rows (tuning tasks) -->
+  <ModelTuningSubRow
+    v-for="taskId in displayedTaskIds"
+    :key="`${model}-${taskId}`"
+    :task-id="taskId"
+    v-model:selectedTaskId="selectedTaskIdProxy"
+  />
+
+  <!-- Dialogs (using teleport to move them outside the table) -->
+  <teleport to="body">
+    <AutoTuneDialog
+      v-model="autoTuneDialogVisible"
+      :model="model"
+      @create-task="handleCreateAutoTuneTask"
+    />
+
+    <ManualTuneDialog
+      v-model="manualTuneDialogVisible"
+      :model="model"
+      @tune="handleManualTune"
+    />
+  </teleport>
 </template>
 
 <script setup lang="ts">
+import { ref, computed, watch, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
+import { WorkItemService, TuneService } from "~/services";
+import { useFormatters } from "~/composables/useFormatters";
+import { AVAILABLE_MODELS } from "~/constants/models";
 
 const { t } = useI18n();
+const { formatTimestamp, formatMetric, getStatusColor } = useFormatters();
 
 const props = defineProps<{
-  column: any;
-  record: any;
+  model: string;
+  workItemId: number;
   selectedTaskId: number | null;
   isTuning: boolean;
+  isExpanded: boolean;
 }>();
 
 const emit = defineEmits<{
-  (e: "update:selectedTaskId", value: number | null): void;
-  (e: "auto-tune", modelName: string, modelLabel: string): void;
-  (e: "manual-train", modelName: string, modelLabel: string): void;
-  (e: "view-logs", taskId: number, modelName: string): void;
+  "update:selectedTaskId": [taskId: number | null];
+  "toggle-expand": [modelName: string];
 }>();
 
-const formatModelName = (name: string) => {
-  return name.replace(/_/g, " ");
+// Compute model label from model value
+const modelLabel = computed(() => {
+  const found = AVAILABLE_MODELS.find(m => m.value === props.model);
+  return found?.label || t(`models.${props.model.replace(".", "_")}`);
+});
+  "toggle-expand": [modelName: string];
+}>();
+
+// Local state
+const taskIds = ref<number[]>([]);
+
+// Dialog states
+const autoTuneDialogVisible = ref(false);
+const manualTuneDialogVisible = ref(false);
+
+// Computed properties
+const selectedTaskIdProxy = computed({
+  get: () => props.selectedTaskId,
+  set: (value) => emit("update:selectedTaskId", value),
+});
+
+const displayedTaskIds = computed(() => {
+  return props.isExpanded ? taskIds.value : [];
+});
+
+// Fetch task IDs for this model from work item
+const fetchTaskIds = async () => {
+  try {
+    const response = await WorkItemService.fetchById(props.workItemId);
+    if (response.success && response.workItem && response.workItem.tasks) {
+      // Filter tasks for this model
+      const modelTasks = response.workItem.tasks
+        .filter((task: any) => {
+          const param = task.parameter || {};
+          return param.model === props.model;
+        })
+        .map((task: any) => task.id);
+
+      taskIds.value = modelTasks;
+    }
+  } catch (error) {
+    console.error(`Failed to fetch task IDs for ${props.model}:`, error);
+  }
 };
 
-const formatTimestamp = (timestamp: any) => {
-  if (!timestamp) return "";
-  const date = new Date(timestamp);
-  return date.toLocaleString();
+// Event handlers
+const handleAutoTune = () => {
+  autoTuneDialogVisible.value = true;
 };
 
-const formatMetric = (value: string | number) => {
-  if (!value) return t("common.na");
-  const num = typeof value === "string" ? parseFloat(value) : value;
-  return num.toFixed(4);
+const handleManualTrain = () => {
+  manualTuneDialogVisible.value = true;
 };
 
-const getStatusColor = (status: string) => {
-  const colors: Record<string, string> = {
-    completed: "green",
-    running: "blue",
-    pending: "orange",
-    failed: "red",
-  };
-  return colors[status?.toLowerCase()] || "default";
+const handleCreateAutoTuneTask = async (paramGrid: Record<string, any>) => {
+  try {
+    // Get work item to extract dataset and feature info
+    const workItem = await WorkItemService.fetchById(props.workItemId);
+    if (workItem.success && workItem.workItem) {
+      const { datasetId, features, target } = workItem.workItem;
+      
+      await TuneService.startAutoTune({
+        datasetId: String(datasetId),
+        features: features || [],
+        target: target || '',
+        model: props.model,
+        paramGrid,
+        workItemId: props.workItemId,
+      });
+      
+      autoTuneDialogVisible.value = false;
+      // Refresh task list
+      await fetchTaskIds();
+    }
+  } catch (error) {
+    console.error('Failed to start auto-tune:', error);
+  }
+};
+
+const handleManualTune = async (parameters: Record<string, any>) => {
+  try {
+    // Get work item to extract dataset and feature info
+    const workItem = await WorkItemService.fetchById(props.workItemId);
+    if (workItem.success && workItem.workItem) {
+      const { datasetId, features, target } = workItem.workItem;
+      
+      await TuneService.startManualTune({
+        datasetId: String(datasetId),
+        features: features || [],
+        target: target || '',
+        model: props.model,
+        parameters,
+        workItemId: props.workItemId,
+      });
+      
+      manualTuneDialogVisible.value = false;
+      // Refresh task list
+      await fetchTaskIds();
+    }
+  } catch (error) {
+    console.error('Failed to start manual tune:', error);
+  }
 };
 
 const formatParamValue = (value: any): string => {
@@ -157,4 +206,28 @@ const formatParamValue = (value: any): string => {
   }
   return String(value);
 };
+
+// Watch for expansion changes to fetch data
+watch(
+  () => props.isExpanded,
+  (expanded) => {
+    if (expanded && taskIds.value.length === 0) {
+      fetchTaskIds();
+    }
+  },
+  { immediate: true }
+);
+
+// Initialize
+onMounted(() => {
+  if (props.isExpanded) {
+    fetchTaskIds();
+  }
+});
 </script>
+
+<style scoped>
+.rotate-90 {
+  transform: rotate(90deg);
+}
+</style>

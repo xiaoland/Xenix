@@ -1,9 +1,9 @@
 /**
- * Training Service
- * Handles model training and tuning operations
+ * Tune Service
+ * Handles all model tuning operations (auto-tune and manual-tune)
  */
 
-export class TrainingService {
+export class TuneService {
   /**
    * Start auto-tune with hyperparameter grid search
    */
@@ -15,16 +15,16 @@ export class TrainingService {
     paramGrid?: Record<string, any>;
     workItemId?: number;
   }): Promise<{ success: boolean; taskId: number }> {
-    return await $fetch("/api/tune", {
+    return await $fetch("/api/auto-tune", {
       method: "POST",
       body: params,
     });
   }
 
   /**
-   * Start manual training with specific parameters
+   * Start manual tune with specific parameters
    */
-  static async startManualTrain(params: {
+  static async startManualTune(params: {
     datasetId: string;
     features: string[];
     target: string;
@@ -32,7 +32,7 @@ export class TrainingService {
     parameters: Record<string, any>;
     workItemId?: number;
   }): Promise<{ success: boolean; taskId: number }> {
-    return await $fetch("/api/train", {
+    return await $fetch("/api/manual-tune", {
       method: "POST",
       body: params,
     });

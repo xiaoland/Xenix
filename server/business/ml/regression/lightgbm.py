@@ -46,16 +46,18 @@ class LightGBMParamGridModel(BaseModel):
 
 
 class LightGBMRegressionModel(
-    RegressionModel[LGBMRegressor, LightGBMModelParam, LightGBMParamGridModel]
+    RegressionModel[LGBMRegressor, LightGBMModelParam, LightGBMParamGridModel],
+    param_grid=LightGBMParamGridModel,
+    model_param=LightGBMModelParam,
 ):
     """LightGBM Regression model implementation."""
 
     @staticmethod
-    def tune(
+    def auto_tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
         param_grid: Optional[LightGBMParamGridModel] = None,
-        progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
+        
     ) -> TuneResult:
         if param_grid is None:
             grid = LightGBMParamGridModel().model_dump()

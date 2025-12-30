@@ -41,16 +41,18 @@ class BayesianRidgeParamGridModel(BaseModel):
 
 
 class BayesianRidgeRegressionModel(
-    RegressionModel[Pipeline, BayesianRidgeModelParam, BayesianRidgeParamGridModel]
+    RegressionModel[Pipeline, BayesianRidgeModelParam, BayesianRidgeParamGridModel],
+    param_grid=BayesianRidgeParamGridModel,
+    model_param=BayesianRidgeModelParam,
 ):
     """BayesianRidge Regression model implementation."""
 
     @staticmethod
-    def tune(
+    def auto_tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
         param_grid: Optional[BayesianRidgeParamGridModel] = None,
-        progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
+        
     ) -> TuneResult:
         if param_grid is None:
             grid = BayesianRidgeParamGridModel().model_dump()

@@ -5,7 +5,7 @@ This module provides tune, evaluate, and predict functions for Ridge regression.
 All functions accept pandas DataFrames instead of file paths.
 """
 
-from typing import Dict, Any, Union, Optional, Callable
+from typing import Dict, Any, Union, Optional, Callable, List
 from pydantic import BaseModel, Field
 import pandas as pd
 from sklearn.linear_model import Ridge
@@ -35,15 +35,19 @@ class RidgeParamGridModel(BaseModel):
     )
 
 
-class RidgeRegression(RegressionModel[Pipeline, RidgeModelParam, RidgeParamGridModel]):
+class RidgeRegression(
+    RegressionModel[Pipeline, RidgeModelParam, RidgeParamGridModel],
+    param_grid=RidgeParamGridModel,
+    model_param=RidgeModelParam,
+):
     """Ridge Regression model implementation."""
 
     @staticmethod
-    def tune(
+    def auto_tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
         param_grid: Optional[RidgeParamGridModel] = None,
-        progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
+        
     ) -> TuneResult:
         if param_grid is None:
             grid = RidgeParamGridModel().model_dump()
@@ -110,7 +114,6 @@ class RidgeRegression(RegressionModel[Pipeline, RidgeModelParam, RidgeParamGridM
             p = params.model_dump()
             model.set_params(**p)
         return model
-
 
 # Alias for the model class
 Model = RidgeRegression

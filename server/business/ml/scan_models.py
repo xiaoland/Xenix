@@ -20,7 +20,7 @@ from base import import_model
 
 def get_param_grid_class(model_class):
     """
-    Extract the ModelParam class from a model class's type hints.
+    Extract the ModelParam class from a model class's schema registration.
 
     Args:
         model_class: The model class to inspect
@@ -28,14 +28,22 @@ def get_param_grid_class(model_class):
     Returns:
         The ModelParam class if found, None otherwise
     """
-    # Get the class's __orig_bases__ to access Generic parameters
-    if hasattr(model_class, "__orig_bases__"):
-        for base in model_class.__orig_bases__:
-            # Check if this is a Generic type with parameters
-            if hasattr(base, "__args__") and len(base.__args__) >= 2:
-                # Second type parameter is ModelParamType
-                return base.__args__[1]
-    return None
+    # Use the __paramgrid__ class variable set by __init_subclass__
+    return getattr(model_class, "__paramgrid__", None)
+
+
+def get_param_class(model_class):
+    """
+    Extract the Model Parameter class from a model class's schema registration.
+
+    Args:
+        model_class: The model class to inspect
+
+    Returns:
+        The Model Parameter class if found, None otherwise
+    """
+    # Use the __modelparam__ class variable set by __init_subclass__
+    return getattr(model_class, "__modelparam__", None)
 
 
 def scan_models_in_directory(category: str, directory: Path) -> List[Dict[str, Any]]:

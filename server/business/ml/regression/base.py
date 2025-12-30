@@ -63,13 +63,36 @@ class RegressionModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]):
         ParamGridType: The parameter grid model type (pydantic BaseModel subclass with list fields)
     """
 
+    def __init_subclass__(
+        cls,
+        param_grid: type["ParamGridType"] = None,
+        model_param: type["ModelParamType"] = None,
+        **kwargs
+    ):
+        """
+        Hook to enforce schema registration when a concrete model class is defined.
+        
+        All concrete model classes must provide param_grid and model_param parameters
+        when subclassing.
+        
+        Args:
+            param_grid: The pydantic model class for parameter grids (with list fields)
+            model_param: The pydantic model class for single parameters
+        """
+        super().__init_subclass__(**kwargs)
+        
+        # Store the parameter schemas as class variables
+        if param_grid is not None:
+            cls.__paramgrid__ = param_grid
+        if model_param is not None:
+            cls.__modelparam__ = model_param
+
     @staticmethod
     @abstractmethod
-    def tune(
+    def auto_tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
         param_grid: Optional[ParamGridType] = None,
-        upd_pg: Optional[Callable[[ProgressInfo], None]] = None,
     ) -> TuneResult:
         """
         Perform hyperparameter tuning for the regression model.
@@ -79,20 +102,50 @@ class RegressionModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]):
             y_train: Training target as Series
             param_grid: Optional parameter grid as pydantic BaseModel instance
                 If None, uses default parameter grid for the model
-            upd_pg: Optional callback function for progress updates.
-                Called with a ProgressInfo dict containing:
-                - percentage: Progress percentage (0-100)
-                - round: Current round/iteration number
-                - total_rounds: Total number of rounds
-                - metrics: Current metrics dictionary
-                - params: Current parameters being evaluated
 
         Returns:
             Dictionary containing:
                 - 'best_params': Best parameters found during tuning
+                - 'best_score': Best score achieved
                 - 'model': Trained model with best parameters
         """
         pass
+
+    @classmethod
+    def manual_tune(
+        cls,
+        X_test: pd.DataFrame,
+        y_test: pd.Series,
+        params: Optional[ModelParamType] = None,
+    ) -> Dict[str, Any]:
+        """
+        Evaludate the regression model with specific parameters.
+
+        This is a concrete method that all regression models can use.
+        It creates a model with the given parameters, and then evaluates on the given test data,
+        and returns the model along with evaluation metrics.
+
+        Args:
+            X_test: Test features as DataFrame
+            y_test: Test target as Series
+            params: Model parameters as pydantic BaseModel instance
+                If None, uses default parameters for the model
+
+        Returns:
+            Dictionary containing:
+                - 'model': Trained model (ModelType)
+                - 'metrics': Evaluation metrics on training data
+        """
+        # Create model with specified parameters
+        model = cls.create_model(params)
+
+        # Evaluate on training data
+        metrics = cls.evaluate(model, X_test, y_test)
+
+        return {
+            "model": model,
+            "metrics": metrics,
+        }
 
     @staticmethod
     @abstractmethod

@@ -5,7 +5,7 @@ This module provides tune, evaluate, and predict functions for Linear regression
 All functions accept pandas DataFrames instead of file paths.
 """
 
-from typing import Dict, Any, Union, Optional, Callable
+from typing import Dict, Any, Union, Optional, Callable, List
 from pydantic import BaseModel, Field
 import pandas as pd
 from sklearn.linear_model import LinearRegression
@@ -45,16 +45,18 @@ class LinearRegressionParamGridModel(BaseModel):
 class LinearRegressionModel(
     RegressionModel[
         Pipeline, LinearRegressionModelParam, LinearRegressionParamGridModel
-    ]
+    ],
+    param_grid=LinearRegressionParamGridModel,
+    model_param=LinearRegressionModelParam,
 ):
     """Linear Regression model implementation."""
 
     @staticmethod
-    def tune(
+    def auto_tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
         param_grid: Optional[LinearRegressionParamGridModel] = None,
-        progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
+        
     ) -> TuneResult:
         if param_grid is None:
             grid = LinearRegressionParamGridModel().model_dump()

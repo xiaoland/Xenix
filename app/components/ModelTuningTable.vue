@@ -3,71 +3,61 @@
     <h3 class="text-lg font-medium mb-3">
       {{ $t("tuning.modelSelectionAndTuning") }}
     </h3>
-    <a-table
-      :dataSource="tableData"
-      :columns="columns"
-      :row-key="getRowKey"
-      :pagination="false"
-      :expandable="{
-        expandedRowKeys: expandedKeys,
-        onExpand: handleExpand,
-      }"
-      class="model-tuning-table"
-    >
-      <template #bodyCell="{ column, record }">
-        <ModelTuningRow
-          :column="column"
-          :record="record"
-          v-model:selectedTaskId="modelValue"
-          :isTuning="isTuning"
-          @auto-tune="handleAutoTune"
-          @manual-train="handleManualTrain"
-          @view-logs="handleViewLogs"
-        />
-      </template>
-    </a-table>
-
-    <!-- Log Viewer Modal -->
-    <a-modal
-      v-model:open="logModalVisible"
-      :title="t('logs.titleWithModel', { model: currentLogModelName })"
-      width="800px"
-      :footer="null"
-    >
-      <LogPanel :logs="currentLogs" />
-    </a-modal>
-
-    <!-- ParamGrid Editor Dialog (for auto-tune) -->
-    <ParamGridDialog
-      v-model="paramGridDialogVisible"
-      :model-name="currentEditModel"
-      :model-label="currentEditModelLabel"
-      :schema="currentModelSchema"
-      :initial-values="paramGridValues[currentEditModel]"
-      @save="handleSaveAutoTune"
-    />
-
-    <!-- Manual Train Dialog -->
-    <ManualTrainDialog
-      v-model="manualTrainDialogVisible"
-      :model-name="currentEditModel"
-      :model-label="currentEditModelLabel"
-      :schema="currentModelSchema"
-      :initial-values="manualTrainValues[currentEditModel]"
-      @train="handleSaveManualTrain"
-    />
+    
+    <!-- Model Selector and Add Button -->
+    <div class="mb-4 flex gap-2 items-center">
+      <a-select
+        v-model:value="selectedModelToAdd"
+        :placeholder="t('tuning.selectModelToAdd')"
+        class="w-64"
+        :options="availableModelOptions"
+      />
+      <a-button
+        type="primary"
+        :disabled="!selectedModelToAdd || selectedModels.some(m => m.value === selectedModelToAdd)"
+        @click="handleAddModel"
+      >
+        {{ t("tuning.addModel") }}
+      </a-button>
+    </div>
+    
+    <table class="w-full border-collapse model-tuning-table">
+      <thead>
+        <tr class="border-b bg-gray-50">
+          <th class="px-4 py-2 text-left w-12"></th>
+          <th class="px-4 py-2 text-left">{{ t("tuning.model") }}</th>
+          <th class="px-4 py-2 text-left w-48">{{ t("tuning.tuneType") }}</th>
+          <th class="px-4 py-2 text-left w-80">{{ t("tuning.tuning") }}</th>
+          <th class="px-4 py-2 text-left w-80">{{ t("tuning.metrics") }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <template v-for="model in selectedModels" :key="model.value">
+          <ModelTuningRow
+            :model="model.value"
+            :work-item-id="workItemId"
+            v-model:selectedTaskId="modelValue"
+            :isTuning="isTuning"
+            :isExpanded="expandedKeys.includes(model.value)"
+            @toggle-expand="toggleExpand"
+          />
+        </template>
+        <tr v-if="selectedModels.length === 0">
+          <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+            {{ t("tuning.noModelsAdded") }}
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { ref, watch, toRef, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { useDialogManagement } from "../composables/useDialogManagement";
-import { useFormatters } from "../composables/useFormatters";
+import { WorkItemService } from "~/services";
 import ModelTuningRow from "./ModelTuningRow.vue";
-import { ref, watch, toRef } from "vue";
-import { WorkItemService, TaskService } from "~/services";
-import type { TuningResult } from "~/types";
+import { AVAILABLE_MODELS } from "~/constants/models";
 
 const { t } = useI18n();
 
@@ -79,139 +69,28 @@ const modelValue = defineModel<number | null>("selectedTaskId", {
   default: null,
 });
 
-const emit = defineEmits<{
-  "start-tune": [
-    model: string,
-    paramGrid?: Record<string, any>,
-    trainingType?: string,
-    parentTaskId?: number
-  ];
-  "view-logs": [taskId: number, modelName: string];
-}>();
-
 const workItemIdRef = toRef(() => props.workItemId);
 
 // Data states
-const availableModels = ref<Array<{ label: string; value: string }>>([]);
-const tuningStatus = ref<Record<string, string>>({});
-const tuningTasks = ref<Record<string, number>>({});
-const tuningResults = ref<TuningResult[]>([]);
-const taskLogs = ref<Record<string, any[]>>({});
-const trainingHistory = ref<Record<string, any[]>>({});
+const selectedModels = ref<Array<{ label: string; value: string }>>([]);
 const isTuning = ref(false);
+const selectedModelToAdd = ref<string | undefined>(undefined);
 
 // UI states
 const expandedKeys = ref<string[]>([]);
 
-const {
-  logModalVisible,
-  paramGridDialogVisible,
-  manualTrainDialogVisible,
-  currentLogTaskId,
-  currentLogModelName,
-  currentEditModel,
-  currentEditModelLabel,
-  currentModelSchema,
-  paramGridValues,
-  manualTrainValues,
-  openAutoTuneDialog,
-  openManualTrainDialog,
-  openLogModal,
-} = useDialogManagement();
-
-const { formatModelName, formatTimestamp, formatMetric, getStatusColor } =
-  useFormatters();
-
-// Table data computed property
-const tableData = computed(() => {
-  const data: any[] = [];
-
-  for (const model of availableModels.value) {
-    const status = tuningStatus.value[model.value];
-    const taskId = tuningTasks.value[model.value];
-    const result = tuningResults.value.find(
-      (r: any) => r.model === model.value
-    );
-
-    // Build children array for expandable rows
-    const children: any[] = [];
-
-    // Add historical tasks
-    const history = trainingHistory.value[model.value] || [];
-    for (const historyItem of history) {
-      children.push({
-        model: model.value,
-        label: model.label,
-        taskId: historyItem.taskId,
-        status: historyItem.status || "completed",
-        metrics: {
-          r2_test: historyItem.r2_test,
-          mse_test: historyItem.mse_test,
-          mae_test: historyItem.mae_test,
-        },
-        params: historyItem.params,
-        trainingType: historyItem.trainingType,
-        createdAt: historyItem.createdAt,
-        isHistory: true,
-      });
-    }
-
-    // Add current active task if not in history
-    if (status && taskId) {
-      const existsInHistory = history.some((h: any) => h.taskId === taskId);
-      if (!existsInHistory) {
-        children.push({
-          model: model.value,
-          label: model.label,
-          taskId: taskId,
-          status: status,
-          metrics: result
-            ? {
-                r2_test: result.metrics?.r2_test,
-                mse_test: result.metrics?.mse_test,
-                mae_test: result.metrics?.mae_test,
-              }
-            : null,
-          params: result?.params,
-          trainingType: result?.trainingType || "auto",
-          createdAt: result?.createdAt || new Date(),
-          isHistory: true,
-          isCurrent: true,
-        });
-      }
-    }
-
-    // Parent row
-    const parentRow = {
-      model: model.value,
-      label: model.label,
-      children: children,
-      isHistory: false,
-    };
-
-    data.push(parentRow);
-  }
-
-  return data;
+// Available model options (all models from constants that are not yet selected)
+const availableModelOptions = computed(() => {
+  return AVAILABLE_MODELS.filter(
+    m => !selectedModels.value.some(sm => sm.value === m.value)
+  ).map(m => ({
+    label: m.label,
+    value: m.value,
+  }));
 });
 
-// Table columns
-const columns = computed(() => [
-  { title: "", key: "select", width: 50 },
-  { title: t("tuning.model"), key: "model", dataIndex: "model" },
-  { title: t("tuning.tuneType"), key: "tuneType", width: 200 },
-  { title: t("tuning.tuning"), key: "action", width: 350 },
-  { title: t("tuning.metrics"), key: "metrics", width: 320 },
-]);
-
-// Current logs computed property
-const currentLogs = computed(() => {
-  if (!currentLogTaskId.value) return [];
-  return taskLogs.value[currentLogTaskId.value] || [];
-});
-
-// Functions from composable
-const fetchTuningData = async () => {
+// Fetch selected models from work item
+const fetchSelectedModels = async () => {
   if (!workItemIdRef.value) return;
 
   try {
@@ -219,7 +98,7 @@ const fetchTuningData = async () => {
     if (response.success && response.workItem) {
       const workItem = response.workItem;
 
-      // Extract available models from tasks or use defaults
+      // Extract selected models from tasks
       const models = new Set<string>();
       if (workItem.tasks) {
         workItem.tasks.forEach((task: any) => {
@@ -229,106 +108,68 @@ const fetchTuningData = async () => {
         });
       }
 
-      // Build available models list (use i18n translation if available)
+      // Build selected models list (use i18n translation if available)
       const modelsList = Array.from(models).map((model) => {
-        const translated = t(`models.${model.replace(".", "_")}`);
-        return { label: translated, value: model };
+        const found = AVAILABLE_MODELS.find(m => m.value === model);
+        return { 
+          label: found?.label || t(`models.${model.replace(".", "_")}`),
+          value: model 
+        };
       });
-      availableModels.value = modelsList;
-
-      // Process tasks and build status, tuningTasks, and results
-      const statusMap: Record<string, string> = {};
-      const tasksMap: Record<string, number> = {};
-      const resultsMap: TuningResult[] = [];
-
-      if (workItem.tasks) {
-        for (const task of workItem.tasks as any[]) {
-          const model = task.parameter?.model;
-          if (!model) continue;
-
-          statusMap[model] = task.status || "pending";
-          if (task.id) {
-            tasksMap[model] = task.id;
-          }
-
-          // Collect completed tuning results
-          if (task.type === "auto-tune" && task.status === "completed") {
-            resultsMap.push({
-              model: model,
-              params: task.result?.params || {},
-              metrics: {
-                mse_train: task.result?.mse_train,
-                mae_train: task.result?.mae_train,
-                r2_train: task.result?.r2_train,
-                mse_test: task.result?.mse_test,
-                mae_test: task.result?.mae_test,
-                r2_test: task.result?.r2_test,
-              },
-              status: task.status,
-              trainingType: task.parameter?.trainingType || "auto-tune",
-              createdAt: task.createdAt,
-              taskId: task.id,
-            } as any);
-          }
-        }
-      }
-
-      tuningStatus.value = statusMap;
-      tuningTasks.value = tasksMap;
-      tuningResults.value = resultsMap;
+      selectedModels.value = modelsList;
 
       // Determine if tuning is in progress
-      isTuning.value = Object.values(statusMap).some(
-        (status) => status === "processing" || status === "pending"
-      );
-
-      // Fetch training history for each model
-      for (const model of modelsList) {
-        await fetchTrainingHistory(model.value);
+      if (workItem.tasks) {
+        const statusMap: Record<string, string> = {};
+        for (const task of workItem.tasks as any[]) {
+          const model = task.parameter?.model;
+          if (model) {
+            statusMap[model] = task.status || "pending";
+          }
+        }
+        isTuning.value = Object.values(statusMap).some(
+          (status) => status === "processing" || status === "pending"
+        );
       }
     }
   } catch (error) {
-    console.error("Failed to fetch tuning data:", error);
+    console.error("Failed to fetch selected models:", error);
   }
 };
 
-const fetchTrainingHistory = async (model: string) => {
-  try {
-    const response = await TaskService.fetchTrainingHistory(model);
-    if (response.success && response.results) {
-      trainingHistory.value[model] = response.results;
-    }
-  } catch (error) {
-    console.error(`Failed to fetch training history for ${model}:`, error);
+// Add a new model to the table
+const handleAddModel = () => {
+  if (!selectedModelToAdd.value) return;
+  
+  // Check if already added
+  if (availableModels.value.some(m => m.value === selectedModelToAdd.value)) {
+    return;
   }
+// Add a new model to the table
+const handleAddModel = () => {
+  if (!selectedModelToAdd.value) return;
+  
+  // Find the model from constants
+  const modelToAdd = AVAILABLE_MODELS.find(m => m.value === selectedModelToAdd.value);
+  if (modelToAdd) {
+    selectedModels.value.push({
+      label: modelToAdd.label,
+      value: modelToAdd.value,
+    });
+  }
+  
+  // Clear selection
+  selectedModelToAdd.value = undefined;
 };
 
-const fetchTaskLogs = async (taskId: number) => {
-  try {
-    const response = await TaskService.fetchLogs(taskId);
-    if (response.success && response.logs) {
-      taskLogs.value[taskId] = response.logs;
-    }
-  } catch (error) {
-    console.error(`Failed to fetch logs for task ${taskId}:`, error);
-  }
-};
-
-const handleExpand = (expanded: boolean, record: any) => {
-  if (expanded) {
-    if (!expandedKeys.value.includes(record.model)) {
-      expandedKeys.value.push(record.model);
-    }
-    fetchTrainingHistory(record.model);
+// Toggle expand/collapse
+const toggleExpand = (modelName: string) => {
+  const index = expandedKeys.value.indexOf(modelName);
+  if (index > -1) {
+    expandedKeys.value.splice(index, 1);
   } else {
-    expandedKeys.value = expandedKeys.value.filter(
-      (key) => key !== record.model
-    );
+    expandedKeys.value.push(modelName);
   }
-};
-
-const getRowKey = (record: any) => {
-  return record.isHistory ? `${record.model}-${record.taskId}` : record.model;
 };
 
 // Watch for workItemId changes and refetch data
@@ -336,60 +177,24 @@ watch(
   workItemIdRef,
   () => {
     if (workItemIdRef.value) {
-      fetchTuningData();
+      fetchSelectedModels();
     }
   },
   { immediate: true }
 );
-
-// Event handlers
-const handleViewLogs = (taskId: number, modelName: string) => {
-  openLogModal(taskId, modelName);
-  fetchTaskLogs(taskId);
-  emit("view-logs", taskId, modelName);
-};
-
-const handleAutoTune = (modelName: string, modelLabel: string) => {
-  openAutoTuneDialog(modelName, modelLabel);
-};
-
-const handleManualTrain = (modelName: string, modelLabel: string) => {
-  openManualTrainDialog(modelName, modelLabel);
-};
-
-const handleSaveAutoTune = (values: Record<string, any>) => {
-  paramGridValues.value[currentEditModel.value] = values;
-  // Start auto-tune with param grid
-  emit("start-tune", currentEditModel.value, values, "auto");
-};
-
-const handleSaveManualTrain = (values: Record<string, any>) => {
-  manualTrainValues.value[currentEditModel.value] = values;
-  // Find the parent task ID (the most recent auto-tune task for this model)
-  const parentTaskId = (tuningTasks.value[currentEditModel.value] || null) as
-    | number
-    | null;
-  // Start manual train with single values
-  emit(
-    "start-tune",
-    currentEditModel.value,
-    values,
-    "manual",
-    parentTaskId || undefined
-  );
-};
 </script>
 
 <style scoped>
-.model-tuning-table :deep(.ant-table-row:hover) {
-  background-color: #f5f5f5;
+.model-tuning-table tr {
+  transition: background-color 0.2s;
 }
 
-.model-tuning-table :deep(.ant-table-expanded-row) {
-  background-color: #fafafa;
+.model-tuning-table th {
+  font-weight: 600;
+  color: #374151;
 }
 
-.model-tuning-table :deep(.ant-table-expanded-row > td) {
-  border-bottom: 1px solid #e8e8e8;
+.rotate-90 {
+  transform: rotate(90deg);
 }
 </style>

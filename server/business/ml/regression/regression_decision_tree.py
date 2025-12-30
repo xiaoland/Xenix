@@ -49,16 +49,18 @@ class DecisionTreeParamGridModel(BaseModel):
 class DecisionTreeRegressionModel(
     RegressionModel[
         DecisionTreeRegressor, DecisionTreeModelParam, DecisionTreeParamGridModel
-    ]
+    ],
+    param_grid=DecisionTreeParamGridModel,
+    model_param=DecisionTreeModelParam,
 ):
     """DecisionTree Regression model implementation."""
 
     @staticmethod
-    def tune(
+    def auto_tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
         param_grid: Optional[DecisionTreeParamGridModel] = None,
-        progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
+        
     ) -> TuneResult:
         if param_grid is None:
             grid = DecisionTreeParamGridModel().model_dump()
@@ -100,7 +102,6 @@ class DecisionTreeRegressionModel(
             p = params.model_dump()
             model.set_params(**p)
         return model
-
 
 # Alias for the model class
 Model = DecisionTreeRegressionModel

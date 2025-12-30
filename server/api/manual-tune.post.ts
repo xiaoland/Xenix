@@ -3,7 +3,7 @@ import { train } from "../business/ml";
 import { eq } from "drizzle-orm";
 
 /**
- * API endpoint for manual training with specific parameters
+ * API endpoint for manual tuning with specific parameters
  * Parameters: datasetId, features, target, model, parameters
  */
 export default defineEventHandler(async (event) => {
@@ -61,12 +61,12 @@ export default defineEventHandler(async (event) => {
       });
     }
 
-    // Create task record with train type
+    // Create task record with manual-tune type
     const [insertedTask] = await db
       .insert(schema.tasks)
       .values({
         workItemId: workItemId ? Number(workItemId) : null,
-        type: "train",
+        type: "manual-tune",
         status: "pending",
         parameter: {
           model,
@@ -91,20 +91,20 @@ export default defineEventHandler(async (event) => {
         taskId,
         parameters,
       }).catch((error) => {
-        console.error(`Failed to execute train task ${taskId}:`, error);
+      console.error(`Failed to execute manual tune task ${taskId}:`, error);
       });
     });
 
     return {
       success: true,
       taskId,
-      message: "Training started",
+      message: "Manual tuning started",
     };
   } catch (error) {
-    console.error("Train error:", error);
+    console.error("Manual tune error:", error);
     throw createError({
       statusCode: 500,
-      message: error instanceof Error ? error.message : "Failed to start training",
+      message: error instanceof Error ? error.message : "Failed to start manual tuning",
     });
   }
 });

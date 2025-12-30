@@ -6,7 +6,7 @@
 import { ref } from "vue";
 import { message } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
-import { TrainingService } from "~/services";
+import { TuneService } from "~/services";
 import type { TrainingType } from "~/types";
 
 interface TrainingParams {
@@ -30,7 +30,7 @@ interface TrainingStrategy {
  */
 class AutoTuneStrategy implements TrainingStrategy {
   async execute(params: TrainingParams) {
-    return await TrainingService.startAutoTune({
+    return await TuneService.startAutoTune({
       datasetId: params.datasetId,
       features: params.featureColumns,
       target: params.targetColumn,
@@ -46,7 +46,7 @@ class AutoTuneStrategy implements TrainingStrategy {
  */
 class ManualTrainStrategy implements TrainingStrategy {
   async execute(params: TrainingParams) {
-    return await TrainingService.startManualTrain({
+    return await TuneService.startManualTrain({
       datasetId: params.datasetId,
       features: params.featureColumns,
       target: params.targetColumn,

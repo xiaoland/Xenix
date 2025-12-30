@@ -43,16 +43,18 @@ class XGBoostParamGridModel(BaseModel):
 
 
 class XGBoostRegressionModel(
-    RegressionModel[XGBRegressor, XGBoostModelParam, XGBoostParamGridModel]
+    RegressionModel[XGBRegressor, XGBoostModelParam, XGBoostParamGridModel],
+    param_grid=XGBoostParamGridModel,
+    model_param=XGBoostModelParam,
 ):
     """XGBoost Regression model implementation."""
 
     @staticmethod
-    def tune(
+    def auto_tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
         param_grid: Optional[XGBoostParamGridModel] = None,
-        progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
+        
     ) -> TuneResult:
         if param_grid is None:
             grid = XGBoostParamGridModel().model_dump()

@@ -28,7 +28,7 @@ export async function syncModelMetadata() {
     for (const model of models) {
       try {
         // Check if model already exists
-        const existing = await db
+        const existing = db
           .select()
           .from(modelMetadata)
           .where(eq(modelMetadata.name, model.name))
@@ -36,12 +36,12 @@ export async function syncModelMetadata() {
 
         if (existing) {
           // Update existing model
-          await db
-            .update(modelMetadata)
+          db.update(modelMetadata)
             .set({
               category: model.category,
               label: model.label,
               paramSchema: model.param_schema,
+              paramGridSchema: model.param_grid_schema,
               updatedAt: new Date(),
             })
             .where(eq(modelMetadata.name, model.name))
@@ -49,12 +49,12 @@ export async function syncModelMetadata() {
           updatedCount++;
         } else {
           // Insert new model
-          await db
-            .insert(modelMetadata)
+          db.insert(modelMetadata)
             .values({
               category: model.category,
               name: model.name,
               label: model.label,
+              paramGridSchema: model.param_grid_schema,
               paramSchema: model.param_schema,
             })
             .run();

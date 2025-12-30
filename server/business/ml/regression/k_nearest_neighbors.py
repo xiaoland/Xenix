@@ -40,15 +40,19 @@ class KNNParamGridModel(BaseModel):
     )
 
 
-class KNNRegressionModel(RegressionModel[Pipeline, KNNModelParam, KNNParamGridModel]):
+class KNNRegressionModel(
+    RegressionModel[Pipeline, KNNModelParam, KNNParamGridModel],
+    param_grid=KNNParamGridModel,
+    model_param=KNNModelParam,
+):
     """KNN Regression model implementation."""
 
     @staticmethod
-    def tune(
+    def auto_tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
         param_grid: Optional[KNNParamGridModel] = None,
-        progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
+        
     ) -> TuneResult:
         if param_grid is None:
             grid = KNNParamGridModel().model_dump()

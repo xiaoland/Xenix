@@ -39,16 +39,18 @@ class GBDTParamGridModel(BaseModel):
 
 
 class GBDTRegressionModel(
-    RegressionModel[GradientBoostingRegressor, GBDTModelParam, GBDTParamGridModel]
+    RegressionModel[GradientBoostingRegressor, GBDTModelParam, GBDTParamGridModel],
+    param_grid=GBDTParamGridModel,
+    model_param=GBDTModelParam,
 ):
     """GBDT Regression model implementation."""
 
     @staticmethod
-    def tune(
+    def auto_tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
         param_grid: Optional[GBDTParamGridModel] = None,
-        progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
+        
     ) -> TuneResult:
         if param_grid is None:
             grid = GBDTParamGridModel().model_dump()

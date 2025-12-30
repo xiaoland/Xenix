@@ -17,48 +17,71 @@
         <a-form-item
           :label="formatFieldLabel(propName as string)"
           :name="propName"
+          :required="schema.required?.includes(propName)"
         >
           <template #extra>
-            <div class="text-xs text-gray-500">
-              {{ propSchema.description || t("autoForm.noDescription") }}
+            <div v-if="propSchema.description" class="text-xs text-gray-500">
+              {{ propSchema.description }}
             </div>
-            <div class="text-xs text-gray-400">
+            <div v-if="propSchema.default !== undefined" class="text-xs text-gray-400">
               {{ t("autoForm.defaultValue") }}:
               <code class="bg-gray-100 px-1 py-0.5 rounded">{{
-                JSON.stringify(getDefaultValue(propSchema, mode))
+                JSON.stringify(propSchema.default)
               }}</code>
             </div>
           </template>
 
-          <!-- Array input for paramGrid mode -->
+          <!-- Array input (type: "array") -->
           <ArrayInput
-            v-if="mode === 'paramGrid'"
+            v-if="propSchema.type === 'array'"
             v-model="formData[propName as string]"
             :item-type="getArrayItemType(propSchema)"
             :placeholder="t('autoForm.arrayPlaceholder')"
           />
 
-          <!-- Single value inputs for parameters mode -->
-          <template v-else>
-            <!-- Boolean input -->
-            <a-switch
-              v-if="getItemType(propSchema) === 'boolean'"
-              v-model:checked="formData[propName as string]"
-            />
-            <!-- Number/Integer input -->
-            <a-input-number
-              v-else-if="getItemType(propSchema) === 'number' || getItemType(propSchema) === 'integer'"
-              v-model:value="formData[propName as string]"
-              :placeholder="getDefaultValue(propSchema, mode).toString()"
-              class="w-full"
-            />
-            <!-- String input -->
-            <a-input
-              v-else
-              v-model:value="formData[propName as string]"
-              :placeholder="getDefaultValue(propSchema, mode).toString()"
-            />
-          </template>
+          <!-- Boolean input (type: "boolean") -->
+          <a-switch
+            v-else-if="propSchema.type === 'boolean'"
+            v-model:checked="formData[propName as string]"
+          />
+
+          <!-- Number/Integer input (type: "number" or "integer") -->
+          <a-input-number
+            v-else-if="propSchema.type === 'number' || propSchema.type === 'integer'"
+            v-model:value="formData[propName as string]"
+            class="w-full"
+            :step="propSchema.type === 'integer' ? 1 : 0.01"
+            :min="propSchema.minimum"
+            :max="propSchema.maximum"
+          />
+
+          <!-- String select (type: "string" with enum) -->
+          <a-select
+            v-else-if="propSchema.type === 'string' && propSchema.enum"
+            v-model:value="formData[propName as string]"
+            class="w-full"
+          >
+            <a-select-option
+              v-for="option in propSchema.enum"
+              :key="option"
+              :value="option"
+            >
+              {{ option }}
+            </a-select-option>
+          </a-select>
+
+          <!-- String input (type: "string" without enum) -->
+          <a-input
+            v-else-if="propSchema.type === 'string'"
+            v-model:value="formData[propName as string]"
+          />
+
+          <!-- Fallback for unsupported types -->
+          <a-input
+            v-else
+            v-model:value="formData[propName as string]"
+            :placeholder="`Unsupported type: ${propSchema.type}`"
+          />
         </a-form-item>
       </template>
     </div>
@@ -67,20 +90,12 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick } from "vue";
-import {
-  formatFieldLabel,
-  getArrayItemType,
-  getItemType,
-  getDefaultValue,
-  createDefaultValue,
-} from "../utils/schemaHelpers";
-
-const { t } = useI18n();
+import { useI18n } from "vue-i18n";
+import ArrayInput from "./ArrayInput.vue";
 
 interface AutoFormProps {
   modelValue: Record<string, any>;
   schema: any;
-  mode: "paramGrid" | "parameters"; // paramGrid for arrays, parameters for single values
 }
 
 const props = defineProps<AutoFormProps>();
@@ -89,9 +104,27 @@ const emit = defineEmits<{
   "update:modelValue": [value: Record<string, any>];
 }>();
 
+const { t } = useI18n();
+
 const formRef = ref();
 const formData = ref<Record<string, any>>({});
 const isInitializing = ref(false);
+
+const getArrayItemType = (propSchema: any): string => {
+  if (propSchema.items && propSchema.items.type) {
+    return propSchema.items.type;
+  }
+  return "string";
+};
+
+const formatFieldLabel = (fieldName: string): string => {
+  return fieldName
+    .replace(/model__/g, "")
+    .replace(/_/g, " ")
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
 
 const initializeFormData = () => {
   isInitializing.value = true;
@@ -107,22 +140,21 @@ const initializeFormData = () => {
       if (props.modelValue && props.modelValue[propName] !== undefined) {
         data[propName] = props.modelValue[propName];
       } else if (schema.default !== undefined) {
-        // Use schema defaults based on mode
-        if (props.mode === "paramGrid") {
-          // For paramGrid mode, expect arrays
-          data[propName] = Array.isArray(schema.default)
-            ? [...schema.default]
-            : [schema.default];
-        } else {
-          // For parameters mode, extract single values
-          data[propName] = Array.isArray(schema.default)
-            ? schema.default[0]
-            : schema.default;
-        }
+        // Use schema defaults
+        data[propName] = schema.default;
       } else {
-        // Create default value based on mode and type
-        const itemType = getItemType(schema);
-        data[propName] = createDefaultValue(itemType, props.mode);
+        // Create default value based on type
+        if (schema.type === "array") {
+          data[propName] = [];
+        } else if (schema.type === "boolean") {
+          data[propName] = false;
+        } else if (schema.type === "number" || schema.type === "integer") {
+          data[propName] = 0;
+        } else if (schema.type === "string") {
+          data[propName] = schema.enum ? schema.enum[0] : "";
+        } else {
+          data[propName] = null;
+        }
       }
     }
   }
@@ -136,46 +168,27 @@ const initializeFormData = () => {
 
 // Initialize form data when schema or initial values change
 watch(
-  () => [props.modelValue, props.schema, props.mode],
+  () => [props.modelValue, props.schema],
   () => {
-    if (props.schema) {
-      initializeFormData();
-    }
+    initializeFormData();
   },
   { immediate: true, deep: true }
 );
 
-// Emit changes to parent (only when not initializing)
+// Watch formData and emit updates
 watch(
   formData,
-  (newValue) => {
+  (newData) => {
     if (!isInitializing.value) {
-      emit("update:modelValue", newValue);
+      emit("update:modelValue", { ...newData });
     }
   },
   { deep: true }
 );
-
-const validate = async () => {
-  return await formRef.value?.validate();
-};
-
-const getValues = () => {
-  return formData.value;
-};
-
-defineExpose({
-  validate,
-  getValues,
-});
 </script>
 
 <style scoped>
-.auto-form :deep(.ant-form-item) {
-  margin-bottom: 16px;
-}
-
-.auto-form :deep(.ant-form-item-label) {
-  font-weight: 500;
+.auto-form {
+  max-width: 600px;
 }
 </style>

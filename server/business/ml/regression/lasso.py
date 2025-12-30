@@ -35,15 +35,19 @@ class LassoParamGridModel(BaseModel):
     )
 
 
-class LassoRegression(RegressionModel[Pipeline, LassoModelParam, LassoParamGridModel]):
+class LassoRegression(
+    RegressionModel[Pipeline, LassoModelParam, LassoParamGridModel],
+    param_grid=LassoParamGridModel,
+    model_param=LassoModelParam,
+):
     """Lasso Regression model implementation."""
 
     @staticmethod
-    def tune(
+    def auto_tune(
         X_train: pd.DataFrame,
         y_train: pd.Series,
         param_grid: Optional[LassoParamGridModel] = None,
-        progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
+        
     ) -> TuneResult:
         if param_grid is None:
             grid = LassoParamGridModel().model_dump()
@@ -110,7 +114,6 @@ class LassoRegression(RegressionModel[Pipeline, LassoModelParam, LassoParamGridM
             p = params.model_dump()
             model.set_params(**p)
         return model
-
 
 # Alias for the model class
 Model = LassoRegression

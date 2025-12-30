@@ -140,53 +140,6 @@
     "selectModelInstruction": "Select a model from the table above to use for predictions",
     "selectModelPlaceholder": "Select model for prediction"
   },
-  "tuning": {
-    "title": "Model Tuning",
-    "modelSelectionAndTuning": "Model Selection and Tuning",
-    "model": "Model",
-    "tuneType": "Tune Type & Parameters",
-    "tuning": "Tuning",
-    "metrics": "Metrics",
-    "startTune": "Start Tune",
-    "autoTune": "Auto Tune",
-    "manualTrain": "Train",
-    "viewLogs": "View Logs",
-    "selectModels": "Select Models to Tune",
-    "startTuning": "Start Hyperparameter Tuning",
-    "viewResults": "View Tuning Results",
-    "selectBest": "Select Best Model",
-    "selectBestForPrediction": "Select Best Model for Prediction",
-    "tuningResults": "Tuning Results",
-    "modelColumn": "Model",
-    "r2Test": "R² (Test)",
-    "mseTest": "MSE (Test)",
-    "maeTest": "MAE (Test)",
-    "statusColumn": "Status",
-    "selectModelInstruction": "Select a model from the table above to use for predictions",
-    "selectModelPlaceholder": "Select model for prediction",
-    "back": "Back",
-    "continue": "Continue to Prediction",
-    "trainingHistory": "Training History",
-    "noHistory": "No training history yet",
-    "paramGrid": {
-      "title": "Edit Parameter Grid - {model}",
-      "description": "Configure the hyperparameter search space for this model. Each field accepts a list of values to try.",
-      "loading": "Loading parameter schema...",
-      "noDescription": "No description available",
-      "defaultValue": "Default",
-      "arrayPlaceholder": "Enter value and press Add",
-      "emptyArray": "No values. Add values using the input above.",
-      "editButton": "Edit Grid"
-    },
-    "manualTrainDialog": {
-      "title": "Manual Training - {model}",
-      "description": "Enter specific parameter values to train the model manually.",
-      "loading": "Loading parameter schema...",
-      "noDescription": "No description available",
-      "defaultValue": "Default",
-      "trainButton": "Train Model"
-    }
-  },
   "prediction": {
     "title": "Make Predictions",
     "bestModel": "Best Model: {model}",
@@ -252,11 +205,13 @@
     "title": "Task Logs",
     "titleWithModel": "Logs - {model}",
     "comparison": "Comparison",
-    "noLogs": "No logs available"
+    "noLogs": "No logs available",
+    "titleWithTask": "Logs - Task #{taskId}"
   },
   "common": {
     "na": "N/A",
-    "add": "Add"
+    "add": "Add",
+    "cancel": "Cancel"
   },
   "autoForm": {
     "loading": "Loading form schema...",
@@ -301,5 +256,59 @@
     "useExistingDataset": "Use Existing Dataset",
     "orUploadNew": "Or upload a new file",
     "paramGridColumn": "Param Grid"
+  },
+  "tuning": {
+    "title": "Model Tuning",
+    "modelSelectionAndTuning": "Model Selection and Tuning",
+    "model": "Model",
+    "tuneType": "Tune Type & Parameters",
+    "tuning": "Tuning",
+    "metrics": "Metrics",
+    "startTune": "Start Tune",
+    "autoTune": "Auto Tune",
+    "manualTune": "Manual Tune",
+    "viewLogs": "View Logs",
+    "selectModels": "Select Models to Tune",
+    "startTuning": "Start Hyperparameter Tuning",
+    "viewResults": "View Tuning Results",
+    "selectBest": "Select Best Model",
+    "selectBestForPrediction": "Select Best Model for Prediction",
+    "tuningResults": "Tuning Results",
+    "modelColumn": "Model",
+    "r2Test": "R² (Test)",
+    "mseTest": "MSE (Test)",
+    "maeTest": "MAE (Test)",
+    "statusColumn": "Status",
+    "selectModelInstruction": "Select a model from the table above to use for predictions",
+    "selectModelPlaceholder": "Select model for prediction",
+    "back": "Back",
+    "continue": "Continue to Prediction",
+    "trainingHistory": "Training History",
+    "noHistory": "No training history yet",
+    "selectModelToAdd": "Select a model to add",
+    "addModel": "Add Model",
+    "noModelsAdded": "No models added yet. Select a model above to get started.",
+    "autoTuneDialog": {
+      "title": "Auto Tune - {model}",
+      "description": "Configure the hyperparameter search space for this model. Each field accepts a list of values to try.",
+      "loading": "Loading parameter schema...",
+      "createButton": "Create Auto Tune Task"
+    },
+    "manualTuneDialog": {
+      "title": "Manual Tune - {model}",
+      "description": "Enter specific parameter values to tune the model manually.",
+      "loading": "Loading parameter schema...",
+      "tuneButton": "Tune Model"
+    },
+    "paramGrid": {
+      "title": "Edit Parameter Grid - {model}",
+      "description": "Configure the hyperparameter search space for this model. Each field accepts a list of values to try.",
+      "loading": "Loading parameter schema...",
+      "noDescription": "No description available",
+      "defaultValue": "Default",
+      "arrayPlaceholder": "Enter value and press Add",
+      "emptyArray": "No values. Add values using the input above.",
+      "editButton": "Edit Grid"
+    }
   }
 }
