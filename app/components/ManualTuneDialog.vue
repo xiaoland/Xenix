@@ -12,7 +12,7 @@
       
       <ModelParamForm
         ref="formRef"
-        :model="modelName"
+        :model="model"
         v-model="formData"
       />
       
@@ -31,13 +31,13 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
+import { AVAILABLE_MODELS } from "~/constants/models";
 
 const { t } = useI18n();
 
 interface ManualTuneDialogProps {
   modelValue: boolean;
-  modelName: string;
-  modelLabel: string;
+  model: string;
 }
 
 const props = defineProps<ManualTuneDialogProps>();
@@ -50,6 +50,12 @@ const emit = defineEmits<{
 const visible = computed({
   get: () => props.modelValue,
   set: (value) => emit("update:modelValue", value),
+});
+
+// Compute model label from model value
+const modelLabel = computed(() => {
+  const found = AVAILABLE_MODELS.find(m => m.value === props.model);
+  return found?.label || t(`models.${props.model.replace(".", "_")}`);
 });
 
 const formRef = ref();

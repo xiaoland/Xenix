@@ -6,7 +6,7 @@
       <span
         class="inline-block transition-transform cursor-pointer"
         :class="{ 'rotate-90': isExpanded }"
-        @click.stop="$emit('toggle-expand', modelName)"
+        @click.stop="$emit('toggle-expand', model)"
       >
         ▶
       </span>
@@ -49,7 +49,7 @@
   <!-- Child rows (tuning tasks) -->
   <ModelTuningSubRow
     v-for="taskId in displayedTaskIds"
-    :key="`${modelName}-${taskId}`"
+    :key="`${model}-${taskId}`"
     :task-id="taskId"
     v-model:selectedTaskId="selectedTaskIdProxy"
   />
@@ -58,15 +58,13 @@
   <teleport to="body">
     <AutoTuneDialog
       v-model="autoTuneDialogVisible"
-      :model-name="modelName"
-      :model-label="modelLabel"
+      :model="model"
       @create-task="handleCreateAutoTuneTask"
     />
 
     <ManualTuneDialog
       v-model="manualTuneDialogVisible"
-      :model-name="modelName"
-      :model-label="modelLabel"
+      :model="model"
       @tune="handleManualTune"
     />
   </teleport>
@@ -75,15 +73,15 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { WorkItemService } from "~/services";
+import { WorkItemService, TrainingService } from "~/services";
 import { useFormatters } from "~/composables/useFormatters";
+import { AVAILABLE_MODELS } from "~/constants/models";
 
 const { t } = useI18n();
 const { formatTimestamp, formatMetric, getStatusColor } = useFormatters();
 
 const props = defineProps<{
-  modelName: string;
-  modelLabel: string;
+  model: string;
   workItemId: number;
   selectedTaskId: number | null;
   isTuning: boolean;
@@ -92,12 +90,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   "update:selectedTaskId": [taskId: number | null];
-  "start-tune": [
-    model: string,
-    paramGrid?: Record<string, any>,
-    trainingType?: string,
-    parentTaskId?: number
-  ];
+  "toggle-expand": [modelName: string];
+}>();
+
+// Compute model label from model value
+const modelLabel = computed(() => {
+  const found = AVAILABLE_MODELS.find(m => m.value === props.model);
+  return found?.label || t(`models.${props.model.replace(".", "_")}`);
+});
   "toggle-expand": [modelName: string];
 }>();
 
@@ -127,14 +127,14 @@ const fetchTaskIds = async () => {
       const modelTasks = response.workItem.tasks
         .filter((task: any) => {
           const param = task.parameter || {};
-          return param.model === props.modelName;
+          return param.model === props.model;
         })
         .map((task: any) => task.id);
 
       taskIds.value = modelTasks;
     }
   } catch (error) {
-    console.error(`Failed to fetch task IDs for ${props.modelName}:`, error);
+    console.error(`Failed to fetch task IDs for ${props.model}:`, error);
   }
 };
 
@@ -147,20 +147,54 @@ const handleManualTrain = () => {
   manualTuneDialogVisible.value = true;
 };
 
-const handleCreateAutoTuneTask = (values: Record<string, any>) => {
-  emit("start-tune", props.modelName, values, "auto");
+const handleCreateAutoTuneTask = async (paramGrid: Record<string, any>) => {
+  try {
+    // Get work item to extract dataset and feature info
+    const workItem = await WorkItemService.fetchById(props.workItemId);
+    if (workItem.success && workItem.workItem) {
+      const { datasetId, features, target } = workItem.workItem;
+      
+      await TrainingService.startAutoTune({
+        datasetId: String(datasetId),
+        features: features || [],
+        target: target || '',
+        model: props.model,
+        paramGrid,
+        workItemId: props.workItemId,
+      });
+      
+      autoTuneDialogVisible.value = false;
+      // Refresh task list
+      await fetchTaskIds();
+    }
+  } catch (error) {
+    console.error('Failed to start auto-tune:', error);
+  }
 };
 
-const handleManualTune = (values: Record<string, any>) => {
-  // Find the most recent task for this model as parent
-  const parentTaskId = taskIds.value[0] || null;
-  emit(
-    "start-tune",
-    props.modelName,
-    values,
-    "manual",
-    parentTaskId || undefined
-  );
+const handleManualTune = async (parameters: Record<string, any>) => {
+  try {
+    // Get work item to extract dataset and feature info
+    const workItem = await WorkItemService.fetchById(props.workItemId);
+    if (workItem.success && workItem.workItem) {
+      const { datasetId, features, target } = workItem.workItem;
+      
+      await TrainingService.startManualTune({
+        datasetId: String(datasetId),
+        features: features || [],
+        target: target || '',
+        model: props.model,
+        parameters,
+        workItemId: props.workItemId,
+      });
+      
+      manualTuneDialogVisible.value = false;
+      // Refresh task list
+      await fetchTaskIds();
+    }
+  } catch (error) {
+    console.error('Failed to start manual tune:', error);
+  }
 };
 
 const formatParamValue = (value: any): string => {

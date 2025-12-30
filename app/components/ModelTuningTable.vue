@@ -14,7 +14,7 @@
       />
       <a-button
         type="primary"
-        :disabled="!selectedModelToAdd || availableModels.some(m => m.value === selectedModelToAdd)"
+        :disabled="!selectedModelToAdd || selectedModels.some(m => m.value === selectedModelToAdd)"
         @click="handleAddModel"
       >
         {{ t("tuning.addModel") }}
@@ -32,19 +32,17 @@
         </tr>
       </thead>
       <tbody>
-        <template v-for="model in availableModels" :key="model.value">
+        <template v-for="model in selectedModels" :key="model.value">
           <ModelTuningRow
-            :model-name="model.value"
-            :model-label="model.label"
+            :model="model.value"
             :work-item-id="workItemId"
             v-model:selectedTaskId="modelValue"
             :isTuning="isTuning"
             :isExpanded="expandedKeys.includes(model.value)"
-            @start-tune="handleStartTune"
             @toggle-expand="toggleExpand"
           />
         </template>
-        <tr v-if="availableModels.length === 0">
+        <tr v-if="selectedModels.length === 0">
           <td colspan="5" class="px-4 py-8 text-center text-gray-500">
             {{ t("tuning.noModelsAdded") }}
           </td>
@@ -71,36 +69,28 @@ const modelValue = defineModel<number | null>("selectedTaskId", {
   default: null,
 });
 
-const emit = defineEmits<{
-  "start-tune": [
-    model: string,
-    paramGrid?: Record<string, any>,
-    trainingType?: string,
-    parentTaskId?: number
-  ];
-  "view-logs": [taskId: number, modelName: string];
-}>();
-
 const workItemIdRef = toRef(() => props.workItemId);
 
 // Data states
-const availableModels = ref<Array<{ label: string; value: string }>>([]);
+const selectedModels = ref<Array<{ label: string; value: string }>>([]);
 const isTuning = ref(false);
 const selectedModelToAdd = ref<string | undefined>(undefined);
 
 // UI states
 const expandedKeys = ref<string[]>([]);
 
-// Available model options (all models from constants)
+// Available model options (all models from constants that are not yet selected)
 const availableModelOptions = computed(() => {
-  return AVAILABLE_MODELS.map(m => ({
+  return AVAILABLE_MODELS.filter(
+    m => !selectedModels.value.some(sm => sm.value === m.value)
+  ).map(m => ({
     label: m.label,
     value: m.value,
   }));
 });
 
-// Fetch available models from work item
-const fetchAvailableModels = async () => {
+// Fetch selected models from work item
+const fetchSelectedModels = async () => {
   if (!workItemIdRef.value) return;
 
   try {
@@ -108,7 +98,7 @@ const fetchAvailableModels = async () => {
     if (response.success && response.workItem) {
       const workItem = response.workItem;
 
-      // Extract available models from tasks or use defaults
+      // Extract selected models from tasks
       const models = new Set<string>();
       if (workItem.tasks) {
         workItem.tasks.forEach((task: any) => {
@@ -118,7 +108,7 @@ const fetchAvailableModels = async () => {
         });
       }
 
-      // Build available models list (use i18n translation if available)
+      // Build selected models list (use i18n translation if available)
       const modelsList = Array.from(models).map((model) => {
         const found = AVAILABLE_MODELS.find(m => m.value === model);
         return { 
@@ -126,7 +116,7 @@ const fetchAvailableModels = async () => {
           value: model 
         };
       });
-      availableModels.value = modelsList;
+      selectedModels.value = modelsList;
 
       // Determine if tuning is in progress
       if (workItem.tasks) {
@@ -143,7 +133,7 @@ const fetchAvailableModels = async () => {
       }
     }
   } catch (error) {
-    console.error("Failed to fetch available models:", error);
+    console.error("Failed to fetch selected models:", error);
   }
 };
 
@@ -155,11 +145,14 @@ const handleAddModel = () => {
   if (availableModels.value.some(m => m.value === selectedModelToAdd.value)) {
     return;
   }
+// Add a new model to the table
+const handleAddModel = () => {
+  if (!selectedModelToAdd.value) return;
   
   // Find the model from constants
   const modelToAdd = AVAILABLE_MODELS.find(m => m.value === selectedModelToAdd.value);
   if (modelToAdd) {
-    availableModels.value.push({
+    selectedModels.value.push({
       label: modelToAdd.label,
       value: modelToAdd.value,
     });
@@ -179,22 +172,12 @@ const toggleExpand = (modelName: string) => {
   }
 };
 
-// Event handlers
-const handleStartTune = (
-  model: string,
-  paramGrid?: Record<string, any>,
-  trainingType?: string,
-  parentTaskId?: number
-) => {
-  emit("start-tune", model, paramGrid, trainingType, parentTaskId);
-};
-
 // Watch for workItemId changes and refetch data
 watch(
   workItemIdRef,
   () => {
     if (workItemIdRef.value) {
-      fetchAvailableModels();
+      fetchSelectedModels();
     }
   },
   { immediate: true }

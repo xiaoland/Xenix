@@ -58,21 +58,7 @@
     
     <!-- Metrics Column -->
     <td class="px-4 py-2">
-      <div v-if="taskMetrics" class="text-sm">
-        <div>
-          <span class="font-medium">{{ t("metrics.r2") }}:</span>
-          {{ formatMetric(taskMetrics.r2_test) }}
-        </div>
-        <div>
-          <span class="font-medium">{{ t("metrics.mse") }}:</span>
-          {{ formatMetric(taskMetrics.mse_test) }}
-        </div>
-        <div>
-          <span class="font-medium">{{ t("metrics.mae") }}:</span>
-          {{ formatMetric(taskMetrics.mae_test) }}
-        </div>
-      </div>
-      <span v-else class="text-gray-400">{{ t("common.na") }}</span>
+      <ModelAutoMetrics :metrics="taskMetrics" />
     </td>
   </tr>
 
