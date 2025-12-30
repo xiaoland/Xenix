@@ -149,7 +149,7 @@ watch(
           selectedModels: vals,
         });
       } catch (error) {
-        console.error("Failed to save selected models:", error);
+        console.error(`Failed to save selected models for work item ${workItemIdRef.value}:`, error);
       }
     }, 500);
   },
