@@ -72,7 +72,7 @@ class RegressionModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]):
         upd_pg: Optional[Callable[[ProgressInfo], None]] = None,
     ) -> TuneResult:
         """
-        Perform hyperparameter tuning for the regression model.
+        Perform automatic(hyperparameter) tuning for the regression model.
 
         Args:
             X_train: Training features as DataFrame
@@ -97,15 +97,15 @@ class RegressionModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]):
     @classmethod
     def manual_tune(
         cls,
-        X_train: pd.DataFrame,
-        y_train: pd.Series,
+        X_test: pd.DataFrame,
+        y_test: pd.Series,
         params: Optional[ModelParamType] = None,
     ) -> Dict[str, Any]:
         """
-        Train the regression model with specific parameters.
-        
+        Train the regression model with specific parameters and evaluate it.
+
         This is a concrete method that all regression models can use.
-        It creates a model with the given parameters, fits it to the training data,
+        It creates a model with the given parameters, and then evaluates on the given test data,
         and returns the trained model along with evaluation metrics.
 
         Args:
@@ -121,13 +121,10 @@ class RegressionModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]):
         """
         # Create model with specified parameters
         model = cls.create_model(params)
-        
-        # Fit the model
-        model.fit(X_train, y_train)
-        
+
         # Evaluate on training data
-        metrics = cls.evaluate(model, X_train, y_train)
-        
+        metrics = cls.evaluate(model, X_test, y_test)
+
         return {
             "model": model,
             "metrics": metrics,
