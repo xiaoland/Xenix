@@ -82,7 +82,9 @@ def auto_tune_regression_model(
         if hasattr(Model, "ParamGrid"):
             param_grid = Model.ParamGrid(**param_grid_dict)
         else:
-            logger.warning(f"Model {model_name} does not have ParamGrid class, using dict")
+            logger.warning(
+                f"Model {model_name} does not have ParamGrid class, using dict"
+            )
             param_grid = param_grid_dict
 
     # Perform auto-tuning
@@ -152,10 +154,12 @@ def main():
         )
 
         # Emit result
-        emit_result({
-            "params": best_params,
-            "metrics": metrics,
-        })
+        emit_result(
+            **{
+                "params": best_params,
+                "metrics": metrics,
+            }
+        )
 
     except Exception as e:
         logger = get_logger()
