@@ -1,5 +1,5 @@
 import { db, schema } from "../database";
-import { train } from "../business/ml";
+import { manualTune } from "../business/ml";
 import { eq } from "drizzle-orm";
 
 /**
@@ -9,9 +9,32 @@ import { eq } from "drizzle-orm";
 export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event);
-    const { datasetId, features, target, model, parameters, workItemId } = body;
+    let { datasetId, features, target, model, parameters, workItemId } = body;
 
-    // Validate required parameters
+    // If workItemId provided, try to fill missing values from the work item
+    if (workItemId) {
+      const [workItem] = await db
+        .select()
+        .from(schema.workItems)
+        .where(eq(schema.workItems.id, Number(workItemId)))
+        .limit(1);
+
+      if (workItem) {
+        if (!datasetId && workItem.datasetId) datasetId = workItem.datasetId;
+        if (
+          (!features || (Array.isArray(features) && features.length === 0)) &&
+          workItem.featureColumns
+        ) {
+          features = Array.isArray(workItem.featureColumns)
+            ? workItem.featureColumns
+            : JSON.parse(workItem.featureColumns as any);
+        }
+        if (!target && workItem.targetColumn)
+          target = workItem.targetColumn as any;
+      }
+    }
+
+    // Validate required parameters (after trying to fill from work item)
     if (!datasetId) {
       throw createError({
         statusCode: 400,
@@ -83,7 +106,7 @@ export default defineEventHandler(async (event) => {
 
     // Execute training task in background
     setImmediate(() => {
-      train({
+      manualTune({
         inputFile: dataset.filePath,
         model,
         featureColumns: features,
@@ -91,7 +114,7 @@ export default defineEventHandler(async (event) => {
         taskId,
         parameters,
       }).catch((error) => {
-      console.error(`Failed to execute manual tune task ${taskId}:`, error);
+        console.error(`Failed to execute manual tune task ${taskId}:`, error);
       });
     });
 
@@ -104,7 +127,10 @@ export default defineEventHandler(async (event) => {
     console.error("Manual tune error:", error);
     throw createError({
       statusCode: 500,
-      message: error instanceof Error ? error.message : "Failed to start manual tuning",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to start manual tuning",
     });
   }
 });

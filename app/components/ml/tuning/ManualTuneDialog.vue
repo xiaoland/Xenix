@@ -9,13 +9,9 @@
       <p class="mb-4 text-gray-600">
         {{ t("tuning.manualTuneDialog.description") }}
       </p>
-      
-      <ModelParamForm
-        ref="formRef"
-        :model="model"
-        v-model="formData"
-      />
-      
+
+      <ModelParamForm ref="formRef" :model="model" v-model="formData" />
+
       <div class="mt-6 flex justify-end gap-2">
         <a-button @click="handleCancel">
           {{ t("common.cancel") }}
@@ -32,6 +28,7 @@
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { AVAILABLE_MODELS } from "~/constants/models";
+import ModelParamForm from "./ModelParamForm.vue";
 
 const { t } = useI18n();
 
@@ -54,7 +51,7 @@ const visible = computed({
 
 // Compute model label from model value
 const modelLabel = computed(() => {
-  const found = AVAILABLE_MODELS.find(m => m.value === props.model);
+  const found = AVAILABLE_MODELS.find((m) => m.value === props.model);
   return found?.label || t(`models.${props.model.replace(".", "_")}`);
 });
 

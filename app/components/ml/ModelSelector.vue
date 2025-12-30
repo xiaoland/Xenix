@@ -1,59 +1,82 @@
 <template>
   <div>
-    <h3 class="text-lg font-medium mb-3">Available Models for Tuning</h3>
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-      <a-button
-        v-for="model in availableModels"
-        :key="model.value"
-        :type="selectedModels.includes(model.value) ? 'primary' : 'default'"
-        @click="toggleModel(model.value)"
-        class="h-auto py-3"
+    <div class="flex items-center gap-3 mb-4">
+      <a-select
+        v-model:value="selectedModelToAdd"
+        :placeholder="$t('ml.modelSelector.selectModel')"
+        style="min-width: 220px"
       >
-        <div class="text-center">
-          <div class="font-medium">{{ model.label }}</div>
-          <div v-if="tuningStatus[model.value]" class="text-xs mt-1">
-            <a-tag :color="getStatusColor(tuningStatus[model.value])">
-              {{ tuningStatus[model.value] }}
-            </a-tag>
-          </div>
-        </div>
+        <a-select-option
+          v-for="model in availableModels"
+          :key="model.value"
+          :value="model.value"
+        >
+          {{ model.label }}
+        </a-select-option>
+      </a-select>
+
+      <a-button
+        type="primary"
+        @click="addSelectedModel"
+        :disabled="!selectedModelToAdd"
+      >
+        {{ $t("common.add") }}
       </a-button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed, ref } from "vue";
+
 const props = defineProps<{
   availableModels: Array<{ label: string; value: string }>;
-  tuningStatus: Record<string, string>;
+  tuningStatus?: Record<string, string>;
+  selectedModels?: string[];
 }>();
-
-const selectedModels = defineModel<string[]>({ required: true });
 
 const emit = defineEmits<{
-  toggle: [modelValue: string]
+  (e: "update:selectedModels", value: string[]): void;
+  (e: "toggle", modelValue: string): void;
 }>();
 
-const toggleModel = (modelValue: string) => {
-  const index = selectedModels.value.indexOf(modelValue);
-  if (index > -1) {
-    selectedModels.value.splice(index, 1);
-  } else {
-    selectedModels.value.push(modelValue);
+const selectedModels = computed<string[]>({
+  get: () => props.selectedModels || [],
+  set: (val: string[]) => emit("update:selectedModels", val),
+});
+
+const selectedModelToAdd = ref<string | undefined>();
+
+const addSelectedModel = () => {
+  if (!selectedModelToAdd.value) return;
+  if (!selectedModels.value.includes(selectedModelToAdd.value)) {
+    selectedModels.value = [...selectedModels.value, selectedModelToAdd.value];
+    emit("toggle", selectedModelToAdd.value);
   }
-  emit('toggle', modelValue);
+  selectedModelToAdd.value = undefined;
+};
+
+const removeModel = (modelValue: string) => {
+  if (!selectedModels.value.includes(modelValue)) return;
+  selectedModels.value = selectedModels.value.filter((v) => v !== modelValue);
+  emit("toggle", modelValue);
+};
+
+const findLabel = (value: string) => {
+  const m = props.availableModels.find((x) => x.value === value);
+  return m ? m.label : value;
 };
 
 const getStatusColor = (status: string) => {
   switch (status) {
-    case 'completed':
-      return 'green';
-    case 'running':
-      return 'blue';
-    case 'failed':
-      return 'red';
+    case "completed":
+      return "green";
+    case "running":
+      return "blue";
+    case "failed":
+      return "red";
     default:
-      return 'default';
+      return "default";
   }
 };
 </script>

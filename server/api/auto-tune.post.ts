@@ -9,9 +9,32 @@ import { eq } from "drizzle-orm";
 export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event);
-    const { datasetId, features, target, model, paramGrid, workItemId } = body;
+    let { datasetId, features, target, model, paramGrid, workItemId } = body;
 
-    // Validate required parameters
+    // If workItemId provided, try to fill missing values from the work item
+    if (workItemId) {
+      const [workItem] = await db
+        .select()
+        .from(schema.workItems)
+        .where(eq(schema.workItems.id, Number(workItemId)))
+        .limit(1);
+
+      if (workItem) {
+        if (!datasetId && workItem.datasetId) datasetId = workItem.datasetId;
+        if (
+          (!features || (Array.isArray(features) && features.length === 0)) &&
+          workItem.featureColumns
+        ) {
+          features = Array.isArray(workItem.featureColumns)
+            ? workItem.featureColumns
+            : JSON.parse(workItem.featureColumns as any);
+        }
+        if (!target && workItem.targetColumn)
+          target = workItem.targetColumn as any;
+      }
+    }
+
+    // Validate required parameters (after trying to fill from work item)
     if (!datasetId) {
       throw createError({
         statusCode: 400,

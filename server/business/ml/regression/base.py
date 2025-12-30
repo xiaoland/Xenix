@@ -65,27 +65,23 @@ class RegressionModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]):
 
     def __init_subclass__(
         cls,
-        param_grid: type["ParamGridType"] = None,
-        model_param: type["ModelParamType"] = None,
-        **kwargs
+        param_grid: type["ParamGridType"],
+        model_param: type["ModelParamType"],
+        **kwargs,
     ):
         """
         Hook to enforce schema registration when a concrete model class is defined.
-        
+
         All concrete model classes must provide param_grid and model_param parameters
         when subclassing.
-        
+
         Args:
             param_grid: The pydantic model class for parameter grids (with list fields)
             model_param: The pydantic model class for single parameters
         """
         super().__init_subclass__(**kwargs)
-        
-        # Store the parameter schemas as class variables
-        if param_grid is not None:
-            cls.__paramgrid__ = param_grid
-        if model_param is not None:
-            cls.__modelparam__ = model_param
+        cls.__paramgrid__ = param_grid
+        cls.__modelparam__ = model_param
 
     @staticmethod
     @abstractmethod

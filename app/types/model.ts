@@ -8,12 +8,7 @@ export interface ModelOption {
 }
 
 export interface TuningMetrics {
-  mse_train?: number;
-  mae_train?: number;
-  r2_train?: number;
-  mse_test?: number;
-  mae_test?: number;
-  r2_test?: number;
+  [key: string]: any;
 }
 
 export interface TuningResult {

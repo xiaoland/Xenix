@@ -310,5 +310,12 @@
       "emptyArray": "No values. Add values using the input above.",
       "editButton": "Edit Grid"
     }
-  }
+  },
+  "modelParamGridForm.noSchema": "This model does not has ParamGrid",
+  "tuning.tuneType": "Tune Type & Param",
+  "tuning.tuning": "Tune",
+  "tuning.type.auto": "Auto",
+  "tuning.type.manual": "Manual",
+  "ml.modelSelector.selectModel": "Select a model",
+  "common.noData": "N/A"
 }

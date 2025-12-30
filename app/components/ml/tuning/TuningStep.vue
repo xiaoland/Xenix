@@ -5,9 +5,7 @@
     <!-- Integrated Model Tuning Table -->
     <ModelTuningTable
       :work-item-id="workItemId"
-      v-model:selected-task-id="localSelectedTaskId"
-      @start-tune="handleStartTune"
-      @view-logs="handleViewLogs"
+      v-model:selected-task-id="selectedTaskId"
     />
 
     <!-- Best Model Selection -->
@@ -16,11 +14,11 @@
         {{ $t("tuning.selectBestForPrediction") }}
       </h3>
       <a-select
-        :value="localSelectedBestModel || undefined"
+        :value="selectedBestModel"
         :placeholder="$t('tuning.selectModelPlaceholder')"
         class="w-full max-w-md"
         :dropdownMatchSelectWidth="false"
-        @change="(val: any) => { localSelectedBestModel = val || null }"
+        @change="(val: any) => { selectedBestModel = val || null }"
       >
         <a-select-option
           v-for="result in tuningResults"
@@ -35,11 +33,13 @@
 
     <!-- Navigation -->
     <div class="flex gap-4 mt-6">
-      <a-button @click="emit('back')">{{ $t("tuning.back") }}</a-button>
+      <a-button @click="emit('back')">
+        {{ $t("tuning.back") }}
+      </a-button>
       <a-button
         type="primary"
-        :disabled="!localSelectedBestModel"
-        @click="emit('continue')"
+        :disabled="!selectedBestModel"
+        @click="emit('continue', selectedBestModel!)"
       >
         {{ $t("tuning.continue") }}
       </a-button>
@@ -48,55 +48,222 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { ref, computed, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
+import { message } from "ant-design-vue";
+import { useModelTraining } from "../../../composables/useModelTraining";
+import { useTaskPolling } from "../../../composables/useTaskPolling";
+import { useDatasetRegistration } from "../../../composables/useDatasetRegistration";
+import { WorkItemService } from "~/services";
 import { useFormatters } from "../../../composables/useFormatters";
+import ModelTuningTable from "./ModelTuningTable.vue";
+import type { TuningResult } from "~/types";
+
+const { t } = useI18n();
+const { executeTrain } = useModelTraining();
+const { pollTaskLogs, pollTaskStatus, registerTask, clearTasks } =
+  useTaskPolling();
+const { registerFileAsDataset } = useDatasetRegistration();
 
 const props = defineProps<{
   workItemId: number;
-  selectedBestModel: string | null;
   selectedTaskId?: number | null;
-  tuningResults: any[];
 }>();
 
 const emit = defineEmits<{
+  "update:selectedTaskId": [taskId: number | null];
+  continue: [model: string];
   back: [];
-  continue: [];
-  "update:selected-best-model": [model: string];
-  "update:selected-task-id": [taskId: number | null];
-  "start-tune": [
-    model: string,
-    paramGrid?: Record<string, any>,
-    trainingType?: string,
-    parentTaskId?: number
-  ];
-  "view-logs": [taskId: number, modelName: string];
 }>();
 
 // Use formatters composable
 const { formatModelName, formatMetric } = useFormatters();
 
-const localSelectedBestModel = computed({
-  get: () => props.selectedBestModel,
-  set: (value) => emit("update:selected-best-model", value || ""),
-});
+// Local state
+const selectedModels = ref<string[]>([]);
+const activeLogTab = ref<string>("");
+const selectedBestModel = ref<string | null>(null);
+const selectedTaskId = ref<number | null>(props.selectedTaskId || null);
+const tuningResults = ref<TuningResult[]>([]);
 
 const localSelectedTaskId = computed({
-  get: () => props.selectedTaskId || null,
-  set: (value) => emit("update:selected-task-id", value),
+  get: () => selectedTaskId.value,
+  set: (value) => {
+    selectedTaskId.value = value;
+    emit("update:selectedTaskId", value);
+  },
 });
 
-const handleStartTune = (
-  model: string,
+/**
+ * Fetch existing tuning results for work item
+ */
+const fetchTuningResults = async (workItemId?: number) => {
+  if (!workItemId) return;
+
+  try {
+    const response = await WorkItemService.fetchById(workItemId);
+    if (response.success && response.workItem.tasks) {
+      const tasks = response.workItem.tasks.filter(
+        (t: any) => t.type === "auto-tune" && t.status === "completed"
+      );
+
+      // Build tuning results from completed tasks
+      tuningResults.value = tasks.map((task: any) => ({
+        model: task.parameter?.model || "",
+        params: task.result?.params || {},
+        metrics: {
+          mse_train: task.result?.mse_train,
+          mae_train: task.result?.mae_train,
+          r2_train: task.result?.r2_train,
+          mse_test: task.result?.mse_test,
+          mae_test: task.result?.mae_test,
+          r2_test: task.result?.r2_test,
+        },
+        status: task.status,
+        trainingType: task.parameter?.trainingType || "auto",
+        createdAt: task.createdAt,
+        taskId: task.id,
+      }));
+
+      // Register tasks for polling
+      tasks.forEach((task: any) => {
+        if (task.parameter?.model) {
+          registerTask(task.parameter.model, task.id, task.status);
+        }
+      });
+    }
+  } catch (error) {
+    console.error("Failed to fetch tuning results:", error);
+  }
+};
+
+/**
+ * Get or register dataset ID
+ */
+const getDatasetId = async (
+  uploadedDatasetIdValue: string,
+  trainingFileList: any[]
+): Promise<string | null> => {
+  let datasetIdToUse = uploadedDatasetIdValue;
+
+  if (!datasetIdToUse && trainingFileList.length > 0) {
+    const file = trainingFileList[0].originFileObj;
+    const registeredId = await registerFileAsDataset(file);
+    if (registeredId) {
+      datasetIdToUse = registeredId;
+    }
+  }
+
+  if (!datasetIdToUse) {
+    message.error(t("messages.datasetRegistrationFailed"));
+    return null;
+  }
+
+  return datasetIdToUse;
+};
+
+/**
+ * Start tuning all selected models
+ */
+const startBatchTuning = async (params: {
+  uploadedDatasetId: string;
+  trainingFileList: any[];
+  selectedFeatureColumns: string[];
+  selectedTargetColumn: string;
+  workItemId?: number;
+}) => {
+  if (!params.uploadedDatasetId && params.trainingFileList.length === 0) {
+    message.error(t("messages.uploadError"));
+    return;
+  }
+
+  const datasetIdToUse = await getDatasetId(
+    params.uploadedDatasetId,
+    params.trainingFileList
+  );
+  if (!datasetIdToUse) return;
+
+  // Train all selected models
+  for (const modelValue of selectedModels.value) {
+    const response = await executeTrain(
+      {
+        datasetId: datasetIdToUse,
+        featureColumns: params.selectedFeatureColumns,
+        targetColumn: params.selectedTargetColumn,
+        model: modelValue,
+        workItemId: params.workItemId,
+      },
+      "auto"
+    );
+
+    if (response) {
+      registerTask(modelValue, response.taskId);
+      activeLogTab.value = response.taskId.toString();
+      pollTaskStatus(response.taskId, modelValue).then(() =>
+        fetchTuningResults(params.workItemId)
+      );
+      pollTaskLogs(response.taskId);
+    }
+  }
+};
+
+/**
+ * Start tuning a single model
+ */
+const startSingleModelTuning = async (
+  params: {
+    uploadedDatasetId: string;
+    trainingFileList: any[];
+    selectedFeatureColumns: string[];
+    selectedTargetColumn: string;
+    workItemId?: number;
+  },
+  modelValue: string,
   paramGrid?: Record<string, any>,
   trainingType?: string,
   parentTaskId?: number
 ) => {
-  // Emit the tune event
-  emit("start-tune", model, paramGrid, trainingType, parentTaskId);
+  const datasetIdToUse = await getDatasetId(
+    params.uploadedDatasetId,
+    params.trainingFileList
+  );
+  if (!datasetIdToUse) return;
+
+  const response = await executeTrain(
+    {
+      datasetId: datasetIdToUse,
+      featureColumns: params.selectedFeatureColumns,
+      targetColumn: params.selectedTargetColumn,
+      model: modelValue,
+      paramGrid: paramGrid,
+      workItemId: params.workItemId,
+    },
+    trainingType === "manual" ? "manual" : "auto"
+  );
+
+  if (response) {
+    registerTask(modelValue, response.taskId, "pending");
+    activeLogTab.value = response.taskId.toString();
+    pollTaskStatus(response.taskId, modelValue).then(() =>
+      fetchTuningResults(params.workItemId)
+    );
+    pollTaskLogs(response.taskId);
+  }
 };
 
-const handleViewLogs = (taskId: number, modelName: string) => {
-  // Handle view logs event
-  console.log("View logs for task:", taskId, modelName);
+/**
+ * Reset tuning step state
+ */
+const resetTuningStep = () => {
+  selectedModels.value = [];
+  selectedBestModel.value = null;
+  selectedTaskId.value = null;
+  activeLogTab.value = "";
+  tuningResults.value = [];
+  clearTasks();
 };
+
+onMounted(() => {
+  fetchTuningResults(props.workItemId);
+});
 </script>

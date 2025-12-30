@@ -4,12 +4,7 @@
       <a-spin />
       <p class="mt-2">{{ t("autoForm.loading") }}</p>
     </div>
-    <AutoForm
-      v-else
-      ref="formRef"
-      v-model="formData"
-      :schema="schema"
-    />
+    <AutoForm v-else ref="formRef" v-model="formData" :schema="schema" />
   </div>
 </template>
 
@@ -17,6 +12,7 @@
 import { ref, computed, watch, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { ModelService } from "~/services";
+import AutoForm from "~/components/common/AutoForm.vue";
 
 const { t } = useI18n();
 
@@ -33,7 +29,7 @@ const formRef = ref();
 const formData = ref<Record<string, any>>({});
 const modelMetadata = ref<any>(null);
 
-// Computed schema from model metadata  
+// Computed schema from model metadata
 const schema = computed(() => {
   return modelMetadata.value?.paramSchema || null;
 });
@@ -41,12 +37,9 @@ const schema = computed(() => {
 // Fetch model metadata
 const fetchModelMetadata = async () => {
   try {
-    const response = await ModelService.fetchMetadata();
-    if (response.success && response.models) {
-      const metadata = response.models.find((m: any) => m.name === props.model);
-      if (metadata) {
-        modelMetadata.value = metadata;
-      }
+    const response = await ModelService.fetchModel(props.model);
+    if (response.success && response.model) {
+      modelMetadata.value = response.model;
     }
   } catch (error) {
     console.error(`Failed to fetch metadata for ${props.model}:`, error);

@@ -47,50 +47,11 @@
         <a-card class="mb-6">
           <div class="mb-4">
             <h3 class="text-lg font-semibold mb-3">Upload New Dataset</h3>
-            
-            <a-form layout="vertical">
-              <a-form-item label="Dataset Name" required>
-                <a-input
-                  v-model:value="newDataset.name"
-                  placeholder="Enter dataset name"
-                />
-              </a-form-item>
-              
-              <a-form-item label="Description">
-                <a-textarea
-                  v-model:value="newDataset.description"
-                  placeholder="Optional description"
-                  :rows="2"
-                />
-              </a-form-item>
-              
-              <a-form-item label="Data File" required>
-                <a-upload-dragger
-                  v-model:file-list="fileList"
-                  name="file"
-                  :before-upload="beforeUpload"
-                  :max-count="1"
-                  accept=".xlsx,.xls"
-                >
-                  <p class="ant-upload-drag-icon">
-                    <span class="i-mdi-cloud-upload text-6xl text-blue-500 inline-block"></span>
-                  </p>
-                  <p class="ant-upload-text">Click or drag Excel file to upload</p>
-                  <p class="ant-upload-hint">
-                    Support for Excel files (.xlsx, .xls)
-                  </p>
-                </a-upload-dragger>
-              </a-form-item>
-              
-              <a-button
-                type="primary"
-                :loading="isUploading"
-                :disabled="!newDataset.name || fileList.length === 0"
-                @click="handleUploadDataset"
-              >
-                Upload Dataset
-              </a-button>
-            </a-form>
+            <UploadDataset
+              :project-id="project.id"
+              @dataset-uploaded="handleDatasetUploaded"
+              @dataset-selected="handleDatasetSelected"
+            />
           </div>
         </a-card>
 
@@ -120,9 +81,7 @@
                       title="Are you sure you want to delete this dataset?"
                       @confirm="deleteDataset(item.id)"
                     >
-                      <a-button type="link" danger>
-                        Delete
-                      </a-button>
+                      <a-button type="link" danger> Delete </a-button>
                     </a-popconfirm>
                   </template>
 
@@ -132,11 +91,15 @@
                     </template>
                     <template #description>
                       <div class="space-y-1">
-                        <div v-if="item.description">{{ item.description }}</div>
+                        <div v-if="item.description">
+                          {{ item.description }}
+                        </div>
                         <div class="text-sm text-gray-500">
                           <span>File: {{ item.fileName }}</span>
                           <span class="ml-4">{{ item.rowCount }} rows</span>
-                          <span class="ml-4">{{ item.columns?.length || 0 }} columns</span>
+                          <span class="ml-4"
+                            >{{ item.columns?.length || 0 }} columns</span
+                          >
                         </div>
                         <div class="text-xs text-gray-400">
                           Uploaded: {{ formatDate(item.createdAt) }}
@@ -181,9 +144,15 @@
             </a-descriptions>
 
             <div>
-              <h4 class="font-semibold mb-2">Columns ({{ selectedDataset.columns?.length || 0 }})</h4>
+              <h4 class="font-semibold mb-2">
+                Columns ({{ selectedDataset.columns?.length || 0 }})
+              </h4>
               <div class="flex flex-wrap gap-2">
-                <a-tag v-for="col in selectedDataset.columns" :key="col" color="blue">
+                <a-tag
+                  v-for="col in selectedDataset.columns"
+                  :key="col"
+                  color="blue"
+                >
                   {{ col }}
                 </a-tag>
               </div>
@@ -197,27 +166,19 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import { message } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
+import UploadDataset from "~/components/dataset/UploadDataset.vue";
 import type { Project, Dataset } from "../../../types";
-import type { UploadProps } from "ant-design-vue";
 
 const { t } = useI18n();
 const route = useRoute();
-const router = useRouter();
 
 const project = ref<Project | null>(null);
 const datasets = ref<Dataset[]>([]);
 const isLoading = ref(false);
 const isLoadingDatasets = ref(false);
-const isUploading = ref(false);
-
-const fileList = ref<any[]>([]);
-const newDataset = ref({
-  name: "",
-  description: "",
-});
 
 const showDatasetDetailsModal = ref(false);
 const selectedDataset = ref<Dataset | null>(null);
@@ -230,12 +191,12 @@ const fetchProject = async () => {
   try {
     const response = await $fetch(`/api/projects/${projectId}`);
     if (response.success) {
-      project.value = response.project;
-      datasets.value = response.project.datasets || [];
+      project.value = response.project as any;
+      datasets.value = (response.project.datasets || []) as any;
     }
   } catch (error) {
     console.error("Failed to fetch project:", error);
-    message.error("Failed to fetch project");
+    message.error(t("projects.fetchError"));
   } finally {
     isLoading.value = false;
   }
@@ -249,63 +210,30 @@ const fetchProjectDatasets = async () => {
   try {
     const response = await $fetch(`/api/projects/${projectId}`);
     if (response.success) {
-      datasets.value = response.project.datasets || [];
+      datasets.value = (response.project.datasets || []) as any;
     }
   } catch (error) {
     console.error("Failed to fetch datasets:", error);
-    message.error("Failed to fetch datasets");
+    message.error(t("datasets.fetchError"));
   } finally {
     isLoadingDatasets.value = false;
   }
 };
 
-const beforeUpload: UploadProps["beforeUpload"] = (file) => {
-  const isExcel =
-    file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-    file.type === "application/vnd.ms-excel" ||
-    file.name.endsWith(".xlsx") ||
-    file.name.endsWith(".xls");
-
-  if (!isExcel) {
-    message.error("You can only upload Excel files!");
-    return false;
-  }
-  return false; // Prevent auto upload
+/**
+ * Handle dataset upload from UploadDataset component
+ */
+const handleDatasetUploaded = async () => {
+  message.success(t("datasets.uploadSuccess"));
+  await fetchProjectDatasets();
 };
 
-const handleUploadDataset = async () => {
-  if (!newDataset.value.name || fileList.value.length === 0) {
-    message.error("Please provide dataset name and file");
-    return;
-  }
-
-  const formData = new FormData();
-  formData.append("file", fileList.value[0].originFileObj);
-  formData.append("name", newDataset.value.name);
-  if (newDataset.value.description) {
-    formData.append("description", newDataset.value.description);
-  }
-  formData.append("projectId", String(project.value?.id));
-
-  isUploading.value = true;
-  try {
-    const response = await $fetch("/api/data", {
-      method: "POST",
-      body: formData,
-    });
-
-    if (response.success) {
-      message.success("Dataset uploaded successfully");
-      newDataset.value = { name: "", description: "" };
-      fileList.value = [];
-      await fetchProjectDatasets();
-    }
-  } catch (error) {
-    console.error("Failed to upload dataset:", error);
-    message.error("Failed to upload dataset");
-  } finally {
-    isUploading.value = false;
-  }
+/**
+ * Handle dataset selection from UploadDataset component
+ */
+const handleDatasetSelected = async () => {
+  message.success(t("datasets.datasetSelected"));
+  await fetchProjectDatasets();
 };
 
 const deleteDataset = async (id: number) => {
@@ -315,12 +243,12 @@ const deleteDataset = async (id: number) => {
     });
 
     if (response.success) {
-      message.success("Dataset deleted successfully");
+      message.success(t("datasets.deleteSuccess"));
       await fetchProjectDatasets();
     }
   } catch (error) {
     console.error("Failed to delete dataset:", error);
-    message.error("Failed to delete dataset");
+    message.error(t("datasets.deleteError"));
   }
 };
 

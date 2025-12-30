@@ -1,44 +1,13 @@
 <template>
   <tr class="bg-gray-50 border-b">
     <!-- Select Column -->
-    <td class="px-4 py-2 text-center">
+    <td class="pl-8 py-2">
       <a-radio
         :checked="selectedTaskId === taskId"
         @click="$emit('update:selectedTaskId', taskId)"
       />
     </td>
-    
-    <!-- Model Name / Timestamp Column -->
-    <td class="px-4 py-2">
-      <span class="font-medium pl-2">
-        {{ formatTimestamp(task?.createdAt) }}
-      </span>
-    </td>
-    
-    <!-- Tune Type Column -->
-    <td class="px-4 py-2">
-      <div class="text-sm">
-        <div class="font-medium mb-1">
-          <a-tag v-if="taskType === 'auto-tune'" color="blue">
-            {{ t("tuning.autoTune") }}
-          </a-tag>
-          <a-tag v-else-if="taskType === 'tune'" color="green">
-            {{ t("tuning.manualTune") }}
-          </a-tag>
-        </div>
-        <div v-if="taskParams" class="text-xs text-gray-600">
-          <div
-            v-for="(value, key) in taskParams"
-            :key="key"
-            class="truncate"
-          >
-            <span class="font-medium">{{ key }}:</span>
-            {{ formatParamValue(value) }}
-          </div>
-        </div>
-      </div>
-    </td>
-    
+
     <!-- Action Column -->
     <td class="px-4 py-2">
       <div class="flex gap-2 items-center">
@@ -55,7 +24,27 @@
         </a-tag>
       </div>
     </td>
-    
+
+    <!-- Tune Type Column -->
+    <td class="px-4 py-2">
+      <div class="text-sm">
+        <div class="font-medium mb-1">
+          <a-tag v-if="taskType === 'auto-tune'" color="blue">
+            {{ t("tuning.type.auto") }}
+          </a-tag>
+          <a-tag v-else-if="taskType === 'manual-tune'" color="green">
+            {{ t("tuning.type.manual") }}
+          </a-tag>
+        </div>
+        <div v-if="taskParams" class="text-xs text-gray-600">
+          <div v-for="(value, key) in taskParams" :key="key" class="truncate">
+            <span class="font-medium">{{ key }}:</span>
+            {{ formatParamValue(value) }}
+          </div>
+        </div>
+      </div>
+    </td>
+
     <!-- Metrics Column -->
     <td class="px-4 py-2">
       <ModelAutoMetrics :metrics="taskMetrics" />
@@ -81,9 +70,11 @@ import { useI18n } from "vue-i18n";
 import { TaskService } from "~/services";
 import { useFormatters } from "~/composables/useFormatters";
 import type { TaskInfo, TuningMetrics } from "~/types";
+import ModelAutoMetrics from "./ModelAutoMetrics.vue";
+import LogPanel from "~/components/obsrv/LogPanel.vue";
 
 const { t } = useI18n();
-const { formatTimestamp, formatMetric, getStatusColor } = useFormatters();
+const { getStatusColor } = useFormatters();
 
 const props = defineProps<{
   taskId: number;
@@ -101,7 +92,7 @@ const logModalVisible = ref(false);
 
 // Computed properties
 const taskType = computed(() => {
-  return task.value?.parameter?.type || task.value?.type || 'unknown';
+  return task.value?.parameter?.type || task.value?.type || "unknown";
 });
 
 const taskParams = computed(() => {
@@ -109,9 +100,9 @@ const taskParams = computed(() => {
   return result?.params || null;
 });
 
-const taskMetrics = computed((): TuningMetrics | null => {
+const taskMetrics = computed((): TuningMetrics | undefined => {
   const result = task.value?.result;
-  if (!result?.metrics) return null;
+  if (!result?.metrics) return undefined;
   return result.metrics;
 });
 
@@ -157,10 +148,16 @@ const formatParamValue = (value: any): string => {
 
 // Poll for task updates if status is not completed or failed
 const pollTask = () => {
-  if (task.value && (task.value.status === 'pending' || task.value.status === 'running')) {
+  if (
+    task.value &&
+    (task.value.status === "pending" || task.value.status === "running")
+  ) {
     setTimeout(() => {
       fetchTask().then(() => {
-        if (task.value && (task.value.status === 'pending' || task.value.status === 'running')) {
+        if (
+          task.value &&
+          (task.value.status === "pending" || task.value.status === "running")
+        ) {
           pollTask();
         }
       });

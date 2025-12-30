@@ -81,17 +81,13 @@
     "fetchError": "获取工作项失败"
   },
   "steps": {
-    "upload": {
-      "title": "上传数据",
-      "description": "选择或上传训练数据集"
+    "prepare": {
+      "title": "准备数据",
+      "description": "选择训练数据集并指定特征与目标"
     },
     "tune": {
       "title": "模型调优",
       "description": "训练和调优机器学习模型"
-    },
-    "uploadTrain": {
-      "title": "上传与训练",
-      "description": "上传数据并调整模型"
     },
     "predict": {
       "title": "预测",
@@ -159,18 +155,18 @@
     "downloading": "正在下载预测结果..."
   },
   "models": {
-    "regression.linear_regression_hyperparameter_tuning": "线性回归",
-    "regression.ridge": "岭回归",
-    "regression.lasso": "套索回归",
-    "regression.bayesian_ridge_regression": "贝叶斯岭回归",
-    "regression.k_nearest_neighbors": "K近邻",
-    "regression.regression_decision_tree": "决策树",
-    "regression.random_forest": "随机森林",
-    "regression.gbdt": "梯度提升决策树",
-    "regression.adaboost": "AdaBoost",
-    "regression.xgboost": "XGBoost",
-    "regression.lightgbm": "LightGBM",
-    "regression.polynomial_regression": "多项式回归"
+    "regression_linear_regression_hyperparameter_tuning": "线性回归",
+    "regression_ridge": "岭回归",
+    "regression_lasso": "套索回归",
+    "regression_bayesian_ridge_regression": "贝叶斯岭回归",
+    "regression_k_nearest_neighbors": "K近邻",
+    "regression_regression_decision_tree": "决策树",
+    "regression_random_forest": "随机森林",
+    "regression_gbdt": "梯度提升决策树",
+    "regression_adaboost": "AdaBoost",
+    "regression_xgboost": "XGBoost",
+    "regression_lightgbm": "LightGBM",
+    "regression_polynomial_regression": "多项式回归"
   },
   "status": {
     "pending": "待处理",
@@ -312,5 +308,12 @@
       "emptyArray": "无值。使用上方输入添加值。",
       "editButton": "编辑"
     }
-  }
+  },
+  "modelParamGridForm.noSchema": "这个模型没有参数网格",
+  "tuning.tuneType": "类型与参数",
+  "tuning.tuning": "调优",
+  "tuning.type.auto": "自动",
+  "tuning.type.manual": "手动",
+  "ml.modelSelector.selectModel": "选择一个模型以添加",
+  "common.noData": "N/A"
 }

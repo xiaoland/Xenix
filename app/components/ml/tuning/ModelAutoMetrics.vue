@@ -7,7 +7,9 @@
       <div class="flex flex-wrap gap-2">
         <template v-for="(value, key) in metrics" :key="key">
           <div class="metric-item">
-            <span class="metric-label">{{ formatMetricLabel(key as string) }}:</span>
+            <span class="metric-label"
+              >{{ formatMetricLabel(key as string) }}:</span
+            >
             <span class="metric-value">{{ formatMetricValue(value) }}</span>
           </div>
         </template>
@@ -39,7 +41,7 @@ const formatMetricValue = (value: any): string => {
   if (value === null || value === undefined) {
     return "N/A";
   }
-  
+
   if (typeof value === "number") {
     // Format numbers to reasonable precision
     if (Number.isInteger(value)) {
@@ -48,24 +50,24 @@ const formatMetricValue = (value: any): string => {
     // For floating point, show up to 6 decimal places, removing trailing zeros
     return value.toFixed(6).replace(/\.?0+$/, "");
   }
-  
+
   if (typeof value === "boolean") {
     return value ? "Yes" : "No";
   }
-  
+
   if (typeof value === "string") {
     return value;
   }
-  
+
   if (Array.isArray(value)) {
     return `[${value.map(formatMetricValue).join(", ")}]`;
   }
-  
+
   if (typeof value === "object") {
     // For nested objects, show as JSON
     return JSON.stringify(value);
   }
-  
+
   return String(value);
 };
 </script>

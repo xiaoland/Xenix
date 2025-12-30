@@ -25,9 +25,9 @@ export class TuneService {
    * Start manual tune with specific parameters
    */
   static async startManualTune(params: {
-    datasetId: string;
-    features: string[];
-    target: string;
+    datasetId?: string;
+    features?: string[];
+    target?: string;
     model: string;
     parameters: Record<string, any>;
     workItemId?: number;

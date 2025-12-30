@@ -36,6 +36,7 @@
 
 <script setup lang="ts">
 import { useRoute } from "vue-router";
+import LanguageSwitcher from "./LanguageSwitcher.vue";
 
 const route = useRoute();
 

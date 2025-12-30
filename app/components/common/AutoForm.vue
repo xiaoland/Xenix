@@ -1,10 +1,5 @@
 <template>
-  <a-form
-    ref="formRef"
-    :model="formData"
-    layout="vertical"
-    class="auto-form"
-  >
+  <a-form ref="formRef" :model="formData" layout="vertical" class="auto-form">
     <div v-if="!schema || !schema.properties" class="text-center py-4">
       <a-spin />
       <p class="mt-2">{{ t("autoForm.loading") }}</p>
@@ -23,7 +18,10 @@
             <div v-if="propSchema.description" class="text-xs text-gray-500">
               {{ propSchema.description }}
             </div>
-            <div v-if="propSchema.default !== undefined" class="text-xs text-gray-400">
+            <div
+              v-if="propSchema.default !== undefined"
+              class="text-xs text-gray-400"
+            >
               {{ t("autoForm.defaultValue") }}:
               <code class="bg-gray-100 px-1 py-0.5 rounded">{{
                 JSON.stringify(propSchema.default)
@@ -47,7 +45,9 @@
 
           <!-- Number/Integer input (type: "number" or "integer") -->
           <a-input-number
-            v-else-if="propSchema.type === 'number' || propSchema.type === 'integer'"
+            v-else-if="
+              propSchema.type === 'number' || propSchema.type === 'integer'
+            "
             v-model:value="formData[propName as string]"
             class="w-full"
             :step="propSchema.type === 'integer' ? 1 : 0.01"
@@ -185,6 +185,19 @@ watch(
   },
   { deep: true }
 );
+
+const validate = async () => {
+  try {
+    await formRef.value?.validate();
+    return { valid: true };
+  } catch (error) {
+    return { valid: false, errors: error };
+  }
+};
+
+defineExpose({
+  validate,
+});
 </script>
 
 <style scoped>

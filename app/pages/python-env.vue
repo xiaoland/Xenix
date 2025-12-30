@@ -97,6 +97,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
+import PageHeader from "~/components/common/PageHeader.vue";
 
 interface EnvStatus {
   pdmInstalled: boolean;

@@ -48,27 +48,30 @@
         </div>
 
         <a-card class="mb-6">
-          <a-steps v-model:current="currentStep" class="mb-8">
-            <a-step
-              :title="$t('steps.upload.title')"
-              :description="$t('steps.upload.description')"
-            />
-            <a-step
-              :title="$t('steps.tune.title')"
-              :description="$t('steps.tune.description')"
-            />
-            <a-step
-              :title="$t('steps.predict.title')"
-              :description="$t('steps.predict.description')"
-            />
-          </a-steps>
+          <Steps
+            :current="currentStep"
+            class="mb-8"
+            :items="[
+              {
+                title: $t('steps.prepare.title'),
+                description: $t('steps.prepare.description'),
+              },
+              {
+                title: $t('steps.tune.title'),
+                description: $t('steps.tune.description'),
+              },
+              {
+                title: $t('steps.predict.title'),
+                description: $t('steps.predict.description'),
+              },
+            ]"
+          />
 
-          <!-- Step 0: Upload (skipped if work item has upload data) -->
+          <!-- Step 0: Prepare (Dataset + Columns) -->
           <div v-if="currentStep === 0">
-            <UploadStep
-              v-model="trainingFileList"
-              :project-id="workItem.projectId"
-              @continue="handleColumnSelection"
+            <PrepareStep
+              :work-item-id="workItem.id"
+              @confirm="handlePrepareConfirm"
             />
           </div>
 
@@ -76,11 +79,8 @@
           <div v-if="currentStep === 1">
             <TuningStep
               :work-item-id="workItem.id"
-              v-model:selected-best-model="selectedBestModel"
               v-model:selected-task-id="selectedTaskId"
-              :tuning-results="tuningResults"
-              @start-tune="handleStartSingleModelTuning"
-              @continue="nextStep"
+              @continue="handleTuningContinue"
               @back="goToUploadStep"
             />
           </div>
@@ -108,12 +108,14 @@ import { ref, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import { message } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
-import { useWorkflowState } from "../../composables/useWorkflowState";
 import { useDatasetRegistration } from "../../composables/useDatasetRegistration";
-import { useTuningStep } from "../../composables/useTuningStep";
 import { usePredictionStep } from "../../composables/usePredictionStep";
 import { WorkItemService } from "../../services";
-import { AVAILABLE_MODELS } from "../../constants/models";
+import PrepareStep from "~/components/ml/prepare/PrepareStep.vue";
+import TuningStep from "~/components/ml/tuning/TuningStep.vue";
+import PredictionStep from "~/components/ml/prediction/PredictionStep.vue";
+import PageHeader from "~/components/common/PageHeader.vue";
+import Steps from "~/components/common/Steps.vue";
 import type { WorkItem } from "../../types";
 
 const { t } = useI18n();
@@ -123,33 +125,10 @@ const route = useRoute();
 const workItem = ref<WorkItem | null>(null);
 const isLoading = ref(false);
 
-// Available regression models
-const availableModels = AVAILABLE_MODELS;
-
-// Workflow state
-const {
-  currentStep,
-  trainingFileList,
-  selectedFeatureColumns,
-  selectedTargetColumn,
-  nextStep,
-  prevStep,
-  resetAll,
-} = useWorkflowState();
-
 // Dataset registration
 const { uploadedDatasetId, clearDatasetId } = useDatasetRegistration();
 
-// Tuning step logic
-const {
-  selectedBestModel,
-  selectedTaskId,
-  tuningResults,
-  tuningTasks,
-  fetchTuningResults,
-  startSingleModelTuning,
-  resetTuningStep,
-} = useTuningStep();
+// Prepare step logic
 
 // Prediction step logic
 const {
@@ -160,86 +139,72 @@ const {
   resetPredictionStep,
 } = usePredictionStep();
 
-const handleColumnSelection = async ({
-  featureColumns,
-  targetColumn,
-  datasetId,
-}: {
-  featureColumns: string[];
-  targetColumn: string;
-  datasetId?: number;
-}) => {
-  selectedFeatureColumns.value = featureColumns;
-  selectedTargetColumn.value = targetColumn;
-  uploadedDatasetId.value = datasetId ? String(datasetId) : "";
+// Workflow state
+const currentStep = ref(0);
+const trainingFileList = ref([]);
+const hasUploadedData = ref(false);
+const selectedModels = ref<string[]>([]);
+const selectedFeatureColumns = ref<string[]>([]);
+const selectedTargetColumn = ref<string>("");
+const activeLogTab = ref<string>("");
+const selectedBestModel = ref<string | null>(null);
+const selectedTaskId = ref<number | null>(null);
 
-  // Save upload step results to work item
-  if (workItem.value) {
-    try {
-      const response = await WorkItemService.update(workItem.value.id, {
-        datasetId: datasetId,
-        featureColumns: featureColumns,
-        targetColumn: targetColumn,
-      });
-
-      // Update local work item state with saved data
-      if (response.success && response.workItem) {
-        workItem.value = response.workItem;
-      } else {
-        // Fallback: update local state manually
-        workItem.value.datasetId = datasetId;
-        workItem.value.featureColumns = featureColumns;
-        workItem.value.targetColumn = targetColumn;
-      }
-
-      message.success(t("messages.uploadDataSaved"));
-    } catch (error) {
-      console.error("Failed to save upload data:", error);
-      // Update local state anyway so UI works
-      workItem.value.datasetId = datasetId;
-      workItem.value.featureColumns = featureColumns;
-      workItem.value.targetColumn = targetColumn;
-    }
+// Navigation
+const nextStep = () => {
+  if (currentStep.value < 2) {
+    currentStep.value = currentStep.value + 1;
   }
+};
 
-  // Move to tuning step
-  currentStep.value = 1;
+const prevStep = () => {
+  if (currentStep.value > 0) {
+    currentStep.value--;
+  }
+};
 
-  // Fetch existing tuning results
-  await fetchTuningResults(workItem.value?.id);
+// Reset all state
+const resetAll = () => {
+  currentStep.value = 0;
+  trainingFileList.value = [];
+  hasUploadedData.value = false;
+  selectedModels.value = [];
+  selectedFeatureColumns.value = [];
+  selectedTargetColumn.value = "";
+  activeLogTab.value = "";
+};
 
-  message.success(t("messages.readyToTrain", { count: featureColumns.length }));
+// Current dataset columns for prepare step
+const currentDatasetColumns = ref<string[]>([]);
+const currentDatasetId = ref<number | undefined>(undefined);
+
+const resetPrepareStep = () => {
+  currentDatasetColumns.value = [];
+  currentDatasetId.value = undefined;
+};
+
+/**
+ * Handle prepare step confirmation
+ */
+const handlePrepareConfirm = async () => {
+  nextStep();
 };
 
 const goToUploadStep = () => {
   currentStep.value = 0;
+  currentDatasetColumns.value = [];
+  currentDatasetId.value = undefined;
 };
 
-const handleStartSingleModelTuning = async (
-  modelValue: string,
-  paramGrid?: Record<string, any>,
-  trainingType?: string,
-  parentTaskId?: number
-) => {
-  await startSingleModelTuning(
-    {
-      uploadedDatasetId: uploadedDatasetId.value,
-      trainingFileList: trainingFileList.value,
-      selectedFeatureColumns: selectedFeatureColumns.value,
-      selectedTargetColumn: selectedTargetColumn.value,
-      workItemId: workItem.value?.id,
-    },
-    modelValue,
-    paramGrid,
-    trainingType,
-    parentTaskId
-  );
+const handleTuningContinue = (model: string) => {
+  selectedBestModel.value = model;
+  nextStep();
 };
 
 const handleStartPrediction = async () => {
   await startPrediction({
     selectedBestModel: selectedBestModel.value,
-    tuningTasks: tuningTasks.value,
+    tuningTasks: [], // No longer needed
     uploadedDatasetId: uploadedDatasetId.value,
     selectedFeatureColumns: selectedFeatureColumns.value,
     selectedTargetColumn: selectedTargetColumn.value,
@@ -249,7 +214,7 @@ const handleStartPrediction = async () => {
 const reset = () => {
   resetAll();
   clearDatasetId();
-  resetTuningStep();
+  resetPrepareStep();
   resetPredictionStep();
 };
 
@@ -276,9 +241,6 @@ const fetchWorkItem = async () => {
 
         // Skip upload step, go directly to tuning
         currentStep.value = 1;
-
-        // Fetch existing tuning results
-        await fetchTuningResults(workItem.value.id);
 
         message.info(t("messages.uploadDataRestored"));
       } else {

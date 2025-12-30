@@ -31,4 +31,13 @@ export class DatasetService {
   static async fetchAll(): Promise<{ success: boolean; datasets: Dataset[] }> {
     return await $fetch("/api/data");
   }
+
+  /**
+   * Fetch a specific dataset by ID
+   */
+  static async fetchById(
+    id: number | string
+  ): Promise<{ success: boolean; dataset: Dataset }> {
+    return await $fetch(`/api/data/${id}`);
+  }
 }

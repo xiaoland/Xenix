@@ -1,15 +1,13 @@
 <template>
   <div class="model-param-grid-form">
-    <div v-if="!schema" class="text-center py-4">
+    <div v-if="schema === undefined" class="text-center py-4">
       <a-spin />
       <p class="mt-2">{{ t("autoForm.loading") }}</p>
     </div>
-    <AutoForm
-      v-else
-      ref="formRef"
-      v-model="formData"
-      :schema="schema"
-    />
+    <div v-if="schema === null" class="text-center py-4">
+      <p class="mt-2 text-red-500">{{ t("modelParamGridForm.noSchema") }}</p>
+    </div>
+    <AutoForm v-else ref="formRef" v-model="formData" :schema="schema" />
   </div>
 </template>
 
@@ -17,6 +15,7 @@
 import { ref, watch, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { ModelService } from "~/services";
+import AutoForm from "~/components/common/AutoForm.vue";
 
 const { t } = useI18n();
 
@@ -31,23 +30,18 @@ const emit = defineEmits<{
 
 const formRef = ref();
 const formData = ref<Record<string, any>>({});
-const modelMetadata = ref<any>(null);
+const modelMetadata = ref<any>();
 
 // Computed schema from model metadata
 const schema = computed(() => {
-  return modelMetadata.value?.paramGridSchema || null;
+  return modelMetadata.value?.paramGridSchema;
 });
 
 // Fetch model metadata
 const fetchModelMetadata = async () => {
   try {
-    const response = await ModelService.fetchMetadata();
-    if (response.success && response.models) {
-      const metadata = response.models.find((m: any) => m.name === props.model);
-      if (metadata) {
-        modelMetadata.value = metadata;
-      }
-    }
+    const response = await ModelService.fetchModel(props.model);
+    modelMetadata.value = response.model;
   } catch (error) {
     console.error(`Failed to fetch metadata for ${props.model}:`, error);
   }

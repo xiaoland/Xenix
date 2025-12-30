@@ -29,7 +29,7 @@ def get_param_grid_class(model_class):
         The ModelParam class if found, None otherwise
     """
     # Use the __paramgrid__ class variable set by __init_subclass__
-    return getattr(model_class, "__paramgrid__", None)
+    return getattr(model_class, "__paramgrid__")
 
 
 def get_param_class(model_class):
@@ -43,7 +43,7 @@ def get_param_class(model_class):
         The Model Parameter class if found, None otherwise
     """
     # Use the __modelparam__ class variable set by __init_subclass__
-    return getattr(model_class, "__modelparam__", None)
+    return getattr(model_class, "__modelparam__")
 
 
 def scan_models_in_directory(category: str, directory: Path) -> List[Dict[str, Any]]:
@@ -75,16 +75,11 @@ def scan_models_in_directory(category: str, directory: Path) -> List[Dict[str, A
 
             # Get the ParamGrid class from type hints
             param_grid_class = get_param_grid_class(Model)
-
-            if param_grid_class is None:
-                print(
-                    f"Warning: Could not find ModelParam class for {full_model_name}",
-                    file=sys.stderr,
-                )
-                continue
+            param_class = get_param_class(Model)
 
             # Get JSON schema from the ModelParam pydantic model
             param_grid_schema = param_grid_class.model_json_schema()
+            param_schema = param_class.model_json_schema()
 
             # Generate a human-readable label
             # Convert snake_case to Title Case
@@ -95,7 +90,8 @@ def scan_models_in_directory(category: str, directory: Path) -> List[Dict[str, A
                 "category": category,
                 "name": full_model_name,
                 "label": label,
-                "param_schema": param_grid_schema,
+                "param_schema": param_schema,
+                "param_grid_schema": param_grid_schema,
             }
 
             models.append(model_metadata)
