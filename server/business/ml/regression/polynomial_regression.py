@@ -34,7 +34,9 @@ class PolynomialParamGridModel(BaseModel):
 
 
 class PolynomialRegressionModel(
-    RegressionModel[Pipeline, PolynomialModelParam, PolynomialParamGridModel]
+    RegressionModel[Pipeline, PolynomialModelParam, PolynomialParamGridModel],
+    param_grid=PolynomialParamGridModel,
+    model_param=PolynomialModelParam,
 ):
     """Polynomial Regression model implementation."""
 
@@ -96,11 +98,4 @@ class PolynomialRegressionModel(
 
 
 # Alias for the model class
-
-# Register parameter schemas
-PolynomialRegressionModel.register_schemas(
-    param_grid_class=PolynomialRegressionParamGridModel,
-    param_class=PolynomialRegressionModelParam,
-)
-
 Model = PolynomialRegressionModel

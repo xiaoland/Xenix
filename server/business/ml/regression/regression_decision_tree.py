@@ -49,7 +49,9 @@ class DecisionTreeParamGridModel(BaseModel):
 class DecisionTreeRegressionModel(
     RegressionModel[
         DecisionTreeRegressor, DecisionTreeModelParam, DecisionTreeParamGridModel
-    ]
+    ],
+    param_grid=DecisionTreeParamGridModel,
+    model_param=DecisionTreeModelParam,
 ):
     """DecisionTree Regression model implementation."""
 
@@ -100,13 +102,6 @@ class DecisionTreeRegressionModel(
             p = params.model_dump()
             model.set_params(**p)
         return model
-
-
-# Register parameter schemas
-RegressionDecisionTreeModel.register_schemas(
-    param_grid_class=RegressionDecisionTreeParamGridModel,
-    param_class=RegressionDecisionTreeModelParam,
-)
 
 # Alias for the model class
 Model = DecisionTreeRegressionModel

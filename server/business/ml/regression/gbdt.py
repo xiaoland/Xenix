@@ -39,7 +39,9 @@ class GBDTParamGridModel(BaseModel):
 
 
 class GBDTRegressionModel(
-    RegressionModel[GradientBoostingRegressor, GBDTModelParam, GBDTParamGridModel]
+    RegressionModel[GradientBoostingRegressor, GBDTModelParam, GBDTParamGridModel],
+    param_grid=GBDTParamGridModel,
+    model_param=GBDTModelParam,
 ):
     """GBDT Regression model implementation."""
 
@@ -93,11 +95,4 @@ class GBDTRegressionModel(
 
 
 # Alias for the model class
-
-# Register parameter schemas
-GBDTRegressionModel.register_schemas(
-    param_grid_class=GBDTRegressionParamGridModel,
-    param_class=GBDTRegressionModelParam,
-)
-
 Model = GBDTRegressionModel

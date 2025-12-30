@@ -41,7 +41,9 @@ class AdaBoostParamGridModel(BaseModel):
 
 
 class AdaBoostRegressionModel(
-    RegressionModel[AdaBoostRegressor, AdaBoostModelParam, AdaBoostParamGridModel]
+    RegressionModel[AdaBoostRegressor, AdaBoostModelParam, AdaBoostParamGridModel],
+    param_grid=AdaBoostParamGridModel,
+    model_param=AdaBoostModelParam,
 ):
     """AdaBoost Regression model implementation."""
 
@@ -100,11 +102,4 @@ class AdaBoostRegressionModel(
 
 
 # Alias for the model class
-
-# Register parameter schemas
-AdaBoostRegressionModel.register_schemas(
-    param_grid_class=AdaBoostRegressionParamGridModel,
-    param_class=AdaBoostRegressionModelParam,
-)
-
 Model = AdaBoostRegressionModel

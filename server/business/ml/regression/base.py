@@ -63,32 +63,29 @@ class RegressionModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]):
         ParamGridType: The parameter grid model type (pydantic BaseModel subclass with list fields)
     """
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(
+        cls,
+        param_grid: type["ParamGridType"] = None,
+        model_param: type["ModelParamType"] = None,
+        **kwargs
+    ):
         """
         Hook to enforce schema registration when a concrete model class is defined.
         
-        All concrete model classes must call register_schemas() to provide their
-        parameter and parameter grid classes.
-        """
-        super().__init_subclass__(**kwargs)
-        # Initialize schema storage attributes
-        cls.__paramgridschema__ = None
-        cls.__modelparamschema__ = None
-
-    @classmethod
-    def register_schemas(cls, param_grid_class: type, param_class: type):
-        """
-        Register parameter schemas for this model class.
-        
-        This method should be called immediately after the class definition to register
-        the parameter and parameter grid schemas.
+        All concrete model classes must provide param_grid and model_param parameters
+        when subclassing.
         
         Args:
-            param_grid_class: The pydantic model class for parameter grids (with list fields)
-            param_class: The pydantic model class for single parameters
+            param_grid: The pydantic model class for parameter grids (with list fields)
+            model_param: The pydantic model class for single parameters
         """
-        cls.__paramgridschema__ = param_grid_class
-        cls.__modelparamschema__ = param_class
+        super().__init_subclass__(**kwargs)
+        
+        # Store the parameter schemas as class variables
+        if param_grid is not None:
+            cls.__paramgrid__ = param_grid
+        if model_param is not None:
+            cls.__modelparam__ = model_param
 
     @staticmethod
     @abstractmethod

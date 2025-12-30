@@ -28,8 +28,8 @@ def get_param_grid_class(model_class):
     Returns:
         The ModelParam class if found, None otherwise
     """
-    # Use the __paramgridschema__ class variable set by register_schemas()
-    return getattr(model_class, "__paramgridschema__", None)
+    # Use the __paramgrid__ class variable set by __init_subclass__
+    return getattr(model_class, "__paramgrid__", None)
 
 
 def get_param_class(model_class):
@@ -42,8 +42,8 @@ def get_param_class(model_class):
     Returns:
         The Model Parameter class if found, None otherwise
     """
-    # Use the __modelparamschema__ class variable set by register_schemas()
-    return getattr(model_class, "__modelparamschema__", None)
+    # Use the __modelparam__ class variable set by __init_subclass__
+    return getattr(model_class, "__modelparam__", None)
 
 
 def scan_models_in_directory(category: str, directory: Path) -> List[Dict[str, Any]]:

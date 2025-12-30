@@ -35,7 +35,11 @@ class RidgeParamGridModel(BaseModel):
     )
 
 
-class RidgeRegression(RegressionModel[Pipeline, RidgeModelParam, RidgeParamGridModel]):
+class RidgeRegression(
+    RegressionModel[Pipeline, RidgeModelParam, RidgeParamGridModel],
+    param_grid=RidgeParamGridModel,
+    model_param=RidgeModelParam,
+):
     """Ridge Regression model implementation."""
 
     @staticmethod
@@ -110,13 +114,6 @@ class RidgeRegression(RegressionModel[Pipeline, RidgeModelParam, RidgeParamGridM
             p = params.model_dump()
             model.set_params(**p)
         return model
-
-
-# Register parameter schemas
-RidgeRegressionModel.register_schemas(
-    param_grid_class=RidgeRegressionParamGridModel,
-    param_class=RidgeRegressionModelParam,
-)
 
 # Alias for the model class
 Model = RidgeRegression

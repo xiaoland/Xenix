@@ -35,7 +35,11 @@ class LassoParamGridModel(BaseModel):
     )
 
 
-class LassoRegression(RegressionModel[Pipeline, LassoModelParam, LassoParamGridModel]):
+class LassoRegression(
+    RegressionModel[Pipeline, LassoModelParam, LassoParamGridModel],
+    param_grid=LassoParamGridModel,
+    model_param=LassoModelParam,
+):
     """Lasso Regression model implementation."""
 
     @staticmethod
@@ -110,13 +114,6 @@ class LassoRegression(RegressionModel[Pipeline, LassoModelParam, LassoParamGridM
             p = params.model_dump()
             model.set_params(**p)
         return model
-
-
-# Register parameter schemas
-LassoRegressionModel.register_schemas(
-    param_grid_class=LassoRegressionParamGridModel,
-    param_class=LassoRegressionModelParam,
-)
 
 # Alias for the model class
 Model = LassoRegression

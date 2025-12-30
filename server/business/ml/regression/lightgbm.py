@@ -46,7 +46,9 @@ class LightGBMParamGridModel(BaseModel):
 
 
 class LightGBMRegressionModel(
-    RegressionModel[LGBMRegressor, LightGBMModelParam, LightGBMParamGridModel]
+    RegressionModel[LGBMRegressor, LightGBMModelParam, LightGBMParamGridModel],
+    param_grid=LightGBMParamGridModel,
+    model_param=LightGBMModelParam,
 ):
     """LightGBM Regression model implementation."""
 
@@ -102,11 +104,4 @@ class LightGBMRegressionModel(
 
 
 # Alias for the model class
-
-# Register parameter schemas
-LightGBMRegressionModel.register_schemas(
-    param_grid_class=LightGBMRegressionParamGridModel,
-    param_class=LightGBMRegressionModelParam,
-)
-
 Model = LightGBMRegressionModel

@@ -43,7 +43,9 @@ class XGBoostParamGridModel(BaseModel):
 
 
 class XGBoostRegressionModel(
-    RegressionModel[XGBRegressor, XGBoostModelParam, XGBoostParamGridModel]
+    RegressionModel[XGBRegressor, XGBoostModelParam, XGBoostParamGridModel],
+    param_grid=XGBoostParamGridModel,
+    model_param=XGBoostModelParam,
 ):
     """XGBoost Regression model implementation."""
 
@@ -97,11 +99,4 @@ class XGBoostRegressionModel(
 
 
 # Alias for the model class
-
-# Register parameter schemas
-XGBoostRegressionModel.register_schemas(
-    param_grid_class=XGBoostRegressionParamGridModel,
-    param_class=XGBoostRegressionModelParam,
-)
-
 Model = XGBoostRegressionModel

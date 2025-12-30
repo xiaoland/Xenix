@@ -47,7 +47,9 @@ class RandomForestParamGridModel(BaseModel):
 class RandomForestRegressionModel(
     RegressionModel[
         RandomForestRegressor, RandomForestModelParam, RandomForestParamGridModel
-    ]
+    ],
+    param_grid=RandomForestParamGridModel,
+    model_param=RandomForestModelParam,
 ):
     """Random Forest Regression model implementation."""
 
@@ -123,11 +125,4 @@ class RandomForestRegressionModel(
 
 
 # Alias for the model class
-
-# Register parameter schemas
-RandomForestRegressionModel.register_schemas(
-    param_grid_class=RandomForestRegressionParamGridModel,
-    param_class=RandomForestRegressionModelParam,
-)
-
 Model = RandomForestRegressionModel

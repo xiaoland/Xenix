@@ -40,7 +40,11 @@ class KNNParamGridModel(BaseModel):
     )
 
 
-class KNNRegressionModel(RegressionModel[Pipeline, KNNModelParam, KNNParamGridModel]):
+class KNNRegressionModel(
+    RegressionModel[Pipeline, KNNModelParam, KNNParamGridModel],
+    param_grid=KNNParamGridModel,
+    model_param=KNNModelParam,
+):
     """KNN Regression model implementation."""
 
     @staticmethod
@@ -96,11 +100,4 @@ class KNNRegressionModel(RegressionModel[Pipeline, KNNModelParam, KNNParamGridMo
 
 
 # Alias for the model class
-
-# Register parameter schemas
-KNNRegressionModel.register_schemas(
-    param_grid_class=KNNRegressionParamGridModel,
-    param_class=KNNRegressionModelParam,
-)
-
 Model = KNNRegressionModel
