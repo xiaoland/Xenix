@@ -16,3 +16,5 @@
 - [ ] 提供 “训练” 操作，这时候可自定义模型参数进行训练，并取得指标（自动调优则是配置 ParamGrid，不再分列）
 - [ ] 提供在线 Table 编辑，提供 Features ，可单独预测
 - [ ] 添加 Work / Project，保存 task （数组）（ Work -> task 链接，task不应该要求 Work ）
+- [ ] 没有 Upload 阶段，只有 Prepare Data 阶段，进行选择 Dataset -> Features , Target Columns -> 分割训练与测试数据集。
+- [ ] 对 business/ml 的 interface 还要来一场重构

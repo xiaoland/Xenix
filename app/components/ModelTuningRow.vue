@@ -3,7 +3,7 @@
   <tr class="border-b hover:bg-gray-50">
     <!-- Expand icon -->
     <td class="px-4 py-2">
-      <span 
+      <span
         class="inline-block transition-transform cursor-pointer"
         :class="{ 'rotate-90': isExpanded }"
         @click.stop="$emit('toggle-expand', modelName)"
@@ -11,15 +11,15 @@
         ▶
       </span>
     </td>
-    
+
     <!-- Model Name Column -->
     <td class="px-4 py-2">
       <span class="font-medium">{{ modelLabel }}</span>
     </td>
-    
+
     <!-- Tune Type Column -->
     <td class="px-4 py-2"></td>
-    
+
     <!-- Action Column -->
     <td class="px-4 py-2">
       <div class="flex gap-2">
@@ -44,11 +44,8 @@
         </a-button>
       </div>
     </td>
-    
-    <!-- Metrics Column -->
-    <td class="px-4 py-2"></td>
   </tr>
-  
+
   <!-- Child rows (tuning tasks) -->
   <ModelTuningSubRow
     v-for="taskId in displayedTaskIds"
@@ -133,7 +130,7 @@ const fetchTaskIds = async () => {
           return param.model === props.modelName;
         })
         .map((task: any) => task.id);
-      
+
       taskIds.value = modelTasks;
     }
   } catch (error) {
@@ -157,7 +154,13 @@ const handleCreateAutoTuneTask = (values: Record<string, any>) => {
 const handleManualTune = (values: Record<string, any>) => {
   // Find the most recent task for this model as parent
   const parentTaskId = taskIds.value[0] || null;
-  emit("start-tune", props.modelName, values, "manual", parentTaskId || undefined);
+  emit(
+    "start-tune",
+    props.modelName,
+    values,
+    "manual",
+    parentTaskId || undefined
+  );
 };
 
 const formatParamValue = (value: any): string => {

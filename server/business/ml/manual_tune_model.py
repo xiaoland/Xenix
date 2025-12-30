@@ -88,7 +88,7 @@ def manual_tune_regression_model(
     # Perform manual tuning using the manual_tune method from base class
     logger.info("Training model with specified parameters using manual_tune method...")
     result = Model.manual_tune(X_train, y_train, params=params)
-    
+
     model = result["model"]
     train_metrics = result["metrics"]
     logger.info(f"Training metrics: {train_metrics}")

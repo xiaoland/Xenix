@@ -61,14 +61,14 @@ export interface ManualTuneTaskParameter {
 // Auto-tune task result type
 export interface AutoTuneTaskResult {
   params: Record<string, any>; // Best parameters found
-  metrics: TuningMetrics;
+  metrics: Record<string, any>;
   bestScore?: number;
 }
 
-// Manual-tune task result type  
+// Manual-tune task result type
 export interface ManualTuneTaskResult {
   params: Record<string, any>; // Parameters used
-  metrics: TuningMetrics;
+  metrics: Record<string, any>;
 }
 
 export interface TaskInfo {
@@ -110,7 +110,7 @@ export interface WorkItem {
   projectId: number; // Required - work items must belong to a project
   name: string;
   description?: string;
-  status: 'active' | 'completed' | 'archived';
+  status: "active" | "completed" | "archived";
   // Upload step results - stored to skip upload step on return
   datasetId?: number; // Selected dataset from upload step
   featureColumns?: string[]; // Selected features
@@ -124,7 +124,7 @@ export interface Project {
   id: number;
   name: string;
   description?: string;
-  status: 'active' | 'completed' | 'archived';
+  status: "active" | "completed" | "archived";
   createdAt: string;
   updatedAt: string;
   workItems?: WorkItem[]; // Populated when needed

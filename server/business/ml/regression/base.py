@@ -102,15 +102,15 @@ class RegressionModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]):
         params: Optional[ModelParamType] = None,
     ) -> Dict[str, Any]:
         """
-        Train the regression model with specific parameters and evaluate it.
+        Evaludate the regression model with specific parameters.
 
         This is a concrete method that all regression models can use.
         It creates a model with the given parameters, and then evaluates on the given test data,
-        and returns the trained model along with evaluation metrics.
+        and returns the model along with evaluation metrics.
 
         Args:
-            X_train: Training features as DataFrame
-            y_train: Training target as Series
+            X_test: Test features as DataFrame
+            y_test: Test target as Series
             params: Model parameters as pydantic BaseModel instance
                 If None, uses default parameters for the model
 
