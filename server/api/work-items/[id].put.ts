@@ -36,6 +36,10 @@ export default defineEventHandler(async (event) => {
     if (body.targetColumn !== undefined) {
       updateData.targetColumn = body.targetColumn;
     }
+    // Tuning step results
+    if (body.selectedModels !== undefined) {
+      updateData.selectedModels = body.selectedModels;
+    }
 
     await db
       .update(schema.workItems)

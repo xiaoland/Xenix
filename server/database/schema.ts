@@ -86,6 +86,8 @@ export const workItems = sqliteTable("work_items", {
   datasetId: integer("dataset_id", { mode: "number" }), // Selected dataset from upload step
   featureColumns: text("feature_columns", { mode: "json" }), // Selected features as JSON array
   targetColumn: text("target_column"), // Selected target column
+  // Tuning step results - stored to remember selected models
+  selectedModels: text("selected_models", { mode: "json" }), // Selected models as JSON array
   createdAt: integer("created_at", { mode: "timestamp" })
     .$defaultFn(() => new Date())
     .notNull(),

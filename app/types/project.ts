@@ -15,6 +15,8 @@ export interface WorkItem {
   datasetId?: number; // Selected dataset from upload step
   featureColumns?: string[]; // Selected features
   targetColumn?: string; // Selected target column
+  // Tuning step results - stored to remember selected models
+  selectedModels?: string[]; // Selected models
   createdAt: string;
   updatedAt: string;
   tasks?: TaskInfo[]; // Populated when needed

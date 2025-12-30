@@ -84,8 +84,10 @@ const fetchSelectedModels = async () => {
     if (response.success && response.workItem) {
       const workItem = response.workItem;
 
-      // Extract selected models from tasks
-      const models = new Set<string>();
+      // Start with models stored in selectedModels field
+      const models = new Set<string>(workItem.selectedModels || []);
+      
+      // Also extract selected models from tasks (for backward compatibility)
       if (workItem.tasks) {
         workItem.tasks.forEach((task: any) => {
           if (task.parameter?.model) {
@@ -122,6 +124,23 @@ watch(
         value: val,
       };
     });
+  },
+  { immediate: false }
+);
+
+// Save selected models to work item whenever they change
+watch(
+  selectedModelValues,
+  async (vals) => {
+    if (!workItemIdRef.value) return;
+    
+    try {
+      await WorkItemService.update(workItemIdRef.value, {
+        selectedModels: vals,
+      });
+    } catch (error) {
+      console.error("Failed to save selected models:", error);
+    }
   },
   { immediate: false }
 );
