@@ -170,6 +170,7 @@ import { useRoute } from "vue-router";
 import { message } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
 import UploadDataset from "~/components/dataset/UploadDataset.vue";
+import PageHeader from "~/components/common/PageHeader.vue";
 import type { Project, Dataset } from "../../../types";
 
 const { t } = useI18n();

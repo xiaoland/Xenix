@@ -19,7 +19,7 @@ warnings.filterwarnings("ignore")
 sys.path.append(str(Path(__file__).parent))
 
 # Import structured output utilities
-from server.business.ml.structured_io import (
+from structured_io import (
     get_logger,
     emit_log,
     read_json_input,

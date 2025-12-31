@@ -18,7 +18,7 @@ warnings.filterwarnings("ignore")
 sys.path.append(str(Path(__file__).parent))
 
 # Import structured output utilities
-from server.business.ml.structured_io import get_logger, emit_result, read_json_input
+from structured_io import get_logger, emit_result, read_json_input
 
 # Import base utilities
 from base import import_model
@@ -79,37 +79,14 @@ def manual_tune_regression_model(
     params = None
     if parameters:
         # Convert dict to Params model if the model has a Params class
-        if hasattr(Model, "Params"):
-            params = Model.Params(**parameters)
-        else:
-            logger.warning(f"Model {model_name} does not have Params class, using dict")
-            params = parameters
+        params = Model.__modelparam__(**parameters)
 
     # Perform manual tuning using the manual_tune method from base class
     logger.info("Training model with specified parameters using manual_tune method...")
-    result = Model.manual_tune(X_train, y_train, params=params)
-
-    model = result["model"]
-    train_metrics = result["metrics"]
-    logger.info(f"Training metrics: {train_metrics}")
-
-    # Evaluate on test set
-    logger.info("Evaluating on test set...")
-    test_metrics = Model.evaluate(model, X_test, y_test)
-    logger.info(f"Test metrics: {test_metrics}")
-
-    # Combine metrics
-    metrics = {
-        "mse_train": train_metrics.get("mse"),
-        "mae_train": train_metrics.get("mae"),
-        "r2_train": train_metrics.get("r2"),
-        "mse_test": test_metrics.get("mse"),
-        "mae_test": test_metrics.get("mae"),
-        "r2_test": test_metrics.get("r2"),
-    }
+    result = Model.manual_tune(X_train, y_train, X_test, y_test, params=params)
 
     logger.info("Manual tuning completed successfully")
-    return parameters or {}, metrics
+    return parameters or {}, result["metrics"]
 
 
 def main():

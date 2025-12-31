@@ -16,7 +16,7 @@ from typing import Dict, List, Any
 sys.path.append(str(Path(__file__).parent))
 
 from base import import_model
-from server.business.ml.structured_io import emit_json_output
+from structured_io import emit_json_output
 
 
 def get_param_grid_class(model_class):

@@ -17,5 +17,10 @@
 - [ ] 提供在线 Table 编辑，提供 Features ，可单独预测
 - [x] 添加 Work / Project，保存 task （数组）（ Work -> task 链接，task不应该要求 Work ）
 - [x] 没有 Upload 阶段，只有 Prepare Data 阶段，进行选择 Dataset -> Features , Target Columns -> 分割训练与测试数据集。
-- [ ] 对 business/ml 的 interface 还要来一场重构，还有 stdin, stdout 的规范化
+- [x] 对 business/ml 的 interface 还要来一场重构，还有 stdin, stdout 的规范化
 - [x] WorkItem 还要记住启用的模型
+- [ ] 移除上报 Train Metrics
+- [ ] 将 Metrics 铺开，方便横向对比（inline scroll）
+- [ ] 一键清除失败任务，删除任务
+- [ ] 参数也是 popup 查看（结合 JSON Schema 渲染）
+- [ ] 选择 taskId 则 model, params 都选好了，也就可以进入预测

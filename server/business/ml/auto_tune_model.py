@@ -18,7 +18,7 @@ warnings.filterwarnings("ignore")
 sys.path.append(str(Path(__file__).parent))
 
 # Import structured output utilities
-from server.business.ml.structured_io import get_logger, emit_result, read_json_input
+from structured_io import get_logger, emit_result, read_json_input
 
 # Import base utilities
 from base import import_model
@@ -79,13 +79,7 @@ def auto_tune_regression_model(
     if param_grid_dict:
         logger.info(f"Custom parameter grid provided: {param_grid_dict}")
         # Convert dict to ParamGrid model if the model has a ParamGrid class
-        if hasattr(Model, "ParamGrid"):
-            param_grid = Model.ParamGrid(**param_grid_dict)
-        else:
-            logger.warning(
-                f"Model {model_name} does not have ParamGrid class, using dict"
-            )
-            param_grid = param_grid_dict
+        param_grid = Model.__paramgrid__(**param_grid_dict)
 
     # Perform auto-tuning
     logger.info("Starting hyperparameter search...")
@@ -97,28 +91,13 @@ def auto_tune_regression_model(
     # Get the tuned model
     model = tune_result["model"]
 
-    # Evaluate on training set
-    logger.info("Evaluating on training set...")
-    train_metrics = Model.evaluate(model, X_train, y_train)
-    logger.info(f"Training metrics: {train_metrics}")
-
     # Evaluate on test set
     logger.info("Evaluating on test set...")
     test_metrics = Model.evaluate(model, X_test, y_test)
     logger.info(f"Test metrics: {test_metrics}")
 
-    # Combine metrics
-    metrics = {
-        "mse_train": train_metrics.get("mse"),
-        "mae_train": train_metrics.get("mae"),
-        "r2_train": train_metrics.get("r2"),
-        "mse_test": test_metrics.get("mse"),
-        "mae_test": test_metrics.get("mae"),
-        "r2_test": test_metrics.get("r2"),
-    }
-
     logger.info("Auto-tuning completed successfully")
-    return best_params, metrics
+    return best_params, test_metrics
 
 
 def main():
@@ -151,12 +130,7 @@ def main():
         )
 
         # Emit result
-        emit_result(
-            **{
-                "params": best_params,
-                "metrics": metrics,
-            }
-        )
+        emit_result(model_name, best_params, metrics)
 
     except Exception as e:
         logger = get_logger()

@@ -63,6 +63,9 @@ class RegressionModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]):
         ParamGridType: The parameter grid model type (pydantic BaseModel subclass with list fields)
     """
 
+    __paramgrid__: type[ParamGridType]
+    __modelparam__: type[ModelParamType]
+
     def __init_subclass__(
         cls,
         param_grid: type["ParamGridType"],
@@ -110,6 +113,8 @@ class RegressionModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]):
     @classmethod
     def manual_tune(
         cls,
+        X_train: pd.DataFrame,
+        y_train: pd.Series,
         X_test: pd.DataFrame,
         y_test: pd.Series,
         params: Optional[ModelParamType] = None,
@@ -122,8 +127,10 @@ class RegressionModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]):
         and returns the model along with evaluation metrics.
 
         Args:
-            X_test: Test features as DataFrame
-            y_test: Test target as Series
+            X_train: Training features as DataFrame
+            y_train: Training target as Series
+            X_test: Testing features as DataFrame
+            y_test: Testing target as Series
             params: Model parameters as pydantic BaseModel instance
                 If None, uses default parameters for the model
 
@@ -135,7 +142,9 @@ class RegressionModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]):
         # Create model with specified parameters
         model = cls.create_model(params)
 
-        # Evaluate on training data
+        model.fit(X_train, y_train)
+
+        # Evaluate on test set
         metrics = cls.evaluate(model, X_test, y_test)
 
         return {

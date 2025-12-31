@@ -16,7 +16,11 @@
       <a-card class="mb-6">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-2xl font-semibold">{{ $t("home.projects") }}</h2>
-          <a-button type="primary" class="inline-flex items-center" @click="showCreateProjectModal = true">
+          <a-button
+            type="primary"
+            class="inline-flex items-center"
+            @click="showCreateProjectModal = true"
+          >
             <span class="i-mdi-plus mr-1" />
             {{ $t("home.createProject") }}
           </a-button>
@@ -40,27 +44,49 @@
                 <div class="flex-1">
                   <div class="flex items-center gap-2">
                     <span class="i-mdi-folder text-blue-500 text-xl"></span>
-                    <span class="text-lg font-semibold">{{ project.name }}</span>
+                    <span class="text-lg font-semibold">{{
+                      project.name
+                    }}</span>
                     <a-tag :color="getStatusColor(project.status)">
                       {{ $t(`projects.${project.status}`) }}
                     </a-tag>
                   </div>
-                  <p v-if="project.description" class="text-sm text-gray-600 mt-1 ml-7">
+                  <p
+                    v-if="project.description"
+                    class="text-sm text-gray-600 mt-1 ml-7"
+                  >
                     {{ project.description }}
                   </p>
                   <div class="text-xs text-gray-400 mt-1 ml-7">
-                    {{ $t("projects.datasetsCount", { count: project.datasets?.length || 0 }) }} · 
-                    {{ $t("projects.workItemsCount", { count: project.workItems?.length || 0 }) }}
+                    {{
+                      $t("projects.datasetsCount", {
+                        count: project.datasets?.length || 0,
+                      })
+                    }}
+                    ·
+                    {{
+                      $t("projects.workItemsCount", {
+                        count: project.workItems?.length || 0,
+                      })
+                    }}
                   </div>
                 </div>
-                
+
                 <!-- Project Actions -->
                 <div class="flex gap-2">
-                  <a-button size="small" class="inline-flex items-center" @click="manageProjectDatasets(project.id)">
+                  <a-button
+                    size="small"
+                    class="inline-flex items-center"
+                    @click="manageProjectDatasets(project.id)"
+                  >
                     <span class="i-mdi-database mr-1" />
                     Manage Datasets
                   </a-button>
-                  <a-button size="small" class="inline-flex items-center" @click="viewEditProjectDetails(project)">
+                  <a-button
+                    size="small"
+                    class="inline-flex items-center"
+                    @click="viewEditProjectDetails(project)"
+                  >
                     <span class="i-mdi-information mr-1" />
                     View Details
                   </a-button>
@@ -68,7 +94,11 @@
                     :title="$t('projects.deleteConfirm')"
                     @confirm="deleteProject(project.id)"
                   >
-                    <a-button size="small" danger class="inline-flex items-center">
+                    <a-button
+                      size="small"
+                      danger
+                      class="inline-flex items-center"
+                    >
                       <span class="i-mdi-delete mr-1" />
                     </a-button>
                   </a-popconfirm>
@@ -76,7 +106,10 @@
               </div>
 
               <!-- Nested Work Items -->
-              <div v-if="project.workItems && project.workItems.length > 0" class="ml-7 mt-3 space-y-2">
+              <div
+                v-if="project.workItems && project.workItems.length > 0"
+                class="ml-7 mt-3 space-y-2"
+              >
                 <div
                   v-for="workItem in project.workItems"
                   :key="workItem.id"
@@ -84,21 +117,36 @@
                   @click="openWorkItem(workItem.id)"
                 >
                   <div class="flex items-center gap-2 flex-1">
-                    <span class="i-mdi-file-document-outline text-green-500"></span>
+                    <span
+                      class="i-mdi-file-document-outline text-green-500"
+                    ></span>
                     <span class="font-medium">{{ workItem.name }}</span>
-                    <a-tag size="small" :color="getStatusColor(workItem.status)">
+                    <a-tag
+                      size="small"
+                      :color="getStatusColor(workItem.status)"
+                    >
                       {{ $t(`workItems.${workItem.status}`) }}
                     </a-tag>
                   </div>
                   <div class="flex gap-1" @click.stop>
-                    <a-button size="small" type="text" class="inline-flex items-center" @click="editWorkItem(workItem)">
+                    <a-button
+                      size="small"
+                      type="text"
+                      class="inline-flex items-center"
+                      @click="editWorkItem(workItem)"
+                    >
                       <span class="i-mdi-pencil mr-1" />
                     </a-button>
                     <a-popconfirm
                       :title="$t('workItems.deleteConfirm')"
                       @confirm="deleteWorkItem(workItem.id)"
                     >
-                      <a-button size="small" type="text" danger class="inline-flex items-center">
+                      <a-button
+                        size="small"
+                        type="text"
+                        danger
+                        class="inline-flex items-center"
+                      >
                         <span class="i-mdi-delete mr-1" />
                       </a-button>
                     </a-popconfirm>
@@ -108,7 +156,15 @@
 
               <!-- Add Work Item Button -->
               <div class="ml-7 mt-2">
-                <a-button size="small" type="dashed" class="inline-flex items-center" @click="showCreateWorkItemModal = true; newWorkItem.projectId = project.id">
+                <a-button
+                  size="small"
+                  type="dashed"
+                  class="inline-flex items-center"
+                  @click="
+                    showCreateWorkItemModal = true;
+                    newWorkItem.projectId = project.id;
+                  "
+                >
                   <span class="i-mdi-plus mr-1" />
                   Add Work Item
                 </a-button>
@@ -164,13 +220,22 @@
               <a-input v-model:value="editingProject.name" />
             </a-form-item>
             <a-form-item :label="$t('projects.description')">
-              <a-textarea v-model:value="editingProject.description" :rows="3" />
+              <a-textarea
+                v-model:value="editingProject.description"
+                :rows="3"
+              />
             </a-form-item>
             <a-form-item :label="$t('projects.status')">
               <a-select v-model:value="editingProject.status">
-                <a-select-option value="active">{{ $t("projects.active") }}</a-select-option>
-                <a-select-option value="completed">{{ $t("projects.completed") }}</a-select-option>
-                <a-select-option value="archived">{{ $t("projects.archived") }}</a-select-option>
+                <a-select-option value="active">{{
+                  $t("projects.active")
+                }}</a-select-option>
+                <a-select-option value="completed">{{
+                  $t("projects.completed")
+                }}</a-select-option>
+                <a-select-option value="archived">{{
+                  $t("projects.archived")
+                }}</a-select-option>
               </a-select>
             </a-form-item>
           </a-form>
@@ -238,9 +303,15 @@
           </a-form-item>
           <a-form-item :label="$t('workItems.status')">
             <a-select v-model:value="editingWorkItem.status">
-              <a-select-option value="active">{{ $t("workItems.active") }}</a-select-option>
-              <a-select-option value="completed">{{ $t("workItems.completed") }}</a-select-option>
-              <a-select-option value="archived">{{ $t("workItems.archived") }}</a-select-option>
+              <a-select-option value="active">{{
+                $t("workItems.active")
+              }}</a-select-option>
+              <a-select-option value="completed">{{
+                $t("workItems.completed")
+              }}</a-select-option>
+              <a-select-option value="archived">{{
+                $t("workItems.archived")
+              }}</a-select-option>
             </a-select>
           </a-form-item>
         </a-form>
@@ -255,6 +326,7 @@ import { message } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import type { Project, WorkItem } from "../types";
+import PageHeader from "~/components/common/PageHeader.vue";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -399,14 +471,17 @@ const handleUpdateWorkItem = async () => {
   if (!editingWorkItem.value.id) return;
 
   try {
-    const response = await $fetch(`/api/work-items/${editingWorkItem.value.id}`, {
-      method: "PUT",
-      body: {
-        name: editingWorkItem.value.name,
-        description: editingWorkItem.value.description,
-        status: editingWorkItem.value.status,
-      },
-    });
+    const response = await $fetch(
+      `/api/work-items/${editingWorkItem.value.id}`,
+      {
+        method: "PUT",
+        body: {
+          name: editingWorkItem.value.name,
+          description: editingWorkItem.value.description,
+          status: editingWorkItem.value.status,
+        },
+      }
+    );
 
     if (response.success) {
       message.success(t("workItems.updateSuccess"));
