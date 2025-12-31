@@ -41,7 +41,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, toRef, computed } from "vue";
+import { ref, watch, toRef, computed, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { WorkItemService } from "~/services";
 import ModelTuningRow from "./ModelTuningRow.vue";
@@ -84,8 +84,10 @@ const fetchSelectedModels = async () => {
     if (response.success && response.workItem) {
       const workItem = response.workItem;
 
-      // Extract selected models from tasks
-      const models = new Set<string>();
+      // Start with models stored in selectedModels field
+      const models = new Set<string>(workItem.selectedModels || []);
+      
+      // Also extract selected models from tasks (for backward compatibility)
       if (workItem.tasks) {
         workItem.tasks.forEach((task: any) => {
           if (task.parameter?.model) {
@@ -126,6 +128,34 @@ watch(
   { immediate: false }
 );
 
+// Debounce timer for saving selected models
+let saveModelsTimeout: ReturnType<typeof setTimeout> | null = null;
+
+// Save selected models to work item whenever they change (debounced)
+watch(
+  selectedModelValues,
+  async (vals) => {
+    if (!workItemIdRef.value) return;
+    
+    // Clear any pending save operation
+    if (saveModelsTimeout) {
+      clearTimeout(saveModelsTimeout);
+    }
+    
+    // Debounce the save operation by 500ms
+    saveModelsTimeout = setTimeout(async () => {
+      try {
+        await WorkItemService.update(workItemIdRef.value, {
+          selectedModels: vals,
+        });
+      } catch (error) {
+        console.error(`Failed to save selected models for work item ${workItemIdRef.value}:`, error);
+      }
+    }, 500);
+  },
+  { immediate: false }
+);
+
 // Watch for workItemId changes and refetch data
 watch(
   workItemIdRef,
@@ -136,6 +166,13 @@ watch(
   },
   { immediate: true }
 );
+
+// Cleanup: Clear the debounce timeout when component is unmounted
+onUnmounted(() => {
+  if (saveModelsTimeout) {
+    clearTimeout(saveModelsTimeout);
+  }
+});
 </script>
 
 <style scoped>

@@ -46,6 +46,7 @@ export class WorkItemService {
       datasetId?: number;
       featureColumns?: string[];
       targetColumn?: string;
+      selectedModels?: string[];
     }
   ): Promise<{ success: boolean; workItem: WorkItem }> {
     return await $fetch(`/api/work-items/${id}`, {
