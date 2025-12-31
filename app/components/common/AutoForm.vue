@@ -35,12 +35,14 @@
             v-model="formData[propName as string]"
             :item-type="getArrayItemType(propSchema)"
             :placeholder="t('autoForm.arrayPlaceholder')"
+            :disabled="props.readonly"
           />
 
           <!-- Boolean input (type: "boolean") -->
           <a-switch
             v-else-if="propSchema.type === 'boolean'"
             v-model:checked="formData[propName as string]"
+            :disabled="props.readonly"
           />
 
           <!-- Number/Integer input (type: "number" or "integer") -->
@@ -53,6 +55,7 @@
             :step="propSchema.type === 'integer' ? 1 : 0.01"
             :min="propSchema.minimum"
             :max="propSchema.maximum"
+            :disabled="props.readonly"
           />
 
           <!-- String select (type: "string" with enum) -->
@@ -60,6 +63,7 @@
             v-else-if="propSchema.type === 'string' && propSchema.enum"
             v-model:value="formData[propName as string]"
             class="w-full"
+            :disabled="props.readonly"
           >
             <a-select-option
               v-for="option in propSchema.enum"
@@ -74,6 +78,7 @@
           <a-input
             v-else-if="propSchema.type === 'string'"
             v-model:value="formData[propName as string]"
+            :disabled="props.readonly"
           />
 
           <!-- Fallback for unsupported types -->
@@ -81,6 +86,7 @@
             v-else
             v-model:value="formData[propName as string]"
             :placeholder="`Unsupported type: ${propSchema.type}`"
+            :disabled="props.readonly"
           />
         </a-form-item>
       </template>
@@ -96,6 +102,7 @@ import ArrayInput from "./ArrayInput.vue";
 interface AutoFormProps {
   modelValue: Record<string, any>;
   schema: any;
+  readonly?: boolean;
 }
 
 const props = defineProps<AutoFormProps>();

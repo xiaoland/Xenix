@@ -22,5 +22,6 @@
 - [ ] 移除上报 Train Metrics
 - [ ] 将 Metrics 铺开，方便横向对比（inline scroll）
 - [ ] 一键清除失败任务，删除任务
+  - [ ] 表中没有重新 fetch
 - [ ] 参数也是 popup 查看（结合 JSON Schema 渲染）
 - [ ] 选择 taskId 则 model, params 都选好了，也就可以进入预测

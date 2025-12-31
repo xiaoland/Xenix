@@ -4,46 +4,61 @@
       {{ $t("tuning.modelSelectionAndTuning") }}
     </h3>
 
-    <!-- Reuse ModelSelector to manage available model options -->
-    <div class="mb-4">
+    <!-- Model Selector and Actions -->
+    <div class="flex items-center justify-between mb-4">
       <ModelSelector
         v-model:selectedModels="selectedModelValues"
         :availableModels="availableModels"
         :tuningStatus="tuningStatus"
       />
+      <a-popconfirm
+        :title="t('tuning.confirmClearFailedTasks')"
+        :ok-text="t('common.confirm')"
+        :cancel-text="t('common.cancel')"
+        @confirm="handleClearFailedTasks"
+      >
+        <a-button danger size="small" class="inline-flex items-center">
+          <span class="i-mdi-delete-outline mr-1" />
+          {{ t("tuning.clearFailedTasks") }}
+        </a-button>
+      </a-popconfirm>
     </div>
 
-    <table class="w-full border-collapse model-tuning-table">
-      <thead>
-        <tr class="border-b bg-gray-50">
-          <th class="px-4 py-2 text-left w-30">{{ t("tuning.model") }}</th>
-          <th class="px-4 py-2 text-left w-48">{{ t("tuning.tuning") }}</th>
-          <th class="px-4 py-2 text-left w-48">{{ t("tuning.tuneType") }}</th>
-          <th class="px-4 py-2 text-left w-80">{{ t("tuning.metrics") }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <template v-for="model in selectedModels" :key="model.value">
-          <ModelTuningRow
-            :model="model.value"
-            :work-item-id="workItemId"
-            v-model:selectedTaskId="modelValue"
-          />
-        </template>
-        <tr v-if="selectedModels.length === 0">
-          <td colspan="4" class="px-4 py-8 text-center text-gray-500">
-            {{ t("tuning.noModelsAdded") }}
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <div>
+      <table class="w-full border-collapse model-tuning-table table-fixed">
+        <thead>
+          <tr class="border-b bg-gray-50">
+            <th class="px-4 py-2 text-left w-20">{{ t("tuning.model") }}</th>
+            <th class="px-4 py-2 text-left w-55">{{ t("tuning.tuning") }}</th>
+            <th class="px-4 py-2 text-left">
+              {{ t("tuning.metrics") }}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <template v-for="model in selectedModels" :key="model.value">
+            <ModelTuningRow
+              :model="model.value"
+              :work-item-id="workItemId"
+              v-model:selectedTaskId="modelValue"
+            />
+          </template>
+          <tr v-if="selectedModels.length === 0">
+            <td colspan="4" class="px-4 py-8 text-center text-gray-500">
+              {{ t("tuning.noModelsAdded") }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, toRef, computed, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { WorkItemService } from "~/services";
+import { message } from "ant-design-vue";
+import { WorkItemService, TaskService } from "~/services";
 import ModelTuningRow from "./ModelTuningRow.vue";
 import { AVAILABLE_MODELS } from "~/constants/models";
 import ModelSelector from "../ModelSelector.vue";
@@ -86,7 +101,7 @@ const fetchSelectedModels = async () => {
 
       // Start with models stored in selectedModels field
       const models = new Set<string>(workItem.selectedModels || []);
-      
+
       // Also extract selected models from tasks (for backward compatibility)
       if (workItem.tasks) {
         workItem.tasks.forEach((task: any) => {
@@ -136,12 +151,12 @@ watch(
   selectedModelValues,
   async (vals) => {
     if (!workItemIdRef.value) return;
-    
+
     // Clear any pending save operation
     if (saveModelsTimeout) {
       clearTimeout(saveModelsTimeout);
     }
-    
+
     // Debounce the save operation by 500ms
     saveModelsTimeout = setTimeout(async () => {
       try {
@@ -149,7 +164,10 @@ watch(
           selectedModels: vals,
         });
       } catch (error) {
-        console.error(`Failed to save selected models for work item ${workItemIdRef.value}:`, error);
+        console.error(
+          `Failed to save selected models for work item ${workItemIdRef.value}:`,
+          error
+        );
       }
     }, 500);
   },
@@ -173,6 +191,19 @@ onUnmounted(() => {
     clearTimeout(saveModelsTimeout);
   }
 });
+
+// Handle clearing failed tasks
+const handleClearFailedTasks = async () => {
+  try {
+    await TaskService.deleteFailedTasks(props.workItemId);
+    message.success(t("tuning.failedTasksCleared"));
+    // Refresh data by re-fetching selected models (which also refetches tasks)
+    await fetchSelectedModels();
+  } catch (error) {
+    console.error("Failed to clear failed tasks:", error);
+    message.error(t("tuning.clearFailedTasksError"));
+  }
+};
 </script>
 
 <style scoped>

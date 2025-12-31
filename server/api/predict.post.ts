@@ -11,10 +11,28 @@ export default defineEventHandler(async (event) => {
     const datasetId = formData.get("datasetId") as string;
     const model = formData.get("model") as string;
     const tuningTaskId = formData.get("tuningTaskId") as string;
-    const trainingDatasetId = formData.get("trainingDatasetId") as string;
-    const featureColumns = formData.get("featureColumns") as string; // JSON string
-    const targetColumn = formData.get("targetColumn") as string;
+    let trainingDatasetId = formData.get("trainingDatasetId") as string;
+    let featureColumns = formData.get("featureColumns") as string; // JSON string
+    let targetColumn = formData.get("targetColumn") as string;
     const workItemId = formData.get("workItemId") as string;
+
+    // If workItemId provided, fill missing values from work item (like auto-tune/manual-tune)
+    if (workItemId) {
+      const [workItem] = await db
+        .select()
+        .from(schema.workItems)
+        .where(eq(schema.workItems.id, Number(workItemId)))
+        .limit(1);
+
+      if (workItem) {
+        if (!trainingDatasetId && workItem.datasetId)
+          trainingDatasetId = String(workItem.datasetId);
+        if (!featureColumns && workItem.featureColumns)
+          featureColumns = JSON.stringify(workItem.featureColumns);
+        if (!targetColumn && workItem.targetColumn)
+          targetColumn = workItem.targetColumn as string;
+      }
+    }
 
     let predictionDatasetId: number;
     let trainingDataPath: string;

@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50 py-8">
+  <div class="min-h-screen bg-gray-50 py-8 overflow-x-hidden">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <PageHeader />
 
@@ -79,20 +79,18 @@
           <div v-if="currentStep === 1">
             <TuningStep
               :work-item-id="workItem.id"
-              v-model:selected-task-id="selectedTaskId"
               @continue="handleTuningContinue"
               @back="goToUploadStep"
             />
           </div>
 
           <!-- Step 2: Prediction -->
-          <div v-if="currentStep === 2">
+          <div v-if="currentStep === 2 && selectedModel && selectedTuningTaskId">
             <PredictionStep
-              v-model="predictionFileList"
-              :best-model="selectedBestModel"
-              :is-predicting="isPredicting"
-              :prediction-task="predictionTask"
-              @predict="handleStartPrediction"
+              :work-item-id="workItem.id"
+              :model="selectedModel"
+              :parameters="selectedParameters"
+              :task-id="selectedTuningTaskId"
               @back="prevStep"
               @reset="reset"
             />
@@ -109,7 +107,6 @@ import { useRoute } from "vue-router";
 import { message } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
 import { useDatasetRegistration } from "../../composables/useDatasetRegistration";
-import { usePredictionStep } from "../../composables/usePredictionStep";
 import { WorkItemService } from "../../services";
 import PrepareStep from "~/components/ml/prepare/PrepareStep.vue";
 import TuningStep from "~/components/ml/tuning/TuningStep.vue";
@@ -128,27 +125,13 @@ const isLoading = ref(false);
 // Dataset registration
 const { uploadedDatasetId, clearDatasetId } = useDatasetRegistration();
 
-// Prepare step logic
-
-// Prediction step logic
-const {
-  predictionFileList,
-  isPredicting,
-  predictionTask,
-  startPrediction,
-  resetPredictionStep,
-} = usePredictionStep();
-
 // Workflow state
 const currentStep = ref(0);
-const trainingFileList = ref([]);
-const hasUploadedData = ref(false);
-const selectedModels = ref<string[]>([]);
-const selectedFeatureColumns = ref<string[]>([]);
-const selectedTargetColumn = ref<string>("");
-const activeLogTab = ref<string>("");
-const selectedBestModel = ref<string | null>(null);
-const selectedTaskId = ref<number | null>(null);
+
+// Tuning step data - passed to PredictionStep
+const selectedModel = ref<string | null>(null);
+const selectedParameters = ref<Record<string, any>>({});
+const selectedTuningTaskId = ref<number | null>(null);
 
 // Navigation
 const nextStep = () => {
@@ -166,12 +149,9 @@ const prevStep = () => {
 // Reset all state
 const resetAll = () => {
   currentStep.value = 0;
-  trainingFileList.value = [];
-  hasUploadedData.value = false;
-  selectedModels.value = [];
-  selectedFeatureColumns.value = [];
-  selectedTargetColumn.value = "";
-  activeLogTab.value = "";
+  selectedModel.value = null;
+  selectedParameters.value = {};
+  selectedTuningTaskId.value = null;
 };
 
 // Current dataset columns for prepare step
@@ -196,26 +176,24 @@ const goToUploadStep = () => {
   currentDatasetId.value = undefined;
 };
 
-const handleTuningContinue = (model: string) => {
-  selectedBestModel.value = model;
+/**
+ * Handle tuning continue - receives model and parameters from TuningStep
+ */
+const handleTuningContinue = (data: {
+  model: string;
+  parameters: Record<string, any>;
+  taskId: number;
+}) => {
+  selectedModel.value = data.model;
+  selectedParameters.value = data.parameters;
+  selectedTuningTaskId.value = data.taskId;
   nextStep();
-};
-
-const handleStartPrediction = async () => {
-  await startPrediction({
-    selectedBestModel: selectedBestModel.value,
-    tuningTasks: [], // No longer needed
-    uploadedDatasetId: uploadedDatasetId.value,
-    selectedFeatureColumns: selectedFeatureColumns.value,
-    selectedTargetColumn: selectedTargetColumn.value,
-  });
 };
 
 const reset = () => {
   resetAll();
   clearDatasetId();
   resetPrepareStep();
-  resetPredictionStep();
 };
 
 const fetchWorkItem = async () => {
@@ -236,8 +214,6 @@ const fetchWorkItem = async () => {
       ) {
         // Restore upload data
         uploadedDatasetId.value = String(workItem.value.datasetId);
-        selectedFeatureColumns.value = workItem.value.featureColumns;
-        selectedTargetColumn.value = workItem.value.targetColumn;
 
         // Skip upload step, go directly to tuning
         currentStep.value = 1;

@@ -8,29 +8,6 @@
       v-model:selected-task-id="selectedTaskId"
     />
 
-    <!-- Best Model Selection -->
-    <div v-if="tuningResults.length > 0" class="mt-6">
-      <h3 class="text-lg font-medium mb-3">
-        {{ $t("tuning.selectBestForPrediction") }}
-      </h3>
-      <a-select
-        :value="selectedBestModel"
-        :placeholder="$t('tuning.selectModelPlaceholder')"
-        class="w-full max-w-md"
-        :dropdownMatchSelectWidth="false"
-        @change="(val: any) => { selectedBestModel = val || null }"
-      >
-        <a-select-option
-          v-for="result in tuningResults"
-          :key="result.model"
-          :value="result.model"
-        >
-          {{ formatModelName(result.model) }} (R²:
-          {{ formatMetric(result.r2_test) }})
-        </a-select-option>
-      </a-select>
-    </div>
-
     <!-- Navigation -->
     <div class="flex gap-4 mt-6">
       <a-button @click="emit('back')">
@@ -38,8 +15,8 @@
       </a-button>
       <a-button
         type="primary"
-        :disabled="!selectedBestModel"
-        @click="emit('continue', selectedBestModel!)"
+        :disabled="!selectedTaskId"
+        @click="handleContinue"
       >
         {{ $t("tuning.continue") }}
       </a-button>
@@ -48,13 +25,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { message } from "ant-design-vue";
 import { useModelTraining } from "../../../composables/useModelTraining";
 import { useTaskPolling } from "../../../composables/useTaskPolling";
 import { useDatasetRegistration } from "../../../composables/useDatasetRegistration";
-import { WorkItemService } from "~/services";
+import { WorkItemService, TaskService } from "~/services";
 import { useFormatters } from "../../../composables/useFormatters";
 import ModelTuningTable from "./ModelTuningTable.vue";
 import type { TuningResult } from "~/types";
@@ -72,9 +49,30 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   "update:selectedTaskId": [taskId: number | null];
-  continue: [model: string];
+  continue: [data: { model: string; parameters: Record<string, any>; taskId: number }];
   back: [];
 }>();
+
+/**
+ * Handle continue button click - fetches task data and emits model + parameters
+ */
+const handleContinue = async () => {
+  if (!selectedTaskId.value) return;
+
+  try {
+    const response = await TaskService.fetchStatus(selectedTaskId.value);
+    if (response.task) {
+      emit("continue", {
+        model: response.task.parameter?.model || "",
+        parameters: response.task.result?.params || {},
+        taskId: selectedTaskId.value,
+      });
+    }
+  } catch (error) {
+    console.error("Failed to fetch task for continue:", error);
+    message.error(t("messages.fetchTaskError"));
+  }
+};
 
 // Use formatters composable
 const { formatModelName, formatMetric } = useFormatters();
@@ -111,14 +109,8 @@ const fetchTuningResults = async (workItemId?: number) => {
       tuningResults.value = tasks.map((task: any) => ({
         model: task.parameter?.model || "",
         params: task.result?.params || {},
-        metrics: {
-          mse_train: task.result?.mse_train,
-          mae_train: task.result?.mae_train,
-          r2_train: task.result?.r2_train,
-          mse_test: task.result?.mse_test,
-          mae_test: task.result?.mae_test,
-          r2_test: task.result?.r2_test,
-        },
+        metrics: task.result?.metrics || {},
+        r2: task.result?.metrics?.r2,
         status: task.status,
         trainingType: task.parameter?.trainingType || "auto",
         createdAt: task.createdAt,
@@ -262,6 +254,23 @@ const resetTuningStep = () => {
   tuningResults.value = [];
   clearTasks();
 };
+
+// Watch for task selection changes and sync with selectedBestModel
+watch(selectedTaskId, async (taskId) => {
+  if (taskId) {
+    try {
+      const response = await TaskService.fetchStatus(taskId);
+      if (response.task) {
+        const model = response.task.parameter?.model;
+        if (model) {
+          selectedBestModel.value = model;
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch selected task:", error);
+    }
+  }
+});
 
 onMounted(() => {
   fetchTuningResults(props.workItemId);

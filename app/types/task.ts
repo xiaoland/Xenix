@@ -101,3 +101,14 @@ export interface TaskLog {
 }
 
 export type TaskStatus = "pending" | "running" | "completed" | "failed";
+
+/**
+ * Prediction task state for UI tracking
+ * Used by PredictionStep component to track prediction progress
+ */
+export interface PredictionTask {
+  taskId: number;
+  status: TaskStatus;
+  outputFile?: string;
+  error?: string;
+}

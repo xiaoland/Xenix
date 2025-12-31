@@ -1,6 +1,6 @@
 <template>
   <div class="array-input">
-    <div class="flex gap-2 mb-2">
+    <div v-if="!props.disabled" class="flex gap-2 mb-2">
       <a-input
         v-model:value="inputValue"
         :placeholder="placeholder"
@@ -22,7 +22,7 @@
       <a-tag
         v-for="(value, index) in localValues"
         :key="index"
-        closable
+        :closable="!props.disabled"
         @close="handleRemove(index)"
         class="mb-1"
       >
@@ -44,11 +44,13 @@ interface ArrayInputProps {
   modelValue: any[];
   itemType?: string;
   placeholder?: string;
+  disabled?: boolean;
 }
 
 const props = withDefaults(defineProps<ArrayInputProps>(), {
   itemType: "string",
   placeholder: "Enter value and press Add",
+  disabled: false,
 });
 
 const emit = defineEmits<{

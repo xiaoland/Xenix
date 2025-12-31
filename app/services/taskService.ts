@@ -19,4 +19,13 @@ export class TaskService {
   static async fetchLogs(taskId: number): Promise<{ success: boolean; logs: TaskLog[] }> {
     return await $fetch(`/api/obsrv/${taskId}`);
   }
+
+  /**
+   * Delete all failed tasks for a work item
+   */
+  static async deleteFailedTasks(workItemId: number): Promise<{ success: boolean; message: string }> {
+    return await $fetch(`/api/tasks/failed?workItemId=${workItemId}`, {
+      method: "DELETE",
+    });
+  }
 }

@@ -15,7 +15,7 @@
           type="primary"
           size="small"
           @click="handleAutoTune"
-          class="inline-flex items-center"
+          class="inline-flex items-center tune-btn"
         >
           <span class="i-mdi-tune mr-1" />
           {{ t("tuning.autoTune") }}
@@ -23,7 +23,7 @@
         <a-button
           size="small"
           @click="handleManualTrain"
-          class="inline-flex items-center"
+          class="inline-flex items-center tune-btn"
         >
           <span class="i-mdi-pencil mr-1" />
           {{ t("tuning.manualTune") }}
@@ -31,8 +31,7 @@
       </div>
     </td>
 
-    <!-- Tune Type Column & Metrics Column -->
-    <td class="px-4 py-2"></td>
+    <!-- Metrics Column (empty for parent row) -->
     <td class="px-4 py-2"></td>
   </tr>
 
@@ -176,5 +175,10 @@ onMounted(() => {
 <style scoped>
 .rotate-90 {
   transform: rotate(90deg);
+}
+
+.tune-btn {
+  min-width: 70px;
+  justify-content: center;
 }
 </style>

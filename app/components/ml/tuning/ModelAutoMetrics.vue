@@ -4,15 +4,17 @@
       <span class="text-gray-400">{{ t("common.noData") }}</span>
     </template>
     <template v-else>
-      <div class="flex flex-wrap gap-2">
-        <template v-for="(value, key) in metrics" :key="key">
-          <div class="metric-item">
-            <span class="metric-label"
-              >{{ formatMetricLabel(key as string) }}:</span
-            >
-            <span class="metric-value">{{ formatMetricValue(value) }}</span>
-          </div>
-        </template>
+      <div class="overflow-x-auto">
+        <div class="flex gap-2 whitespace-nowrap min-w-max">
+          <template v-for="(value, key) in metrics" :key="key">
+            <div class="metric-item">
+              <span class="metric-label"
+                >{{ formatMetricLabel(key as string) }}:</span
+              >
+              <span class="metric-value">{{ formatMetricValue(value) }}</span>
+            </div>
+          </template>
+        </div>
       </div>
     </template>
   </div>
