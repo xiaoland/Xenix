@@ -18,7 +18,7 @@ warnings.filterwarnings("ignore")
 sys.path.append(str(Path(__file__).parent))
 
 # Import structured output utilities
-from structured_output import get_logger, emit_result
+from server.business.ml.structured_io import get_logger, emit_result, read_json_input
 
 # Import base utilities
 from base import import_model
@@ -33,7 +33,7 @@ def manual_tune_regression_model(
     feature_columns: list,
     target_column: str,
     logger,
-    parameters: dict = None,
+    parameters: dict | None = None,
 ):
     """
     Manual tune a regression model with specific parameters.
@@ -115,11 +115,8 @@ def manual_tune_regression_model(
 def main():
     """Main entry point for the manual tune script."""
     try:
-        # Parse command line arguments
-        if len(sys.argv) < 2:
-            raise ValueError("Configuration JSON required as argument")
-
-        config = json.loads(sys.argv[1])
+        # Read JSON configuration from stdin
+        config = read_json_input()
 
         # Extract parameters
         model_name = config.get("model")

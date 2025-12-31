@@ -18,7 +18,7 @@ warnings.filterwarnings("ignore")
 sys.path.append(str(Path(__file__).parent))
 
 # Import structured output utilities
-from structured_output import get_logger, emit_result
+from server.business.ml.structured_io import get_logger, emit_result, read_json_input
 
 # Import base utilities
 from base import import_model
@@ -33,7 +33,7 @@ def auto_tune_regression_model(
     feature_columns: list,
     target_column: str,
     logger,
-    param_grid_dict: dict = None,
+    param_grid_dict: dict | None = None,
 ):
     """
     Auto-tune a regression model using hyperparameter search.
@@ -124,11 +124,8 @@ def auto_tune_regression_model(
 def main():
     """Main entry point for the auto-tune script."""
     try:
-        # Parse command line arguments
-        if len(sys.argv) < 2:
-            raise ValueError("Configuration JSON required as argument")
-
-        config = json.loads(sys.argv[1])
+        # Read JSON configuration from stdin
+        config = read_json_input()
 
         # Extract parameters
         model_name = config.get("model")

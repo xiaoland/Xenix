@@ -5,6 +5,7 @@ Each model is imported as a module with a Model class providing tune(), evaluate
 Reads all configuration from stdin JSON (no database interactions).
 Outputs structured JSON to stdout.
 """
+
 import json
 import sys
 import warnings
@@ -18,7 +19,12 @@ warnings.filterwarnings("ignore")
 sys.path.append(str(Path(__file__).parent))
 
 # Import structured output utilities
-from structured_output import get_logger, emit_log
+from server.business.ml.structured_io import (
+    get_logger,
+    emit_log,
+    read_json_input,
+    emit_prediction_result,
+)
 
 # Import base utilities
 from base import import_model
@@ -32,11 +38,11 @@ def predict_regression_model(
     params: dict,
     feature_columns: list,
     target_column: str,
-    logger
+    logger,
 ):
     """
     Perform batch prediction using a trained regression model.
-    
+
     Args:
         model_name: Name of the regression model (e.g., "regression.ridge")
         training_data_path: Path to training data file
@@ -46,50 +52,50 @@ def predict_regression_model(
         feature_columns: List of feature column names
         target_column: Target column name
         logger: Logger instance for logging progress
-        
+
     Returns:
         Tuple of (output_path, num_predictions)
     """
     # Import Model class directly
     logger.info(f"Importing regression model for {model_name}")
     Model = import_model(model_name)
-    
+
     # Load training data and train model with best parameters
     logger.info(f"Loading training data from {training_data_path}")
     training_df = pd.read_excel(training_data_path)
     logger.info(f"Training data loaded: {len(training_df)} rows")
-    
+
     X_train = training_df[feature_columns]
     y_train = training_df[target_column]
-    
+
     # Create model with tuned parameters using the Model class's create_model method
     logger.info(f"Creating {model_name} with tuned parameters")
     model = Model.create_model(params)
-    
+
     # Train the model on full training dataset
     logger.info("Training model on full training dataset")
     model.fit(X_train, y_train)
     logger.info("Model training completed")
-    
+
     # Load prediction data
     logger.info(f"Loading prediction data from {prediction_data_path}")
     prediction_df = pd.read_excel(prediction_data_path)
     logger.info(f"Prediction data loaded: {len(prediction_df)} rows")
-    
+
     # Make predictions using the Model class's predict method
     logger.info("Generating predictions")
     X_pred = prediction_df[feature_columns]
     predictions = Model.predict(model, X_pred)
-    
+
     # Add predictions to dataframe
-    prediction_df['Predicted_Value'] = predictions.values
+    prediction_df["Predicted_Value"] = predictions.values
     logger.info(f"Predictions generated for {len(predictions)} samples")
-    
+
     # Save results
     logger.info(f"Saving predictions to {output_path}")
     prediction_df.to_excel(output_path, index=False)
     logger.info("Predictions saved successfully")
-    
+
     return output_path, len(predictions)
 
 
@@ -108,21 +114,21 @@ def main():
     }
     """
     logger = get_logger(__name__)
-    
+
     try:
         # Read input from stdin
         logger.info("Reading input configuration from stdin")
-        input_data = json.loads(sys.stdin.read())
-        
+        input_data = read_json_input()
+
         # Extract parameters
-        training_data_path = input_data.get('trainingDataPath')
-        prediction_data_path = input_data.get('predictionDataPath')
-        output_path = input_data.get('outputPath')
-        model_name = input_data.get('model')
-        params = input_data.get('params', {})
-        feature_columns = input_data.get('featureColumns')
-        target_column = input_data.get('targetColumn')
-        
+        training_data_path = input_data.get("trainingDataPath")
+        prediction_data_path = input_data.get("predictionDataPath")
+        output_path = input_data.get("outputPath")
+        model_name = input_data.get("model")
+        params = input_data.get("params", {})
+        feature_columns = input_data.get("featureColumns")
+        target_column = input_data.get("targetColumn")
+
         # Validate required parameters
         if not training_data_path:
             raise ValueError("trainingDataPath is required")
@@ -136,12 +142,12 @@ def main():
             raise ValueError("featureColumns is required")
         if not target_column:
             raise ValueError("targetColumn is required")
-        
+
         logger.info(f"Starting batch prediction using {model_name}")
         logger.info(f"Parameters: {params}")
-        
+
         # Determine model type and call appropriate prediction function
-        if model_name.startswith('regression.'):
+        if model_name.startswith("regression."):
             output_path, num_predictions = predict_regression_model(
                 model_name,
                 training_data_path,
@@ -150,7 +156,7 @@ def main():
                 params,
                 feature_columns,
                 target_column,
-                logger
+                logger,
             )
         # Future: Add support for other model types
         # elif model_name.startswith('classification.'):
@@ -158,25 +164,22 @@ def main():
         # elif model_name.startswith('association.'):
         #     output_path, num_predictions = predict_association_model(...)
         else:
-            raise ValueError(f"Unknown model type for '{model_name}'. Model name should start with 'regression.', 'classification.', etc.")
-        
+            raise ValueError(
+                f"Unknown model type for '{model_name}'. Model name should start with 'regression.', 'classification.', etc."
+            )
+
         # Emit success status
-        emit_log("info", f"Batch prediction completed successfully! Output saved to {output_path}")
-        
+        emit_log(
+            f"Batch prediction completed successfully! Output saved to {output_path}",
+        )
+
         # Output result information
-        result_info = {
-            "type": "prediction_result",
-            "data": {
-                "output_path": output_path,
-                "num_predictions": num_predictions,
-                "model": model_name
-            }
-        }
-        print(json.dumps(result_info), flush=True)
-        
+        emit_prediction_result(output_path, num_predictions, model_name)
+
     except Exception as e:
         logger.error(f"Error during batch prediction: {str(e)}")
         import traceback
+
         logger.error(traceback.format_exc())
         sys.exit(1)
 

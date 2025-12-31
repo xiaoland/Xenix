@@ -16,6 +16,7 @@ from typing import Dict, List, Any
 sys.path.append(str(Path(__file__).parent))
 
 from base import import_model
+from server.business.ml.structured_io import emit_json_output
 
 
 def get_param_grid_class(model_class):
@@ -140,8 +141,7 @@ def main():
 
         # Output as JSON to stdout
         result = {"success": True, "models": models, "count": len(models)}
-
-        print(json.dumps(result, indent=2))
+        emit_json_output(result)
 
     except Exception as e:
         import traceback
@@ -151,7 +151,7 @@ def main():
             "error": str(e),
             "traceback": traceback.format_exc(),
         }
-        print(json.dumps(error_result, indent=2))
+        emit_json_output(error_result)
         sys.exit(1)
 
 
