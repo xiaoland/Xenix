@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
-Batch prediction script using modular model definitions.
-Each model is imported as a module with a Model class providing tune(), evaluate(), and predict() methods.
+File-based prediction script using modular model definitions.
+Takes Excel files as input for training and prediction data, outputs predictions to Excel file.
 Reads all configuration from stdin JSON (no database interactions).
 Outputs structured JSON to stdout.
 """
 
-import json
 import sys
 import warnings
 import pandas as pd
@@ -23,14 +22,14 @@ from structured_io import (
     get_logger,
     emit_log,
     read_json_input,
-    emit_prediction_result,
+    emit_json_output,
 )
 
-# Import base utilities
-from base import import_model
+# Import helper functions
+from predict_helpers import load_and_train_model, predict_on_dataframe
 
 
-def predict_regression_model(
+def predict_on_file(
     model_name: str,
     training_data_path: str,
     prediction_data_path: str,
@@ -41,13 +40,13 @@ def predict_regression_model(
     logger,
 ):
     """
-    Perform batch prediction using a trained regression model.
+    Perform file-based prediction using a trained model.
 
     Args:
-        model_name: Name of the regression model (e.g., "regression.ridge")
-        training_data_path: Path to training data file
-        prediction_data_path: Path to prediction data file
-        output_path: Path to save predictions
+        model_name: Name of the model (e.g., "regression.ridge")
+        training_data_path: Path to training data Excel file
+        prediction_data_path: Path to prediction data Excel file
+        output_path: Path to save predictions Excel file
         params: Model parameters
         feature_columns: List of feature column names
         target_column: Target column name
@@ -56,41 +55,28 @@ def predict_regression_model(
     Returns:
         Tuple of (output_path, num_predictions)
     """
-    # Import Model class directly
-    logger.info(f"Importing regression model for {model_name}")
-    Model = import_model(model_name)
-
-    # Load training data and train model with best parameters
-    logger.info(f"Loading training data from {training_data_path}")
-    training_df = pd.read_excel(training_data_path)
-    logger.info(f"Training data loaded: {len(training_df)} rows")
-
-    X_train = training_df[feature_columns]
-    y_train = training_df[target_column]
-
-    # Create model with tuned parameters using the Model class's create_model method
-    logger.info(f"Creating {model_name} with tuned parameters")
-    params_model = Model.__modelparam__.model_validate(params)
-    model = Model.create_model(params_model)
-
-    # Train the model on full training dataset
-    logger.info("Training model on full training dataset")
-    model.fit(X_train, y_train)
-    logger.info("Model training completed")
+    # Load training data and train model
+    model, Model = load_and_train_model(
+        model_name,
+        training_data_path,
+        feature_columns,
+        target_column,
+        params,
+        logger,
+    )
 
     # Load prediction data
     logger.info(f"Loading prediction data from {prediction_data_path}")
     prediction_df = pd.read_excel(prediction_data_path)
     logger.info(f"Prediction data loaded: {len(prediction_df)} rows")
 
-    # Make predictions using the Model class's predict method
-    logger.info("Generating predictions")
-    X_pred = prediction_df[feature_columns]
-    predictions = Model.predict(model, X_pred)
+    # Make predictions
+    predictions = predict_on_dataframe(
+        model, Model, prediction_df, feature_columns, logger
+    )
 
     # Add predictions to dataframe
     prediction_df["Predicted_Value"] = predictions.values
-    logger.info(f"Predictions generated for {len(predictions)} samples")
 
     # Save results
     logger.info(f"Saving predictions to {output_path}")
@@ -108,7 +94,7 @@ def main():
         "trainingDataPath": "/path/to/training_data.xlsx",
         "predictionDataPath": "/path/to/prediction_data.xlsx",
         "outputPath": "/path/to/output.xlsx",
-        "model": "ridge",
+        "model": "regression.ridge",
         "params": {"model__alpha": 1.0},
         "featureColumns": ["col1", "col2", "col3"],
         "targetColumn": "target"
@@ -144,41 +130,39 @@ def main():
         if not target_column:
             raise ValueError("targetColumn is required")
 
-        logger.info(f"Starting batch prediction using {model_name}")
+        logger.info(f"Starting file-based prediction using {model_name}")
         logger.info(f"Parameters: {params}")
 
-        # Determine model type and call appropriate prediction function
-        if model_name.startswith("regression."):
-            output_path, num_predictions = predict_regression_model(
-                model_name,
-                training_data_path,
-                prediction_data_path,
-                output_path,
-                params,
-                feature_columns,
-                target_column,
-                logger,
-            )
-        # Future: Add support for other model types
-        # elif model_name.startswith('classification.'):
-        #     output_path, num_predictions = predict_classification_model(...)
-        # elif model_name.startswith('association.'):
-        #     output_path, num_predictions = predict_association_model(...)
-        else:
-            raise ValueError(
-                f"Unknown model type for '{model_name}'. Model name should start with 'regression.', 'classification.', etc."
-            )
+        # Perform prediction
+        output_path, num_predictions = predict_on_file(
+            model_name,
+            training_data_path,
+            prediction_data_path,
+            output_path,
+            params,
+            feature_columns,
+            target_column,
+            logger,
+        )
 
-        # Emit success status
+        # Emit success log
         emit_log(
-            f"Batch prediction completed successfully! Output saved to {output_path}",
+            f"File-based prediction completed successfully! Output saved to {output_path}"
         )
 
         # Output result information
-        emit_prediction_result(output_path, num_predictions, model_name)
+        result_data = {
+            "type": "result",
+            "data": {
+                "outputPath": output_path,
+                "numPredictions": num_predictions,
+                "model": model_name,
+            },
+        }
+        emit_json_output(result_data)
 
     except Exception as e:
-        logger.error(f"Error during batch prediction: {str(e)}")
+        logger.error(f"Error during file-based prediction: {str(e)}")
         import traceback
 
         logger.error(traceback.format_exc())

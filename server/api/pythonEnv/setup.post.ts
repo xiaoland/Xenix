@@ -1,4 +1,4 @@
-import { setupEnvironment } from "../../business/ml";
+import { setupEnvironment } from "../../business/ml/env";
 
 export default defineEventHandler(async (event) => {
   try {

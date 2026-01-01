@@ -49,7 +49,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   "update:selectedTaskId": [taskId: number | null];
-  continue: [data: { model: string; parameters: Record<string, any>; taskId: number }];
+  continue: [
+    data: { model: string; parameters: Record<string, any>; taskId: number }
+  ];
   back: [];
 }>();
 
@@ -99,11 +101,11 @@ const fetchTuningResults = async (workItemId?: number) => {
   if (!workItemId) return;
 
   try {
-    const response = await WorkItemService.fetchById(workItemId);
-    if (response.success && response.workItem.tasks) {
-      const tasks = response.workItem.tasks.filter(
-        (t: any) => t.type === "auto-tune" && t.status === "completed"
-      );
+    const response = await TaskService.fetchByWorkItemId(workItemId, [
+      "auto-tune",
+    ]);
+    if (response.success && response.tasks) {
+      const tasks = response.tasks.filter((t: any) => t.status === "completed");
 
       // Build tuning results from completed tasks
       tuningResults.value = tasks.map((task: any) => ({

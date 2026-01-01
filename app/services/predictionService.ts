@@ -5,7 +5,7 @@
 
 export class PredictionService {
   /**
-   * Start prediction on new data
+   * Start prediction on new data from file
    * Backend fetches trainingDatasetId, featureColumns, targetColumn from workItemId
    */
   static async start(params: {
@@ -20,9 +20,30 @@ export class PredictionService {
     formData.append("tuningTaskId", params.tuningTaskId.toString());
     formData.append("workItemId", params.workItemId.toString());
 
-    return await $fetch("/api/predict", {
+    return await $fetch("/api/predict/by-file", {
       method: "POST",
       body: formData,
+    });
+  }
+
+  /**
+   * Start prediction with inline data
+   * Backend fetches trainingDatasetId, featureColumns, targetColumn from workItemId
+   */
+  static async predictInline(params: {
+    predictionData: Record<string, any>[];
+    model: string;
+    tuningTaskId: number;
+    workItemId: number;
+  }): Promise<{ success: boolean; taskId: number }> {
+    return await $fetch("/api/predict/inline", {
+      method: "POST",
+      body: {
+        predictionData: params.predictionData,
+        model: params.model,
+        tuningTaskId: params.tuningTaskId,
+        workItemId: params.workItemId,
+      },
     });
   }
 }

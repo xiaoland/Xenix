@@ -88,15 +88,15 @@
     </td>
   </tr>
 
-  <!-- Log Modal -->
   <teleport to="body">
+    <!-- Log Modal -->
     <a-modal
       v-model:open="logModalVisible"
       :title="t('logs.titleWithTask', { taskId })"
       width="800px"
       :footer="null"
     >
-      <LogPanel :logs="taskLogs" />
+      <TaskLogViewer :task-id="taskId" :title="t('logs.title')" />
     </a-modal>
 
     <!-- Params Modal -->
@@ -132,7 +132,7 @@ import { TaskService, ModelService } from "~/services";
 import { useFormatters } from "~/composables/useFormatters";
 import type { TaskInfo, TuningMetrics } from "~/types";
 import ModelAutoMetrics from "./ModelAutoMetrics.vue";
-import LogPanel from "~/components/obsrv/LogPanel.vue";
+import TaskLogViewer from "~/components/obsrv/TaskLogViewer.vue";
 import AutoForm from "~/components/common/AutoForm.vue";
 
 const { t } = useI18n();
@@ -149,7 +149,6 @@ const emit = defineEmits<{
 
 // Local state
 const task = ref<TaskInfo | null>(null);
-const taskLogs = ref<any[]>([]);
 const logModalVisible = ref(false);
 const paramsModalVisible = ref(false);
 const paramSchema = ref<any>(null);
@@ -219,22 +218,9 @@ const fetchTask = async () => {
   }
 };
 
-// Fetch task logs
-const fetchTaskLogs = async () => {
-  try {
-    const response = await TaskService.fetchLogs(props.taskId);
-    if (response.success && response.logs) {
-      taskLogs.value = response.logs;
-    }
-  } catch (error) {
-    console.error(`Failed to fetch logs for task ${props.taskId}:`, error);
-  }
-};
-
 // Event handlers
 const handleViewLogs = () => {
   logModalVisible.value = true;
-  fetchTaskLogs();
 };
 
 const handleViewParams = async () => {

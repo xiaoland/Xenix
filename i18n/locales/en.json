@@ -143,6 +143,9 @@
   "prediction": {
     "title": "Make Predictions",
     "bestModel": "Best Model: {model}",
+    "mode": "Prediction Mode",
+    "modeFile": "Upload File",
+    "modeInline": "Input Inline",
     "uploadData": "Upload data for prediction",
     "uploadHint": "The file should have the same features as the training data.",
     "startPrediction": "Generate Predictions",
@@ -154,7 +157,15 @@
     "completed": "Predictions completed successfully!",
     "failed": "Prediction failed: {error}",
     "excelOnly": "You can only upload Excel files!",
-    "downloading": "Downloading prediction results..."
+    "downloading": "Downloading prediction results...",
+    "inlineInput": "Inline Input",
+    "inlineInputHint": "Enter feature values for prediction. Add rows as needed.",
+    "addRow": "Add Row",
+    "removeRow": "Remove",
+    "predictInline": "Predict",
+    "noInputData": "Please add at least one row of input data",
+    "inlineResults": "Prediction Results",
+    "predictedValue": "Predicted Value"
   },
   "models": {
     "regression_linear_regression_hyperparameter_tuning": "Linear Regression",
@@ -211,7 +222,8 @@
   "common": {
     "na": "N/A",
     "add": "Add",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "refresh": "Refresh"
   },
   "autoForm": {
     "loading": "Loading form schema...",
@@ -317,5 +329,7 @@
   "tuning.type.auto": "Auto",
   "tuning.type.manual": "Manual",
   "ml.modelSelector.selectModel": "Select a model",
-  "common.noData": "N/A"
+  "common.noData": "N/A",
+  "common.confirm": "Confirm",
+  "tuning.confirmClearFailedTasks": "Sure to delete all failed tasks in this work item?"
 }

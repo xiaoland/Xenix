@@ -85,12 +85,16 @@
           </div>
 
           <!-- Step 2: Prediction -->
-          <div v-if="currentStep === 2 && selectedModel && selectedTuningTaskId">
+          <div
+            v-if="currentStep === 2 && selectedModel && selectedTuningTaskId"
+          >
             <PredictionStep
               :work-item-id="workItem.id"
               :model="selectedModel"
               :parameters="selectedParameters"
               :task-id="selectedTuningTaskId"
+              :feature-columns="workItem.featureColumns || []"
+              :target-column="workItem.targetColumn || ''"
               @back="prevStep"
               @reset="reset"
             />

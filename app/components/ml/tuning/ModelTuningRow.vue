@@ -62,7 +62,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { WorkItemService, TuneService } from "~/services";
+import { WorkItemService, TuneService, TaskService } from "~/services";
 import ModelTuningSubRow from "./ModelTuningSubRow.vue";
 import ManualTuneDialog from "./ManualTuneDialog.vue";
 import AutoTuneDialog from "./AutoTuneDialog.vue";
@@ -73,6 +73,7 @@ const props = defineProps<{
   model: string;
   workItemId: number;
   selectedTaskId: number | null;
+  refreshTrigger: number;
 }>();
 
 const emit = defineEmits<{
@@ -99,10 +100,13 @@ const displayedTaskIds = computed(() => {
 // Fetch task IDs for this model from work item
 const fetchTaskIds = async () => {
   try {
-    const response = await WorkItemService.fetchById(props.workItemId);
-    if (response.success && response.workItem && response.workItem.tasks) {
+    const response = await TaskService.fetchByWorkItemId(props.workItemId, [
+      "manual-tune",
+      "auto-tune",
+    ]);
+    if (response.success && response.tasks) {
       // Filter tasks for this model
-      const modelTasks = response.workItem.tasks
+      const modelTasks = response.tasks
         .filter((task: any) => {
           const param = task.parameter || {};
           return param.model === props.model;
@@ -170,6 +174,14 @@ const handleManualTune = async (parameters: Record<string, any>) => {
 onMounted(() => {
   fetchTaskIds();
 });
+
+// Watch for refresh trigger to re-fetch tasks
+watch(
+  () => props.refreshTrigger,
+  () => {
+    fetchTaskIds();
+  }
+);
 </script>
 
 <style scoped>

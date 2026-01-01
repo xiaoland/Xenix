@@ -40,6 +40,7 @@
             <ModelTuningRow
               :model="model.value"
               :work-item-id="workItemId"
+              :refresh-trigger="refreshTrigger"
               v-model:selectedTaskId="modelValue"
             />
           </template>
@@ -80,8 +81,8 @@ const selectedModels = ref<Array<{ label: string; value: string }>>([]);
 // ModelSelector manages the list of selected model values (string[])
 const selectedModelValues = ref<string[]>([]);
 
-// Optional tuning status per model (placeholder - could be populated from tasks)
-const tuningStatus = ref<Record<string, string>>({});
+// Refresh trigger for ModelTuningRow components
+const refreshTrigger = ref(0);
 
 // UI states
 
@@ -99,17 +100,22 @@ const fetchSelectedModels = async () => {
     if (response.success && response.workItem) {
       const workItem = response.workItem;
 
+      // Fetch tasks separately
+      const tasksResponse = await TaskService.fetchByWorkItemId(
+        workItemIdRef.value,
+        ["manual-tune", "auto-tune"]
+      );
+      const tasks = tasksResponse.success ? tasksResponse.tasks : [];
+
       // Start with models stored in selectedModels field
       const models = new Set<string>(workItem.selectedModels || []);
 
       // Also extract selected models from tasks (for backward compatibility)
-      if (workItem.tasks) {
-        workItem.tasks.forEach((task: any) => {
-          if (task.parameter?.model) {
-            models.add(task.parameter.model);
-          }
-        });
-      }
+      tasks.forEach((task: any) => {
+        if (task.parameter?.model) {
+          models.add(task.parameter.model);
+        }
+      });
 
       // Build selected models list (use i18n translation if available)
       const modelsList = Array.from(models).map((model) => {
@@ -199,6 +205,8 @@ const handleClearFailedTasks = async () => {
     message.success(t("tuning.failedTasksCleared"));
     // Refresh data by re-fetching selected models (which also refetches tasks)
     await fetchSelectedModels();
+    // Trigger refresh for all ModelTuningRow components
+    refreshTrigger.value++;
   } catch (error) {
     console.error("Failed to clear failed tasks:", error);
     message.error(t("tuning.clearFailedTasksError"));

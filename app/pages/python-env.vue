@@ -2,31 +2,47 @@
   <div class="min-h-screen bg-gray-50 py-8">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <PageHeader />
-      <a-card title="Python Environment Management" class="env-card">
+      <a-card :title="$t('pythonEnv.title')" class="env-card">
         <a-descriptions bordered :column="1" size="small">
-          <a-descriptions-item label="PDM Installed">
+          <a-descriptions-item :label="$t('pythonEnv.pdmInstalled')">
             <a-tag :color="envStatus.pdmInstalled ? 'success' : 'error'">
-              {{ envStatus.pdmInstalled ? "Yes" : "No" }}
+              {{
+                envStatus.pdmInstalled
+                  ? $t("pythonEnv.yes")
+                  : $t("pythonEnv.no")
+              }}
             </a-tag>
           </a-descriptions-item>
-          <a-descriptions-item label="Environment Ready">
+          <a-descriptions-item :label="$t('pythonEnv.envReady')">
             <a-tag :color="envStatus.envReady ? 'success' : 'warning'">
-              {{ envStatus.envReady ? "Yes" : "No" }}
+              {{
+                envStatus.envReady ? $t("pythonEnv.yes") : $t("pythonEnv.no")
+              }}
             </a-tag>
           </a-descriptions-item>
-          <a-descriptions-item label="Initialized">
+          <a-descriptions-item :label="$t('pythonEnv.initialized')">
             <a-tag :color="envStatus.initialized ? 'success' : 'default'">
-              {{ envStatus.initialized ? "Yes" : "No" }}
+              {{
+                envStatus.initialized ? $t("pythonEnv.yes") : $t("pythonEnv.no")
+              }}
             </a-tag>
           </a-descriptions-item>
-          <a-descriptions-item label="__pypackages__ Directory">
+          <a-descriptions-item :label="$t('pythonEnv.pyPackagesDir')">
             <a-tag :color="envStatus.pyPackagesExists ? 'success' : 'default'">
-              {{ envStatus.pyPackagesExists ? "Exists" : "Not Found" }}
+              {{
+                envStatus.pyPackagesExists
+                  ? $t("pythonEnv.exists")
+                  : $t("pythonEnv.notFound")
+              }}
             </a-tag>
           </a-descriptions-item>
-          <a-descriptions-item label="pdm.lock File">
+          <a-descriptions-item :label="$t('pythonEnv.pdmLockFile')">
             <a-tag :color="envStatus.pdmLockExists ? 'success' : 'default'">
-              {{ envStatus.pdmLockExists ? "Exists" : "Not Found" }}
+              {{
+                envStatus.pdmLockExists
+                  ? $t("pythonEnv.exists")
+                  : $t("pythonEnv.notFound")
+              }}
             </a-tag>
           </a-descriptions-item>
         </a-descriptions>
@@ -40,7 +56,7 @@
               class="inline-flex items-center"
             >
               <template #icon><span class="i-mdi-refresh" /></template>
-              Refresh Status
+              {{ $t("pythonEnv.refreshStatus") }}
             </a-button>
             <a-button
               :loading="setupLoading"
@@ -48,7 +64,7 @@
               class="inline-flex items-center"
             >
               <template #icon><span class="i-mdi-cog" /></template>
-              Setup Environment
+              {{ $t("pythonEnv.setupEnvironment") }}
             </a-button>
             <a-button
               danger
@@ -57,7 +73,7 @@
               class="inline-flex items-center"
             >
               <template #icon><span class="i-mdi-download" /></template>
-              Reinstall Dependencies
+              {{ $t("pythonEnv.reinstallDependencies") }}
             </a-button>
             <a-button
               type="default"
@@ -66,7 +82,7 @@
               class="inline-flex items-center"
             >
               <template #icon><span class="i-mdi-sync" /></template>
-              Sync Models
+              {{ $t("pythonEnv.syncModels") }}
             </a-button>
           </a-space>
         </div>
@@ -82,7 +98,7 @@
         />
 
         <div v-if="logs.length > 0" class="logs" style="margin-top: 24px">
-          <h4>Environment Logs:</h4>
+          <h4>{{ $t("pythonEnv.logsTitle") }}</h4>
           <a-textarea
             :value="logs.join('\n')"
             :rows="10"
@@ -97,7 +113,10 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import PageHeader from "~/components/common/PageHeader.vue";
+
+const { t } = useI18n();
 
 interface EnvStatus {
   pdmInstalled: boolean;
@@ -131,11 +150,11 @@ const refreshStatus = async () => {
     const response = await $fetch("/api/pythonEnv/status");
     if (response.success) {
       envStatus.value = response.status;
-      message.value = "Status refreshed successfully";
+      message.value = t("pythonEnv.statusRefreshed");
       messageType.value = "success";
     }
   } catch (error) {
-    message.value = `Failed to fetch status: ${error.message}`;
+    message.value = t("pythonEnv.fetchStatusFailed", { error: error.message });
     messageType.value = "error";
     console.error("Error fetching environment status:", error);
   } finally {
@@ -149,19 +168,19 @@ const setupEnvironment = async () => {
   logs.value = [];
 
   try {
-    logs.value.push("[INFO] Starting environment setup...");
+    logs.value.push(t("pythonEnv.logStartingSetup"));
     const response = await $fetch("/api/pythonEnv/setup", { method: "POST" });
 
     if (response.success) {
       envStatus.value = response.status;
-      message.value = "Environment setup completed successfully";
+      message.value = t("pythonEnv.setupCompleted");
       messageType.value = "success";
-      logs.value.push("[SUCCESS] Environment setup completed");
+      logs.value.push(t("pythonEnv.logSetupSuccess"));
     }
   } catch (error) {
-    message.value = `Failed to setup environment: ${error.message}`;
+    message.value = t("pythonEnv.setupFailed", { error: error.message });
     messageType.value = "error";
-    logs.value.push(`[ERROR] ${error.message}`);
+    logs.value.push(t("pythonEnv.logError", { error: error.message }));
     console.error("Error setting up environment:", error);
   } finally {
     setupLoading.value = false;
@@ -175,8 +194,8 @@ const reinstallEnvironment = async () => {
   logs.value = [];
 
   try {
-    logs.value.push("[INFO] Starting environment reinstallation...");
-    logs.value.push("[INFO] This may take a few minutes...");
+    logs.value.push(t("pythonEnv.logStartingReinstall"));
+    logs.value.push(t("pythonEnv.logReinstallNote"));
 
     const response = await $fetch("/api/pythonEnv/reinstall", {
       method: "POST",
@@ -184,14 +203,14 @@ const reinstallEnvironment = async () => {
 
     if (response.success) {
       envStatus.value = response.status;
-      message.value = "Environment reinstalled successfully";
+      message.value = t("pythonEnv.reinstallCompleted");
       messageType.value = "success";
-      logs.value.push("[SUCCESS] Environment reinstallation completed");
+      logs.value.push(t("pythonEnv.logReinstallSuccess"));
     }
   } catch (error) {
-    message.value = `Failed to reinstall environment: ${error.message}`;
+    message.value = t("pythonEnv.reinstallFailed", { error: error.message });
     messageType.value = "error";
-    logs.value.push(`[ERROR] ${error.message}`);
+    logs.value.push(t("pythonEnv.logError", { error: error.message }));
     console.error("Error reinstalling environment:", error);
   } finally {
     reinstallLoading.value = false;
@@ -205,18 +224,20 @@ const syncModels = async () => {
   logs.value = [];
 
   try {
-    logs.value.push("[INFO] Starting model metadata synchronization...");
+    logs.value.push(t("pythonEnv.logStartingSync"));
     const response = await $fetch("/api/sync-models", { method: "POST" });
 
     if (response.success) {
       message.value = response.message;
       messageType.value = "success";
-      logs.value.push(`[SUCCESS] ${response.message}`);
+      logs.value.push(
+        t("pythonEnv.logSyncSuccess", { message: response.message })
+      );
     }
   } catch (error) {
-    message.value = `Failed to sync models: ${error.message}`;
+    message.value = t("pythonEnv.syncFailed", { error: error.message });
     messageType.value = "error";
-    logs.value.push(`[ERROR] ${error.message}`);
+    logs.value.push(t("pythonEnv.logError", { error: error.message }));
     console.error("Error syncing models:", error);
   } finally {
     syncLoading.value = false;

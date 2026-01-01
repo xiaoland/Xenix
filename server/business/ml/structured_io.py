@@ -169,10 +169,11 @@ def emit_prediction_result(output_path: str, num_predictions: int, model: str):
         num_predictions: Number of predictions made
         model: Model name used for prediction
     """
+    # Emit as generic `result` type so TS/JS side handles both training and prediction results
     result_data = {
-        "type": "prediction_result",
+        "type": "result",
         "data": {
-            "output_path": output_path,
+            "output_file": output_path,
             "num_predictions": num_predictions,
             "model": model,
         },

@@ -91,7 +91,7 @@
     },
     "predict": {
       "title": "预测",
-      "description": "选择模型并进行预测"
+      "description": "基于调优好的模型进行预测"
     }
   },
   "upload": {
@@ -141,6 +141,9 @@
   "prediction": {
     "title": "进行预测",
     "bestModel": "基于模型：{model}",
+    "mode": "预测模式",
+    "modeFile": "上传文件",
+    "modeInline": "在线输入",
     "uploadData": "上传要预测的数据",
     "uploadHint": "文件应与训练数据有相同的特征列。",
     "startPrediction": "开始预测",
@@ -152,7 +155,15 @@
     "completed": "预测成功！",
     "failed": "预测失败：{error}",
     "excelOnly": "只能上传 Excel 文件！",
-    "downloading": "正在下载预测结果..."
+    "downloading": "正在下载预测结果...",
+    "inlineInput": "在线输入",
+    "inlineInputHint": "输入特征值进行预测。根据需要添加行。",
+    "addRow": "添加行",
+    "removeRow": "删除",
+    "predictInline": "预测",
+    "noInputData": "请至少添加一行输入数据",
+    "inlineResults": "预测结果",
+    "predictedValue": "预测值"
   },
   "models": {
     "regression_linear_regression_hyperparameter_tuning": "线性回归",
@@ -209,7 +220,8 @@
   "common": {
     "na": "不可用",
     "add": "添加",
-    "cancel": "取消"
+    "cancel": "取消",
+    "refresh": "刷新"
   },
   "autoForm": {
     "loading": "加载表单模式...",
@@ -326,5 +338,39 @@
   "tuning.type.auto": "自动",
   "tuning.type.manual": "手动",
   "ml.modelSelector.selectModel": "选择一个模型以添加",
-  "common.noData": "N/A"
+  "common.noData": "N/A",
+  "common.confirm": "确认",
+  "tuning.confirmClearFailedTasks": "确认要删除所有本工作中失败的调优任务吗？",
+  "pythonEnv": {
+    "title": "Python 环境管理",
+    "pdmInstalled": "PDM 已安装",
+    "envReady": "环境就绪",
+    "initialized": "已初始化",
+    "pyPackagesDir": "__pypackages__ 目录",
+    "pdmLockFile": "pdm.lock 文件",
+    "yes": "是",
+    "no": "否",
+    "exists": "存在",
+    "notFound": "未找到",
+    "refreshStatus": "刷新状态",
+    "setupEnvironment": "设置环境",
+    "reinstallDependencies": "重新安装依赖",
+    "syncModels": "同步模型",
+    "statusRefreshed": "状态刷新成功",
+    "fetchStatusFailed": "获取状态失败：{error}",
+    "setupCompleted": "环境设置完成",
+    "setupFailed": "环境设置失败：{error}",
+    "reinstallCompleted": "环境重新安装成功",
+    "reinstallFailed": "环境重新安装失败：{error}",
+    "syncFailed": "同步模型失败：{error}",
+    "logsTitle": "环境日志：",
+    "logStartingSetup": "[信息] 开始环境设置...",
+    "logSetupSuccess": "[成功] 环境设置完成",
+    "logStartingReinstall": "[信息] 开始环境重新安装...",
+    "logReinstallNote": "[信息] 这可能需要几分钟...",
+    "logReinstallSuccess": "[成功] 环境重新安装完成",
+    "logStartingSync": "[信息] 开始模型元数据同步...",
+    "logSyncSuccess": "[成功] {message}",
+    "logError": "[错误] {error}"
+  }
 }
