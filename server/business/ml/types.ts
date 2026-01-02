@@ -80,6 +80,7 @@ export interface PredictFileOptions {
 export interface PredictInlineOptions {
   trainingDataPath: string;
   predictionData: any[];
+  outputPath: string;
   model: string;
   params: Record<string, any>;
   featureColumns: string[];

@@ -133,6 +133,14 @@
                       size="small"
                       type="text"
                       class="inline-flex items-center"
+                      @click="viewPredictions(workItem.id)"
+                    >
+                      <span class="i-mdi-chart-line mr-1" />
+                    </a-button>
+                    <a-button
+                      size="small"
+                      type="text"
+                      class="inline-flex items-center"
                       @click="editWorkItem(workItem)"
                     >
                       <span class="i-mdi-pencil mr-1" />
@@ -512,6 +520,10 @@ const deleteWorkItem = async (id: number) => {
 
 const openWorkItem = (id: number) => {
   router.push(`/work-items/${id}`);
+};
+
+const viewPredictions = (id: number) => {
+  router.push(`/predictions/work-item/${id}`);
 };
 
 const manageProjectDatasets = (id: number) => {

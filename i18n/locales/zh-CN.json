@@ -163,7 +163,19 @@
     "predictInline": "预测",
     "noInputData": "请至少添加一行输入数据",
     "inlineResults": "预测结果",
-    "predictedValue": "预测值"
+    "predictedValue": "预测值",
+    "viewPredictions": "查看预测",
+    "history": "预测历史",
+    "historyDescription": "查看此工作项的所有预测",
+    "noPredictions": "暂无预测",
+    "taskCreated": "创建时间",
+    "taskId": "任务ID",
+    "model": "模型",
+    "viewResult": "查看结果",
+    "downloadResult": "下载",
+    "results": "结果",
+    "fileResultsReady": "预测结果已准备好下载",
+    "loading": "正在加载预测详情..."
   },
   "models": {
     "regression_linear_regression_hyperparameter_tuning": "线性回归",
@@ -380,5 +392,8 @@
     "logStartingSync": "[信息] 开始模型元数据同步...",
     "logSyncSuccess": "[成功] {message}",
     "logError": "[错误] {error}"
-  }
+  },
+  "prediction.resultsReady": "预测结果已就绪",
+  "prediction.createdAt": "开始时间",
+  "prediction.status": "状态"
 }

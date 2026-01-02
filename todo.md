@@ -29,3 +29,5 @@
 - [ ] Prediction Result 也保存为 Dataset
 - [ ] PredictStep 也可以从 Dataset 选择
 - [x] ModelTuningRow 可以删除
+- [ ] PredictionHistory
+  - [ ] PredictionResult 对于文件类型的预测没有提供文件下载；其实不管是 inline 还是 on file，都应该导出为 excel

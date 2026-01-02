@@ -13,6 +13,17 @@
         :project-id="workItem?.projectId"
         @dataset-selected="handleDatasetSelected"
       />
+      <div class="mt-4">
+        <NuxtLink
+          :to="`/project/${workItem?.projectId}/datasets`"
+          class="inline-block"
+        >
+          <a-button type="default" class="inline-flex items-center gap-2">
+            <span class="i-mdi-cloud-upload"></span>
+            {{ $t("datasets.uploadNew") }}
+          </a-button>
+        </NuxtLink>
+      </div>
     </div>
 
     <!-- Step 2: Column Selection -->

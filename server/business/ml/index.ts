@@ -199,6 +199,7 @@ export async function predictInline(
   const {
     trainingDataPath,
     predictionData,
+    outputPath,
     model,
     params,
     featureColumns,
@@ -210,6 +211,7 @@ export async function predictInline(
   const stdinData = {
     trainingDataPath,
     predictionData,
+    outputPath,
     model: model.toLowerCase(),
     params,
     featureColumns,

@@ -58,8 +58,11 @@
         <a-card>
           <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-semibold">Project Datasets</h3>
-            <a-button @click="fetchProjectDatasets">
-              <template #icon><span class="i-mdi-refresh" /></template>
+            <a-button
+              @click="fetchProjectDatasets"
+              class="inline-flex items-center"
+            >
+              <span class="i-mdi-refresh" />
               Refresh
             </a-button>
           </div>

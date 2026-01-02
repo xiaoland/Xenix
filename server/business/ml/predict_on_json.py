@@ -34,6 +34,7 @@ def predict_on_json(
     model_name: str,
     training_data_path: str,
     prediction_data: list,
+    output_path: str,
     params: dict,
     feature_columns: list,
     target_column: str,
@@ -46,13 +47,14 @@ def predict_on_json(
         model_name: Name of the model (e.g., "regression.ridge")
         training_data_path: Path to training data Excel file
         prediction_data: List of dictionaries containing prediction data
+        output_path: Path where to save the Excel file with input data + predictions
         params: Model parameters
         feature_columns: List of feature column names
         target_column: Target column name
         logger: Logger instance for logging progress
 
     Returns:
-        List of predictions
+        Dict containing predictions list and output path
     """
     # Load training data and train model
     model, Model = load_and_train_model(
@@ -83,9 +85,24 @@ def predict_on_json(
 
     # Convert predictions to list
     predictions_list = predictions.tolist()
-    logger.info(f"Returning {len(predictions_list)} predictions as JSON array")
+    logger.info(f"Generated {len(predictions_list)} predictions")
 
-    return predictions_list
+    # Create DataFrame with input data + predictions
+    result_df = prediction_df.copy()
+    result_df[target_column] = predictions_list
+    logger.info(
+        f"Created result DataFrame with {len(result_df)} rows and {len(result_df.columns)} columns"
+    )
+
+    # Save to Excel file
+    result_df.to_excel(output_path, index=False)
+    logger.info(f"Saved results to Excel file: {output_path}")
+
+    return {
+        "predictions": predictions_list,
+        "outputPath": output_path,
+        "numPredictions": len(predictions_list),
+    }
 
 
 def main():
@@ -114,6 +131,7 @@ def main():
         # Extract parameters
         training_data_path = input_data.get("trainingDataPath")
         prediction_data = input_data.get("predictionData")
+        output_path = input_data.get("outputPath")
         model_name = input_data.get("model")
         params = input_data.get("params", {})
         feature_columns = input_data.get("featureColumns")
@@ -126,6 +144,8 @@ def main():
             raise ValueError("predictionData is required")
         if not isinstance(prediction_data, list):
             raise ValueError("predictionData must be an array")
+        if not output_path:
+            raise ValueError("outputPath is required")
         if not model_name:
             raise ValueError("model is required")
         if not feature_columns:
@@ -138,10 +158,11 @@ def main():
         logger.info(f"Prediction data rows: {len(prediction_data)}")
 
         # Perform prediction
-        predictions = predict_on_json(
+        result = predict_on_json(
             model_name,
             training_data_path,
             prediction_data,
+            output_path,
             params,
             feature_columns,
             target_column,
@@ -150,16 +171,17 @@ def main():
 
         # Emit success log
         emit_log(
-            f"JSON-based prediction completed successfully! Generated {len(predictions)} predictions"
+            f"JSON-based prediction completed successfully! Generated {result['numPredictions']} predictions and saved to {result['outputPath']}"
         )
 
-        # Output result information with predictions
+        # Output result information with predictions and output path
         result_data = {
             "type": "result",
             "data": {
-                "predictions": predictions,
+                "predictions": result["predictions"],
+                "outputPath": result["outputPath"],
                 "model": model_name,
-                "numPredictions": len(predictions),
+                "numPredictions": result["numPredictions"],
             },
         }
         emit_json_output(result_data)

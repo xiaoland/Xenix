@@ -1,6 +1,7 @@
 import { db, schema } from "../../database";
 import { predictInline } from "../../business/ml";
 import { eq } from "drizzle-orm";
+import path from "path";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -130,6 +131,14 @@ export default defineEventHandler(async (event) => {
     const result: any = tuningTask.result;
     const params = result.params;
 
+    // Generate output file path for inline predictions
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const outputFile = path.join(
+      process.cwd(),
+      "uploads",
+      `inline_prediction_${workItemId}_${taskId}_${timestamp}.xlsx`
+    );
+
     // Create task record with type "predict" and appropriate parameters
     const [insertedTask] = await db
       .insert(schema.tasks)
@@ -145,6 +154,7 @@ export default defineEventHandler(async (event) => {
           tuningTaskId: Number(tuningTaskId),
           predictionType: "inline",
           predictionDataCount: predictionData.length,
+          outputFile,
         },
       })
       .returning();
@@ -156,6 +166,7 @@ export default defineEventHandler(async (event) => {
       predictInline({
         trainingDataPath,
         predictionData,
+        outputPath: outputFile,
         model,
         params,
         featureColumns,

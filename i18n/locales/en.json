@@ -165,7 +165,19 @@
     "predictInline": "Predict",
     "noInputData": "Please add at least one row of input data",
     "inlineResults": "Prediction Results",
-    "predictedValue": "Predicted Value"
+    "predictedValue": "Predicted Value",
+    "viewPredictions": "View Predictions",
+    "history": "Prediction History",
+    "historyDescription": "View all predictions for this work item",
+    "noPredictions": "No predictions yet",
+    "taskCreated": "Created",
+    "taskId": "Task ID",
+    "model": "Model",
+    "viewResult": "View Result",
+    "downloadResult": "Download",
+    "results": "Results",
+    "fileResultsReady": "Prediction results are ready for download",
+    "loading": "Loading prediction details..."
   },
   "models": {
     "regression_linear_regression_hyperparameter_tuning": "Linear Regression",
@@ -338,5 +350,8 @@
   "tuning.confirmClearFailedTasks": "Sure to delete all failed tasks in this work item?",
   "tuning.confirmRemoveModel": "Are you sure you want to remove this model? All associated tasks will be deleted.",
   "tuning.modelRemoved": "Model removed successfully",
-  "tuning.removeModelError": "Failed to remove model"
+  "tuning.removeModelError": "Failed to remove model",
+  "prediction.resultsReady": "Prediction result is ready to download",
+  "prediction.createdAt": "Created at",
+  "prediction.status": "Status"
 }

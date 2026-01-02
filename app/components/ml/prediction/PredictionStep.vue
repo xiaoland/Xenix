@@ -131,56 +131,14 @@
           <span class="i-mdi-chart-line mr-2" />
           {{ t("prediction.predictInline") }}
         </a-button>
-
-        <!-- Inline Results -->
-        <div v-if="inlinePredictions.length > 0" class="mt-6">
-          <h3 class="text-lg font-medium mb-4">
-            {{ t("prediction.inlineResults") }}
-          </h3>
-          <a-table
-            :columns="resultColumns"
-            :data-source="inlinePredictions"
-            :pagination="false"
-            bordered
-            size="small"
-          >
-            <template #bodyCell="{ column, text }">
-              <span
-                v-if="column.key === 'prediction'"
-                class="font-semibold text-green-600"
-              >
-                {{ typeof text === "number" ? text.toFixed(4) : text }}
-              </span>
-              <span v-else>
-                {{ typeof text === "number" ? text.toFixed(4) : text }}
-              </span>
-            </template>
-          </a-table>
-        </div>
       </div>
     </div>
 
     <div v-if="predictionTask" class="mt-4">
-      <a-alert :message="predictionMessage" :type="predictionType" show-icon />
-
-      <!-- Task Logs -->
-      <TaskLogViewer
-        v-if="predictionTask.taskId"
+      <PredictionResult
         :task-id="predictionTask.taskId"
-        :title="t('logs.title')"
+        :input-data="predictionMode === 'inline' ? inputData : undefined"
       />
-
-      <a-button
-        v-if="predictionTask.status === 'completed' && predictionTask.taskId"
-        type="primary"
-        size="large"
-        block
-        class="mt-4 inline-flex items-center justify-center"
-        @click="downloadResults"
-      >
-        <span class="i-mdi-download mr-2" />
-        {{ t("prediction.downloadResults") }}
-      </a-button>
     </div>
 
     <div class="flex gap-4 mt-6">
@@ -197,7 +155,7 @@ import { message } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
 import { PredictionService, TaskService } from "~/services";
 import type { PredictionTask } from "~/types";
-import TaskLogViewer from "~/components/obsrv/TaskLogViewer.vue";
+import PredictionResult from "./PredictionResult.vue";
 
 const { t } = useI18n();
 
@@ -223,48 +181,10 @@ const fileList = ref<any[]>([]);
 
 // Inline mode state
 const inputData = ref<Record<string, any>[]>([]);
-const inlinePredictions = ref<any[]>([]);
 
 // Shared state
 const isPredicting = ref(false);
 const predictionTask = ref<PredictionTask | null>(null);
-
-// Computed properties for inline mode
-const inputColumns = computed(() => {
-  const columns = props.featureColumns.map((col) => ({
-    title: col,
-    dataIndex: col,
-    key: col,
-    width: 150,
-  }));
-
-  columns.push({
-    title: "Action",
-    key: "action",
-    dataIndex: "action",
-    width: 120,
-  });
-
-  return columns;
-});
-
-const resultColumns = computed(() => {
-  const columns = props.featureColumns.map((col) => ({
-    title: col,
-    dataIndex: col,
-    key: col,
-    width: 150,
-  }));
-
-  columns.push({
-    title: t("prediction.predictedValue"),
-    key: "prediction",
-    dataIndex: "prediction",
-    width: 150,
-  });
-
-  return columns;
-});
 
 // Computed properties for task status display
 const predictionMessage = computed(() => {
@@ -297,6 +217,19 @@ const predictionType = computed(() => {
     default:
       return "info";
   }
+});
+
+const inputColumns = computed(() => {
+  const cols: any[] = props.featureColumns.map((col) => ({
+    title: col,
+    dataIndex: col,
+    key: col,
+  }));
+  cols.push({
+    title: t("prediction.action"),
+    key: "action",
+  });
+  return cols;
 });
 
 /**
@@ -337,7 +270,6 @@ const predictInline = async () => {
   }
 
   isPredicting.value = true;
-  inlinePredictions.value = [];
 
   try {
     // Clean up input data - remove key and null values
@@ -365,19 +297,7 @@ const predictInline = async () => {
       if (result && result.task.status === "completed") {
         predictionTask.value.status = "completed";
 
-        // Get predictions from task result
-        const predictions = result.task.result?.predictions || [];
-
-        // Combine input data with predictions
-        inlinePredictions.value = cleanedData.map((row, index) => ({
-          ...row,
-          prediction: predictions[index],
-          key: index,
-        }));
-
-        message.success(
-          t("messages.predictionCompleted", { path: "inline results" })
-        );
+        message.success(t("messages.predictionCompleted"));
       } else if (result && result.task.status === "failed") {
         predictionTask.value.status = "failed";
         predictionTask.value.error = result.task.error;
@@ -503,28 +423,11 @@ const startPrediction = async () => {
 };
 
 /**
- * Download prediction results
- */
-const downloadResults = () => {
-  if (predictionTask.value?.taskId) {
-    const downloadUrl = `/api/download/${predictionTask.value.taskId}`;
-    const link = document.createElement("a");
-    link.href = downloadUrl;
-    link.download = "";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    message.success(t("prediction.downloading"));
-  }
-};
-
-/**
  * Reset prediction step state and emit reset event
  */
 const resetPrediction = () => {
   fileList.value = [];
   inputData.value = [];
-  inlinePredictions.value = [];
   isPredicting.value = false;
   predictionTask.value = null;
   predictionMode.value = "file";
