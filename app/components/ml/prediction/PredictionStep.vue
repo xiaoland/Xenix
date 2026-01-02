@@ -164,22 +164,11 @@
       <a-alert :message="predictionMessage" :type="predictionType" show-icon />
 
       <!-- Task Logs -->
-      <div class="mt-4">
-        <div class="flex items-center justify-between mb-2">
-          <span class="text-sm font-medium text-gray-700">{{
-            t("logs.title")
-          }}</span>
-          <a-button
-            size="small"
-            @click="fetchTaskLogs"
-            class="inline-flex items-center"
-          >
-            <span class="i-mdi-refresh mr-1" />
-            {{ t("common.refresh") }}
-          </a-button>
-        </div>
-        <LogPanel :logs="taskLogs" />
-      </div>
+      <TaskLogViewer
+        v-if="predictionTask.taskId"
+        :task-id="predictionTask.taskId"
+        :title="t('logs.title')"
+      />
 
       <a-button
         v-if="predictionTask.status === 'completed' && predictionTask.taskId"
@@ -207,12 +196,10 @@ import type { UploadProps } from "ant-design-vue";
 import { message } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
 import { PredictionService, TaskService } from "~/services";
-import { useTaskPolling } from "~/composables/useTaskPolling";
 import type { PredictionTask } from "~/types";
-import LogPanel from "~/components/obsrv/LogPanel.vue";
+import TaskLogViewer from "~/components/obsrv/TaskLogViewer.vue";
 
 const { t } = useI18n();
-const { pollTaskStatus } = useTaskPolling();
 
 const props = defineProps<{
   workItemId: number;
@@ -241,8 +228,6 @@ const inlinePredictions = ref<any[]>([]);
 // Shared state
 const isPredicting = ref(false);
 const predictionTask = ref<PredictionTask | null>(null);
-const taskLogs = ref<any[]>([]);
-let logPollingInterval: ReturnType<typeof setInterval> | null = null;
 
 // Computed properties for inline mode
 const inputColumns = computed(() => {
@@ -374,7 +359,6 @@ const predictInline = async () => {
     if (response.success) {
       predictionTask.value = { taskId: response.taskId, status: "running" };
       message.success(t("messages.predictionStarted"));
-      startLogPolling();
 
       const result = await pollTaskStatus(response.taskId);
 
@@ -410,6 +394,39 @@ const predictInline = async () => {
 };
 
 /**
+ * Poll task status until completion
+ */
+const pollTaskStatus = async (taskId: number, maxAttempts: number = 120) => {
+  let attempts = 0;
+
+  while (attempts < maxAttempts) {
+    try {
+      const response = await TaskService.fetchStatus(taskId);
+
+      if (
+        response.task.status === "completed" ||
+        response.task.status === "failed"
+      ) {
+        return response;
+      }
+
+      attempts++;
+      if (attempts < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      }
+    } catch (error) {
+      console.error("Failed to poll task status:", error);
+      attempts++;
+      if (attempts < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      }
+    }
+  }
+
+  return null;
+};
+
+/**
  * Validate file before upload
  */
 const beforeUpload: UploadProps["beforeUpload"] = (file) => {
@@ -418,53 +435,6 @@ const beforeUpload: UploadProps["beforeUpload"] = (file) => {
     message.error(t("prediction.excelOnly"));
   }
   return false; // Prevent auto upload
-};
-
-/**
- * Fetch task logs
- */
-const fetchTaskLogs = async () => {
-  if (!predictionTask.value?.taskId) return;
-
-  try {
-    const response = await TaskService.fetchLogs(predictionTask.value.taskId);
-    if (response.success && response.logs) {
-      taskLogs.value = response.logs;
-    }
-  } catch (error) {
-    console.error("Failed to fetch task logs:", error);
-  }
-};
-
-/**
- * Start polling task logs
- */
-const startLogPolling = () => {
-  stopLogPolling();
-  fetchTaskLogs();
-
-  logPollingInterval = setInterval(() => {
-    fetchTaskLogs();
-
-    // Stop polling when task is completed or failed
-    if (
-      predictionTask.value &&
-      (predictionTask.value.status === "completed" ||
-        predictionTask.value.status === "failed")
-    ) {
-      stopLogPolling();
-    }
-  }, 3000);
-};
-
-/**
- * Stop polling task logs
- */
-const stopLogPolling = () => {
-  if (logPollingInterval) {
-    clearInterval(logPollingInterval);
-    logPollingInterval = null;
-  }
 };
 
 /**
@@ -500,7 +470,6 @@ const startPrediction = async () => {
     if (response.success) {
       predictionTask.value = { taskId: response.taskId, status: "running" };
       message.success(t("messages.predictionStarted"));
-      startLogPolling();
 
       const result = await pollTaskStatus(response.taskId);
 
@@ -558,20 +527,13 @@ const resetPrediction = () => {
   inlinePredictions.value = [];
   isPredicting.value = false;
   predictionTask.value = null;
-  taskLogs.value = [];
   predictionMode.value = "file";
-  stopLogPolling();
 };
 
 const handleReset = () => {
   resetPrediction();
   emit("reset");
 };
-
-// Cleanup on unmount
-onUnmounted(() => {
-  stopLogPolling();
-});
 </script>
 
 <style scoped>

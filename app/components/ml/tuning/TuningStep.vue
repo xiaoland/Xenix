@@ -29,7 +29,6 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { message } from "ant-design-vue";
 import { useModelTraining } from "../../../composables/useModelTraining";
-import { useTaskPolling } from "../../../composables/useTaskPolling";
 import { useDatasetRegistration } from "../../../composables/useDatasetRegistration";
 import { WorkItemService, TaskService } from "~/services";
 import { useFormatters } from "../../../composables/useFormatters";
@@ -38,8 +37,6 @@ import type { TuningResult } from "~/types";
 
 const { t } = useI18n();
 const { executeTrain } = useModelTraining();
-const { pollTaskLogs, pollTaskStatus, registerTask, clearTasks } =
-  useTaskPolling();
 const { registerFileAsDataset } = useDatasetRegistration();
 
 const props = defineProps<{
@@ -118,13 +115,6 @@ const fetchTuningResults = async (workItemId?: number) => {
         createdAt: task.createdAt,
         taskId: task.id,
       }));
-
-      // Register tasks for polling
-      tasks.forEach((task: any) => {
-        if (task.parameter?.model) {
-          registerTask(task.parameter.model, task.id, task.status);
-        }
-      });
     }
   } catch (error) {
     console.error("Failed to fetch tuning results:", error);
@@ -191,12 +181,7 @@ const startBatchTuning = async (params: {
     );
 
     if (response) {
-      registerTask(modelValue, response.taskId);
       activeLogTab.value = response.taskId.toString();
-      pollTaskStatus(response.taskId, modelValue).then(() =>
-        fetchTuningResults(params.workItemId)
-      );
-      pollTaskLogs(response.taskId);
     }
   }
 };
@@ -236,12 +221,7 @@ const startSingleModelTuning = async (
   );
 
   if (response) {
-    registerTask(modelValue, response.taskId, "pending");
     activeLogTab.value = response.taskId.toString();
-    pollTaskStatus(response.taskId, modelValue).then(() =>
-      fetchTuningResults(params.workItemId)
-    );
-    pollTaskLogs(response.taskId);
   }
 };
 
@@ -254,7 +234,6 @@ const resetTuningStep = () => {
   selectedTaskId.value = null;
   activeLogTab.value = "";
   tuningResults.value = [];
-  clearTasks();
 };
 
 // Watch for task selection changes and sync with selectedBestModel

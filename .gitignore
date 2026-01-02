@@ -70,3 +70,7 @@ output.xlsx
 *.db-journal
 *.db-wal
 *.db-shm
+
+# Temporary files
+tmp/
+temp/
