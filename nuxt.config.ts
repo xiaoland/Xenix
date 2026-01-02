@@ -1,8 +1,33 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
-  devtools: { enabled: true },
-  modules: ["@unocss/nuxt", "@ant-design-vue/nuxt", "@nuxtjs/i18n"],
+  ssr: false,
+  devtools: { enabled: process.env.NODE_ENV !== "production" },
+  app: {
+    baseURL: "./",
+    buildAssetsDir: "/",
+  },
+  router: {
+    options: {
+      hashMode: true,
+    },
+  },
+  modules: [
+    "@unocss/nuxt",
+    "@ant-design-vue/nuxt",
+    "@nuxtjs/i18n",
+    "nuxt-electron",
+  ],
+  electron: {
+    build: [
+      {
+        entry: "electron/main.ts",
+      },
+      {
+        entry: "electron/preload.ts",
+      },
+    ],
+  },
   devServer: {
     port: 3005,
   },
