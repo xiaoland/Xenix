@@ -221,7 +221,10 @@
     "na": "不可用",
     "add": "添加",
     "cancel": "取消",
-    "refresh": "刷新"
+    "confirm": "确认",
+    "refresh": "刷新",
+    "remove": "删除",
+    "actions": "操作"
   },
   "autoForm": {
     "loading": "加载表单模式...",
@@ -232,6 +235,8 @@
   "datasets": {
     "title": "数据集管理",
     "subtitle": "管理并在多个任务中重用您的数据文件",
+    "selectDatasetDescription": "选择你上传到项目中的数据集",
+    "datasetSelected": "已选择数据集",
     "uploadNew": "上传新数据集",
     "name": "数据集名称",
     "namePlaceholder": "为您的数据集输入一个描述性名称",
@@ -341,6 +346,9 @@
   "common.noData": "N/A",
   "common.confirm": "确认",
   "tuning.confirmClearFailedTasks": "确认要删除所有本工作中失败的调优任务吗？",
+  "tuning.confirmRemoveModel": "确认要删除此模型吗？所有相关的任务将被删除。",
+  "tuning.modelRemoved": "模型删除成功",
+  "tuning.removeModelError": "删除模型失败",
   "pythonEnv": {
     "title": "Python 环境管理",
     "pdmInstalled": "PDM 已安装",

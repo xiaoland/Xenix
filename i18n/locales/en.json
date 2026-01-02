@@ -223,7 +223,10 @@
     "na": "N/A",
     "add": "Add",
     "cancel": "Cancel",
-    "refresh": "Refresh"
+    "confirm": "Confirm",
+    "refresh": "Refresh",
+    "remove": "Remove",
+    "actions": "Actions"
   },
   "autoForm": {
     "loading": "Loading form schema...",
@@ -264,6 +267,7 @@
     "deleteSuccess": "Dataset deleted successfully",
     "deleteError": "Failed to delete dataset",
     "selectDataset": "Select from Existing Datasets",
+    "selectDatasetDescription": "Choose a dataset you have uploaded to the project",
     "selectDatasetPlaceholder": "Choose a dataset",
     "useExistingDataset": "Use Existing Dataset",
     "orUploadNew": "Or upload a new file",
@@ -331,5 +335,8 @@
   "ml.modelSelector.selectModel": "Select a model",
   "common.noData": "N/A",
   "common.confirm": "Confirm",
-  "tuning.confirmClearFailedTasks": "Sure to delete all failed tasks in this work item?"
+  "tuning.confirmClearFailedTasks": "Sure to delete all failed tasks in this work item?",
+  "tuning.confirmRemoveModel": "Are you sure you want to remove this model? All associated tasks will be deleted.",
+  "tuning.modelRemoved": "Model removed successfully",
+  "tuning.removeModelError": "Failed to remove model"
 }

@@ -8,7 +8,7 @@
       }}</span>
     </td>
 
-    <!-- Action Column -->
+    <!-- (Model) Action Column -->
     <td class="px-4 py-2">
       <div class="flex gap-2">
         <a-button
@@ -32,7 +32,19 @@
     </td>
 
     <!-- Metrics Column (empty for parent row) -->
-    <td class="px-4 py-2"></td>
+    <td class="px-4 py-2 text-right">
+      <a-popconfirm
+        :title="t('tuning.confirmRemoveModel')"
+        :ok-text="t('common.confirm')"
+        :cancel-text="t('common.cancel')"
+        @confirm="handleRemoveModel"
+      >
+        <a-button danger size="small" class="inline-flex items-center">
+          <span class="i-mdi-delete-outline mr-1" />
+          {{ t("common.remove") }}
+        </a-button>
+      </a-popconfirm>
+    </td>
   </tr>
 
   <!-- Child rows (tuning tasks) -->
@@ -78,6 +90,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   "update:selectedTaskId": [taskId: number | null];
+  remove: [model: string];
 }>();
 
 // Compute model label from model value
@@ -127,6 +140,10 @@ const handleAutoTune = () => {
 
 const handleManualTrain = () => {
   manualTuneDialogVisible.value = true;
+};
+
+const handleRemoveModel = () => {
+  emit("remove", props.model);
 };
 
 const handleCreateAutoTuneTask = async (paramGrid: Record<string, any>) => {

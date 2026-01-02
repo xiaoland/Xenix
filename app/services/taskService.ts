@@ -34,6 +34,23 @@ export class TaskService {
   }
 
   /**
+   * Delete all tasks for a specific model in a work item
+   */
+  static async deleteByModel(
+    workItemId: number,
+    model: string
+  ): Promise<{ success: boolean; message: string }> {
+    return await $fetch(
+      `/api/tasks/model?workItemId=${workItemId}&model=${encodeURIComponent(
+        model
+      )}`,
+      {
+        method: "DELETE",
+      }
+    );
+  }
+
+  /**
    * Fetch tasks for a work item
    */
   static async fetchByWorkItemId(

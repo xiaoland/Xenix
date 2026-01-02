@@ -86,6 +86,9 @@
         </transition>
       </div>
     </td>
+
+    <!-- Remove Column (empty for sub-rows) -->
+    <td class="px-4 py-2"></td>
   </tr>
 
   <teleport to="body">
@@ -431,6 +434,6 @@ onUnmounted(() => {
 }
 
 .metrics-cell {
-  max-width: 0; /* Force cell to respect table-fixed layout */
+  width: 100%;
 }
 </style>

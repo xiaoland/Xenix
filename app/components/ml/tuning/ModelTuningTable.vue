@@ -30,7 +30,7 @@
           <tr class="border-b bg-gray-50">
             <th class="px-4 py-2 text-left w-20">{{ t("tuning.model") }}</th>
             <th class="px-4 py-2 text-left w-55">{{ t("tuning.tuning") }}</th>
-            <th class="px-4 py-2 text-left">
+            <th class="px-4 py-2 text-left" style="width: 100%">
               {{ t("tuning.metrics") }}
             </th>
           </tr>
@@ -42,6 +42,7 @@
               :work-item-id="workItemId"
               :refresh-trigger="refreshTrigger"
               v-model:selectedTaskId="modelValue"
+              @remove="removeModel"
             />
           </template>
           <tr v-if="selectedModels.length === 0">
@@ -210,6 +211,24 @@ const handleClearFailedTasks = async () => {
   } catch (error) {
     console.error("Failed to clear failed tasks:", error);
     message.error(t("tuning.clearFailedTasksError"));
+  }
+};
+
+// Handle removing a model
+const removeModel = async (model: string) => {
+  try {
+    // Delete all tasks for this model
+    await TaskService.deleteByModel(props.workItemId, model);
+
+    // Remove model from selectedModelValues (this will trigger the watch to update selectedModels and save to work item)
+    selectedModelValues.value = selectedModelValues.value.filter(
+      (m) => m !== model
+    );
+
+    message.success(t("tuning.modelRemoved"));
+  } catch (error) {
+    console.error("Failed to remove model:", error);
+    message.error(t("tuning.removeModelError"));
   }
 };
 </script>

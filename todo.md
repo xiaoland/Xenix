@@ -26,3 +26,6 @@
 - [x] 参数也是 popup 查看（结合 JSON Schema 渲染）
 - [x] 选择 taskId 则 model, params 都选好了，也就可以进入预测
 - [ ] trainingType 什么鬼？移除掉
+- [ ] Prediction Result 也保存为 Dataset
+- [ ] PredictStep 也可以从 Dataset 选择
+- [x] ModelTuningRow 可以删除
