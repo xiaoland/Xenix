@@ -26,11 +26,11 @@ export default defineEventHandler(async (event) => {
     for (const model of models) {
       try {
         // Check if model already exists
-        const existing = await db
+        const [existing] = await db
           .select()
           .from(modelMetadata)
           .where(eq(modelMetadata.name, model.name))
-          .get();
+          .limit(1);
 
         if (existing) {
           // Update existing model
@@ -42,8 +42,7 @@ export default defineEventHandler(async (event) => {
               paramGridSchema: model.param_grid_schema,
               updatedAt: new Date(),
             })
-            .where(eq(modelMetadata.name, model.name))
-            .run();
+            .where(eq(modelMetadata.name, model.name));
           updatedCount++;
         } else {
           // Insert new model
@@ -54,8 +53,7 @@ export default defineEventHandler(async (event) => {
               name: model.name,
               label: model.label,
               paramGridSchema: model.param_grid_schema,
-            })
-            .run();
+            });
           syncedCount++;
         }
       } catch (error: any) {

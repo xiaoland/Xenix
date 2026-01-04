@@ -26,8 +26,10 @@
 - [x] 参数也是 popup 查看（结合 JSON Schema 渲染）
 - [x] 选择 taskId 则 model, params 都选好了，也就可以进入预测
 - [ ] trainingType 什么鬼？移除掉
-- [ ] Prediction Result 也保存为 Dataset
-- [ ] PredictStep 也可以从 Dataset 选择
 - [x] ModelTuningRow 可以删除
-- [ ] PredictionHistory
-  - [ ] PredictionResult 对于文件类型的预测没有提供文件下载；其实不管是 inline 还是 on file，都应该导出为 excel
+- [x] PredictionHistory
+  - [x] PredictionResult 对于文件类型的预测没有提供文件下载；其实不管是 inline 还是 on file，都应该导出为 excel
+- [ ] 云端部署
+  - [ ] 搞个服务器，目前要运行 Python 脚本
+  - [ ] model_metadata 是 migration 的一部分，不要在运行时有操作
+  - [ ] 添加 users 表

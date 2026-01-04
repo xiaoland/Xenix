@@ -8,7 +8,7 @@ import { executePythonScript } from "./pythonExecutor";
 import { eq } from "drizzle-orm";
 
 export async function syncModelMetadata() {
-  console.log("🔄 Synchronizing model metadata...");
+  console.log("Synchronizing model metadata...");
 
   try {
     // Execute the Python model scanning script
@@ -16,7 +16,7 @@ export async function syncModelMetadata() {
     const result = await executePythonScript(scriptPath, {});
 
     if (!result.success) {
-      console.error("❌ Model scanning failed:", result.error);
+      console.error("Model scanning failed:", result.error);
       throw new Error(`Model scanning failed: ${result.error}`);
     }
 
@@ -28,15 +28,16 @@ export async function syncModelMetadata() {
     for (const model of models) {
       try {
         // Check if model already exists
-        const existing = db
+        const [existing] = await db
           .select()
           .from(modelMetadata)
           .where(eq(modelMetadata.name, model.name))
-          .get();
+          .limit(1);
 
         if (existing) {
           // Update existing model
-          db.update(modelMetadata)
+          await db
+            .update(modelMetadata)
             .set({
               category: model.category,
               label: model.label,
@@ -44,28 +45,27 @@ export async function syncModelMetadata() {
               paramGridSchema: model.param_grid_schema,
               updatedAt: new Date(),
             })
-            .where(eq(modelMetadata.name, model.name))
-            .run();
+            .where(eq(modelMetadata.name, model.name));
           updatedCount++;
         } else {
           // Insert new model
-          db.insert(modelMetadata)
+          await db
+            .insert(modelMetadata)
             .values({
               category: model.category,
               name: model.name,
               label: model.label,
               paramGridSchema: model.param_grid_schema,
               paramSchema: model.param_schema,
-            })
-            .run();
+            });
           syncedCount++;
         }
       } catch (error: any) {
-        console.error(`❌ Failed to sync ${model.name}:`, error.message);
+        console.error(`Failed to sync ${model.name}:`, error.message);
       }
     }
 
-    const message = `✅ Model metadata synchronized: ${syncedCount} new, ${updatedCount} updated, ${models.length} total`;
+    const message = `Model metadata synchronized: ${syncedCount} new, ${updatedCount} updated, ${models.length} total`;
     console.log(message);
     return {
       success: true,
@@ -75,7 +75,7 @@ export async function syncModelMetadata() {
       message,
     };
   } catch (error: any) {
-    console.error("❌ Failed to sync model metadata:", error);
+    console.error("Failed to sync model metadata:", error);
     throw error;
   }
 }

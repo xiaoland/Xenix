@@ -50,7 +50,7 @@
         :loading="isProcessing"
         @click="handleContinue"
       >
-        {{ $t("upload.nextButton") }}
+        {{ $t("upload.upload") }}
       </a-button>
     </div>
   </div>

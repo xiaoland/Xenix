@@ -353,5 +353,6 @@
   "tuning.removeModelError": "Failed to remove model",
   "prediction.resultsReady": "Prediction result is ready to download",
   "prediction.createdAt": "Created at",
-  "prediction.status": "Status"
+  "prediction.status": "Status",
+  "upload.upload": "Upload"
 }

@@ -6,7 +6,7 @@ import { modelMetadata } from '../../database/schema';
 
 export default defineEventHandler(async (event) => {
   try {
-    const models = await db.select().from(modelMetadata).all();
+    const models = await db.select().from(modelMetadata);
 
     return {
       success: true,

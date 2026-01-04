@@ -395,5 +395,6 @@
   },
   "prediction.resultsReady": "预测结果已就绪",
   "prediction.createdAt": "开始时间",
-  "prediction.status": "状态"
+  "prediction.status": "状态",
+  "upload.upload": "上传"
 }

@@ -1,1 +1,0 @@
-ALTER TABLE `model_metadata` ADD `param_grid_schema` text;
