@@ -1,0 +1,28 @@
+# Xenix File Structure
+
+- `AGENTS.md` - Project documentation
+- `drizzle.config.ts` - Database configuration
+- `i18n.config.ts` - Internationalization config
+- `nuxt.config.ts` - Nuxt configuration
+- `package.json` - Node.js dependencies
+- `pyproject.toml` - Python dependencies
+- `tsconfig.json` - TypeScript configuration
+- `uno.config.ts` - UnoCSS configuration
+- `app/` - Frontend application (Nuxt.js)
+  - `components/` - Vue components (common, dataset, ml, obsrv)
+  - `composables/` - Vue composition functions
+  - `pages/` - Nuxt page routes
+  - `services/` - API client services
+  - `types/` - TypeScript definitions
+  - `utils/` - Frontend utilities
+- `server/` - Backend (Nitro server)
+  - `api/` - REST API endpoints
+  - `business/ml/` - ML business logic & Python scripts
+  - `database/` - DrizzleORM schema & migrations
+- `data/` - For testing
+- `datasets/` - Uploaded dataset storage
+- `electron/` - Electron application files
+- `i18n/` - Internationalization locales
+- `public/` - Static assets
+- `uploads/` - User file uploads
+- `temp/`, `tmp/` - Temporary directories

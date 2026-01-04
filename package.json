@@ -5,17 +5,16 @@
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {
-    "build": "nuxt build",
-    "dev": "nuxt dev",
+    "dev:nuxt": "nuxt dev -p 3005",
+    "dev:electron": "electron-vite dev",
+    "dev": "concurrently \"pnpm dev:nuxt\" \"pnpm dev:electron\"",
+    "build": "nuxt build && electron-vite build && electron-builder",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio",
-    "electron:dev": "nuxt dev --no-fork",
-    "electron:build": "nuxt build --prerender && electron-builder",
-    "electron:build:win": "pnpm electron:build -- --win"
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@ant-design-vue/nuxt": "1.4.6",
@@ -24,9 +23,9 @@
     "better-sqlite3": "^12.5.0",
     "drizzle-kit": "^0.31.8",
     "drizzle-orm": "^0.45.1",
+    "get-port": "^7.1.0",
     "nanoid": "^5.1.6",
     "nuxt": "^4.2.2",
-    "nuxt-electron": "^0.7.0",
     "vue": "^3.5.25",
     "vue-router": "^4.6.4",
     "xlsx": "^0.18.5"
@@ -37,12 +36,12 @@
     "@types/node": "^25.0.3",
     "@unocss/nuxt": "^66.5.10",
     "@unocss/preset-icons": "^66.5.10",
+    "concurrently": "^9.2.1",
     "electron": "^35.1.4",
     "electron-builder": "^24.13.3",
+    "electron-vite": "^5.0.0",
     "sass": "^1.97.0",
-    "unocss": "^66.5.10",
-    "vite-plugin-electron": "^0.28.4",
-    "vite-plugin-electron-renderer": "^0.14.5"
+    "unocss": "^66.5.10"
   },
   "build": {
     "appId": "com.xenix.app",
@@ -54,8 +53,16 @@
     },
     "files": [
       "dist-electron/**/*",
-      ".output/public/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": ".output/",
+        "to": "server/",
+        "filter": [
+          "**/*"
+        ]
+      }
     ],
     "extraMetadata": {
       "main": "dist-electron/main.js"
@@ -68,5 +75,13 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true
     }
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "electron",
+      "esbuild",
+      "electron-builder"
+    ]
   }
 }

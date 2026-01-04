@@ -1,6 +1,7 @@
 ignoredBuiltDependencies:
   - '@parcel/watcher'
   - core-js
+  - electron
   - esbuild
 
 onlyBuiltDependencies:
