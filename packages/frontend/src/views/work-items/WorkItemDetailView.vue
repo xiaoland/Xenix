@@ -65,7 +65,10 @@
             <!-- Step 1: Tune -->
             <div v-if="currentStep === 1">
               <tuning-step
-                :work-item="workItem"
+                :work-item-id="workItem.id"
+                :dataset-id="workItem.datasetId?.toString() || ''"
+                :feature-columns="workItem.featureColumns || []"
+                :target-column="workItem.targetColumn || ''"
                 @continue="handleTuningContinue"
                 @back="goToPrepareStep"
               />
@@ -74,10 +77,11 @@
             <!-- Step 2: Predict -->
             <div v-if="currentStep === 2">
               <prediction-step
-                :work-item="workItem"
+                :work-item-id="workItem.id"
                 :selected-model="selectedModel"
                 :selected-parameters="selectedParameters"
                 :task-id="selectedTuningTaskId"
+                :feature-columns="workItem.featureColumns || []"
                 @back="goToTuningStep"
                 @reset="resetWorkflow"
               />
