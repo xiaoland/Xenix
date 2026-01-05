@@ -19,7 +19,7 @@
             Manage datasets for your project
           </p>
         </div>
-        <a-button type="primary" @click="showUploadModal = true">
+        <a-button type="primary" class="inline-flex items-center" @click="showUploadModal = true">
           <span class="i-mdi-cloud-upload mr-2"></span>
           Upload Dataset
         </a-button>
@@ -39,7 +39,7 @@
           <p class="text-gray-600 mb-4">
             Upload a dataset to get started with machine learning.
           </p>
-          <a-button type="primary" @click="showUploadModal = true">
+          <a-button type="primary" class="inline-flex items-center" @click="showUploadModal = true">
             <span class="i-mdi-cloud-upload mr-2"></span>
             Upload First Dataset
           </a-button>

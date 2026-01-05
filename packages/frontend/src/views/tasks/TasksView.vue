@@ -39,7 +39,7 @@
             </a-select>
           </div>
 
-          <a-button @click="fetchTasks" :loading="loading">
+          <a-button @click="fetchTasks" :loading="loading" class="inline-flex items-center">
             <span class="i-mdi-refresh mr-1"></span>
             Refresh
           </a-button>

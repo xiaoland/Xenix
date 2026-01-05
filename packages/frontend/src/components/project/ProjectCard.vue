@@ -22,6 +22,7 @@
       <div class="flex gap-2">
         <a-button
           size="small"
+          class="inline-flex items-center"
           @click="$emit('manage-datasets', project.id)"
         >
           <span class="i-mdi-database mr-1" />
@@ -29,6 +30,7 @@
         </a-button>
         <a-button
           size="small"
+          class="inline-flex items-center"
           @click="$emit('edit', project)"
         >
           <span class="i-mdi-pencil mr-1" />
@@ -41,6 +43,7 @@
           <a-button
             size="small"
             danger
+            class="inline-flex items-center"
           >
             <span class="i-mdi-delete mr-1" />
           </a-button>
@@ -62,6 +65,7 @@
       <a-button
         size="small"
         type="dashed"
+        class="inline-flex items-center"
         @click="$emit('add-work-item', project.id)"
       >
         <span class="i-mdi-plus mr-1" />

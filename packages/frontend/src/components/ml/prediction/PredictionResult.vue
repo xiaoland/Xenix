@@ -19,7 +19,7 @@
     <div v-else-if="task && task.status === 'completed'">
       <!-- Download Button (for file mode) -->
       <div v-if="task.result?.outputFile" class="mb-4">
-        <a-button type="primary" @click="handleDownload" :loading="downloading">
+        <a-button type="primary" class="inline-flex items-center" @click="handleDownload" :loading="downloading">
           <span class="i-mdi-download mr-2"></span>
           Download Results
         </a-button>

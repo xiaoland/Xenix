@@ -25,6 +25,7 @@
       <div class="flex gap-2">
         <a-button
           type="primary"
+          class="inline-flex items-center"
           :loading="isTraining"
           :disabled="selectedModels.length === 0"
           @click="handleStartAutoTune"
@@ -35,6 +36,7 @@
         <a-button
           :disabled="tasks.length === 0"
           danger
+          class="inline-flex items-center"
           @click="handleClearFailedTasks"
         >
           <span class="i-mdi-delete-outline mr-1"></span>

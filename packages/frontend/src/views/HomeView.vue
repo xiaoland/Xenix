@@ -15,6 +15,7 @@
           <h2 class="text-2xl font-semibold">Projects</h2>
           <a-button
             type="primary"
+            class="inline-flex items-center"
             @click="showCreateModal = true"
           >
             <span class="i-mdi-plus mr-1" />

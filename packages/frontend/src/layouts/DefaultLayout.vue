@@ -25,7 +25,7 @@
               Tasks
             </router-link>
             
-            <a-button v-if="isAuthenticated" type="text" danger @click="handleLogout">
+            <a-button v-if="isAuthenticated" type="text" danger class="inline-flex items-center" @click="handleLogout">
               <span class="i-mdi-logout mr-1" />
               Logout
             </a-button>

@@ -15,7 +15,7 @@
           accept=".csv,.xlsx,.xls"
           :max-count="1"
         >
-          <a-button>
+          <a-button class="inline-flex items-center">
             <span class="i-mdi-file-upload mr-2"></span>
             Select File
           </a-button>

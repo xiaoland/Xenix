@@ -51,7 +51,7 @@
       </a-upload-dragger>
 
       <a-button
-        class="mt-4"
+        class="mt-4 inline-flex items-center justify-center"
         type="primary"
         size="large"
         block

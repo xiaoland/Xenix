@@ -18,7 +18,7 @@
       />
       <div class="mt-4">
         <router-link :to="`/projects/${workItem.projectId}/datasets`">
-          <a-button type="default">
+          <a-button type="default" class="inline-flex items-center">
             <span class="i-mdi-cloud-upload mr-2"></span>
             Upload New Dataset
           </a-button>
