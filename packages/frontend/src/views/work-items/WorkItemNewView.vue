@@ -87,12 +87,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { message } from 'ant-design-vue';
 import type { Project } from '@xenix/shared';
 import DefaultLayout from '../../layouts/DefaultLayout.vue';
-import { WorkItemService, ProjectService } from '../../services';
+import { useProjects, useCreateWorkItem } from '../../composables';
 
 const router = useRouter();
 const route = useRoute();
@@ -102,9 +102,11 @@ const projectId = computed(() => {
   return id ? Number(id) : null;
 });
 
-const projects = ref<Project[]>([]);
-const isLoadingProjects = ref(false);
-const isSubmitting = ref(false);
+// Use composables for data fetching
+const { data: projectsData, isLoading: isLoadingProjects } = useProjects();
+const { mutate: createWorkItem, isPending: isSubmitting } = useCreateWorkItem();
+
+const projects = computed(() => projectsData.value || []);
 
 const formState = ref({
   projectId: projectId.value || undefined,
@@ -127,55 +129,36 @@ const rules = {
   ],
 };
 
-const fetchProjects = async () => {
-  isLoadingProjects.value = true;
-  try {
-    const response = await ProjectService.fetchAll();
-    if (response.success) {
-      projects.value = response.projects;
-    }
-  } catch (error: any) {
-    console.error('Failed to fetch projects:', error);
-    message.error('Failed to load projects');
-  } finally {
-    isLoadingProjects.value = false;
-  }
-};
-
-const handleSubmit = async () => {
+const handleSubmit = () => {
   if (!formState.value.projectId) {
     message.error('Please select a project');
     return;
   }
 
-  isSubmitting.value = true;
-  try {
-    const response = await WorkItemService.create({
+  createWorkItem(
+    {
       projectId: formState.value.projectId,
       name: formState.value.name,
       description: formState.value.description || undefined,
-    });
-
-    if (response.success) {
-      message.success('Work item created successfully');
-      // Navigate to the work item detail page
-      router.push(`/work-items/${response.workItem.id}`);
+    },
+    {
+      onSuccess: (workItem) => {
+        message.success('Work item created successfully');
+        // Navigate to the work item detail page
+        router.push(`/work-items/${workItem.id}`);
+      },
+      onError: (error: any) => {
+        console.error('Failed to create work item:', error);
+        message.error('Failed to create work item');
+      }
     }
-  } catch (error: any) {
-    console.error('Failed to create work item:', error);
-    message.error('Failed to create work item');
-  } finally {
-    isSubmitting.value = false;
-  }
+  );
 };
 
 const handleCancel = () => {
   router.push('/');
 };
-
-onMounted(() => {
-  fetchProjects();
-});
+</script>
 </script>
 
 <style lang="scss" scoped>

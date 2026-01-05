@@ -63,50 +63,41 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';
 import type { Project } from '@xenix/shared';
 import DefaultLayout from '../layouts/DefaultLayout.vue';
 import ProjectCard from '../components/project/ProjectCard.vue';
 import ProjectFormModal from '../components/project/ProjectFormModal.vue';
-import { ProjectService } from '../services';
+import { useProjects, useCreateProject, useUpdateProject, useDeleteProject } from '../composables';
 
 const router = useRouter();
 
-const projects = ref<Project[]>([]);
-const isLoading = ref(false);
+// Use composables for data fetching
+const { data: projectsData, isLoading, error } = useProjects();
+const { mutate: createProject, isPending: isCreating } = useCreateProject();
+const { mutate: updateProject, isPending: isUpdating } = useUpdateProject();
+const { mutate: deleteProject, isPending: isDeleting } = useDeleteProject();
+
+// Computed property to safely access projects array
+const projects = computed(() => projectsData.value || []);
+
 const showCreateModal = ref(false);
 const showEditModal = ref(false);
 const editingProject = ref<Partial<Project>>({});
 
-const fetchProjects = async () => {
-  isLoading.value = true;
-  try {
-    const response = await ProjectService.fetchAll();
-    if (response.success) {
-      projects.value = response.projects;
-    }
-  } catch (error: any) {
-    console.error('Failed to fetch projects:', error);
-    message.error('Failed to load projects');
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-const handleCreate = async (values: { name: string; description?: string }) => {
-  try {
-    const response = await ProjectService.create(values);
-    if (response.success) {
+const handleCreate = (values: { name: string; description?: string }) => {
+  createProject(values, {
+    onSuccess: () => {
       message.success('Project created successfully');
       showCreateModal.value = false;
-      await fetchProjects();
+    },
+    onError: (error: any) => {
+      console.error('Failed to create project:', error);
+      message.error('Failed to create project');
     }
-  } catch (error: any) {
-    console.error('Failed to create project:', error);
-    message.error('Failed to create project');
-  }
+  });
 };
 
 const handleEdit = (project: Project) => {
@@ -114,33 +105,34 @@ const handleEdit = (project: Project) => {
   showEditModal.value = true;
 };
 
-const handleUpdate = async (values: any) => {
+const handleUpdate = (values: any) => {
   if (!editingProject.value.id) return;
   
-  try {
-    const response = await ProjectService.update(editingProject.value.id, values);
-    if (response.success) {
-      message.success('Project updated successfully');
-      showEditModal.value = false;
-      await fetchProjects();
+  updateProject(
+    { id: editingProject.value.id, updates: values },
+    {
+      onSuccess: () => {
+        message.success('Project updated successfully');
+        showEditModal.value = false;
+      },
+      onError: (error: any) => {
+        console.error('Failed to update project:', error);
+        message.error('Failed to update project');
+      }
     }
-  } catch (error: any) {
-    console.error('Failed to update project:', error);
-    message.error('Failed to update project');
-  }
+  );
 };
 
-const handleDelete = async (projectId: number) => {
-  try {
-    const response = await ProjectService.delete(projectId);
-    if (response.success) {
+const handleDelete = (projectId: number) => {
+  deleteProject(projectId, {
+    onSuccess: () => {
       message.success('Project deleted successfully');
-      await fetchProjects();
+    },
+    onError: (error: any) => {
+      console.error('Failed to delete project:', error);
+      message.error('Failed to delete project');
     }
-  } catch (error: any) {
-    console.error('Failed to delete project:', error);
-    message.error('Failed to delete project');
-  }
+  });
 };
 
 const handleManageDatasets = (projectId: number) => {
@@ -150,10 +142,6 @@ const handleManageDatasets = (projectId: number) => {
 const handleAddWorkItem = (projectId: number) => {
   router.push(`/work-items/new?projectId=${projectId}`);
 };
-
-onMounted(() => {
-  fetchProjects();
-});
 </script>
 
 <style lang="scss" scoped>

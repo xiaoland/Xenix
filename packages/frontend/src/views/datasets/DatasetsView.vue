@@ -122,12 +122,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { message, Modal } from 'ant-design-vue';
 import DefaultLayout from '../../layouts/DefaultLayout.vue';
 import DatasetUpload from '../../components/dataset/DatasetUpload.vue';
-import { DatasetService } from '../../services';
+import { useDatasets, useDeleteDataset } from '../../composables';
 
 interface Dataset {
   id: number;
@@ -140,31 +140,20 @@ interface Dataset {
 const route = useRoute();
 const projectId = Number(route.params.projectId);
 
-const datasets = ref<Dataset[]>([]);
-const loading = ref(false);
+// Use composables for data fetching
+const { data: datasetsData, isLoading: loading, refetch } = useDatasets();
+const { mutate: deleteDataset } = useDeleteDataset();
+
+const datasets = computed(() => datasetsData.value || []);
+
 const showUploadModal = ref(false);
 const showDetailsModal = ref(false);
 const selectedDataset = ref<Dataset | null>(null);
 
-const fetchDatasets = async () => {
-  loading.value = true;
-  try {
-    const response = await DatasetService.listByProject(projectId);
-    if (response.success && response.datasets) {
-      datasets.value = response.datasets;
-    }
-  } catch (err) {
-    console.error('Failed to fetch datasets:', err);
-    message.error('Failed to load datasets');
-  } finally {
-    loading.value = false;
-  }
-};
-
 const handleUploadSuccess = () => {
   showUploadModal.value = false;
   message.success('Dataset uploaded successfully');
-  fetchDatasets();
+  refetch();
 };
 
 const viewDetails = (dataset: Dataset) => {
@@ -178,24 +167,18 @@ const handleDelete = (id: number) => {
     content: 'Are you sure you want to delete this dataset? This action cannot be undone.',
     okText: 'Delete',
     okType: 'danger',
-    onOk: async () => {
-      try {
-        const response = await DatasetService.delete(id);
-        if (response.success) {
+    onOk: () => {
+      deleteDataset(id, {
+        onSuccess: () => {
           message.success('Dataset deleted successfully');
-          fetchDatasets();
-        } else {
+        },
+        onError: (error: any) => {
+          console.error('Failed to delete dataset:', error);
           message.error('Failed to delete dataset');
         }
-      } catch (err) {
-        console.error('Failed to delete dataset:', err);
-        message.error('Failed to delete dataset');
-      }
+      });
     },
   });
 };
-
-onMounted(() => {
-  fetchDatasets();
-});
+</script>
 </script>

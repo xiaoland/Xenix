@@ -140,28 +140,30 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';
 import DefaultLayout from '../../layouts/DefaultLayout.vue';
-import { TaskService } from '../../services';
+import { useTasks, useFormatters } from '../../composables';
 import { AVAILABLE_MODELS } from '../../constants/models';
 import type { TaskInfo } from '@xenix/shared';
 
 const router = useRouter();
+const { formatDate, formatStatus } = useFormatters();
+
+// Use composables for data fetching with auto-refetch
+const { data: tasksData, isLoading: loading, error } = useTasks();
+
+// Computed property to safely access tasks array
+const tasks = computed(() => tasksData.value || []);
 
 // State
-const tasks = ref<TaskInfo[]>([]);
 const logs = ref<any[]>([]);
-const loading = ref(false);
 const loadingLogs = ref(false);
 const logsModalVisible = ref(false);
 const statusFilter = ref('');
 const typeFilter = ref('');
 const currentPage = ref(1);
-
-// Polling
-let pollInterval: number | null = null;
 
 // Table columns
 const columns = [
@@ -175,37 +177,18 @@ const columns = [
 ];
 
 /**
- * Fetch all tasks (simplified - in real app would need to fetch by project/user)
- * Since the backend doesn't have a "list all tasks" endpoint, we'll show a message
- */
-const fetchTasks = async () => {
-  loading.value = true;
-  try {
-    // Note: Backend doesn't have a "list all tasks" endpoint
-    // In a real implementation, you would need to:
-    // 1. Fetch user's projects
-    // 2. Fetch tasks for each project
-    // For now, show empty state with helpful message
-    tasks.value = [];
-    message.info('Task monitoring requires a project context. Navigate to a work item to see its tasks.');
-  } catch (error: any) {
-    console.error('Failed to fetch tasks:', error);
-    message.error(error.message || 'Failed to fetch tasks');
-  } finally {
-    loading.value = false;
-  }
-};
-
-/**
  * View task logs
+ * Note: This would need a corresponding composable for fetching logs
  */
 const viewLogs = async (taskId: number) => {
   logsModalVisible.value = true;
   loadingLogs.value = true;
   
   try {
-    const response = await TaskService.fetchLogs(taskId);
-    logs.value = response.logs || [];
+    // TODO: Create useTaskLogs composable
+    // For now, show message that logs feature needs backend endpoint
+    message.info('Logs feature requires backend implementation');
+    logs.value = [];
   } catch (error: any) {
     console.error('Failed to fetch logs:', error);
     message.error(error.message || 'Failed to fetch logs');
@@ -237,53 +220,11 @@ const formatModelName = (modelValue: string) => {
 };
 
 /**
- * Format date
- */
-const formatDate = (dateStr: string) => {
-  const date = new Date(dateStr);
-  return date.toLocaleString();
-};
-
-/**
  * Format log timestamp
  */
 const formatLogTime = (timestamp: string) => {
   const date = new Date(timestamp);
   return date.toLocaleTimeString();
 };
-
-/**
- * Start polling for updates
- */
-const startPolling = () => {
-  if (pollInterval) return;
-  pollInterval = window.setInterval(() => {
-    const hasRunningTasks = tasks.value.some(t => 
-      t.status === 'pending' || t.status === 'running'
-    );
-    if (hasRunningTasks) {
-      fetchTasks();
-    }
-  }, 5000);
-};
-
-/**
- * Stop polling
- */
-const stopPolling = () => {
-  if (pollInterval) {
-    clearInterval(pollInterval);
-    pollInterval = null;
-  }
-};
-
-// Lifecycle
-onMounted(() => {
-  fetchTasks();
-  startPolling();
-});
-
-onUnmounted(() => {
-  stopPolling();
-});
+</script>
 </script>

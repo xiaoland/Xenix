@@ -94,14 +94,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';
 import DefaultLayout from '../../layouts/DefaultLayout.vue';
 import PrepareStep from '../../components/ml/prepare/PrepareStep.vue';
 import TuningStep from '../../components/ml/tuning/TuningStep.vue';
 import PredictionStep from '../../components/ml/prediction/PredictionStep.vue';
-import { WorkItemService } from '../../services';
+import { useWorkItem } from '../../composables';
 
 interface WorkItem {
   id: number;
@@ -117,15 +117,37 @@ interface WorkItem {
 const route = useRoute();
 const router = useRouter();
 
-const workItem = ref<WorkItem | null>(null);
-const loading = ref(false);
-const error = ref(false);
+// Use composable for fetching work item
+const workItemId = computed(() => Number(route.params.id));
+const { data: workItemData, isLoading: loading, error: fetchError, refetch } = useWorkItem(workItemId);
+
+// Computed property to safely access work item
+const workItem = computed(() => workItemData.value);
+const error = computed(() => !!fetchError.value);
 
 // Workflow state
 const currentStep = ref(0);
 const selectedModel = ref<string | null>(null);
 const selectedParameters = ref<Record<string, any>>({});
 const selectedTuningTaskId = ref<number | null>(null);
+
+// Check if work item has saved prepare data and auto-advance
+const checkWorkItemStep = () => {
+  if (
+    workItem.value?.datasetId &&
+    workItem.value?.featureColumns &&
+    workItem.value?.targetColumn
+  ) {
+    // Skip to tuning step
+    currentStep.value = 1;
+    message.info('Restored saved dataset configuration');
+  }
+};
+
+// Watch for work item data and check step
+if (workItem.value) {
+  checkWorkItemStep();
+}
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -140,44 +162,10 @@ const getStatusColor = (status: string) => {
   }
 };
 
-const fetchWorkItem = async () => {
-  const workItemId = route.params.id as string;
-  if (!workItemId) return;
-
-  loading.value = true;
-  error.value = false;
-
-  try {
-    const response = await WorkItemService.fetchById(Number(workItemId));
-    if (response.success && response.workItem) {
-      workItem.value = response.workItem;
-
-      // Check if work item has saved prepare data
-      if (
-        workItem.value.datasetId &&
-        workItem.value.featureColumns &&
-        workItem.value.targetColumn
-      ) {
-        // Skip to tuning step
-        currentStep.value = 1;
-        message.info('Restored saved dataset configuration');
-      }
-    } else {
-      error.value = true;
-    }
-  } catch (err) {
-    console.error('Failed to fetch work item:', err);
-    error.value = true;
-    message.error('Failed to load work item');
-  } finally {
-    loading.value = false;
-  }
-};
-
 const handlePrepareConfirm = () => {
   currentStep.value = 1;
   // Refresh work item to get updated data
-  fetchWorkItem();
+  refetch();
 };
 
 const handleTuningContinue = (data: {
@@ -198,6 +186,14 @@ const goToPrepareStep = () => {
 const goToTuningStep = () => {
   currentStep.value = 1;
 };
+
+const resetWorkflow = () => {
+  currentStep.value = 0;
+  selectedModel.value = null;
+  selectedParameters.value = {};
+  selectedTuningTaskId.value = null;
+};
+</script>
 
 const resetWorkflow = () => {
   currentStep.value = 0;
