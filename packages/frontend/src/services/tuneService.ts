@@ -1,0 +1,42 @@
+/**
+ * Tune Service
+ * Handles all model tuning operations (auto-tune and manual-tune)
+ */
+
+import { useAuthStore } from '../stores/auth';
+
+export class TuneService {
+  /**
+   * Start auto-tune with hyperparameter grid search
+   */
+  static async startAutoTune(params: {
+    datasetId: string;
+    features: string[];
+    target: string;
+    model: string;
+    paramGrid?: Record<string, any>;
+    workItemId?: number;
+  }): Promise<{ success: boolean; taskId: number }> {
+    return await useAuthStore().requestWithToken("/api/auto-tune", {
+      method: "POST",
+      body: params,
+    });
+  }
+
+  /**
+   * Start manual tune with specific parameters
+   */
+  static async startManualTune(params: {
+    datasetId?: string;
+    features?: string[];
+    target?: string;
+    model: string;
+    parameters: Record<string, any>;
+    workItemId?: number;
+  }): Promise<{ success: boolean; taskId: number }> {
+    return await useAuthStore().requestWithToken("/api/manual-tune", {
+      method: "POST",
+      body: params,
+    });
+  }
+}
