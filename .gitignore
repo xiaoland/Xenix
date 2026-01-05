@@ -75,3 +75,8 @@ output.xlsx
 # Temporary files
 tmp/
 temp/
+
+# Test coverage
+coverage/
+.nyc_output/
+*.lcov
