@@ -9,8 +9,14 @@
     "build": "pnpm --filter \"@xenix/*\" build",
     "build:frontend": "pnpm --filter \"@xenix/frontend\" build",
     "build:backend": "pnpm --filter \"@xenix/backend\" build",
+    "test": "pnpm -r test",
+    "test:watch": "pnpm -r test:watch",
+    "test:coverage": "pnpm -r test:coverage",
     "db:generate": "pnpm --filter \"@xenix/backend\" db:generate",
-    "db:migrate": "pnpm --filter \"@xenix/backend\" db:migrate"
+    "db:migrate": "pnpm --filter \"@xenix/backend\" db:migrate",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f"
   },
   "dependencies": {
     "@ant-design-vue/nuxt": "1.4.6",
