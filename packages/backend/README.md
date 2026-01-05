@@ -22,6 +22,8 @@ Backend API server for Xenix ML platform, built with Hono framework.
    - `PYTHON_EXECUTABLE`: Path to Python executable (default: python3)
    - `PORT`: Server port (default: 3000)
    - `FRONTEND_URL`: Frontend URL for CORS (default: http://localhost:5173)
+   
+   > **Note**: This backend uses Node.js native `.env` file support (Node.js >= 20.6.0) via the `--env-file` flag. No additional packages like `dotenv` are needed.
 
 3. **Run database migrations:**
    ```bash

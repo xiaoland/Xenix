@@ -4,11 +4,11 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx --env-file=.env watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "start": "node --env-file=.env dist/index.js",
+    "db:generate": "tsx --env-file=.env node_modules/.bin/drizzle-kit generate",
+    "db:migrate": "tsx --env-file=.env node_modules/.bin/drizzle-kit migrate"
   },
   "dependencies": {
     "@hono/node-server": "^1.14.0",
@@ -19,7 +19,6 @@
     "jsonwebtoken": "^9.0.3",
     "nanoid": "^5.1.6",
     "xlsx": "^0.18.5",
-    "dotenv": "^16.4.7",
     "@xenix/shared": "workspace:*"
   },
   "devDependencies": {
