@@ -13,7 +13,7 @@
     "vue-router": "^4.6.4",
     "pinia": "^2.3.0",
     "ant-design-vue": "^4.2.6",
-    "vue-i18n": "^10.0.13",
+    "vue-i18n": "^11.2.8",
     "xlsx": "^0.18.5",
     "@xenix/shared": "workspace:*"
   },
