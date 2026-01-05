@@ -13,6 +13,8 @@ import modelsRoutes from './routes/models.js';
 import tasksRoutes from './routes/tasks.js';
 import tuneRoutes from './routes/tune.js';
 import predictRoutes from './routes/predict.js';
+import downloadRoutes from './routes/download.js';
+import obsrvRoutes from './routes/obsrv.js';
 
 const app = new Hono();
 
@@ -36,6 +38,8 @@ app.route('/api/models', modelsRoutes);
 app.route('/api/tasks', tasksRoutes);
 app.route('/api', tuneRoutes);
 app.route('/api/predict', predictRoutes);
+app.route('/api/download', downloadRoutes);
+app.route('/api/obsrv', obsrvRoutes);
 
 const port = Number(process.env.PORT) || 3000;
 
