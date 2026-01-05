@@ -49,7 +49,7 @@ venv/
 
 # Uploads
 uploads/
-datasets/
+/datasets/
 *.xlsx
 *.xls
 !Customer\ Value\ Data\ Table.xlsx
