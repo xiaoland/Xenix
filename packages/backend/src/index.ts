@@ -1,3 +1,7 @@
+// Load environment variables from .env file
+import { config } from 'dotenv';
+config();
+
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
