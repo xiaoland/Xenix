@@ -4,20 +4,23 @@
  */
 
 import type { Project } from "~/types";
+import { useAuthStore } from "~/stores/auth";
 
 export class ProjectService {
   /**
    * Fetch all projects
    */
   static async fetchAll(): Promise<{ success: boolean; projects: Project[] }> {
-    return await $fetch("/api/projects");
+    return await useAuthStore().requestWithToken("/api/projects");
   }
 
   /**
    * Fetch a specific project by ID (with optional nested data)
    */
-  static async fetchById(id: number | string): Promise<{ success: boolean; project: Project }> {
-    return await $fetch(`/api/projects/${id}`);
+  static async fetchById(
+    id: number | string
+  ): Promise<{ success: boolean; project: Project }> {
+    return await useAuthStore().requestWithToken(`/api/projects/${id}`);
   }
 
   /**
@@ -27,7 +30,7 @@ export class ProjectService {
     name: string;
     description?: string;
   }): Promise<{ success: boolean; project: Project }> {
-    return await $fetch("/api/projects", {
+    return await useAuthStore().requestWithToken("/api/projects", {
       method: "POST",
       body: project,
     });
@@ -44,7 +47,7 @@ export class ProjectService {
       status?: "active" | "completed" | "archived";
     }
   ): Promise<{ success: boolean; project: Project }> {
-    return await $fetch(`/api/projects/${id}`, {
+    return await useAuthStore().requestWithToken(`/api/projects/${id}`, {
       method: "PUT",
       body: updates,
     });
@@ -54,7 +57,7 @@ export class ProjectService {
    * Delete a project
    */
   static async delete(id: number | string): Promise<{ success: boolean }> {
-    return await $fetch(`/api/projects/${id}`, {
+    return await useAuthStore().requestWithToken(`/api/projects/${id}`, {
       method: "DELETE",
     });
   }

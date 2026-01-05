@@ -354,5 +354,45 @@
   "prediction.resultsReady": "Prediction result is ready to download",
   "prediction.createdAt": "Created at",
   "prediction.status": "Status",
-  "upload.upload": "Upload"
+  "upload.upload": "Upload",
+  "auth": {
+    "signin": {
+      "title": "Sign In",
+      "identifier": "Email or Phone",
+      "identifierPlaceholder": "Enter your email or phone number",
+      "password": "Password",
+      "passwordPlaceholder": "Enter your password",
+      "signinButton": "Sign In",
+      "signingIn": "Signing In...",
+      "noAccount": "Don't have an account?",
+      "signupLink": "Sign up here",
+      "signinError": "Sign in failed",
+      "identifierRequired": "Please enter your email or phone number",
+      "passwordRequired": "Please enter your password"
+    },
+    "signup": {
+      "title": "Sign Up",
+      "email": "Email",
+      "emailPlaceholder": "Enter your email",
+      "phone": "Phone",
+      "phonePlaceholder": "Enter your phone number (optional)",
+      "password": "Password",
+      "passwordPlaceholder": "Enter your password",
+      "confirmPassword": "Confirm Password",
+      "confirmPasswordPlaceholder": "Confirm your password",
+      "signupButton": "Sign Up",
+      "signingUp": "Signing Up...",
+      "haveAccount": "Already have an account?",
+      "signinLink": "Sign in here",
+      "signupError": "Sign up failed",
+      "emailRequired": "Please enter your email",
+      "emailInvalid": "Please enter a valid email",
+      "passwordRequired": "Please enter your password",
+      "passwordMin": "Password must be at least 8 characters",
+      "confirmPasswordRequired": "Please confirm your password",
+      "passwordsNotMatch": "Passwords do not match",
+      "signupSuccess": "Account created successfully. Please sign in."
+    },
+    "logout": "Logout"
+  }
 }

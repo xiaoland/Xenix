@@ -104,18 +104,6 @@ const modelValue = defineModel<number | null>("selectedTaskId", {
 });
 ```
 
-### Composables Usage
-
-Components typically use composables for shared logic:
-
-```typescript
-import { useFormatters } from "~/composables/useFormatters";
-import { useTaskPolling } from "~/composables/useTaskPolling";
-
-const { formatModelName, formatMetric } = useFormatters();
-const { pollTaskStatus, registerTask } = useTaskPolling();
-```
-
 ## Styling
 
 - Use UnoCSS utility classes for simple styles

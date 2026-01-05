@@ -2,7 +2,12 @@
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   devtools: { enabled: true },
-  modules: ["@unocss/nuxt", "@ant-design-vue/nuxt", "@nuxtjs/i18n"],
+  modules: [
+    "@unocss/nuxt",
+    "@ant-design-vue/nuxt",
+    "@nuxtjs/i18n",
+    "@pinia/nuxt",
+  ],
   devServer: {
     port: 3005,
   },

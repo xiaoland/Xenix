@@ -3,12 +3,14 @@
  * Handles model metadata operations
  */
 
+import { useAuthStore } from "~/stores/auth";
+
 export class ModelService {
   /**
    * Fetch model metadata and schemas
    */
   static async fetchMetadata(): Promise<{ success: boolean; models: any[] }> {
-    return await $fetch("/api/models");
+    return await useAuthStore().requestWithToken("/api/models");
   }
 
   /**
@@ -17,6 +19,6 @@ export class ModelService {
   static async fetchModel(
     name: string
   ): Promise<{ success: boolean; model: any }> {
-    return await $fetch(`/api/models/${name}`);
+    return await useAuthStore().requestWithToken(`/api/models/${name}`);
   }
 }

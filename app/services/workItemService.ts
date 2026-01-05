@@ -5,19 +5,26 @@
 
 import type { WorkItem } from "~/types";
 
+import { useAuthStore } from "~/stores/auth";
+
 export class WorkItemService {
   /**
    * Fetch all work items
    */
-  static async fetchAll(): Promise<{ success: boolean; workItems: WorkItem[] }> {
-    return await $fetch("/api/work-items");
+  static async fetchAll(): Promise<{
+    success: boolean;
+    workItems: WorkItem[];
+  }> {
+    return await useAuthStore().requestWithToken("/api/work-items");
   }
 
   /**
    * Fetch a specific work item by ID
    */
-  static async fetchById(id: number | string): Promise<{ success: boolean; workItem: WorkItem }> {
-    return await $fetch(`/api/work-items/${id}`);
+  static async fetchById(
+    id: number | string
+  ): Promise<{ success: boolean; workItem: WorkItem }> {
+    return await useAuthStore().requestWithToken(`/api/work-items/${id}`);
   }
 
   /**
@@ -28,7 +35,7 @@ export class WorkItemService {
     name: string;
     description?: string;
   }): Promise<{ success: boolean; workItem: WorkItem }> {
-    return await $fetch("/api/work-items", {
+    return await useAuthStore().requestWithToken("/api/work-items", {
       method: "POST",
       body: workItem,
     });
@@ -49,7 +56,7 @@ export class WorkItemService {
       selectedModels?: string[];
     }
   ): Promise<{ success: boolean; workItem: WorkItem }> {
-    return await $fetch(`/api/work-items/${id}`, {
+    return await useAuthStore().requestWithToken(`/api/work-items/${id}`, {
       method: "PUT",
       body: updates,
     });
@@ -59,7 +66,7 @@ export class WorkItemService {
    * Delete a work item
    */
   static async delete(id: number | string): Promise<{ success: boolean }> {
-    return await $fetch(`/api/work-items/${id}`, {
+    return await useAuthStore().requestWithToken(`/api/work-items/${id}`, {
       method: "DELETE",
     });
   }

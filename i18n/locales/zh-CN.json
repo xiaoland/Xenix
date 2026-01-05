@@ -396,5 +396,45 @@
   "prediction.resultsReady": "预测结果已就绪",
   "prediction.createdAt": "开始时间",
   "prediction.status": "状态",
-  "upload.upload": "上传"
+  "upload.upload": "上传",
+  "auth": {
+    "signin": {
+      "title": "登录",
+      "identifier": "邮箱或手机号",
+      "identifierPlaceholder": "输入您的邮箱或手机号",
+      "password": "密码",
+      "passwordPlaceholder": "输入您的密码",
+      "signinButton": "登录",
+      "signingIn": "登录中...",
+      "noAccount": "还没有账户？",
+      "signupLink": "在这里注册",
+      "signinError": "登录失败",
+      "identifierRequired": "请输入邮箱或手机号",
+      "passwordRequired": "请输入密码"
+    },
+    "signup": {
+      "title": "注册",
+      "email": "邮箱",
+      "emailPlaceholder": "输入您的邮箱",
+      "phone": "手机号",
+      "phonePlaceholder": "输入您的手机号（可选）",
+      "password": "密码",
+      "passwordPlaceholder": "输入您的密码",
+      "confirmPassword": "确认密码",
+      "confirmPasswordPlaceholder": "确认您的密码",
+      "signupButton": "注册",
+      "signingUp": "注册中...",
+      "haveAccount": "已有账户？",
+      "signinLink": "在这里登录",
+      "signupError": "注册失败",
+      "emailRequired": "请输入邮箱",
+      "emailInvalid": "请输入有效的邮箱",
+      "passwordRequired": "请输入密码",
+      "passwordMin": "密码至少8个字符",
+      "confirmPasswordRequired": "请确认密码",
+      "passwordsNotMatch": "密码不匹配",
+      "signupSuccess": "账户创建成功。请登录。"
+    },
+    "logout": "登出"
+  }
 }

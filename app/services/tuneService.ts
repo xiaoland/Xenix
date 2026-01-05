@@ -3,6 +3,8 @@
  * Handles all model tuning operations (auto-tune and manual-tune)
  */
 
+import { useAuthStore } from "~/stores/auth";
+
 export class TuneService {
   /**
    * Start auto-tune with hyperparameter grid search
@@ -15,7 +17,7 @@ export class TuneService {
     paramGrid?: Record<string, any>;
     workItemId?: number;
   }): Promise<{ success: boolean; taskId: number }> {
-    return await $fetch("/api/auto-tune", {
+    return await useAuthStore().requestWithToken("/api/auto-tune", {
       method: "POST",
       body: params,
     });
@@ -32,7 +34,7 @@ export class TuneService {
     parameters: Record<string, any>;
     workItemId?: number;
   }): Promise<{ success: boolean; taskId: number }> {
-    return await $fetch("/api/manual-tune", {
+    return await useAuthStore().requestWithToken("/api/manual-tune", {
       method: "POST",
       body: params,
     });

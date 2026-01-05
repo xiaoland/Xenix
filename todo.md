@@ -32,4 +32,9 @@
 - [ ] 云端部署
   - [ ] 搞个服务器，目前要运行 Python 脚本
   - [ ] model_metadata 是 migration 的一部分，不要在运行时有操作
+  - [ ] PythonEnv 相关的管理可以移除了，因为云端部署
+  - [ ] ModelTuningTable 的模型也应该从数据库获取
+  - [ ] i18n 是远程资源，不要打包在里面，不然的话模型的翻译更新很麻烦
   - [ ] 添加 users 表
+  - [ ] CSR
+  - [ ] remove AVAILABLE_MODELS constant, use api

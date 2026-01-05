@@ -4,13 +4,14 @@
  */
 
 import type { TaskInfo, TaskLog } from "~/types";
+import { useAuthStore } from "~/stores/auth";
 
 export class TaskService {
   /**
    * Fetch task status and details
    */
   static async fetchStatus(taskId: number): Promise<{ task: TaskInfo }> {
-    return await $fetch(`/api/task/${taskId}`);
+    return await useAuthStore().requestWithToken(`/api/task/${taskId}`);
   }
 
   /**
@@ -19,7 +20,7 @@ export class TaskService {
   static async fetchLogs(
     taskId: number
   ): Promise<{ success: boolean; logs: TaskLog[] }> {
-    return await $fetch(`/api/obsrv/${taskId}`);
+    return await useAuthStore().requestWithToken(`/api/obsrv/${taskId}`);
   }
 
   /**
@@ -28,9 +29,12 @@ export class TaskService {
   static async deleteFailedTasks(
     workItemId: number
   ): Promise<{ success: boolean; message: string }> {
-    return await $fetch(`/api/tasks/failed?workItemId=${workItemId}`, {
-      method: "DELETE",
-    });
+    return await useAuthStore().requestWithToken(
+      `/api/tasks/failed?workItemId=${workItemId}`,
+      {
+        method: "DELETE",
+      }
+    );
   }
 
   /**
@@ -40,7 +44,7 @@ export class TaskService {
     workItemId: number,
     model: string
   ): Promise<{ success: boolean; message: string }> {
-    return await $fetch(
+    return await useAuthStore().requestWithToken(
       `/api/tasks/model?workItemId=${workItemId}&model=${encodeURIComponent(
         model
       )}`,
@@ -63,6 +67,8 @@ export class TaskService {
     if (types && types.length > 0) {
       queryParams.append("type", types.join(","));
     }
-    return await $fetch(`/api/tasks?${queryParams.toString()}`);
+    return await useAuthStore().requestWithToken(
+      `/api/tasks?${queryParams.toString()}`
+    );
   }
 }

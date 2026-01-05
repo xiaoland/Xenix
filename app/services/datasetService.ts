@@ -4,6 +4,7 @@
  */
 
 import type { Dataset } from "~/types";
+import { useAuthStore } from "~/stores/auth";
 
 export class DatasetService {
   /**
@@ -19,7 +20,7 @@ export class DatasetService {
     formData.append("name", name);
     formData.append("description", description);
 
-    return await $fetch("/api/data", {
+    return await useAuthStore().requestWithToken("/api/data", {
       method: "POST",
       body: formData,
     });
@@ -29,7 +30,7 @@ export class DatasetService {
    * Fetch all datasets
    */
   static async fetchAll(): Promise<{ success: boolean; datasets: Dataset[] }> {
-    return await $fetch("/api/data");
+    return await useAuthStore().requestWithToken("/api/data");
   }
 
   /**
@@ -38,6 +39,6 @@ export class DatasetService {
   static async fetchById(
     id: number | string
   ): Promise<{ success: boolean; dataset: Dataset }> {
-    return await $fetch(`/api/data/${id}`);
+    return await useAuthStore().requestWithToken(`/api/data/${id}`);
   }
 }

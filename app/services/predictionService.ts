@@ -3,6 +3,8 @@
  * Handles prediction operations
  */
 
+import { useAuthStore } from "~/stores/auth";
+
 export class PredictionService {
   /**
    * Start prediction on new data from file
@@ -20,7 +22,7 @@ export class PredictionService {
     formData.append("tuningTaskId", params.tuningTaskId.toString());
     formData.append("workItemId", params.workItemId.toString());
 
-    return await $fetch("/api/predict/by-file", {
+    return await useAuthStore().requestWithToken("/api/predict/by-file", {
       method: "POST",
       body: formData,
     });
@@ -36,7 +38,7 @@ export class PredictionService {
     tuningTaskId: number;
     workItemId: number;
   }): Promise<{ success: boolean; taskId: number }> {
-    return await $fetch("/api/predict/inline", {
+    return await useAuthStore().requestWithToken("/api/predict/inline", {
       method: "POST",
       body: {
         predictionData: params.predictionData,

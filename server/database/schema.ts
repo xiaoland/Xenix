@@ -1,6 +1,28 @@
 // PostgreSQL database schema for Xenix
 
-import { pgTable, text, integer, timestamp, serial, jsonb } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  integer,
+  timestamp,
+  serial,
+  jsonb,
+  uuid,
+} from "drizzle-orm/pg-core";
+
+// Users table for authentication and user management
+export const users = pgTable("users", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  email: text("email").notNull().unique(),
+  phone: text("phone"),
+  password: text("password").notNull(),
+  createdAt: timestamp("created_at", { mode: "date" })
+    .$defaultFn(() => new Date())
+    .notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" })
+    .$defaultFn(() => new Date())
+    .notNull(),
+});
 
 // Model metadata table for storing model information and ModelParam schemas
 export const modelMetadata = pgTable("model_metadata", {
@@ -97,6 +119,7 @@ export const workItems = pgTable("work_items", {
 // Projects table - organizes datasets and work items
 export const projects = pgTable("projects", {
   id: serial("id").primaryKey(),
+  createdBy: uuid("created_by").references(() => users.id),
   name: text("name").notNull(),
   description: text("description"),
   status: text("status").notNull().default("active"), // 'active', 'completed', 'archived'

@@ -24,6 +24,7 @@ export interface WorkItem {
 
 export interface Project {
   id: number;
+  createdBy?: string; // UUID of the user who created the project
   name: string;
   description?: string;
   status: "active" | "completed" | "archived";
