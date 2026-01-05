@@ -41,4 +41,34 @@ export class DatasetService {
   ): Promise<{ success: boolean; dataset: Dataset }> {
     return await useAuthStore().requestWithToken(`/api/data/${id}`);
   }
+
+  /**
+   * List datasets by project ID
+   */
+  static async listByProject(
+    projectId: number
+  ): Promise<{ success: boolean; datasets: Dataset[] }> {
+    return await useAuthStore().requestWithToken(`/api/data?projectId=${projectId}`);
+  }
+
+  /**
+   * Upload a new dataset
+   */
+  static async upload(
+    formData: FormData
+  ): Promise<{ success: boolean; dataset?: Dataset }> {
+    return await useAuthStore().requestWithToken("/api/data", {
+      method: "POST",
+      body: formData,
+    });
+  }
+
+  /**
+   * Delete a dataset
+   */
+  static async delete(id: number): Promise<{ success: boolean }> {
+    return await useAuthStore().requestWithToken(`/api/data/${id}`, {
+      method: "DELETE",
+    });
+  }
 }

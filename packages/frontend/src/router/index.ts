@@ -33,6 +33,18 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/projects/ProjectDetailView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/work-items/:id',
+    name: 'WorkItemDetail',
+    component: () => import('../views/work-items/WorkItemDetailView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/projects/:projectId/datasets',
+    name: 'ProjectDatasets',
+    component: () => import('../views/datasets/DatasetsView.vue'),
+    meta: { requiresAuth: true },
+  },
 ];
 
 const router = createRouter({
