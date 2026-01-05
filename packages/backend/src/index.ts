@@ -54,3 +54,6 @@ serve({
 });
 
 export default app;
+
+// Export type for Hono RPC client
+export type AppType = typeof app;

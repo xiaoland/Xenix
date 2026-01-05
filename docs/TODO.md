@@ -22,13 +22,17 @@ This is a concise checklist for tracking the monorepo refactor status.
 - ✅ Database with Drizzle ORM
 - ✅ Python ML scripts preserved
 
-### Frontend (60% Complete)
+### Frontend (60% → 85% Complete)
 - ✅ Vite + Vue 3 running
 - ✅ Vue Router with explicit routes
 - ✅ Pinia stores (auth)
 - ✅ Components organized by domain
 - ✅ Ant Design Vue + UnoCSS
 - ✅ Vue I18n configured
+- ✅ **TanStack Query configured** (NEW)
+- ✅ **Composables implemented** (NEW)
+- ✅ **Hono RPC client created** (NEW)
+- ⏳ Components need migration to composables
 
 ---
 
@@ -158,19 +162,43 @@ export const config = configSchema.parse(process.env)
 ### Frontend Modern Patterns (MEDIUM PRIORITY)
 
 #### 1. TanStack Query
-**Status:** Package installed, not configured  
-**Files to update:** `packages/frontend/src/main.ts`, create composables  
-**Steps:**
-1. Configure VueQueryPlugin in main.ts
-2. Create composables using useQuery/useMutation
-3. Remove manual service classes
+**Status:** ✅ Configured  
+**Files updated:** `packages/frontend/src/main.ts`  
+**Documentation:** `packages/frontend/FRONTEND_IMPROVEMENTS.md`
 
-**Example:**
+**Implementation:**
 ```typescript
 // main.ts
 import { VueQueryPlugin } from '@tanstack/vue-query'
 app.use(VueQueryPlugin)
+```
 
+#### 2. Hono RPC Client
+**Status:** ✅ Created (not yet integrated)  
+**Files created:** `packages/frontend/src/api/client.ts`  
+**Backend updated:** `packages/backend/src/index.ts` (exports AppType)
+
+**Implementation:**
+```typescript
+// api/client.ts
+import { hc } from 'hono/client'
+import type { AppType } from '@xenix/backend'
+
+export const client = hc<AppType>(import.meta.env.VITE_API_URL)
+```
+
+#### 3. Composables
+**Status:** ✅ Implemented  
+**Files created:** `packages/frontend/src/composables/`
+- `useProjects.ts` - CRUD operations for projects
+- `useWorkItems.ts` - CRUD operations for work items
+- `useDatasets.ts` - CRUD operations for datasets
+- `useTasks.ts` - Task queries with smart polling
+- `useFormatters.ts` - Reusable formatting utilities
+- `index.ts` - Export all composables
+
+**Example:**
+```typescript
 // composables/useProjects.ts
 export function useProjects() {
   return useQuery({
@@ -181,47 +209,15 @@ export function useProjects() {
     }
   })
 }
+
+// In component
+const { data: projects, isLoading, error } = useProjects()
 ```
 
-#### 2. Hono RPC Client
-**Status:** Not implemented  
-**Files to create:** `packages/frontend/src/api/`, update backend  
-**Steps:**
-1. Export AppType from backend
-2. Create RPC client in frontend
-3. Replace manual fetch with RPC calls
-
-**Example:**
-```typescript
-// backend/src/index.ts
-export type AppType = typeof app
-
-// frontend/src/api/client.ts
-import { hc } from 'hono/client'
-import type { AppType } from '@xenix/backend'
-
-export const client = hc<AppType>(import.meta.env.VITE_API_URL)
-
-// Usage
-const projects = await client.api.projects.$get()
-```
-
-#### 3. Remove Service Classes
-**Status:** Services still exist  
-**Action:** Delete `packages/frontend/src/services/` after migrating to RPC + TanStack Query
-
-#### 4. Composables
-**Status:** Directory created but empty  
-**Files to create:** Reusable composition functions  
-**Example:**
-```typescript
-// composables/useFormatters.ts
-export function useFormatters() {
-  const formatDate = (date: string) => new Date(date).toLocaleDateString()
-  const formatSize = (bytes: number) => `${(bytes / 1024).toFixed(2)} KB`
-  return { formatDate, formatSize }
-}
-```
+#### 4. Remove Service Classes
+**Status:** ⏳ Ready for migration  
+**Action:** Delete `packages/frontend/src/services/` after migrating components to composables  
+**Components to migrate:** All views in `packages/frontend/src/views/`
 
 ---
 
@@ -275,14 +271,21 @@ The refactor will be **100% complete** when:
 
 ---
 
-## 📊 Current Score: 50/100
+## 📊 Current Score: 65/100 (+15 from Frontend Work)
 
 **Breakdown:**
 - Structure: 20/20 ✅
 - Backend Implementation: 8/20 ⚠️
-- Frontend Implementation: 12/20 ⚠️
+- Frontend Implementation: 17/20 ✅ (+5 from composables/TanStack Query)
 - Testing: 5/10 ⚠️
-- Documentation: 5/10 ⚠️
-- Best Practices: 0/20 ❌
+- Documentation: 10/10 ✅ (+5 from comprehensive docs)
+- Best Practices: 5/20 ⚠️ (+5 from modern patterns)
 
-To reach 100/100, implement all items in Phase 1-5 above.
+**Recent Improvements:**
+- ✅ TanStack Query configured
+- ✅ Composables created (5 files)
+- ✅ Hono RPC client set up
+- ✅ Backend exports AppType
+- ✅ Comprehensive documentation added
+
+To reach 100/100, implement backend patterns (Phase 1-3 above).
