@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "vite",
+    "dev": "dotenv -c development -- dotenv -c development -- vite",
     "build": "vue-tsc && vite build",
     "preview": "vite preview"
   },

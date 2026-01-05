@@ -36,6 +36,7 @@
     "@types/pg": "^8.11.10",
     "@unocss/nuxt": "^66.5.10",
     "@unocss/preset-icons": "^66.5.10",
+    "dotenv-cli": "^11.0.0",
     "sass": "^1.97.0",
     "unocss": "^66.5.10"
   }
