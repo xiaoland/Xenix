@@ -1,0 +1,289 @@
+<template>
+  <default-layout>
+    <div class="max-w-7xl mx-auto px-4 py-8">
+      <div class="mb-6">
+        <h1 class="text-3xl font-bold mb-2">Task Monitor</h1>
+        <p class="text-gray-600">Monitor all background tasks across your projects</p>
+      </div>
+
+      <!-- Filters -->
+      <a-card class="mb-6">
+        <div class="flex gap-4 items-end flex-wrap">
+          <div class="flex-1 min-w-[200px]">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+            <a-select
+              v-model:value="statusFilter"
+              style="width: 100%"
+              @change="fetchTasks"
+            >
+              <a-select-option value="">All</a-select-option>
+              <a-select-option value="pending">Pending</a-select-option>
+              <a-select-option value="running">Running</a-select-option>
+              <a-select-option value="completed">Completed</a-select-option>
+              <a-select-option value="failed">Failed</a-select-option>
+            </a-select>
+          </div>
+
+          <div class="flex-1 min-w-[200px]">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Type</label>
+            <a-select
+              v-model:value="typeFilter"
+              style="width: 100%"
+              @change="fetchTasks"
+            >
+              <a-select-option value="">All</a-select-option>
+              <a-select-option value="auto-tune">Auto-Tune</a-select-option>
+              <a-select-option value="manual-tune">Manual-Tune</a-select-option>
+              <a-select-option value="predict-file">Predict (File)</a-select-option>
+              <a-select-option value="predict-inline">Predict (Inline)</a-select-option>
+            </a-select>
+          </div>
+
+          <a-button @click="fetchTasks" :loading="loading">
+            <span class="i-mdi-refresh mr-1"></span>
+            Refresh
+          </a-button>
+        </div>
+      </a-card>
+
+      <!-- Tasks Table -->
+      <a-card>
+        <a-table
+          :columns="columns"
+          :data-source="tasks"
+          :loading="loading"
+          :pagination="{
+            current: currentPage,
+            pageSize: 20,
+            total: tasks.length,
+            showSizeChanger: false,
+          }"
+          row-key="id"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'id'">
+              <span class="font-mono text-sm">#{{ record.id }}</span>
+            </template>
+
+            <template v-else-if="column.key === 'type'">
+              <a-tag>{{ record.type }}</a-tag>
+            </template>
+
+            <template v-else-if="column.key === 'status'">
+              <a-tag :color="getStatusColor(record.status)">
+                {{ record.status }}
+              </a-tag>
+            </template>
+
+            <template v-else-if="column.key === 'model'">
+              <span v-if="record.parameter?.model" class="font-medium">
+                {{ formatModelName(record.parameter.model) }}
+              </span>
+              <span v-else class="text-gray-400">-</span>
+            </template>
+
+            <template v-else-if="column.key === 'workItem'">
+              <router-link
+                v-if="record.workItemId"
+                :to="`/work-items/${record.workItemId}`"
+                class="text-blue-600 hover:text-blue-800"
+              >
+                Work Item #{{ record.workItemId }}
+              </router-link>
+              <span v-else class="text-gray-400">-</span>
+            </template>
+
+            <template v-else-if="column.key === 'createdAt'">
+              <span class="text-sm">{{ formatDate(record.createdAt) }}</span>
+            </template>
+
+            <template v-else-if="column.key === 'action'">
+              <a-button
+                size="small"
+                @click="viewLogs(record.id)"
+                class="inline-flex items-center"
+              >
+                <span class="i-mdi-file-document-outline mr-1"></span>
+                Logs
+              </a-button>
+            </template>
+          </template>
+        </a-table>
+      </a-card>
+
+      <!-- Logs Modal -->
+      <a-modal
+        v-model:open="logsModalVisible"
+        title="Task Logs"
+        :footer="null"
+        width="800px"
+      >
+        <div v-if="loadingLogs" class="text-center py-8">
+          <a-spin />
+        </div>
+        <div v-else-if="logs.length > 0" class="space-y-2">
+          <div
+            v-for="log in logs"
+            :key="log.timestamp"
+            class="p-2 bg-gray-50 rounded font-mono text-sm"
+          >
+            <span class="text-gray-500">{{ formatLogTime(log.timestamp) }}</span>
+            <span class="ml-2">{{ log.message }}</span>
+          </div>
+        </div>
+        <div v-else class="text-center py-8 text-gray-500">
+          No logs available
+        </div>
+      </a-modal>
+    </div>
+  </default-layout>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { message } from 'ant-design-vue';
+import DefaultLayout from '../../layouts/DefaultLayout.vue';
+import { TaskService } from '../../services';
+import { AVAILABLE_MODELS } from '../../constants/models';
+import type { TaskInfo } from '@xenix/shared';
+
+const router = useRouter();
+
+// State
+const tasks = ref<TaskInfo[]>([]);
+const logs = ref<any[]>([]);
+const loading = ref(false);
+const loadingLogs = ref(false);
+const logsModalVisible = ref(false);
+const statusFilter = ref('');
+const typeFilter = ref('');
+const currentPage = ref(1);
+
+// Polling
+let pollInterval: number | null = null;
+
+// Table columns
+const columns = [
+  { title: 'ID', key: 'id', width: 80 },
+  { title: 'Type', key: 'type', width: 140 },
+  { title: 'Status', key: 'status', width: 120 },
+  { title: 'Model', key: 'model', width: 150 },
+  { title: 'Work Item', key: 'workItem', width: 150 },
+  { title: 'Created', key: 'createdAt', width: 180 },
+  { title: 'Action', key: 'action', width: 100 },
+];
+
+/**
+ * Fetch all tasks (simplified - in real app would need to fetch by project/user)
+ * Since the backend doesn't have a "list all tasks" endpoint, we'll show a message
+ */
+const fetchTasks = async () => {
+  loading.value = true;
+  try {
+    // Note: Backend doesn't have a "list all tasks" endpoint
+    // In a real implementation, you would need to:
+    // 1. Fetch user's projects
+    // 2. Fetch tasks for each project
+    // For now, show empty state with helpful message
+    tasks.value = [];
+    message.info('Task monitoring requires a project context. Navigate to a work item to see its tasks.');
+  } catch (error: any) {
+    console.error('Failed to fetch tasks:', error);
+    message.error(error.message || 'Failed to fetch tasks');
+  } finally {
+    loading.value = false;
+  }
+};
+
+/**
+ * View task logs
+ */
+const viewLogs = async (taskId: number) => {
+  logsModalVisible.value = true;
+  loadingLogs.value = true;
+  
+  try {
+    const response = await TaskService.fetchLogs(taskId);
+    logs.value = response.logs || [];
+  } catch (error: any) {
+    console.error('Failed to fetch logs:', error);
+    message.error(error.message || 'Failed to fetch logs');
+    logs.value = [];
+  } finally {
+    loadingLogs.value = false;
+  }
+};
+
+/**
+ * Get status color
+ */
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'completed': return 'success';
+    case 'failed': return 'error';
+    case 'running': return 'processing';
+    case 'pending': return 'default';
+    default: return 'default';
+  }
+};
+
+/**
+ * Format model name
+ */
+const formatModelName = (modelValue: string) => {
+  const model = AVAILABLE_MODELS.find(m => m.value === modelValue);
+  return model ? model.label : modelValue;
+};
+
+/**
+ * Format date
+ */
+const formatDate = (dateStr: string) => {
+  const date = new Date(dateStr);
+  return date.toLocaleString();
+};
+
+/**
+ * Format log timestamp
+ */
+const formatLogTime = (timestamp: string) => {
+  const date = new Date(timestamp);
+  return date.toLocaleTimeString();
+};
+
+/**
+ * Start polling for updates
+ */
+const startPolling = () => {
+  if (pollInterval) return;
+  pollInterval = window.setInterval(() => {
+    const hasRunningTasks = tasks.value.some(t => 
+      t.status === 'pending' || t.status === 'running'
+    );
+    if (hasRunningTasks) {
+      fetchTasks();
+    }
+  }, 5000);
+};
+
+/**
+ * Stop polling
+ */
+const stopPolling = () => {
+  if (pollInterval) {
+    clearInterval(pollInterval);
+    pollInterval = null;
+  }
+};
+
+// Lifecycle
+onMounted(() => {
+  fetchTasks();
+  startPolling();
+});
+
+onUnmounted(() => {
+  stopPolling();
+});
+</script>

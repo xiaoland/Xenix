@@ -18,6 +18,13 @@
               Projects
             </router-link>
             
+            <router-link
+              to="/tasks"
+              class="text-gray-700 hover:text-blue-600 transition-colors"
+            >
+              Tasks
+            </router-link>
+            
             <a-button v-if="isAuthenticated" type="text" danger @click="handleLogout">
               <span class="i-mdi-logout mr-1" />
               Logout
