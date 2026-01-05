@@ -1,7 +1,7 @@
 <template>
-  <div id="app">
-    <router-view />
-  </div>
+  <router-view v-slot="{ Component }">
+    <component :is="Component" />
+  </router-view>
 </template>
 
 <script setup lang="ts">
@@ -11,6 +11,12 @@
 <style lang="scss">
 #app {
   width: 100%;
-  height: 100vh;
+  min-height: 100vh;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 </style>
