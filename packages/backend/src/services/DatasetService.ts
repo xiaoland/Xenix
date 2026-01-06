@@ -2,8 +2,13 @@
  * Dataset Service
  * Business logic for dataset operations
  */
+import fs from 'fs/promises';
+
 import { NotFoundError } from '../errors/index.js';
 import { DatasetRepository } from '../repositories/index.js';
+import { analyzeExcelFile } from '../utils/datasetUtils.js';
+import logger from '../utils/logger/index.js';
+import { saveUploadedFile, validateExcelFile } from '../utils/taskUtils.js';
 
 export class DatasetService {
   private datasetRepo: DatasetRepository;
@@ -26,8 +31,41 @@ export class DatasetService {
     return dataset;
   }
 
-  async createDataset(data: any) {
-    return await this.datasetRepo.create(data);
+  async createDataset(
+    file: File,
+    name: string,
+    description: string | null,
+    projectId: number | null,
+    datasetsDir: string
+  ) {
+    // Validate file
+    if (!validateExcelFile(file.name)) {
+      throw new Error(
+        'Invalid file type. Only Excel files (.xlsx, .xls) are allowed.'
+      );
+    }
+
+    // Save uploaded file
+    const filePath = await saveUploadedFile(file, datasetsDir);
+
+    // Get file stats
+    const stats = await fs.stat(filePath);
+    const fileSize = stats.size;
+
+    // Analyze the Excel file
+    const { columns, rowCount } = await analyzeExcelFile(filePath);
+
+    // Create dataset record
+    return await this.datasetRepo.create({
+      projectId: projectId && !isNaN(projectId) ? projectId : null,
+      name,
+      description,
+      filePath,
+      fileName: file.name,
+      fileSize,
+      columns,
+      rowCount,
+    });
   }
 
   async deleteDataset(id: number) {
@@ -37,7 +75,22 @@ export class DatasetService {
       throw new NotFoundError('Dataset');
     }
 
+    // Delete the file from filesystem if it exists
+    try {
+      await fs.unlink(dataset.filePath);
+    } catch (fileError: any) {
+      // Ignore ENOENT (file not found) errors, but log others
+      if (fileError.code !== 'ENOENT') {
+        logger.warn(
+          { error: fileError, filePath: dataset.filePath },
+          'Failed to delete file'
+        );
+      }
+    }
+
+    // Delete dataset record
     await this.datasetRepo.delete(id);
     return dataset;
   }
 }
+
