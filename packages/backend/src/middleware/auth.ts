@@ -1,8 +1,11 @@
 import { Context, Next } from 'hono';
-import { HTTPException } from 'hono/http-exception';
 import jwt from 'jsonwebtoken';
 import { db, schema } from '../database/index.js';
 import { eq } from 'drizzle-orm';
+import {
+  UnauthorizedError,
+  InternalServerError,
+} from '../errors/index.js';
 
 export interface AuthUser {
   id: string;
@@ -17,19 +20,19 @@ declare module 'hono' {
 }
 
 export async function authMiddleware(c: Context, next: Next) {
+  const authHeader = c.req.header('authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    throw new UnauthorizedError('Authentication required');
+  }
+
+  const token = authHeader.substring(7); // Remove "Bearer "
+  const jwtSecret = process.env.JWT_SECRET;
+
+  if (!jwtSecret) {
+    throw new InternalServerError('Server configuration error');
+  }
+
   try {
-    const authHeader = c.req.header('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new HTTPException(401, { message: 'Authentication required' });
-    }
-
-    const token = authHeader.substring(7); // Remove "Bearer "
-    const jwtSecret = process.env.JWT_SECRET;
-
-    if (!jwtSecret) {
-      throw new HTTPException(500, { message: 'Server configuration error' });
-    }
-
     const decoded = jwt.verify(token, jwtSecret) as { userId: string };
     const userId = decoded.userId;
 
@@ -45,24 +48,23 @@ export async function authMiddleware(c: Context, next: Next) {
       .limit(1);
 
     if (!user) {
-      throw new HTTPException(401, { message: 'Invalid token' });
+      throw new UnauthorizedError('Invalid token');
     }
 
     c.set('user', user);
     await next();
   } catch (error) {
-    if (error instanceof HTTPException) {
-      throw error;
+    if (error instanceof jwt.JsonWebTokenError) {
+      throw new UnauthorizedError('Invalid token');
     }
-    console.error('Auth error:', error);
-    throw new HTTPException(401, { message: 'Authentication failed' });
+    throw error;
   }
 }
 
 export function requireAuth(c: Context): AuthUser {
   const user = c.get('user');
   if (!user) {
-    throw new HTTPException(401, { message: 'Authentication required' });
+    throw new UnauthorizedError('Authentication required');
   }
   return user;
 }

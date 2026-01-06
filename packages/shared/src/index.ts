@@ -1,2 +1,2 @@
-// Shared types and utilities
-export * from './types/index.js';
+// Shared types, schemas, and utilities
+export * from "./schemas/index.js";

@@ -46,7 +46,7 @@
 import { ref, computed } from 'vue';
 import { message } from 'ant-design-vue';
 import type { UploadProps } from 'ant-design-vue';
-import { DatasetService } from '../../services';
+import { useUploadDataset } from '../../composables';
 
 const props = defineProps<{
   projectId: number;
@@ -59,7 +59,9 @@ const emit = defineEmits<{
 
 const datasetName = ref('');
 const fileList = ref<any[]>([]);
-const uploading = ref(false);
+
+// Use composable for upload
+const { mutate: uploadDataset, isPending: uploading } = useUploadDataset();
 
 const canUpload = computed(() => {
   return datasetName.value.trim() !== '' && fileList.value.length > 0;
@@ -85,33 +87,27 @@ const beforeUpload: UploadProps['beforeUpload'] = (file) => {
   return false; // Prevent auto upload
 };
 
-const handleUpload = async () => {
+const handleUpload = () => {
   if (!canUpload.value) return;
 
-  uploading.value = true;
-  try {
-    const formData = new FormData();
-    formData.append('file', fileList.value[0].originFileObj);
-    formData.append('name', datasetName.value);
-    formData.append('projectId', String(props.projectId));
+  const formData = new FormData();
+  formData.append('file', fileList.value[0].originFileObj);
+  formData.append('name', datasetName.value);
+  formData.append('projectId', String(props.projectId));
 
-    const response = await DatasetService.upload(formData);
-    
-    if (response.success) {
+  uploadDataset(formData, {
+    onSuccess: () => {
       message.success('Dataset uploaded successfully');
       emit('success');
       
       // Reset form
       datasetName.value = '';
       fileList.value = [];
-    } else {
+    },
+    onError: (error: any) => {
+      console.error('Upload failed:', error);
       message.error('Failed to upload dataset');
     }
-  } catch (err) {
-    console.error('Upload failed:', err);
-    message.error('Failed to upload dataset');
-  } finally {
-    uploading.value = false;
-  }
+  });
 };
 </script>

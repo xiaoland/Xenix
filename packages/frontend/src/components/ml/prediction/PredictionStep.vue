@@ -32,7 +32,10 @@
     </div>
 
     <!-- File Upload Mode -->
-    <div v-if="predictionMode === 'file'" class="bg-white rounded-lg border p-4">
+    <div
+      v-if="predictionMode === 'file'"
+      class="bg-white rounded-lg border p-4"
+    >
       <h3 class="text-lg font-medium mb-3">Upload Prediction Data</h3>
       <a-upload-dragger
         v-model:file-list="fileList"
@@ -42,7 +45,9 @@
         accept=".xlsx,.xls,.csv"
       >
         <p class="ant-upload-drag-icon">
-          <span class="i-mdi-file-table text-6xl text-green-500 inline-block"></span>
+          <span
+            class="i-mdi-file-table text-6xl text-green-500 inline-block"
+          ></span>
         </p>
         <p class="ant-upload-text">Click or drag file to upload</p>
         <p class="ant-upload-hint">
@@ -65,16 +70,24 @@
     </div>
 
     <!-- Inline Input Mode -->
-    <div v-else-if="predictionMode === 'inline'" class="bg-white rounded-lg border p-4">
+    <div
+      v-else-if="predictionMode === 'inline'"
+      class="bg-white rounded-lg border p-4"
+    >
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-lg font-medium">Manual Data Input</h3>
-        <a-button type="primary" @click="addRow" class="inline-flex items-center">
+        <a-button
+          type="primary"
+          @click="addRow"
+          class="inline-flex items-center"
+        >
           <span class="i-mdi-plus mr-1" />
           Add Row
         </a-button>
       </div>
       <p class="text-sm text-gray-600 mb-4">
-        Enter values for each feature column. You can add multiple rows for batch prediction.
+        Enter values for each feature column. You can add multiple rows for
+        batch prediction.
       </p>
 
       <a-table
@@ -139,23 +152,19 @@
 
     <!-- Navigation -->
     <div class="flex justify-between">
-      <a-button @click="emit('back')">
-        Back to Tuning
-      </a-button>
-      <a-button @click="handleReset">
-        Reset Workflow
-      </a-button>
+      <a-button @click="emit('back')"> Back to Tuning </a-button>
+      <a-button @click="handleReset"> Reset Workflow </a-button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { message } from 'ant-design-vue';
-import type { UploadProps } from 'ant-design-vue';
-import { PredictionService } from '../../../services';
-import { AVAILABLE_MODELS } from '../../../constants/models';
-import PredictionResult from './PredictionResult.vue';
+import { ref, computed } from "vue";
+import { message } from "ant-design-vue";
+import type { UploadProps } from "ant-design-vue";
+import { client } from "../../../api/client";
+import { AVAILABLE_MODELS } from "../../../constants/models";
+import PredictionResult from "./PredictionResult.vue";
 
 const props = defineProps<{
   workItemId: number;
@@ -171,7 +180,7 @@ const emit = defineEmits<{
 }>();
 
 // State
-const predictionMode = ref<'file' | 'inline'>('file');
+const predictionMode = ref<"file" | "inline">("file");
 const fileList = ref<any[]>([]);
 const inputData = ref<Record<string, any>[]>([]);
 const isPredicting = ref(false);
@@ -186,8 +195,8 @@ const inputColumns = computed(() => {
     width: 150,
   }));
   cols.push({
-    title: 'Action',
-    key: 'action',
+    title: "Action",
+    key: "action",
     width: 100,
   });
   return cols;
@@ -197,7 +206,7 @@ const inputColumns = computed(() => {
  * Format model name for display
  */
 const formatModelName = (modelValue: string) => {
-  const model = AVAILABLE_MODELS.find(m => m.value === modelValue);
+  const model = AVAILABLE_MODELS.find((m) => m.value === modelValue);
   return model ? model.label : modelValue;
 };
 
@@ -222,23 +231,24 @@ const removeRow = (index: number) => {
 /**
  * Before upload handler
  */
-const beforeUpload: UploadProps['beforeUpload'] = (file) => {
-  const isExcelOrCsv = 
-    file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-    file.type === 'application/vnd.ms-excel' ||
-    file.type === 'text/csv';
-  
+const beforeUpload: UploadProps["beforeUpload"] = (file) => {
+  const isExcelOrCsv =
+    file.type ===
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+    file.type === "application/vnd.ms-excel" ||
+    file.type === "text/csv";
+
   if (!isExcelOrCsv) {
-    message.error('You can only upload Excel or CSV files!');
+    message.error("You can only upload Excel or CSV files!");
     return false;
   }
-  
+
   const isLt10M = file.size / 1024 / 1024 < 10;
   if (!isLt10M) {
-    message.error('File must be smaller than 10MB!');
+    message.error("File must be smaller than 10MB!");
     return false;
   }
-  
+
   return false; // Prevent auto upload
 };
 
@@ -252,20 +262,10 @@ const startPredictionFromFile = async () => {
 
   isPredicting.value = true;
   try {
-    const file = fileList.value[0].originFileObj || fileList.value[0];
-    const response = await PredictionService.start({
-      file,
-      model: props.selectedModel,
-      tuningTaskId: props.taskId,
-      workItemId: props.workItemId,
-    });
-    
-    message.success('Prediction started successfully');
-    predictionTaskId.value = response.taskId;
-    fileList.value = [];
+    throw new Error("File prediction not implemented");
   } catch (error: any) {
-    console.error('Prediction failed:', error);
-    message.error(error.message || 'Failed to start prediction');
+    console.error("Prediction failed:", error);
+    message.error(error.message || "Failed to start prediction");
   } finally {
     isPredicting.value = false;
   }
@@ -280,35 +280,39 @@ const predictInline = async () => {
   }
 
   // Validate that all fields are filled
-  const hasEmptyFields = inputData.value.some(row =>
-    props.featureColumns.some(col => row[col] === null || row[col] === undefined)
+  const hasEmptyFields = inputData.value.some((row) =>
+    props.featureColumns.some(
+      (col) => row[col] === null || row[col] === undefined
+    )
   );
 
   if (hasEmptyFields) {
-    message.error('Please fill in all fields');
+    message.error("Please fill in all fields");
     return;
   }
 
   isPredicting.value = true;
   try {
     // Remove the 'key' field from data
-    const cleanData = inputData.value.map(row => {
+    const cleanData = inputData.value.map((row) => {
       const { key, ...rest } = row;
       return rest;
     });
 
-    const response = await PredictionService.predictInline({
-      predictionData: cleanData,
-      model: props.selectedModel,
-      tuningTaskId: props.taskId,
-      workItemId: props.workItemId,
+    const response = await client.api.predict.inline.$post({
+      json: {
+        predictionData: cleanData,
+        model: props.selectedModel,
+        tuningTaskId: props.taskId,
+        workItemId: props.workItemId,
+      },
     });
-    
-    message.success('Prediction completed successfully');
+
+    message.success("Prediction completed successfully");
     predictionTaskId.value = response.taskId;
   } catch (error: any) {
-    console.error('Prediction failed:', error);
-    message.error(error.message || 'Failed to predict');
+    console.error("Prediction failed:", error);
+    message.error(error.message || "Failed to predict");
   } finally {
     isPredicting.value = false;
   }
@@ -318,6 +322,6 @@ const predictInline = async () => {
  * Reset workflow
  */
 const handleReset = () => {
-  emit('reset');
+  emit("reset");
 };
 </script>

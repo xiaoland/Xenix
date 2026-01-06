@@ -6,20 +6,20 @@
         <a-breadcrumb-item>
           <router-link to="/">Home</router-link>
         </a-breadcrumb-item>
-        <a-breadcrumb-item>
-          Datasets
-        </a-breadcrumb-item>
+        <a-breadcrumb-item> Datasets </a-breadcrumb-item>
       </a-breadcrumb>
 
       <!-- Header -->
       <div class="flex justify-between items-center mb-6">
         <div>
           <h1 class="text-3xl font-bold">Datasets</h1>
-          <p class="text-gray-600 mt-1">
-            Manage datasets for your project
-          </p>
+          <p class="text-gray-600 mt-1">Manage datasets for your project</p>
         </div>
-        <a-button type="primary" class="inline-flex items-center" @click="showUploadModal = true">
+        <a-button
+          type="primary"
+          class="inline-flex items-center"
+          @click="showUploadModal = true"
+        >
           <span class="i-mdi-cloud-upload mr-2"></span>
           Upload Dataset
         </a-button>
@@ -39,7 +39,11 @@
           <p class="text-gray-600 mb-4">
             Upload a dataset to get started with machine learning.
           </p>
-          <a-button type="primary" class="inline-flex items-center" @click="showUploadModal = true">
+          <a-button
+            type="primary"
+            class="inline-flex items-center"
+            @click="showUploadModal = true"
+          >
             <span class="i-mdi-cloud-upload mr-2"></span>
             Upload First Dataset
           </a-button>
@@ -69,7 +73,7 @@
               <strong>Columns:</strong> {{ dataset.columns.length }}
             </p>
             <p class="text-sm text-gray-600" v-if="dataset.filePath">
-              <strong>File:</strong> {{ dataset.filePath.split('/').pop() }}
+              <strong>File:</strong> {{ dataset.filePath.split("/").pop() }}
             </p>
             <p class="text-xs text-gray-500" v-if="dataset.createdAt">
               Uploaded: {{ new Date(dataset.createdAt).toLocaleDateString() }}
@@ -113,7 +117,9 @@
           </div>
           <div v-if="selectedDataset.filePath">
             <strong>File Path:</strong>
-            <p class="text-sm text-gray-600 mt-1">{{ selectedDataset.filePath }}</p>
+            <p class="text-sm text-gray-600 mt-1">
+              {{ selectedDataset.filePath }}
+            </p>
           </div>
         </div>
       </a-modal>
@@ -122,12 +128,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
-import { message, Modal } from 'ant-design-vue';
-import DefaultLayout from '../../layouts/DefaultLayout.vue';
-import DatasetUpload from '../../components/dataset/DatasetUpload.vue';
-import { DatasetService } from '../../services';
+import { ref, computed } from "vue";
+import { useRoute } from "vue-router";
+import { message, Modal } from "ant-design-vue";
+import DefaultLayout from "../../layouts/DefaultLayout.vue";
+import DatasetUpload from "../../components/dataset/DatasetUpload.vue";
+import { useDatasets, useDeleteDataset } from "../../composables";
 
 interface Dataset {
   id: number;
@@ -140,31 +146,20 @@ interface Dataset {
 const route = useRoute();
 const projectId = Number(route.params.projectId);
 
-const datasets = ref<Dataset[]>([]);
-const loading = ref(false);
+// Use composables for data fetching
+const { data: datasetsData, isLoading: loading, refetch } = useDatasets();
+const { mutate: deleteDataset } = useDeleteDataset();
+
+const datasets = computed(() => datasetsData.value || []);
+
 const showUploadModal = ref(false);
 const showDetailsModal = ref(false);
 const selectedDataset = ref<Dataset | null>(null);
 
-const fetchDatasets = async () => {
-  loading.value = true;
-  try {
-    const response = await DatasetService.listByProject(projectId);
-    if (response.success && response.datasets) {
-      datasets.value = response.datasets;
-    }
-  } catch (err) {
-    console.error('Failed to fetch datasets:', err);
-    message.error('Failed to load datasets');
-  } finally {
-    loading.value = false;
-  }
-};
-
 const handleUploadSuccess = () => {
   showUploadModal.value = false;
-  message.success('Dataset uploaded successfully');
-  fetchDatasets();
+  message.success("Dataset uploaded successfully");
+  refetch();
 };
 
 const viewDetails = (dataset: Dataset) => {
@@ -174,28 +169,22 @@ const viewDetails = (dataset: Dataset) => {
 
 const handleDelete = (id: number) => {
   Modal.confirm({
-    title: 'Delete Dataset',
-    content: 'Are you sure you want to delete this dataset? This action cannot be undone.',
-    okText: 'Delete',
-    okType: 'danger',
-    onOk: async () => {
-      try {
-        const response = await DatasetService.delete(id);
-        if (response.success) {
-          message.success('Dataset deleted successfully');
-          fetchDatasets();
-        } else {
-          message.error('Failed to delete dataset');
-        }
-      } catch (err) {
-        console.error('Failed to delete dataset:', err);
-        message.error('Failed to delete dataset');
-      }
+    title: "Delete Dataset",
+    content:
+      "Are you sure you want to delete this dataset? This action cannot be undone.",
+    okText: "Delete",
+    okType: "danger",
+    onOk: () => {
+      deleteDataset(id, {
+        onSuccess: () => {
+          message.success("Dataset deleted successfully");
+        },
+        onError: (error: any) => {
+          console.error("Failed to delete dataset:", error);
+          message.error("Failed to delete dataset");
+        },
+      });
     },
   });
 };
-
-onMounted(() => {
-  fetchDatasets();
-});
 </script>
