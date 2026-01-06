@@ -1,9 +1,11 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { logger } from "hono/logger";
+import { logger as honoLogger } from "hono/logger";
 import { prettyJSON } from "hono/pretty-json";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { config } from "./config/index.js";
+import logger from "./utils/logger/index.js";
 
 // Routes
 import authRoutes from "./routes/auth.js";
@@ -20,12 +22,12 @@ import obsrvRoutes from "./routes/obsrv.js";
 const app = new Hono();
 
 // Middleware
-app.use("*", logger());
+app.use("*", honoLogger());
 app.use("*", prettyJSON());
 app.use(
   "*",
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: config.FRONTEND_URL,
     credentials: true,
   })
 );
@@ -47,13 +49,11 @@ const routes = app
 // Error handler (must be last)
 app.onError(errorHandler);
 
-const port = Number(process.env.BACKEND_PORT) || 3000;
-
-console.log(`Starting server on port ${port}...`);
+logger.info({ port: config.BACKEND_PORT, env: config.NODE_ENV }, 'Starting server');
 
 serve({
   fetch: app.fetch,
-  port,
+  port: config.BACKEND_PORT,
 });
 
 export default app;

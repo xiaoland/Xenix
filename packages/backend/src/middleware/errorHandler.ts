@@ -1,5 +1,6 @@
 import { Context } from "hono";
 import { AppError } from "../errors/index.js";
+import logger from "../utils/logger/index.js";
 
 /**
  * Global error handler middleware
@@ -40,7 +41,7 @@ export const errorHandler = (err: Error, c: Context) => {
   }
 
   // Log unexpected errors
-  console.error("Unexpected error:", err);
+  logger.error({ err }, "Unexpected error");
 
   // Handle unexpected errors
   return c.json(

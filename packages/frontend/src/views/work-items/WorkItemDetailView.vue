@@ -66,7 +66,7 @@
             <div v-if="currentStep === 1">
               <tuning-step
                 :work-item-id="workItem.id"
-                :dataset-id="workItem.datasetId?.toString() || ''"
+                :dataset-id="workItem.datasetId || 0"
                 :feature-columns="workItem.featureColumns || []"
                 :target-column="workItem.targetColumn || ''"
                 @continue="handleTuningContinue"
@@ -102,17 +102,6 @@ import PrepareStep from "../../components/ml/prepare/PrepareStep.vue";
 import TuningStep from "../../components/ml/tuning/TuningStep.vue";
 import PredictionStep from "../../components/ml/prediction/PredictionStep.vue";
 import { useWorkItem } from "../../composables";
-
-interface WorkItem {
-  id: number;
-  name: string;
-  description?: string;
-  status: string;
-  projectId: number;
-  datasetId?: number;
-  featureColumns?: string[];
-  targetColumn?: string;
-}
 
 const route = useRoute();
 const router = useRouter();
