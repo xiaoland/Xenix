@@ -87,20 +87,20 @@ export const TaskSchema = z.discriminatedUnion('type', [
 ]);
 
 export const CreateAutoTuneTaskSchema = z.object({
-  workItemId: z.number(),
+  workItemId: z.number().optional(),
   model: z.string(),
-  datasetId: z.number(),
-  featureColumns: z.array(z.string()).min(1),
-  targetColumn: z.string(),
+  datasetId: z.number().optional(),
+  featureColumns: z.array(z.string()).optional(),
+  targetColumn: z.string().optional(),
   paramGrid: z.record(z.array(z.any())).optional(),
 });
 
 export const CreateManualTuneTaskSchema = z.object({
-  workItemId: z.number(),
+  workItemId: z.number().optional(),
   model: z.string(),
-  datasetId: z.number(),
-  featureColumns: z.array(z.string()).min(1),
-  targetColumn: z.string(),
+  datasetId: z.number().optional(),
+  featureColumns: z.array(z.string()).optional(),
+  targetColumn: z.string().optional(),
   parameters: z.record(z.any()),
 });
 
