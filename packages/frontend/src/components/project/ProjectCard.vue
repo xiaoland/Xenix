@@ -15,9 +15,12 @@
           {{ project.description }}
         </p>
         <div class="text-xs text-gray-400 ml-7">
-          <span v-if="(project as any).datasets">{{ (project as any).datasets.length }} datasets</span>
+          <span v-if="(project as any).datasets"
+            >{{ (project as any).datasets.length }} datasets</span
+          >
           <span v-if="(project as any).workItems">
-            · {{ (project as any).workItems.length }} work items</span>
+            · {{ (project as any).workItems.length }} work items</span
+          >
           <span> · Created {{ formatDate(project.createdAt) }}</span>
         </div>
       </div>

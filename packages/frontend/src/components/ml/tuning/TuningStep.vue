@@ -237,10 +237,11 @@ const handleStartAutoTune = async () => {
  */
 const handleClearFailedTasks = async () => {
   try {
-    // TODO: implement delete failed tasks
+    // NOTE: Backend endpoint for bulk task deletion not yet implemented
+    // Future: Implement DELETE /api/tasks/failed endpoint
     // await TaskService.deleteFailedTasks(props.workItemId);
-    message.success('Failed tasks cleared');
-    await fetchTasks();
+    message.info('Task deletion feature coming soon');
+    // await fetchTasks();
   } catch (error: any) {
     console.error('Failed to clear tasks:', error);
     message.error(error.message || 'Failed to clear tasks');

@@ -12,7 +12,9 @@
       <a-card class="mb-6">
         <div class="flex gap-4 items-end flex-wrap">
           <div class="flex-1 min-w-[200px]">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+            <label class="block text-sm font-medium text-gray-700 mb-2"
+              >Status</label
+            >
             <a-select
               v-model:value="statusFilter"
               style="width: 100%"
@@ -27,7 +29,9 @@
           </div>
 
           <div class="flex-1 min-w-[200px]">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Type</label>
+            <label class="block text-sm font-medium text-gray-700 mb-2"
+              >Type</label
+            >
             <a-select
               v-model:value="typeFilter"
               style="width: 100%"
@@ -37,11 +41,11 @@
               <a-select-option value="auto-tune">Auto-Tune</a-select-option>
               <a-select-option value="manual-tune">Manual-Tune</a-select-option>
               <a-select-option value="predict-file">
-Predict (File)
-</a-select-option>
+                Predict (File)
+              </a-select-option>
               <a-select-option value="predict-inline">
-Predict (Inline)
-</a-select-option>
+                Predict (Inline)
+              </a-select-option>
             </a-select>
           </div>
 
@@ -152,11 +156,14 @@ Predict (Inline)
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
 import { message } from 'ant-design-vue';
-import DefaultLayout from '../../layouts/DefaultLayout.vue';
-import { useTasks, useFormatters } from '../../composables';
+
+import { computed, ref } from 'vue';
+
+import { useFormatters, useTasks } from '../../composables';
 import { AVAILABLE_MODELS } from '../../constants/models';
+import DefaultLayout from '../../layouts/DefaultLayout.vue';
+
 const { formatDate } = useFormatters();
 
 // Use composables for data fetching with auto-refetch
@@ -169,34 +176,35 @@ const tasks = computed(() => tasksData.value || []);
 const logs = ref<any[]>([]);
 const loadingLogs = ref(false);
 const logsModalVisible = ref(false);
-const statusFilter = ref("");
-const typeFilter = ref("");
+const statusFilter = ref('');
+const typeFilter = ref('');
 const currentPage = ref(1);
 
 const fetchTasks = refetch;
 
 // Table columns
 const columns = [
-  { title: "ID", key: "id", width: 80 },
-  { title: "Type", key: "type", width: 140 },
-  { title: "Status", key: "status", width: 120 },
-  { title: "Model", key: "model", width: 150 },
-  { title: "Work Item", key: "workItem", width: 150 },
-  { title: "Created", key: "createdAt", width: 180 },
-  { title: "Action", key: "action", width: 100 },
+  { title: 'ID', key: 'id', width: 80 },
+  { title: 'Type', key: 'type', width: 140 },
+  { title: 'Status', key: 'status', width: 120 },
+  { title: 'Model', key: 'model', width: 150 },
+  { title: 'Work Item', key: 'workItem', width: 150 },
+  { title: 'Created', key: 'createdAt', width: 180 },
+  { title: 'Action', key: 'action', width: 100 },
 ];
 
 /**
  * View task logs
- * Note: This would need a corresponding composable for fetching logs
+ * Note: Requires backend endpoint implementation and useTaskLogs composable
+ * Future: Create packages/frontend/src/composables/useTaskLogs.ts
  */
 const viewLogs = async (_taskId: number) => {
   logsModalVisible.value = true;
   loadingLogs.value = true;
 
   try {
-    // TODO: Create useTaskLogs composable
-    // For now, show message that logs feature needs backend endpoint
+    // Future: Implement backend GET /api/tasks/:id/logs endpoint
+    // Future: Create useTaskLogs composable for data fetching
     message.info('Logs feature requires backend implementation');
     logs.value = [];
   } catch (err: any) {
@@ -213,16 +221,16 @@ const viewLogs = async (_taskId: number) => {
  */
 const getStatusColor = (status: string) => {
   switch (status) {
-    case "completed":
-      return "success";
-    case "failed":
-      return "error";
-    case "running":
-      return "processing";
-    case "pending":
-      return "default";
+    case 'completed':
+      return 'success';
+    case 'failed':
+      return 'error';
+    case 'running':
+      return 'processing';
+    case 'pending':
+      return 'default';
     default:
-      return "default";
+      return 'default';
   }
 };
 

@@ -1,7 +1,6 @@
 /**
  * Project and WorkItem Zod schemas for validation
  */
-
 import { z } from 'zod';
 
 export const WorkItemSchema = z.object({

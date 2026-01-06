@@ -151,7 +151,11 @@ const predict = new Hono()
     );
   });
 
-// TODO: by-file and generic predict endpoints
-// These are complex and require file upload handling similar to datasets
+/**
+ * Future endpoints:
+ * - POST /predict/by-file - Accept file upload for batch prediction
+ * - POST /predict/generic - Generic prediction endpoint with customizable input format
+ * These require additional file upload handling similar to datasets endpoints
+ */
 
 export default predict;

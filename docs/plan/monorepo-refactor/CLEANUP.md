@@ -193,6 +193,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
   - ❌ `ModelService.ts` - stub only
 - [ ] Complete or remove stubs
 - [ ] Ensure all services follow consistent pattern:
+
   ```typescript
   export class XxxService {
     constructor(private repo: XxxRepository) {}

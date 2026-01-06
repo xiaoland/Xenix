@@ -1,7 +1,6 @@
 /**
  * Prediction-related Zod schemas for validation
  */
-
 import { z } from 'zod';
 
 // More specific schema for prediction data values (valid JSON types)

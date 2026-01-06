@@ -94,14 +94,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { message } from "ant-design-vue";
-import DefaultLayout from "../../layouts/DefaultLayout.vue";
-import PrepareStep from "../../components/ml/prepare/PrepareStep.vue";
-import TuningStep from "../../components/ml/tuning/TuningStep.vue";
-import PredictionStep from "../../components/ml/prediction/PredictionStep.vue";
-import { useWorkItem } from "../../composables";
+import { message } from 'ant-design-vue';
+
+import { computed, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+
+import PredictionStep from '../../components/ml/prediction/PredictionStep.vue';
+import PrepareStep from '../../components/ml/prepare/PrepareStep.vue';
+import TuningStep from '../../components/ml/tuning/TuningStep.vue';
+import { useWorkItem } from '../../composables';
+import DefaultLayout from '../../layouts/DefaultLayout.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -134,7 +136,7 @@ const checkWorkItemStep = () => {
   ) {
     // Skip to tuning step
     currentStep.value = 1;
-    message.info("Restored saved dataset configuration");
+    message.info('Restored saved dataset configuration');
   }
 };
 
@@ -145,14 +147,14 @@ if (workItem.value) {
 
 const getStatusColor = (status: string) => {
   switch (status) {
-    case "active":
-      return "green";
-    case "completed":
-      return "blue";
-    case "archived":
-      return "gray";
+    case 'active':
+      return 'green';
+    case 'completed':
+      return 'blue';
+    case 'archived':
+      return 'gray';
     default:
-      return "default";
+      return 'default';
   }
 };
 

@@ -23,11 +23,13 @@ packages/
 ### Setup
 
 1. Install dependencies:
+
 ```bash
 pnpm install
 ```
 
 2. Configure environment:
+
 ```bash
 # Backend
 cp packages/backend/.env.example packages/backend/.env
@@ -35,6 +37,7 @@ cp packages/backend/.env.example packages/backend/.env
 ```
 
 3. Setup database:
+
 ```bash
 pnpm db:generate
 pnpm db:migrate
@@ -43,11 +46,13 @@ pnpm db:migrate
 ### Running in Development
 
 Run both frontend and backend concurrently:
+
 ```bash
 pnpm dev
 ```
 
 Or run them separately:
+
 ```bash
 # Terminal 1 - Backend (http://localhost:3000)
 pnpm dev:backend
@@ -67,6 +72,7 @@ pnpm build
 ### Backend (`@xenix/backend`)
 
 Hono-based API server with:
+
 - RESTful API endpoints
 - PostgreSQL database with DrizzleORM
 - JWT authentication
@@ -78,6 +84,7 @@ Hono-based API server with:
 ### Frontend (`@xenix/frontend`)
 
 Vite + Vue 3 single-page application with:
+
 - Vue Router for routing
 - Pinia for state management
 - Ant Design Vue for UI components
@@ -99,6 +106,7 @@ This project was migrated from a Nuxt.js fullstack application to a monorepo str
 - **Structure**: Monolithic → Monorepo
 
 Benefits:
+
 - Faster build times with Vite
 - Independent deployment of frontend and backend
 - Clearer separation of concerns

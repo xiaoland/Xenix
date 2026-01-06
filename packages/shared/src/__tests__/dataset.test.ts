@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import type { Dataset, ColumnSelection } from '../types/dataset';
+import { describe, expect, it } from 'vitest';
+
+import type { ColumnSelection, Dataset } from '../types/dataset';
 
 describe('Dataset Types', () => {
   describe('Dataset', () => {

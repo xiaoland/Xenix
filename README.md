@@ -32,6 +32,7 @@ packages/
 ### Tech Stack
 
 **Frontend:**
+
 - Framework: Vite + Vue 3 (Composition API)
 - UI Library: Ant Design Vue
 - State Management: Pinia
@@ -40,17 +41,20 @@ packages/
 - i18n: Vue I18n
 
 **Backend:**
+
 - Framework: Hono
 - Database: PostgreSQL
 - ORM: Drizzle ORM
 - Authentication: JWT with bcrypt
 
 **Machine Learning:**
+
 - Language: Python 3.9+
 - Package Manager: PDM
 - Libraries: scikit-learn, pandas, XGBoost, LightGBM
 
 **Infrastructure:**
+
 - Monorepo: pnpm workspaces
 - Testing: Vitest
 - Database: PostgreSQL 17 (Docker)
@@ -59,6 +63,7 @@ packages/
 ## Quick Start
 
 ### Prerequisites
+
 - Node.js 18+
 - pnpm 8+
 - Python 3.9+
@@ -96,6 +101,7 @@ pnpm dev
 ```
 
 Access the application:
+
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:3000
 - Health Check: http://localhost:3000/health
@@ -116,11 +122,13 @@ pnpm test:coverage
 ## Documentation
 
 ### General
+
 - [Deployment Guide](docs/DEPLOYMENT.md) - Production deployment instructions
 - [Migration Notes](docs/MIGRATION-NOTES.md) - Migration journey from Nuxt to monorepo
 - [Architecture Plan](docs/plan/monorepo-refactor-vite-vue-hono.md) - Detailed architecture documentation
 
 ### Legacy Documentation (from Nuxt version)
+
 - [Supported Models](docs/models.md)
 - [Setup Guide](docs/setup.md)
 - [Usage Guide](docs/usage.md)
@@ -134,6 +142,7 @@ pnpm test:coverage
 ### Package Scripts
 
 **Root level:**
+
 ```bash
 pnpm dev              # Run all packages in development mode
 pnpm dev:frontend     # Run frontend only
@@ -147,6 +156,7 @@ pnpm docker:down      # Stop containers
 ```
 
 **Individual packages:**
+
 ```bash
 cd packages/shared    # Shared types and utilities
 pnpm test             # Run tests
@@ -231,4 +241,3 @@ This project is licensed under the MIT License.
 - ML powered by scikit-learn, XGBoost, and LightGBM
 - UI components from Ant Design Vue
 - Styling with UnoCSS
-

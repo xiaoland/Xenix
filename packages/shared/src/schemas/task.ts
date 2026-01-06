@@ -1,10 +1,14 @@
 /**
  * Task Zod schemas for validation
  */
-
 import { z } from 'zod';
 
-export const TaskStatusSchema = z.enum(['pending', 'running', 'completed', 'failed']);
+export const TaskStatusSchema = z.enum([
+  'pending',
+  'running',
+  'completed',
+  'failed',
+]);
 
 export const AutoTuneTaskParameterSchema = z.object({
   model: z.string(),
@@ -116,7 +120,9 @@ export const CreatePredictTaskSchema = z.object({
 
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 export type AutoTuneTaskParameter = z.infer<typeof AutoTuneTaskParameterSchema>;
-export type ManualTuneTaskParameter = z.infer<typeof ManualTuneTaskParameterSchema>;
+export type ManualTuneTaskParameter = z.infer<
+  typeof ManualTuneTaskParameterSchema
+>;
 export type PredictTaskParameter = z.infer<typeof PredictTaskParameterSchema>;
 export type AutoTuneTaskResult = z.infer<typeof AutoTuneTaskResultSchema>;
 export type ManualTuneTaskResult = z.infer<typeof ManualTuneTaskResultSchema>;
@@ -126,7 +132,9 @@ export type ManualTuneTask = z.infer<typeof ManualTuneTaskSchema>;
 export type PredictTask = z.infer<typeof PredictTaskSchema>;
 export type Task = z.infer<typeof TaskSchema>;
 export type CreateAutoTuneTaskDto = z.infer<typeof CreateAutoTuneTaskSchema>;
-export type CreateManualTuneTaskDto = z.infer<typeof CreateManualTuneTaskSchema>;
+export type CreateManualTuneTaskDto = z.infer<
+  typeof CreateManualTuneTaskSchema
+>;
 export type CreatePredictTaskDto = z.infer<typeof CreatePredictTaskSchema>;
 
 // Query validation schemas
@@ -145,8 +153,12 @@ export const DeleteFailedTasksQuerySchema = z.object({
 });
 
 export type GetTasksQuery = z.infer<typeof GetTasksQuerySchema>;
-export type DeleteTasksByModelQuery = z.infer<typeof DeleteTasksByModelQuerySchema>;
-export type DeleteFailedTasksQuery = z.infer<typeof DeleteFailedTasksQuerySchema>;
+export type DeleteTasksByModelQuery = z.infer<
+  typeof DeleteTasksByModelQuerySchema
+>;
+export type DeleteFailedTasksQuery = z.infer<
+  typeof DeleteFailedTasksQuerySchema
+>;
 
 // Task ID param validation schema
 export const TaskIdParamSchema = z.object({
