@@ -2,7 +2,7 @@
  * User Zod schemas for validation
  */
 
-import { z } from 'zod';
+import { z } from "zod";
 
 export const UserSchema = z.object({
   id: z.string().uuid(),
@@ -20,7 +20,7 @@ export const SignUpSchema = z.object({
 });
 
 export const SignInSchema = z.object({
-  email: z.string().email(),
+  identifier: z.string().min(1),
   password: z.string().min(1),
 });
 

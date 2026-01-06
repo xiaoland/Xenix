@@ -3,19 +3,19 @@
  * Uses TanStack Query with Hono RPC client for type-safe data fetching
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
-import { client } from '../api/client';
-import type { WorkItem } from '@xenix/shared';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/vue-query";
+import { client } from "../api/client";
+import type { WorkItem } from "@xenix/shared";
 
 export function useWorkItems() {
   return useQuery({
-    queryKey: ['work-items'],
+    queryKey: ["work-items"],
     queryFn: async () => {
-      const response = await client.api['work-items'].$get();
+      const response = await client["work-items"].$get({});
       if (!response.ok) {
-        throw new Error('Failed to fetch work items');
+        throw new Error("Failed to fetch work items");
       }
-      const data = await response.json();
+      const data = (await response.json()) as any;
       return data.workItems || [];
     },
   });
@@ -23,15 +23,15 @@ export function useWorkItems() {
 
 export function useWorkItem(id: number | string) {
   return useQuery({
-    queryKey: ['work-item', id],
+    queryKey: ["work-item", id],
     queryFn: async () => {
-      const response = await client.api['work-items'][':id'].$get({
+      const response = await client["work-items"][":id"].$get({
         param: { id: String(id) },
       });
       if (!response.ok) {
-        throw new Error('Failed to fetch work item');
+        throw new Error("Failed to fetch work item");
       }
-      const data = await response.json();
+      const data = (await response.json()) as any;
       return data.workItem;
     },
     enabled: !!id,
@@ -47,18 +47,18 @@ export function useCreateWorkItem() {
       name: string;
       description?: string;
     }) => {
-      const response = await client.api['work-items'].$post({
+      const response = await client["work-items"].$post({
         json: workItem,
       });
       if (!response.ok) {
-        throw new Error('Failed to create work item');
+        throw new Error("Failed to create work item");
       }
-      const data = await response.json();
+      const data = (await response.json()) as any;
       return data.workItem;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['work-items'] });
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ["work-items"] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
   });
 }
@@ -74,19 +74,19 @@ export function useUpdateWorkItem() {
       id: number | string;
       updates: Partial<WorkItem>;
     }) => {
-      const response = await client.api['work-items'][':id'].$put({
+      const response = await client["work-items"][":id"].$put({
         param: { id: String(id) },
         json: updates,
       });
       if (!response.ok) {
-        throw new Error('Failed to update work item');
+        throw new Error("Failed to update work item");
       }
-      const data = await response.json();
+      const data = (await response.json()) as any;
       return data.workItem;
     },
     onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: ['work-items'] });
-      queryClient.invalidateQueries({ queryKey: ['work-item', id] });
+      queryClient.invalidateQueries({ queryKey: ["work-items"] });
+      queryClient.invalidateQueries({ queryKey: ["work-item", id] });
     },
   });
 }
@@ -96,15 +96,15 @@ export function useDeleteWorkItem() {
 
   return useMutation({
     mutationFn: async (id: number | string) => {
-      const response = await client.api['work-items'][':id'].$delete({
+      const response = await client["work-items"][":id"].$delete({
         param: { id: String(id) },
       });
       if (!response.ok) {
-        throw new Error('Failed to delete work item');
+        throw new Error("Failed to delete work item");
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['work-items'] });
+      queryClient.invalidateQueries({ queryKey: ["work-items"] });
     },
   });
 }

@@ -124,7 +124,7 @@ const {
   isLoading: loading,
   error: fetchError,
   refetch,
-} = useWorkItem(workItemId);
+} = useWorkItem(workItemId.value);
 
 // Computed property to safely access work item
 const workItem = computed(() => workItemData.value);

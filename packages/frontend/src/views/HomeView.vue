@@ -2,9 +2,7 @@
   <default-layout>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-8">
-        <h1 class="text-4xl font-bold text-gray-900 mb-2">
-          Welcome to Xenix
-        </h1>
+        <h1 class="text-4xl font-bold text-gray-900 mb-2">Welcome to Xenix</h1>
         <p class="text-lg text-gray-600">
           Machine Learning Model Training Platform
         </p>
@@ -63,14 +61,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
-import { message } from 'ant-design-vue';
-import type { Project } from '@xenix/shared';
-import DefaultLayout from '../layouts/DefaultLayout.vue';
-import ProjectCard from '../components/project/ProjectCard.vue';
-import ProjectFormModal from '../components/project/ProjectFormModal.vue';
-import { useProjects, useCreateProject, useUpdateProject, useDeleteProject } from '../composables';
+import { ref, computed } from "vue";
+import { useRouter } from "vue-router";
+import { message } from "ant-design-vue";
+import type { Project } from "@xenix/shared";
+import DefaultLayout from "../layouts/DefaultLayout.vue";
+import ProjectCard from "../components/project/ProjectCard.vue";
+import ProjectFormModal from "../components/project/ProjectFormModal.vue";
+import {
+  useProjects,
+  useCreateProject,
+  useUpdateProject,
+  useDeleteProject,
+} from "../composables";
 
 const router = useRouter();
 
@@ -81,7 +84,7 @@ const { mutate: updateProject, isPending: isUpdating } = useUpdateProject();
 const { mutate: deleteProject, isPending: isDeleting } = useDeleteProject();
 
 // Computed property to safely access projects array
-const projects = computed(() => projectsData.value || []);
+const projects = computed(() => (projectsData.value as any[]) || []);
 
 const showCreateModal = ref(false);
 const showEditModal = ref(false);
@@ -90,13 +93,13 @@ const editingProject = ref<Partial<Project>>({});
 const handleCreate = (values: { name: string; description?: string }) => {
   createProject(values, {
     onSuccess: () => {
-      message.success('Project created successfully');
+      message.success("Project created successfully");
       showCreateModal.value = false;
     },
     onError: (error: any) => {
-      console.error('Failed to create project:', error);
-      message.error('Failed to create project');
-    }
+      console.error("Failed to create project:", error);
+      message.error("Failed to create project");
+    },
   });
 };
 
@@ -107,18 +110,18 @@ const handleEdit = (project: Project) => {
 
 const handleUpdate = (values: any) => {
   if (!editingProject.value.id) return;
-  
+
   updateProject(
     { id: editingProject.value.id, updates: values },
     {
       onSuccess: () => {
-        message.success('Project updated successfully');
+        message.success("Project updated successfully");
         showEditModal.value = false;
       },
       onError: (error: any) => {
-        console.error('Failed to update project:', error);
-        message.error('Failed to update project');
-      }
+        console.error("Failed to update project:", error);
+        message.error("Failed to update project");
+      },
     }
   );
 };
@@ -126,12 +129,12 @@ const handleUpdate = (values: any) => {
 const handleDelete = (projectId: number) => {
   deleteProject(projectId, {
     onSuccess: () => {
-      message.success('Project deleted successfully');
+      message.success("Project deleted successfully");
     },
     onError: (error: any) => {
-      console.error('Failed to delete project:', error);
-      message.error('Failed to delete project');
-    }
+      console.error("Failed to delete project:", error);
+      message.error("Failed to delete project");
+    },
   });
 };
 

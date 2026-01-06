@@ -30,20 +30,19 @@ app.use(
   })
 );
 
-// Health check
-app.get("/health", (c) => c.json({ status: "ok" }));
-
-// API routes
-app.route("/api/auth", authRoutes);
-app.route("/api/projects", projectsRoutes);
-app.route("/api/work-items", workItemsRoutes);
-app.route("/api/data", datasetsRoutes);
-app.route("/api/models", modelsRoutes);
-app.route("/api/tasks", tasksRoutes);
-app.route("/api", tuneRoutes);
-app.route("/api/predict", predictRoutes);
-app.route("/api/download", downloadRoutes);
-app.route("/api/obsrv", obsrvRoutes);
+// API Routes
+const routes = app
+  .get("/health", (c) => c.json({ status: "ok" }))
+  .route("/auth", authRoutes)
+  .route("/projects", projectsRoutes)
+  .route("/work-items", workItemsRoutes)
+  .route("/data", datasetsRoutes)
+  .route("/models", modelsRoutes)
+  .route("/tasks", tasksRoutes)
+  .route("/tune", tuneRoutes)
+  .route("/predict", predictRoutes)
+  .route("/download", downloadRoutes)
+  .route("/obsrv", obsrvRoutes);
 
 // Error handler (must be last)
 app.onError(errorHandler);
@@ -60,4 +59,4 @@ serve({
 export default app;
 
 // Export type for Hono RPC client
-export type AppType = typeof app;
+export type AppType = typeof routes;

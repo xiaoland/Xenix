@@ -3,18 +3,18 @@
  * Uses TanStack Query with Hono RPC client for type-safe data fetching
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
-import { client } from '../api/client';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/vue-query";
+import { client } from "../api/client";
 
 export function useDatasets() {
   return useQuery({
-    queryKey: ['datasets'],
+    queryKey: ["datasets"],
     queryFn: async () => {
-      const response = await client.api.data.$get();
+      const response = await client.api.data.$get({});
       if (!response.ok) {
-        throw new Error('Failed to fetch datasets');
+        throw new Error("Failed to fetch datasets");
       }
-      const data = await response.json();
+      const data = (await response.json()) as any;
       return data.datasets || [];
     },
   });
@@ -22,15 +22,15 @@ export function useDatasets() {
 
 export function useDataset(id: number | string) {
   return useQuery({
-    queryKey: ['dataset', id],
+    queryKey: ["dataset", id],
     queryFn: async () => {
-      const response = await client.api.data[':id'].$get({
+      const response = await client.api.data[":id"].$get({
         param: { id: String(id) },
       });
       if (!response.ok) {
-        throw new Error('Failed to fetch dataset');
+        throw new Error("Failed to fetch dataset");
       }
-      const data = await response.json();
+      const data = (await response.json()) as any;
       return data.dataset;
     },
     enabled: !!id,
@@ -46,13 +46,14 @@ export function useUploadDataset() {
         body: formData,
       });
       if (!response.ok) {
-        throw new Error('Failed to upload dataset');
+        const error = (await response.json()) as any;
+        throw new Error(error.error || "Failed to upload dataset");
       }
-      const data = await response.json();
+      const data = (await response.json()) as any;
       return data.dataset;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['datasets'] });
+      queryClient.invalidateQueries({ queryKey: ["datasets"] });
     },
   });
 }
@@ -62,15 +63,15 @@ export function useDeleteDataset() {
 
   return useMutation({
     mutationFn: async (id: number | string) => {
-      const response = await client.api.data[':id'].$delete({
+      const response = await client.api.data[":id"].$delete({
         param: { id: String(id) },
       });
       if (!response.ok) {
-        throw new Error('Failed to delete dataset');
+        throw new Error("Failed to delete dataset");
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['datasets'] });
+      queryClient.invalidateQueries({ queryKey: ["datasets"] });
     },
   });
 }

@@ -7,7 +7,7 @@
       type="info"
       show-icon
       class="mb-4"
-    />
+    ></a-alert>
 
     <!-- Dataset Selection -->
     <div v-if="!selectedDatasetId">
@@ -15,9 +15,9 @@
       <dataset-selector
         :project-id="workItem.projectId"
         @select="handleDatasetSelect"
-      />
+      ></dataset-selector>
       <div class="mt-4">
-        <router-link :to="`/projects/${workItem.projectId}/datasets`">
+        <router-link :to="'/projects/' + workItem.projectId + '/datasets'">
           <a-button type="default" class="inline-flex items-center">
             <span class="i-mdi-cloud-upload mr-2"></span>
             Upload New Dataset
@@ -29,7 +29,7 @@
     <!-- Column Selection -->
     <div v-else>
       <h3 class="text-lg font-semibold mb-4">Step 2: Select Columns</h3>
-      
+
       <div class="bg-gray-50 p-4 rounded mb-4">
         <div class="flex items-center justify-between">
           <div>
@@ -46,12 +46,10 @@
         :target-column="targetColumn"
         @update:feature-columns="featureColumns = $event"
         @update:target-column="targetColumn = $event"
-      />
+      ></column-selector>
 
       <div class="flex justify-between mt-6">
-        <a-button @click="changeDataset">
-          Back to Dataset Selection
-        </a-button>
+        <a-button @click="changeDataset"> Back to Dataset Selection </a-button>
         <a-button
           type="primary"
           :disabled="!canConfirm"
@@ -66,11 +64,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { message } from 'ant-design-vue';
-import DatasetSelector from '../../dataset/DatasetSelector.vue';
-import ColumnSelector from './ColumnSelector.vue';
-import { useUpdateWorkItem } from '../../../composables';
+import { ref, computed } from "vue";
+import { message } from "ant-design-vue";
+import DatasetSelector from "../../dataset/DatasetSelector.vue";
+import ColumnSelector from "./ColumnSelector.vue";
+import { useUpdateWorkItem } from "../../../composables";
+import { client } from "../../../api/client";
 
 interface WorkItem {
   id: number;
@@ -95,7 +94,7 @@ const emit = defineEmits<{
 }>();
 
 const selectedDatasetId = ref<number | undefined>(props.workItem.datasetId);
-const selectedDatasetName = ref<string>('');
+const selectedDatasetName = ref<string>("");
 const datasetColumns = ref<string[]>([]);
 const featureColumns = ref<string[]>(props.workItem.featureColumns || []);
 const targetColumn = ref<string | undefined>(props.workItem.targetColumn);
@@ -115,7 +114,7 @@ const handleDatasetSelect = async (dataset: Dataset) => {
   selectedDatasetId.value = dataset.id;
   selectedDatasetName.value = dataset.name;
   datasetColumns.value = dataset.columns;
-  
+
   // Reset column selections when changing dataset
   featureColumns.value = [];
   targetColumn.value = undefined;
@@ -123,7 +122,7 @@ const handleDatasetSelect = async (dataset: Dataset) => {
 
 const changeDataset = () => {
   selectedDatasetId.value = undefined;
-  selectedDatasetName.value = '';
+  selectedDatasetName.value = "";
   datasetColumns.value = [];
   featureColumns.value = [];
   targetColumn.value = undefined;
@@ -143,53 +142,14 @@ const handleConfirm = () => {
     },
     {
       onSuccess: () => {
-        message.success('Dataset configuration saved successfully');
-        emit('confirm');
+        message.success("Dataset configuration saved successfully");
+        emit("confirm");
       },
       onError: (error: any) => {
-        console.error('Failed to save configuration:', error);
-        message.error('Failed to save configuration');
-      }
+        console.error("Failed to save configuration:", error);
+        message.error("Failed to save configuration");
+      },
     }
   );
 };
-</script>
-  if (!canConfirm.value) return;
-
-  saving.value = true;
-  try {
-    const response = await WorkItemService.update(props.workItem.id, {
-      datasetId: selectedDatasetId.value!,
-      featureColumns: featureColumns.value,
-      targetColumn: targetColumn.value!,
-    });
-
-    if (response.success) {
-      message.success('Dataset and columns saved successfully');
-      emit('confirm');
-    } else {
-      message.error('Failed to save configuration');
-    }
-  } catch (err) {
-    console.error('Failed to save prepare configuration:', err);
-    message.error('Failed to save configuration');
-  } finally {
-    saving.value = false;
-  }
-};
-
-// Load dataset info if already selected
-onMounted(async () => {
-  if (selectedDatasetId.value) {
-    try {
-      const response = await DatasetService.fetchById(selectedDatasetId.value);
-      if (response.success && response.dataset) {
-        selectedDatasetName.value = response.dataset.name;
-        datasetColumns.value = response.dataset.columns;
-      }
-    } catch (err) {
-      console.error('Failed to load dataset:', err);
-    }
-  }
-});
 </script>

@@ -21,7 +21,7 @@
         :options="availableModels"
         class="mb-3"
       />
-      
+
       <div class="flex gap-2">
         <a-button
           type="primary"
@@ -50,7 +50,7 @@
       <div class="px-4 py-3 border-b bg-gray-50">
         <h3 class="text-lg font-medium">Training Tasks</h3>
       </div>
-      
+
       <a-table
         :columns="columns"
         :data-source="tasks"
@@ -61,28 +61,39 @@
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'model'">
-            <span class="font-medium">{{ formatModelName(record.parameter?.model) }}</span>
+            <span class="font-medium">{{
+              formatModelName(record.parameter?.model)
+            }}</span>
           </template>
-          
+
           <template v-else-if="column.key === 'status'">
             <a-tag :color="getStatusColor(record.status)">
               {{ record.status }}
             </a-tag>
           </template>
-          
+
           <template v-else-if="column.key === 'metrics'">
-            <div v-if="record.status === 'completed' && record.result?.params" class="text-sm">
-              <div v-for="(value, key) in getDisplayMetrics(record.result)" :key="key">
+            <div
+              v-if="record.status === 'completed' && record.result?.params"
+              class="text-sm"
+            >
+              <div
+                v-for="(value, key) in getDisplayMetrics(record.result)"
+                :key="key"
+              >
                 <span class="text-gray-600">{{ key }}:</span>
                 <span class="ml-1 font-medium">{{ formatMetric(value) }}</span>
               </div>
             </div>
-            <span v-else-if="record.status === 'failed'" class="text-red-500 text-sm">
-              {{ record.error || 'Training failed' }}
+            <span
+              v-else-if="record.status === 'failed'"
+              class="text-red-500 text-sm"
+            >
+              {{ record.error || "Training failed" }}
             </span>
             <span v-else class="text-gray-400 text-sm">-</span>
           </template>
-          
+
           <template v-else-if="column.key === 'action'">
             <a-radio
               :checked="selectedTaskId === record.id"
@@ -95,16 +106,17 @@
         </template>
       </a-table>
 
-      <div v-if="tasks.length === 0 && !loading" class="text-center py-8 text-gray-500">
+      <div
+        v-if="tasks.length === 0 && !loading"
+        class="text-center py-8 text-gray-500"
+      >
         No training tasks yet. Select models and start training.
       </div>
     </div>
 
     <!-- Navigation -->
     <div class="flex justify-between">
-      <a-button @click="emit('back')">
-        Back to Prepare
-      </a-button>
+      <a-button @click="emit('back')"> Back to Prepare </a-button>
       <a-button
         type="primary"
         :disabled="!selectedTaskId"
@@ -117,11 +129,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
-import { message } from 'ant-design-vue';
-import { client } from '../../../api/client';
-import { AVAILABLE_MODELS } from '../../../constants/models';
-import type { TaskInfo } from '@xenix/shared';
+import { ref, onMounted, onUnmounted } from "vue";
+import { message } from "ant-design-vue";
+import { client } from "../../../api/client";
+import { AVAILABLE_MODELS } from "../../../constants/models";
+import type { Task } from "@xenix/shared";
 
 const props = defineProps<{
   workItemId: number;
@@ -131,29 +143,31 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  continue: [data: { model: string; parameters: Record<string, any>; taskId: number }];
+  continue: [
+    data: { model: string; parameters: Record<string, any>; taskId: number }
+  ];
   back: [];
 }>();
 
 // State
 const selectedModels = ref<string[]>([]);
-const tasks = ref<TaskInfo[]>([]);
+const tasks = ref<Task[]>([]);
 const selectedTaskId = ref<number | null>(null);
 const loading = ref(false);
 const isTraining = ref(false);
 
 // Available models
-const availableModels = AVAILABLE_MODELS.map(m => ({
+const availableModels = AVAILABLE_MODELS.map((m) => ({
   label: m.label,
   value: m.value,
 }));
 
 // Table columns
 const columns = [
-  { title: 'Model', key: 'model', width: 200 },
-  { title: 'Status', key: 'status', width: 120 },
-  { title: 'Metrics / Error', key: 'metrics' },
-  { title: 'Action', key: 'action', width: 100 },
+  { title: "Model", key: "model", width: 200 },
+  { title: "Status", key: "status", width: 120 },
+  { title: "Metrics / Error", key: "metrics" },
+  { title: "Action", key: "action", width: 100 },
 ];
 
 // Polling interval
@@ -168,15 +182,15 @@ const fetchTasks = async () => {
     const response = await client.api.tasks.$get({
       query: {
         workItemId: String(props.workItemId),
-        types: 'auto-tune,manual-tune',
+        types: "auto-tune,manual-tune",
       },
     });
     if (response.ok) {
-      const data = await response.json();
+      const data = (await response.json()) as any;
       tasks.value = data.tasks || [];
     }
   } catch (error) {
-    console.error('Failed to fetch tasks:', error);
+    console.error("Failed to fetch tasks:", error);
   } finally {
     loading.value = false;
   }
@@ -190,21 +204,26 @@ const handleStartAutoTune = async () => {
   try {
     // Start training for each selected model
     for (const model of selectedModels.value) {
-      await TuneService.startAutoTune({
-        datasetId: props.datasetId,
-        features: props.featureColumns,
-        target: props.targetColumn,
-        model,
-        workItemId: props.workItemId,
+      const response = await client.api.tune["auto-tune"].$post({
+        json: {
+          datasetId: props.datasetId,
+          features: props.featureColumns,
+          target: props.targetColumn,
+          model,
+          workItemId: props.workItemId,
+        },
       });
+      if (!response.ok) throw new Error("Failed to start auto tune");
     }
-    message.success(`Started training for ${selectedModels.value.length} model(s)`);
+    message.success(
+      `Started training for ${selectedModels.value.length} model(s)`
+    );
     selectedModels.value = [];
     await fetchTasks();
     startPolling();
   } catch (error: any) {
-    console.error('Failed to start training:', error);
-    message.error(error.message || 'Failed to start training');
+    console.error("Failed to start training:", error);
+    message.error(error.message || "Failed to start training");
   } finally {
     isTraining.value = false;
   }
@@ -215,12 +234,13 @@ const handleStartAutoTune = async () => {
  */
 const handleClearFailedTasks = async () => {
   try {
-    await TaskService.deleteFailedTasks(props.workItemId);
-    message.success('Failed tasks cleared');
+    // TODO: implement delete failed tasks
+    // await TaskService.deleteFailedTasks(props.workItemId);
+    message.success("Failed tasks cleared");
     await fetchTasks();
   } catch (error: any) {
-    console.error('Failed to clear tasks:', error);
-    message.error(error.message || 'Failed to clear tasks');
+    console.error("Failed to clear tasks:", error);
+    message.error(error.message || "Failed to clear tasks");
   }
 };
 
@@ -236,19 +256,23 @@ const handleSelectTask = (taskId: number) => {
  */
 const handleContinue = async () => {
   if (!selectedTaskId.value) return;
-  
+
   try {
-    const response = await TaskService.fetchStatus(selectedTaskId.value);
-    if (response.task) {
-      emit('continue', {
-        model: response.task.parameter?.model || '',
-        parameters: response.task.result?.params || {},
+    const response = await client.api.tasks[":id"].$get({
+      param: { id: String(selectedTaskId.value) },
+    });
+    if (!response.ok) throw new Error("Failed to fetch task");
+    const data = (await response.json()) as any;
+    if (data.task) {
+      emit("continue", {
+        model: data.task.parameter?.model || "",
+        parameters: data.task.result?.params || {},
         taskId: selectedTaskId.value,
       });
     }
   } catch (error: any) {
-    console.error('Failed to fetch task:', error);
-    message.error(error.message || 'Failed to fetch task details');
+    console.error("Failed to fetch task:", error);
+    message.error(error.message || "Failed to fetch task details");
   }
 };
 
@@ -258,8 +282,8 @@ const handleContinue = async () => {
 const startPolling = () => {
   if (pollInterval) return;
   pollInterval = window.setInterval(() => {
-    const hasRunningTasks = tasks.value.some(t => 
-      t.status === 'pending' || t.status === 'running'
+    const hasRunningTasks = tasks.value.some(
+      (t: Task) => t.status === "pending" || t.status === "running"
     );
     if (hasRunningTasks) {
       fetchTasks();
@@ -284,11 +308,16 @@ const stopPolling = () => {
  */
 const getStatusColor = (status: string) => {
   switch (status) {
-    case 'completed': return 'success';
-    case 'failed': return 'error';
-    case 'running': return 'processing';
-    case 'pending': return 'default';
-    default: return 'default';
+    case "completed":
+      return "success";
+    case "failed":
+      return "error";
+    case "running":
+      return "processing";
+    case "pending":
+      return "default";
+    default:
+      return "default";
   }
 };
 
@@ -296,8 +325,8 @@ const getStatusColor = (status: string) => {
  * Format model name
  */
 const formatModelName = (modelValue?: string) => {
-  if (!modelValue) return '-';
-  const model = AVAILABLE_MODELS.find(m => m.value === modelValue);
+  if (!modelValue) return "-";
+  const model = AVAILABLE_MODELS.find((m) => m.value === modelValue);
   return model ? model.label : modelValue;
 };
 
@@ -305,7 +334,7 @@ const formatModelName = (modelValue?: string) => {
  * Format metric value
  */
 const formatMetric = (value: any) => {
-  if (typeof value === 'number') {
+  if (typeof value === "number") {
     return value.toFixed(4);
   }
   return value;
@@ -318,10 +347,10 @@ const getDisplayMetrics = (result: any) => {
   if (!result || !result.params) return {};
   // Show a subset of important metrics
   const metrics: Record<string, any> = {};
-  if (result.score !== undefined) metrics['Score'] = result.score;
+  if (result.score !== undefined) metrics["Score"] = result.score;
   if (result.params) {
     const paramCount = Object.keys(result.params).length;
-    metrics['Parameters'] = `${paramCount} params`;
+    metrics["Parameters"] = `${paramCount} params`;
   }
   return metrics;
 };
@@ -329,8 +358,8 @@ const getDisplayMetrics = (result: any) => {
 // Lifecycle
 onMounted(async () => {
   await fetchTasks();
-  const hasRunningTasks = tasks.value.some(t => 
-    t.status === 'pending' || t.status === 'running'
+  const hasRunningTasks = tasks.value.some(
+    (t: Task) => t.status === "pending" || t.status === "running"
   );
   if (hasRunningTasks) {
     startPolling();

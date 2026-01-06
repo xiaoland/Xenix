@@ -99,6 +99,9 @@ importers:
       '@vueuse/core':
         specifier: ^12.4.0
         version: 12.8.2(typescript@5.9.3)
+      '@xenix/backend':
+        specifier: workspace:*
+        version: link:../backend
       '@xenix/shared':
         specifier: workspace:*
         version: link:../shared
