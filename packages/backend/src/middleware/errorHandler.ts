@@ -4,13 +4,19 @@ import { AppError } from '../errors/index.js';
 /**
  * Global error handler middleware
  * Handles all errors thrown in the application
+ * 
+ * Error response format (HTTP semantics pattern):
+ * {
+ *   code: string,      // Error code (e.g., "UNAUTHORIZED", "NOT_FOUND")
+ *   error: string      // Human-readable error message
+ * }
  */
 export const errorHandler = (err: Error, c: Context) => {
   // Handle custom AppError instances
   if (err instanceof AppError) {
     return c.json(
       {
-        success: false,
+        code: err.name.replace('Error', '').toUpperCase().replace(/([A-Z])/g, '_$1').substring(1),
         error: err.message,
       },
       err.statusCode
@@ -21,7 +27,7 @@ export const errorHandler = (err: Error, c: Context) => {
   if (err.name === 'ZodError') {
     return c.json(
       {
-        success: false,
+        code: 'VALIDATION_ERROR',
         error: 'Validation failed',
         details: (err as any).errors,
       },
@@ -35,7 +41,7 @@ export const errorHandler = (err: Error, c: Context) => {
   // Handle unexpected errors
   return c.json(
     {
-      success: false,
+      code: 'INTERNAL_SERVER_ERROR',
       error: 'Internal Server Error',
     },
     500

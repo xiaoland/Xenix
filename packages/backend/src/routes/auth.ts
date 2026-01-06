@@ -13,7 +13,7 @@ import {
 
 const auth = new Hono();
 
-// Sign in
+// Sign in - returns token directly (HTTP semantics)
 auth.post('/signin', zValidator('json', SignInSchema), async (c) => {
   const { identifier, password } = c.req.valid('json');
 
@@ -49,15 +49,11 @@ auth.post('/signin', zValidator('json', SignInSchema), async (c) => {
     expiresIn: '7d',
   });
 
-  // Return success response
-  return c.json({
-    success: true,
-    message: 'Signin successful',
-    token,
-  });
+  // Return token directly (no envelope)
+  return c.json({ token });
 });
 
-// Sign up
+// Sign up - returns token directly (HTTP semantics)
 auth.post('/signup', zValidator('json', SignUpSchema), async (c) => {
   const { email, phone, password } = c.req.valid('json');
 
@@ -97,11 +93,8 @@ auth.post('/signup', zValidator('json', SignUpSchema), async (c) => {
     expiresIn: '7d',
   });
 
-  return c.json({
-    success: true,
-    message: 'Signup successful',
-    token,
-  });
+  // Return token directly (no envelope)
+  return c.json({ token });
 });
 
 export default auth;

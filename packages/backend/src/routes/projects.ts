@@ -11,7 +11,7 @@ const projects = new Hono();
 // Apply auth middleware to all routes
 projects.use('*', authMiddleware);
 
-// Get all projects
+// Get all projects - returns array directly (HTTP semantics)
 projects.get('/', async (c) => {
   const user = requireAuth(c);
 
@@ -43,13 +43,11 @@ projects.get('/', async (c) => {
     })
   );
 
-  return c.json({
-    success: true,
-    projects: projectsWithRelations,
-  });
+  // Return projects array directly (no envelope)
+  return c.json(projectsWithRelations);
 });
 
-// Create project
+// Create project - returns created project directly (HTTP semantics)
 projects.post(
   '/',
   zValidator('json', CreateProjectSchema),
@@ -70,15 +68,12 @@ projects.post(
 
     const project = result[0];
 
-    return c.json({
-      success: true,
-      project,
-      message: 'Project created successfully',
-    });
+    // Return project directly (no envelope), 201 Created
+    return c.json(project, 201);
   }
 );
 
-// Get single project
+// Get single project - returns project directly (HTTP semantics)
 projects.get('/:id', async (c) => {
   const user = requireAuth(c);
   const id = parseInt(c.req.param('id'));
@@ -113,17 +108,15 @@ projects.get('/:id', async (c) => {
     .from(schema.datasets)
     .where(eq(schema.datasets.projectId, id));
 
+  // Return project directly (no envelope)
   return c.json({
-    success: true,
-    project: {
-      ...project,
-      workItems,
-      datasets,
-    },
+    ...project,
+    workItems,
+    datasets,
   });
 });
 
-// Update project
+// Update project - returns updated project directly (HTTP semantics)
 projects.put(
   '/:id',
   zValidator('json', UpdateProjectSchema),
@@ -161,15 +154,12 @@ projects.put(
       .where(eq(schema.projects.id, id))
       .returning();
 
-    return c.json({
-      success: true,
-      project: updatedProject,
-      message: 'Project updated successfully',
-    });
+    // Return updated project directly (no envelope)
+    return c.json(updatedProject);
   }
 );
 
-// Delete project
+// Delete project - returns 204 No Content (HTTP semantics)
 projects.delete('/:id', async (c) => {
   const user = requireAuth(c);
   const id = parseInt(c.req.param('id'));
@@ -196,16 +186,8 @@ projects.delete('/:id', async (c) => {
   // Delete project
   await db.delete(schema.projects).where(eq(schema.projects.id, id));
 
-  return c.json({
-    success: true,
-    message: 'Project deleted successfully',
-  });
-});
-
-export default projects;
-
-    });
-  }
+  // Return 204 No Content (standard for successful DELETE)
+  return c.body(null, 204);
 });
 
 export default projects;

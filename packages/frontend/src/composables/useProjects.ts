@@ -1,6 +1,7 @@
 /**
  * Projects Composable
  * Uses TanStack Query with Hono RPC client for type-safe data fetching
+ * HTTP Semantics Pattern: Success responses return data directly, errors have {code, error}
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
@@ -12,10 +13,11 @@ export function useProjects() {
     queryFn: async () => {
       const response = await client.api.projects.$get();
       if (!response.ok) {
-        throw new Error('Failed to fetch projects');
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch projects');
       }
-      const data = await response.json();
-      return data.projects || [];
+      // HTTP semantics: success response is the data directly (array of projects)
+      return await response.json();
     },
   });
 }
@@ -28,10 +30,11 @@ export function useProject(id: number | string) {
         param: { id: String(id) },
       });
       if (!response.ok) {
-        throw new Error('Failed to fetch project');
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch project');
       }
-      const data = await response.json();
-      return data.project;
+      // HTTP semantics: success response is the project object directly
+      return await response.json();
     },
     enabled: !!id,
   });
@@ -46,10 +49,11 @@ export function useCreateProject() {
         json: project,
       });
       if (!response.ok) {
-        throw new Error('Failed to create project');
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create project');
       }
-      const data = await response.json();
-      return data.project;
+      // HTTP semantics: success response is the created project directly
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
@@ -73,10 +77,11 @@ export function useUpdateProject() {
         json: updates,
       });
       if (!response.ok) {
-        throw new Error('Failed to update project');
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update project');
       }
-      const data = await response.json();
-      return data.project;
+      // HTTP semantics: success response is the updated project directly
+      return await response.json();
     },
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
@@ -94,8 +99,11 @@ export function useDeleteProject() {
         param: { id: String(id) },
       });
       if (!response.ok) {
-        throw new Error('Failed to delete project');
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete project');
       }
+      // HTTP semantics: DELETE returns 204 No Content (no body)
+      return null;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });

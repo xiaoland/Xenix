@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed, readonly } from 'vue';
 import { useRouter } from 'vue-router';
+import { client } from '../api/client';
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref('');
@@ -25,21 +26,20 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(credentials: { identifier: string; password: string }) {
     try {
-      const response = await fetch('/api/auth/signin', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(credentials),
+      const response = await client.api.auth.signin.$post({
+        json: credentials,
       });
 
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Login failed');
+      if (!response.ok) {
+        // HTTP semantics: error response has {code, error}
+        const error = await response.json();
+        throw new Error(error.error || 'Login failed');
       }
 
+      // HTTP semantics: success response is {token} directly
+      const data = await response.json();
       token.value = data.token;
+      
       if (typeof window !== 'undefined') {
         localStorage.setItem('auth_token', token.value);
       }
@@ -56,20 +56,18 @@ export const useAuthStore = defineStore('auth', () => {
     phone?: string;
   }) {
     try {
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(credentials),
+      const response = await client.api.auth.signup.$post({
+        json: credentials,
       });
 
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Signup failed');
+      if (!response.ok) {
+        // HTTP semantics: error response has {code, error}
+        const error = await response.json();
+        throw new Error(error.error || 'Signup failed');
       }
 
+      // HTTP semantics: success response is {token} directly
+      const data = await response.json();
       return { success: true, data };
     } catch (error) {
       return { success: false, error: (error as Error).message };
