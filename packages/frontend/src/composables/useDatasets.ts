@@ -40,9 +40,19 @@ export function useUploadDataset() {
 
   return useMutation({
     mutationFn: async (formData: FormData) => {
-      const response = await client.data.$post({
+      // Use fetch directly for FormData to ensure proper Content-Type with boundary
+      const token = localStorage.getItem("auth_token");
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
+      
+      const response = await fetch(`${apiUrl}/data`, {
+        method: "POST",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          // Don't set Content-Type - let browser set it with boundary
+        },
         body: formData,
       });
+
       if (!response.ok) {
         const error = (await response.json()) as any;
         throw new Error(error.error || "Failed to upload dataset");
