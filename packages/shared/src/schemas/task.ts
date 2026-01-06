@@ -128,3 +128,29 @@ export type Task = z.infer<typeof TaskSchema>;
 export type CreateAutoTuneTaskDto = z.infer<typeof CreateAutoTuneTaskSchema>;
 export type CreateManualTuneTaskDto = z.infer<typeof CreateManualTuneTaskSchema>;
 export type CreatePredictTaskDto = z.infer<typeof CreatePredictTaskSchema>;
+
+// Query validation schemas
+export const GetTasksQuerySchema = z.object({
+  workItemId: z.string().regex(/^\d+$/, 'Must be a valid number'),
+  type: z.string().optional(),
+});
+
+export const DeleteTasksByModelQuerySchema = z.object({
+  workItemId: z.string().regex(/^\d+$/, 'Must be a valid number'),
+  model: z.string().min(1),
+});
+
+export const DeleteFailedTasksQuerySchema = z.object({
+  workItemId: z.string().regex(/^\d+$/, 'Must be a valid number'),
+});
+
+export type GetTasksQuery = z.infer<typeof GetTasksQuerySchema>;
+export type DeleteTasksByModelQuery = z.infer<typeof DeleteTasksByModelQuerySchema>;
+export type DeleteFailedTasksQuery = z.infer<typeof DeleteFailedTasksQuerySchema>;
+
+// Task ID param validation schema
+export const TaskIdParamSchema = z.object({
+  id: z.string().regex(/^\d+$/, 'Must be a valid number'),
+});
+
+export type TaskIdParam = z.infer<typeof TaskIdParamSchema>;

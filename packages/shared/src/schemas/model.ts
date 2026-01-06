@@ -12,4 +12,9 @@ export const ModelMetadataSchema = z.object({
   parameters: z.record(z.any()).optional(),
 });
 
+export const ModelIdParamSchema = z.object({
+  id: z.string().min(1, 'Model name is required'),
+});
+
 export type ModelMetadata = z.infer<typeof ModelMetadataSchema>;
+export type ModelIdParam = z.infer<typeof ModelIdParamSchema>;

@@ -35,3 +35,10 @@ export const CreateDatasetSchema = z.object({
 export type Dataset = z.infer<typeof DatasetSchema>;
 export type ColumnSelection = z.infer<typeof ColumnSelectionSchema>;
 export type CreateDatasetDto = z.infer<typeof CreateDatasetSchema>;
+
+// ID param validation schema
+export const DatasetIdParamSchema = z.object({
+  id: z.string().regex(/^\d+$/, 'Must be a valid number'),
+});
+
+export type DatasetIdParam = z.infer<typeof DatasetIdParamSchema>;
