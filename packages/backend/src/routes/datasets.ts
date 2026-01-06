@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { HTTPException } from "hono/http-exception";
 import { db, schema } from "../database/index.js";
 import { desc, eq } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
@@ -8,6 +7,11 @@ import {
   analyzeExcelFile,
 } from "../utils/datasetUtils.js";
 import { validateExcelFile, saveUploadedFile } from "../utils/taskUtils.js";
+import {
+  NotFoundError,
+  BadRequestError,
+} from "../errors/index.js";
+import logger from "../utils/logger/index.js";
 import path from "path";
 import fs from "fs/promises";
 
@@ -16,100 +20,77 @@ const datasets = new Hono()
 
   // Get all datasets
   .get("/", async (c) => {
-    try {
-      // Fetch all datasets, ordered by most recent first
-      const datasetsList = await db
-        .select()
-        .from(schema.datasets)
-        .orderBy(desc(schema.datasets.createdAt));
+    // Fetch all datasets, ordered by most recent first
+    const datasetsList = await db
+      .select()
+      .from(schema.datasets)
+      .orderBy(desc(schema.datasets.createdAt));
 
-      // Parse columns field for each dataset using utility function
-      const datasetsWithParsedColumns = datasetsList.map((dataset) => ({
-        ...dataset,
-        columns: parseDatasetColumns(dataset.columns),
-      }));
+    // Parse columns field for each dataset using utility function
+    const datasetsWithParsedColumns = datasetsList.map((dataset) => ({
+      ...dataset,
+      columns: parseDatasetColumns(dataset.columns),
+    }));
 
-      return c.json(datasetsWithParsedColumns);
-    } catch (error) {
-      console.error("Datasets fetch error:", error);
-      throw new HTTPException(500, {
-        message:
-          error instanceof Error ? error.message : "Failed to fetch datasets",
-      });
-    }
+    return c.json(datasetsWithParsedColumns);
   })
 
   // Upload dataset
   .post("/", async (c) => {
-    try {
-      const formData = await c.req.formData();
-      const file = formData.get("file") as File;
-      const name = formData.get("name") as string;
-      const description = (formData.get("description") as string) || null;
-      const projectIdStr = (formData.get("projectId") as string) || null;
-      const projectId = projectIdStr ? Number(projectIdStr) : null;
+    const formData = await c.req.formData();
+    const file = formData.get("file") as File;
+    const name = formData.get("name") as string;
+    const description = (formData.get("description") as string) || null;
+    const projectIdStr = (formData.get("projectId") as string) || null;
+    const projectId = projectIdStr ? Number(projectIdStr) : null;
 
-      if (!file) {
-        throw new HTTPException(400, { message: "No file uploaded" });
-      }
-
-      if (!validateExcelFile(file.name)) {
-        throw new HTTPException(400, {
-          message:
-            "Invalid file type. Only Excel files (.xlsx, .xls) are allowed.",
-        });
-      }
-
-      if (!name) {
-        throw new HTTPException(400, { message: "Dataset name is required" });
-      }
-
-      // Save uploaded file to datasets directory
-      const datasetsDir = path.join(process.cwd(), "datasets");
-      const filePath = await saveUploadedFile(file, datasetsDir);
-
-      // Get file stats
-      const stats = await fs.stat(filePath);
-      const fileSize = stats.size;
-
-      // Analyze the Excel file to get columns and row count
-      const { columns, rowCount } = await analyzeExcelFile(filePath);
-
-      // Create dataset record with optional project link
-      const result = await db
-        .insert(schema.datasets)
-        .values({
-          projectId: projectId && !isNaN(projectId) ? projectId : null,
-          name,
-          description,
-          filePath,
-          fileName: file.name,
-          fileSize,
-          columns: columns, // Store as JSONB directly
-          rowCount,
-        })
-        .returning();
-
-      const dataset = result[0];
-
-      return c.json({
-        success: true,
-        dataset: {
-          ...dataset,
-          columns,
-        },
-        message: "Dataset uploaded successfully",
-      });
-    } catch (error) {
-      console.error("Dataset upload error:", error);
-      if (error instanceof HTTPException) {
-        throw error;
-      }
-      throw new HTTPException(500, {
-        message:
-          error instanceof Error ? error.message : "Failed to upload dataset",
-      });
+    if (!file) {
+      throw new BadRequestError("No file uploaded");
     }
+
+    if (!validateExcelFile(file.name)) {
+      throw new BadRequestError(
+        "Invalid file type. Only Excel files (.xlsx, .xls) are allowed."
+      );
+    }
+
+    if (!name) {
+      throw new BadRequestError("Dataset name is required");
+    }
+
+    // Save uploaded file to datasets directory
+    const datasetsDir = path.join(process.cwd(), "datasets");
+    const filePath = await saveUploadedFile(file, datasetsDir);
+
+    // Get file stats
+    const stats = await fs.stat(filePath);
+    const fileSize = stats.size;
+
+    // Analyze the Excel file to get columns and row count
+    const { columns, rowCount } = await analyzeExcelFile(filePath);
+
+    // Create dataset record with optional project link
+    const [dataset] = await db
+      .insert(schema.datasets)
+      .values({
+        projectId: projectId && !isNaN(projectId) ? projectId : null,
+        name,
+        description,
+        filePath,
+        fileName: file.name,
+        fileSize,
+        columns: columns, // Store as JSONB directly
+        rowCount,
+      })
+      .returning();
+
+    return c.json(
+      {
+        ...dataset,
+        columns,
+      },
+      201
+    );
   })
 
   // Get single dataset
@@ -117,41 +98,27 @@ const datasets = new Hono()
     const id = parseInt(c.req.param("id"));
 
     if (isNaN(id)) {
-      throw new HTTPException(400, { message: "Invalid dataset ID" });
+      throw new BadRequestError("Invalid dataset ID");
     }
 
-    try {
-      // Fetch dataset by ID
-      const [dataset] = await db
-        .select()
-        .from(schema.datasets)
-        .where(eq(schema.datasets.id, id))
-        .limit(1);
+    // Fetch dataset by ID
+    const [dataset] = await db
+      .select()
+      .from(schema.datasets)
+      .where(eq(schema.datasets.id, id))
+      .limit(1);
 
-      if (!dataset) {
-        throw new HTTPException(404, { message: "Dataset not found" });
-      }
-
-      // Parse columns field using utility function
-      const datasetWithParsedColumns = {
-        ...dataset,
-        columns: parseDatasetColumns(dataset.columns),
-      };
-
-      return c.json({
-        success: true,
-        dataset: datasetWithParsedColumns,
-      });
-    } catch (error) {
-      console.error("Dataset fetch error:", error);
-      if (error instanceof HTTPException) {
-        throw error;
-      }
-      throw new HTTPException(500, {
-        message:
-          error instanceof Error ? error.message : "Failed to fetch dataset",
-      });
+    if (!dataset) {
+      throw new NotFoundError("Dataset");
     }
+
+    // Parse columns field using utility function
+    const datasetWithParsedColumns = {
+      ...dataset,
+      columns: parseDatasetColumns(dataset.columns),
+    };
+
+    return c.json(datasetWithParsedColumns);
   })
 
   // Delete dataset
@@ -159,48 +126,36 @@ const datasets = new Hono()
     const id = parseInt(c.req.param("id"));
 
     if (isNaN(id)) {
-      throw new HTTPException(400, { message: "Invalid dataset ID" });
+      throw new BadRequestError("Invalid dataset ID");
     }
 
+    // Fetch dataset by ID
+    const [dataset] = await db
+      .select()
+      .from(schema.datasets)
+      .where(eq(schema.datasets.id, id))
+      .limit(1);
+
+    if (!dataset) {
+      throw new NotFoundError("Dataset");
+    }
+
+    // Delete the file from filesystem if it exists
     try {
-      // Fetch dataset by ID
-      const [dataset] = await db
-        .select()
-        .from(schema.datasets)
-        .where(eq(schema.datasets.id, id))
-        .limit(1);
-
-      if (!dataset) {
-        throw new HTTPException(404, { message: "Dataset not found" });
+      await fs.unlink(dataset.filePath);
+    } catch (fileError: any) {
+      // Ignore ENOENT (file not found) errors, but log others
+      if (fileError.code !== "ENOENT") {
+        logger.warn({ error: fileError, filePath: dataset.filePath }, "Failed to delete file");
       }
-
-      // Delete the file from filesystem if it exists
-      try {
-        await fs.unlink(dataset.filePath);
-      } catch (fileError: any) {
-        // Ignore ENOENT (file not found) errors, but log others
-        if (fileError.code !== "ENOENT") {
-          console.warn("Failed to delete file:", fileError);
-        }
-      }
-
-      // Delete dataset record from database
-      await db.delete(schema.datasets).where(eq(schema.datasets.id, id));
-
-      return c.json({
-        success: true,
-        message: "Dataset deleted successfully",
-      });
-    } catch (error) {
-      console.error("Dataset deletion error:", error);
-      if (error instanceof HTTPException) {
-        throw error;
-      }
-      throw new HTTPException(500, {
-        message:
-          error instanceof Error ? error.message : "Failed to delete dataset",
-      });
     }
+
+    // Delete dataset record from database
+    await db.delete(schema.datasets).where(eq(schema.datasets.id, id));
+
+    return c.json({
+      message: "Dataset deleted successfully",
+    });
   });
 
 export default datasets;
