@@ -179,7 +179,7 @@ let pollInterval: number | null = null;
 const fetchTasks = async () => {
   loading.value = true;
   try {
-    const response = await client.api.tasks.$get({
+    const response = await client.tasks.$get({
       query: {
         workItemId: String(props.workItemId),
         types: "auto-tune,manual-tune",
@@ -204,7 +204,7 @@ const handleStartAutoTune = async () => {
   try {
     // Start training for each selected model
     for (const model of selectedModels.value) {
-      const response = await client.api.tune["auto-tune"].$post({
+      const response = await client.tune["auto-tune"].$post({
         json: {
           datasetId: props.datasetId,
           features: props.featureColumns,
@@ -258,7 +258,7 @@ const handleContinue = async () => {
   if (!selectedTaskId.value) return;
 
   try {
-    const response = await client.api.tasks[":id"].$get({
+    const response = await client.tasks[":id"].$get({
       param: { id: String(selectedTaskId.value) },
     });
     if (!response.ok) throw new Error("Failed to fetch task");

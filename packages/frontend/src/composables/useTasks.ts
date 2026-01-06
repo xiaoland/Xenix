@@ -10,7 +10,7 @@ export function useTasks() {
   return useQuery({
     queryKey: ["tasks"],
     queryFn: async () => {
-      const response = await client.api.tasks.$get({});
+      const response = await client.tasks.$get({});
       if (!response.ok) {
         throw new Error("Failed to fetch tasks");
       }
@@ -25,7 +25,7 @@ export function useTask(id: number | string) {
   return useQuery({
     queryKey: ["task", id],
     queryFn: async () => {
-      const response = await client.api.tasks[":id"].$get({
+      const response = await client.tasks[":id"].$get({
         param: { id: String(id) },
       });
       if (!response.ok) {

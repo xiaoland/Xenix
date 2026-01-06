@@ -10,7 +10,7 @@ export function useDatasets() {
   return useQuery({
     queryKey: ["datasets"],
     queryFn: async () => {
-      const response = await client.api.data.$get({});
+      const response = await client.data.$get({});
       if (!response.ok) {
         throw new Error("Failed to fetch datasets");
       }
@@ -24,7 +24,7 @@ export function useDataset(id: number | string) {
   return useQuery({
     queryKey: ["dataset", id],
     queryFn: async () => {
-      const response = await client.api.data[":id"].$get({
+      const response = await client.data[":id"].$get({
         param: { id: String(id) },
       });
       if (!response.ok) {
@@ -42,7 +42,7 @@ export function useUploadDataset() {
 
   return useMutation({
     mutationFn: async (formData: FormData) => {
-      const response = await client.api.data.$post({
+      const response = await client.data.$post({
         body: formData,
       });
       if (!response.ok) {
@@ -63,7 +63,7 @@ export function useDeleteDataset() {
 
   return useMutation({
     mutationFn: async (id: number | string) => {
-      const response = await client.api.data[":id"].$delete({
+      const response = await client.data[":id"].$delete({
         param: { id: String(id) },
       });
       if (!response.ok) {

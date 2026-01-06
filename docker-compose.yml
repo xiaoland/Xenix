@@ -1,3 +1,5 @@
+# TODO from env var
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -17,7 +19,7 @@ services:
     container_name: xenix-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes

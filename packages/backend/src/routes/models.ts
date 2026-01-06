@@ -65,7 +65,7 @@ const models = new Hono()
   .post("/sync", async (c) => {
     try {
       // Execute the Python model scanning script
-      const scriptPath = "server/business/ml/scan_models.py";
+      const scriptPath = "src/business/ml/scan_models.py";
       const result = await executePythonScript(scriptPath, {});
 
       if (!result.success) {

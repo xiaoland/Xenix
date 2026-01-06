@@ -193,7 +193,7 @@ const avgPrediction = computed(() => {
 const fetchTaskStatus = async () => {
   loading.value = true;
   try {
-    const response = await client.api.tasks[":id"].$get({
+    const response = await client.tasks[":id"].$get({
       param: { id: String(props.taskId) },
     });
     if (!response.ok) throw new Error("Failed to fetch task");

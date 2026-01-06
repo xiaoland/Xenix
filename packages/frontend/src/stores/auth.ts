@@ -26,7 +26,7 @@ export const useAuthStore = defineStore("auth", () => {
 
   async function login(credentials: { identifier: string; password: string }) {
     try {
-      const response = await client.api.auth.signin.$post({
+      const response = await client.auth.signin.$post({
         json: credentials,
       });
 
@@ -56,7 +56,7 @@ export const useAuthStore = defineStore("auth", () => {
     phone?: string;
   }) {
     try {
-      const response = await client.api.auth.signup.$post({
+      const response = await client.auth.signup.$post({
         json: credentials,
       });
 

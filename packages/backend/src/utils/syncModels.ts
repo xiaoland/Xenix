@@ -12,7 +12,7 @@ export async function syncModelMetadata() {
 
   try {
     // Execute the Python model scanning script
-    const scriptPath = "server/business/ml/scan_models.py";
+    const scriptPath = "src/business/ml/scan_models.py";
     const result = await executePythonScript(scriptPath, {});
 
     if (!result.success) {
@@ -49,15 +49,13 @@ export async function syncModelMetadata() {
           updatedCount++;
         } else {
           // Insert new model
-          await db
-            .insert(modelMetadata)
-            .values({
-              category: model.category,
-              name: model.name,
-              label: model.label,
-              paramGridSchema: model.param_grid_schema,
-              paramSchema: model.param_schema,
-            });
+          await db.insert(modelMetadata).values({
+            category: model.category,
+            name: model.name,
+            label: model.label,
+            paramGridSchema: model.param_grid_schema,
+            paramSchema: model.param_schema,
+          });
           syncedCount++;
         }
       } catch (error: any) {

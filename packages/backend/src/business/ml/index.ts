@@ -11,7 +11,7 @@ import {
 } from "./types";
 
 // Constants for ML script paths
-const ML_MODELS_DIR = path.join("server", "business", "ml");
+const ML_MODELS_DIR = path.join("src", "business", "ml");
 
 /**
  * Helper function to get script path

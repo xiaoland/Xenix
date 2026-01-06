@@ -299,7 +299,7 @@ const predictInline = async () => {
       return rest;
     });
 
-    const response = await client.api.predict.inline.$post({
+    const response = await client.predict.inline.$post({
       json: {
         predictionData: cleanData,
         model: props.selectedModel,

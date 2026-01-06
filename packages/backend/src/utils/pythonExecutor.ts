@@ -1,4 +1,5 @@
 import { spawn } from "child_process";
+import path from "path";
 import { db, schema } from "../database";
 import { eq } from "drizzle-orm";
 import { generateTraceId } from "./taskUtils";
@@ -35,12 +36,21 @@ export async function executePythonTask(
       .where(eq(schema.tasks.id, taskId));
 
     // Use python3 explicitly or from environment variable
-    const pythonCmd = process.env.PYTHON_EXECUTABLE || "python3";
+    const pythonCmd = (process.env.PYTHON_EXECUTABLE || "python3").replace(
+      /\\/g,
+      "/"
+    );
 
     // Execute Python script (no CLI args, use stdin instead)
     const pythonProcess = spawn(pythonCmd, [script], {
       cwd: cwd || process.cwd(),
-      env: process.env,
+      env: {
+        ...process.env,
+        PATH: `${path.dirname(process.env.PYTHON_EXECUTABLE || "python3")};${
+          process.env.PATH
+        }`,
+      },
+      shell: true,
     });
 
     // Write JSON data to stdin
@@ -229,11 +239,20 @@ export async function executePythonScript(
   stdinData: any
 ): Promise<any> {
   return new Promise((resolve, reject) => {
-    const pythonCmd = process.env.PYTHON_EXECUTABLE || "python3";
+    const pythonCmd = (process.env.PYTHON_EXECUTABLE || "python3").replace(
+      /\\/g,
+      "/"
+    );
 
     const pythonProcess = spawn(pythonCmd, [scriptPath], {
       cwd: process.cwd(),
-      env: process.env,
+      env: {
+        ...process.env,
+        PATH: `${path.dirname(process.env.PYTHON_EXECUTABLE || "python3")};${
+          process.env.PATH
+        }`,
+      },
+      shell: true,
     });
 
     // Write JSON data to stdin
