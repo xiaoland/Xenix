@@ -94,14 +94,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { message } from 'ant-design-vue';
-import DefaultLayout from '../../layouts/DefaultLayout.vue';
-import PrepareStep from '../../components/ml/prepare/PrepareStep.vue';
-import TuningStep from '../../components/ml/tuning/TuningStep.vue';
-import PredictionStep from '../../components/ml/prediction/PredictionStep.vue';
-import { useWorkItem } from '../../composables';
+import { ref, computed } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { message } from "ant-design-vue";
+import DefaultLayout from "../../layouts/DefaultLayout.vue";
+import PrepareStep from "../../components/ml/prepare/PrepareStep.vue";
+import TuningStep from "../../components/ml/tuning/TuningStep.vue";
+import PredictionStep from "../../components/ml/prediction/PredictionStep.vue";
+import { useWorkItem } from "../../composables";
 
 interface WorkItem {
   id: number;
@@ -119,7 +119,12 @@ const router = useRouter();
 
 // Use composable for fetching work item
 const workItemId = computed(() => Number(route.params.id));
-const { data: workItemData, isLoading: loading, error: fetchError, refetch } = useWorkItem(workItemId);
+const {
+  data: workItemData,
+  isLoading: loading,
+  error: fetchError,
+  refetch,
+} = useWorkItem(workItemId);
 
 // Computed property to safely access work item
 const workItem = computed(() => workItemData.value);
@@ -140,7 +145,7 @@ const checkWorkItemStep = () => {
   ) {
     // Skip to tuning step
     currentStep.value = 1;
-    message.info('Restored saved dataset configuration');
+    message.info("Restored saved dataset configuration");
   }
 };
 
@@ -151,14 +156,14 @@ if (workItem.value) {
 
 const getStatusColor = (status: string) => {
   switch (status) {
-    case 'active':
-      return 'green';
-    case 'completed':
-      return 'blue';
-    case 'archived':
-      return 'gray';
+    case "active":
+      return "green";
+    case "completed":
+      return "blue";
+    case "archived":
+      return "gray";
     default:
-      return 'default';
+      return "default";
   }
 };
 
@@ -193,17 +198,4 @@ const resetWorkflow = () => {
   selectedParameters.value = {};
   selectedTuningTaskId.value = null;
 };
-</script>
-
-const resetWorkflow = () => {
-  currentStep.value = 0;
-  selectedModel.value = null;
-  selectedParameters.value = {};
-  selectedTuningTaskId.value = null;
-  fetchWorkItem();
-};
-
-onMounted(() => {
-  fetchWorkItem();
-});
 </script>
