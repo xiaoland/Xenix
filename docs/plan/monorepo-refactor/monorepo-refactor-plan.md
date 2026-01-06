@@ -310,7 +310,7 @@ Xenix/
      const client = hc<AppType>('http://localhost:3001')
      
      // Fully type-safe!
-     const projects = await client.api.projects.$get()
+     const projects = await client.projects.$get()
      const data = await projects.json()  // Type: Project[]
      ```
 
@@ -325,7 +325,7 @@ Xenix/
        return useQuery({
          queryKey: ['projects'],
          queryFn: async () => {
-           const res = await client.api.projects.$get()
+           const res = await client.projects.$get()
            return res.json()
          }
        })
@@ -355,7 +355,7 @@ Xenix/
        const user = ref<User | null>(null)
        
        async function login(credentials: LoginDto) {
-         const res = await client.api.auth.signin.$post({ json: credentials })
+         const res = await client.auth.signin.$post({ json: credentials })
          const data = await res.json()
          token.value = data.token
          user.value = data.user
@@ -428,7 +428,7 @@ Xenix/
      
      const { mutate: createProject, isPending } = useMutation({
        mutationFn: async (data: CreateProjectDto) => {
-         const res = await client.api.projects.$post({ json: data })
+         const res = await client.projects.$post({ json: data })
          return res.json()
        },
        onSuccess: () => {
@@ -589,7 +589,6 @@ Xenix/
      *.pyc
      ```
 
-
 ### Phase 6: Migration Strategy
 
 **Status: ✅ COMPLETED**
@@ -599,6 +598,7 @@ The migration from Nuxt.js full-stack to Vite+Vue frontend + Hono backend monore
 #### Completed Migration Steps
 
 **✅ Step 1: Structure & Shared Package (Phase 1)**
+
 - Created `packages/` directory with three sub-packages:
   - `packages/shared` - Shared TypeScript types
   - `packages/backend` - Hono backend server
@@ -609,6 +609,7 @@ The migration from Nuxt.js full-stack to Vite+Vue frontend + Hono backend monore
 - All types are exported from `@xenix/shared` package
 
 **✅ Step 2: Backend Migration (Phase 2)**
+
 - Created Hono application with clean architecture:
   - Routes in `src/routes/` (auth, projects, datasets, work-items, tasks, tune, predict, download, models, obsrv)
   - Business logic in `src/business/ml/` (Python integration, model management)
@@ -625,6 +626,7 @@ The migration from Nuxt.js full-stack to Vite+Vue frontend + Hono backend monore
   - DB commands: generate and migrate with Drizzle
 
 **✅ Step 3: Frontend Migration (Phase 3)**
+
 - Created Vite + Vue 3 application:
   - Explicit routing in `src/router/index.ts` (no file-based routing)
   - Pinia stores for auth and global state
@@ -645,6 +647,7 @@ The migration from Nuxt.js full-stack to Vite+Vue frontend + Hono backend monore
   - Build: `vue-tsc && vite build`
 
 **✅ Step 4: Testing Infrastructure (Phase 4)**
+
 - Added Vitest to all packages
 - Created test configurations:
   - `packages/shared/vitest.config.ts` - Node environment
@@ -660,6 +663,7 @@ The migration from Nuxt.js full-stack to Vite+Vue frontend + Hono backend monore
   - `test:coverage` - Generate coverage reports
 
 **✅ Step 5: Configuration & Tooling (Phase 5)**
+
 - Updated root `package.json` with comprehensive scripts:
   - `dev` - Run all packages in parallel
   - `dev:frontend` / `dev:backend` - Run individual packages
@@ -683,6 +687,7 @@ The migration from Nuxt.js full-stack to Vite+Vue frontend + Hono backend monore
 #### Migration Notes & Lessons Learned
 
 **What Went Well:**
+
 1. **Clean Separation**: Separating frontend and backend into distinct packages made the codebase much clearer
 2. **Type Safety**: Shared types package eliminates duplicate type definitions
 3. **Python Integration**: Keeping Python scripts unchanged reduced migration risk
@@ -690,12 +695,14 @@ The migration from Nuxt.js full-stack to Vite+Vue frontend + Hono backend monore
 5. **Development Experience**: Vite HMR is significantly faster than Nuxt builds
 
 **Challenges Overcome:**
+
 1. **Port Configuration**: Changed PostgreSQL port to 5435 to avoid conflicts with existing installations
 2. **Module Resolution**: Configured TypeScript path aliases properly for all packages
 3. **Environment Variables**: Needed different .env files for frontend (VITE_) and backend
 4. **Workspace Dependencies**: Properly configured `@xenix/shared` as workspace dependency
 
 **Deviations from Original Plan:**
+
 1. **No Zod Validation Yet**: Original plan called for Zod schemas, but current implementation uses TypeScript types only. Zod can be added incrementally later.
 2. **No Repository Pattern Yet**: Backend directly uses Drizzle queries in routes. Repository layer can be refactored later.
 3. **No Service Layer Yet**: Business logic is mixed with route handlers. Can be extracted into services later.
@@ -708,6 +715,7 @@ These deviations represent a more pragmatic, incremental approach that got the b
 #### Deployment Guide
 
 **Prerequisites:**
+
 - Node.js 18+ and pnpm installed
 - Python 3.9+ with required ML packages (scikit-learn, XGBoost, LightGBM, pandas, etc.)
 - Docker and Docker Compose (for PostgreSQL and Redis)
@@ -715,6 +723,7 @@ These deviations represent a more pragmatic, incremental approach that got the b
 **Development Setup:**
 
 1. **Clone and Install Dependencies**
+
    ```bash
    git clone https://github.com/xiaoland/Xenix.git
    cd Xenix
@@ -722,6 +731,7 @@ These deviations represent a more pragmatic, incremental approach that got the b
    ```
 
 2. **Setup Environment Variables**
+
    ```bash
    # Copy root .env.example
    cp .env.example .env
@@ -736,16 +746,19 @@ These deviations represent a more pragmatic, incremental approach that got the b
    ```
 
 3. **Start PostgreSQL and Redis**
+
    ```bash
    pnpm docker:up
    ```
 
 4. **Run Database Migrations**
+
    ```bash
    pnpm db:migrate
    ```
 
 5. **Start Development Servers**
+
    ```bash
    # Start both frontend and backend
    pnpm dev
@@ -756,6 +769,7 @@ These deviations represent a more pragmatic, incremental approach that got the b
    ```
 
 6. **Run Tests**
+
    ```bash
    pnpm test          # Run all tests once
    pnpm test:watch    # Run tests in watch mode
@@ -765,11 +779,13 @@ These deviations represent a more pragmatic, incremental approach that got the b
 **Production Build:**
 
 1. **Build All Packages**
+
    ```bash
    pnpm build
    ```
 
 2. **Start Backend Server**
+
    ```bash
    cd packages/backend
    node dist/index.js
@@ -781,6 +797,7 @@ These deviations represent a more pragmatic, incremental approach that got the b
    - Configure `VITE_API_URL` to point to production backend
 
 **Environment Variables for Production:**
+
 - `DATABASE_URL` - PostgreSQL connection string
 - `REDIS_URL` - Redis connection string (for future job queue)
 - `JWT_SECRET` - Strong secret for JWT tokens (change from default!)
@@ -794,6 +811,7 @@ These deviations represent a more pragmatic, incremental approach that got the b
 The following improvements are planned but not yet implemented:
 
 **High Priority:**
+
 1. **Zod Validation**: Add runtime validation with Zod schemas in shared package
 2. **Repository Pattern**: Extract database queries into repository layer
 3. **Service Layer**: Move business logic from routes to service classes
@@ -877,6 +895,7 @@ The monorepo refactor is complete with all planned phases implemented:
 **Recent Progress (January 2026):**
 
 ✅ **Frontend Modernization Completed**
+
 - TanStack Query configured for automatic caching and refetching
 - 5 comprehensive composables created (useProjects, useWorkItems, useDatasets, useTasks, useFormatters)
 - Hono RPC client setup with AppType export for end-to-end type safety
@@ -922,10 +941,10 @@ The monorepo refactor is complete with all planned phases implemented:
 The codebase now follows modern Vue 3 best practices with full type safety and automatic cache management. The pragmatic approach taken allows for incremental adoption of advanced patterns (Repository layer, BullMQ, etc.) without blocking the core functionality.
 
 **Next Steps:**
+
 - Consider removing `src/services/` directory (views no longer use services)
 - Optionally migrate composables from fetch to Hono RPC client for full type safety
 - Backend architectural patterns (Repository, Service, BullMQ) as Phase 2 improvements
-
 
 ## Key Improvements from Current Architecture
 
