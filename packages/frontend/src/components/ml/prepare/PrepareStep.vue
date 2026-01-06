@@ -68,7 +68,6 @@ import { message } from 'ant-design-vue';
 
 import { computed, ref } from 'vue';
 
-import { client } from '../../../api/client';
 import { useUpdateWorkItem } from '../../../composables';
 import DatasetSelector from '../../dataset/DatasetSelector.vue';
 import ColumnSelector from './ColumnSelector.vue';

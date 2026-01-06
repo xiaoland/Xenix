@@ -51,11 +51,11 @@ export default [
       },
     },
     rules: {
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      'no-console': 'off', // Allow console for error logging
       'no-debugger': 'warn',
       'no-unreachable': 'error',
       'prefer-const': 'warn',
-      'no-unused-vars': 'warn',
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     },
   },
 
@@ -73,6 +73,7 @@ export default [
         FormData: 'readonly',
         File: 'readonly',
         Blob: 'readonly',
+        RequestInit: 'readonly',
       },
     },
   },
@@ -88,6 +89,11 @@ export default [
         ecmaVersion: 'latest',
         sourceType: 'module',
       },
+      globals: {
+        console: 'readonly',
+        clearInterval: 'readonly',
+        setInterval: 'readonly',
+      },
     },
     rules: {
       'vue/multi-word-component-names': 'off',
@@ -97,6 +103,7 @@ export default [
       'vue/html-self-closing': 'off',
       'vue/attributes-order': 'warn',
       'vue/html-indent': 'off',
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     },
   },
 ];

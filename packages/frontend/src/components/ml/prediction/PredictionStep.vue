@@ -78,8 +78,8 @@
         <h3 class="text-lg font-medium">Manual Data Input</h3>
         <a-button
           type="primary"
-          @click="addRow"
           class="inline-flex items-center"
+          @click="addRow"
         >
           <span class="i-mdi-plus mr-1" />
           Add Row
@@ -105,8 +105,8 @@
               type="link"
               danger
               size="small"
-              @click="removeRow(index)"
               class="inline-flex items-center"
+              @click="removeRow(index)"
             >
               <span class="i-mdi-delete mr-1" />
               Remove
@@ -133,8 +133,8 @@
         block
         :loading="isPredicting"
         :disabled="inputData.length === 0"
-        @click="predictInline"
         class="inline-flex items-center justify-center"
+        @click="predictInline"
       >
         <span class="i-mdi-chart-line mr-2" />
         Predict
@@ -297,7 +297,7 @@ const predictInline = async () => {
   try {
     // Remove the 'key' field from data
     const cleanData = inputData.value.map((row) => {
-      const { key, ...rest } = row;
+      const { key: _key, ...rest } = row;
       return rest;
     });
 

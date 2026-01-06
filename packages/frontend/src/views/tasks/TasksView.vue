@@ -12,9 +12,7 @@
       <a-card class="mb-6">
         <div class="flex gap-4 items-end flex-wrap">
           <div class="flex-1 min-w-[200px]">
-            <label class="block text-sm font-medium text-gray-700 mb-2"
-              >Status</label
-            >
+            <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
             <a-select
               v-model:value="statusFilter"
               style="width: 100%"
@@ -29,9 +27,7 @@
           </div>
 
           <div class="flex-1 min-w-[200px]">
-            <label class="block text-sm font-medium text-gray-700 mb-2"
-              >Type</label
-            >
+            <label class="block text-sm font-medium text-gray-700 mb-2">Type</label>
             <a-select
               v-model:value="typeFilter"
               style="width: 100%"
@@ -40,19 +36,19 @@
               <a-select-option value="">All</a-select-option>
               <a-select-option value="auto-tune">Auto-Tune</a-select-option>
               <a-select-option value="manual-tune">Manual-Tune</a-select-option>
-              <a-select-option value="predict-file"
-                >Predict (File)</a-select-option
-              >
-              <a-select-option value="predict-inline"
-                >Predict (Inline)</a-select-option
-              >
+              <a-select-option value="predict-file">
+Predict (File)
+</a-select-option>
+              <a-select-option value="predict-inline">
+Predict (Inline)
+</a-select-option>
             </a-select>
           </div>
 
           <a-button
-            @click="fetchTasks"
             :loading="loading"
             class="inline-flex items-center"
+            @click="fetchTasks"
           >
             <span class="i-mdi-refresh mr-1"></span>
             Refresh
@@ -114,8 +110,8 @@
             <template v-else-if="column.key === 'action'">
               <a-button
                 size="small"
-                @click="viewLogs(record.id)"
                 class="inline-flex items-center"
+                @click="viewLogs(record.id)"
               >
                 <span class="i-mdi-file-document-outline mr-1"></span>
                 Logs

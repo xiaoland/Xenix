@@ -10,8 +10,8 @@
         <a-form
           :model="formData"
           :rules="rules"
-          @finish="handleSignup"
           layout="vertical"
+          @finish="handleSignup"
         >
           <a-form-item label="Email" name="email">
             <a-input

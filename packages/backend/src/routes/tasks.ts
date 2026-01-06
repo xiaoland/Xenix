@@ -23,7 +23,7 @@ const tasks = new Hono()
     const { workItemId: workItemIdStr, type: typeFilter } =
       c.req.valid('query');
 
-    let conditions = [eq(schema.tasks.workItemId, Number(workItemIdStr))];
+    const conditions = [eq(schema.tasks.workItemId, Number(workItemIdStr))];
 
     // Filter by type if specified
     if (typeFilter) {

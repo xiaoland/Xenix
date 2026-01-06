@@ -72,10 +72,10 @@
             <p class="text-sm text-gray-600">
               <strong>Columns:</strong> {{ dataset.columns.length }}
             </p>
-            <p class="text-sm text-gray-600" v-if="dataset.filePath">
+            <p v-if="dataset.filePath" class="text-sm text-gray-600">
               <strong>File:</strong> {{ dataset.filePath.split("/").pop() }}
             </p>
-            <p class="text-xs text-gray-500" v-if="dataset.createdAt">
+            <p v-if="dataset.createdAt" class="text-xs text-gray-500">
               Uploaded: {{ new Date(dataset.createdAt).toLocaleDateString() }}
             </p>
             <a-button type="link" size="small" @click="viewDetails(dataset)">

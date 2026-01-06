@@ -25,8 +25,8 @@
         <a-button
           type="primary"
           class="inline-flex items-center"
-          @click="handleDownload"
           :loading="downloading"
+          @click="handleDownload"
         >
           <span class="i-mdi-download mr-2"></span>
           Download Results

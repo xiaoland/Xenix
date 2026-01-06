@@ -50,7 +50,7 @@ const models = new Hono()
     const modelsList = result.models || [];
     let syncedCount = 0;
     let updatedCount = 0;
-    let errors: string[] = [];
+    const errors: string[] = [];
 
     // Synchronize each model to the database
     for (const model of modelsList) {

@@ -17,7 +17,7 @@
           layout="vertical"
           @finish="handleSubmit"
         >
-          <a-form-item label="Project" name="projectId" v-if="!projectId">
+          <a-form-item v-if="!projectId" label="Project" name="projectId">
             <a-select
               v-model:value="formState.projectId"
               placeholder="Select a project"
