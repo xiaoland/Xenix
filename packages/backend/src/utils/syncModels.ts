@@ -6,9 +6,10 @@ import { db } from "../database";
 import { modelMetadata } from "../database/schema";
 import { executePythonScript } from "./pythonExecutor";
 import { eq } from "drizzle-orm";
+import logger from "./logger/index.js";
 
 export async function syncModelMetadata() {
-  console.log("Synchronizing model metadata...");
+  logger.info('Synchronizing model metadata...');
 
   try {
     // Execute the Python model scanning script
@@ -16,7 +17,7 @@ export async function syncModelMetadata() {
     const result = await executePythonScript(scriptPath, {});
 
     if (!result.success) {
-      console.error("Model scanning failed:", result.error);
+      logger.error({ error: result.error }, 'Model scanning failed');
       throw new Error(`Model scanning failed: ${result.error}`);
     }
 
@@ -59,12 +60,12 @@ export async function syncModelMetadata() {
           syncedCount++;
         }
       } catch (error: any) {
-        console.error(`Failed to sync ${model.name}:`, error.message);
+        logger.error({ error, modelName: model.name }, 'Failed to sync model');
       }
     }
 
     const message = `Model metadata synchronized: ${syncedCount} new, ${updatedCount} updated, ${models.length} total`;
-    console.log(message);
+    logger.info({ syncedCount, updatedCount, total: models.length }, message);
     return {
       success: true,
       syncedCount,
@@ -73,7 +74,7 @@ export async function syncModelMetadata() {
       message,
     };
   } catch (error: any) {
-    console.error("Failed to sync model metadata:", error);
+    logger.error({ error }, 'Failed to sync model metadata');
     throw error;
   }
 }

@@ -1,6 +1,7 @@
 import path from "path";
 import { spawn } from "child_process";
 import { existsSync } from "fs";
+import logger from "../../utils/logger/index.js";
 
 /**
  * Check if PDM is installed
@@ -22,7 +23,7 @@ export async function isPdmInstalled(): Promise<boolean> {
  * Supports installation without pip using curl/wget
  */
 export async function installPdm(): Promise<void> {
-  console.log("PDM not found. Installing PDM...");
+  logger.info('PDM not found. Installing PDM...');
 
   // Try official PDM installer first (works without pip)
   // https://pdm-project.org/latest/#installation
@@ -43,30 +44,30 @@ export async function installPdm(): Promise<void> {
     installer.stdout.pipe(python.stdin);
 
     installer.stderr.on("data", (data) => {
-      console.error(`[PDM Install - Curl] ${data.toString()}`);
+      logger.error({ message: data.toString() }, 'PDM Install - Curl error');
     });
 
     python.stdout.on("data", (data) => {
-      console.log(`[PDM Install] ${data.toString()}`);
+      logger.info({ message: data.toString() }, 'PDM Install');
     });
 
     python.stderr.on("data", (data) => {
-      console.error(`[PDM Install] ${data.toString()}`);
+      logger.error({ message: data.toString() }, 'PDM Install error');
     });
 
     python.on("close", (code) => {
       if (code === 0) {
-        console.log("PDM installed successfully using official installer");
+        logger.info('PDM installed successfully using official installer');
         resolve();
       } else {
-        console.log("Official installer failed, trying pip fallback...");
+        logger.warn('Official installer failed, trying pip fallback...');
         // Fallback to pip if available
         installPdmViaPip().then(resolve).catch(reject);
       }
     });
 
     python.on("error", (error) => {
-      console.error("Failed to run Python for PDM installation:", error);
+      logger.error({ error }, 'Failed to run Python for PDM installation');
       // Fallback to pip if available
       installPdmViaPip().then(resolve).catch(reject);
     });
@@ -81,16 +82,16 @@ export async function installPdmViaPip(): Promise<void> {
     const pip = spawn("pip", ["install", "--user", "pdm"]);
 
     pip.stdout.on("data", (data) => {
-      console.log(`[PDM Install - Pip] ${data.toString()}`);
+      logger.info({ message: data.toString() }, 'PDM Install - Pip');
     });
 
     pip.stderr.on("data", (data) => {
-      console.error(`[PDM Install - Pip] ${data.toString()}`);
+      logger.error({ message: data.toString() }, 'PDM Install - Pip error');
     });
 
     pip.on("close", (code) => {
       if (code === 0) {
-        console.log("PDM installed successfully via pip");
+        logger.info('PDM installed successfully via pip');
         resolve();
       } else {
         reject(new Error(`Failed to install PDM via pip: exit code ${code}`));
@@ -118,7 +119,7 @@ export function isPythonEnvReady(): boolean {
  * Install Python dependencies using PDM
  */
 export async function setupPythonEnvironment(): Promise<void> {
-  console.log("Setting up Python environment with PDM...");
+  logger.info('Setting up Python environment with PDM...');
   return new Promise((resolve, reject) => {
     const pdmInstall = spawn("pdm", ["install"], {
       cwd: process.cwd(),
@@ -126,16 +127,16 @@ export async function setupPythonEnvironment(): Promise<void> {
     });
 
     pdmInstall.stdout.on("data", (data) => {
-      console.log(`[PDM Install] ${data.toString()}`);
+      logger.info({ message: data.toString() }, 'PDM Install');
     });
 
     pdmInstall.stderr.on("data", (data) => {
-      console.error(`[PDM Install] ${data.toString()}`);
+      logger.error({ message: data.toString() }, 'PDM Install error');
     });
 
     pdmInstall.on("close", (code) => {
       if (code === 0) {
-        console.log("Python environment setup completed");
+        logger.info('Python environment setup completed');
         resolve();
       } else {
         reject(
@@ -162,7 +163,7 @@ export async function ensurePythonEnvironment(): Promise<void> {
   if (!isPythonEnvReady()) {
     await setupPythonEnvironment();
   } else {
-    console.log("Python environment already configured");
+    logger.info('Python environment already configured');
   }
 }
 
@@ -187,7 +188,7 @@ export async function getInitPromise(): Promise<void> {
       await ensurePythonEnvironment();
       environmentInitialized = true;
     } catch (error) {
-      console.error("Failed to initialize Python environment:", error);
+      logger.error({ error }, 'Failed to initialize Python environment');
       // Reset promise so it can be retried
       environmentInitPromise = null;
       throw error;

@@ -3,6 +3,7 @@ import path from "path";
 import { db, schema } from "../database";
 import { eq } from "drizzle-orm";
 import { generateTraceId } from "./taskUtils";
+import logger from "./logger/index.js";
 
 export interface PythonTaskOptions {
   script: string;
@@ -78,7 +79,7 @@ export async function executePythonTask(
             await handleStructuredOutput(parsed, taskId);
           } catch {
             // Not JSON, just log as plain text
-            console.log(`[${traceId}] ${line}`);
+            logger.info({ traceId, line }, 'Python stdout');
           }
         }
       }
@@ -100,7 +101,7 @@ export async function executePythonTask(
             await handleStructuredOutput(parsed, taskId);
           } catch {
             // Not JSON, just log as error
-            console.error(`[${traceId}] ${line}`);
+            logger.error({ traceId, line }, 'Python stderr');
           }
         }
       }
@@ -120,7 +121,7 @@ export async function executePythonTask(
           })
           .where(eq(schema.tasks.id, taskId));
 
-        console.log(`[${traceId}] Task completed successfully`);
+        logger.info({ traceId }, 'Task completed successfully');
       } else {
         // Task failed
         await db
@@ -132,7 +133,7 @@ export async function executePythonTask(
           })
           .where(eq(schema.tasks.id, taskId));
 
-        console.error(`[${traceId}] Task failed with code ${code}`);
+        logger.error({ traceId, exitCode: code }, 'Task failed');
       }
     });
 
@@ -150,7 +151,7 @@ export async function executePythonTask(
         })
         .where(eq(schema.tasks.id, taskId));
 
-      console.error(`[${traceId}] Failed to start task:`, error);
+      logger.error({ traceId, error }, 'Failed to start task');
     });
   } catch (error) {
     if (taskCompleted) return; // Prevent duplicate updates
@@ -205,7 +206,7 @@ async function handleStructuredOutput(
         break;
     }
   } catch (error) {
-    console.error(`[${traceId}] Error handling structured output:`, error);
+    logger.error({ traceId, error }, 'Error handling structured output');
   }
 }
 
@@ -226,7 +227,7 @@ async function storeLog(logData: any, taskId: number) {
       createdAt: new Date(),
     });
   } catch (error) {
-    console.error(`[${traceId}] Error storing log:`, error);
+    logger.error({ traceId, error }, 'Error storing log');
   }
 }
 
