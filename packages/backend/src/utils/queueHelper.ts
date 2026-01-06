@@ -6,10 +6,11 @@
 import { mlTasksQueue } from '../queues/index.js';
 import type { MLTaskData } from '../jobs/index.js';
 import logger from '../utils/logger/index.js';
+import { randomUUID } from 'crypto';
 
 export async function addMLTask(data: MLTaskData) {
   const job = await mlTasksQueue.add('ml-task', data, {
-    jobId: `ml-task-${data.taskId}-${Date.now()}`,
+    jobId: `ml-task-${data.taskId}-${randomUUID()}`,
   });
 
   logger.info(

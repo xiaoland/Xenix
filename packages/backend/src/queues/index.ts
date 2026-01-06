@@ -3,14 +3,17 @@
  * Centralized Redis connection and queue setup
  */
 
-import { Queue, Worker, QueueEvents } from 'bullmq';
+import { Queue, QueueEvents } from 'bullmq';
 import { config } from '../config/index.js';
 import logger from '../utils/logger/index.js';
 
+// Parse Redis URL once
+const redisUrl = new URL(config.REDIS_URL);
+
 // Redis connection configuration
 export const connection = {
-  host: new URL(config.REDIS_URL).hostname,
-  port: Number(new URL(config.REDIS_URL).port) || 6379,
+  host: redisUrl.hostname,
+  port: Number(redisUrl.port) || 6379,
 };
 
 // Queue names

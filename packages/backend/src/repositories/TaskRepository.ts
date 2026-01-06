@@ -15,10 +15,10 @@ export class TaskRepository extends BaseRepository<Task> {
   }
 
   async findByWorkItem(workItemId: number, types?: string[]) {
-    let conditions = [eq(schema.tasks.workItemId, workItemId)];
+    const conditions: any[] = [eq(schema.tasks.workItemId, workItemId)];
 
     if (types && types.length > 0) {
-      conditions.push(inArray(schema.tasks.type, types) as any);
+      conditions.push(inArray(schema.tasks.type, types));
     }
 
     return await db
