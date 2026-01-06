@@ -1,8 +1,10 @@
 import { Hono } from 'hono';
-import { HTTPException } from 'hono/http-exception';
+import { zValidator } from '@hono/zod-validator';
 import { db, schema } from '../database/index.js';
 import { desc, eq } from 'drizzle-orm';
 import { authMiddleware, requireAuth } from '../middleware/auth.js';
+import { CreateProjectSchema, UpdateProjectSchema } from '@xenix/shared';
+import { NotFoundError, BadRequestError, ForbiddenError } from '../errors/index.js';
 
 const projects = new Hono();
 
@@ -11,60 +13,49 @@ projects.use('*', authMiddleware);
 
 // Get all projects
 projects.get('/', async (c) => {
-  try {
-    const user = requireAuth(c);
+  const user = requireAuth(c);
 
-    // Fetch projects created by the current user
-    const projectsList = await db
-      .select()
-      .from(schema.projects)
-      .where(eq(schema.projects.createdBy, user.id))
-      .orderBy(desc(schema.projects.createdAt));
+  // Fetch projects created by the current user
+  const projectsList = await db
+    .select()
+    .from(schema.projects)
+    .where(eq(schema.projects.createdBy, user.id))
+    .orderBy(desc(schema.projects.createdAt));
 
-    // For each project, fetch its work items and datasets
-    const projectsWithRelations = await Promise.all(
-      projectsList.map(async (project) => {
-        const workItems = await db
-          .select()
-          .from(schema.workItems)
-          .where(eq(schema.workItems.projectId, project.id));
+  // For each project, fetch its work items and datasets
+  const projectsWithRelations = await Promise.all(
+    projectsList.map(async (project) => {
+      const workItems = await db
+        .select()
+        .from(schema.workItems)
+        .where(eq(schema.workItems.projectId, project.id));
 
-        const datasets = await db
-          .select()
-          .from(schema.datasets)
-          .where(eq(schema.datasets.projectId, project.id));
+      const datasets = await db
+        .select()
+        .from(schema.datasets)
+        .where(eq(schema.datasets.projectId, project.id));
 
-        return {
-          ...project,
-          workItems,
-          datasets,
-        };
-      })
-    );
+      return {
+        ...project,
+        workItems,
+        datasets,
+      };
+    })
+  );
 
-    return c.json({
-      success: true,
-      projects: projectsWithRelations,
-    });
-  } catch (error) {
-    console.error('Projects fetch error:', error);
-    throw new HTTPException(500, {
-      message:
-        error instanceof Error ? error.message : 'Failed to fetch projects',
-    });
-  }
+  return c.json({
+    success: true,
+    projects: projectsWithRelations,
+  });
 });
 
 // Create project
-projects.post('/', async (c) => {
-  try {
+projects.post(
+  '/',
+  zValidator('json', CreateProjectSchema),
+  async (c) => {
     const user = requireAuth(c);
-    const body = await c.req.json();
-    const { name, description } = body;
-
-    if (!name) {
-      throw new HTTPException(400, { message: 'Project name is required' });
-    }
+    const { name, description } = c.req.valid('json');
 
     // Create project record
     const result = await db
@@ -84,82 +75,65 @@ projects.post('/', async (c) => {
       project,
       message: 'Project created successfully',
     });
-  } catch (error) {
-    console.error('Project creation error:', error);
-    if (error instanceof HTTPException) {
-      throw error;
-    }
-    throw new HTTPException(500, {
-      message:
-        error instanceof Error ? error.message : 'Failed to create project',
-    });
   }
-});
+);
 
 // Get single project
 projects.get('/:id', async (c) => {
-  try {
-    const user = requireAuth(c);
-    const id = parseInt(c.req.param('id'));
+  const user = requireAuth(c);
+  const id = parseInt(c.req.param('id'));
 
-    if (isNaN(id)) {
-      throw new HTTPException(400, { message: 'Invalid project ID' });
-    }
-
-    const [project] = await db
-      .select()
-      .from(schema.projects)
-      .where(eq(schema.projects.id, id))
-      .limit(1);
-
-    if (!project) {
-      throw new HTTPException(404, { message: 'Project not found' });
-    }
-
-    // Verify ownership
-    if (project.createdBy !== user.id) {
-      throw new HTTPException(403, { message: 'Access denied' });
-    }
-
-    // Fetch related work items and datasets
-    const workItems = await db
-      .select()
-      .from(schema.workItems)
-      .where(eq(schema.workItems.projectId, id));
-
-    const datasets = await db
-      .select()
-      .from(schema.datasets)
-      .where(eq(schema.datasets.projectId, id));
-
-    return c.json({
-      success: true,
-      project: {
-        ...project,
-        workItems,
-        datasets,
-      },
-    });
-  } catch (error) {
-    if (error instanceof HTTPException) {
-      throw error;
-    }
-    console.error('Project fetch error:', error);
-    throw new HTTPException(500, {
-      message: error instanceof Error ? error.message : 'Failed to fetch project',
-    });
+  if (isNaN(id)) {
+    throw new BadRequestError('Invalid project ID');
   }
+
+  const [project] = await db
+    .select()
+    .from(schema.projects)
+    .where(eq(schema.projects.id, id))
+    .limit(1);
+
+  if (!project) {
+    throw new NotFoundError('Project');
+  }
+
+  // Verify ownership
+  if (project.createdBy !== user.id) {
+    throw new ForbiddenError('Access denied to this project');
+  }
+
+  // Fetch related work items and datasets
+  const workItems = await db
+    .select()
+    .from(schema.workItems)
+    .where(eq(schema.workItems.projectId, id));
+
+  const datasets = await db
+    .select()
+    .from(schema.datasets)
+    .where(eq(schema.datasets.projectId, id));
+
+  return c.json({
+    success: true,
+    project: {
+      ...project,
+      workItems,
+      datasets,
+    },
+  });
 });
 
 // Update project
-projects.put('/:id', async (c) => {
-  try {
+projects.put(
+  '/:id',
+  zValidator('json', UpdateProjectSchema),
+  async (c) => {
     const user = requireAuth(c);
     const id = parseInt(c.req.param('id'));
-    const body = await c.req.json();
+    const updates = c.req.valid('json');
 
     if (isNaN(id)) {
-      throw new HTTPException(400, { message: 'Invalid project ID' });
+      throw new BadRequestError('Invalid project ID');
     }
 
     // Check ownership
@@ -170,20 +144,18 @@ projects.put('/:id', async (c) => {
       .limit(1);
 
     if (!existingProject) {
-      throw new HTTPException(404, { message: 'Project not found' });
+      throw new NotFoundError('Project');
     }
 
     if (existingProject.createdBy !== user.id) {
-      throw new HTTPException(403, { message: 'Access denied' });
+      throw new ForbiddenError('Access denied to this project');
     }
 
     // Update project
     const [updatedProject] = await db
       .update(schema.projects)
       .set({
-        name: body.name,
-        description: body.description,
-        status: body.status,
+        ...updates,
         updatedAt: new Date(),
       })
       .where(eq(schema.projects.id, id))
@@ -194,56 +166,44 @@ projects.put('/:id', async (c) => {
       project: updatedProject,
       message: 'Project updated successfully',
     });
-  } catch (error) {
-    if (error instanceof HTTPException) {
-      throw error;
-    }
-    console.error('Project update error:', error);
-    throw new HTTPException(500, {
-      message: error instanceof Error ? error.message : 'Failed to update project',
-    });
   }
-});
+);
 
 // Delete project
 projects.delete('/:id', async (c) => {
-  try {
-    const user = requireAuth(c);
-    const id = parseInt(c.req.param('id'));
+  const user = requireAuth(c);
+  const id = parseInt(c.req.param('id'));
 
-    if (isNaN(id)) {
-      throw new HTTPException(400, { message: 'Invalid project ID' });
-    }
+  if (isNaN(id)) {
+    throw new BadRequestError('Invalid project ID');
+  }
 
-    // Check ownership
-    const [existingProject] = await db
-      .select()
-      .from(schema.projects)
-      .where(eq(schema.projects.id, id))
-      .limit(1);
+  // Check ownership
+  const [existingProject] = await db
+    .select()
+    .from(schema.projects)
+    .where(eq(schema.projects.id, id))
+    .limit(1);
 
-    if (!existingProject) {
-      throw new HTTPException(404, { message: 'Project not found' });
-    }
+  if (!existingProject) {
+    throw new NotFoundError('Project');
+  }
 
-    if (existingProject.createdBy !== user.id) {
-      throw new HTTPException(403, { message: 'Access denied' });
-    }
+  if (existingProject.createdBy !== user.id) {
+    throw new ForbiddenError('Access denied to this project');
+  }
 
-    // Delete project
-    await db.delete(schema.projects).where(eq(schema.projects.id, id));
+  // Delete project
+  await db.delete(schema.projects).where(eq(schema.projects.id, id));
 
-    return c.json({
-      success: true,
-      message: 'Project deleted successfully',
-    });
-  } catch (error) {
-    if (error instanceof HTTPException) {
-      throw error;
-    }
-    console.error('Project delete error:', error);
-    throw new HTTPException(500, {
-      message: error instanceof Error ? error.message : 'Failed to delete project',
+  return c.json({
+    success: true,
+    message: 'Project deleted successfully',
+  });
+});
+
+export default projects;
+
     });
   }
 });

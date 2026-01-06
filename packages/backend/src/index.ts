@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { prettyJSON } from "hono/pretty-json";
+import { errorHandler } from "./middleware/errorHandler.js";
 
 // Routes
 import authRoutes from "./routes/auth.js";
@@ -43,6 +44,9 @@ app.route("/api", tuneRoutes);
 app.route("/api/predict", predictRoutes);
 app.route("/api/download", downloadRoutes);
 app.route("/api/obsrv", obsrvRoutes);
+
+// Error handler (must be last)
+app.onError(errorHandler);
 
 const port = Number(process.env.BACKEND_PORT) || 3000;
 
