@@ -14,8 +14,7 @@ export function useDatasets() {
       if (!response.ok) {
         throw new Error("Failed to fetch datasets");
       }
-      const data = (await response.json()) as any;
-      return data.datasets || [];
+      return response.json();
     },
   });
 }
@@ -30,8 +29,7 @@ export function useDataset(id: number | string) {
       if (!response.ok) {
         throw new Error("Failed to fetch dataset");
       }
-      const data = (await response.json()) as any;
-      return data.dataset;
+      return response.json();
     },
     enabled: !!id,
   });
@@ -49,8 +47,7 @@ export function useUploadDataset() {
         const error = (await response.json()) as any;
         throw new Error(error.error || "Failed to upload dataset");
       }
-      const data = (await response.json()) as any;
-      return data.dataset;
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["datasets"] });

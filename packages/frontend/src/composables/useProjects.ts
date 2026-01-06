@@ -50,8 +50,7 @@ export function useCreateProject() {
         const error = (await response.json()) as any;
         throw new Error(error.error || "Failed to create project");
       }
-      const data = (await response.json()) as any;
-      return data.project;
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
@@ -82,8 +81,7 @@ export function useUpdateProject() {
         const error = (await response.json()) as any;
         throw new Error(error.error || "Failed to update project");
       }
-      const data = (await response.json()) as any;
-      return data.project;
+      return response.json();
     },
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });

@@ -14,8 +14,7 @@ export function useTasks() {
       if (!response.ok) {
         throw new Error("Failed to fetch tasks");
       }
-      const data = (await response.json()) as any;
-      return data.tasks || [];
+      return response.json();
     },
     refetchInterval: 5000, // Refetch every 5 seconds to get task updates
   });
@@ -31,8 +30,7 @@ export function useTask(id: number | string) {
       if (!response.ok) {
         throw new Error("Failed to fetch task");
       }
-      const data = (await response.json()) as any;
-      return data.task;
+      return response.json();
     },
     enabled: !!id,
     refetchInterval: (query) => {

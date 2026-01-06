@@ -29,10 +29,7 @@ const datasets = new Hono()
         columns: parseDatasetColumns(dataset.columns),
       }));
 
-      return c.json({
-        success: true,
-        datasets: datasetsWithParsedColumns,
-      });
+      return c.json(datasetsWithParsedColumns);
     } catch (error) {
       console.error("Datasets fetch error:", error);
       throw new HTTPException(500, {

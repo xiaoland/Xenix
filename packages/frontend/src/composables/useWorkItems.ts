@@ -15,8 +15,7 @@ export function useWorkItems() {
       if (!response.ok) {
         throw new Error("Failed to fetch work items");
       }
-      const data = (await response.json()) as any;
-      return data.workItems || [];
+      return response.json();
     },
   });
 }
@@ -31,8 +30,7 @@ export function useWorkItem(id: number | string) {
       if (!response.ok) {
         throw new Error("Failed to fetch work item");
       }
-      const data = (await response.json()) as any;
-      return data.workItem;
+      return response.json();
     },
     enabled: !!id,
   });
@@ -53,8 +51,7 @@ export function useCreateWorkItem() {
       if (!response.ok) {
         throw new Error("Failed to create work item");
       }
-      const data = (await response.json()) as any;
-      return data.workItem;
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["work-items"] });
@@ -81,8 +78,7 @@ export function useUpdateWorkItem() {
       if (!response.ok) {
         throw new Error("Failed to update work item");
       }
-      const data = (await response.json()) as any;
-      return data.workItem;
+      return response.json();
     },
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ["work-items"] });

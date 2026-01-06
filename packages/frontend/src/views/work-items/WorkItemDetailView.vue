@@ -103,17 +103,6 @@ import TuningStep from "../../components/ml/tuning/TuningStep.vue";
 import PredictionStep from "../../components/ml/prediction/PredictionStep.vue";
 import { useWorkItem } from "../../composables";
 
-interface WorkItem {
-  id: number;
-  name: string;
-  description?: string;
-  status: string;
-  projectId: number;
-  datasetId?: number;
-  featureColumns?: string[];
-  targetColumn?: string;
-}
-
 const route = useRoute();
 const router = useRouter();
 
