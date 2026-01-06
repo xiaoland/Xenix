@@ -11,16 +11,16 @@ const configSchema = z.object({
   
   // Server
   BACKEND_PORT: z.coerce.number().default(3000),
-  FRONTEND_URL: z.string().default('http://localhost:5173'),
+  FRONTEND_URL: z.string().url(),
   
   // Database
-  DATABASE_URL: z.string(),
+  DATABASE_URL: z.string().url(),
   
   // Redis
-  REDIS_URL: z.string().default('redis://localhost:6379'),
+  REDIS_URL: z.string().url().default('redis://localhost:6379'),
   
   // Authentication
-  JWT_SECRET: z.string(),
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   
   // File uploads
   MAX_FILE_SIZE: z.coerce.number().default(100 * 1024 * 1024), // 100MB
