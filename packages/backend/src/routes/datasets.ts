@@ -37,7 +37,15 @@ const datasets = new Hono()
 
   // Upload dataset
   .post("/", async (c) => {
-    const formData = await c.req.formData();
+    let formData;
+    try {
+      formData = await c.req.formData();
+    } catch (error) {
+      throw new BadRequestError(
+        "Invalid request. Please ensure you're sending multipart/form-data with a file."
+      );
+    }
+
     const file = formData.get("file") as File;
     const name = formData.get("name") as string;
     const description = (formData.get("description") as string) || null;
