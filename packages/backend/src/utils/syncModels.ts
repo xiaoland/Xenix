@@ -2,18 +2,19 @@
  * Utility function to synchronize model metadata
  * This ensures the model metadata table is up-to-date with available models
  */
-import { db } from "../database";
-import { modelMetadata } from "../database/schema";
-import { executePythonScript } from "./pythonExecutor";
-import { eq } from "drizzle-orm";
-import logger from "./logger/index.js";
+import { eq } from 'drizzle-orm';
+
+import { db } from '../database';
+import { modelMetadata } from '../database/schema';
+import logger from './logger/index.js';
+import { executePythonScript } from './pythonExecutor';
 
 export async function syncModelMetadata() {
   logger.info('Synchronizing model metadata...');
 
   try {
     // Execute the Python model scanning script
-    const scriptPath = "src/business/ml/scan_models.py";
+    const scriptPath = 'src/business/ml/scan_models.py';
     const result = await executePythonScript(scriptPath, {});
 
     if (!result.success) {

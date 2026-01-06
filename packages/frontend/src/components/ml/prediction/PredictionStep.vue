@@ -159,12 +159,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { message } from "ant-design-vue";
-import type { UploadProps } from "ant-design-vue";
-import { client } from "../../../api/client";
-import { AVAILABLE_MODELS } from "../../../constants/models";
-import PredictionResult from "./PredictionResult.vue";
+import { message } from 'ant-design-vue';
+import type { UploadProps } from 'ant-design-vue';
+
+import { computed, ref } from 'vue';
+
+import { client } from '../../../api/client';
+import { AVAILABLE_MODELS } from '../../../constants/models';
+import PredictionResult from './PredictionResult.vue';
 
 const props = defineProps<{
   workItemId: number;
@@ -180,7 +182,7 @@ const emit = defineEmits<{
 }>();
 
 // State
-const predictionMode = ref<"file" | "inline">("file");
+const predictionMode = ref<'file' | 'inline'>('file');
 const fileList = ref<any[]>([]);
 const inputData = ref<Record<string, any>[]>([]);
 const isPredicting = ref(false);
@@ -195,8 +197,8 @@ const inputColumns = computed(() => {
     width: 150,
   }));
   cols.push({
-    title: "Action",
-    key: "action",
+    title: 'Action',
+    key: 'action',
     width: 100,
   });
   return cols;
@@ -231,21 +233,21 @@ const removeRow = (index: number) => {
 /**
  * Before upload handler
  */
-const beforeUpload: UploadProps["beforeUpload"] = (file) => {
+const beforeUpload: UploadProps['beforeUpload'] = (file) => {
   const isExcelOrCsv =
     file.type ===
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-    file.type === "application/vnd.ms-excel" ||
-    file.type === "text/csv";
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    file.type === 'application/vnd.ms-excel' ||
+    file.type === 'text/csv';
 
   if (!isExcelOrCsv) {
-    message.error("You can only upload Excel or CSV files!");
+    message.error('You can only upload Excel or CSV files!');
     return false;
   }
 
   const isLt10M = file.size / 1024 / 1024 < 10;
   if (!isLt10M) {
-    message.error("File must be smaller than 10MB!");
+    message.error('File must be smaller than 10MB!');
     return false;
   }
 
@@ -262,10 +264,10 @@ const startPredictionFromFile = async () => {
 
   isPredicting.value = true;
   try {
-    throw new Error("File prediction not implemented");
+    throw new Error('File prediction not implemented');
   } catch (error: any) {
-    console.error("Prediction failed:", error);
-    message.error(error.message || "Failed to start prediction");
+    console.error('Prediction failed:', error);
+    message.error(error.message || 'Failed to start prediction');
   } finally {
     isPredicting.value = false;
   }
@@ -287,7 +289,7 @@ const predictInline = async () => {
   );
 
   if (hasEmptyFields) {
-    message.error("Please fill in all fields");
+    message.error('Please fill in all fields');
     return;
   }
 
@@ -308,11 +310,11 @@ const predictInline = async () => {
       },
     });
 
-    message.success("Prediction completed successfully");
+    message.success('Prediction completed successfully');
     predictionTaskId.value = response.taskId;
   } catch (error: any) {
-    console.error("Prediction failed:", error);
-    message.error(error.message || "Failed to predict");
+    console.error('Prediction failed:', error);
+    message.error(error.message || 'Failed to predict');
   } finally {
     isPredicting.value = false;
   }
@@ -322,6 +324,6 @@ const predictInline = async () => {
  * Reset workflow
  */
 const handleReset = () => {
-  emit("reset");
+  emit('reset');
 };
 </script>

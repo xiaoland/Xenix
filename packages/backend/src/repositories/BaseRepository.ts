@@ -2,9 +2,9 @@
  * Base Repository
  * Provides common database operations
  */
+import { eq } from 'drizzle-orm';
 
 import { db } from '../database/index.js';
-import { eq } from 'drizzle-orm';
 
 export abstract class BaseRepository<T> {
   constructor(protected table: any) {}

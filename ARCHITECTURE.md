@@ -81,53 +81,59 @@
 
 ## Technology Stack Comparison
 
-| Component | Before (Nuxt.js) | After (Monorepo) |
-|-----------|------------------|------------------|
-| **Frontend Framework** | Nuxt.js 4.2 (SSR) | Vite 6 + Vue 3.5 (SPA) |
-| **Backend Framework** | Nitro (built-in) | Hono 4.6 |
-| **Routing** | File-based (auto) | Vue Router 4.6 |
-| **State Management** | Pinia (auto) | Pinia 2.3 |
-| **Build Tool** | Webpack/Rollup | Vite |
-| **API Style** | H3 event handlers | Hono handlers |
-| **Auto-imports** | Yes | No (explicit) |
-| **Type Safety** | TypeScript | TypeScript |
-| **Database** | PostgreSQL + Drizzle | PostgreSQL + Drizzle |
-| **ORM** | DrizzleORM 0.45 | DrizzleORM 0.45 |
-| **Auth** | JWT (custom) | JWT (custom) |
-| **i18n** | @nuxtjs/i18n | vue-i18n 11 |
-| **CSS** | UnoCSS + SCSS | UnoCSS + SCSS |
-| **UI Library** | Ant Design Vue | Ant Design Vue |
+| Component              | Before (Nuxt.js)     | After (Monorepo)       |
+| ---------------------- | -------------------- | ---------------------- |
+| **Frontend Framework** | Nuxt.js 4.2 (SSR)    | Vite 6 + Vue 3.5 (SPA) |
+| **Backend Framework**  | Nitro (built-in)     | Hono 4.6               |
+| **Routing**            | File-based (auto)    | Vue Router 4.6         |
+| **State Management**   | Pinia (auto)         | Pinia 2.3              |
+| **Build Tool**         | Webpack/Rollup       | Vite                   |
+| **API Style**          | H3 event handlers    | Hono handlers          |
+| **Auto-imports**       | Yes                  | No (explicit)          |
+| **Type Safety**        | TypeScript           | TypeScript             |
+| **Database**           | PostgreSQL + Drizzle | PostgreSQL + Drizzle   |
+| **ORM**                | DrizzleORM 0.45      | DrizzleORM 0.45        |
+| **Auth**               | JWT (custom)         | JWT (custom)           |
+| **i18n**               | @nuxtjs/i18n         | vue-i18n 11            |
+| **CSS**                | UnoCSS + SCSS        | UnoCSS + SCSS          |
+| **UI Library**         | Ant Design Vue       | Ant Design Vue         |
 
 ## Benefits of New Architecture
 
 ### 1. Separation of Concerns
+
 - **Before**: Frontend and backend tightly coupled
 - **After**: Clear boundaries, independent development
 
 ### 2. Build Performance
+
 - **Before**: Nuxt build ~30-60s
 - **After**: Vite build ~5-10s (6x faster)
 
 ### 3. Deployment Flexibility
+
 - **Before**: Must deploy as single unit
-- **After**: 
+- **After**:
   - Frontend → Static hosting (CDN, Vercel, Netlify)
   - Backend → Node.js server (anywhere)
   - Independent scaling
 
 ### 4. Development Experience
+
 - **Before**: Full server restart on backend changes
-- **After**: 
+- **After**:
   - Frontend: Hot module replacement (instant)
   - Backend: Watch mode with tsx (fast restart)
 
 ### 5. Bundle Size
+
 - **Before**: Large SSR bundle
 - **After**: Optimized SPA with code splitting
 
 ### 6. Team Workflow
+
 - **Before**: Single codebase, potential conflicts
-- **After**: 
+- **After**:
   - Frontend team works in `packages/frontend/`
   - Backend team works in `packages/backend/`
   - Shared types in `packages/shared/`
@@ -197,6 +203,7 @@
 ## File Structure Comparison
 
 ### Before
+
 ```
 Xenix/
 ├── app/
@@ -213,6 +220,7 @@ Xenix/
 ```
 
 ### After
+
 ```
 Xenix/
 ├── packages/
@@ -240,6 +248,7 @@ Xenix/
 ## Development Workflow
 
 ### Before (Nuxt.js)
+
 ```bash
 # Single command for everything
 pnpm dev
@@ -249,6 +258,7 @@ pnpm dev
 ```
 
 ### After (Monorepo)
+
 ```bash
 # Run everything
 pnpm dev
@@ -265,6 +275,7 @@ pnpm dev:backend   # Terminal 2
 ## Summary
 
 The new monorepo architecture provides:
+
 - ✅ Better separation of concerns
 - ✅ Faster build times (6x improvement)
 - ✅ Independent deployment options
@@ -274,6 +285,7 @@ The new monorepo architecture provides:
 - ✅ Type safety across packages
 
 While maintaining:
+
 - ✅ All existing functionality
 - ✅ PostgreSQL database
 - ✅ Python ML scripts

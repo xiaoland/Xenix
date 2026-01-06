@@ -141,11 +141,11 @@ Xenix/
 
      ```typescript
      export class ProjectRepository {
-       async findById(id: number): Promise<Project | null>
-       async create(data: InsertProject): Promise<Project>
-       async update(id: number, data: Partial<Project>): Promise<Project>
-       async delete(id: number): Promise<void>
-       async findByUser(userId: string): Promise<Project[]>
+       async findById(id: number): Promise<Project | null>;
+       async create(data: InsertProject): Promise<Project>;
+       async update(id: number, data: Partial<Project>): Promise<Project>;
+       async delete(id: number): Promise<void>;
+       async findByUser(userId: string): Promise<Project[]>;
      }
      ```
 
@@ -162,10 +162,10 @@ Xenix/
          private projectRepo: ProjectRepository,
          private workItemRepo: WorkItemRepository
        ) {}
-       
+
        async createProject(userId: string, data: CreateProjectDto) {
          // Business logic here
-         return this.projectRepo.create({ ...data, createdBy: userId })
+         return this.projectRepo.create({ ...data, createdBy: userId });
        }
      }
      ```
@@ -178,17 +178,16 @@ Xenix/
    - Example:
 
      ```typescript
-     const projectRoutes = new Hono<{ Variables: AppVariables }>()
-       .post(
-         '/',
-         zValidator('json', CreateProjectSchema),
-         async (c) => {
-           const user = c.get('user')
-           const data = c.req.valid('json')
-           const project = await projectService.createProject(user.id, data)
-           return c.json(project, 201)
-         }
-       )
+     const projectRoutes = new Hono<{ Variables: AppVariables }>().post(
+       '/',
+       zValidator('json', CreateProjectSchema),
+       async (c) => {
+         const user = c.get('user');
+         const data = c.req.valid('json');
+         const project = await projectService.createProject(user.id, data);
+         return c.json(project, 201);
+       }
+     );
      ```
 
 3. **Dependency Injection**
@@ -200,10 +199,10 @@ Xenix/
 4. **Middleware Stack**
 
    ```typescript
-   app.use('*', cors())
-   app.use('*', pinoLogger())
-   app.use('/api/*', authMiddleware())  // Validates JWT, attaches user
-   app.use('*', errorHandler())         // Catches all errors, formats response
+   app.use('*', cors());
+   app.use('*', pinoLogger());
+   app.use('/api/*', authMiddleware()); // Validates JWT, attaches user
+   app.use('*', errorHandler()); // Catches all errors, formats response
    ```
 
 5. **Error Handling**
@@ -217,7 +216,7 @@ Xenix/
          public code?: string
        ) {}
      }
-     
+
      class NotFoundError extends AppError {}
      class UnauthorizedError extends AppError {}
      class ValidationError extends AppError {}
@@ -229,18 +228,18 @@ Xenix/
    - Replace database polling with Redis queue
    - Create job queues:
      - `ml-auto-tune` queue
-     - `ml-manual-tune` queue  
+     - `ml-manual-tune` queue
      - `ml-predict` queue
    - Job processors in `src/jobs/`:
 
      ```typescript
      // src/jobs/autoTuneProcessor.ts
      export const autoTuneProcessor = async (job: Job<AutoTuneJobData>) => {
-       const { taskId, datasetId, model, paramGrid } = job.data
+       const { taskId, datasetId, model, paramGrid } = job.data;
        // Execute Python script
        // Update task status via repository
        // Store results
-     }
+     };
      ```
 
    - API endpoint adds job to queue, returns task ID immediately
@@ -269,9 +268,9 @@ Xenix/
        DATABASE_URL: z.string(),
        REDIS_URL: z.string(),
        JWT_SECRET: z.string(),
-     })
-     
-     export const config = configSchema.parse(process.env)
+     });
+
+     export const config = configSchema.parse(process.env);
      ```
 
 ### Phase 3: Frontend - Vite + Vue with Modern Patterns
@@ -304,14 +303,15 @@ Xenix/
 
      ```typescript
      // Automatically get types from backend
-     import { hc } from 'hono/client'
-     import type { AppType } from '@xenix/server'
-     
-     const client = hc<AppType>('http://localhost:3001')
-     
+     import { hc } from 'hono/client';
+
+     import type { AppType } from '@xenix/server';
+
+     const client = hc<AppType>('http://localhost:3001');
+
      // Fully type-safe!
-     const projects = await client.projects.$get()
-     const data = await projects.json()  // Type: Project[]
+     const projects = await client.projects.$get();
+     const data = await projects.json(); // Type: Project[]
      ```
 
 3. **TanStack Query Integration**
@@ -325,14 +325,14 @@ Xenix/
        return useQuery({
          queryKey: ['projects'],
          queryFn: async () => {
-           const res = await client.projects.$get()
-           return res.json()
-         }
-       })
+           const res = await client.projects.$get();
+           return res.json();
+         },
+       });
      }
-     
+
      // In component
-     const { data: projects, isLoading, error } = useProjects()
+     const { data: projects, isLoading, error } = useProjects();
      ```
 
 4. **Remove Unnecessary Abstractions**
@@ -351,25 +351,25 @@ Xenix/
      ```typescript
      // stores/auth.ts
      export const useAuthStore = defineStore('auth', () => {
-       const token = ref<string | null>(localStorage.getItem('token'))
-       const user = ref<User | null>(null)
-       
+       const token = ref<string | null>(localStorage.getItem('token'));
+       const user = ref<User | null>(null);
+
        async function login(credentials: LoginDto) {
-         const res = await client.auth.signin.$post({ json: credentials })
-         const data = await res.json()
-         token.value = data.token
-         user.value = data.user
-         localStorage.setItem('token', data.token)
+         const res = await client.auth.signin.$post({ json: credentials });
+         const data = await res.json();
+         token.value = data.token;
+         user.value = data.user;
+         localStorage.setItem('token', data.token);
        }
-       
+
        function logout() {
-         token.value = null
-         user.value = null
-         localStorage.removeItem('token')
+         token.value = null;
+         user.value = null;
+         localStorage.removeItem('token');
        }
-       
-       return { token, user, login, logout }
-     })
+
+       return { token, user, login, logout };
+     });
      ```
 
 6. **Vue Router - Explicit Routes**
@@ -380,26 +380,26 @@ Xenix/
      const routes = [
        { path: '/', component: () => import('@/pages/HomePage.vue') },
        { path: '/signin', component: () => import('@/pages/SignInPage.vue') },
-       { 
-         path: '/projects', 
+       {
+         path: '/projects',
          component: () => import('@/pages/ProjectsPage.vue'),
-         meta: { requiresAuth: true }
+         meta: { requiresAuth: true },
        },
        // ... all routes explicitly defined
-     ]
+     ];
      ```
 
    - Auth guard:
 
      ```typescript
      router.beforeEach((to, from, next) => {
-       const auth = useAuthStore()
+       const auth = useAuthStore();
        if (to.meta.requiresAuth && !auth.token) {
-         next('/signin')
+         next('/signin');
        } else {
-         next()
+         next();
        }
-     })
+     });
      ```
 
 7. **Component Structure**
@@ -409,8 +409,8 @@ Xenix/
 
      ```typescript
      const props = defineProps<{
-       project: z.infer<typeof ProjectSchema>
-     }>()
+       project: z.infer<typeof ProjectSchema>;
+     }>();
      ```
 
    - Prefer primitives over "smart" components
@@ -423,19 +423,19 @@ Xenix/
      ```typescript
      const formData = reactive<CreateProjectDto>({
        name: '',
-       description: ''
-     })
-     
+       description: '',
+     });
+
      const { mutate: createProject, isPending } = useMutation({
        mutationFn: async (data: CreateProjectDto) => {
-         const res = await client.projects.$post({ json: data })
-         return res.json()
+         const res = await client.projects.$post({ json: data });
+         return res.json();
        },
        onSuccess: () => {
-         queryClient.invalidateQueries({ queryKey: ['projects'] })
-         router.push('/projects')
-       }
-     })
+         queryClient.invalidateQueries({ queryKey: ['projects'] });
+         router.push('/projects');
+       },
+     });
      ```
 
 9. **i18n Setup**
@@ -444,7 +444,7 @@ Xenix/
    - Example:
 
      ```typescript
-     const { t } = useI18n()
+     const { t } = useI18n();
      ```
 
 10. **Development Experience**
@@ -463,10 +463,10 @@ Xenix/
      ```typescript
      describe('ProjectSchema', () => {
        it('validates correct project data', () => {
-         const valid = { name: 'Test', description: 'Desc' }
-         expect(() => ProjectSchema.parse(valid)).not.toThrow()
-       })
-     })
+         const valid = { name: 'Test', description: 'Desc' };
+         expect(() => ProjectSchema.parse(valid)).not.toThrow();
+       });
+     });
      ```
 
 2. **Backend Tests** (Vitest + Supertest)
@@ -478,20 +478,20 @@ Xenix/
      ```typescript
      describe('ProjectService', () => {
        it('creates project with valid data', async () => {
-         const project = await projectService.create(userId, data)
-         expect(project).toMatchObject(data)
-       })
-     })
-     
+         const project = await projectService.create(userId, data);
+         expect(project).toMatchObject(data);
+       });
+     });
+
      describe('POST /api/projects', () => {
        it('returns 201 with project data', async () => {
          const res = await request(app)
            .post('/api/projects')
            .set('Authorization', `Bearer ${token}`)
-           .send({ name: 'Test' })
-         expect(res.status).toBe(201)
-       })
-     })
+           .send({ name: 'Test' });
+         expect(res.status).toBe(201);
+       });
+     });
      ```
 
 3. **Frontend Tests** (Vitest + Testing Library)
@@ -504,11 +504,11 @@ Xenix/
      describe('ProjectCard', () => {
        it('renders project name', () => {
          const { getByText } = render(ProjectCard, {
-           props: { project: mockProject }
-         })
-         expect(getByText(mockProject.name)).toBeInTheDocument()
-       })
-     })
+           props: { project: mockProject },
+         });
+         expect(getByText(mockProject.name)).toBeInTheDocument();
+       });
+     });
      ```
 
 ### Phase 5: Configuration & Tooling
@@ -550,7 +550,7 @@ Xenix/
    REDIS_URL=redis://localhost:6379
    JWT_SECRET=your-secret-key
    PYTHON_PATH=/path/to/python
-   
+
    # Frontend (.env)
    VITE_API_URL=http://localhost:3001
    ```
@@ -562,16 +562,16 @@ Xenix/
      postgres:
        image: postgres:16
        ports:
-         - "5432:5432"
+         - '5432:5432'
        environment:
          POSTGRES_DB: xenix
          POSTGRES_USER: user
          POSTGRES_PASSWORD: pass
-     
+
      redis:
        image: redis:7
        ports:
-         - "6379:6379"
+         - '6379:6379'
    ```
 
 5. **Git Setup**
@@ -698,7 +698,7 @@ The migration from Nuxt.js full-stack to Vite+Vue frontend + Hono backend monore
 
 1. **Port Configuration**: Changed PostgreSQL port to 5435 to avoid conflicts with existing installations
 2. **Module Resolution**: Configured TypeScript path aliases properly for all packages
-3. **Environment Variables**: Needed different .env files for frontend (VITE_) and backend
+3. **Environment Variables**: Needed different .env files for frontend (VITE\_) and backend
 4. **Workspace Dependencies**: Properly configured `@xenix/shared` as workspace dependency
 
 **Deviations from Original Plan:**
@@ -735,13 +735,13 @@ These deviations represent a more pragmatic, incremental approach that got the b
    ```bash
    # Copy root .env.example
    cp .env.example .env
-   
+
    # Copy backend .env.example
    cp packages/backend/.env.example packages/backend/.env
-   
+
    # Copy frontend .env.example
    cp packages/frontend/.env.example packages/frontend/.env
-   
+
    # Edit .env files with your configuration
    ```
 
@@ -762,7 +762,7 @@ These deviations represent a more pragmatic, incremental approach that got the b
    ```bash
    # Start both frontend and backend
    pnpm dev
-   
+
    # Or start them separately:
    pnpm dev:backend  # Backend on http://localhost:3000
    pnpm dev:frontend # Frontend on http://localhost:5173
@@ -818,19 +818,9 @@ The following improvements are planned but not yet implemented:
 4. **Error Handling**: Implement standardized error classes and middleware
 5. **TanStack Query**: Replace manual API calls with TanStack Query for better caching
 
-**Medium Priority:**
-6. **Hono RPC Client**: Add end-to-end type safety with Hono RPC
-7. **BullMQ**: Replace database polling with Redis-based job queue
-8. **Dependency Injection**: Implement DI container for better testability
-9. **API Documentation**: Add OpenAPI/Swagger documentation
-10. **More Tests**: Increase test coverage for routes, components, and business logic
+**Medium Priority:** 6. **Hono RPC Client**: Add end-to-end type safety with Hono RPC 7. **BullMQ**: Replace database polling with Redis-based job queue 8. **Dependency Injection**: Implement DI container for better testability 9. **API Documentation**: Add OpenAPI/Swagger documentation 10. **More Tests**: Increase test coverage for routes, components, and business logic
 
-**Low Priority:**
-11. **Logging**: Add structured logging with Pino
-12. **Monitoring**: Add application performance monitoring
-13. **Rate Limiting**: Add rate limiting middleware
-14. **Authentication Improvements**: Add refresh tokens, OAuth support
-15. **Internationalization**: Move i18n resources to remote API
+**Low Priority:** 11. **Logging**: Add structured logging with Pino 12. **Monitoring**: Add application performance monitoring 13. **Rate Limiting**: Add rate limiting middleware 14. **Authentication Improvements**: Add refresh tokens, OAuth support 15. **Internationalization**: Move i18n resources to remote API
 
 #### Architecture Diagrams
 
@@ -890,7 +880,7 @@ The monorepo refactor is complete with all planned phases implemented:
 ✅ **Phase 3**: Vite + Vue 3 frontend with explicit routing and modern patterns  
 ✅ **Phase 4**: Vitest testing infrastructure in all packages  
 ✅ **Phase 5**: Comprehensive configuration and tooling  
-✅ **Phase 6**: Migration documentation and deployment guide  
+✅ **Phase 6**: Migration documentation and deployment guide
 
 **Recent Progress (January 2026):**
 

@@ -6,10 +6,7 @@
     <div class="flex items-center gap-2 flex-1">
       <span class="i-mdi-file-document-outline text-green-500"></span>
       <span class="font-medium">{{ workItem.name }}</span>
-      <a-tag
-        size="small"
-        :color="statusColor"
-      >
+      <a-tag size="small" :color="statusColor">
         {{ workItem.status || 'active' }}
       </a-tag>
     </div>
@@ -19,6 +16,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
+
 import type { WorkItem } from '@xenix/shared';
 
 interface Props {

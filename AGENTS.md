@@ -126,7 +126,6 @@ Background tasks for ML operations:
 - **TanStack Query (Vue Query):** All data fetching uses composables with automatic caching
   - Example: `useProjects()`, `useWorkItems()`, `useDatasets()`
   - Benefits: Automatic cache invalidation, background refetching, loading states
-  
 - **Composables Architecture:** Reusable business logic in `src/composables/`
   - Query hooks: `useQuery` for fetching data
   - Mutation hooks: `useMutation` for create/update/delete operations

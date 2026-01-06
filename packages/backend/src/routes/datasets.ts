@@ -1,27 +1,27 @@
-import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
-import { db, schema } from "../database/index.js";
-import { desc, eq } from "drizzle-orm";
-import { authMiddleware } from "../middleware/auth.js";
+import { desc, eq } from 'drizzle-orm';
+import fs from 'fs/promises';
+import path from 'path';
+
+import { zValidator } from '@hono/zod-validator';
+import { Hono } from 'hono';
+
+import { DatasetIdParamSchema } from '@xenix/shared';
+
+import { db, schema } from '../database/index.js';
+import { BadRequestError, NotFoundError } from '../errors/index.js';
+import { authMiddleware } from '../middleware/auth.js';
 import {
-  parseDatasetColumns,
   analyzeExcelFile,
-} from "../utils/datasetUtils.js";
-import { validateExcelFile, saveUploadedFile } from "../utils/taskUtils.js";
-import {
-  NotFoundError,
-  BadRequestError,
-} from "../errors/index.js";
-import { DatasetIdParamSchema } from "@xenix/shared";
-import logger from "../utils/logger/index.js";
-import path from "path";
-import fs from "fs/promises";
+  parseDatasetColumns,
+} from '../utils/datasetUtils.js';
+import logger from '../utils/logger/index.js';
+import { saveUploadedFile, validateExcelFile } from '../utils/taskUtils.js';
 
 const datasets = new Hono()
-  .use("*", authMiddleware)
+  .use('*', authMiddleware)
 
   // Get all datasets
-  .get("/", async (c) => {
+  .get('/', async (c) => {
     // Fetch all datasets, ordered by most recent first
     const datasetsList = await db
       .select()
@@ -38,30 +38,30 @@ const datasets = new Hono()
   })
 
   // Upload dataset
-  .post("/", async (c) => {
+  .post('/', async (c) => {
     const formData = await c.req.formData();
-    const file = formData.get("file") as File;
-    const name = formData.get("name") as string;
-    const description = (formData.get("description") as string) || null;
-    const projectIdStr = (formData.get("projectId") as string) || null;
+    const file = formData.get('file') as File;
+    const name = formData.get('name') as string;
+    const description = (formData.get('description') as string) || null;
+    const projectIdStr = (formData.get('projectId') as string) || null;
     const projectId = projectIdStr ? Number(projectIdStr) : null;
 
     if (!file) {
-      throw new BadRequestError("No file uploaded");
+      throw new BadRequestError('No file uploaded');
     }
 
     if (!validateExcelFile(file.name)) {
       throw new BadRequestError(
-        "Invalid file type. Only Excel files (.xlsx, .xls) are allowed."
+        'Invalid file type. Only Excel files (.xlsx, .xls) are allowed.'
       );
     }
 
     if (!name) {
-      throw new BadRequestError("Dataset name is required");
+      throw new BadRequestError('Dataset name is required');
     }
 
     // Save uploaded file to datasets directory
-    const datasetsDir = path.join(process.cwd(), "datasets");
+    const datasetsDir = path.join(process.cwd(), 'datasets');
     const filePath = await saveUploadedFile(file, datasetsDir);
 
     // Get file stats
@@ -96,8 +96,8 @@ const datasets = new Hono()
   })
 
   // Get single dataset
-  .get("/:id", zValidator("param", DatasetIdParamSchema), async (c) => {
-    const { id: idStr } = c.req.valid("param");
+  .get('/:id', zValidator('param', DatasetIdParamSchema), async (c) => {
+    const { id: idStr } = c.req.valid('param');
     const id = parseInt(idStr);
 
     // Fetch dataset by ID
@@ -108,7 +108,7 @@ const datasets = new Hono()
       .limit(1);
 
     if (!dataset) {
-      throw new NotFoundError("Dataset");
+      throw new NotFoundError('Dataset');
     }
 
     // Parse columns field using utility function
@@ -121,8 +121,8 @@ const datasets = new Hono()
   })
 
   // Delete dataset
-  .delete("/:id", zValidator("param", DatasetIdParamSchema), async (c) => {
-    const { id: idStr } = c.req.valid("param");
+  .delete('/:id', zValidator('param', DatasetIdParamSchema), async (c) => {
+    const { id: idStr } = c.req.valid('param');
     const id = parseInt(idStr);
 
     // Fetch dataset by ID
@@ -133,7 +133,7 @@ const datasets = new Hono()
       .limit(1);
 
     if (!dataset) {
-      throw new NotFoundError("Dataset");
+      throw new NotFoundError('Dataset');
     }
 
     // Delete the file from filesystem if it exists
@@ -141,8 +141,11 @@ const datasets = new Hono()
       await fs.unlink(dataset.filePath);
     } catch (fileError: any) {
       // Ignore ENOENT (file not found) errors, but log others
-      if (fileError.code !== "ENOENT") {
-        logger.warn({ error: fileError, filePath: dataset.filePath }, "Failed to delete file");
+      if (fileError.code !== 'ENOENT') {
+        logger.warn(
+          { error: fileError, filePath: dataset.filePath },
+          'Failed to delete file'
+        );
       }
     }
 
@@ -150,7 +153,7 @@ const datasets = new Hono()
     await db.delete(schema.datasets).where(eq(schema.datasets.id, id));
 
     return c.json({
-      message: "Dataset deleted successfully",
+      message: 'Dataset deleted successfully',
     });
   });
 

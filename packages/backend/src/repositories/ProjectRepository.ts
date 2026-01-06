@@ -2,10 +2,10 @@
  * Project Repository
  * Handles database operations for projects
  */
+import { desc, eq } from 'drizzle-orm';
 
-import { BaseRepository } from './BaseRepository.js';
 import { db, schema } from '../database/index.js';
-import { eq, desc } from 'drizzle-orm';
+import { BaseRepository } from './BaseRepository.js';
 
 type Project = typeof schema.projects.$inferSelect;
 

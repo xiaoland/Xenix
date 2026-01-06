@@ -2,17 +2,17 @@
  * Tasks Composable
  * Uses TanStack Query with Hono RPC client for type-safe data fetching
  */
+import { useQuery } from '@tanstack/vue-query';
 
-import { useQuery } from "@tanstack/vue-query";
-import { client } from "../api/client";
+import { client } from '../api/client';
 
 export function useTasks() {
   return useQuery({
-    queryKey: ["tasks"],
+    queryKey: ['tasks'],
     queryFn: async () => {
       const response = await client.tasks.$get({});
       if (!response.ok) {
-        throw new Error("Failed to fetch tasks");
+        throw new Error('Failed to fetch tasks');
       }
       return response.json();
     },
@@ -22,13 +22,13 @@ export function useTasks() {
 
 export function useTask(id: number | string) {
   return useQuery({
-    queryKey: ["task", id],
+    queryKey: ['task', id],
     queryFn: async () => {
-      const response = await client.tasks[":id"].$get({
+      const response = await client.tasks[':id'].$get({
         param: { id: String(id) },
       });
       if (!response.ok) {
-        throw new Error("Failed to fetch task");
+        throw new Error('Failed to fetch task');
       }
       return response.json();
     },
@@ -36,7 +36,7 @@ export function useTask(id: number | string) {
     refetchInterval: (query) => {
       const task = query.state.data;
       // Only refetch if task is pending or running
-      if (task && (task.status === "pending" || task.status === "running")) {
+      if (task && (task.status === 'pending' || task.status === 'running')) {
         return 3000; // 3 seconds
       }
       return false; // Don't refetch if completed or failed

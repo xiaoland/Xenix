@@ -1,28 +1,28 @@
-import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
-import { db, schema } from "../database/index.js";
-import { eq } from "drizzle-orm";
-import { authMiddleware } from "../middleware/auth.js";
-import { executePythonScript } from "../utils/pythonExecutor.js";
-import {
-  NotFoundError,
-  BadRequestError,
-} from "../errors/index.js";
-import { ModelIdParamSchema } from "@xenix/shared";
-import logger from "../utils/logger/index.js";
+import { eq } from 'drizzle-orm';
+
+import { zValidator } from '@hono/zod-validator';
+import { Hono } from 'hono';
+
+import { ModelIdParamSchema } from '@xenix/shared';
+
+import { db, schema } from '../database/index.js';
+import { BadRequestError, NotFoundError } from '../errors/index.js';
+import { authMiddleware } from '../middleware/auth.js';
+import logger from '../utils/logger/index.js';
+import { executePythonScript } from '../utils/pythonExecutor.js';
 
 const models = new Hono()
-  .use("*", authMiddleware)
+  .use('*', authMiddleware)
 
   // Get all models
-  .get("/", async (c) => {
+  .get('/', async (c) => {
     const modelsList = await db.select().from(schema.modelMetadata);
     return c.json(modelsList);
   })
 
   // Get single model by name
-  .get("/:id", zValidator("param", ModelIdParamSchema), async (c) => {
-    const { id } = c.req.valid("param");
+  .get('/:id', zValidator('param', ModelIdParamSchema), async (c) => {
+    const { id } = c.req.valid('param');
 
     const [model] = await db
       .select()
@@ -31,20 +31,20 @@ const models = new Hono()
       .limit(1);
 
     if (!model) {
-      throw new NotFoundError("Model");
+      throw new NotFoundError('Model');
     }
 
     return c.json(model);
   })
 
   // Sync model metadata
-  .post("/sync", async (c) => {
+  .post('/sync', async (c) => {
     // Execute the Python model scanning script
-    const scriptPath = "src/business/ml/scan_models.py";
+    const scriptPath = 'src/business/ml/scan_models.py';
     const result = await executePythonScript(scriptPath, {});
 
     if (!result.success) {
-      throw new Error(result.error || "Model scanning failed");
+      throw new Error(result.error || 'Model scanning failed');
     }
 
     const modelsList = result.models || [];
@@ -86,12 +86,12 @@ const models = new Hono()
         }
       } catch (error: any) {
         errors.push(`Failed to sync ${model.name}: ${error.message}`);
-        logger.error({ error, modelName: model.name }, "Failed to sync model");
+        logger.error({ error, modelName: model.name }, 'Failed to sync model');
       }
     }
 
     return c.json({
-      message: "Model metadata synchronized successfully",
+      message: 'Model metadata synchronized successfully',
       synced: syncedCount,
       updated: updatedCount,
       total: modelsList.length,

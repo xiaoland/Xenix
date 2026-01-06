@@ -3,18 +3,18 @@
  * Uses TanStack Query with Hono RPC client for type-safe data fetching
  * HTTP Semantics Pattern: Success responses return data directly, errors have {code, error}
  */
+import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/vue-query";
-import { client } from "../api/client";
+import { client } from '../api/client';
 
 export function useProjects() {
   return useQuery({
-    queryKey: ["projects"],
+    queryKey: ['projects'],
     queryFn: async () => {
       const response = await client.projects.$get({});
       if (!response.ok) {
         const error = (await response.json()) as any;
-        throw new Error(error.error || "Failed to fetch projects");
+        throw new Error(error.error || 'Failed to fetch projects');
       }
       return response.json();
     },
@@ -23,14 +23,14 @@ export function useProjects() {
 
 export function useProject(id: number | string) {
   return useQuery({
-    queryKey: ["project", id],
+    queryKey: ['project', id],
     queryFn: async () => {
-      const response = await client.projects[":id"].$get({
+      const response = await client.projects[':id'].$get({
         param: { id: String(id) },
       });
       if (!response.ok) {
         const error = (await response.json()) as any;
-        throw new Error(error.error || "Failed to fetch project");
+        throw new Error(error.error || 'Failed to fetch project');
       }
       return response.json();
     },
@@ -48,12 +48,12 @@ export function useCreateProject() {
       });
       if (!response.ok) {
         const error = (await response.json()) as any;
-        throw new Error(error.error || "Failed to create project");
+        throw new Error(error.error || 'Failed to create project');
       }
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
     },
   });
 }
@@ -70,22 +70,22 @@ export function useUpdateProject() {
       updates: {
         name?: string;
         description?: string;
-        status?: "active" | "completed" | "archived";
+        status?: 'active' | 'completed' | 'archived';
       };
     }) => {
-      const response = await client.projects[":id"].$put({
+      const response = await client.projects[':id'].$put({
         param: { id: String(id) },
         json: updates,
       });
       if (!response.ok) {
         const error = (await response.json()) as any;
-        throw new Error(error.error || "Failed to update project");
+        throw new Error(error.error || 'Failed to update project');
       }
       return response.json();
     },
     onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-      queryClient.invalidateQueries({ queryKey: ["project", id] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
     },
   });
 }
@@ -95,18 +95,18 @@ export function useDeleteProject() {
 
   return useMutation({
     mutationFn: async (id: number | string) => {
-      const response = await client.projects[":id"].$delete({
+      const response = await client.projects[':id'].$delete({
         param: { id: String(id) },
       });
       if (!response.ok) {
         const error = (await response.json()) as any;
-        throw new Error(error.error || "Failed to delete project");
+        throw new Error(error.error || 'Failed to delete project');
       }
       // HTTP semantics: DELETE returns 204 No Content (no body)
       return null;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
     },
   });
 }

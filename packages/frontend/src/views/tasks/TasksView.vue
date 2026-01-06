@@ -156,19 +156,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { useRouter } from "vue-router";
-import { message } from "ant-design-vue";
-import DefaultLayout from "../../layouts/DefaultLayout.vue";
-import { useTasks, useFormatters } from "../../composables";
-import { AVAILABLE_MODELS } from "../../constants/models";
-import type { Task } from "@xenix/shared";
-
-const router = useRouter();
-const { formatDate, formatStatus } = useFormatters();
+import { ref, computed } from 'vue';
+import { message } from 'ant-design-vue';
+import DefaultLayout from '../../layouts/DefaultLayout.vue';
+import { useTasks, useFormatters } from '../../composables';
+import { AVAILABLE_MODELS } from '../../constants/models';
+const { formatDate } = useFormatters();
 
 // Use composables for data fetching with auto-refetch
-const { data: tasksData, isLoading: loading, error, refetch } = useTasks();
+const { data: tasksData, isLoading: loading, refetch } = useTasks();
 
 // Computed property to safely access tasks array
 const tasks = computed(() => tasksData.value || []);
@@ -198,18 +194,18 @@ const columns = [
  * View task logs
  * Note: This would need a corresponding composable for fetching logs
  */
-const viewLogs = async (taskId: number) => {
+const viewLogs = async (_taskId: number) => {
   logsModalVisible.value = true;
   loadingLogs.value = true;
 
   try {
     // TODO: Create useTaskLogs composable
     // For now, show message that logs feature needs backend endpoint
-    message.info("Logs feature requires backend implementation");
+    message.info('Logs feature requires backend implementation');
     logs.value = [];
-  } catch (error: any) {
-    console.error("Failed to fetch logs:", error);
-    message.error(error.message || "Failed to fetch logs");
+  } catch (err: any) {
+    console.error('Failed to fetch logs:', err);
+    message.error(err.message || 'Failed to fetch logs');
     logs.value = [];
   } finally {
     loadingLogs.value = false;

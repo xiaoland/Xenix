@@ -2,17 +2,17 @@
  * Datasets Composable
  * Uses TanStack Query with Hono RPC client for type-safe data fetching
  */
+import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/vue-query";
-import { client } from "../api/client";
+import { client } from '../api/client';
 
 export function useDatasets() {
   return useQuery({
-    queryKey: ["datasets"],
+    queryKey: ['datasets'],
     queryFn: async () => {
       const response = await client.data.$get({});
       if (!response.ok) {
-        throw new Error("Failed to fetch datasets");
+        throw new Error('Failed to fetch datasets');
       }
       return response.json();
     },
@@ -21,13 +21,13 @@ export function useDatasets() {
 
 export function useDataset(id: number | string) {
   return useQuery({
-    queryKey: ["dataset", id],
+    queryKey: ['dataset', id],
     queryFn: async () => {
-      const response = await client.data[":id"].$get({
+      const response = await client.data[':id'].$get({
         param: { id: String(id) },
       });
       if (!response.ok) {
-        throw new Error("Failed to fetch dataset");
+        throw new Error('Failed to fetch dataset');
       }
       return response.json();
     },
@@ -41,11 +41,11 @@ export function useUploadDataset() {
   return useMutation({
     mutationFn: async (formData: FormData) => {
       // Use fetch directly for FormData to ensure proper Content-Type with boundary
-      const token = localStorage.getItem("auth_token");
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
-      
+      const token = localStorage.getItem('auth_token');
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
       const response = await fetch(`${apiUrl}/data`, {
-        method: "POST",
+        method: 'POST',
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
           // Don't set Content-Type - let browser set it with boundary
@@ -55,12 +55,12 @@ export function useUploadDataset() {
 
       if (!response.ok) {
         const error = (await response.json()) as any;
-        throw new Error(error.error || "Failed to upload dataset");
+        throw new Error(error.error || 'Failed to upload dataset');
       }
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["datasets"] });
+      queryClient.invalidateQueries({ queryKey: ['datasets'] });
     },
   });
 }
@@ -70,15 +70,15 @@ export function useDeleteDataset() {
 
   return useMutation({
     mutationFn: async (id: number | string) => {
-      const response = await client.data[":id"].$delete({
+      const response = await client.data[':id'].$delete({
         param: { id: String(id) },
       });
       if (!response.ok) {
-        throw new Error("Failed to delete dataset");
+        throw new Error('Failed to delete dataset');
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["datasets"] });
+      queryClient.invalidateQueries({ queryKey: ['datasets'] });
     },
   });
 }

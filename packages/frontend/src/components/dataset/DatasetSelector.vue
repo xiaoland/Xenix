@@ -10,9 +10,7 @@
         <template #image>
           <span class="i-mdi-database-off text-6xl text-gray-400"></span>
         </template>
-        <p class="text-gray-600 mb-4">
-          Upload a dataset to get started.
-        </p>
+        <p class="text-gray-600 mb-4">Upload a dataset to get started.</p>
       </a-empty>
     </div>
 
@@ -46,8 +44,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
 import { message } from 'ant-design-vue';
+
+import { computed, ref } from 'vue';
+
 import { useDatasets } from '../../composables';
 
 interface Dataset {

@@ -84,17 +84,20 @@
       ></span>
       <h3 class="text-xl font-semibold text-red-600 mb-2">Prediction Failed</h3>
       <p class="text-gray-600">
-        {{ task.error || "An unknown error occurred" }}
+        {{ task.error || 'An unknown error occurred' }}
       </p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
-import { message } from "ant-design-vue";
-import { client } from "../../../api/client";
-import type { Task, PredictTaskResult } from "@xenix/shared";
+import { message } from 'ant-design-vue';
+
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+
+import type { PredictTaskResult, Task } from '@xenix/shared';
+
+import { client } from '../../../api/client';
 
 const props = defineProps<{
   taskId: number;
@@ -111,34 +114,34 @@ let pollInterval: number | null = null;
 
 // Computed
 const statusMessage = computed(() => {
-  if (!task.value) return "";
+  if (!task.value) return '';
 
   switch (task.value.status) {
-    case "pending":
-      return "Prediction task queued";
-    case "running":
-      return "Generating predictions...";
-    case "completed":
-      return "Prediction completed successfully!";
-    case "failed":
-      return `Prediction failed: ${task.value.error || "Unknown error"}`;
+    case 'pending':
+      return 'Prediction task queued';
+    case 'running':
+      return 'Generating predictions...';
+    case 'completed':
+      return 'Prediction completed successfully!';
+    case 'failed':
+      return `Prediction failed: ${task.value.error || 'Unknown error'}`;
     default:
-      return "";
+      return '';
   }
 });
 
 const statusType = computed(() => {
-  if (!task.value) return "info";
+  if (!task.value) return 'info';
 
   switch (task.value.status) {
-    case "completed":
-      return "success";
-    case "failed":
-      return "error";
-    case "running":
-      return "info";
+    case 'completed':
+      return 'success';
+    case 'failed':
+      return 'error';
+    case 'running':
+      return 'info';
     default:
-      return "info";
+      return 'info';
   }
 });
 
@@ -150,7 +153,7 @@ const resultColumns = computed(() => {
 
   const firstRow = predictResult.predictions[0];
   const cols: any[] = Object.keys(firstRow)
-    .filter((key) => key !== "prediction")
+    .filter((key) => key !== 'prediction')
     .map((key) => ({
       title: key,
       dataIndex: key,
@@ -158,9 +161,9 @@ const resultColumns = computed(() => {
     }));
 
   cols.push({
-    title: "Prediction",
-    dataIndex: "prediction",
-    key: "prediction",
+    title: 'Prediction',
+    dataIndex: 'prediction',
+    key: 'prediction',
   });
 
   return cols;
@@ -178,7 +181,7 @@ const formattedResults = computed(() => {
 const avgPrediction = computed(() => {
   const predictResult = task.value?.result as any;
   if (!predictResult?.predictions || predictResult.predictions.length === 0) {
-    return "-";
+    return '-';
   }
 
   const predictions = predictResult.predictions.map((p: any) => p.prediction);
@@ -193,14 +196,14 @@ const avgPrediction = computed(() => {
 const fetchTaskStatus = async () => {
   loading.value = true;
   try {
-    const response = await client.tasks[":id"].$get({
+    const response = await client.tasks[':id'].$get({
       param: { id: String(props.taskId) },
     });
-    if (!response.ok) throw new Error("Failed to fetch task");
+    if (!response.ok) throw new Error('Failed to fetch task');
     const data = await response.json();
     task.value = data.task;
   } catch (error) {
-    console.error("Failed to fetch task:", error);
+    console.error('Failed to fetch task:', error);
   } finally {
     loading.value = false;
   }
@@ -214,7 +217,7 @@ const startPolling = () => {
   pollInterval = window.setInterval(() => {
     if (
       task.value &&
-      (task.value.status === "pending" || task.value.status === "running")
+      (task.value.status === 'pending' || task.value.status === 'running')
     ) {
       fetchTaskStatus();
     } else {
@@ -243,17 +246,17 @@ const handleDownload = async () => {
   downloading.value = true;
   try {
     // Create download link
-    const link = document.createElement("a");
+    const link = document.createElement('a');
     link.href = `/api/download/${task.value!.id}`;
     link.download = predictResult.outputFile;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 
-    message.success("Download started");
+    message.success('Download started');
   } catch (error: any) {
-    console.error("Download failed:", error);
-    message.error(error.message || "Failed to download file");
+    console.error('Download failed:', error);
+    message.error(error.message || 'Failed to download file');
   } finally {
     downloading.value = false;
   }
@@ -264,7 +267,7 @@ onMounted(async () => {
   await fetchTaskStatus();
   if (
     task.value &&
-    (task.value.status === "pending" || task.value.status === "running")
+    (task.value.status === 'pending' || task.value.status === 'running')
   ) {
     startPolling();
   }

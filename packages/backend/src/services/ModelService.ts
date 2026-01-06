@@ -2,9 +2,9 @@
  * Model Service
  * Business logic for model metadata operations
  */
+import { eq } from 'drizzle-orm';
 
 import { db, schema } from '../database/index.js';
-import { eq } from 'drizzle-orm';
 import { NotFoundError } from '../errors/index.js';
 import { syncModelMetadata } from '../utils/syncModels.js';
 

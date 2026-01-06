@@ -12,6 +12,10 @@
     "test": "pnpm -r test",
     "test:watch": "pnpm -r test:watch",
     "test:coverage": "pnpm -r test:coverage",
+    "lint": "eslint .",
+    "lint:fix": "eslint --fix .",
+    "format": "prettier --write \"**/*.{ts,vue,js,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,vue,js,json,md}\"",
     "db:generate": "pnpm --filter \"@xenix/backend\" db:generate",
     "db:migrate": "pnpm --filter \"@xenix/backend\" db:migrate",
     "docker:up": "docker compose up -d",
@@ -19,6 +23,14 @@
     "docker:logs": "docker compose logs -f"
   },
   "devDependencies": {
-    "dotenv-cli": "^11.0.0"
+    "@eslint/js": "^9.39.2",
+    "@trivago/prettier-plugin-sort-imports": "^6.0.1",
+    "@typescript-eslint/eslint-plugin": "^8.52.0",
+    "@typescript-eslint/parser": "^8.52.0",
+    "dotenv-cli": "^11.0.0",
+    "eslint": "^9.39.2",
+    "eslint-plugin-vue": "^10.6.2",
+    "prettier": "^3.7.4",
+    "vue-eslint-parser": "^10.2.0"
   }
 }

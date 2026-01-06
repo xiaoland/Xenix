@@ -89,7 +89,7 @@
               v-else-if="record.status === 'failed'"
               class="text-red-500 text-sm"
             >
-              {{ record.error || "Training failed" }}
+              {{ record.error || 'Training failed' }}
             </span>
             <span v-else class="text-gray-400 text-sm">-</span>
           </template>
@@ -129,11 +129,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
-import { message } from "ant-design-vue";
-import { client } from "../../../api/client";
-import { AVAILABLE_MODELS } from "../../../constants/models";
-import type { Task } from "@xenix/shared";
+import { message } from 'ant-design-vue';
+
+import { onMounted, onUnmounted, ref } from 'vue';
+
+import type { Task } from '@xenix/shared';
+
+import { client } from '../../../api/client';
+import { AVAILABLE_MODELS } from '../../../constants/models';
 
 const props = defineProps<{
   workItemId: number;
@@ -144,7 +147,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   continue: [
-    data: { model: string; parameters: Record<string, any>; taskId: number }
+    data: { model: string; parameters: Record<string, any>; taskId: number },
   ];
   back: [];
 }>();
@@ -164,10 +167,10 @@ const availableModels = AVAILABLE_MODELS.map((m) => ({
 
 // Table columns
 const columns = [
-  { title: "Model", key: "model", width: 200 },
-  { title: "Status", key: "status", width: 120 },
-  { title: "Metrics / Error", key: "metrics" },
-  { title: "Action", key: "action", width: 100 },
+  { title: 'Model', key: 'model', width: 200 },
+  { title: 'Status', key: 'status', width: 120 },
+  { title: 'Metrics / Error', key: 'metrics' },
+  { title: 'Action', key: 'action', width: 100 },
 ];
 
 // Polling interval
@@ -182,7 +185,7 @@ const fetchTasks = async () => {
     const response = await client.tasks.$get({
       query: {
         workItemId: String(props.workItemId),
-        types: "auto-tune,manual-tune",
+        types: 'auto-tune,manual-tune',
       },
     });
     if (response.ok) {
@@ -190,7 +193,7 @@ const fetchTasks = async () => {
       tasks.value = data.tasks || [];
     }
   } catch (error) {
-    console.error("Failed to fetch tasks:", error);
+    console.error('Failed to fetch tasks:', error);
   } finally {
     loading.value = false;
   }
@@ -204,7 +207,7 @@ const handleStartAutoTune = async () => {
   try {
     // Start training for each selected model
     for (const model of selectedModels.value) {
-      const response = await client.tune["auto-tune"].$post({
+      const response = await client.tune['auto-tune'].$post({
         json: {
           datasetId: props.datasetId,
           featureColumns: props.featureColumns,
@@ -213,7 +216,7 @@ const handleStartAutoTune = async () => {
           workItemId: props.workItemId,
         },
       });
-      if (!response.ok) throw new Error("Failed to start auto tune");
+      if (!response.ok) throw new Error('Failed to start auto tune');
     }
     message.success(
       `Started training for ${selectedModels.value.length} model(s)`
@@ -222,8 +225,8 @@ const handleStartAutoTune = async () => {
     await fetchTasks();
     startPolling();
   } catch (error: any) {
-    console.error("Failed to start training:", error);
-    message.error(error.message || "Failed to start training");
+    console.error('Failed to start training:', error);
+    message.error(error.message || 'Failed to start training');
   } finally {
     isTraining.value = false;
   }
@@ -236,11 +239,11 @@ const handleClearFailedTasks = async () => {
   try {
     // TODO: implement delete failed tasks
     // await TaskService.deleteFailedTasks(props.workItemId);
-    message.success("Failed tasks cleared");
+    message.success('Failed tasks cleared');
     await fetchTasks();
   } catch (error: any) {
-    console.error("Failed to clear tasks:", error);
-    message.error(error.message || "Failed to clear tasks");
+    console.error('Failed to clear tasks:', error);
+    message.error(error.message || 'Failed to clear tasks');
   }
 };
 
@@ -258,21 +261,21 @@ const handleContinue = async () => {
   if (!selectedTaskId.value) return;
 
   try {
-    const response = await client.tasks[":id"].$get({
+    const response = await client.tasks[':id'].$get({
       param: { id: String(selectedTaskId.value) },
     });
-    if (!response.ok) throw new Error("Failed to fetch task");
+    if (!response.ok) throw new Error('Failed to fetch task');
     const data = (await response.json()) as any;
     if (data.task) {
-      emit("continue", {
-        model: data.task.parameter?.model || "",
+      emit('continue', {
+        model: data.task.parameter?.model || '',
         parameters: data.task.result?.params || {},
         taskId: selectedTaskId.value,
       });
     }
   } catch (error: any) {
-    console.error("Failed to fetch task:", error);
-    message.error(error.message || "Failed to fetch task details");
+    console.error('Failed to fetch task:', error);
+    message.error(error.message || 'Failed to fetch task details');
   }
 };
 
@@ -283,7 +286,7 @@ const startPolling = () => {
   if (pollInterval) return;
   pollInterval = window.setInterval(() => {
     const hasRunningTasks = tasks.value.some(
-      (t: Task) => t.status === "pending" || t.status === "running"
+      (t: Task) => t.status === 'pending' || t.status === 'running'
     );
     if (hasRunningTasks) {
       fetchTasks();
@@ -308,16 +311,16 @@ const stopPolling = () => {
  */
 const getStatusColor = (status: string) => {
   switch (status) {
-    case "completed":
-      return "success";
-    case "failed":
-      return "error";
-    case "running":
-      return "processing";
-    case "pending":
-      return "default";
+    case 'completed':
+      return 'success';
+    case 'failed':
+      return 'error';
+    case 'running':
+      return 'processing';
+    case 'pending':
+      return 'default';
     default:
-      return "default";
+      return 'default';
   }
 };
 
@@ -325,7 +328,7 @@ const getStatusColor = (status: string) => {
  * Format model name
  */
 const formatModelName = (modelValue?: string) => {
-  if (!modelValue) return "-";
+  if (!modelValue) return '-';
   const model = AVAILABLE_MODELS.find((m) => m.value === modelValue);
   return model ? model.label : modelValue;
 };
@@ -334,7 +337,7 @@ const formatModelName = (modelValue?: string) => {
  * Format metric value
  */
 const formatMetric = (value: any) => {
-  if (typeof value === "number") {
+  if (typeof value === 'number') {
     return value.toFixed(4);
   }
   return value;
@@ -347,10 +350,10 @@ const getDisplayMetrics = (result: any) => {
   if (!result || !result.params) return {};
   // Show a subset of important metrics
   const metrics: Record<string, any> = {};
-  if (result.score !== undefined) metrics["Score"] = result.score;
+  if (result.score !== undefined) metrics['Score'] = result.score;
   if (result.params) {
     const paramCount = Object.keys(result.params).length;
-    metrics["Parameters"] = `${paramCount} params`;
+    metrics['Parameters'] = `${paramCount} params`;
   }
   return metrics;
 };
@@ -359,7 +362,7 @@ const getDisplayMetrics = (result: any) => {
 onMounted(async () => {
   await fetchTasks();
   const hasRunningTasks = tasks.value.some(
-    (t: Task) => t.status === "pending" || t.status === "running"
+    (t: Task) => t.status === 'pending' || t.status === 'running'
   );
   if (hasRunningTasks) {
     startPolling();

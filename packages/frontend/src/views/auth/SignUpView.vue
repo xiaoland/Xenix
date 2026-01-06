@@ -3,12 +3,8 @@
     <div class="max-w-md w-full px-4">
       <a-card class="shadow-lg">
         <div class="text-center mb-6">
-          <h1 class="text-2xl font-bold text-gray-900 mb-2">
-            Sign Up
-          </h1>
-          <p class="text-gray-600">
-            ML Training Platform
-          </p>
+          <h1 class="text-2xl font-bold text-gray-900 mb-2">Sign Up</h1>
+          <p class="text-gray-600">ML Training Platform</p>
         </div>
 
         <a-form
@@ -53,10 +49,7 @@
             </a-input-password>
           </a-form-item>
 
-          <a-form-item
-            label="Confirm Password"
-            name="confirmPassword"
-          >
+          <a-form-item label="Confirm Password" name="confirmPassword">
             <a-input-password
               v-model:value="formData.confirmPassword"
               placeholder="Confirm your password"
@@ -107,8 +100,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
+
 import { useAuthStore } from '../../stores/auth';
 
 const router = useRouter();
@@ -174,4 +168,3 @@ async function handleSignup() {
 <style scoped>
 /* Additional styles if needed */
 </style>
-

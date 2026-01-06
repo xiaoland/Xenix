@@ -2,9 +2,8 @@
  * Dataset Service
  * Business logic for dataset operations
  */
-
-import { DatasetRepository } from '../repositories/index.js';
 import { NotFoundError } from '../errors/index.js';
+import { DatasetRepository } from '../repositories/index.js';
 
 export class DatasetService {
   private datasetRepo: DatasetRepository;

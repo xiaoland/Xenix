@@ -1,23 +1,24 @@
-import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
-import { db, schema } from "../database/index.js";
-import { eq } from "drizzle-orm";
-import { authMiddleware } from "../middleware/auth.js";
-import { predictInline } from "../business/ml/index.js";
-import {
-  NotFoundError,
-  BadRequestError,
-} from "../errors/index.js";
-import { InlinePredictSchema } from "@xenix/shared";
-import logger from "../utils/logger/index.js";
-import path from "path";
+import { eq } from 'drizzle-orm';
+import path from 'path';
+
+import { zValidator } from '@hono/zod-validator';
+import { Hono } from 'hono';
+
+import { InlinePredictSchema } from '@xenix/shared';
+
+import { predictInline } from '../business/ml/index.js';
+import { db, schema } from '../database/index.js';
+import { BadRequestError, NotFoundError } from '../errors/index.js';
+import { authMiddleware } from '../middleware/auth.js';
+import logger from '../utils/logger/index.js';
 
 const predict = new Hono()
-  .use("*", authMiddleware)
+  .use('*', authMiddleware)
 
   // Inline prediction (JSON data)
-  .post("/inline", zValidator("json", InlinePredictSchema), async (c) => {
-    const { predictionData, model, tuningTaskId, workItemId } = c.req.valid("json");
+  .post('/inline', zValidator('json', InlinePredictSchema), async (c) => {
+    const { predictionData, model, tuningTaskId, workItemId } =
+      c.req.valid('json');
 
     // Load work item to get datasetId (training), featureColumns, targetColumn
     const [workItem] = await db
@@ -27,16 +28,16 @@ const predict = new Hono()
       .limit(1);
 
     if (!workItem) {
-      throw new NotFoundError("Work item");
+      throw new NotFoundError('Work item');
     }
 
     if (!workItem.datasetId) {
-      throw new BadRequestError("Work item does not have a training dataset");
+      throw new BadRequestError('Work item does not have a training dataset');
     }
 
     if (!workItem.featureColumns || !workItem.targetColumn) {
       throw new BadRequestError(
-        "Work item does not have feature columns or target column configured"
+        'Work item does not have feature columns or target column configured'
       );
     }
 
@@ -63,7 +64,7 @@ const predict = new Hono()
       .limit(1);
 
     if (!trainingDataset) {
-      throw new NotFoundError("Training dataset");
+      throw new NotFoundError('Training dataset');
     }
 
     const trainingDataPath = trainingDataset.filePath;
@@ -76,7 +77,7 @@ const predict = new Hono()
       .limit(1);
 
     if (!tuningTask || !tuningTask.result) {
-      throw new NotFoundError("Tuning results for the specified task ID");
+      throw new NotFoundError('Tuning results for the specified task ID');
     }
 
     const result: any = tuningTask.result;
@@ -87,15 +88,15 @@ const predict = new Hono()
       .insert(schema.tasks)
       .values({
         workItemId,
-        type: "predict",
-        status: "pending",
+        type: 'predict',
+        status: 'pending',
         parameter: {
           model,
           trainingDatasetId: workItem.datasetId,
           featureColumns,
           targetColumn,
           tuningTaskId,
-          predictionType: "inline",
+          predictionType: 'inline',
           predictionDataCount: predictionData.length,
         },
       })
@@ -104,10 +105,10 @@ const predict = new Hono()
     const taskId = insertedTask.id;
 
     // Generate output file path with taskId
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const outputFile = path.join(
       process.cwd(),
-      "uploads",
+      'uploads',
       `inline_prediction_${workItemId}_${taskId}_${timestamp}.xlsx`
     );
 
@@ -141,10 +142,13 @@ const predict = new Hono()
       });
     });
 
-    return c.json({
-      taskId,
-      message: "Inline prediction started",
-    }, 201);
+    return c.json(
+      {
+        taskId,
+        message: 'Inline prediction started',
+      },
+      201
+    );
   });
 
 // TODO: by-file and generic predict endpoints

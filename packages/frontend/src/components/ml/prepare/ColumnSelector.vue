@@ -39,7 +39,10 @@
     </div>
 
     <!-- Summary -->
-    <div v-if="localFeatureColumns.length > 0 && localTargetColumn" class="bg-blue-50 border border-blue-200 rounded p-4">
+    <div
+      v-if="localFeatureColumns.length > 0 && localTargetColumn"
+      class="bg-blue-50 border border-blue-200 rounded p-4"
+    >
       <h4 class="font-medium mb-2">Configuration Summary:</h4>
       <ul class="text-sm space-y-1">
         <li><strong>Features:</strong> {{ localFeatureColumns.join(', ') }}</li>
@@ -50,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps<{
   columns: string[];
@@ -69,15 +72,15 @@ const localTargetColumn = ref<string | undefined>(props.targetColumn);
 // Available feature columns (exclude target if selected)
 const availableFeatureOptions = computed(() => {
   return props.columns
-    .filter(col => col !== localTargetColumn.value)
-    .map(col => ({ label: col, value: col }));
+    .filter((col) => col !== localTargetColumn.value)
+    .map((col) => ({ label: col, value: col }));
 });
 
 // Available target columns (exclude selected features)
 const availableTargetOptions = computed(() => {
   return props.columns
-    .filter(col => !localFeatureColumns.value.includes(col))
-    .map(col => ({ label: col, value: col }));
+    .filter((col) => !localFeatureColumns.value.includes(col))
+    .map((col) => ({ label: col, value: col }));
 });
 
 const handleFeatureColumnsChange = () => {
@@ -91,11 +94,17 @@ const handleTargetColumnChange = () => {
 };
 
 // Watch for external changes
-watch(() => props.featureColumns, (newVal) => {
-  localFeatureColumns.value = [...newVal];
-});
+watch(
+  () => props.featureColumns,
+  (newVal) => {
+    localFeatureColumns.value = [...newVal];
+  }
+);
 
-watch(() => props.targetColumn, (newVal) => {
-  localTargetColumn.value = newVal;
-});
+watch(
+  () => props.targetColumn,
+  (newVal) => {
+    localTargetColumn.value = newVal;
+  }
+);
 </script>

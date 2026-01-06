@@ -2,10 +2,13 @@
  * Work Item Service
  * Business logic for work item operations
  */
-
-import { WorkItemRepository, ProjectRepository } from '../repositories/index.js';
-import { NotFoundError, ForbiddenError } from '../errors/index.js';
 import type { CreateWorkItemDto, UpdateWorkItemDto } from '@xenix/shared';
+
+import { ForbiddenError, NotFoundError } from '../errors/index.js';
+import {
+  ProjectRepository,
+  WorkItemRepository,
+} from '../repositories/index.js';
 
 export class WorkItemService {
   private workItemRepo: WorkItemRepository;

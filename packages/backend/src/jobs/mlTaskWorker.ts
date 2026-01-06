@@ -2,11 +2,11 @@
  * ML Task Worker
  * Worker process that consumes jobs from the ML tasks queue
  */
-
 import { Worker } from 'bullmq';
-import { connection, QUEUE_NAMES } from '../queues/index.js';
-import { processMLTask, MLTaskData } from './mlTaskProcessor.js';
+
+import { QUEUE_NAMES, connection } from '../queues/index.js';
 import logger from '../utils/logger/index.js';
+import { MLTaskData, processMLTask } from './mlTaskProcessor.js';
 
 // Create worker
 export const mlTaskWorker = new Worker<MLTaskData>(

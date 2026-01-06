@@ -2,10 +2,10 @@
  * Task Repository
  * Handles database operations for tasks
  */
+import { and, eq, inArray, sql } from 'drizzle-orm';
 
-import { BaseRepository } from './BaseRepository.js';
 import { db, schema } from '../database/index.js';
-import { eq, inArray, and, sql } from 'drizzle-orm';
+import { BaseRepository } from './BaseRepository.js';
 
 type Task = typeof schema.tasks.$inferSelect;
 

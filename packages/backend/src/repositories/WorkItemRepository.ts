@@ -2,10 +2,10 @@
  * Work Item Repository
  * Handles database operations for work items
  */
+import { desc, eq, inArray } from 'drizzle-orm';
 
-import { BaseRepository } from './BaseRepository.js';
 import { db, schema } from '../database/index.js';
-import { eq, desc, inArray } from 'drizzle-orm';
+import { BaseRepository } from './BaseRepository.js';
 
 type WorkItem = typeof schema.workItems.$inferSelect;
 
@@ -24,7 +24,7 @@ export class WorkItemRepository extends BaseRepository<WorkItem> {
 
   async findByProjects(projectIds: number[]) {
     if (projectIds.length === 0) return [];
-    
+
     return await db
       .select()
       .from(schema.workItems)

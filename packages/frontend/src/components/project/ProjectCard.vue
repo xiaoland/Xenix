@@ -8,7 +8,7 @@
           <span class="i-mdi-folder text-blue-500 text-xl"></span>
           <span class="text-lg font-semibold">{{ project.name }}</span>
           <a-tag :color="statusColor">
-            {{ project.status || "active" }}
+            {{ project.status || 'active' }}
           </a-tag>
         </div>
         <p v-if="project.description" class="text-sm text-gray-600 ml-7 mb-2">
@@ -81,9 +81,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import type { Project } from "@xenix/shared";
-import WorkItemRow from "./WorkItemRow.vue";
+import { computed } from 'vue';
+
+import type { Project } from '@xenix/shared';
+
+import WorkItemRow from './WorkItemRow.vue';
 
 interface Props {
   project: Project;
@@ -94,25 +96,25 @@ const props = defineProps<Props>();
 defineEmits<{
   edit: [project: Project];
   delete: [projectId: number];
-  "manage-datasets": [projectId: number];
-  "add-work-item": [projectId: number];
+  'manage-datasets': [projectId: number];
+  'add-work-item': [projectId: number];
 }>();
 
 const statusColor = computed(() => {
   switch (props.project.status) {
-    case "active":
-      return "green";
-    case "completed":
-      return "blue";
-    case "archived":
-      return "gray";
+    case 'active':
+      return 'green';
+    case 'completed':
+      return 'blue';
+    case 'archived':
+      return 'gray';
     default:
-      return "default";
+      return 'default';
   }
 });
 
 const formatDate = (dateString?: string) => {
-  if (!dateString) return "";
+  if (!dateString) return '';
   const date = new Date(dateString);
   return date.toLocaleDateString();
 };

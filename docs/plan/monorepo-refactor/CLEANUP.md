@@ -12,6 +12,7 @@ The monorepo refactor successfully migrated Xenix from Nuxt.js full-stack to a m
 ### Current State Analysis
 
 **Strengths:**
+
 - ✅ Monorepo structure established (pnpm workspace)
 - ✅ Modern stack (Vite, Vue 3, Hono, Drizzle ORM)
 - ✅ TanStack Query implemented in frontend
@@ -23,6 +24,7 @@ The monorepo refactor successfully migrated Xenix from Nuxt.js full-stack to a m
 - ✅ Pino structured logging configured
 
 **Technical Debt:**
+
 - ⚠️ Backend routes have mixed patterns (direct DB access vs repository vs service layer)
 - ⚠️ Only 5/10 backend routes use Zod validation
 - ⚠️ Service layer incomplete (only ProjectService, WorkItemService implemented)
@@ -40,12 +42,15 @@ The monorepo refactor successfully migrated Xenix from Nuxt.js full-stack to a m
 Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority order:
 
 ### Priority 1: Critical Architecture Cleanup (HIGH IMPACT)
+
 **Goal**: Establish consistent architectural patterns across all code
 
 ### Priority 2: Code Quality & Maintainability (MEDIUM IMPACT)
+
 **Goal**: Remove code smells, improve readability, ensure consistency
 
 ### Priority 3: Testing & Documentation (FOUNDATIONAL)
+
 **Goal**: Increase confidence in changes, improve onboarding
 
 ---
@@ -55,6 +60,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 ### 1. Dead / Unused Code Removal
 
 #### 1.1 Static Analysis Setup
+
 - [ ] Install and configure ESLint for both backend and frontend
   - Backend: `@typescript-eslint/eslint-plugin`, `@typescript-eslint/parser`
   - Frontend: `eslint-plugin-vue`, Vue-specific rules
@@ -65,6 +71,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 **Estimated findings**: Minimal (modern refactor already fairly clean)
 
 #### 1.2 Unreachable Code Detection
+
 - [ ] Search for unreachable code after returns:
   ```bash
   grep -rn "return" packages/ | grep -A 5 "return" | grep -v "^--$"
@@ -74,6 +81,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 **Expected**: Likely clean due to recent refactor
 
 #### 1.3 Commented Code Cleanup
+
 - [ ] Review files with commented code blocks:
   - `packages/backend/src/utils/pythonExecutor.ts`
   - `packages/backend/src/utils/syncModels.ts`
@@ -85,9 +93,10 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 **Files to review**: ~20 files identified with comment blocks
 
 #### 1.4 Debug/Scaffolding Cleanup
+
 - [x] Remove console.log statements (DONE - 0 found in packages)
 - [ ] Audit logger usage - ensure consistency:
-  - Replace any remaining console.* with logger.*
+  - Replace any remaining console._ with logger._
   - Ensure log levels are appropriate (info, warn, error)
 - [ ] Review TODO/FIXME comments:
   - `packages/backend/src/routes/predict.ts:1` - "TODO: by-file and generic predict endpoints"
@@ -104,14 +113,17 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 ### 2. Duplicated Code Elimination
 
 #### 2.1 Backend Route Patterns
+
 **Issue**: Routes use mixed patterns for data access
 
 **Current patterns found:**
+
 1. Direct DB access: `datasets.ts`, `tasks.ts`, `obsrv.ts`, `download.ts`
 2. Repository access: `projects.ts` (partial)
 3. Service access: `work-items.ts` (partial), `projects.ts` (partial)
 
 **Action plan:**
+
 - [ ] Complete service layer implementation:
   - [ ] `DatasetService.ts` - CRUD for datasets
   - [ ] `TaskService.ts` - Task monitoring and updates
@@ -132,12 +144,15 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 **Files to refactor**: 8-10 route files
 
 #### 2.2 Frontend Data Fetching Patterns
+
 **Status**: ✅ Already modernized with TanStack Query composables
 
 **No action needed** - Views already use:
+
 - `useProjects()`, `useWorkItems()`, `useDatasets()`, `useTasks()`, `useFormatters()`
 
 #### 2.3 Configuration & Constants
+
 - [ ] Audit for hardcoded values:
   ```bash
   grep -rn '"http://\|3000\|3001\|5173"' packages/
@@ -152,6 +167,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 **Expected**: Some hardcoded ports and paths to extract
 
 #### 2.4 Shared Utilities
+
 - [ ] Look for similar utility functions across packages
 - [ ] Extract common logic to `packages/shared/src/utils/`
 - [ ] Candidates:
@@ -166,6 +182,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 ### 3. Legacy / Obsolete Code Cleanup
 
 #### 3.1 Backend Services Completion
+
 **Current state**: Only 2/5 services implemented
 
 - [ ] Review backend service implementations:
@@ -179,7 +196,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
   ```typescript
   export class XxxService {
     constructor(private repo: XxxRepository) {}
-    
+
     async create(data: CreateXxxDto): Promise<Xxx> { ... }
     async findById(id: number): Promise<Xxx | null> { ... }
     async update(id: number, data: UpdateXxxDto): Promise<Xxx> { ... }
@@ -190,11 +207,13 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 **Files to complete**: 3 service stubs
 
 #### 3.2 Frontend Legacy Patterns
+
 **Status**: ✅ Frontend already modernized - services directory removed
 
 **No action needed**
 
 #### 3.3 Python Integration Review
+
 - [ ] Review `packages/backend/src/utils/pythonExecutor.ts` (295 lines):
   - Check for old workarounds no longer needed
   - Verify error handling is robust
@@ -206,6 +225,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 **Files to review**: ~10-15 Python files + executor
 
 #### 3.4 Deprecated API Usage
+
 - [ ] Check for deprecated npm package usage:
   ```bash
   npm outdated
@@ -218,9 +238,11 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 ### 4. Code Smells and Structural Improvements
 
 #### 4.1 Long Methods/Classes
+
 **Target**: Functions > 50 lines, classes > 200 lines
 
 **Files identified:**
+
 - `packages/frontend/src/components/ml/tuning/TuningStep.vue` (372 lines)
 - `packages/frontend/src/components/ml/prediction/PredictionStep.vue` (327 lines)
 - `packages/backend/src/utils/pythonExecutor.ts` (295 lines)
@@ -229,6 +251,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 - `packages/backend/src/business/ml/index.ts` (227 lines)
 
 **Action plan:**
+
 - [ ] Review each large file for Single Responsibility violations
 - [ ] Extract reusable components/functions:
   - TuningStep → extract parameter form, model selection, task display
@@ -240,6 +263,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 **Files to refactor**: 6 large files
 
 #### 4.2 Magic Numbers/Strings
+
 - [ ] Search for magic values:
   ```bash
   grep -rn '"[0-9]\{3,\}"' packages/
@@ -254,6 +278,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 **Expected**: Moderate findings (ports, timeouts, batch sizes)
 
 #### 4.3 Deep Nesting
+
 - [ ] Identify deeply nested code (>3 levels):
   ```bash
   # Check indentation levels
@@ -267,6 +292,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 **Expected**: Moderate findings in route handlers and Vue components
 
 #### 4.4 Code Formatting
+
 - [ ] Install Prettier:
   ```bash
   pnpm add -D prettier @trivago/prettier-plugin-sort-imports
@@ -288,6 +314,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 - [ ] Add to package.json scripts: `"format": "prettier --write ."`
 
 #### 4.5 Naming Consistency
+
 - [ ] Review naming conventions:
   - Routes: kebab-case URLs (✅ already consistent)
   - Variables: camelCase (audit needed)
@@ -300,6 +327,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 ### 5. Documentation and Comments
 
 #### 5.1 Outdated Comments
+
 - [ ] Find comments referencing old architecture:
   ```bash
   grep -rni "nuxt\|nitro\|pages/\|composable" packages/ --include="*.ts" --include="*.vue"
@@ -309,6 +337,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 **Expected**: Likely clean (recent refactor)
 
 #### 5.2 Missing Documentation
+
 - [ ] Add JSDoc comments to public APIs:
   - All service methods
   - All repository methods
@@ -319,6 +348,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
   - `docs/architecture/repositories.md` - Repository pattern guide
 
 #### 5.3 Redundant Comments
+
 - [ ] Remove obvious comments like:
   ```typescript
   // Get user by ID
@@ -335,6 +365,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 ### 6. Dependencies and Imports
 
 #### 6.1 Unused Imports Detection
+
 - [ ] Enable ESLint rule: `@typescript-eslint/no-unused-vars`
 - [ ] Run and fix:
   ```bash
@@ -343,6 +374,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 - [ ] Manual review remaining warnings
 
 #### 6.2 Dependency Audit
+
 - [ ] Check for unused packages:
   ```bash
   pnpm exec depcheck
@@ -357,6 +389,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 **Expected**: Some dev dependencies may be unused
 
 #### 6.3 Dependency Updates
+
 - [ ] Check outdated packages:
   ```bash
   pnpm outdated
@@ -372,7 +405,9 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 ### 7. Testing and Safety Checks
 
 #### 7.1 Current Test Status
+
 **Existing tests:**
+
 - Backend: `datasetUtils.test.ts` (1 file)
 - Frontend: `auth.test.ts` (1 file)
 - Shared: `dataset.test.ts`, `project.test.ts` (2 files)
@@ -380,6 +415,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 **Coverage**: Estimated <10%
 
 #### 7.2 Test Expansion Plan
+
 - [ ] Backend unit tests:
   - [ ] Repository tests (5 repositories × 4 methods = 20 tests)
   - [ ] Service tests (5 services × 4 methods = 20 tests)
@@ -398,6 +434,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 **Target**: 60% coverage minimum
 
 #### 7.3 Test Infrastructure
+
 - [ ] Configure test coverage thresholds in `vitest.config.ts`:
   ```typescript
   coverage: {
@@ -414,6 +451,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 - [ ] Create test data fixtures
 
 #### 7.4 Smoke Tests
+
 - [ ] Create smoke test suite:
   - [ ] Backend server starts
   - [ ] Database connection works
@@ -427,6 +465,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 ### 8. Final Validation
 
 #### 8.1 Build Validation
+
 - [ ] Clean build test:
   ```bash
   rm -rf packages/*/dist packages/*/node_modules
@@ -437,6 +476,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 - [ ] Verify output bundle sizes
 
 #### 8.2 Type Safety Validation
+
 - [ ] Run TypeScript compilation:
   ```bash
   pnpm -r exec tsc --noEmit
@@ -445,6 +485,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 - [ ] Review any `@ts-ignore` comments and remove if possible
 
 #### 8.3 Linting Validation
+
 - [ ] Run all linters:
   ```bash
   pnpm eslint .
@@ -453,6 +494,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 - [ ] Achieve 0 errors (warnings acceptable with justification)
 
 #### 8.4 Manual Testing
+
 - [ ] Test ML workflow end-to-end:
   - [ ] Sign up / sign in
   - [ ] Create project
@@ -468,6 +510,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
   - [ ] Unauthorized access
 
 #### 8.5 Code Review
+
 - [ ] Conduct team code review focusing on:
   - Architectural consistency
   - Naming clarity
@@ -476,6 +519,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 - [ ] Document decisions in `docs/adr/` (Architecture Decision Records)
 
 #### 8.6 Performance Check
+
 - [ ] Run frontend in production mode:
   ```bash
   pnpm build:frontend
@@ -493,6 +537,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 ## Implementation Timeline
 
 ### Week 1: Critical Architecture (Priority 1)
+
 - Day 1-2: Complete service layer (DatasetService, TaskService, AuthService)
 - Day 3-4: Refactor routes to use service layer consistently
 - Day 5: Apply Zod validation to all 10 routes
@@ -500,6 +545,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 **Deliverable**: Consistent 3-layer architecture (routes → services → repositories)
 
 ### Week 2: Code Quality (Priority 2)
+
 - Day 1: Install and configure ESLint + Prettier
 - Day 2: Run automated fixes, review warnings
 - Day 3: Refactor large files (6 identified)
@@ -509,6 +555,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 **Deliverable**: Clean, readable, consistent codebase
 
 ### Week 3: Testing (Priority 3)
+
 - Day 1-2: Write service tests (5 services)
 - Day 3-4: Write route integration tests (10 routes)
 - Day 5: Write frontend composable tests (5 composables)
@@ -516,6 +563,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 **Deliverable**: 60%+ test coverage
 
 ### Week 4: Final Validation
+
 - Day 1: Full build and lint validation
 - Day 2: Manual end-to-end testing
 - Day 3: Performance testing and optimization
@@ -529,6 +577,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 ## Success Metrics
 
 ### Before Cleanup (Current State)
+
 - **Refactor Score**: 85/100
 - **Test Coverage**: <10%
 - **Code Consistency**: Mixed (3 patterns for data access)
@@ -537,6 +586,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 - **Maintainability**: Fair (some technical debt)
 
 ### After Cleanup (Target State)
+
 - **Refactor Score**: 95/100
 - **Test Coverage**: >60%
 - **Code Consistency**: Excellent (single pattern throughout)
@@ -545,6 +595,7 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 - **Maintainability**: Excellent (clean, tested, documented)
 
 ### Key Performance Indicators
+
 - ✅ 0 TypeScript compilation errors
 - ✅ 0 ESLint errors (warnings allowed with justification)
 - ✅ 10/10 routes use Zod validation
@@ -560,20 +611,24 @@ Based on the Post-Refactor Cleanup Checklist, we'll tackle issues in priority or
 ## Risk Assessment
 
 ### Low Risk
+
 - **ESLint/Prettier setup**: Automated, safe
 - **Formatting**: Automated, reversible
 - **Documentation**: Additive, no code changes
 
 ### Medium Risk
+
 - **Service layer completion**: New code, needs testing
 - **Route refactoring**: Existing functionality, comprehensive testing needed
 - **Large file refactoring**: Risk of breaking functionality
 
 ### High Risk
+
 - **Dependency updates**: Potential breaking changes
 - **Python executor changes**: Critical ML functionality
 
 ### Mitigation Strategies
+
 1. **Make incremental changes**: Commit after each logical unit
 2. **Test thoroughly**: Run tests after each change
 3. **Manual validation**: Test ML workflow after backend changes
@@ -599,22 +654,26 @@ The cleanup is estimated to take 4 weeks with 1 developer, or 2 weeks with 2 dev
 ## Appendix: Tools Reference
 
 ### Static Analysis Tools
+
 - **ESLint**: `@typescript-eslint/eslint-plugin` + `eslint-plugin-vue`
 - **Prettier**: Code formatting
 - **depcheck**: Unused dependency detection
 - **TypeScript**: Type checking with `--noEmit`
 
 ### Testing Tools
+
 - **Vitest**: Unit and integration testing
 - **@vue/test-utils**: Vue component testing
 - **supertest**: HTTP endpoint testing (optional)
 
 ### Development Tools
+
 - **tsx**: TypeScript execution for development
 - **pnpm**: Fast, efficient package manager
 - **Drizzle Kit**: Database migrations
 
 ### Monitoring Tools
+
 - **pnpm outdated**: Check for dependency updates
 - **du**: Check bundle sizes
 - **Vite bundle analyzer**: Frontend bundle analysis

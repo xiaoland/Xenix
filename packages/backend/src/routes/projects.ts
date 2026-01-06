@@ -1,20 +1,23 @@
-import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
-import { db, schema } from "../database/index.js";
-import { desc, eq } from "drizzle-orm";
-import { authMiddleware, requireAuth } from "../middleware/auth.js";
-import { CreateProjectSchema, UpdateProjectSchema } from "@xenix/shared";
+import { desc, eq } from 'drizzle-orm';
+
+import { zValidator } from '@hono/zod-validator';
+import { Hono } from 'hono';
+
+import { CreateProjectSchema, UpdateProjectSchema } from '@xenix/shared';
+
+import { db, schema } from '../database/index.js';
 import {
-  NotFoundError,
   BadRequestError,
   ForbiddenError,
-} from "../errors/index.js";
+  NotFoundError,
+} from '../errors/index.js';
+import { authMiddleware, requireAuth } from '../middleware/auth.js';
 
 const projects = new Hono()
-  .use("*", authMiddleware)
+  .use('*', authMiddleware)
 
   // Get all projects - returns array directly (HTTP semantics)
-  .get("/", async (c) => {
+  .get('/', async (c) => {
     const user = requireAuth(c);
 
     // Fetch projects created by the current user
@@ -50,9 +53,9 @@ const projects = new Hono()
   })
 
   // Create project - returns created project directly (HTTP semantics)
-  .post("/", zValidator("json", CreateProjectSchema), async (c) => {
+  .post('/', zValidator('json', CreateProjectSchema), async (c) => {
     const user = requireAuth(c);
-    const { name, description } = c.req.valid("json");
+    const { name, description } = c.req.valid('json');
 
     // Create project record
     const result = await db
@@ -60,7 +63,7 @@ const projects = new Hono()
       .values({
         name,
         description: description || null,
-        status: "active",
+        status: 'active',
         createdBy: user.id,
       })
       .returning();
@@ -72,12 +75,12 @@ const projects = new Hono()
   })
 
   // Get single project - returns project directly (HTTP semantics)
-  .get("/:id", async (c) => {
+  .get('/:id', async (c) => {
     const user = requireAuth(c);
-    const id = parseInt(c.req.param("id"));
+    const id = parseInt(c.req.param('id'));
 
     if (isNaN(id)) {
-      throw new BadRequestError("Invalid project ID");
+      throw new BadRequestError('Invalid project ID');
     }
 
     const [project] = await db
@@ -87,12 +90,12 @@ const projects = new Hono()
       .limit(1);
 
     if (!project) {
-      throw new NotFoundError("Project");
+      throw new NotFoundError('Project');
     }
 
     // Verify ownership
     if (project.createdBy !== user.id) {
-      throw new ForbiddenError("Access denied to this project");
+      throw new ForbiddenError('Access denied to this project');
     }
 
     // Fetch related work items and datasets
@@ -115,13 +118,13 @@ const projects = new Hono()
   })
 
   // Update project - returns updated project directly (HTTP semantics)
-  .put("/:id", zValidator("json", UpdateProjectSchema), async (c) => {
+  .put('/:id', zValidator('json', UpdateProjectSchema), async (c) => {
     const user = requireAuth(c);
-    const id = parseInt(c.req.param("id"));
-    const updates = c.req.valid("json");
+    const id = parseInt(c.req.param('id'));
+    const updates = c.req.valid('json');
 
     if (isNaN(id)) {
-      throw new BadRequestError("Invalid project ID");
+      throw new BadRequestError('Invalid project ID');
     }
 
     // Check ownership
@@ -132,11 +135,11 @@ const projects = new Hono()
       .limit(1);
 
     if (!existingProject) {
-      throw new NotFoundError("Project");
+      throw new NotFoundError('Project');
     }
 
     if (existingProject.createdBy !== user.id) {
-      throw new ForbiddenError("Access denied to this project");
+      throw new ForbiddenError('Access denied to this project');
     }
 
     // Update project
@@ -154,12 +157,12 @@ const projects = new Hono()
   })
 
   // Delete project - returns 204 No Content (HTTP semantics)
-  .delete("/:id", async (c) => {
+  .delete('/:id', async (c) => {
     const user = requireAuth(c);
-    const id = parseInt(c.req.param("id"));
+    const id = parseInt(c.req.param('id'));
 
     if (isNaN(id)) {
-      throw new BadRequestError("Invalid project ID");
+      throw new BadRequestError('Invalid project ID');
     }
 
     // Check ownership
@@ -170,11 +173,11 @@ const projects = new Hono()
       .limit(1);
 
     if (!existingProject) {
-      throw new NotFoundError("Project");
+      throw new NotFoundError('Project');
     }
 
     if (existingProject.createdBy !== user.id) {
-      throw new ForbiddenError("Access denied to this project");
+      throw new ForbiddenError('Access denied to this project');
     }
 
     // Delete project

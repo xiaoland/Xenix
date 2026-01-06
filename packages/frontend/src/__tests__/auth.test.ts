@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { setActivePinia, createPinia } from 'pinia';
+import { createPinia, setActivePinia } from 'pinia';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { useAuthStore } from '../stores/auth';
 
 // Mock router
@@ -49,7 +50,7 @@ describe('Auth Store', () => {
 
     it('should load token from localStorage on initialization', () => {
       localStorage.setItem('auth_token', 'test-token');
-      
+
       const authStore = useAuthStore();
 
       expect(authStore.token).toBe('test-token');
@@ -60,7 +61,10 @@ describe('Auth Store', () => {
   describe('logout', () => {
     it('should clear token and user data', () => {
       localStorage.setItem('auth_token', 'test-token');
-      localStorage.setItem('auth_user', JSON.stringify({ id: '1', email: 'test@test.com' }));
+      localStorage.setItem(
+        'auth_user',
+        JSON.stringify({ id: '1', email: 'test@test.com' })
+      );
 
       const authStore = useAuthStore();
       authStore.logout();
@@ -85,7 +89,7 @@ describe('Auth Store', () => {
   describe('isAuthenticated computed', () => {
     it('should return true when token exists', () => {
       localStorage.setItem('auth_token', 'test-token');
-      
+
       const authStore = useAuthStore();
 
       expect(authStore.isAuthenticated).toBe(true);

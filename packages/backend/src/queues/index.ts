@@ -2,8 +2,8 @@
  * Queue Configuration
  * Centralized Redis connection and queue setup
  */
-
 import { Queue, QueueEvents } from 'bullmq';
+
 import { config } from '../config/index.js';
 import logger from '../utils/logger/index.js';
 

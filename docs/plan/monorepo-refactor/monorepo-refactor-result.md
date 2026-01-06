@@ -35,13 +35,13 @@ Xenix, a Machine Learning Model Training and Prediction Platform, has been succe
 
 ## Architecture Transformation
 
-| Aspect | Before (Nuxt Monolith) | After (Monorepo) |
-|--------|----------------------|------------------|
-| **Build Time** | 30-60 seconds | 5-10 seconds (6x faster) |
-| **Deployment** | Single deploy | Independent services |
-| **Development** | Coupled stack | Decoupled packages |
-| **Scalability** | Limited | Flexible microservices |
-| **Type Safety** | Partial | End-to-end |
+| Aspect          | Before (Nuxt Monolith) | After (Monorepo)         |
+| --------------- | ---------------------- | ------------------------ |
+| **Build Time**  | 30-60 seconds          | 5-10 seconds (6x faster) |
+| **Deployment**  | Single deploy          | Independent services     |
+| **Development** | Coupled stack          | Decoupled packages       |
+| **Scalability** | Limited                | Flexible microservices   |
+| **Type Safety** | Partial                | End-to-end               |
 
 ## Key Benefits Achieved
 

@@ -1,16 +1,16 @@
-import path from "path";
-import { executePythonTask } from "../../utils/pythonExecutor";
+import path from 'path';
 
+import { executePythonTask } from '../../utils/pythonExecutor';
 import {
   AutoTuneOptions,
   ManualTuneOptions,
-  PredictOptions,
   PredictFileOptions,
   PredictInlineOptions,
-} from "./types";
+  PredictOptions,
+} from './types';
 
 // Constants for ML script paths
-const ML_MODELS_DIR = path.join("src", "business", "ml");
+const ML_MODELS_DIR = path.join('src', 'business', 'ml');
 
 /**
  * Helper function to get script path
@@ -47,7 +47,7 @@ export async function autoTune(options: AutoTuneOptions): Promise<void> {
 
   // Execute Python task with auto_tune_model.py
   await executePythonTask({
-    script: getScriptPath("auto_tune_model.py"),
+    script: getScriptPath('auto_tune_model.py'),
     stdinData,
     taskId,
     cwd: getWorkingDirectory(),
@@ -83,7 +83,7 @@ export async function manualTune(options: ManualTuneOptions): Promise<void> {
 
   // Execute Python task with manual_tune_model.py
   await executePythonTask({
-    script: getScriptPath("manual_tune_model.py"),
+    script: getScriptPath('manual_tune_model.py'),
     stdinData,
     taskId,
     cwd: getWorkingDirectory(),
@@ -121,7 +121,7 @@ export async function predict(options: PredictOptions): Promise<void> {
 
   // Execute Python task
   await executePythonTask({
-    script: getScriptPath("predict.py"),
+    script: getScriptPath('predict.py'),
     stdinData,
     taskId,
     cwd: getWorkingDirectory(),
@@ -159,7 +159,7 @@ export async function predictFile(options: PredictFileOptions): Promise<void> {
 
   // Execute Python task with predict_on_file.py
   await executePythonTask({
-    script: getScriptPath("predict_on_file.py"),
+    script: getScriptPath('predict_on_file.py'),
     stdinData,
     taskId,
     cwd: getWorkingDirectory(),
@@ -199,7 +199,7 @@ export async function predictInline(
 
   // Execute Python task with predict_on_json.py
   await executePythonTask({
-    script: getScriptPath("predict_on_json.py"),
+    script: getScriptPath('predict_on_json.py'),
     stdinData,
     taskId,
     cwd: getWorkingDirectory(),
@@ -211,17 +211,17 @@ export async function predictInline(
  */
 export function getAvailableModels(): string[] {
   return [
-    "regression.linear_regression_hyperparameter_tuning",
-    "regression.ridge",
-    "regression.lasso",
-    "regression.bayesian_ridge_regression",
-    "regression.k_nearest_neighbors",
-    "regression.regression_decision_tree",
-    "regression.random_forest",
-    "regression.gbdt",
-    "regression.adaboost",
-    "regression.xgboost",
-    "regression.lightgbm",
-    "regression.polynomial_regression",
+    'regression.linear_regression_hyperparameter_tuning',
+    'regression.ridge',
+    'regression.lasso',
+    'regression.bayesian_ridge_regression',
+    'regression.k_nearest_neighbors',
+    'regression.regression_decision_tree',
+    'regression.random_forest',
+    'regression.gbdt',
+    'regression.adaboost',
+    'regression.xgboost',
+    'regression.lightgbm',
+    'regression.polynomial_regression',
   ];
 }

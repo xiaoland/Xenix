@@ -177,11 +177,11 @@ const handleDelete = (id: number) => {
     onOk: () => {
       deleteDataset(id, {
         onSuccess: () => {
-          message.success("Dataset deleted successfully");
+          message.success('Dataset deleted successfully');
         },
-        onError: (error: any) => {
-          console.error("Failed to delete dataset:", error);
-          message.error("Failed to delete dataset");
+        onError: (err: any) => {
+          console.error('Failed to delete dataset:', err);
+          message.error('Failed to delete dataset');
         },
       });
     },
