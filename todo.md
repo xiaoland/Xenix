@@ -43,3 +43,5 @@
   - [ ] ColumnSelector 用回之前的样子
   - [ ] 我还要日志预览
   - [ ] 修复Dataset上传：Dataset upload error: TypeError: Content-Type was not one of "multipart/form-data" or "application/x-www-form-urlencoded"
+  - [ ] 没有应用 RFC 7807 Problem Details for HTTP APIs
+  - [ ] 增加更多的数据库约束（比如 work_items.dataset_id -> datasets.id)

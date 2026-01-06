@@ -66,7 +66,7 @@
             <div v-if="currentStep === 1">
               <tuning-step
                 :work-item-id="workItem.id"
-                :dataset-id="workItem.datasetId?.toString() || ''"
+                :dataset-id="workItem.datasetId || 0"
                 :feature-columns="workItem.featureColumns || []"
                 :target-column="workItem.targetColumn || ''"
                 @continue="handleTuningContinue"

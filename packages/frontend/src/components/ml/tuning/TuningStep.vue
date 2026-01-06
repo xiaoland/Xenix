@@ -137,7 +137,7 @@ import type { Task } from "@xenix/shared";
 
 const props = defineProps<{
   workItemId: number;
-  datasetId: string;
+  datasetId: number | null;
   featureColumns: string[];
   targetColumn: string;
 }>();
@@ -207,8 +207,8 @@ const handleStartAutoTune = async () => {
       const response = await client.tune["auto-tune"].$post({
         json: {
           datasetId: props.datasetId,
-          features: props.featureColumns,
-          target: props.targetColumn,
+          featureColumns: props.featureColumns,
+          targetColumn: props.targetColumn,
           model,
           workItemId: props.workItemId,
         },
