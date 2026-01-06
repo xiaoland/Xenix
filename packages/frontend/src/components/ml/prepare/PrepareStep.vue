@@ -66,11 +66,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import { message } from 'ant-design-vue';
 import DatasetSelector from '../../dataset/DatasetSelector.vue';
 import ColumnSelector from './ColumnSelector.vue';
-import { WorkItemService, DatasetService } from '../../../services';
+import { useUpdateWorkItem } from '../../../composables';
 
 interface WorkItem {
   id: number;
@@ -99,7 +99,9 @@ const selectedDatasetName = ref<string>('');
 const datasetColumns = ref<string[]>([]);
 const featureColumns = ref<string[]>(props.workItem.featureColumns || []);
 const targetColumn = ref<string | undefined>(props.workItem.targetColumn);
-const saving = ref(false);
+
+// Use composable for updating work item
+const { mutate: updateWorkItem, isPending: saving } = useUpdateWorkItem();
 
 const canConfirm = computed(() => {
   return (
@@ -127,7 +129,31 @@ const changeDataset = () => {
   targetColumn.value = undefined;
 };
 
-const handleConfirm = async () => {
+const handleConfirm = () => {
+  if (!canConfirm.value) return;
+
+  updateWorkItem(
+    {
+      id: props.workItem.id,
+      updates: {
+        datasetId: selectedDatasetId.value,
+        featureColumns: featureColumns.value,
+        targetColumn: targetColumn.value,
+      },
+    },
+    {
+      onSuccess: () => {
+        message.success('Dataset configuration saved successfully');
+        emit('confirm');
+      },
+      onError: (error: any) => {
+        console.error('Failed to save configuration:', error);
+        message.error('Failed to save configuration');
+      }
+    }
+  );
+};
+</script>
   if (!canConfirm.value) return;
 
   saving.value = true;

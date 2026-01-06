@@ -119,7 +119,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 import { message } from 'ant-design-vue';
-import { TuneService, TaskService, WorkItemService } from '../../../services';
+import { client } from '../../../api/client';
 import { AVAILABLE_MODELS } from '../../../constants/models';
 import type { TaskInfo } from '@xenix/shared';
 
@@ -165,8 +165,16 @@ let pollInterval: number | null = null;
 const fetchTasks = async () => {
   loading.value = true;
   try {
-    const response = await TaskService.fetchByWorkItemId(props.workItemId, ['auto-tune', 'manual-tune']);
-    tasks.value = response.tasks || [];
+    const response = await client.api.tasks.$get({
+      query: {
+        workItemId: String(props.workItemId),
+        types: 'auto-tune,manual-tune',
+      },
+    });
+    if (response.ok) {
+      const data = await response.json();
+      tasks.value = data.tasks || [];
+    }
   } catch (error) {
     console.error('Failed to fetch tasks:', error);
   } finally {

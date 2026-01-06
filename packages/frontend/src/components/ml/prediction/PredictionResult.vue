@@ -71,7 +71,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { message } from 'ant-design-vue';
-import { TaskService } from '../../../services';
+import { client } from '../../../api/client';
 import type { TaskInfo } from '@xenix/shared';
 
 const props = defineProps<{

@@ -153,7 +153,7 @@
 import { ref, computed } from 'vue';
 import { message } from 'ant-design-vue';
 import type { UploadProps } from 'ant-design-vue';
-import { PredictionService } from '../../../services';
+import { client } from '../../../api/client';
 import { AVAILABLE_MODELS } from '../../../constants/models';
 import PredictionResult from './PredictionResult.vue';
 

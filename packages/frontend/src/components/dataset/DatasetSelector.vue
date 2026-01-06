@@ -46,9 +46,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import { message } from 'ant-design-vue';
-import { DatasetService } from '../../services';
+import { useDatasets } from '../../composables';
 
 interface Dataset {
   id: number;
@@ -66,31 +66,19 @@ const emit = defineEmits<{
   select: [dataset: Dataset];
 }>();
 
-const datasets = ref<Dataset[]>([]);
-const loading = ref(false);
+// Use composable for data fetching
+const { data: datasetsData, isLoading: loading, error } = useDatasets();
+const datasets = computed(() => datasetsData.value || []);
+
 const selectedId = ref<number | null>(null);
 
-const fetchDatasets = async () => {
-  loading.value = true;
-  try {
-    const response = await DatasetService.listByProject(props.projectId);
-    if (response.success && response.datasets) {
-      datasets.value = response.datasets;
-    }
-  } catch (err) {
-    console.error('Failed to fetch datasets:', err);
-    message.error('Failed to load datasets');
-  } finally {
-    loading.value = false;
-  }
-};
+// Handle errors
+if (error.value) {
+  message.error('Failed to load datasets');
+}
 
 const handleSelect = (dataset: Dataset) => {
   selectedId.value = dataset.id;
   emit('select', dataset);
 };
-
-onMounted(() => {
-  fetchDatasets();
-});
 </script>

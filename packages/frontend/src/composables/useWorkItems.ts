@@ -1,70 +1,44 @@
 /**
  * Work Items Composable
- * Uses TanStack Query for data fetching and caching
+ * Uses TanStack Query with Hono RPC client for type-safe data fetching
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
-import { useAuthStore } from '../stores/auth';
+import { client } from '../api/client';
 import type { WorkItem } from '@xenix/shared';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-
 export function useWorkItems() {
-  const authStore = useAuthStore();
-
   return useQuery({
     queryKey: ['work-items'],
-    queryFn: async (): Promise<WorkItem[]> => {
-      const response = await fetch(`${API_URL}/api/work-items`, {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authStore.token}`,
-        },
-      });
-
+    queryFn: async () => {
+      const response = await client.api['work-items'].$get();
       if (!response.ok) {
-        if (response.status === 401) {
-          authStore.logout();
-        }
         throw new Error('Failed to fetch work items');
       }
-
       const data = await response.json();
       return data.workItems || [];
     },
-    enabled: authStore.isAuthenticated,
   });
 }
 
 export function useWorkItem(id: number | string) {
-  const authStore = useAuthStore();
-
   return useQuery({
     queryKey: ['work-item', id],
-    queryFn: async (): Promise<WorkItem> => {
-      const response = await fetch(`${API_URL}/api/work-items/${id}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authStore.token}`,
-        },
+    queryFn: async () => {
+      const response = await client.api['work-items'][':id'].$get({
+        param: { id: String(id) },
       });
-
       if (!response.ok) {
-        if (response.status === 401) {
-          authStore.logout();
-        }
         throw new Error('Failed to fetch work item');
       }
-
       const data = await response.json();
       return data.workItem;
     },
-    enabled: authStore.isAuthenticated && !!id,
+    enabled: !!id,
   });
 }
 
 export function useCreateWorkItem() {
-  const authStore = useAuthStore();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -72,23 +46,13 @@ export function useCreateWorkItem() {
       projectId: number;
       name: string;
       description?: string;
-    }): Promise<WorkItem> => {
-      const response = await fetch(`${API_URL}/api/work-items`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authStore.token}`,
-        },
-        body: JSON.stringify(workItem),
+    }) => {
+      const response = await client.api['work-items'].$post({
+        json: workItem,
       });
-
       if (!response.ok) {
-        if (response.status === 401) {
-          authStore.logout();
-        }
         throw new Error('Failed to create work item');
       }
-
       const data = await response.json();
       return data.workItem;
     },
@@ -100,7 +64,6 @@ export function useCreateWorkItem() {
 }
 
 export function useUpdateWorkItem() {
-  const authStore = useAuthStore();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -110,23 +73,14 @@ export function useUpdateWorkItem() {
     }: {
       id: number | string;
       updates: Partial<WorkItem>;
-    }): Promise<WorkItem> => {
-      const response = await fetch(`${API_URL}/api/work-items/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authStore.token}`,
-        },
-        body: JSON.stringify(updates),
+    }) => {
+      const response = await client.api['work-items'][':id'].$put({
+        param: { id: String(id) },
+        json: updates,
       });
-
       if (!response.ok) {
-        if (response.status === 401) {
-          authStore.logout();
-        }
         throw new Error('Failed to update work item');
       }
-
       const data = await response.json();
       return data.workItem;
     },
@@ -138,23 +92,14 @@ export function useUpdateWorkItem() {
 }
 
 export function useDeleteWorkItem() {
-  const authStore = useAuthStore();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: number | string): Promise<void> => {
-      const response = await fetch(`${API_URL}/api/work-items/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authStore.token}`,
-        },
+    mutationFn: async (id: number | string) => {
+      const response = await client.api['work-items'][':id'].$delete({
+        param: { id: String(id) },
       });
-
       if (!response.ok) {
-        if (response.status === 401) {
-          authStore.logout();
-        }
         throw new Error('Failed to delete work item');
       }
     },
