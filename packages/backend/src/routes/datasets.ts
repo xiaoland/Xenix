@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
 import { db, schema } from "../database/index.js";
 import { desc, eq } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
@@ -11,6 +12,7 @@ import {
   NotFoundError,
   BadRequestError,
 } from "../errors/index.js";
+import { DatasetIdParamSchema } from "@xenix/shared";
 import logger from "../utils/logger/index.js";
 import path from "path";
 import fs from "fs/promises";
@@ -94,12 +96,9 @@ const datasets = new Hono()
   })
 
   // Get single dataset
-  .get("/:id", async (c) => {
-    const id = parseInt(c.req.param("id"));
-
-    if (isNaN(id)) {
-      throw new BadRequestError("Invalid dataset ID");
-    }
+  .get("/:id", zValidator("param", DatasetIdParamSchema), async (c) => {
+    const { id: idStr } = c.req.valid("param");
+    const id = parseInt(idStr);
 
     // Fetch dataset by ID
     const [dataset] = await db
@@ -122,12 +121,9 @@ const datasets = new Hono()
   })
 
   // Delete dataset
-  .delete("/:id", async (c) => {
-    const id = parseInt(c.req.param("id"));
-
-    if (isNaN(id)) {
-      throw new BadRequestError("Invalid dataset ID");
-    }
+  .delete("/:id", zValidator("param", DatasetIdParamSchema), async (c) => {
+    const { id: idStr } = c.req.valid("param");
+    const id = parseInt(idStr);
 
     // Fetch dataset by ID
     const [dataset] = await db

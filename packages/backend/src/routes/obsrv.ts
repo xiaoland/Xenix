@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
 import { db, schema } from "../database/index.js";
 import { eq, desc } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
@@ -6,20 +7,16 @@ import { generateTraceId } from "../utils/taskUtils.js";
 import {
   BadRequestError,
 } from "../errors/index.js";
+import { TaskIdParamSchema } from "@xenix/shared";
 import logger from "../utils/logger/index.js";
 
 const obsrv = new Hono()
   .use("*", authMiddleware)
 
   // Get task observation logs
-  .get("/:id", async (c) => {
-    const id = c.req.param("id");
-
-    if (!id) {
-      throw new BadRequestError("Task ID is required");
-    }
-
-    const taskId = parseInt(id);
+  .get("/:id", zValidator("param", TaskIdParamSchema), async (c) => {
+    const { id: idStr } = c.req.valid("param");
+    const taskId = parseInt(idStr);
     const traceId = generateTraceId(taskId);
 
     // Get logs for this task (using trace_id format: task.{id})

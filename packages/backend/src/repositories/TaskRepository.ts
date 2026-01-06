@@ -5,7 +5,7 @@
 
 import { BaseRepository } from './BaseRepository.js';
 import { db, schema } from '../database/index.js';
-import { eq, inArray, and } from 'drizzle-orm';
+import { eq, inArray, and, sql } from 'drizzle-orm';
 
 type Task = typeof schema.tasks.$inferSelect;
 
@@ -44,5 +44,27 @@ export class TaskRepository extends BaseRepository<Task> {
       status: 'running',
       startedAt: new Date(),
     });
+  }
+
+  async deleteFailedByWorkItem(workItemId: number) {
+    return await db
+      .delete(schema.tasks)
+      .where(
+        and(
+          eq(schema.tasks.workItemId, workItemId),
+          eq(schema.tasks.status, 'failed')
+        )
+      );
+  }
+
+  async deleteByModel(workItemId: number, model: string) {
+    return await db
+      .delete(schema.tasks)
+      .where(
+        and(
+          eq(schema.tasks.workItemId, workItemId),
+          sql`${schema.tasks.parameter} ->> 'model' = ${model}`
+        )
+      );
   }
 }

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
 import { db, schema } from "../database/index.js";
 import { eq } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
@@ -7,6 +8,7 @@ import {
   NotFoundError,
   BadRequestError,
 } from "../errors/index.js";
+import { ModelIdParamSchema } from "@xenix/shared";
 import logger from "../utils/logger/index.js";
 
 const models = new Hono()
@@ -19,12 +21,8 @@ const models = new Hono()
   })
 
   // Get single model by name
-  .get("/:id", async (c) => {
-    const id = c.req.param("id");
-
-    if (!id) {
-      throw new BadRequestError("Model name is required");
-    }
+  .get("/:id", zValidator("param", ModelIdParamSchema), async (c) => {
+    const { id } = c.req.valid("param");
 
     const [model] = await db
       .select()

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
 import { db, schema } from "../database/index.js";
 import { eq } from "drizzle-orm";
 import { authMiddleware } from "../middleware/auth.js";
@@ -8,20 +9,16 @@ import {
   NotFoundError,
   BadRequestError,
 } from "../errors/index.js";
+import { TaskIdParamSchema } from "@xenix/shared";
 import logger from "../utils/logger/index.js";
 
 const download = new Hono()
   .use("*", authMiddleware)
 
   // Download prediction result file
-  .get("/:id", async (c) => {
-    const id = c.req.param("id");
-
-    if (!id) {
-      throw new BadRequestError("Task ID is required");
-    }
-
-    const taskId = parseInt(id);
+  .get("/:id", zValidator("param", TaskIdParamSchema), async (c) => {
+    const { id: idStr } = c.req.valid("param");
+    const taskId = parseInt(idStr);
 
     // Get task info
     const [task] = await db

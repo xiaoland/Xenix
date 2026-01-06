@@ -1,6 +1,5 @@
 import path from "path";
 import { executePythonTask } from "../../utils/pythonExecutor";
-import { getInitPromise } from "./env";
 
 import {
   AutoTuneOptions,
@@ -29,15 +28,11 @@ function getWorkingDirectory(): string {
 
 /**
  * High-level function to auto-tune a machine learning model
- * Automatically ensures Python environment is ready before execution
  *
  * @param options - Auto-tuning configuration options
  * @returns Promise that resolves when auto-tuning task is started
  */
 export async function autoTune(options: AutoTuneOptions): Promise<void> {
-  // Ensure environment is ready (with proper mutex to prevent race conditions)
-  await getInitPromise();
-
   const { inputFile, model, featureColumns, targetColumn, taskId, paramGrid } =
     options;
 
@@ -61,15 +56,11 @@ export async function autoTune(options: AutoTuneOptions): Promise<void> {
 
 /**
  * High-level function to manually tune a machine learning model with specific parameters
- * Automatically ensures Python environment is ready before execution
  *
  * @param options - Manual tuning configuration options
  * @returns Promise that resolves when manual tuning task is started
  */
 export async function manualTune(options: ManualTuneOptions): Promise<void> {
-  // Ensure environment is ready (with proper mutex to prevent race conditions)
-  await getInitPromise();
-
   const {
     inputFile,
     model,
@@ -101,15 +92,11 @@ export async function manualTune(options: ManualTuneOptions): Promise<void> {
 
 /**
  * High-level function to make predictions using a trained model
- * Automatically ensures Python environment is ready before execution
  *
  * @param options - Prediction configuration options
  * @returns Promise that resolves when prediction task is started
  */
 export async function predict(options: PredictOptions): Promise<void> {
-  // Ensure environment is ready (with proper mutex to prevent race conditions)
-  await getInitPromise();
-
   const {
     trainingDataPath,
     predictionDataPath,
@@ -143,15 +130,11 @@ export async function predict(options: PredictOptions): Promise<void> {
 
 /**
  * High-level function to make predictions using a trained model with file-based input
- * Automatically ensures Python environment is ready before execution
  *
  * @param options - File-based prediction configuration options
  * @returns Promise that resolves when prediction task is started
  */
 export async function predictFile(options: PredictFileOptions): Promise<void> {
-  // Ensure environment is ready (with proper mutex to prevent race conditions)
-  await getInitPromise();
-
   const {
     trainingDataPath,
     predictionDataPath,
@@ -185,7 +168,6 @@ export async function predictFile(options: PredictFileOptions): Promise<void> {
 
 /**
  * High-level function to make predictions using a trained model with inline JSON data
- * Automatically ensures Python environment is ready before execution
  *
  * @param options - Inline prediction configuration options
  * @returns Promise that resolves when prediction task is started
@@ -193,9 +175,6 @@ export async function predictFile(options: PredictFileOptions): Promise<void> {
 export async function predictInline(
   options: PredictInlineOptions
 ): Promise<void> {
-  // Ensure environment is ready (with proper mutex to prevent race conditions)
-  await getInitPromise();
-
   const {
     trainingDataPath,
     predictionData,
@@ -246,10 +225,3 @@ export function getAvailableModels(): string[] {
     "regression.polynomial_regression",
   ];
 }
-
-// Re-export environment functions
-export {
-  getPythonEnvStatus,
-  setupEnvironment,
-  reinstallEnvironment,
-} from "./env";
