@@ -38,3 +38,8 @@
   - [x] 添加 users 表
   - [x] CSR
   - [ ] remove AVAILABLE_MODELS constant, use api
+- [ ] 超级重构
+  - [ ] UploadDataset 要支持 Drag
+  - [ ] ColumnSelector 用回之前的样子
+  - [ ] 我还要日志预览
+  - [ ] 修复Dataset上传：Dataset upload error: TypeError: Content-Type was not one of "multipart/form-data" or "application/x-www-form-urlencoded"
