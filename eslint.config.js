@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import tsParser from '@typescript-eslint/parser';
+import vueI18nPlugin from '@intlify/eslint-plugin-vue-i18n';
 import vuePlugin from 'eslint-plugin-vue';
 
 import vueParser from 'vue-eslint-parser';
@@ -104,6 +105,23 @@ export default [
       'vue/attributes-order': 'warn',
       'vue/html-indent': 'off',
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+    },
+  },
+
+  // Vue i18n config for frontend
+  ...vueI18nPlugin.configs['flat/recommended'],
+  {
+    files: ['packages/frontend/**/*.vue', 'packages/frontend/**/*.ts'],
+    rules: {
+      '@intlify/vue-i18n/no-raw-text': 'off', // Can be enabled later for stricter enforcement
+      '@intlify/vue-i18n/no-unused-keys': 'warn',
+      '@intlify/vue-i18n/no-missing-keys': 'warn',
+    },
+    settings: {
+      'vue-i18n': {
+        localeDir: './packages/frontend/src/locales/*.json',
+        messageSyntaxVersion: '^11.0.0',
+      },
     },
   },
 ];

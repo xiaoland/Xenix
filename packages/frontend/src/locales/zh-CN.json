@@ -6,6 +6,7 @@
   "navigation": {
     "home": "首页",
     "projects": "项目",
+    "tasks": "任务",
     "pythonEnv": "Python环境"
   },
   "home": {
