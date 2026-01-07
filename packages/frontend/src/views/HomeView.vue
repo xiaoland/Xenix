@@ -2,29 +2,31 @@
   <default-layout>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-8">
-        <h1 class="text-4xl font-bold text-gray-900 mb-2">Welcome to Xenix</h1>
+        <h1 class="text-4xl font-bold text-gray-900 mb-2">
+          {{ $t('home.title') }}
+        </h1>
         <p class="text-lg text-gray-600">
-          Machine Learning Model Training Platform
+          {{ $t('home.subtitle') }}
         </p>
       </div>
 
       <a-card class="mb-6">
         <div class="flex justify-between items-center mb-4">
-          <h2 class="text-2xl font-semibold">Projects</h2>
+          <h2 class="text-2xl font-semibold">{{ $t('home.projects') }}</h2>
           <a-button
             type="primary"
             class="inline-flex items-center"
             @click="showCreateModal = true"
           >
             <span class="i-mdi-plus mr-1" />
-            Create Project
+            {{ $t('home.createProject') }}
           </a-button>
         </div>
 
         <a-spin :spinning="isLoading">
           <a-empty
             v-if="projects.length === 0 && !isLoading"
-            description="No projects yet. Create your first project to get started!"
+            :description="$t('home.noProjects')"
           />
 
           <div v-else class="space-y-4">
@@ -44,14 +46,14 @@
       <!-- Create Project Modal -->
       <project-form-modal
         v-model:open="showCreateModal"
-        title="Create New Project"
+        :title="$t('projects.createNew')"
         @submit="handleCreate"
       />
 
       <!-- Edit Project Modal -->
       <project-form-modal
         v-model:open="showEditModal"
-        title="Edit Project"
+        :title="$t('projects.editProject')"
         :initial-values="editingProject"
         :show-status="true"
         @submit="handleUpdate"
@@ -64,6 +66,7 @@
 import { message } from 'ant-design-vue';
 
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 
 import type { Project } from '@xenix/shared';
@@ -79,6 +82,7 @@ import {
 import DefaultLayout from '../layouts/DefaultLayout.vue';
 
 const router = useRouter();
+const { t } = useI18n();
 
 // Use composables for data fetching
 const { data: projectsData, isLoading, error } = useProjects();
@@ -96,12 +100,12 @@ const editingProject = ref<Partial<Project>>({});
 const handleCreate = (values: { name: string; description?: string }) => {
   createProject(values, {
     onSuccess: () => {
-      message.success('Project created successfully');
+      message.success(t('projects.createSuccess'));
       showCreateModal.value = false;
     },
     onError: (error: any) => {
       console.error('Failed to create project:', error);
-      message.error('Failed to create project');
+      message.error(t('projects.createError'));
     },
   });
 };
@@ -118,12 +122,12 @@ const handleUpdate = (values: any) => {
     { id: editingProject.value.id, updates: values },
     {
       onSuccess: () => {
-        message.success('Project updated successfully');
+        message.success(t('projects.updateSuccess'));
         showEditModal.value = false;
       },
       onError: (error: any) => {
         console.error('Failed to update project:', error);
-        message.error('Failed to update project');
+        message.error(t('projects.updateError'));
       },
     }
   );
@@ -132,11 +136,11 @@ const handleUpdate = (values: any) => {
 const handleDelete = (projectId: number) => {
   deleteProject(projectId, {
     onSuccess: () => {
-      message.success('Project deleted successfully');
+      message.success(t('projects.deleteSuccess'));
     },
     onError: (error: any) => {
       console.error('Failed to delete project:', error);
-      message.error('Failed to delete project');
+      message.error(t('projects.deleteError'));
     },
   });
 };

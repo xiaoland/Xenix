@@ -62,6 +62,7 @@ uploads/
 !drizzle.config.ts
 !i18n/locales/*.json
 !packages/frontend/src/locales/*.json
+!packages/frontend/public/locales/*.json
 *_Params.json
 Model_Comparison_*.xlsx
 output.xlsx

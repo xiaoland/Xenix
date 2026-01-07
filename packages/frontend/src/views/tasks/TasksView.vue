@@ -2,9 +2,9 @@
   <default-layout>
     <div class="max-w-7xl mx-auto px-4 py-8">
       <div class="mb-6">
-        <h1 class="text-3xl font-bold mb-2">Task Monitor</h1>
+        <h1 class="text-3xl font-bold mb-2">{{ $t("tasks.title") }}</h1>
         <p class="text-gray-600">
-          Monitor all background tasks across your projects
+          {{ $t("tasks.subtitle") }}
         </p>
       </div>
 
@@ -12,39 +12,51 @@
       <a-card class="mb-6">
         <div class="flex gap-4 items-end flex-wrap">
           <div class="flex-1 min-w-[200px]">
-            <label class="block text-sm font-medium text-gray-700 mb-2"
-              >Status</label
-            >
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{
+              $t("tasks.status")
+            }}</label>
             <a-select
               v-model:value="statusFilter"
               style="width: 100%"
               @change="fetchTasks"
             >
-              <a-select-option value="">All</a-select-option>
-              <a-select-option value="pending">Pending</a-select-option>
-              <a-select-option value="running">Running</a-select-option>
-              <a-select-option value="completed">Completed</a-select-option>
-              <a-select-option value="failed">Failed</a-select-option>
+              <a-select-option value="">{{ $t("tasks.all") }}</a-select-option>
+              <a-select-option value="pending">{{
+                $t("tasks.pending")
+              }}</a-select-option>
+              <a-select-option value="running">{{
+                $t("tasks.running")
+              }}</a-select-option>
+              <a-select-option value="completed">{{
+                $t("tasks.completed")
+              }}</a-select-option>
+              <a-select-option value="failed">{{
+                $t("tasks.failed")
+              }}</a-select-option>
             </a-select>
           </div>
 
           <div class="flex-1 min-w-[200px]">
-            <label class="block text-sm font-medium text-gray-700 mb-2"
-              >Type</label
-            >
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{
+              $t("tasks.type")
+            }}</label>
             <a-select
               v-model:value="typeFilter"
               style="width: 100%"
               @change="fetchTasks"
             >
-              <a-select-option value="">All</a-select-option>
-              <a-select-option value="auto-tune">Auto-Tune</a-select-option>
-              <a-select-option value="manual-tune">Manual-Tune</a-select-option>
+              <a-select-option value="">{{ $t("tasks.all") }}</a-select-option>
+              <a-select-option value="auto-tune">{{
+                $t("tasks.autoTune")
+              }}</a-select-option>
+              <a-select-option value="manual-tune">{{
+                $t("tasks.manualTune")
+              }}</a-select-option>
               <a-select-option value="predict-file">
-                Predict (File)
+                {{ $t("tasks.predictFile") }}
               </a-select-option>
               <a-select-option value="predict-inline">
-                Predict (Inline)
+                {{ $t("tasks.predictInline") }}
               </a-select-option>
             </a-select>
           </div>
@@ -55,7 +67,7 @@
             @click="fetchTasks"
           >
             <span class="i-mdi-refresh mr-1"></span>
-            Refresh
+            {{ $t("common.refresh") }}
           </a-button>
         </div>
       </a-card>
@@ -118,7 +130,7 @@
                 @click="viewLogs(record.id)"
               >
                 <span class="i-mdi-file-document-outline mr-1"></span>
-                Logs
+                {{ $t("logs.title") }}
               </a-button>
             </template>
           </template>
@@ -128,7 +140,7 @@
       <!-- Logs Modal -->
       <a-modal
         v-model:open="logsModalVisible"
-        title="Task Logs"
+        :title="$t('logs.title')"
         :footer="null"
         width="800px"
       >
@@ -156,13 +168,16 @@
 </template>
 
 <script setup lang="ts">
-import { message } from 'ant-design-vue';
+import { message } from "ant-design-vue";
 
-import { computed, ref } from 'vue';
+import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 
-import { useFormatters, useTasks } from '../../composables';
-import { AVAILABLE_MODELS } from '../../constants/models';
-import DefaultLayout from '../../layouts/DefaultLayout.vue';
+import { useFormatters, useTasks } from "../../composables";
+import { AVAILABLE_MODELS } from "../../constants/models";
+import DefaultLayout from "../../layouts/DefaultLayout.vue";
+
+const { t } = useI18n();
 
 const { formatDate } = useFormatters();
 
@@ -176,21 +191,21 @@ const tasks = computed(() => tasksData.value || []);
 const logs = ref<any[]>([]);
 const loadingLogs = ref(false);
 const logsModalVisible = ref(false);
-const statusFilter = ref('');
-const typeFilter = ref('');
+const statusFilter = ref("");
+const typeFilter = ref("");
 const currentPage = ref(1);
 
 const fetchTasks = refetch;
 
 // Table columns
 const columns = [
-  { title: 'ID', key: 'id', width: 80 },
-  { title: 'Type', key: 'type', width: 140 },
-  { title: 'Status', key: 'status', width: 120 },
-  { title: 'Model', key: 'model', width: 150 },
-  { title: 'Work Item', key: 'workItem', width: 150 },
-  { title: 'Created', key: 'createdAt', width: 180 },
-  { title: 'Action', key: 'action', width: 100 },
+  { title: t("tasks.id"), key: "id", width: 80 },
+  { title: t("tasks.type"), key: "type", width: 140 },
+  { title: t("tasks.status"), key: "status", width: 120 },
+  { title: t("tasks.model"), key: "model", width: 150 },
+  { title: t("tasks.workItem"), key: "workItem", width: 150 },
+  { title: t("tasks.created"), key: "createdAt", width: 180 },
+  { title: t("tasks.actions"), key: "action", width: 100 },
 ];
 
 /**
@@ -205,11 +220,11 @@ const viewLogs = async (_taskId: number) => {
   try {
     // Future: Implement backend GET /api/tasks/:id/logs endpoint
     // Future: Create useTaskLogs composable for data fetching
-    message.info('Logs feature requires backend implementation');
+    message.info("Logs feature requires backend implementation");
     logs.value = [];
   } catch (err: any) {
-    console.error('Failed to fetch logs:', err);
-    message.error(err.message || 'Failed to fetch logs');
+    console.error("Failed to fetch logs:", err);
+    message.error(err.message || "Failed to fetch logs");
     logs.value = [];
   } finally {
     loadingLogs.value = false;
@@ -221,16 +236,16 @@ const viewLogs = async (_taskId: number) => {
  */
 const getStatusColor = (status: string) => {
   switch (status) {
-    case 'completed':
-      return 'success';
-    case 'failed':
-      return 'error';
-    case 'running':
-      return 'processing';
-    case 'pending':
-      return 'default';
+    case "completed":
+      return "success";
+    case "failed":
+      return "error";
+    case "running":
+      return "processing";
+    case "pending":
+      return "default";
     default:
-      return 'default';
+      return "default";
   }
 };
 

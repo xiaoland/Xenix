@@ -5,30 +5,20 @@ import { createPinia } from 'pinia';
 import 'uno.css';
 
 import { createApp } from 'vue';
-import { createI18n } from 'vue-i18n';
 
 import App from './App.vue';
-// Import i18n messages
-import en from './locales/en.json';
-import zhCN from './locales/zh-CN.json';
+import i18n, { setupI18n } from './i18n';
 import router from './router/index.js';
 
-const i18n = createI18n({
-  legacy: false,
-  locale: 'en',
-  fallbackLocale: 'en',
-  messages: {
-    en,
-    'zh-CN': zhCN,
-  },
+// Setup i18n with lazy loading
+setupI18n().then(() => {
+  const app = createApp(App);
+
+  app.use(createPinia());
+  app.use(router);
+  app.use(Antd);
+  app.use(i18n);
+  app.use(VueQueryPlugin);
+
+  app.mount('#app');
 });
-
-const app = createApp(App);
-
-app.use(createPinia());
-app.use(router);
-app.use(Antd);
-app.use(i18n);
-app.use(VueQueryPlugin);
-
-app.mount('#app');

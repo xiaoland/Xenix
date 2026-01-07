@@ -2,8 +2,8 @@
   <div class="space-y-6">
     <!-- Info Alert -->
     <a-alert
-      message="Prepare Your Data"
-      description="Select a dataset and choose the feature columns and target column for your machine learning model."
+      :message="$t('components.ml.prepare.title')"
+      :description="$t('components.ml.prepare.description')"
       type="info"
       show-icon
       class="mb-4"
@@ -11,7 +11,9 @@
 
     <!-- Dataset Selection -->
     <div v-if="!selectedDatasetId">
-      <h3 class="text-lg font-semibold mb-4">Step 1: Select Dataset</h3>
+      <h3 class="text-lg font-semibold mb-4">
+        {{ $t("components.ml.prepare.step1") }}
+      </h3>
       <dataset-selector
         :project-id="workItem.projectId"
         @select="handleDatasetSelect"
@@ -20,7 +22,7 @@
         <router-link :to="'/projects/' + workItem.projectId + '/datasets'">
           <a-button type="default" class="inline-flex items-center">
             <span class="i-mdi-cloud-upload mr-2"></span>
-            Upload New Dataset
+            {{ $t("components.ml.prepare.uploadNew") }}
           </a-button>
         </router-link>
       </div>
@@ -28,15 +30,21 @@
 
     <!-- Column Selection -->
     <div v-else>
-      <h3 class="text-lg font-semibold mb-4">Step 2: Select Columns</h3>
+      <h3 class="text-lg font-semibold mb-4">
+        {{ $t("components.ml.prepare.step2") }}
+      </h3>
 
       <div class="bg-gray-50 p-4 rounded mb-4">
         <div class="flex items-center justify-between">
           <div>
-            <span class="font-medium">Selected Dataset:</span>
+            <span class="font-medium"
+              >{{ $t("components.ml.prepare.selectedDataset") }}:</span
+            >
             <span class="ml-2">{{ selectedDatasetName }}</span>
           </div>
-          <a-button size="small" @click="changeDataset">Change</a-button>
+          <a-button size="small" @click="changeDataset">{{
+            $t("components.ml.prepare.change")
+          }}</a-button>
         </div>
       </div>
 
@@ -64,13 +72,13 @@
 </template>
 
 <script setup lang="ts">
-import { message } from 'ant-design-vue';
+import { message } from "ant-design-vue";
 
-import { computed, ref } from 'vue';
+import { computed, ref } from "vue";
 
-import { useUpdateWorkItem } from '../../../composables';
-import DatasetSelector from '../../dataset/DatasetSelector.vue';
-import ColumnSelector from './ColumnSelector.vue';
+import { useUpdateWorkItem } from "../../../composables";
+import DatasetSelector from "../../dataset/DatasetSelector.vue";
+import ColumnSelector from "./ColumnSelector.vue";
 
 interface WorkItem {
   id: number;
@@ -95,7 +103,7 @@ const emit = defineEmits<{
 }>();
 
 const selectedDatasetId = ref<number | undefined>(props.workItem.datasetId);
-const selectedDatasetName = ref<string>('');
+const selectedDatasetName = ref<string>("");
 const datasetColumns = ref<string[]>([]);
 const featureColumns = ref<string[]>(props.workItem.featureColumns || []);
 const targetColumn = ref<string | undefined>(props.workItem.targetColumn);
@@ -123,7 +131,7 @@ const handleDatasetSelect = async (dataset: Dataset) => {
 
 const changeDataset = () => {
   selectedDatasetId.value = undefined;
-  selectedDatasetName.value = '';
+  selectedDatasetName.value = "";
   datasetColumns.value = [];
   featureColumns.value = [];
   targetColumn.value = undefined;
@@ -143,12 +151,12 @@ const handleConfirm = () => {
     },
     {
       onSuccess: () => {
-        message.success('Dataset configuration saved successfully');
-        emit('confirm');
+        message.success("Dataset configuration saved successfully");
+        emit("confirm");
       },
       onError: (error: any) => {
-        console.error('Failed to save configuration:', error);
-        message.error('Failed to save configuration');
+        console.error("Failed to save configuration:", error);
+        message.error("Failed to save configuration");
       },
     }
   );

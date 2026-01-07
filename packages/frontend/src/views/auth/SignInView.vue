@@ -3,8 +3,10 @@
     <div class="max-w-md w-full px-4">
       <a-card class="shadow-lg">
         <div class="text-center mb-6">
-          <h1 class="text-2xl font-bold text-gray-900 mb-2">Sign In</h1>
-          <p class="text-gray-600">ML Training Platform</p>
+          <h1 class="text-2xl font-bold text-gray-900 mb-2">
+            {{ $t('auth.signin.title') }}
+          </h1>
+          <p class="text-gray-600">{{ $t('app.subtitle') }}</p>
         </div>
 
         <a-form
@@ -13,10 +15,13 @@
           layout="vertical"
           @finish="handleSignin"
         >
-          <a-form-item label="Email or Phone" name="identifier">
+          <a-form-item
+            :label="$t('auth.signin.identifier')"
+            name="identifier"
+          >
             <a-input
               v-model:value="formData.identifier"
-              placeholder="Enter your email or phone"
+              :placeholder="$t('auth.signin.identifierPlaceholder')"
               size="large"
             >
               <template #prefix>
@@ -25,10 +30,10 @@
             </a-input>
           </a-form-item>
 
-          <a-form-item label="Password" name="password">
+          <a-form-item :label="$t('auth.signin.password')" name="password">
             <a-input-password
               v-model:value="formData.password"
-              placeholder="Enter your password"
+              :placeholder="$t('auth.signin.passwordPlaceholder')"
               size="large"
             >
               <template #prefix>
@@ -45,14 +50,18 @@
               block
               :loading="isLoading"
             >
-              {{ isLoading ? 'Signing In...' : 'Sign In' }}
+              {{
+                isLoading
+                  ? $t('auth.signin.signingIn')
+                  : $t('auth.signin.signinButton')
+              }}
             </a-button>
           </a-form-item>
         </a-form>
 
         <div v-if="errorMessage" class="mb-4">
           <a-alert
-            message="Sign In Error"
+            :message="$t('auth.signin.signinError')"
             :description="errorMessage"
             type="error"
             show-icon
@@ -63,7 +72,7 @@
 
         <div v-if="successMessage" class="mb-4">
           <a-alert
-            message="Signup Successful! Please sign in."
+            :message="$t('auth.signup.signupSuccess')"
             type="success"
             show-icon
             closable
@@ -72,12 +81,12 @@
         </div>
 
         <div class="text-center">
-          <span class="text-gray-600">Don't have an account?</span>
+          <span class="text-gray-600">{{ $t('auth.signin.noAccount') }}</span>
           <router-link
             to="/auth/signup"
             class="text-blue-600 hover:text-blue-800 ml-1"
           >
-            Sign Up
+            {{ $t('auth.signin.signupLink') }}
           </router-link>
         </div>
       </a-card>
@@ -87,6 +96,7 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 
 import { useAuthStore } from '../../stores/auth';
@@ -94,6 +104,7 @@ import { useAuthStore } from '../../stores/auth';
 const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
+const { t } = useI18n();
 
 const formData = reactive({
   identifier: '',
@@ -101,8 +112,18 @@ const formData = reactive({
 });
 
 const rules = {
-  identifier: [{ required: true, message: 'Email or phone is required' }],
-  password: [{ required: true, message: 'Password is required' }],
+  identifier: [
+    {
+      required: true,
+      message: t('auth.signin.identifierRequired'),
+    },
+  ],
+  password: [
+    {
+      required: true,
+      message: t('auth.signin.passwordRequired'),
+    },
+  ],
 };
 
 const isLoading = ref(false);
@@ -129,10 +150,10 @@ async function handleSignin() {
       sessionStorage.removeItem('intendedRoute');
       await router.push(intendedRoute);
     } else {
-      errorMessage.value = result.error || 'Unknown error';
+      errorMessage.value = result.error || t('auth.signin.signinError');
     }
   } catch (error: any) {
-    errorMessage.value = error.message || 'Sign in failed';
+    errorMessage.value = error.message || t('auth.signin.signinError');
   } finally {
     isLoading.value = false;
   }

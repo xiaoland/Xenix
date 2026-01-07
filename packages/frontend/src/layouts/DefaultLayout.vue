@@ -5,9 +5,9 @@
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-4">
             <router-link to="/" class="text-2xl font-bold text-blue-600">
-              Xenix
+              {{ $t('app.title') }}
             </router-link>
-            <span class="text-sm text-gray-500">ML Training Platform</span>
+            <span class="text-sm text-gray-500">{{ $t('app.subtitle') }}</span>
           </div>
 
           <div class="flex items-center gap-4">
@@ -15,15 +15,17 @@
               to="/"
               class="text-gray-700 hover:text-blue-600 transition-colors"
             >
-              Projects
+              {{ $t('navigation.projects') }}
             </router-link>
 
             <router-link
               to="/tasks"
               class="text-gray-700 hover:text-blue-600 transition-colors"
             >
-              Tasks
+              {{ $t('navigation.tasks') }}
             </router-link>
+
+            <language-switcher />
 
             <a-button
               v-if="isAuthenticated"
@@ -33,7 +35,7 @@
               @click="handleLogout"
             >
               <span class="i-mdi-logout mr-1" />
-              Logout
+              {{ $t('auth.logout') }}
             </a-button>
           </div>
         </div>
@@ -57,6 +59,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import LanguageSwitcher from '../components/common/LanguageSwitcher.vue';
 import { useAuthStore } from '../stores/auth';
 
 const authStore = useAuthStore();

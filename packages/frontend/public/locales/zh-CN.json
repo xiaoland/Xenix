@@ -55,10 +55,14 @@
     "createNew": "创建新工作项",
     "name": "工作项名称",
     "namePlaceholder": "输入工作项名称",
+    "nameRequired": "请输入工作项名称",
+    "nameMinLength": "名称至少2个字符",
     "description": "描述",
     "descriptionPlaceholder": "可选描述",
-    "selectProject": "选择项目",
+    "selectProject": "项目",
     "selectProjectPlaceholder": "选择一个项目",
+    "selectProjectRequired": "请选择一个项目",
+    "creatingFor": "为项目创建工作项：{project}",
     "createButton": "创建工作项",
     "editWorkItem": "编辑工作项",
     "deleteWorkItem": "删除工作项",
@@ -79,7 +83,10 @@
     "createError": "创建工作项失败",
     "updateError": "更新工作项失败",
     "deleteError": "删除工作项失败",
-    "fetchError": "获取工作项失败"
+    "fetchError": "获取工作项失败",
+    "notFound": "工作项未找到",
+    "notFoundDescription": "您查找的工作项不存在或您无权访问。",
+    "backToHome": "返回首页"
   },
   "steps": {
     "prepare": {
@@ -239,6 +246,26 @@
     "remove": "删除",
     "actions": "操作"
   },
+  "tasks": {
+    "title": "任务监控",
+    "subtitle": "监控所有项目中的后台任务",
+    "status": "状态",
+    "type": "类型",
+    "all": "全部",
+    "pending": "待处理",
+    "running": "运行中",
+    "completed": "已完成",
+    "failed": "失败",
+    "autoTune": "自动调优",
+    "manualTune": "手动调优",
+    "predictFile": "预测（文件）",
+    "predictInline": "预测（内联）",
+    "id": "ID",
+    "model": "模型",
+    "workItem": "工作项",
+    "created": "创建时间",
+    "actions": "操作"
+  },
   "autoForm": {
     "loading": "加载表单模式...",
     "noDescription": "无可用描述",
@@ -284,6 +311,97 @@
     "useExistingDataset": "使用现有数据集",
     "orUploadNew": "或上传新文件",
     "paramGridColumn": "参数网格"
+  },
+  "components": {
+    "project": {
+      "form": {
+        "name": "项目名称",
+        "namePlaceholder": "输入项目名称",
+        "nameRequired": "请输入项目名称",
+        "description": "描述",
+        "descriptionPlaceholder": "输入项目描述（可选）",
+        "status": "状态",
+        "active": "活动",
+        "completed": "已完成",
+        "archived": "已归档"
+      },
+      "card": {
+        "datasets": "个数据集",
+        "workItems": "个工作项",
+        "created": "创建时间",
+        "manageDatasets": "数据集",
+        "edit": "编辑",
+        "delete": "删除",
+        "deleteConfirm": "确定要删除此项目吗？"
+      }
+    },
+    "dataset": {
+      "selector": {
+        "loading": "加载数据集中...",
+        "noDatasets": "未找到数据集",
+        "uploadHint": "上传数据集开始使用。",
+        "selected": "已选择",
+        "columns": "列",
+        "uploaded": "上传时间"
+      },
+      "upload": {
+        "name": "数据集名称",
+        "namePlaceholder": "输入数据集名称",
+        "file": "选择文件",
+        "selectFile": "选择文件",
+        "supportedFormats": "支持格式：CSV、Excel（.xlsx、.xls）",
+        "cancel": "取消",
+        "upload": "上传"
+      }
+    },
+    "ml": {
+      "prepare": {
+        "title": "准备您的数据",
+        "description": "选择数据集并为您的机器学习模型选择特征列和目标列。",
+        "step1": "步骤1：选择数据集",
+        "uploadNew": "上传新数据集",
+        "step2": "步骤2：选择列",
+        "selectedDataset": "已选择数据集",
+        "change": "更改"
+      },
+      "columnSelector": {
+        "featureColumns": "特征列",
+        "featureColumnsRequired": "选择将用作模型输入特征的列。",
+        "featurePlaceholder": "选择特征列",
+        "selectedCount": "已选择：{count} 列",
+        "targetColumn": "目标列",
+        "targetColumnRequired": "选择模型应预测的列。",
+        "targetPlaceholder": "选择目标列",
+        "summary": "配置摘要",
+        "features": "特征",
+        "target": "目标"
+      },
+      "tuning": {
+        "title": "模型调优",
+        "trainDescription": "选择模型并配置超参数在您的数据集上训练。选择已完成的任务继续进行预测。",
+        "selectModels": "选择要训练的模型",
+        "selectPlaceholder": "选择要训练的模型",
+        "startAutoTune": "开始自动调优",
+        "clearFailedTasks": "清除失败任务"
+      },
+      "prediction": {
+        "title": "进行预测",
+        "usingModel": "使用训练模型：{model}",
+        "mode": "预测模式",
+        "uploadFile": "上传文件",
+        "manualInput": "手动输入",
+        "uploadData": "上传预测数据",
+        "dragHint": "点击或拖拽文件上传",
+        "supportedFormats": "支持格式：Excel（.xlsx、.xls）、CSV",
+        "or": "或",
+        "enterData": "手动输入数据",
+        "inputHint": "为每个特征列输入值",
+        "startPrediction": "开始预测",
+        "processing": "处理预测中...",
+        "downloadResults": "下载结果",
+        "results": "预测结果"
+      }
+    }
   },
   "tuning": {
     "title": "模型调优",

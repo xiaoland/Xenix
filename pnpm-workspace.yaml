@@ -10,3 +10,4 @@ onlyBuiltDependencies:
   - bcrypt
   - better-sqlite3
   - msgpackr-extract
+  - vue-demi

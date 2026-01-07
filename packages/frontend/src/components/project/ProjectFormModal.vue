@@ -7,29 +7,47 @@
   >
     <a-form :model="formData" layout="vertical">
       <a-form-item
-        label="Project Name"
+        :label="$t('components.project.form.name')"
         name="name"
-        :rules="[{ required: true, message: 'Please enter project name' }]"
+        :rules="[
+          {
+            required: true,
+            message: $t('components.project.form.nameRequired'),
+          },
+        ]"
       >
         <a-input
           v-model:value="formData.name"
-          placeholder="Enter project name"
+          :placeholder="$t('components.project.form.namePlaceholder')"
         />
       </a-form-item>
 
-      <a-form-item label="Description" name="description">
+      <a-form-item
+        :label="$t('components.project.form.description')"
+        name="description"
+      >
         <a-textarea
           v-model:value="formData.description"
-          placeholder="Enter project description (optional)"
+          :placeholder="$t('components.project.form.descriptionPlaceholder')"
           :rows="3"
         />
       </a-form-item>
 
-      <a-form-item v-if="showStatus" label="Status" name="status">
+      <a-form-item
+        v-if="showStatus"
+        :label="$t('components.project.form.status')"
+        name="status"
+      >
         <a-select v-model:value="formData.status">
-          <a-select-option value="active">Active</a-select-option>
-          <a-select-option value="completed">Completed</a-select-option>
-          <a-select-option value="archived">Archived</a-select-option>
+          <a-select-option value="active">{{
+            $t("components.project.form.active")
+          }}</a-select-option>
+          <a-select-option value="completed">{{
+            $t("components.project.form.completed")
+          }}</a-select-option>
+          <a-select-option value="archived">{{
+            $t("components.project.form.archived")
+          }}</a-select-option>
         </a-select>
       </a-form-item>
     </a-form>
@@ -37,7 +55,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch } from "vue";
 
 interface Props {
   open: boolean;
@@ -52,14 +70,14 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  'update:open': [value: boolean];
+  "update:open": [value: boolean];
   submit: [values: any];
 }>();
 
 const formData = ref({
-  name: '',
-  description: '',
-  status: 'active',
+  name: "",
+  description: "",
+  status: "active",
 });
 
 watch(
@@ -68,15 +86,15 @@ watch(
     if (isOpen) {
       if (props.initialValues.id) {
         formData.value = {
-          name: props.initialValues.name || '',
-          description: props.initialValues.description || '',
-          status: props.initialValues.status || 'active',
+          name: props.initialValues.name || "",
+          description: props.initialValues.description || "",
+          status: props.initialValues.status || "active",
         };
       } else {
         formData.value = {
-          name: '',
-          description: '',
-          status: 'active',
+          name: "",
+          description: "",
+          status: "active",
         };
       }
     }
@@ -87,10 +105,10 @@ const handleSubmit = () => {
   if (!formData.value.name.trim()) {
     return;
   }
-  emit('submit', formData.value);
+  emit("submit", formData.value);
 };
 
 const handleCancel = () => {
-  emit('update:open', false);
+  emit("update:open", false);
 };
 </script>

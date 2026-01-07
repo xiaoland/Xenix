@@ -8,7 +8,7 @@
           <span class="i-mdi-folder text-blue-500 text-xl"></span>
           <span class="text-lg font-semibold">{{ project.name }}</span>
           <a-tag :color="statusColor">
-            {{ project.status || 'active' }}
+            {{ project.status || "active" }}
           </a-tag>
         </div>
         <p v-if="project.description" class="text-sm text-gray-600 ml-7 mb-2">
@@ -16,12 +16,17 @@
         </p>
         <div class="text-xs text-gray-400 ml-7">
           <span v-if="(project as any).datasets"
-            >{{ (project as any).datasets.length }} datasets</span
+            >{{ (project as any).datasets.length }}
+            {{ $t("components.project.card.datasets") }}</span
           >
           <span v-if="(project as any).workItems">
-            · {{ (project as any).workItems.length }} work items</span
+            · {{ (project as any).workItems.length }}
+            {{ $t("components.project.card.workItems") }}</span
           >
-          <span> · Created {{ formatDate(project.createdAt) }}</span>
+          <span>
+            · {{ $t("components.project.card.created") }}
+            {{ formatDate(project.createdAt) }}</span
+          >
         </div>
       </div>
 
@@ -32,7 +37,7 @@
           @click="$emit('manage-datasets', project.id)"
         >
           <span class="i-mdi-database mr-1" />
-          Datasets
+          {{ $t("components.project.card.manageDatasets") }}
         </a-button>
         <a-button
           size="small"
@@ -40,14 +45,15 @@
           @click="$emit('edit', project)"
         >
           <span class="i-mdi-pencil mr-1" />
-          Edit
+          {{ $t("components.project.card.edit") }}
         </a-button>
         <a-popconfirm
-          title="Are you sure you want to delete this project?"
+          :title="$t('components.project.card.deleteConfirm')"
           @confirm="$emit('delete', project.id)"
         >
           <a-button size="small" danger class="inline-flex items-center">
             <span class="i-mdi-delete mr-1" />
+            {{ $t("components.project.card.delete") }}
           </a-button>
         </a-popconfirm>
       </div>
@@ -81,11 +87,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed } from "vue";
 
-import type { Project } from '@xenix/shared';
+import type { Project } from "@xenix/shared";
 
-import WorkItemRow from './WorkItemRow.vue';
+import WorkItemRow from "./WorkItemRow.vue";
 
 interface Props {
   project: Project;
@@ -96,25 +102,25 @@ const props = defineProps<Props>();
 defineEmits<{
   edit: [project: Project];
   delete: [projectId: number];
-  'manage-datasets': [projectId: number];
-  'add-work-item': [projectId: number];
+  "manage-datasets": [projectId: number];
+  "add-work-item": [projectId: number];
 }>();
 
 const statusColor = computed(() => {
   switch (props.project.status) {
-    case 'active':
-      return 'green';
-    case 'completed':
-      return 'blue';
-    case 'archived':
-      return 'gray';
+    case "active":
+      return "green";
+    case "completed":
+      return "blue";
+    case "archived":
+      return "gray";
     default:
-      return 'default';
+      return "default";
   }
 });
 
 const formatDate = (dateString?: string) => {
-  if (!dateString) return '';
+  if (!dateString) return "";
   const date = new Date(dateString);
   return date.toLocaleDateString();
 };

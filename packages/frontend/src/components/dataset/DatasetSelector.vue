@@ -2,7 +2,9 @@
   <div>
     <div v-if="loading" class="text-center py-8">
       <a-spin />
-      <p class="mt-2 text-gray-600">Loading datasets...</p>
+      <p class="mt-2 text-gray-600">
+        {{ $t("components.dataset.selector.loading") }}
+      </p>
     </div>
 
     <div v-else-if="datasets.length === 0" class="text-center py-8">
@@ -10,7 +12,9 @@
         <template #image>
           <span class="i-mdi-database-off text-6xl text-gray-400"></span>
         </template>
-        <p class="text-gray-600 mb-4">Upload a dataset to get started.</p>
+        <p class="text-gray-600 mb-4">
+          {{ $t("components.dataset.selector.uploadHint") }}
+        </p>
       </a-empty>
     </div>
 
@@ -30,12 +34,16 @@
           ></span>
         </div>
         <p v-if="dataset.filePath" class="text-sm text-gray-600 mb-2">
-          {{ dataset.filePath.split('/').pop() }}
+          {{ dataset.filePath.split("/").pop() }}
         </p>
         <div class="text-sm text-gray-500">
-          <p>{{ dataset.columns.length }} columns</p>
+          <p>
+            {{ dataset.columns.length }}
+            {{ $t("components.dataset.selector.columns") }}
+          </p>
           <p v-if="dataset.createdAt">
-            Uploaded: {{ new Date(dataset.createdAt).toLocaleDateString() }}
+            {{ $t("components.dataset.selector.uploaded") }}:
+            {{ new Date(dataset.createdAt).toLocaleDateString() }}
           </p>
         </div>
       </div>
@@ -44,11 +52,11 @@
 </template>
 
 <script setup lang="ts">
-import { message } from 'ant-design-vue';
+import { message } from "ant-design-vue";
 
-import { computed, ref } from 'vue';
+import { computed, ref } from "vue";
 
-import { useDatasets } from '../../composables';
+import { useDatasets } from "../../composables";
 
 interface Dataset {
   id: number;
@@ -74,11 +82,11 @@ const selectedId = ref<number | null>(null);
 
 // Handle errors
 if (error.value) {
-  message.error('Failed to load datasets');
+  message.error("Failed to load datasets");
 }
 
 const handleSelect = (dataset: Dataset) => {
   selectedId.value = dataset.id;
-  emit('select', dataset);
+  emit("select", dataset);
 };
 </script>
