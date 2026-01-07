@@ -137,6 +137,7 @@ import type { Task } from '@xenix/shared';
 
 import { client } from '../../../api/client';
 import { AVAILABLE_MODELS } from '../../../constants/models';
+import { POLLING_CONFIG } from '../../../constants/config';
 
 const props = defineProps<{
   workItemId: number;
@@ -294,7 +295,7 @@ const startPolling = () => {
     } else {
       stopPolling();
     }
-  }, 3000);
+  }, POLLING_CONFIG.DEFAULT_INTERVAL);
 };
 
 /**

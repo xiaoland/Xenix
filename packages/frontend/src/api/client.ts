@@ -6,7 +6,9 @@ import { hc } from 'hono/client';
 
 import type { AppType } from '@xenix/backend';
 
-const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+import { API_CONFIG } from '../constants/config';
+
+const apiUrl = import.meta.env.VITE_API_URL || API_CONFIG.DEFAULT_URL;
 
 // Create client with authentication headers
 export const client = hc<AppType>(apiUrl, {

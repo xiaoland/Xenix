@@ -5,6 +5,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 
 import { client } from '../api/client';
+import { API_CONFIG } from '../constants/config';
 
 export function useDatasets() {
   return useQuery({
@@ -42,7 +43,7 @@ export function useUploadDataset() {
     mutationFn: async (formData: FormData) => {
       // Use fetch directly for FormData to ensure proper Content-Type with boundary
       const token = localStorage.getItem('auth_token');
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const apiUrl = import.meta.env.VITE_API_URL || API_CONFIG.DEFAULT_URL;
 
       const response = await fetch(`${apiUrl}/data`, {
         method: 'POST',

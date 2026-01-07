@@ -5,6 +5,7 @@
 import { useQuery } from '@tanstack/vue-query';
 
 import { client } from '../api/client';
+import { POLLING_CONFIG } from '../constants/config';
 
 export function useTasks() {
   return useQuery({
@@ -37,7 +38,7 @@ export function useTask(id: number | string) {
       const task = query.state.data;
       // Only refetch if task is pending or running
       if (task && (task.status === 'pending' || task.status === 'running')) {
-        return 3000; // 3 seconds
+        return POLLING_CONFIG.TASK_STATUS_INTERVAL;
       }
       return false; // Don't refetch if completed or failed
     },
