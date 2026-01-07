@@ -44,7 +44,8 @@ Xenix/
 │   │   │   ├── composables/ # TanStack Query composables
 │   │   │   ├── api/         # Hono RPC client
 │   │   │   ├── services/    # Legacy services (being phased out)
-│   │   │   ├── styles/      # SCSS styles
+│   │   │   └── styles/      # SCSS styles
+│   │   ├── public/
 │   │   │   └── locales/     # i18n translations
 │   │   ├── vite.config.ts
 │   │   └── package.json

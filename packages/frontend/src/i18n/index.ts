@@ -1,11 +1,11 @@
-import { createI18n } from 'vue-i18n';
+import { createI18n } from "vue-i18n";
 
 // Supported locales
-export const SUPPORT_LOCALES = ['en', 'zh-CN'] as const;
+export const SUPPORT_LOCALES = ["en", "zh-CN"] as const;
 export type SupportedLocale = (typeof SUPPORT_LOCALES)[number];
 
 // LocalStorage key for language preference
-export const LOCALE_STORAGE_KEY = 'xenix-locale';
+export const LOCALE_STORAGE_KEY = "xenix-locale";
 
 // Track loaded languages
 const loadedLanguages: string[] = [];
@@ -13,8 +13,8 @@ const loadedLanguages: string[] = [];
 // Create i18n instance with empty messages initially
 const i18n = createI18n({
   legacy: false,
-  locale: 'en',
-  fallbackLocale: 'en',
+  locale: "en",
+  fallbackLocale: "en",
   messages: {},
 });
 
@@ -31,7 +31,7 @@ function isSupportedLocale(locale: string): locale is SupportedLocale {
  */
 function getLocaleBaseUrl(): string {
   // Use environment variable if available, otherwise default to /locales/
-  return import.meta.env.VITE_LOCALE_BASE_URL || '/locales/';
+  return import.meta.env.VITE_LOCALE_BASE_URL || "/locales/";
 }
 
 /**
@@ -52,23 +52,40 @@ export async function loadLanguageAsync(lang: string): Promise<void> {
     return;
   }
 
+  // 开发环境特权：直接 import，享受 HMR (热更新)
+  // 注意：这会导致开发环境 bundle 包含所有语言，但生产环境不会
+  if (import.meta.env.DEV) {
+    try {
+      // Vite 支持这种动态导入 (Glob Import 的变体或直接路径)
+      // 注意：这里路径必须明确，不能完全动态
+      const messages = await import(`../../public/locales/${lang}.json`);
+      i18n.global.setLocaleMessage(lang, messages.default);
+      loadedLanguages.push(lang);
+      i18n.global.locale.value = lang;
+    } catch (e) {
+      // fallback to fetch if import fails
+    }
+  }
+
   // Load the language from remote source (server or CDN)
   try {
     const baseUrl = getLocaleBaseUrl();
     const localeUrl = `${baseUrl}${lang}.json`;
-    
+
     console.log(`Loading locale from remote: ${localeUrl}`);
-    
+
     const response = await fetch(localeUrl);
     if (!response.ok) {
-      throw new Error(`Failed to fetch locale: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Failed to fetch locale: ${response.status} ${response.statusText}`
+      );
     }
-    
+
     const messages = await response.json();
     i18n.global.setLocaleMessage(lang, messages);
     loadedLanguages.push(lang);
     i18n.global.locale.value = lang;
-    
+
     console.log(`Successfully loaded locale: ${lang}`);
   } catch (error) {
     console.error(`Failed to load language '${lang}':`, error);
@@ -80,8 +97,8 @@ export async function loadLanguageAsync(lang: string): Promise<void> {
  * Get saved language preference from localStorage
  */
 function getSavedLocale(): SupportedLocale | null {
-  if (typeof window === 'undefined') return null;
-  
+  if (typeof window === "undefined") return null;
+
   const saved = localStorage.getItem(LOCALE_STORAGE_KEY);
   return saved && isSupportedLocale(saved) ? saved : null;
 }
@@ -89,7 +106,7 @@ function getSavedLocale(): SupportedLocale | null {
 // Load the initial language (saved preference or English)
 export async function setupI18n(): Promise<typeof i18n> {
   const savedLocale = getSavedLocale();
-  const initialLocale = savedLocale || 'en';
+  const initialLocale = savedLocale || "en";
   await loadLanguageAsync(initialLocale);
   return i18n;
 }
