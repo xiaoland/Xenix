@@ -6,22 +6,22 @@
     <div class="flex flex-col gap-4">
       <!-- New Dataset Form -->
       <a-form layout="vertical">
-        <a-form-item label="Dataset Name" required>
+        <a-form-item :label="$t('datasets.name')" required>
           <a-input
             v-model:value="newDatasetName"
-            placeholder="Enter dataset name"
+            :placeholder="$t('datasets.namePlaceholder')"
           />
         </a-form-item>
 
-        <a-form-item label="Description">
+        <a-form-item :label="$t('datasets.description')">
           <a-textarea
             v-model:value="newDatasetDescription"
-            placeholder="Optional description"
+            :placeholder="$t('datasets.descriptionPlaceholder')"
             :rows="2"
           />
         </a-form-item>
 
-        <a-form-item label="Data File" required>
+        <a-form-item :label="$t('datasets.file')" required>
           <a-upload-dragger
             v-model:file-list="fileList"
             name="file"

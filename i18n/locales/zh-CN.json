@@ -98,7 +98,8 @@
     "title": "上传训练数据",
     "dragHint": "点击或拖拽文件上传训练数据",
     "hint": "支持Excel文件（.xlsx, .xls）。数据应包含特征和目标变量。",
-    "nextButton": "下一步：选择特征与目标"
+    "nextButton": "下一步：选择特征与目标",
+    "noFileError": "请提供数据集名称和文件"
   },
   "columns": {
     "title": "选择列",

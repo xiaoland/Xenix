@@ -102,7 +102,8 @@
     "title": "Upload Training Data",
     "dragHint": "Click or drag file to upload training data",
     "hint": "Support for Excel files (.xlsx, .xls). Data should contain features and target variable.",
-    "nextButton": "Next: Select Columns"
+    "nextButton": "Next: Select Columns",
+    "noFileError": "Please provide a dataset name and file"
   },
   "columns": {
     "title": "Select Columns",
