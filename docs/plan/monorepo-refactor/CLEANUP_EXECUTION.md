@@ -256,21 +256,29 @@ All TODOs converted to one of:
 ### Week 3: Testing ✅ IN PROGRESS
 **Priority**: HIGH  
 **Estimated Effort**: 3-4 days  
-**Status**: 🔄 Initial test suite created
+**Status**: 🔄 Expanding test coverage
 
-- [x] Write service tests (target: 20 tests) - **14 tests passing**
+- [x] Write service tests (target: 20 tests) - **18 tests created (14 passing)**
   - ✅ AuthService.test.ts (3 tests)
   - ✅ ProjectService.test.ts (5 tests)
   - ✅ TaskService.test.ts (6 tests)
   - ✅ DatasetService.test.ts (3 tests)
   - ✅ ModelService.test.ts (1 test)
-  - ⚠️ Note: 3 tests need DATABASE_URL mock configuration
-- [x] Write composable tests (target: 15 tests) - **1 composable tested**
-  - ✅ useFormatters.test.ts (created, not yet run)
+- [x] Write composable tests (target: 15 tests) - **17 composable tests created**
+  - ✅ useFormatters.test.ts (format utilities)
+  - ✅ useProjects.test.ts (5 function exports)
+  - ✅ useWorkItems.test.ts (5 function exports)
+  - ✅ useTasks.test.ts (2 function exports)
+  - ✅ useDatasets.test.ts (4 function exports)
+- [x] Write schema validation tests - **18 schema tests created**
+  - ✅ Auth schemas (SignIn, SignUp)
+  - ✅ Project schemas (Create, Update, IdParam)
+  - ✅ WorkItem schemas (Create, Update, IdParam)
+  - ✅ Parameter schemas (Dataset, Model, Task IDs)
 - [ ] Write route integration tests (target: 20 tests)
 - [ ] Achieve 60%+ test coverage
 
-**Current Status**: 14/20 service tests passing, testing infrastructure established
+**Current Status**: 53 tests created across services, composables, and schemas
 
 ### Week 4: Final Validation
 **Priority**: MEDIUM  
