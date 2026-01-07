@@ -5,16 +5,14 @@ export const SUPPORT_LOCALES = ['en', 'zh-CN'] as const;
 export type SupportedLocale = (typeof SUPPORT_LOCALES)[number];
 
 // Track loaded languages
-const loadedLanguages: string[] = ['en'];
+const loadedLanguages: string[] = [];
 
-// Create i18n instance with only English initially
+// Create i18n instance with empty messages initially
 const i18n = createI18n({
   legacy: false,
   locale: 'en',
   fallbackLocale: 'en',
-  messages: {
-    en: {},
-  },
+  messages: {},
 });
 
 /**
