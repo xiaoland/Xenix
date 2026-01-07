@@ -266,6 +266,18 @@
     "created": "创建时间",
     "actions": "操作"
   },
+  "dataset": {
+    "upload": {
+      "name": "数据集名称",
+      "namePlaceholder": "输入数据集名称",
+      "file": "文件",
+      "selectFile": "选择文件",
+      "dragDropHere": "点击或拖拽文件到此处上传",
+      "supportedFormats": "支持 CSV 和 Excel 文件（.csv、.xlsx、.xls）",
+      "cancel": "取消",
+      "upload": "上传"
+    }
+  },
   "autoForm": {
     "loading": "加载表单模式...",
     "noDescription": "无可用描述",

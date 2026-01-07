@@ -272,6 +272,18 @@
     "created": "Created",
     "actions": "Actions"
   },
+  "dataset": {
+    "upload": {
+      "name": "Dataset Name",
+      "namePlaceholder": "Enter dataset name",
+      "file": "File",
+      "selectFile": "Select File",
+      "dragDropHere": "Click or drag file to this area to upload",
+      "supportedFormats": "Support for CSV and Excel files (.csv, .xlsx, .xls)",
+      "cancel": "Cancel",
+      "upload": "Upload"
+    }
+  },
   "autoForm": {
     "loading": "Loading form schema...",
     "noDescription": "No description available",

@@ -1,34 +1,37 @@
 <template>
   <div class="space-y-4">
     <a-form layout="vertical">
-      <a-form-item :label="$t('components.dataset.upload.name')" required>
+      <a-form-item :label="$t('dataset.upload.name')" required>
         <a-input
           v-model:value="datasetName"
-          :placeholder="$t('components.dataset.upload.namePlaceholder')"
+          :placeholder="$t('dataset.upload.namePlaceholder')"
         />
       </a-form-item>
 
-      <a-form-item :label="$t('components.dataset.upload.file')" required>
-        <a-upload
+      <a-form-item :label="$t('dataset.upload.file')" required>
+        <a-upload-dragger
           v-model:file-list="fileList"
           :before-upload="beforeUpload"
           accept=".csv,.xlsx,.xls"
           :max-count="1"
+          :show-upload-list="{ showRemoveIcon: true }"
         >
-          <a-button class="inline-flex items-center">
-            <span class="i-mdi-file-upload mr-2"></span>
-            {{ $t("components.dataset.upload.selectFile") }}
-          </a-button>
-        </a-upload>
-        <p class="text-sm text-gray-500 mt-2">
-          {{ $t("components.dataset.upload.supportedFormats") }}
-        </p>
+          <p class="ant-upload-drag-icon">
+            <span class="i-mdi-cloud-upload text-4xl text-gray-400"></span>
+          </p>
+          <p class="ant-upload-text">
+            {{ $t("dataset.upload.dragDropHere") }}
+          </p>
+          <p class="ant-upload-hint">
+            {{ $t("dataset.upload.supportedFormats") }}
+          </p>
+        </a-upload-dragger>
       </a-form-item>
     </a-form>
 
     <div class="flex justify-end space-x-2">
       <a-button @click="emit('cancel')">
-        {{ $t("components.dataset.upload.cancel") }}
+        {{ $t("dataset.upload.cancel") }}
       </a-button>
       <a-button
         type="primary"
@@ -36,7 +39,7 @@
         :disabled="!canUpload"
         @click="handleUpload"
       >
-        {{ $t("components.dataset.upload.upload") }}
+        {{ $t("dataset.upload.upload") }}
       </a-button>
     </div>
   </div>
