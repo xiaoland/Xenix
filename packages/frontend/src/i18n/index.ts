@@ -26,7 +26,17 @@ function isSupportedLocale(locale: string): locale is SupportedLocale {
 }
 
 /**
- * Load language async and set as current locale
+ * Get the base URL for locale files
+ * In production, this could point to a CDN
+ */
+function getLocaleBaseUrl(): string {
+  // Use environment variable if available, otherwise default to /locales/
+  return import.meta.env.VITE_LOCALE_BASE_URL || '/locales/';
+}
+
+/**
+ * Load language async from remote source and set as current locale
+ * Supports remote/CDN loading for over-the-air translation updates
  * @param lang - Language code to load (e.g., 'en', 'zh-CN')
  */
 export async function loadLanguageAsync(lang: string): Promise<void> {
@@ -42,12 +52,24 @@ export async function loadLanguageAsync(lang: string): Promise<void> {
     return;
   }
 
-  // Load the language module dynamically
+  // Load the language from remote source (server or CDN)
   try {
-    const messages = await import(`../locales/${lang}.json`);
-    i18n.global.setLocaleMessage(lang, messages.default);
+    const baseUrl = getLocaleBaseUrl();
+    const localeUrl = `${baseUrl}${lang}.json`;
+    
+    console.log(`Loading locale from remote: ${localeUrl}`);
+    
+    const response = await fetch(localeUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch locale: ${response.status} ${response.statusText}`);
+    }
+    
+    const messages = await response.json();
+    i18n.global.setLocaleMessage(lang, messages);
     loadedLanguages.push(lang);
     i18n.global.locale.value = lang;
+    
+    console.log(`Successfully loaded locale: ${lang}`);
   } catch (error) {
     console.error(`Failed to load language '${lang}':`, error);
     throw error;
