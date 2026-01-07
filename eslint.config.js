@@ -2,8 +2,12 @@ import js from '@eslint/js';
 import tsParser from '@typescript-eslint/parser';
 import vueI18nPlugin from '@intlify/eslint-plugin-vue-i18n';
 import vuePlugin from 'eslint-plugin-vue';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import vueParser from 'vue-eslint-parser';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default [
   // Ignore patterns
@@ -119,7 +123,7 @@ export default [
     },
     settings: {
       'vue-i18n': {
-        localeDir: './packages/frontend/src/locales/*.json',
+        localeDir: path.resolve(__dirname, './packages/frontend/src/locales/*.json'),
         messageSyntaxVersion: '^11.0.0',
       },
     },

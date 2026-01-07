@@ -16,7 +16,12 @@
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 
-import { loadLanguageAsync, SUPPORT_LOCALES } from '../../i18n';
+import {
+  LOCALE_STORAGE_KEY,
+  loadLanguageAsync,
+  SUPPORT_LOCALES,
+  type SupportedLocale,
+} from '../../i18n';
 
 const { locale } = useI18n();
 const isLoading = ref(false);
@@ -33,8 +38,15 @@ const languageOptions = [
   { value: 'zh-CN', label: '中文' },
 ];
 
+/**
+ * Type guard to check if a string is a valid locale
+ */
+function isSupportedLocale(locale: string): locale is SupportedLocale {
+  return SUPPORT_LOCALES.includes(locale as SupportedLocale);
+}
+
 const handleLanguageChange = async (lang: string) => {
-  if (!SUPPORT_LOCALES.includes(lang as any)) {
+  if (!isSupportedLocale(lang)) {
     console.error(`Unsupported language: ${lang}`);
     return;
   }
@@ -43,7 +55,7 @@ const handleLanguageChange = async (lang: string) => {
   try {
     await loadLanguageAsync(lang);
     // Store the selected language in localStorage for persistence
-    localStorage.setItem('xenix-locale', lang);
+    localStorage.setItem(LOCALE_STORAGE_KEY, lang);
   } catch (error) {
     console.error('Failed to change language:', error);
   } finally {
