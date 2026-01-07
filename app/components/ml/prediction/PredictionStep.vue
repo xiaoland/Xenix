@@ -199,7 +199,7 @@ const predictionMessage = computed(() => {
       return t("prediction.completed");
     case "failed":
       return t("prediction.failed", {
-        error: predictionTask.value.error || "Unknown error",
+        error: predictionTask.value.error || t("common.unknownError"),
       });
     default:
       return "";

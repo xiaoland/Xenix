@@ -232,12 +232,15 @@
   },
   "common": {
     "na": "不可用",
+    "yes": "是",
+    "no": "否",
     "add": "添加",
     "cancel": "取消",
     "confirm": "确认",
     "refresh": "刷新",
     "remove": "删除",
-    "actions": "操作"
+    "actions": "操作",
+    "unknownError": "未知错误"
   },
   "autoForm": {
     "loading": "加载表单模式...",

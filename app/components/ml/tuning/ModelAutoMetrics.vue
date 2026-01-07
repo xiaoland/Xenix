@@ -41,7 +41,7 @@ const formatMetricLabel = (key: string): string => {
 // Format metric value based on type
 const formatMetricValue = (value: any): string => {
   if (value === null || value === undefined) {
-    return "N/A";
+    return t("common.na");
   }
 
   if (typeof value === "number") {
@@ -54,7 +54,7 @@ const formatMetricValue = (value: any): string => {
   }
 
   if (typeof value === "boolean") {
-    return value ? "Yes" : "No";
+    return value ? t("common.yes") : t("common.no");
   }
 
   if (typeof value === "string") {

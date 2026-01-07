@@ -55,7 +55,7 @@ const statusMessage = computed(() => {
       return t("prediction.completed");
     case "failed":
       return t("prediction.failed", {
-        error: task.value.error || "Unknown error",
+        error: task.value.error || t("common.unknownError"),
       });
     default:
       return "";

@@ -3,7 +3,7 @@
     <div v-if="!props.disabled" class="flex gap-2 mb-2">
       <a-input
         v-model:value="inputValue"
-        :placeholder="placeholder"
+        :placeholder="placeholderText"
         :type="inputType"
         @keydown.enter="handleAdd"
         class="flex-1"
@@ -37,6 +37,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 
@@ -49,7 +50,7 @@ interface ArrayInputProps {
 
 const props = withDefaults(defineProps<ArrayInputProps>(), {
   itemType: "string",
-  placeholder: "Enter value and press Add",
+  placeholder: "",
   disabled: false,
 });
 
@@ -61,6 +62,10 @@ const inputValue = ref("");
 const localValues = computed({
   get: () => props.modelValue || [],
   set: (value) => emit("update:modelValue", value),
+});
+
+const placeholderText = computed(() => {
+  return props.placeholder || t("autoForm.arrayPlaceholder");
 });
 
 const inputType = computed(() => {

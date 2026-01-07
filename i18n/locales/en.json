@@ -234,12 +234,15 @@
   },
   "common": {
     "na": "N/A",
+    "yes": "Yes",
+    "no": "No",
     "add": "Add",
     "cancel": "Cancel",
     "confirm": "Confirm",
     "refresh": "Refresh",
     "remove": "Remove",
-    "actions": "Actions"
+    "actions": "Actions",
+    "unknownError": "Unknown error"
   },
   "autoForm": {
     "loading": "Loading form schema...",
