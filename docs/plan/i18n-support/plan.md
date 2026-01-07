@@ -74,12 +74,16 @@ export default defineI18nConfig(() => ({
 
 #### File Structure
 
+Translation files are located in the project root:
+
 ```
 i18n/
 └── locales/
     ├── en.json      (357 lines, ~14KB)
     └── zh-CN.json   (399 lines, ~15KB)
 ```
+
+The `langDir: "locales"` configuration in `nuxt.config.ts` points to this directory relative to the i18n module's base path.
 
 #### Translation Organization
 
@@ -460,8 +464,8 @@ npm run i18n:validate
 
 1. **No Prefix Strategy**: URLs do not reflect current locale (e.g., no `/en/` or `/zh-CN/` prefix)
    - Simpler URL structure
-   - Cannot share locale-specific links
-   - SEO considerations for multi-language sites
+   - Shared links display in user's preferred language (via cookie or browser detection)
+   - SEO considerations for multi-language sites (search engines may not detect locale-specific content)
 
 2. **Client-Side Only**: Translations are client-side rendered
    - Works well for SPA/desktop app
