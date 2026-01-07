@@ -1,13 +1,5 @@
 <template>
   <div class="space-y-4">
-    <a-alert
-      :message="$t('columns.title')"
-      :description="$t('columns.description')"
-      type="info"
-      show-icon
-      class="mb-4"
-    />
-
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <!-- Feature Columns Selection -->
       <div>

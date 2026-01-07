@@ -30,3 +30,4 @@
   - [ ] 增加更多的数据库约束（比如 work_items.dataset_id -> datasets.id)
   - [ ] 手动训练死翘翘
   - [ ] 自动训练又不能修改参数了
+  - [ ] TuningStep 不要不停的 poll tasks
