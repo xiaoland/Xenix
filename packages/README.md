@@ -4,7 +4,7 @@ This is a monorepo containing the Xenix ML Platform packages.
 
 ## Structure
 
-```
+```bash
 packages/
 ├── backend/     # Hono API server
 ├── frontend/    # Vite + Vue 3 SPA
@@ -28,7 +28,7 @@ packages/
 pnpm install
 ```
 
-2. Configure environment:
+1. Configure environment:
 
 ```bash
 # Backend
@@ -36,7 +36,7 @@ cp packages/backend/.env.example packages/backend/.env
 # Edit packages/backend/.env with your database credentials
 ```
 
-3. Setup database:
+1. Setup database:
 
 ```bash
 pnpm db:generate

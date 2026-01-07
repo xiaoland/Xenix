@@ -22,7 +22,7 @@ Xenix provides an interface for teachers and mid-small enterprises to analyze th
 
 Xenix is built as a modern monorepo with three main packages:
 
-```
+```bash
 packages/
 ├── shared/      # Shared TypeScript types and utilities
 ├── backend/     # Hono API server with Python ML integration
@@ -102,9 +102,9 @@ pnpm dev
 
 Access the application:
 
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:3000
-- Health Check: http://localhost:3000/health
+- Frontend: <http://localhost:5173>
+- Backend API: <http://localhost:3000>
+- Health Check: <http://localhost:3000/health>
 
 ### Running Tests
 
@@ -174,7 +174,7 @@ pnpm test             # Run tests
 
 ## Project Structure
 
-```
+```bash
 Xenix/
 ├── packages/
 │   ├── shared/               # Shared TypeScript types

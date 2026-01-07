@@ -2,7 +2,7 @@
 
 ## Before (Nuxt.js Fullstack)
 
-```
+```text
 ┌─────────────────────────────────────────┐
 │          Nuxt.js Application            │
 ├─────────────────────────────────────────┤
@@ -21,7 +21,7 @@
 
 ## After (Monorepo)
 
-```
+```text
 ┌──────────────────────────────────────────────────────────────┐
 │                      Xenix Monorepo                          │
 └──────────────────────────────────────────────────────────────┘
@@ -51,7 +51,7 @@
 
 ### Client-Side Rendering (SPA)
 
-```
+```text
 ┌─────────┐         ┌──────────┐         ┌──────────┐         ┌─────────┐
 │ Browser │ ──────> │ Frontend │ ──────> │ Backend  │ ──────> │Database │
 │         │  HTTP   │  (Vite)  │  /api/* │  (Hono)  │   SQL   │  (PG)   │
@@ -67,7 +67,7 @@
 
 ### Authentication Flow
 
-```
+```text
 1. User signs in
    └─> Frontend sends POST /api/auth/signin
        └─> Backend verifies credentials
@@ -140,7 +140,7 @@
 
 ## Migration Path
 
-```
+```text
 ┌─────────────────┐
 │ Nuxt.js App     │
 │ (Monolithic)    │
@@ -177,7 +177,7 @@
 
 ## Package Dependencies
 
-```
+```text
 ┌──────────────────┐
 │  @xenix/frontend │
 │                  │
@@ -204,7 +204,7 @@
 
 ### Before
 
-```
+```text
 Xenix/
 ├── app/
 │   ├── components/
@@ -221,7 +221,7 @@ Xenix/
 
 ### After
 
-```
+```text
 Xenix/
 ├── packages/
 │   ├── frontend/
@@ -257,7 +257,7 @@ pnpm dev
 # Slower feedback loop
 ```
 
-### After (Monorepo)
+### After (Monorepo Development)
 
 ```bash
 # Run everything

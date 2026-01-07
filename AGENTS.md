@@ -24,7 +24,7 @@ The application follows a 3-step ML workflow:
 
 ## Project Structure (Monorepo)
 
-```
+```bash
 Xenix/
 ├── packages/
 │   ├── shared/              # Shared TypeScript types & Zod schemas

@@ -23,11 +23,12 @@ Backend API server for Xenix ML platform, built with Hono framework.
    - `JWT_SECRET`: Secret key for JWT token signing
    - `PYTHON_EXECUTABLE`: Path to Python executable (default: python3)
    - `PORT`: Server port (default: 3000)
-   - `FRONTEND_URL`: Frontend URL for CORS (default: http://localhost:5173)
+   - `FRONTEND_URL`: Frontend URL for CORS (default: <http://localhost:5173>)
 
    > **Note**: This backend uses Node.js native `.env` file support (Node.js >= 20.6.0) via the `--env-file` flag. No additional packages like `dotenv` are needed.
 
 3. **Run database migrations:**
+
    ```bash
    pnpm db:generate  # Generate migration files
    pnpm db:migrate   # Apply migrations
@@ -123,4 +124,4 @@ Required environment variables:
 - `JWT_SECRET` - Secret key for JWT tokens (required)
 - `PYTHON_EXECUTABLE` - Python executable path (optional, default: python3)
 - `PORT` - Server port (optional, default: 3000)
-- `FRONTEND_URL` - Frontend URL for CORS (optional, default: http://localhost:5173)
+- `FRONTEND_URL` - Frontend URL for CORS (optional, default: <http://localhost:5173>)

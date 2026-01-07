@@ -198,7 +198,7 @@ const handleStartAutoTune = async () => {
     for (const model of selectedModels.value) {
       const response = await client.tune["auto-tune"].$post({
         json: {
-          datasetId: props.datasetId,
+          datasetId: props.datasetId ?? undefined,
           featureColumns: props.featureColumns,
           targetColumn: props.targetColumn,
           model,
@@ -276,7 +276,7 @@ const startPolling = () => {
   if (pollInterval) return;
   pollInterval = window.setInterval(() => {
     const hasRunningTasks = (tasks.value ?? []).some(
-      (t: Task) => t.status === "pending" || t.status === "running"
+      (t) => t.status === "pending" || t.status === "running"
     );
     if (hasRunningTasks) {
       fetchTasks();
@@ -352,7 +352,7 @@ const getDisplayMetrics = (result: any) => {
 onMounted(async () => {
   await fetchTasks();
   const hasRunningTasks = (tasks.value ?? []).some(
-    (t: Task) => t.status === "pending" || t.status === "running"
+    (t) => t.status === "pending" || t.status === "running"
   );
   if (hasRunningTasks) {
     startPolling();

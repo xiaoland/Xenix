@@ -140,9 +140,9 @@ pnpm dev:frontend
 
 Access the application:
 
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:3000
-- Backend Health: http://localhost:3000/health
+- Frontend: <http://localhost:5173>
+- Backend API: <http://localhost:3000>
+- Backend Health: <http://localhost:3000/health>
 
 ### 7. Run Tests
 
@@ -302,13 +302,13 @@ A production-ready Dockerfile for the application is planned but not yet impleme
 | `REDIS_URL`         | Redis connection string      | No       | redis://localhost:6379 |
 | `JWT_SECRET`        | Secret for JWT tokens        | Yes      | -                      |
 | `PYTHON_EXECUTABLE` | Path to Python               | Yes      | python3                |
-| `FRONTEND_URL`      | Frontend URL for CORS        | Yes      | http://localhost:5173  |
+| `FRONTEND_URL`      | Frontend URL for CORS        | Yes      | <http://localhost:5173>  |
 
 ### Frontend Variables
 
 | Variable       | Description          | Required | Default               |
 | -------------- | -------------------- | -------- | --------------------- |
-| `VITE_API_URL` | Backend API base URL | Yes      | http://localhost:3000 |
+| `VITE_API_URL` | Backend API base URL | Yes      | <http://localhost:3000> |
 
 ## Database Management
 
@@ -483,6 +483,6 @@ Before deploying to production:
 
 For issues and questions:
 
-- GitHub Issues: https://github.com/xiaoland/Xenix/issues
+- GitHub Issues: <https://github.com/xiaoland/Xenix/issues>
 - Documentation: See `docs/` directory
 - Architecture: See `ARCHITECTURE.md` and `docs/plan/monorepo-refactor-vite-vue-hono.md`
