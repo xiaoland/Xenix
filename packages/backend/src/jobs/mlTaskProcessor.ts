@@ -2,8 +2,8 @@
  * ML Task Job Processor
  * Handles ML tasks (auto-tune, manual-tune, predict) in background
  */
-
 import { Job } from 'bullmq';
+
 import { autoTune, manualTune, predictInline } from '../business/ml/index.js';
 import { TaskRepository } from '../repositories/index.js';
 import logger from '../utils/logger/index.js';
@@ -71,7 +71,7 @@ export async function processMLTask(job: Job<MLTaskData>) {
     return result;
   } catch (error) {
     logger.error({ jobId: job.id, taskId, type, error }, 'ML task failed');
-    
+
     // Update task status to failed
     await taskRepo.updateStatus(
       taskId,

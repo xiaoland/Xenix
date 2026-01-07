@@ -9,7 +9,7 @@
             </router-link>
             <span class="text-sm text-gray-500">ML Training Platform</span>
           </div>
-          
+
           <div class="flex items-center gap-4">
             <router-link
               to="/"
@@ -17,15 +17,21 @@
             >
               Projects
             </router-link>
-            
+
             <router-link
               to="/tasks"
               class="text-gray-700 hover:text-blue-600 transition-colors"
             >
               Tasks
             </router-link>
-            
-            <a-button v-if="isAuthenticated" type="text" danger class="inline-flex items-center" @click="handleLogout">
+
+            <a-button
+              v-if="isAuthenticated"
+              type="text"
+              danger
+              class="inline-flex items-center"
+              @click="handleLogout"
+            >
               <span class="i-mdi-logout mr-1" />
               Logout
             </a-button>
@@ -39,7 +45,9 @@
     </main>
 
     <footer class="bg-white border-t border-gray-200 mt-auto">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center text-sm text-gray-500">
+      <div
+        class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center text-sm text-gray-500"
+      >
         © 2026 Xenix ML Platform
       </div>
     </footer>
@@ -48,10 +56,9 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useRouter } from 'vue-router';
+
 import { useAuthStore } from '../stores/auth';
 
-const router = useRouter();
 const authStore = useAuthStore();
 
 const isAuthenticated = computed(() => authStore.isAuthenticated);

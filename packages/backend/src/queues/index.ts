@@ -2,9 +2,10 @@
  * Queue Configuration
  * Centralized Redis connection and queue setup
  */
-
 import { Queue, QueueEvents } from 'bullmq';
+
 import { config } from '../config/index.js';
+import { QUEUE_CONFIG, REDIS_DEFAULTS } from '../constants/config.js';
 import logger from '../utils/logger/index.js';
 
 // Parse Redis URL once
@@ -13,7 +14,7 @@ const redisUrl = new URL(config.REDIS_URL);
 // Redis connection configuration
 export const connection = {
   host: redisUrl.hostname,
-  port: Number(redisUrl.port) || 6379,
+  port: Number(redisUrl.port) || REDIS_DEFAULTS.PORT,
 };
 
 // Queue names
@@ -28,14 +29,14 @@ export const mlTasksQueue = new Queue(QUEUE_NAMES.ML_TASKS, {
     attempts: 3,
     backoff: {
       type: 'exponential',
-      delay: 2000,
+      delay: QUEUE_CONFIG.RETRY_DELAY,
     },
     removeOnComplete: {
-      age: 24 * 3600, // Keep completed jobs for 24 hours
-      count: 1000,
+      age: QUEUE_CONFIG.COMPLETED_JOB_AGE,
+      count: QUEUE_CONFIG.COMPLETED_JOB_COUNT,
     },
     removeOnFail: {
-      age: 7 * 24 * 3600, // Keep failed jobs for 7 days
+      age: QUEUE_CONFIG.FAILED_JOB_AGE,
     },
   },
 });

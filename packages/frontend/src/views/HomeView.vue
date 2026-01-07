@@ -61,19 +61,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { useRouter } from "vue-router";
-import { message } from "ant-design-vue";
-import type { Project } from "@xenix/shared";
-import DefaultLayout from "../layouts/DefaultLayout.vue";
-import ProjectCard from "../components/project/ProjectCard.vue";
-import ProjectFormModal from "../components/project/ProjectFormModal.vue";
+import { message } from 'ant-design-vue';
+
+import { computed, ref } from 'vue';
+import { useRouter } from 'vue-router';
+
+import type { Project } from '@xenix/shared';
+
+import ProjectCard from '../components/project/ProjectCard.vue';
+import ProjectFormModal from '../components/project/ProjectFormModal.vue';
 import {
-  useProjects,
   useCreateProject,
-  useUpdateProject,
   useDeleteProject,
-} from "../composables";
+  useProjects,
+  useUpdateProject,
+} from '../composables';
+import DefaultLayout from '../layouts/DefaultLayout.vue';
 
 const router = useRouter();
 
@@ -93,12 +96,12 @@ const editingProject = ref<Partial<Project>>({});
 const handleCreate = (values: { name: string; description?: string }) => {
   createProject(values, {
     onSuccess: () => {
-      message.success("Project created successfully");
+      message.success('Project created successfully');
       showCreateModal.value = false;
     },
     onError: (error: any) => {
-      console.error("Failed to create project:", error);
-      message.error("Failed to create project");
+      console.error('Failed to create project:', error);
+      message.error('Failed to create project');
     },
   });
 };
@@ -115,12 +118,12 @@ const handleUpdate = (values: any) => {
     { id: editingProject.value.id, updates: values },
     {
       onSuccess: () => {
-        message.success("Project updated successfully");
+        message.success('Project updated successfully');
         showEditModal.value = false;
       },
       onError: (error: any) => {
-        console.error("Failed to update project:", error);
-        message.error("Failed to update project");
+        console.error('Failed to update project:', error);
+        message.error('Failed to update project');
       },
     }
   );
@@ -129,11 +132,11 @@ const handleUpdate = (values: any) => {
 const handleDelete = (projectId: number) => {
   deleteProject(projectId, {
     onSuccess: () => {
-      message.success("Project deleted successfully");
+      message.success('Project deleted successfully');
     },
     onError: (error: any) => {
-      console.error("Failed to delete project:", error);
-      message.error("Failed to delete project");
+      console.error('Failed to delete project:', error);
+      message.error('Failed to delete project');
     },
   });
 };

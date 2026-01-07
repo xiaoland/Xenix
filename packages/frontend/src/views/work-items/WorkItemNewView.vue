@@ -17,7 +17,7 @@
           layout="vertical"
           @finish="handleSubmit"
         >
-          <a-form-item label="Project" name="projectId" v-if="!projectId">
+          <a-form-item v-if="!projectId" label="Project" name="projectId">
             <a-select
               v-model:value="formState.projectId"
               placeholder="Select a project"
@@ -75,12 +75,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { useRouter, useRoute } from "vue-router";
-import { message } from "ant-design-vue";
-import type { Project } from "@xenix/shared";
-import DefaultLayout from "../../layouts/DefaultLayout.vue";
-import { useProjects, useCreateWorkItem } from "../../composables";
+import { message } from 'ant-design-vue';
+
+import { computed, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+
+import type { Project } from '@xenix/shared';
+
+import { useCreateWorkItem, useProjects } from '../../composables';
+import DefaultLayout from '../../layouts/DefaultLayout.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -100,8 +103,8 @@ const projects = computed(() =>
 
 const formState = ref({
   projectId: projectId.value || undefined,
-  name: "",
-  description: "",
+  name: '',
+  description: '',
 });
 
 const selectedProject = computed(() => {
@@ -111,17 +114,17 @@ const selectedProject = computed(() => {
 
 const rules = {
   projectId: [
-    { required: true, message: "Please select a project", type: "number" },
+    { required: true, message: 'Please select a project', type: 'number' },
   ],
   name: [
-    { required: true, message: "Please enter work item name", trigger: "blur" },
-    { min: 2, message: "Name must be at least 2 characters", trigger: "blur" },
+    { required: true, message: 'Please enter work item name', trigger: 'blur' },
+    { min: 2, message: 'Name must be at least 2 characters', trigger: 'blur' },
   ],
 };
 
 const handleSubmit = () => {
   if (!formState.value.projectId) {
-    message.error("Please select a project");
+    message.error('Please select a project');
     return;
   }
 
@@ -133,20 +136,20 @@ const handleSubmit = () => {
     },
     {
       onSuccess: (workItem) => {
-        message.success("Work item created successfully");
+        message.success('Work item created successfully');
         // Navigate to the work item detail page
         router.push(`/work-items/${workItem.id}`);
       },
       onError: (error: any) => {
-        console.error("Failed to create work item:", error);
-        message.error("Failed to create work item");
+        console.error('Failed to create work item:', error);
+        message.error('Failed to create work item');
       },
     }
   );
 };
 
 const handleCancel = () => {
-  router.push("/");
+  router.push('/');
 };
 </script>
 

@@ -34,7 +34,7 @@
           Start Auto-Tune
         </a-button>
         <a-button
-          :disabled="tasks.length === 0"
+          :disabled="tasks?.length === 0"
           danger
           class="inline-flex items-center"
           @click="handleClearFailedTasks"
@@ -107,7 +107,7 @@
       </a-table>
 
       <div
-        v-if="tasks.length === 0 && !loading"
+        v-if="tasks?.length === 0 && !loading"
         class="text-center py-8 text-gray-500"
       >
         No training tasks yet. Select models and start training.
@@ -129,11 +129,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
 import { message } from "ant-design-vue";
+
+import { onMounted, onUnmounted, ref } from "vue";
+
+import type { Task } from "@xenix/shared";
+
 import { client } from "../../../api/client";
 import { AVAILABLE_MODELS } from "../../../constants/models";
-import type { Task } from "@xenix/shared";
+import { POLLING_CONFIG } from "../../../constants/config";
+import { useTasks } from "@/composables";
 
 const props = defineProps<{
   workItemId: number;
@@ -144,16 +149,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   continue: [
-    data: { model: string; parameters: Record<string, any>; taskId: number }
+    data: { model: string; parameters: Record<string, any>; taskId: number },
   ];
   back: [];
 }>();
 
 // State
 const selectedModels = ref<string[]>([]);
-const tasks = ref<Task[]>([]);
 const selectedTaskId = ref<number | null>(null);
-const loading = ref(false);
 const isTraining = ref(false);
 
 // Available models
@@ -176,25 +179,14 @@ let pollInterval: number | null = null;
 /**
  * Fetch tuning tasks for the work item
  */
-const fetchTasks = async () => {
-  loading.value = true;
-  try {
-    const response = await client.tasks.$get({
-      query: {
-        workItemId: String(props.workItemId),
-        types: "auto-tune,manual-tune",
-      },
-    });
-    if (response.ok) {
-      const data = (await response.json()) as any;
-      tasks.value = data.tasks || [];
-    }
-  } catch (error) {
-    console.error("Failed to fetch tasks:", error);
-  } finally {
-    loading.value = false;
-  }
-};
+const {
+  data: tasks,
+  isLoading: loading,
+  refetch: fetchTasks,
+} = useTasks({
+  workItemId: String(props.workItemId),
+  types: "auto-tune,manual-tune",
+});
 
 /**
  * Start auto-tune for selected models
@@ -234,10 +226,11 @@ const handleStartAutoTune = async () => {
  */
 const handleClearFailedTasks = async () => {
   try {
-    // TODO: implement delete failed tasks
+    // NOTE: Backend endpoint for bulk task deletion not yet implemented
+    // Future: Implement DELETE /api/tasks/failed endpoint
     // await TaskService.deleteFailedTasks(props.workItemId);
-    message.success("Failed tasks cleared");
-    await fetchTasks();
+    message.info("Task deletion feature coming soon");
+    // await fetchTasks();
   } catch (error: any) {
     console.error("Failed to clear tasks:", error);
     message.error(error.message || "Failed to clear tasks");
@@ -282,7 +275,7 @@ const handleContinue = async () => {
 const startPolling = () => {
   if (pollInterval) return;
   pollInterval = window.setInterval(() => {
-    const hasRunningTasks = tasks.value.some(
+    const hasRunningTasks = (tasks.value ?? []).some(
       (t: Task) => t.status === "pending" || t.status === "running"
     );
     if (hasRunningTasks) {
@@ -290,7 +283,7 @@ const startPolling = () => {
     } else {
       stopPolling();
     }
-  }, 3000);
+  }, POLLING_CONFIG.DEFAULT_INTERVAL);
 };
 
 /**
@@ -358,7 +351,7 @@ const getDisplayMetrics = (result: any) => {
 // Lifecycle
 onMounted(async () => {
   await fetchTasks();
-  const hasRunningTasks = tasks.value.some(
+  const hasRunningTasks = (tasks.value ?? []).some(
     (t: Task) => t.status === "pending" || t.status === "running"
   );
   if (hasRunningTasks) {

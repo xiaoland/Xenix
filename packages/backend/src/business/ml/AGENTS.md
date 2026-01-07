@@ -141,8 +141,8 @@ Output:
 ```json
 {
   "success": true,
-  "params": {"n_estimators": 100, "max_depth": 10},
-  "metrics": {"mse": 0.05, "mae": 0.15, "r2": 0.92}
+  "params": { "n_estimators": 100, "max_depth": 10 },
+  "metrics": { "mse": 0.05, "mae": 0.15, "r2": 0.92 }
 }
 ```
 
@@ -158,7 +158,7 @@ Input:
   "featureColumns": ["col1", "col2"],
   "targetColumn": "target",
   "model": "sklearn.ensemble.RandomForestRegressor",
-  "params": {"n_estimators": 200, "max_depth": 15}
+  "params": { "n_estimators": 200, "max_depth": 15 }
 }
 ```
 
@@ -175,7 +175,7 @@ Input:
   "featureColumns": ["col1", "col2"],
   "targetColumn": "target",
   "model": "sklearn.ensemble.RandomForestRegressor",
-  "params": {"n_estimators": 100}
+  "params": { "n_estimators": 100 }
 }
 ```
 
@@ -211,20 +211,20 @@ Output:
 
 ### Regression
 
-| Model | File | Key Parameters |
-|-------|------|----------------|
-| Linear Regression | linear_regression_hyperparameter_tuning.py | fit_intercept |
-| Ridge | ridge.py | alpha |
-| Lasso | lasso.py | alpha |
-| Polynomial | polynomial_regression.py | degree |
-| KNN | k_nearest_neighbors.py | n_neighbors, weights |
-| Decision Tree | regression_decision_tree.py | max_depth, min_samples_split |
-| Random Forest | random_forest.py | n_estimators, max_depth |
-| AdaBoost | adaboost.py | n_estimators, learning_rate |
-| GBDT | gbdt.py | n_estimators, learning_rate, max_depth |
-| XGBoost | xgboost.py | n_estimators, learning_rate, max_depth |
-| LightGBM | lightgbm.py | n_estimators, learning_rate, num_leaves |
-| Bayesian Ridge | bayesian_ridge_regression.py | alpha_1, alpha_2, lambda_1, lambda_2 |
+| Model             | File                                       | Key Parameters                          |
+| ----------------- | ------------------------------------------ | --------------------------------------- |
+| Linear Regression | linear_regression_hyperparameter_tuning.py | fit_intercept                           |
+| Ridge             | ridge.py                                   | alpha                                   |
+| Lasso             | lasso.py                                   | alpha                                   |
+| Polynomial        | polynomial_regression.py                   | degree                                  |
+| KNN               | k_nearest_neighbors.py                     | n_neighbors, weights                    |
+| Decision Tree     | regression_decision_tree.py                | max_depth, min_samples_split            |
+| Random Forest     | random_forest.py                           | n_estimators, max_depth                 |
+| AdaBoost          | adaboost.py                                | n_estimators, learning_rate             |
+| GBDT              | gbdt.py                                    | n_estimators, learning_rate, max_depth  |
+| XGBoost           | xgboost.py                                 | n_estimators, learning_rate, max_depth  |
+| LightGBM          | lightgbm.py                                | n_estimators, learning_rate, num_leaves |
+| Bayesian Ridge    | bayesian_ridge_regression.py               | alpha_1, alpha_2, lambda_1, lambda_2    |
 
 ## Adding a New Model
 

@@ -2,10 +2,7 @@
   <div class="space-y-4">
     <a-form layout="vertical">
       <a-form-item label="Dataset Name" required>
-        <a-input
-          v-model:value="datasetName"
-          placeholder="Enter dataset name"
-        />
+        <a-input v-model:value="datasetName" placeholder="Enter dataset name" />
       </a-form-item>
 
       <a-form-item label="Select File" required>
@@ -27,9 +24,7 @@
     </a-form>
 
     <div class="flex justify-end space-x-2">
-      <a-button @click="emit('cancel')">
-        Cancel
-      </a-button>
+      <a-button @click="emit('cancel')"> Cancel </a-button>
       <a-button
         type="primary"
         :loading="uploading"
@@ -43,9 +38,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
 import { message } from 'ant-design-vue';
 import type { UploadProps } from 'ant-design-vue';
+
+import { computed, ref } from 'vue';
+
 import { useUploadDataset } from '../../composables';
 
 const props = defineProps<{
@@ -71,7 +68,8 @@ const beforeUpload: UploadProps['beforeUpload'] = (file) => {
   const isValidFormat =
     file.type === 'text/csv' ||
     file.type === 'application/vnd.ms-excel' ||
-    file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    file.type ===
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
   if (!isValidFormat) {
     message.error('You can only upload CSV or Excel files!');
@@ -99,7 +97,7 @@ const handleUpload = () => {
     onSuccess: () => {
       message.success('Dataset uploaded successfully');
       emit('success');
-      
+
       // Reset form
       datasetName.value = '';
       fileList.value = [];
@@ -107,7 +105,7 @@ const handleUpload = () => {
     onError: (error: any) => {
       console.error('Upload failed:', error);
       message.error('Failed to upload dataset');
-    }
+    },
   });
 };
 </script>

@@ -1,10 +1,11 @@
-import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router';
+import { RouteRecordRaw, createRouter, createWebHistory } from 'vue-router';
 
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
     name: 'Home',
     component: () => import('../views/HomeView.vue'),
+    meta: { requiresAuth: true },
   },
   {
     path: '/auth',
@@ -20,18 +21,6 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/auth/SignUpView.vue'),
       },
     ],
-  },
-  {
-    path: '/projects',
-    name: 'Projects',
-    component: () => import('../views/projects/ProjectsView.vue'),
-    meta: { requiresAuth: true },
-  },
-  {
-    path: '/projects/:id',
-    name: 'ProjectDetail',
-    component: () => import('../views/projects/ProjectDetailView.vue'),
-    meta: { requiresAuth: true },
   },
   {
     path: '/work-items/new',
@@ -67,7 +56,7 @@ const router = createRouter({
 // Navigation guard for authentication
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('auth_token');
-  
+
   if (to.meta.requiresAuth && !token) {
     next('/auth/signin');
   } else {

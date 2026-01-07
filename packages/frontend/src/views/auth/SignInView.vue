@@ -3,19 +3,15 @@
     <div class="max-w-md w-full px-4">
       <a-card class="shadow-lg">
         <div class="text-center mb-6">
-          <h1 class="text-2xl font-bold text-gray-900 mb-2">
-            Sign In
-          </h1>
-          <p class="text-gray-600">
-            ML Training Platform
-          </p>
+          <h1 class="text-2xl font-bold text-gray-900 mb-2">Sign In</h1>
+          <p class="text-gray-600">ML Training Platform</p>
         </div>
 
         <a-form
           :model="formData"
           :rules="rules"
-          @finish="handleSignin"
           layout="vertical"
+          @finish="handleSignin"
         >
           <a-form-item label="Email or Phone" name="identifier">
             <a-input
@@ -90,8 +86,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
+import { onMounted, reactive, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+
 import { useAuthStore } from '../../stores/auth';
 
 const router = useRouter();
@@ -104,12 +101,8 @@ const formData = reactive({
 });
 
 const rules = {
-  identifier: [
-    { required: true, message: 'Email or phone is required' },
-  ],
-  password: [
-    { required: true, message: 'Password is required' },
-  ],
+  identifier: [{ required: true, message: 'Email or phone is required' }],
+  password: [{ required: true, message: 'Password is required' }],
 };
 
 const isLoading = ref(false);
@@ -149,4 +142,3 @@ async function handleSignin() {
 <style scoped>
 /* Additional styles if needed */
 </style>
-

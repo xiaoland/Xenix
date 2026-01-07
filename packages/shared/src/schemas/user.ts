@@ -1,8 +1,7 @@
 /**
  * User Zod schemas for validation
  */
-
-import { z } from "zod";
+import { z } from 'zod';
 
 export const UserSchema = z.object({
   id: z.string().uuid(),

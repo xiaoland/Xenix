@@ -17,7 +17,7 @@ export interface TuningResult {
   metrics?: TuningMetrics;
   r2?: number;
   status?: string;
-  trainingType?: "auto" | "manual";
+  trainingType?: 'auto' | 'manual';
   createdAt?: string | Date;
   taskId?: number;
 }

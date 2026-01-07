@@ -1,11 +1,10 @@
-import { Context, Next } from 'hono';
-import jwt from 'jsonwebtoken';
-import { db, schema } from '../database/index.js';
 import { eq } from 'drizzle-orm';
-import {
-  UnauthorizedError,
-  InternalServerError,
-} from '../errors/index.js';
+import jwt from 'jsonwebtoken';
+
+import { Context, Next } from 'hono';
+
+import { db, schema } from '../database/index.js';
+import { InternalServerError, UnauthorizedError } from '../errors/index.js';
 
 export interface AuthUser {
   id: string;

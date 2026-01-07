@@ -2,7 +2,6 @@
  * Pino logger configuration
  * Provides structured logging throughout the application
  */
-
 import pino from 'pino';
 
 const isDevelopment = process.env.NODE_ENV === 'development';

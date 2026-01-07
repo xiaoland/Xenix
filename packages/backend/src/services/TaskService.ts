@@ -2,9 +2,8 @@
  * Task Service
  * Business logic for task operations
  */
-
-import { TaskRepository } from '../repositories/index.js';
 import { NotFoundError } from '../errors/index.js';
+import { TaskRepository } from '../repositories/index.js';
 
 export class TaskService {
   private taskRepo: TaskRepository;

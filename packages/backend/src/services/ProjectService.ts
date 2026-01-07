@@ -2,10 +2,10 @@
  * Project Service
  * Business logic for project operations
  */
-
-import { ProjectRepository } from '../repositories/index.js';
-import { NotFoundError, ForbiddenError } from '../errors/index.js';
 import type { CreateProjectDto, UpdateProjectDto } from '@xenix/shared';
+
+import { ForbiddenError, NotFoundError } from '../errors/index.js';
+import { ProjectRepository } from '../repositories/index.js';
 
 export class ProjectService {
   private projectRepo: ProjectRepository;

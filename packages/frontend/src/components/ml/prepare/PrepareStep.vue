@@ -64,12 +64,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { message } from "ant-design-vue";
-import DatasetSelector from "../../dataset/DatasetSelector.vue";
-import ColumnSelector from "./ColumnSelector.vue";
-import { useUpdateWorkItem } from "../../../composables";
-import { client } from "../../../api/client";
+import { message } from 'ant-design-vue';
+
+import { computed, ref } from 'vue';
+
+import { useUpdateWorkItem } from '../../../composables';
+import DatasetSelector from '../../dataset/DatasetSelector.vue';
+import ColumnSelector from './ColumnSelector.vue';
 
 interface WorkItem {
   id: number;
@@ -94,7 +95,7 @@ const emit = defineEmits<{
 }>();
 
 const selectedDatasetId = ref<number | undefined>(props.workItem.datasetId);
-const selectedDatasetName = ref<string>("");
+const selectedDatasetName = ref<string>('');
 const datasetColumns = ref<string[]>([]);
 const featureColumns = ref<string[]>(props.workItem.featureColumns || []);
 const targetColumn = ref<string | undefined>(props.workItem.targetColumn);
@@ -122,7 +123,7 @@ const handleDatasetSelect = async (dataset: Dataset) => {
 
 const changeDataset = () => {
   selectedDatasetId.value = undefined;
-  selectedDatasetName.value = "";
+  selectedDatasetName.value = '';
   datasetColumns.value = [];
   featureColumns.value = [];
   targetColumn.value = undefined;
@@ -142,12 +143,12 @@ const handleConfirm = () => {
     },
     {
       onSuccess: () => {
-        message.success("Dataset configuration saved successfully");
-        emit("confirm");
+        message.success('Dataset configuration saved successfully');
+        emit('confirm');
       },
       onError: (error: any) => {
-        console.error("Failed to save configuration:", error);
-        message.error("Failed to save configuration");
+        console.error('Failed to save configuration:', error);
+        message.error('Failed to save configuration');
       },
     }
   );

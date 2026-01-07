@@ -1,7 +1,6 @@
 /**
  * Model Zod schemas for validation
  */
-
 import { z } from 'zod';
 
 export const ModelMetadataSchema = z.object({

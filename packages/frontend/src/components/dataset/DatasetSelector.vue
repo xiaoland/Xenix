@@ -10,9 +10,7 @@
         <template #image>
           <span class="i-mdi-database-off text-6xl text-gray-400"></span>
         </template>
-        <p class="text-gray-600 mb-4">
-          Upload a dataset to get started.
-        </p>
+        <p class="text-gray-600 mb-4">Upload a dataset to get started.</p>
       </a-empty>
     </div>
 
@@ -31,7 +29,7 @@
             class="i-mdi-check-circle text-blue-500 text-xl"
           ></span>
         </div>
-        <p class="text-sm text-gray-600 mb-2" v-if="dataset.filePath">
+        <p v-if="dataset.filePath" class="text-sm text-gray-600 mb-2">
           {{ dataset.filePath.split('/').pop() }}
         </p>
         <div class="text-sm text-gray-500">
@@ -46,8 +44,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
 import { message } from 'ant-design-vue';
+
+import { computed, ref } from 'vue';
+
 import { useDatasets } from '../../composables';
 
 interface Dataset {
@@ -58,7 +58,7 @@ interface Dataset {
   createdAt?: string;
 }
 
-const props = defineProps<{
+defineProps<{
   projectId: number;
 }>();
 

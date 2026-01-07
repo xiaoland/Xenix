@@ -1,7 +1,6 @@
 /**
  * Project and WorkItem Zod schemas for validation
  */
-
 import { z } from 'zod';
 
 export const WorkItemSchema = z.object({
@@ -55,9 +54,21 @@ export const UpdateWorkItemSchema = z.object({
   selectedModels: z.array(z.string()).optional(),
 });
 
+// Parameter validation schemas
+export const ProjectIdParamSchema = z.object({
+  id: z.string().regex(/^\d+$/, 'Invalid project ID'),
+});
+
+export const WorkItemIdParamSchema = z.object({
+  id: z.string().regex(/^\d+$/, 'Invalid work item ID'),
+});
+
+// Type exports
 export type WorkItem = z.infer<typeof WorkItemSchema>;
 export type Project = z.infer<typeof ProjectSchema>;
 export type CreateProjectDto = z.infer<typeof CreateProjectSchema>;
 export type UpdateProjectDto = z.infer<typeof UpdateProjectSchema>;
 export type CreateWorkItemDto = z.infer<typeof CreateWorkItemSchema>;
 export type UpdateWorkItemDto = z.infer<typeof UpdateWorkItemSchema>;
+export type ProjectIdParam = z.infer<typeof ProjectIdParamSchema>;
+export type WorkItemIdParam = z.infer<typeof WorkItemIdParamSchema>;

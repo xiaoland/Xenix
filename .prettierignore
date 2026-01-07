@@ -1,0 +1,20 @@
+# Build outputs
+dist
+.output
+.nuxt
+.nitro
+.cache
+coverage
+
+# Dependencies
+node_modules
+pnpm-lock.yaml
+
+# Generated files
+*.gen.ts
+*.generated.ts
+
+# Data directories
+datasets
+uploads
+data

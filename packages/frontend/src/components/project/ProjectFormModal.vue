@@ -5,10 +5,7 @@
     @ok="handleSubmit"
     @cancel="handleCancel"
   >
-    <a-form
-      :model="formData"
-      layout="vertical"
-    >
+    <a-form :model="formData" layout="vertical">
       <a-form-item
         label="Project Name"
         name="name"
@@ -20,10 +17,7 @@
         />
       </a-form-item>
 
-      <a-form-item
-        label="Description"
-        name="description"
-      >
+      <a-form-item label="Description" name="description">
         <a-textarea
           v-model:value="formData.description"
           placeholder="Enter project description (optional)"
@@ -31,11 +25,7 @@
         />
       </a-form-item>
 
-      <a-form-item
-        v-if="showStatus"
-        label="Status"
-        name="status"
-      >
+      <a-form-item v-if="showStatus" label="Status" name="status">
         <a-select v-model:value="formData.status">
           <a-select-option value="active">Active</a-select-option>
           <a-select-option value="completed">Completed</a-select-option>
@@ -72,23 +62,26 @@ const formData = ref({
   status: 'active',
 });
 
-watch(() => props.open, (isOpen) => {
-  if (isOpen) {
-    if (props.initialValues.id) {
-      formData.value = {
-        name: props.initialValues.name || '',
-        description: props.initialValues.description || '',
-        status: props.initialValues.status || 'active',
-      };
-    } else {
-      formData.value = {
-        name: '',
-        description: '',
-        status: 'active',
-      };
+watch(
+  () => props.open,
+  (isOpen) => {
+    if (isOpen) {
+      if (props.initialValues.id) {
+        formData.value = {
+          name: props.initialValues.name || '',
+          description: props.initialValues.description || '',
+          status: props.initialValues.status || 'active',
+        };
+      } else {
+        formData.value = {
+          name: '',
+          description: '',
+          status: 'active',
+        };
+      }
     }
   }
-});
+);
 
 const handleSubmit = () => {
   if (!formData.value.name.trim()) {

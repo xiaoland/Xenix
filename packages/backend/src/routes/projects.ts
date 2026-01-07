@@ -1,187 +1,71 @@
-import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
-import { db, schema } from "../database/index.js";
-import { desc, eq } from "drizzle-orm";
-import { authMiddleware, requireAuth } from "../middleware/auth.js";
-import { CreateProjectSchema, UpdateProjectSchema } from "@xenix/shared";
-import {
-  NotFoundError,
-  BadRequestError,
-  ForbiddenError,
-} from "../errors/index.js";
+import { zValidator } from '@hono/zod-validator';
+import { Hono } from 'hono';
 
-const projects = new Hono()
-  .use("*", authMiddleware)
+import {
+  CreateProjectSchema,
+  ProjectIdParamSchema,
+  UpdateProjectSchema,
+} from '@xenix/shared';
+
+import { authMiddleware, requireAuth } from '../middleware/auth.js';
+import { ProjectService } from '../services/index.js';
+
+const projects = new Hono();
+const projectService = new ProjectService();
+
+projects
+  .use('*', authMiddleware)
 
   // Get all projects - returns array directly (HTTP semantics)
-  .get("/", async (c) => {
+  .get('/', async (c) => {
     const user = requireAuth(c);
-
-    // Fetch projects created by the current user
-    const projectsList = await db
-      .select()
-      .from(schema.projects)
-      .where(eq(schema.projects.createdBy, user.id))
-      .orderBy(desc(schema.projects.createdAt));
-
-    // For each project, fetch its work items and datasets
-    const projectsWithRelations = await Promise.all(
-      projectsList.map(async (project) => {
-        const workItems = await db
-          .select()
-          .from(schema.workItems)
-          .where(eq(schema.workItems.projectId, project.id));
-
-        const datasets = await db
-          .select()
-          .from(schema.datasets)
-          .where(eq(schema.datasets.projectId, project.id));
-
-        return {
-          ...project,
-          workItems,
-          datasets,
-        };
-      })
-    );
-
-    // Return projects array directly (no envelope)
-    return c.json(projectsWithRelations);
+    const projectsList = await projectService.getAllProjects(user.id);
+    return c.json(projectsList);
   })
 
   // Create project - returns created project directly (HTTP semantics)
-  .post("/", zValidator("json", CreateProjectSchema), async (c) => {
+  .post('/', zValidator('json', CreateProjectSchema), async (c) => {
     const user = requireAuth(c);
-    const { name, description } = c.req.valid("json");
-
-    // Create project record
-    const result = await db
-      .insert(schema.projects)
-      .values({
-        name,
-        description: description || null,
-        status: "active",
-        createdBy: user.id,
-      })
-      .returning();
-
-    const project = result[0];
-
-    // Return project directly (no envelope), 201 Created
+    const data = c.req.valid('json');
+    const project = await projectService.createProject(user.id, data);
     return c.json(project, 201);
   })
 
   // Get single project - returns project directly (HTTP semantics)
-  .get("/:id", async (c) => {
+  .get('/:id', zValidator('param', ProjectIdParamSchema), async (c) => {
     const user = requireAuth(c);
-    const id = parseInt(c.req.param("id"));
-
-    if (isNaN(id)) {
-      throw new BadRequestError("Invalid project ID");
-    }
-
-    const [project] = await db
-      .select()
-      .from(schema.projects)
-      .where(eq(schema.projects.id, id))
-      .limit(1);
-
-    if (!project) {
-      throw new NotFoundError("Project");
-    }
-
-    // Verify ownership
-    if (project.createdBy !== user.id) {
-      throw new ForbiddenError("Access denied to this project");
-    }
-
-    // Fetch related work items and datasets
-    const workItems = await db
-      .select()
-      .from(schema.workItems)
-      .where(eq(schema.workItems.projectId, id));
-
-    const datasets = await db
-      .select()
-      .from(schema.datasets)
-      .where(eq(schema.datasets.projectId, id));
-
-    // Return project directly (no envelope)
-    return c.json({
-      ...project,
-      workItems,
-      datasets,
-    });
+    const { id: idStr } = c.req.valid('param');
+    const id = parseInt(idStr);
+    const project = await projectService.getProjectById(id, user.id);
+    return c.json(project);
   })
 
   // Update project - returns updated project directly (HTTP semantics)
-  .put("/:id", zValidator("json", UpdateProjectSchema), async (c) => {
+  .put(
+    '/:id',
+    zValidator('param', ProjectIdParamSchema),
+    zValidator('json', UpdateProjectSchema),
+    async (c) => {
+      const user = requireAuth(c);
+      const { id: idStr } = c.req.valid('param');
+      const id = parseInt(idStr);
+      const data = c.req.valid('json');
+      const updatedProject = await projectService.updateProject(
+        id,
+        user.id,
+        data
+      );
+      return c.json(updatedProject);
+    }
+  )
+
+  // Delete project - returns success message (HTTP semantics)
+  .delete('/:id', zValidator('param', ProjectIdParamSchema), async (c) => {
     const user = requireAuth(c);
-    const id = parseInt(c.req.param("id"));
-    const updates = c.req.valid("json");
-
-    if (isNaN(id)) {
-      throw new BadRequestError("Invalid project ID");
-    }
-
-    // Check ownership
-    const [existingProject] = await db
-      .select()
-      .from(schema.projects)
-      .where(eq(schema.projects.id, id))
-      .limit(1);
-
-    if (!existingProject) {
-      throw new NotFoundError("Project");
-    }
-
-    if (existingProject.createdBy !== user.id) {
-      throw new ForbiddenError("Access denied to this project");
-    }
-
-    // Update project
-    const [updatedProject] = await db
-      .update(schema.projects)
-      .set({
-        ...updates,
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.projects.id, id))
-      .returning();
-
-    // Return updated project directly (no envelope)
-    return c.json(updatedProject);
-  })
-
-  // Delete project - returns 204 No Content (HTTP semantics)
-  .delete("/:id", async (c) => {
-    const user = requireAuth(c);
-    const id = parseInt(c.req.param("id"));
-
-    if (isNaN(id)) {
-      throw new BadRequestError("Invalid project ID");
-    }
-
-    // Check ownership
-    const [existingProject] = await db
-      .select()
-      .from(schema.projects)
-      .where(eq(schema.projects.id, id))
-      .limit(1);
-
-    if (!existingProject) {
-      throw new NotFoundError("Project");
-    }
-
-    if (existingProject.createdBy !== user.id) {
-      throw new ForbiddenError("Access denied to this project");
-    }
-
-    // Delete project
-    await db.delete(schema.projects).where(eq(schema.projects.id, id));
-
-    // Return 204 No Content (standard for successful DELETE)
-    return c.body(null, 204);
+    const { id: idStr } = c.req.valid('param');
+    const id = parseInt(idStr);
+    await projectService.deleteProject(id, user.id);
+    return c.json({ message: 'Project deleted successfully' });
   });
 
 export default projects;

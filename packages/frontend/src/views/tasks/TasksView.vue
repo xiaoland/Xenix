@@ -40,19 +40,19 @@
               <a-select-option value="">All</a-select-option>
               <a-select-option value="auto-tune">Auto-Tune</a-select-option>
               <a-select-option value="manual-tune">Manual-Tune</a-select-option>
-              <a-select-option value="predict-file"
-                >Predict (File)</a-select-option
-              >
-              <a-select-option value="predict-inline"
-                >Predict (Inline)</a-select-option
-              >
+              <a-select-option value="predict-file">
+                Predict (File)
+              </a-select-option>
+              <a-select-option value="predict-inline">
+                Predict (Inline)
+              </a-select-option>
             </a-select>
           </div>
 
           <a-button
-            @click="fetchTasks"
             :loading="loading"
             class="inline-flex items-center"
+            @click="fetchTasks"
           >
             <span class="i-mdi-refresh mr-1"></span>
             Refresh
@@ -114,8 +114,8 @@
             <template v-else-if="column.key === 'action'">
               <a-button
                 size="small"
-                @click="viewLogs(record.id)"
                 class="inline-flex items-center"
+                @click="viewLogs(record.id)"
               >
                 <span class="i-mdi-file-document-outline mr-1"></span>
                 Logs
@@ -156,19 +156,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { useRouter } from "vue-router";
-import { message } from "ant-design-vue";
-import DefaultLayout from "../../layouts/DefaultLayout.vue";
-import { useTasks, useFormatters } from "../../composables";
-import { AVAILABLE_MODELS } from "../../constants/models";
-import type { Task } from "@xenix/shared";
+import { message } from 'ant-design-vue';
 
-const router = useRouter();
-const { formatDate, formatStatus } = useFormatters();
+import { computed, ref } from 'vue';
+
+import { useFormatters, useTasks } from '../../composables';
+import { AVAILABLE_MODELS } from '../../constants/models';
+import DefaultLayout from '../../layouts/DefaultLayout.vue';
+
+const { formatDate } = useFormatters();
 
 // Use composables for data fetching with auto-refetch
-const { data: tasksData, isLoading: loading, error, refetch } = useTasks();
+const { data: tasksData, isLoading: loading, refetch } = useTasks();
 
 // Computed property to safely access tasks array
 const tasks = computed(() => tasksData.value || []);
@@ -177,39 +176,40 @@ const tasks = computed(() => tasksData.value || []);
 const logs = ref<any[]>([]);
 const loadingLogs = ref(false);
 const logsModalVisible = ref(false);
-const statusFilter = ref("");
-const typeFilter = ref("");
+const statusFilter = ref('');
+const typeFilter = ref('');
 const currentPage = ref(1);
 
 const fetchTasks = refetch;
 
 // Table columns
 const columns = [
-  { title: "ID", key: "id", width: 80 },
-  { title: "Type", key: "type", width: 140 },
-  { title: "Status", key: "status", width: 120 },
-  { title: "Model", key: "model", width: 150 },
-  { title: "Work Item", key: "workItem", width: 150 },
-  { title: "Created", key: "createdAt", width: 180 },
-  { title: "Action", key: "action", width: 100 },
+  { title: 'ID', key: 'id', width: 80 },
+  { title: 'Type', key: 'type', width: 140 },
+  { title: 'Status', key: 'status', width: 120 },
+  { title: 'Model', key: 'model', width: 150 },
+  { title: 'Work Item', key: 'workItem', width: 150 },
+  { title: 'Created', key: 'createdAt', width: 180 },
+  { title: 'Action', key: 'action', width: 100 },
 ];
 
 /**
  * View task logs
- * Note: This would need a corresponding composable for fetching logs
+ * Note: Requires backend endpoint implementation and useTaskLogs composable
+ * Future: Create packages/frontend/src/composables/useTaskLogs.ts
  */
-const viewLogs = async (taskId: number) => {
+const viewLogs = async (_taskId: number) => {
   logsModalVisible.value = true;
   loadingLogs.value = true;
 
   try {
-    // TODO: Create useTaskLogs composable
-    // For now, show message that logs feature needs backend endpoint
-    message.info("Logs feature requires backend implementation");
+    // Future: Implement backend GET /api/tasks/:id/logs endpoint
+    // Future: Create useTaskLogs composable for data fetching
+    message.info('Logs feature requires backend implementation');
     logs.value = [];
-  } catch (error: any) {
-    console.error("Failed to fetch logs:", error);
-    message.error(error.message || "Failed to fetch logs");
+  } catch (err: any) {
+    console.error('Failed to fetch logs:', err);
+    message.error(err.message || 'Failed to fetch logs');
     logs.value = [];
   } finally {
     loadingLogs.value = false;
@@ -221,16 +221,16 @@ const viewLogs = async (taskId: number) => {
  */
 const getStatusColor = (status: string) => {
   switch (status) {
-    case "completed":
-      return "success";
-    case "failed":
-      return "error";
-    case "running":
-      return "processing";
-    case "pending":
-      return "default";
+    case 'completed':
+      return 'success';
+    case 'failed':
+      return 'error';
+    case 'running':
+      return 'processing';
+    case 'pending':
+      return 'default';
     default:
-      return "default";
+      return 'default';
   }
 };
 
