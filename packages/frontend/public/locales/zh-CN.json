@@ -55,10 +55,14 @@
     "createNew": "创建新工作项",
     "name": "工作项名称",
     "namePlaceholder": "输入工作项名称",
+    "nameRequired": "请输入工作项名称",
+    "nameMinLength": "名称至少2个字符",
     "description": "描述",
     "descriptionPlaceholder": "可选描述",
-    "selectProject": "选择项目",
+    "selectProject": "项目",
     "selectProjectPlaceholder": "选择一个项目",
+    "selectProjectRequired": "请选择一个项目",
+    "creatingFor": "为项目创建工作项：{project}",
     "createButton": "创建工作项",
     "editWorkItem": "编辑工作项",
     "deleteWorkItem": "删除工作项",
@@ -79,7 +83,10 @@
     "createError": "创建工作项失败",
     "updateError": "更新工作项失败",
     "deleteError": "删除工作项失败",
-    "fetchError": "获取工作项失败"
+    "fetchError": "获取工作项失败",
+    "notFound": "工作项未找到",
+    "notFoundDescription": "您查找的工作项不存在或您无权访问。",
+    "backToHome": "返回首页"
   },
   "steps": {
     "prepare": {

@@ -55,10 +55,14 @@
     "createNew": "Create New Work Item",
     "name": "Work Item Name",
     "namePlaceholder": "Enter work item name",
+    "nameRequired": "Please enter work item name",
+    "nameMinLength": "Name must be at least 2 characters",
     "description": "Description",
     "descriptionPlaceholder": "Optional description",
-    "selectProject": "Select Project",
-    "selectProjectPlaceholder": "Choose a project",
+    "selectProject": "Project",
+    "selectProjectPlaceholder": "Select a project",
+    "selectProjectRequired": "Please select a project",
+    "creatingFor": "Creating work item for project: {project}",
     "createButton": "Create Work Item",
     "editWorkItem": "Edit Work Item",
     "deleteWorkItem": "Delete Work Item",
@@ -79,16 +83,23 @@
     "createError": "Failed to create work item",
     "updateError": "Failed to update work item",
     "deleteError": "Failed to delete work item",
-    "fetchError": "Failed to fetch work items"
+    "fetchError": "Failed to fetch work items",
+    "notFound": "Work Item Not Found",
+    "notFoundDescription": "The work item you're looking for doesn't exist or you don't have access to it.",
+    "backToHome": "Back to Home"
   },
   "steps": {
+    "prepare": {
+      "title": "Prepare",
+      "description": "Dataset & Column Selection"
+    },
     "upload": {
       "title": "Upload Data",
       "description": "Select or upload your training dataset"
     },
     "tune": {
-      "title": "Tune Models",
-      "description": "Train and tune machine learning models"
+      "title": "Tune",
+      "description": "Model Training & Tuning"
     },
     "uploadTrain": {
       "title": "Upload & Train",
@@ -96,7 +107,7 @@
     },
     "predict": {
       "title": "Predict",
-      "description": "Select model and make predictions"
+      "description": "Make Predictions"
     }
   },
   "upload": {

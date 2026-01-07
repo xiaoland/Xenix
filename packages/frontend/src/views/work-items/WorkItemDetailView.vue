@@ -20,12 +20,12 @@
       <div v-else-if="error" class="text-center py-12">
         <a-result
           status="404"
-          title="Work Item Not Found"
-          sub-title="The work item you're looking for doesn't exist or you don't have access to it."
+          :title="$t('workItems.notFound')"
+          :sub-title="$t('workItems.notFoundDescription')"
         >
           <template #extra>
             <a-button type="primary" @click="router.push('/')">
-              Back to Home
+              {{ $t('workItems.backToHome') }}
             </a-button>
           </template>
         </a-result>
@@ -47,9 +47,18 @@
         <!-- Workflow Steps -->
         <a-card class="mb-6">
           <a-steps :current="currentStep" class="mb-8">
-            <a-step title="Prepare" description="Dataset & Column Selection" />
-            <a-step title="Tune" description="Model Training & Tuning" />
-            <a-step title="Predict" description="Make Predictions" />
+            <a-step
+              :title="$t('steps.prepare.title')"
+              :description="$t('steps.prepare.description')"
+            />
+            <a-step
+              :title="$t('steps.tune.title')"
+              :description="$t('steps.tune.description')"
+            />
+            <a-step
+              :title="$t('steps.predict.title')"
+              :description="$t('steps.predict.description')"
+            />
           </a-steps>
 
           <!-- Step Content -->

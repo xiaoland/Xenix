@@ -4,23 +4,27 @@
       <div class="mb-6">
         <a-breadcrumb>
           <a-breadcrumb-item>
-            <router-link to="/">Home</router-link>
+            <router-link to="/">{{ $t('navigation.home') }}</router-link>
           </a-breadcrumb-item>
-          <a-breadcrumb-item>New Work Item</a-breadcrumb-item>
+          <a-breadcrumb-item>{{ $t('workItems.createNew') }}</a-breadcrumb-item>
         </a-breadcrumb>
       </div>
 
-      <a-card title="Create New Work Item">
+      <a-card :title="$t('workItems.createNew')">
         <a-form
           :model="formState"
           :rules="rules"
           layout="vertical"
           @finish="handleSubmit"
         >
-          <a-form-item v-if="!projectId" label="Project" name="projectId">
+          <a-form-item
+            v-if="!projectId"
+            :label="$t('workItems.selectProject')"
+            name="projectId"
+          >
             <a-select
               v-model:value="formState.projectId"
-              placeholder="Select a project"
+              :placeholder="$t('workItems.selectProjectPlaceholder')"
               :loading="isLoadingProjects"
             >
               <a-select-option
@@ -35,23 +39,25 @@
 
           <a-alert
             v-if="projectId && selectedProject"
-            :message="`Creating work item for project: ${selectedProject.name}`"
+            :message="
+              $t('workItems.creatingFor', { project: selectedProject.name })
+            "
             type="info"
             show-icon
             class="mb-4"
           />
 
-          <a-form-item label="Work Item Name" name="name">
+          <a-form-item :label="$t('workItems.name')" name="name">
             <a-input
               v-model:value="formState.name"
-              placeholder="Enter work item name"
+              :placeholder="$t('workItems.namePlaceholder')"
             />
           </a-form-item>
 
-          <a-form-item label="Description" name="description">
+          <a-form-item :label="$t('workItems.description')" name="description">
             <a-textarea
               v-model:value="formState.description"
-              placeholder="Enter work item description (optional)"
+              :placeholder="$t('workItems.descriptionPlaceholder')"
               :rows="4"
             />
           </a-form-item>
@@ -63,9 +69,11 @@
                 html-type="submit"
                 :loading="isSubmitting"
               >
-                Create Work Item
+                {{ $t('workItems.createButton') }}
               </a-button>
-              <a-button @click="handleCancel"> Cancel </a-button>
+              <a-button @click="handleCancel">
+                {{ $t('common.cancel') }}
+              </a-button>
             </div>
           </a-form-item>
         </a-form>
@@ -78,6 +86,7 @@
 import { message } from 'ant-design-vue';
 
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 
 import type { Project } from '@xenix/shared';
@@ -87,6 +96,7 @@ import DefaultLayout from '../../layouts/DefaultLayout.vue';
 
 const router = useRouter();
 const route = useRoute();
+const { t } = useI18n();
 
 const projectId = computed(() => {
   const id = route.query.projectId;
@@ -114,17 +124,29 @@ const selectedProject = computed(() => {
 
 const rules = {
   projectId: [
-    { required: true, message: 'Please select a project', type: 'number' },
+    {
+      required: true,
+      message: t('workItems.selectProjectRequired'),
+      type: 'number' as const,
+    },
   ],
   name: [
-    { required: true, message: 'Please enter work item name', trigger: 'blur' },
-    { min: 2, message: 'Name must be at least 2 characters', trigger: 'blur' },
+    {
+      required: true,
+      message: t('workItems.nameRequired'),
+      trigger: 'blur',
+    },
+    {
+      min: 2,
+      message: t('workItems.nameMinLength'),
+      trigger: 'blur',
+    },
   ],
 };
 
 const handleSubmit = () => {
   if (!formState.value.projectId) {
-    message.error('Please select a project');
+    message.error(t('workItems.selectProjectRequired'));
     return;
   }
 
@@ -136,13 +158,13 @@ const handleSubmit = () => {
     },
     {
       onSuccess: (workItem) => {
-        message.success('Work item created successfully');
+        message.success(t('workItems.createSuccess'));
         // Navigate to the work item detail page
         router.push(`/work-items/${workItem.id}`);
       },
       onError: (error: any) => {
         console.error('Failed to create work item:', error);
-        message.error('Failed to create work item');
+        message.error(t('workItems.createError'));
       },
     }
   );
