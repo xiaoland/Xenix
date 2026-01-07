@@ -3,35 +3,41 @@
     <!-- Feature Columns Selection -->
     <div>
       <label class="block text-sm font-medium mb-2">
-        Feature Columns <span class="text-red-500">*</span>
+        {{ $t("components.ml.columnSelector.featureColumns") }}
+        <span class="text-red-500">*</span>
       </label>
       <p class="text-sm text-gray-600 mb-3">
-        Select the columns that will be used as input features for the model.
+        {{ $t("components.ml.columnSelector.featureColumnsRequired") }}
       </p>
       <a-select
         v-model:value="localFeatureColumns"
         mode="multiple"
-        placeholder="Select feature columns"
+        :placeholder="$t('components.ml.columnSelector.featurePlaceholder')"
         :options="availableFeatureOptions"
         class="w-full"
         @change="handleFeatureColumnsChange"
       />
       <p class="text-xs text-gray-500 mt-1">
-        Selected: {{ localFeatureColumns.length }} column(s)
+        {{
+          $t("components.ml.columnSelector.selectedCount", {
+            count: localFeatureColumns.length,
+          })
+        }}
       </p>
     </div>
 
     <!-- Target Column Selection -->
     <div>
       <label class="block text-sm font-medium mb-2">
-        Target Column <span class="text-red-500">*</span>
+        {{ $t("components.ml.columnSelector.targetColumn") }}
+        <span class="text-red-500">*</span>
       </label>
       <p class="text-sm text-gray-600 mb-3">
-        Select the column that the model should predict.
+        {{ $t("components.ml.columnSelector.targetColumnRequired") }}
       </p>
       <a-select
         v-model:value="localTargetColumn"
-        placeholder="Select target column"
+        :placeholder="$t('components.ml.columnSelector.targetPlaceholder')"
         :options="availableTargetOptions"
         class="w-full"
         @change="handleTargetColumnChange"
@@ -43,17 +49,25 @@
       v-if="localFeatureColumns.length > 0 && localTargetColumn"
       class="bg-blue-50 border border-blue-200 rounded p-4"
     >
-      <h4 class="font-medium mb-2">Configuration Summary:</h4>
+      <h4 class="font-medium mb-2">
+        {{ $t("components.ml.columnSelector.summary") }}
+      </h4>
       <ul class="text-sm space-y-1">
-        <li><strong>Features:</strong> {{ localFeatureColumns.join(', ') }}</li>
-        <li><strong>Target:</strong> {{ localTargetColumn }}</li>
+        <li>
+          <strong>{{ $t("components.ml.columnSelector.features") }}:</strong>
+          {{ localFeatureColumns.join(", ") }}
+        </li>
+        <li>
+          <strong>{{ $t("components.ml.columnSelector.target") }}:</strong>
+          {{ localTargetColumn }}
+        </li>
       </ul>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch } from "vue";
 
 const props = defineProps<{
   columns: string[];
@@ -62,8 +76,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  'update:featureColumns': [value: string[]];
-  'update:targetColumn': [value: string];
+  "update:featureColumns": [value: string[]];
+  "update:targetColumn": [value: string];
 }>();
 
 const localFeatureColumns = ref<string[]>([...props.featureColumns]);
@@ -84,12 +98,12 @@ const availableTargetOptions = computed(() => {
 });
 
 const handleFeatureColumnsChange = () => {
-  emit('update:featureColumns', localFeatureColumns.value);
+  emit("update:featureColumns", localFeatureColumns.value);
 };
 
 const handleTargetColumnChange = () => {
   if (localTargetColumn.value) {
-    emit('update:targetColumn', localTargetColumn.value);
+    emit("update:targetColumn", localTargetColumn.value);
   }
 };
 

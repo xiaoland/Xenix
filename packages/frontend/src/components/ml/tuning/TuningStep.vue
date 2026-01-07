@@ -1,10 +1,11 @@
 <template>
   <div class="space-y-6">
-    <h2 class="text-2xl font-semibold mb-4">Model Tuning</h2>
+    <h2 class="text-2xl font-semibold mb-4">
+      {{ $t("components.ml.tuning.title") }}
+    </h2>
 
     <a-alert
-      message="Train machine learning models"
-      description="Select models and configure hyperparameters to train on your dataset. Select a completed task to continue to predictions."
+      :message="$t('components.ml.tuning.trainDescription')"
       type="info"
       show-icon
       class="mb-4"
@@ -12,11 +13,13 @@
 
     <!-- Model Selection -->
     <div class="bg-white rounded-lg border p-4 mb-4">
-      <h3 class="text-lg font-medium mb-3">Select Models to Train</h3>
+      <h3 class="text-lg font-medium mb-3">
+        {{ $t("components.ml.tuning.selectModels") }}
+      </h3>
       <a-select
         v-model:value="selectedModels"
         mode="multiple"
-        placeholder="Select models to train"
+        :placeholder="$t('components.ml.tuning.selectPlaceholder')"
         style="width: 100%"
         :options="availableModels"
         class="mb-3"
@@ -31,7 +34,7 @@
           @click="handleStartAutoTune"
         >
           <span class="i-mdi-auto-fix mr-1"></span>
-          Start Auto-Tune
+          {{ $t("components.ml.tuning.startAutoTune") }}
         </a-button>
         <a-button
           :disabled="tasks?.length === 0"
@@ -40,7 +43,7 @@
           @click="handleClearFailedTasks"
         >
           <span class="i-mdi-delete-outline mr-1"></span>
-          Clear Failed Tasks
+          {{ $t("components.ml.tuning.clearFailedTasks") }}
         </a-button>
       </div>
     </div>

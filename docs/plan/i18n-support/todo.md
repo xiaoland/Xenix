@@ -7,117 +7,124 @@ This document tracks the progress of replacing hard-coded strings with i18n tran
 - [x] Core infrastructure (i18n setup, remote loading)
 - [x] Layout components (DefaultLayout, LanguageSwitcher)
 - [x] HomeView
-- [ ] Auth views (SignIn, SignUp)
-- [ ] Work Item views (New, Detail)
-- [ ] Datasets view
-- [ ] Tasks view
-- [ ] Components (Project, Dataset, ML components)
+- [x] Auth views (SignIn, SignUp)
+- [x] Work Item views (New, Detail)
+- [x] Datasets view (has hard-coded "No datasets yet" in empty state)
+- [x] Tasks view
+- [x] Components (Project components done, Dataset components mostly done, ML components mostly done)
 
 ## Files to Update
 
 ### Views
 
 #### Auth Views
-- [ ] `src/views/auth/SignInView.vue`
-  - [ ] Page title "Sign In"
-  - [ ] Subtitle "ML Training Platform"
-  - [ ] Form labels and placeholders
-  - [ ] Button text
-  - [ ] Error/success messages
-  - [ ] "Don't have an account?" link text
-  - [ ] Validation messages
 
-- [ ] `src/views/auth/SignUpView.vue`
-  - [ ] Page title "Sign Up"
-  - [ ] Form labels and placeholders
-  - [ ] Button text
-  - [ ] Error/success messages
-  - [ ] "Already have an account?" link text
-  - [ ] Validation messages
+- [x] `src/views/auth/SignInView.vue`
+  - [x] Page title "Sign In"
+  - [x] Subtitle "ML Training Platform"
+  - [x] Form labels and placeholders
+  - [x] Button text
+  - [x] Error/success messages
+  - [x] "Don't have an account?" link text
+  - [x] Validation messages
+
+- [x] `src/views/auth/SignUpView.vue`
+  - [x] Page title "Sign Up"
+  - [x] Form labels and placeholders
+  - [x] Button text
+  - [x] Error/success messages
+  - [x] "Already have an account?" link text
+  - [x] Validation messages
 
 #### Work Item Views
-- [ ] `src/views/work-items/WorkItemNewView.vue`
-  - [ ] Card title "Create New Work Item"
-  - [ ] Form labels and placeholders
-  - [ ] Button text
-  - [ ] Success/error messages
 
-- [ ] `src/views/work-items/WorkItemDetailView.vue`
-  - [ ] "Work Item Not Found" title
-  - [ ] Steps labels (Prepare, Tune, Predict)
-  - [ ] Step descriptions
-  - [ ] All user-facing text
+- [x] `src/views/work-items/WorkItemNewView.vue`
+  - [x] Card title "Create New Work Item"
+  - [x] Form labels and placeholders
+  - [x] Button text
+  - [x] Success/error messages
+
+- [x] `src/views/work-items/WorkItemDetailView.vue`
+  - [x] "Work Item Not Found" title
+  - [x] Steps labels (Prepare, Tune, Predict)
+  - [x] Step descriptions
+  - [x] All user-facing text
 
 #### Dataset View
-- [ ] `src/views/datasets/DatasetsView.vue`
-  - [ ] Page title
-  - [ ] Upload modal title
-  - [ ] Form labels and placeholders
-  - [ ] Empty state message
-  - [ ] Success/error messages
-  - [ ] Delete confirmation dialog
+
+- [x] `src/views/datasets/DatasetsView.vue`
+  - [x] Page title
+  - [x] Upload modal title
+  - [x] Form labels and placeholders
+  - [ ] Empty state message (hard-coded "No datasets yet")
+  - [x] Success/error messages
+  - [x] Delete confirmation dialog
 
 #### Tasks View
-- [ ] `src/views/tasks/TasksView.vue`
-  - [ ] Page title "Task Logs"
-  - [ ] Table headers
-  - [ ] Filter labels
-  - [ ] All user-facing text
+
+- [x] `src/views/tasks/TasksView.vue`
+  - [x] Page title "Task Logs"
+  - [x] Table headers
+  - [x] Filter labels
+  - [x] All user-facing text
 
 ### Components
 
 #### Project Components
-- [ ] `src/components/project/ProjectFormModal.vue`
-  - [ ] Modal title
-  - [ ] Form labels and placeholders
-  - [ ] Button text
 
-- [ ] `src/components/project/ProjectCard.vue`
-  - [ ] Action button text
-  - [ ] Labels and tooltips
+- [x] `src/components/project/ProjectFormModal.vue`
+  - [x] Modal title
+  - [x] Form labels and placeholders
+  - [x] Button text
 
-- [ ] `src/components/project/WorkItemRow.vue`
-  - [ ] Status labels
-  - [ ] Action text
+- [x] `src/components/project/ProjectCard.vue`
+  - [x] Action button text
+  - [ ] Labels and tooltips (status labels hard-coded: "active", "completed", "archived")
+
+- [x] `src/components/project/WorkItemRow.vue`
+  - [ ] Status labels (hard-coded: 'active', 'completed', 'archived')
 
 #### Dataset Components
-- [ ] `src/components/dataset/DatasetSelector.vue`
-  - [ ] Selector label
-  - [ ] Placeholder text
-  - [ ] Empty state message
 
-- [ ] `src/components/dataset/DatasetUpload.vue`
-  - [ ] Upload instructions
-  - [ ] File type hints
-  - [ ] Error messages
+- [x] `src/components/dataset/DatasetSelector.vue`
+  - [x] Selector label
+  - [ ] Placeholder text (hard-coded "No datasets found")
+  - [x] Empty state message
+  - [x] Validation messages
+
+- [x] `src/components/dataset/DatasetUpload.vue`
+  - [x] Upload instructions
+  - [x] File type hints
+  - [x] Error messages
 
 #### ML Components
-- [ ] `src/components/ml/prepare/PrepareStep.vue`
-  - [ ] Step instructions
-  - [ ] Button labels
-  - [ ] Validation messages
 
-- [ ] `src/components/ml/prepare/ColumnSelector.vue`
-  - [ ] Column selection labels
-  - [ ] Instructions
-  - [ ] Validation messages
+- [x] `src/components/ml/prepare/PrepareStep.vue`
+  - [x] Step instructions
+  - [x] Button labels
+  - [x] Validation messages
 
-- [ ] `src/components/ml/tuning/TuningStep.vue`
-  - [ ] Model selection labels
-  - [ ] Tuning options
-  - [ ] Status messages
-  - [ ] Button text
+- [x] `src/components/ml/prepare/ColumnSelector.vue`
+  - [x] Column selection labels
+  - [x] Instructions
+  - [x] Validation messages
 
-- [ ] `src/components/ml/prediction/PredictionStep.vue`
-  - [ ] Upload instructions
-  - [ ] Mode selection labels
-  - [ ] Button text
-  - [ ] Status messages
+- [x] `src/components/ml/tuning/TuningStep.vue`
+  - [x] Model selection labels
+  - [x] Tuning options
+  - [x] Status messages
+  - [x] Button text
 
-- [ ] `src/components/ml/prediction/PredictionResult.vue`
-  - [ ] Result labels
-  - [ ] Download button text
-  - [ ] Status messages
+- [x] `src/components/ml/prediction/PredictionStep.vue`
+  - [x] Upload instructions
+  - [ ] Mode selection labels (hard-coded "Upload Prediction Data")
+  - [x] Button text
+  - [x] Status messages
+
+- [x] `src/components/ml/prediction/PredictionResult.vue`
+  - [x] Result labels
+  - [x] Download button text
+  - [x] Status messages
 
 ## Translation Keys Structure
 
@@ -143,6 +150,15 @@ Organize translation keys by feature/module:
 }
 ```
 
+## Remaining Hard-coded Strings
+
+- `src/views/datasets/DatasetsView.vue`: "No datasets yet" in a-empty description
+- `src/components/dataset/DatasetSelector.vue`: "No datasets found" in a-empty description
+- `src/components/ml/prediction/PredictionStep.vue`: "Upload Prediction Data" in h3
+- `src/components/project/ProjectCard.vue`: Status values "active", "completed", "archived"
+- `src/components/project/WorkItemRow.vue`: Status values 'active', 'completed', 'archived'
+- `src/views/work-items/WorkItemDetailView.vue`: Status display (may need translation for status values)
+
 ## Notes
 
 - Ensure all validation messages use i18n
@@ -150,4 +166,5 @@ Organize translation keys by feature/module:
 - Update success/error toast messages
 - Check for hard-coded strings in computed properties
 - Test language switching on all updated pages
-- Run `npm run i18n:check` after updates to verify coverage
+- Run `pnpm run i18n:check` after updates to verify coverage
+- Fix remaining hard-coded strings listed above

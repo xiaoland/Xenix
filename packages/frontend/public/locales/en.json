@@ -252,6 +252,26 @@
     "remove": "Remove",
     "actions": "Actions"
   },
+  "tasks": {
+    "title": "Task Monitor",
+    "subtitle": "Monitor all background tasks across your projects",
+    "status": "Status",
+    "type": "Type",
+    "all": "All",
+    "pending": "Pending",
+    "running": "Running",
+    "completed": "Completed",
+    "failed": "Failed",
+    "autoTune": "Auto-Tune",
+    "manualTune": "Manual-Tune",
+    "predictFile": "Predict (File)",
+    "predictInline": "Predict (Inline)",
+    "id": "ID",
+    "model": "Model",
+    "workItem": "Work Item",
+    "created": "Created",
+    "actions": "Actions"
+  },
   "autoForm": {
     "loading": "Loading form schema...",
     "noDescription": "No description available",
@@ -296,6 +316,97 @@
     "useExistingDataset": "Use Existing Dataset",
     "orUploadNew": "Or upload a new file",
     "paramGridColumn": "Param Grid"
+  },
+  "components": {
+    "project": {
+      "form": {
+        "name": "Project Name",
+        "namePlaceholder": "Enter project name",
+        "nameRequired": "Please enter project name",
+        "description": "Description",
+        "descriptionPlaceholder": "Enter project description (optional)",
+        "status": "Status",
+        "active": "Active",
+        "completed": "Completed",
+        "archived": "Archived"
+      },
+      "card": {
+        "datasets": "datasets",
+        "workItems": "work items",
+        "created": "Created",
+        "manageDatasets": "Datasets",
+        "edit": "Edit",
+        "delete": "Delete",
+        "deleteConfirm": "Are you sure you want to delete this project?"
+      }
+    },
+    "dataset": {
+      "selector": {
+        "loading": "Loading datasets...",
+        "noDatasets": "No datasets found",
+        "uploadHint": "Upload a dataset to get started.",
+        "selected": "Selected",
+        "columns": "columns",
+        "uploaded": "Uploaded"
+      },
+      "upload": {
+        "name": "Dataset Name",
+        "namePlaceholder": "Enter dataset name",
+        "file": "Select File",
+        "selectFile": "Select File",
+        "supportedFormats": "Supported formats: CSV, Excel (.xlsx, .xls)",
+        "cancel": "Cancel",
+        "upload": "Upload"
+      }
+    },
+    "ml": {
+      "prepare": {
+        "title": "Prepare Your Data",
+        "description": "Select a dataset and choose the feature columns and target column for your machine learning model.",
+        "step1": "Step 1: Select Dataset",
+        "uploadNew": "Upload New Dataset",
+        "step2": "Step 2: Select Columns",
+        "selectedDataset": "Selected Dataset",
+        "change": "Change"
+      },
+      "columnSelector": {
+        "featureColumns": "Feature Columns",
+        "featureColumnsRequired": "Select the columns that will be used as input features for the model.",
+        "featurePlaceholder": "Select feature columns",
+        "selectedCount": "Selected: {count} column(s)",
+        "targetColumn": "Target Column",
+        "targetColumnRequired": "Select the column that the model should predict.",
+        "targetPlaceholder": "Select target column",
+        "summary": "Configuration Summary",
+        "features": "Features",
+        "target": "Target"
+      },
+      "tuning": {
+        "title": "Model Tuning",
+        "trainDescription": "Select models and configure hyperparameters to train on your dataset. Select a completed task to continue to predictions.",
+        "selectModels": "Select Models to Train",
+        "selectPlaceholder": "Select models to train",
+        "startAutoTune": "Start Auto-Tune",
+        "clearFailedTasks": "Clear Failed Tasks"
+      },
+      "prediction": {
+        "title": "Make Predictions",
+        "usingModel": "Using trained model: {model}",
+        "mode": "Prediction Mode",
+        "uploadFile": "Upload File",
+        "manualInput": "Manual Input",
+        "uploadData": "Upload Prediction Data",
+        "dragHint": "Click or drag file to upload",
+        "supportedFormats": "Supported formats: Excel (.xlsx, .xls), CSV",
+        "or": "or",
+        "enterData": "Enter Data Manually",
+        "inputHint": "Enter values for each feature column",
+        "startPrediction": "Start Prediction",
+        "processing": "Processing prediction...",
+        "downloadResults": "Download Results",
+        "results": "Prediction Results"
+      }
+    }
   },
   "tuning": {
     "title": "Model Tuning",

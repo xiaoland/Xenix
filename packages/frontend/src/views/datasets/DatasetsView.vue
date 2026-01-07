@@ -4,16 +4,16 @@
       <!-- Breadcrumb -->
       <a-breadcrumb class="mb-6">
         <a-breadcrumb-item>
-          <router-link to="/">Home</router-link>
+          <router-link to="/"> {{ $t('navigation.home') }} </router-link>
         </a-breadcrumb-item>
-        <a-breadcrumb-item> Datasets </a-breadcrumb-item>
+        <a-breadcrumb-item> {{ $t('datasets.title') }} </a-breadcrumb-item>
       </a-breadcrumb>
 
       <!-- Header -->
       <div class="flex justify-between items-center mb-6">
         <div>
-          <h1 class="text-3xl font-bold">Datasets</h1>
-          <p class="text-gray-600 mt-1">Manage datasets for your project</p>
+          <h1 class="text-3xl font-bold">{{ $t('datasets.title') }}</h1>
+          <p class="text-gray-600 mt-1">{{ $t('datasets.subtitle') }}</p>
         </div>
         <a-button
           type="primary"
@@ -21,7 +21,7 @@
           @click="showUploadModal = true"
         >
           <span class="i-mdi-cloud-upload mr-2"></span>
-          Upload Dataset
+          {{ $t('datasets.uploadNew') }}
         </a-button>
       </div>
 
@@ -37,7 +37,7 @@
             <span class="i-mdi-database-off text-8xl text-gray-300"></span>
           </template>
           <p class="text-gray-600 mb-4">
-            Upload a dataset to get started with machine learning.
+            {{ $t('datasets.noDatasets') }}
           </p>
           <a-button
             type="primary"
@@ -45,7 +45,7 @@
             @click="showUploadModal = true"
           >
             <span class="i-mdi-cloud-upload mr-2"></span>
-            Upload First Dataset
+            {{ $t('datasets.uploadNew') }}
           </a-button>
         </a-empty>
       </div>

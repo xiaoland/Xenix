@@ -1,10 +1,16 @@
 <template>
   <div class="space-y-6">
-    <h2 class="text-2xl font-semibold mb-4">Make Predictions</h2>
+    <h2 class="text-2xl font-semibold mb-4">
+      {{ $t("components.ml.prediction.title") }}
+    </h2>
 
     <a-alert
       v-if="selectedModel"
-      :message="`Using trained model: ${formatModelName(selectedModel)}`"
+      :message="
+        $t('components.ml.prediction.usingModel', {
+          model: formatModelName(selectedModel),
+        })
+      "
       type="success"
       show-icon
       class="mb-4"
@@ -13,19 +19,19 @@
     <!-- Mode Selector -->
     <div class="bg-white rounded-lg border p-4">
       <label class="block text-sm font-medium text-gray-700 mb-2">
-        Prediction Mode
+        {{ $t("components.ml.prediction.mode") }}
       </label>
       <a-radio-group v-model:value="predictionMode" button-style="solid">
         <a-radio-button value="file">
           <span class="inline-flex items-center">
             <span class="i-mdi-file-upload mr-2"></span>
-            Upload File
+            {{ $t("components.ml.prediction.uploadFile") }}
           </span>
         </a-radio-button>
         <a-radio-button value="inline">
           <span class="inline-flex items-center">
             <span class="i-mdi-table-edit mr-2"></span>
-            Manual Input
+            {{ $t("components.ml.prediction.manualInput") }}
           </span>
         </a-radio-button>
       </a-radio-group>
@@ -49,9 +55,11 @@
             class="i-mdi-file-table text-6xl text-green-500 inline-block"
           ></span>
         </p>
-        <p class="ant-upload-text">Click or drag file to upload</p>
+        <p class="ant-upload-text">
+          {{ $t("components.ml.prediction.dragHint") }}
+        </p>
         <p class="ant-upload-hint">
-          Upload an Excel or CSV file with the same feature columns
+          {{ $t("components.ml.prediction.supportedFormats") }}
         </p>
       </a-upload-dragger>
 
@@ -65,7 +73,7 @@
         @click="startPredictionFromFile"
       >
         <span class="i-mdi-chart-line mr-2" />
-        Start Prediction
+        {{ $t("components.ml.prediction.startPrediction") }}
       </a-button>
     </div>
 
@@ -75,19 +83,20 @@
       class="bg-white rounded-lg border p-4"
     >
       <div class="flex items-center justify-between mb-3">
-        <h3 class="text-lg font-medium">Manual Data Input</h3>
+        <h3 class="text-lg font-medium">
+          {{ $t("components.ml.prediction.enterData") }}
+        </h3>
         <a-button
           type="primary"
           class="inline-flex items-center"
           @click="addRow"
         >
           <span class="i-mdi-plus mr-1" />
-          Add Row
+          {{ $t("common.add") }}
         </a-button>
       </div>
       <p class="text-sm text-gray-600 mb-4">
-        Enter values for each feature column. You can add multiple rows for
-        batch prediction.
+        {{ $t("components.ml.prediction.inputHint") }}
       </p>
 
       <a-table
@@ -159,14 +168,14 @@
 </template>
 
 <script setup lang="ts">
-import { message } from 'ant-design-vue';
-import type { UploadProps } from 'ant-design-vue';
+import { message } from "ant-design-vue";
+import type { UploadProps } from "ant-design-vue";
 
-import { computed, ref } from 'vue';
+import { computed, ref } from "vue";
 
-import { client } from '../../../api/client';
-import { AVAILABLE_MODELS } from '../../../constants/models';
-import PredictionResult from './PredictionResult.vue';
+import { client } from "../../../api/client";
+import { AVAILABLE_MODELS } from "../../../constants/models";
+import PredictionResult from "./PredictionResult.vue";
 
 const props = defineProps<{
   workItemId: number;
@@ -182,7 +191,7 @@ const emit = defineEmits<{
 }>();
 
 // State
-const predictionMode = ref<'file' | 'inline'>('file');
+const predictionMode = ref<"file" | "inline">("file");
 const fileList = ref<any[]>([]);
 const inputData = ref<Record<string, any>[]>([]);
 const isPredicting = ref(false);
@@ -197,8 +206,8 @@ const inputColumns = computed(() => {
     width: 150,
   }));
   cols.push({
-    title: 'Action',
-    key: 'action',
+    title: "Action",
+    key: "action",
     width: 100,
   });
   return cols;
@@ -233,21 +242,21 @@ const removeRow = (index: number) => {
 /**
  * Before upload handler
  */
-const beforeUpload: UploadProps['beforeUpload'] = (file) => {
+const beforeUpload: UploadProps["beforeUpload"] = (file) => {
   const isExcelOrCsv =
     file.type ===
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-    file.type === 'application/vnd.ms-excel' ||
-    file.type === 'text/csv';
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+    file.type === "application/vnd.ms-excel" ||
+    file.type === "text/csv";
 
   if (!isExcelOrCsv) {
-    message.error('You can only upload Excel or CSV files!');
+    message.error("You can only upload Excel or CSV files!");
     return false;
   }
 
   const isLt10M = file.size / 1024 / 1024 < 10;
   if (!isLt10M) {
-    message.error('File must be smaller than 10MB!');
+    message.error("File must be smaller than 10MB!");
     return false;
   }
 
@@ -264,10 +273,10 @@ const startPredictionFromFile = async () => {
 
   isPredicting.value = true;
   try {
-    throw new Error('File prediction not implemented');
+    throw new Error("File prediction not implemented");
   } catch (error: any) {
-    console.error('Prediction failed:', error);
-    message.error(error.message || 'Failed to start prediction');
+    console.error("Prediction failed:", error);
+    message.error(error.message || "Failed to start prediction");
   } finally {
     isPredicting.value = false;
   }
@@ -289,7 +298,7 @@ const predictInline = async () => {
   );
 
   if (hasEmptyFields) {
-    message.error('Please fill in all fields');
+    message.error("Please fill in all fields");
     return;
   }
 
@@ -310,11 +319,11 @@ const predictInline = async () => {
       },
     });
 
-    message.success('Prediction completed successfully');
+    message.success("Prediction completed successfully");
     predictionTaskId.value = response.taskId;
   } catch (error: any) {
-    console.error('Prediction failed:', error);
-    message.error(error.message || 'Failed to predict');
+    console.error("Prediction failed:", error);
+    message.error(error.message || "Failed to predict");
   } finally {
     isPredicting.value = false;
   }
@@ -324,6 +333,6 @@ const predictInline = async () => {
  * Reset workflow
  */
 const handleReset = () => {
-  emit('reset');
+  emit("reset");
 };
 </script>
