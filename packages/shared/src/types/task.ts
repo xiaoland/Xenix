@@ -49,7 +49,7 @@ export interface PredictTaskResult {
 export interface AutoTuneTask {
   id: number;
   workItemId?: number;
-  type: 'auto-tune';
+  type: "auto-tune";
   status: TaskStatus;
   parameter: AutoTuneTaskParameter;
   result?: AutoTuneTaskResult;
@@ -60,7 +60,7 @@ export interface AutoTuneTask {
 export interface ManualTuneTask {
   id: number;
   workItemId?: number;
-  type: 'manual-tune';
+  type: "manual-tune";
   status: TaskStatus;
   parameter: ManualTuneTaskParameter;
   result?: ManualTuneTaskResult;
@@ -71,7 +71,7 @@ export interface ManualTuneTask {
 export interface PredictTask {
   id: number;
   workItemId?: number;
-  type: 'predict';
+  type: "predict";
   status: TaskStatus;
   parameter: PredictTaskParameter;
   result?: PredictTaskResult;
@@ -104,7 +104,7 @@ export interface TaskLog {
   timestamp: string;
 }
 
-export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed';
+export type TaskStatus = "pending" | "running" | "completed" | "failed";
 
 /**
  * Prediction task state for UI tracking

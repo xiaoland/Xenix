@@ -7,11 +7,11 @@ import { useQuery } from "@tanstack/vue-query";
 import { client } from "../api/client";
 import { POLLING_CONFIG } from "../constants/config";
 
-export function useTasks(params?: { workItemId: string; types: string }) {
+export function useTasks(params?: { workItemId: string; type?: string }) {
   return useQuery({
     queryKey: ["tasks", params],
     queryFn: async () => {
-      const response = await client.tasks.$get({ query: params });
+      const response = await client.tasks.$get({ query: params! });
       if (!response.ok) {
         throw new Error("Failed to fetch tasks");
       }

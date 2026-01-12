@@ -188,7 +188,7 @@ const {
   refetch: fetchTasks,
 } = useTasks({
   workItemId: String(props.workItemId),
-  types: "auto-tune,manual-tune",
+  type: "auto-tune,manual-tune",
 });
 
 /**

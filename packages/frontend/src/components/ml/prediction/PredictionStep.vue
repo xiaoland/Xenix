@@ -319,8 +319,9 @@ const predictInline = async () => {
       },
     });
 
+    const data = await response.json();
     message.success("Prediction completed successfully");
-    predictionTaskId.value = response.taskId;
+    predictionTaskId.value = data.taskId;
   } catch (error: any) {
     console.error("Prediction failed:", error);
     message.error(error.message || "Failed to predict");

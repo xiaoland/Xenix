@@ -108,6 +108,8 @@ import { message } from "ant-design-vue";
 import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
+import type { WorkItem } from "@xenix/shared";
+
 import PredictionStep from "../../components/ml/prediction/PredictionStep.vue";
 import PrepareStep from "../../components/ml/prepare/PrepareStep.vue";
 import TuningStep from "../../components/ml/tuning/TuningStep.vue";
@@ -127,7 +129,14 @@ const {
 } = useWorkItem(workItemId.value);
 
 // Computed property to safely access work item
-const workItem = computed(() => workItemData.value);
+const workItem = computed((): WorkItem | undefined => {
+  if (!workItemData.value) return undefined;
+  return {
+    ...workItemData.value,
+    datasetId: workItemData.value.datasetId || undefined,
+    featureColumns: (workItemData.value.featureColumns as string[]) || [],
+  } as WorkItem;
+});
 const error = computed(() => !!fetchError.value);
 
 // Workflow state

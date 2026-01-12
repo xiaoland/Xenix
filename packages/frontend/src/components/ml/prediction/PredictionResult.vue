@@ -205,7 +205,7 @@ const fetchTaskStatus = async () => {
     });
     if (!response.ok) throw new Error("Failed to fetch task");
     const data = await response.json();
-    task.value = data.task;
+    task.value = data as any;
   } catch (error) {
     console.error("Failed to fetch task:", error);
   } finally {

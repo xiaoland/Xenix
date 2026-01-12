@@ -1,13 +1,13 @@
 /**
  * Task Zod schemas for validation
  */
-import { z } from 'zod';
+import { z } from "zod";
 
 export const TaskStatusSchema = z.enum([
-  'pending',
-  'running',
-  'completed',
-  'failed',
+  "pending",
+  "running",
+  "completed",
+  "failed",
 ]);
 
 export const AutoTuneTaskParameterSchema = z.object({
@@ -54,7 +54,7 @@ export const PredictTaskResultSchema = z.object({
 export const AutoTuneTaskSchema = z.object({
   id: z.number(),
   workItemId: z.number().optional(),
-  type: z.literal('auto-tune'),
+  type: z.literal("auto-tune"),
   status: TaskStatusSchema,
   parameter: AutoTuneTaskParameterSchema,
   result: AutoTuneTaskResultSchema.optional(),
@@ -65,7 +65,7 @@ export const AutoTuneTaskSchema = z.object({
 export const ManualTuneTaskSchema = z.object({
   id: z.number(),
   workItemId: z.number().optional(),
-  type: z.literal('manual-tune'),
+  type: z.literal("manual-tune"),
   status: TaskStatusSchema,
   parameter: ManualTuneTaskParameterSchema,
   result: ManualTuneTaskResultSchema.optional(),
@@ -76,7 +76,7 @@ export const ManualTuneTaskSchema = z.object({
 export const PredictTaskSchema = z.object({
   id: z.number(),
   workItemId: z.number().optional(),
-  type: z.literal('predict'),
+  type: z.literal("predict"),
   status: TaskStatusSchema,
   parameter: PredictTaskParameterSchema,
   result: PredictTaskResultSchema.optional(),
@@ -84,7 +84,7 @@ export const PredictTaskSchema = z.object({
   createdAt: z.string().datetime().optional(),
 });
 
-export const TaskSchema = z.discriminatedUnion('type', [
+export const TaskSchema = z.discriminatedUnion("type", [
   AutoTuneTaskSchema,
   ManualTuneTaskSchema,
   PredictTaskSchema,
@@ -139,17 +139,17 @@ export type CreatePredictTaskDto = z.infer<typeof CreatePredictTaskSchema>;
 
 // Query validation schemas
 export const GetTasksQuerySchema = z.object({
-  workItemId: z.string().regex(/^\d+$/, 'Must be a valid number'),
+  workItemId: z.string().regex(/^\d+$/, "Must be a valid number"),
   type: z.string().optional(),
 });
 
 export const DeleteTasksByModelQuerySchema = z.object({
-  workItemId: z.string().regex(/^\d+$/, 'Must be a valid number'),
+  workItemId: z.string().regex(/^\d+$/, "Must be a valid number"),
   model: z.string().min(1),
 });
 
 export const DeleteFailedTasksQuerySchema = z.object({
-  workItemId: z.string().regex(/^\d+$/, 'Must be a valid number'),
+  workItemId: z.string().regex(/^\d+$/, "Must be a valid number"),
 });
 
 export type GetTasksQuery = z.infer<typeof GetTasksQuerySchema>;
@@ -162,7 +162,7 @@ export type DeleteFailedTasksQuery = z.infer<
 
 // Task ID param validation schema
 export const TaskIdParamSchema = z.object({
-  id: z.string().regex(/^\d+$/, 'Must be a valid number'),
+  id: z.string().regex(/^\d+$/, "Must be a valid number"),
 });
 
 export type TaskIdParam = z.infer<typeof TaskIdParamSchema>;

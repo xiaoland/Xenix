@@ -4,9 +4,9 @@
       <div class="mb-6">
         <a-breadcrumb>
           <a-breadcrumb-item>
-            <router-link to="/">{{ $t('navigation.home') }}</router-link>
+            <router-link to="/">{{ $t("navigation.home") }}</router-link>
           </a-breadcrumb-item>
-          <a-breadcrumb-item>{{ $t('workItems.createNew') }}</a-breadcrumb-item>
+          <a-breadcrumb-item>{{ $t("workItems.createNew") }}</a-breadcrumb-item>
         </a-breadcrumb>
       </div>
 
@@ -69,10 +69,10 @@
                 html-type="submit"
                 :loading="isSubmitting"
               >
-                {{ $t('workItems.createButton') }}
+                {{ $t("workItems.createButton") }}
               </a-button>
               <a-button @click="handleCancel">
-                {{ $t('common.cancel') }}
+                {{ $t("common.cancel") }}
               </a-button>
             </div>
           </a-form-item>
@@ -83,16 +83,16 @@
 </template>
 
 <script setup lang="ts">
-import { message } from 'ant-design-vue';
+import { message } from "ant-design-vue";
 
-import { computed, ref } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { useRoute, useRouter } from 'vue-router';
+import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
+import { useRoute, useRouter } from "vue-router";
 
-import type { Project } from '@xenix/shared';
+import type { Project } from "@xenix/shared";
 
-import { useCreateWorkItem, useProjects } from '../../composables';
-import DefaultLayout from '../../layouts/DefaultLayout.vue';
+import { useCreateWorkItem, useProjects } from "../../composables";
+import DefaultLayout from "../../layouts/DefaultLayout.vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -113,40 +113,42 @@ const projects = computed(() =>
 
 const formState = ref({
   projectId: projectId.value || undefined,
-  name: '',
-  description: '',
+  name: "",
+  description: "",
 });
 
 const selectedProject = computed(() => {
   if (!projectId.value) return null;
-  return projects.value.find((p: Project) => p.id === projectId.value);
+  return (projects.value as Project[]).find(
+    (p: Project) => p.id === projectId.value
+  );
 });
 
 const rules = {
   projectId: [
     {
       required: true,
-      message: t('workItems.selectProjectRequired'),
-      type: 'number' as const,
+      message: t("workItems.selectProjectRequired"),
+      type: "number" as const,
     },
   ],
   name: [
     {
       required: true,
-      message: t('workItems.nameRequired'),
-      trigger: 'blur',
+      message: t("workItems.nameRequired"),
+      trigger: "blur",
     },
     {
       min: 2,
-      message: t('workItems.nameMinLength'),
-      trigger: 'blur',
+      message: t("workItems.nameMinLength"),
+      trigger: "blur",
     },
   ],
 };
 
 const handleSubmit = () => {
   if (!formState.value.projectId) {
-    message.error(t('workItems.selectProjectRequired'));
+    message.error(t("workItems.selectProjectRequired"));
     return;
   }
 
@@ -158,20 +160,20 @@ const handleSubmit = () => {
     },
     {
       onSuccess: (workItem) => {
-        message.success(t('workItems.createSuccess'));
+        message.success(t("workItems.createSuccess"));
         // Navigate to the work item detail page
         router.push(`/work-items/${workItem.id}`);
       },
       onError: (error: any) => {
-        console.error('Failed to create work item:', error);
-        message.error(t('workItems.createError'));
+        console.error("Failed to create work item:", error);
+        message.error(t("workItems.createError"));
       },
     }
   );
 };
 
 const handleCancel = () => {
-  router.push('/');
+  router.push("/");
 };
 </script>
 
