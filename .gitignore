@@ -1,10 +1,11 @@
-# Nuxt dev/build outputs
+# dev/build outputs
 .output
 .data
 .nuxt
 .nitro
 .cache
 dist
+*.zip
 
 # Node dependencies
 node_modules
@@ -46,6 +47,7 @@ __pycache__/
 *.egg-info/
 venv/
 .venv/
+python/
 
 # Uploads
 uploads/

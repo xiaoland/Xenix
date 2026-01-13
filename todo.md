@@ -22,8 +22,8 @@
   - [x] CSR
   - [ ] remove AVAILABLE_MODELS constant, use api
 - [ ] 超级重构
-  - [ ] UploadDataset 要支持 Drag
-  - [ ] ColumnSelector 用回之前的样子
+  - [x] UploadDataset 要支持 Drag
+  - [x] ColumnSelector 用回之前的样子
   - [ ] 我还要日志预览
   - [ ] 修复Dataset上传：Dataset upload error: TypeError: Content-Type was not one of "multipart/form-data" or "application/x-www-form-urlencoded"
   - [ ] 没有应用 RFC 7807 Problem Details for HTTP APIs
@@ -31,3 +31,6 @@
   - [ ] 手动训练死翘翘
   - [ ] 自动训练又不能修改参数了
   - [ ] TuningStep 不要不停的 poll tasks
+  - [ ] 移除对 redis 的依赖，使用 pgsql
+- [ ] 计算阿里云Serverless方案的费用
+  - 按照当前定价模型和用户画像，会付费的用户的使用频率、数据量是多少
