@@ -1,0 +1,29 @@
+# TODO from env var
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: xenix-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: xenix
+      POSTGRES_PASSWORD: xenix_dev_password
+      POSTGRES_DB: xenix
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: xenix-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+volumes:
+  postgres_data:
+  redis_data:

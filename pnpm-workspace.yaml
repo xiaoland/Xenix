@@ -1,8 +1,13 @@
+packages:
+  - packages/*
+
 ignoredBuiltDependencies:
   - '@parcel/watcher'
   - core-js
-  - electron
   - esbuild
 
 onlyBuiltDependencies:
+  - bcrypt
   - better-sqlite3
+  - msgpackr-extract
+  - vue-demi

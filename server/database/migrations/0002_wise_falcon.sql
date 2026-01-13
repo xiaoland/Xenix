@@ -1,1 +1,0 @@
-ALTER TABLE `model_metadata` RENAME COLUMN "param_grid_schema" TO "param_schema";

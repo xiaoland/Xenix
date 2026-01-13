@@ -1,87 +1,37 @@
 {
   "name": "xenix",
-  "version": "0.1.0",
   "type": "module",
   "private": true,
-  "main": "dist-electron/main.js",
   "scripts": {
-    "dev:nuxt": "nuxt dev -p 3005",
-    "dev:electron": "electron-vite dev",
-    "dev": "concurrently \"pnpm dev:nuxt\" \"pnpm dev:electron\"",
-    "build": "nuxt build && electron-vite build && electron-builder",
-    "generate": "nuxt generate",
-    "preview": "nuxt preview",
-    "postinstall": "nuxt prepare",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
-  },
-  "dependencies": {
-    "@ant-design-vue/nuxt": "1.4.6",
-    "@nuxtjs/i18n": "10.2.1",
-    "ant-design-vue": "^4.2.6",
-    "better-sqlite3": "^12.5.0",
-    "drizzle-kit": "^0.31.8",
-    "drizzle-orm": "^0.45.1",
-    "get-port": "^7.1.0",
-    "nanoid": "^5.1.6",
-    "nuxt": "^4.2.2",
-    "vue": "^3.5.25",
-    "vue-router": "^4.6.4",
-    "xlsx": "^0.18.5"
+    "dev": "pnpm --parallel --filter \"@xenix/*\" dev",
+    "dev:frontend": "pnpm --filter \"@xenix/frontend\" dev",
+    "dev:backend": "pnpm --filter \"@xenix/backend\" dev",
+    "build": "pnpm --filter \"@xenix/*\" build",
+    "build:frontend": "pnpm --filter \"@xenix/frontend\" build",
+    "build:backend": "pnpm --filter \"@xenix/backend\" build",
+    "test": "pnpm -r test",
+    "test:watch": "pnpm -r test:watch",
+    "test:coverage": "pnpm -r test:coverage",
+    "lint": "eslint .",
+    "lint:fix": "eslint --fix .",
+    "format": "prettier --write \"**/*.{ts,vue,js,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,vue,js,json,md}\"",
+    "db:generate": "pnpm --filter \"@xenix/backend\" db:generate",
+    "db:migrate": "pnpm --filter \"@xenix/backend\" db:migrate",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f"
   },
   "devDependencies": {
-    "@iconify-json/mdi": "^1.2.3",
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^25.0.3",
-    "@unocss/nuxt": "^66.5.10",
-    "@unocss/preset-icons": "^66.5.10",
-    "concurrently": "^9.2.1",
-    "electron": "^35.1.4",
-    "electron-builder": "^24.13.3",
-    "electron-vite": "^5.0.0",
-    "sass": "^1.97.0",
-    "unocss": "^66.5.10"
-  },
-  "build": {
-    "appId": "com.xenix.app",
-    "productName": "Xenix",
-    "asar": true,
-    "directories": {
-      "output": "dist-electron-pack",
-      "buildResources": "build"
-    },
-    "files": [
-      "dist-electron/**/*",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": ".output/",
-        "to": "server/",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
-    "extraMetadata": {
-      "main": "dist-electron/main.js"
-    },
-    "win": {
-      "target": "nsis"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true
-    }
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "better-sqlite3",
-      "electron",
-      "esbuild",
-      "electron-builder"
-    ]
+    "@eslint/js": "^9.39.2",
+    "@intlify/eslint-plugin-vue-i18n": "^4.1.0",
+    "@trivago/prettier-plugin-sort-imports": "^6.0.1",
+    "@typescript-eslint/eslint-plugin": "^8.52.0",
+    "@typescript-eslint/parser": "^8.52.0",
+    "dotenv-cli": "^11.0.0",
+    "eslint": "^9.39.2",
+    "eslint-plugin-vue": "^10.6.2",
+    "prettier": "^3.7.4",
+    "vue-eslint-parser": "^10.2.0"
   }
 }
