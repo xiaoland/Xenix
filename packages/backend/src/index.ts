@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger as honoLogger } from "hono/logger";
 import { prettyJSON } from "hono/pretty-json";
+import fs from "fs";
 
 import { config } from "./config";
 import { errorHandler } from "./middleware/errorHandler";
@@ -19,6 +20,12 @@ import tuneRoutes from "./routes/tune";
 import workItemsRoutes from "./routes/work-items";
 import logger from "./utils/logger";
 
+// Ensure upload directory exists
+if (!fs.existsSync(config.UPLOAD_DIR)) {
+  fs.mkdirSync(config.UPLOAD_DIR, { recursive: true });
+  logger.info({ uploadDir: config.UPLOAD_DIR }, "Created upload directory");
+}
+
 const app = new Hono();
 
 // Middleware
@@ -34,7 +41,14 @@ app.use(
 
 // API Routes
 const routes = app
-  .get("/health", (c) => c.json({ status: "ok" }))
+  .get("/health", (c) =>
+    c.json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      environment: config.NODE_ENV,
+      version: process.env.FC_FUNCTION_VERSION || "dev",
+    })
+  )
   .route("/auth", authRoutes)
   .route("/projects", projectsRoutes)
   .route("/work-items", workItemsRoutes)

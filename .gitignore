@@ -49,6 +49,7 @@ __pycache__/
 venv/
 .venv/
 python/
+nul
 
 # Uploads
 uploads/

@@ -25,10 +25,14 @@ const configSchema = z.object({
 
   // File uploads
   MAX_FILE_SIZE: z.coerce.number().default(100 * 1024 * 1024), // 100MB
-  UPLOAD_DIR: z.string().default('./uploads'),
+  UPLOAD_DIR: z
+    .string()
+    .default(
+      process.env.NODE_ENV === 'production' ? '/tmp/uploads' : './uploads'
+    ),
 
   // ML
-  PYTHON_PATH: z.string().default('python3'),
+  PYTHON_PATH: z.string().default('/usr/bin/python3'),
   ML_TIMEOUT: z.coerce.number().default(300000), // 5 minutes
 });
 

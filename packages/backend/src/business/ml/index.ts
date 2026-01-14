@@ -9,21 +9,37 @@ import {
   PredictOptions,
 } from './types';
 
+/**
+ * Helper function to get ML directory based on environment
+ * For FC deployment, scripts are in dist-fc/ml/
+ * For local dev, scripts are in src/business/ml/
+ */
+function getMLDirectory(): string {
+  // Check if running in Aliyun FC environment
+  if (process.env.NODE_ENV === 'production' && process.env.FC_FUNC_CODE_PATH) {
+    // FC environment - scripts are in ml/ subdirectory
+    return path.join(process.env.FC_FUNC_CODE_PATH, 'ml');
+  }
+
+  // Local development - use src directory
+  return path.join(process.cwd(), 'src', 'business', 'ml');
+}
+
 // Constants for ML script paths
-const ML_MODELS_DIR = path.join('src', 'business', 'ml');
+const ML_MODELS_DIR = getMLDirectory();
 
 /**
  * Helper function to get script path
  */
 function getScriptPath(scriptName: string): string {
-  return path.join(process.cwd(), ML_MODELS_DIR, scriptName);
+  return path.join(ML_MODELS_DIR, scriptName);
 }
 
 /**
  * Helper function to get working directory
  */
 function getWorkingDirectory(): string {
-  return path.join(process.cwd(), ML_MODELS_DIR);
+  return ML_MODELS_DIR;
 }
 
 /**
