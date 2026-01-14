@@ -1,14 +1,14 @@
-import { VueQueryPlugin } from '@tanstack/vue-query';
-import Antd from 'ant-design-vue';
-import 'ant-design-vue/dist/reset.css';
-import { createPinia } from 'pinia';
-import 'uno.css';
+import { VueQueryPlugin } from "@tanstack/vue-query";
+import Antd from "ant-design-vue";
+import "ant-design-vue/dist/reset.css";
+import { createPinia } from "pinia";
+import "uno.css";
 
-import { createApp } from 'vue';
+import { createApp } from "vue";
 
-import App from './App.vue';
-import i18n, { setupI18n } from './i18n';
-import router from './router/index.js';
+import App from "./App.vue";
+import i18n, { setupI18n } from "./i18n";
+import router from "./router";
 
 // Setup i18n with lazy loading
 setupI18n().then(() => {
@@ -20,5 +20,5 @@ setupI18n().then(() => {
   app.use(i18n);
   app.use(VueQueryPlugin);
 
-  app.mount('#app');
+  app.mount("#app");
 });

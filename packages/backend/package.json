@@ -10,7 +10,7 @@
   },
   "scripts": {
     "dev": "dotenv -c development -- tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsup",
     "start": "node dist/index.js",
     "db:generate": "tsx node_modules/.bin/drizzle-kit generate",
     "db:migrate": "tsx node_modules/.bin/drizzle-kit migrate",
@@ -21,30 +21,31 @@
   "dependencies": {
     "@hono/node-server": "^1.14.0",
     "@hono/zod-validator": "^0.4.1",
-    "hono": "^4.6.14",
-    "drizzle-orm": "^0.45.1",
-    "pg": "^8.13.1",
+    "@xenix/shared": "workspace:*",
     "bcrypt": "^6.0.0",
+    "bullmq": "^5.38.1",
+    "drizzle-orm": "^0.45.1",
+    "hono": "^4.6.14",
+    "ioredis": "^5.4.2",
     "jsonwebtoken": "^9.0.3",
     "nanoid": "^5.1.6",
-    "xlsx": "^0.18.5",
-    "zod": "^3.24.1",
+    "pg": "^8.13.1",
     "pino": "^9.7.0",
     "pino-pretty": "^13.0.0",
-    "bullmq": "^5.38.1",
-    "ioredis": "^5.4.2",
-    "@xenix/shared": "workspace:*"
+    "xlsx": "^0.18.5",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@types/node": "^25.0.3",
-    "@types/pg": "^8.11.10",
     "@types/bcrypt": "^6.0.0",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^25.0.3",
+    "@types/pg": "^8.11.10",
+    "@vitest/coverage-v8": "^2.1.8",
+    "dotenv-cli": "^11.0.0",
     "drizzle-kit": "^0.31.8",
+    "tsup": "^8.5.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
-    "vitest": "^2.1.8",
-    "@vitest/coverage-v8": "^2.1.8",
-    "dotenv-cli": "^11.0.0"
+    "vitest": "^2.1.8"
   }
 }

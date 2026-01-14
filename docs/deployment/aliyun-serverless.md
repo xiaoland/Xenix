@@ -28,6 +28,8 @@
 - `pip install -r tmp/requirements.txt --target ./python --platform manylinux2014_x86_64 --only-binary=:all:` （注意因为 FC 环境是 Debian，在 Windows/MacOS 上构建时要加上平台参数）
 - `pnpm s cli fc layer publish --code ./my-layer-code --compatible-runtime java8,Java11,custom  --region cn-guangzhou --layer-name xenix-python-dep`
 
+### 挂载 OSS
+
 ## ESA
 
 1. 添加：
