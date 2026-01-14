@@ -223,38 +223,24 @@ const tune = new Hono()
 
       const taskId = insertedTask.id;
 
-      // Execute training task - use FC async invoke if available, otherwise local execution
-      if (fcInvokeService.isAvailable()) {
-        // FC async invoke (production)
-        const storageKey = `datasets/${datasetId}/${dataset.fileName}`;
-        const inputFile = storage.getFilesystemPath(storageKey);
+      // Determine input file path based on storage type
+      const inputFile = storage.getType() === 'oss'
+        ? storage.getFilesystemPath(`datasets/${datasetId}/${dataset.fileName}`) // OSS: /mnt/oss/datasets/...
+        : dataset.filePath; // Local: full file path
 
-        await fcInvokeService.invokeAsync({
-          functionName: 'ml-manual-tune-worker',
-          payload: {
-            taskId,
-            inputFile, // OSS mount path: /mnt/oss/datasets/...
-            model,
-            featureColumns,
-            targetColumn,
-            params: parameters,
-          },
+      // Invoke ML task via adapter (automatically chooses FC or spawn)
+      setImmediate(() => {
+        manualTune({
+          inputFile,
+          model,
+          featureColumns,
+          targetColumn,
+          taskId,
+          parameters,
+        }).catch((error) => {
+          logger.error({ error, taskId }, `Failed to execute manual tune task`);
         });
-      } else {
-        // Local execution (development)
-        setImmediate(() => {
-          manualTune({
-            inputFile: dataset.filePath,
-            model,
-            featureColumns,
-            targetColumn,
-            taskId,
-            parameters,
-          }).catch((error) => {
-            logger.error({ error, taskId }, `Failed to execute manual tune task`);
-          });
-        });
-      }
+      });
 
       return c.json(
         {

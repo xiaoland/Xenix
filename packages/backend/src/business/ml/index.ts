@@ -1,17 +1,9 @@
 /**
- * ML operations wrapper
- * Re-exports ML functions from @xenix/ml-backend with backend-specific context
+ * ML operations
+ * Uses ML Backend adapters to invoke operations (local spawn or FC invoke)
  */
 
-import path from "path";
-
-import {
-  batchTrain as mlBatchTrain,
-  singleTrain as mlSingleTrain,
-  predict as mlPredict,
-  createLogger,
-} from "@xenix/ml-backend";
-
+import { getMLBackendAdapter } from "../../adapters/ml-backend";
 import type {
   AutoTuneOptions,
   ManualTuneOptions,
@@ -24,28 +16,15 @@ import type {
  * Auto-tune (batch training with GridSearchCV)
  */
 export async function autoTune(options: AutoTuneOptions): Promise<void> {
-  const {
-    inputFile,
-    model,
-    featureColumns,
-    targetColumn,
-    taskId,
-    paramGrid,
-  } = options;
+  const adapter = getMLBackendAdapter();
 
-  const logger = createLogger(taskId, {
-    databaseUrl: process.env.DATABASE_URL!,
-    serviceName: "xenix-backend",
-  });
-
-  await mlBatchTrain({
-    inputFile,
-    model,
-    featureColumns,
-    targetColumn,
-    paramGrid: paramGrid || {},
-    taskId,
-    logger,
+  await adapter.autoTune({
+    taskId: options.taskId,
+    inputFile: options.inputFile,
+    model: options.model,
+    featureColumns: options.featureColumns,
+    targetColumn: options.targetColumn,
+    paramGrid: options.paramGrid,
   });
 }
 
@@ -53,30 +32,16 @@ export async function autoTune(options: AutoTuneOptions): Promise<void> {
  * Manual-tune (single training with specific parameters)
  */
 export async function manualTune(options: ManualTuneOptions): Promise<void> {
-  const {
-    inputFile,
-    model,
-    featureColumns,
-    targetColumn,
-    taskId,
-    parameters,
-    parentTaskId,
-  } = options;
+  const adapter = getMLBackendAdapter();
 
-  const logger = createLogger(taskId, {
-    databaseUrl: process.env.DATABASE_URL!,
-    serviceName: "xenix-backend",
-  });
-
-  await mlSingleTrain({
-    inputFile,
-    model,
-    featureColumns,
-    targetColumn,
-    params: parameters,
-    taskId,
-    logger,
-    parentTaskId,
+  await adapter.manualTune({
+    taskId: options.taskId,
+    inputFile: options.inputFile,
+    model: options.model,
+    featureColumns: options.featureColumns,
+    targetColumn: options.targetColumn,
+    parameters: options.parameters,
+    parentTaskId: options.parentTaskId,
   });
 }
 
@@ -84,32 +49,17 @@ export async function manualTune(options: ManualTuneOptions): Promise<void> {
  * Predict (file-based prediction)
  */
 export async function predict(options: PredictOptions): Promise<void> {
-  const {
-    trainingDataPath,
-    predictionDataPath,
-    outputPath,
-    model,
-    params,
-    featureColumns,
-    targetColumn,
-    taskId,
-  } = options;
+  const adapter = getMLBackendAdapter();
 
-  const logger = createLogger(taskId, {
-    databaseUrl: process.env.DATABASE_URL!,
-    serviceName: "xenix-backend",
-  });
-
-  await mlPredict({
-    trainData: trainingDataPath,
-    predictData: predictionDataPath,
-    outputPath,
-    model,
-    params,
-    featureColumns,
-    targetColumn,
-    taskId,
-    logger,
+  await adapter.predict({
+    taskId: options.taskId,
+    trainingDataPath: options.trainingDataPath,
+    predictionData: options.predictionDataPath,
+    outputPath: options.outputPath,
+    model: options.model,
+    params: options.params,
+    featureColumns: options.featureColumns,
+    targetColumn: options.targetColumn,
   });
 }
 
@@ -128,42 +78,24 @@ export async function predictFile(
 export async function predictInline(
   options: PredictInlineOptions
 ): Promise<void> {
-  const {
-    trainingDataPath,
-    predictionData,
-    outputPath,
-    model,
-    params,
-    featureColumns,
-    targetColumn,
-    taskId,
-  } = options;
+  const adapter = getMLBackendAdapter();
 
-  const logger = createLogger(taskId, {
-    databaseUrl: process.env.DATABASE_URL!,
-    serviceName: "xenix-backend",
-  });
-
-  await mlPredict({
-    trainData: trainingDataPath,
-    predictData: predictionData, // Pass inline array directly
-    outputPath,
-    model,
-    params,
-    featureColumns,
-    targetColumn,
-    taskId,
-    logger,
+  await adapter.predict({
+    taskId: options.taskId,
+    trainingDataPath: options.trainingDataPath,
+    predictionData: options.predictionData, // Pass inline array directly
+    outputPath: options.outputPath,
+    model: options.model,
+    params: options.params,
+    featureColumns: options.featureColumns,
+    targetColumn: options.targetColumn,
   });
 }
 
 /**
- * Get available models by scanning Python modules
- * Uses executePythonSync from ml-backend
+ * Get available models
  */
 export function getAvailableModels(): string[] {
-  // For now, return hardcoded list of models
-  // This can be enhanced to use scan_models.py from ml-backend
   return [
     "regression.ridge",
     "regression.lasso",
