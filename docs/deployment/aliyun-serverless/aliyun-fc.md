@@ -13,7 +13,7 @@ This guide provides detailed instructions for deploying the Xenix backend to Ali
 7. [Deployment](#deployment)
 8. [Post-Deployment Verification](#post-deployment-verification)
 9. [BullMQ Worker Setup](#bullmq-worker-setup)
-10. [Troubleshooting](#troubleshooting)
+10. [References](#references)
 
 ---
 
@@ -21,7 +21,7 @@ This guide provides detailed instructions for deploying the Xenix backend to Ali
 
 - Node.js 22+ and pnpm installed locally
 - Aliyun account with Function Compute service enabled
-- Aliyun CLI (`aliyun-cli`) or `fcli` installed (optional, for CLI deployment)
+- Aliyun Serverless Devs installed
 - Access to Aliyun RDS PostgreSQL and Redis instances
 
 ---
@@ -66,6 +66,7 @@ fc-deploy.zip
 ### 1. Create Aliyun Services
 
 #### RDS PostgreSQL Instance
+
 ```bash
 # Create RDS instance via Aliyun Console or CLI
 # Note the connection string:
@@ -73,6 +74,7 @@ fc-deploy.zip
 ```
 
 #### Redis Instance
+
 ```bash
 # Create Redis instance via Aliyun Console or CLI
 # Note the connection string:
@@ -129,6 +131,7 @@ cd ../backend
 ```
 
 Or use the built-in script:
+
 ```bash
 pnpm run build:shared
 ```
@@ -142,9 +145,11 @@ tsup --config tsup.config.fc.ts
 ```
 
 This creates:
+
 - `dist-fc/index.js` - Single bundled file with all Node.js code
 
 Key configuration:
+
 - `noExternal: [/.*/]` - Bundles ALL dependencies
 - `external: [...]` - Excludes Node.js built-ins
 - Injects `__dirname` and `__filename` for Python path resolution
@@ -164,6 +169,7 @@ pnpm run package:fc
 ```
 
 This creates `fc-deploy.zip` containing:
+
 - Bundled `index.js`
 - Minimal `package.json`
 - Python scripts in `ml/` directory
@@ -194,6 +200,7 @@ zip -r python-layer.zip python/
 #### Upload to Aliyun FC
 
 Via Console:
+
 1. Navigate to **Function Compute** > **Layers**
 2. Click **Create Layer**
 3. Upload `python-layer.zip`
@@ -201,6 +208,7 @@ Via Console:
 5. Note the Layer ARN
 
 Via CLI:
+
 ```bash
 fcli layer publish \
   --layer-name xenix-python-deps \
@@ -213,6 +221,7 @@ fcli layer publish \
 Create a bootstrap script that installs packages on cold start:
 
 **bootstrap.sh:**
+
 ```bash
 #!/bin/bash
 set -e
@@ -342,6 +351,7 @@ curl https://<function-url>/health
 ```
 
 Expected response:
+
 ```json
 {
   "status": "ok",
@@ -363,16 +373,19 @@ curl -X POST https://<function-url>/auth/login \
 ### 3. Check Logs
 
 Via Console:
+
 1. Navigate to function
 2. Click **Logs** tab
 3. Check for errors or warnings
 
 Via CLI:
+
 ```bash
 fcli logs tail -s xenix -f xenix-backend
 ```
 
 Look for:
+
 - ✅ "Starting server" message
 - ✅ Database connection success
 - ✅ Redis connection success
@@ -413,6 +426,7 @@ Create a second FC function dedicated to processing jobs:
 Same code package, but different entry point:
 
 **worker.js:**
+
 ```javascript
 import './dist-fc/index.js';
 // Import and start worker only
@@ -447,178 +461,18 @@ Replace BullMQ with FC async invocation:
 Run worker alongside HTTP server in same function.
 
 **Cons**:
+
 - Cold start issues
 - Worker may not process jobs during idle periods
 - Resource contention
 
 ---
 
-## Troubleshooting
-
-### Issue: Python ImportError
-
-**Symptoms**: ML tasks fail with `ModuleNotFoundError`
-
-**Solutions**:
-1. Verify Python layer is attached to function
-2. Check `PYTHONPATH` environment variable
-3. Ensure layer packages match [requirements.txt](requirements.txt)
-4. Test Python imports:
-   ```bash
-   # SSH into FC environment (if available) or use debug endpoint
-   python3 -c "import pandas; print(pandas.__version__)"
-   ```
-
-### Issue: File Upload Fails
-
-**Symptoms**: `/data` endpoint returns 500 error
-
-**Solutions**:
-1. Verify `UPLOAD_DIR=/tmp/uploads` in environment variables
-2. Check FC logs for permission errors
-3. Ensure upload directory is created (code in [src/index.ts](src/index.ts:24-27) handles this)
-4. Consider migrating to Aliyun OSS for persistent storage
-
-### Issue: Database Connection Timeout
-
-**Symptoms**: Queries timeout, connection pool errors
-
-**Solutions**:
-1. Verify VPC configuration:
-   - Function is in same VPC as RDS
-   - Security group allows port 5432
-2. Check RDS whitelist includes FC VPC CIDR
-3. Test connection:
-   ```bash
-   # From function logs
-   psql $DATABASE_URL -c "SELECT 1"
-   ```
-4. Increase connection timeout in `DATABASE_URL`:
-   ```
-   postgresql://user:pass@host:5432/db?connect_timeout=10
-   ```
-
-### Issue: Cold Starts Are Slow
-
-**Symptoms**: First request takes 5-10 seconds
-
-**Solutions**:
-1. Reduce bundle size:
-   - Analyze with `esbuild-visualizer`
-   - Remove unused dependencies
-2. Use FC Provisioned Instances:
-   - Pre-warm function instances
-   - Configure in FC console
-3. Optimize initialization:
-   - Lazy load heavy modules
-   - Pre-connect to database/Redis
-
-### Issue: Memory Limit Exceeded
-
-**Symptoms**: Function crashes with OOM error
-
-**Solutions**:
-1. Increase function memory (Console > Configuration)
-2. Optimize Python scripts:
-   - Process data in chunks
-   - Use `del` to free memory
-3. Monitor memory usage in logs
-
-### Issue: BullMQ Jobs Not Processing
-
-**Symptoms**: Tasks stuck in queue
-
-**Solutions**:
-1. Verify Redis connection:
-   ```bash
-   redis-cli -u $REDIS_URL ping
-   ```
-2. Check worker function is running (if separate)
-3. Review worker logs for errors
-4. Test job submission:
-   ```javascript
-   import { queue } from './queues/index.js';
-   await queue.add('test', { data: 'test' });
-   ```
-
-### Issue: CORS Errors
-
-**Symptoms**: Frontend requests blocked
-
-**Solutions**:
-1. Verify `FRONTEND_URL` matches your frontend domain exactly
-2. Check CORS middleware in [src/index.ts](src/index.ts:27-33)
-3. Ensure credentials are enabled:
-   ```typescript
-   cors({
-     origin: config.FRONTEND_URL,
-     credentials: true,
-   })
-   ```
-
----
-
-## Monitoring Best Practices
-
-### Set Up CloudMonitor Alerts
-
-1. Navigate to **CloudMonitor** > **Application Monitoring**
-2. Configure alerts for:
-   - Function error rate > 5%
-   - Function timeout > 10%
-   - Memory usage > 80%
-   - Cold start duration > 5s
-
-### Enable Log Service
-
-1. Function Configuration > Log Configuration
-2. Enable Aliyun Log Service
-3. Create log project and logstore
-4. Query logs using SQL-like syntax
-
-### Custom Metrics
-
-Add custom metrics to your code:
-
-```typescript
-import logger from './utils/logger';
-
-logger.info({
-  metric: 'ml_task_duration',
-  duration: taskDuration,
-  model: modelName
-}, 'ML task completed');
-```
-
-Query metrics in Log Service:
-```sql
-* | SELECT model, AVG(duration) as avg_duration
-  WHERE metric = 'ml_task_duration'
-  GROUP BY model
-```
-
----
-
-## Next Steps
-
-- [ ] Set up CI/CD pipeline for automated deployments
-- [ ] Migrate file storage from `/tmp` to Aliyun OSS
-- [ ] Implement function warming to reduce cold starts
-- [ ] Create separate worker function for BullMQ processing
-- [ ] Set up performance monitoring and alerts
-- [ ] Document rollback procedures
-- [ ] Create staging environment for testing
-
----
-
-## Additional Resources
+## References
 
 - [Aliyun Function Compute Documentation](https://www.alibabacloud.com/help/fc)
-- [Node.js Runtime Reference](https://www.alibabacloud.com/help/fc/user-guide/nodejs-runtime)
+- [FC Custom Runtime Documentation](https://help.aliyun.com/zh/functioncompute/fc/user-guide/principles-1)
+- [FC Node.js Runtime Reference](https://help.aliyun.com/zh/functioncompute/fc/user-guide/node-js/)
 - [HTTP Trigger Configuration](https://www.alibabacloud.com/help/fc/user-guide/http-triggers)
-- [FC Layer Documentation](https://www.alibabacloud.com/help/fc/user-guide/layers)
-- [FC CLI (fcli) Documentation](https://github.com/aliyun/fcli)
-
----
-
-For issues or questions, please refer to [FC_DEPLOYMENT_CHECKLIST.md](FC_DEPLOYMENT_CHECKLIST.md) or consult the Aliyun FC support team.
+- [FC Custom Layer Documentation](https://help.aliyun.com/zh/functioncompute/fc/user-guide/create-a-custom-layer-1)
+- [Aliyun Serverless Devs Documentation](https://docs.serverless-devs.com/)

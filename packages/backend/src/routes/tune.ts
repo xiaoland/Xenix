@@ -13,6 +13,9 @@ import { db, schema } from "../database";
 import { BadRequestError, NotFoundError } from "../errors";
 import { authMiddleware } from "../middleware/auth";
 import logger from "../utils/logger";
+import { fcInvokeService } from "../services/FCInvokeService";
+import { storage } from "../storage";
+import { config } from "../config";
 
 const tune = new Hono()
   .use("*", authMiddleware)
@@ -97,19 +100,38 @@ const tune = new Hono()
 
       const taskId = insertedTask.id;
 
-      // Execute tuning task in background
-      setImmediate(() => {
-        autoTune({
-          inputFile: dataset.filePath,
-          model,
-          featureColumns,
-          targetColumn,
-          taskId,
-          paramGrid,
-        }).catch((error) => {
-          logger.error({ error, taskId }, `Failed to execute tune task`);
+      // Execute tuning task - use FC async invoke if available, otherwise local execution
+      if (fcInvokeService.isAvailable()) {
+        // FC async invoke (production)
+        const storageKey = `datasets/${datasetId}/${dataset.fileName}`;
+        const inputFile = storage.getFilesystemPath(storageKey);
+
+        await fcInvokeService.invokeAsync({
+          functionName: 'auto-tune-worker',
+          payload: {
+            taskId,
+            inputFile, // OSS mount path: /mnt/oss/datasets/...
+            model,
+            featureColumns,
+            targetColumn,
+            paramGrid,
+          },
         });
-      });
+      } else {
+        // Local execution (development)
+        setImmediate(() => {
+          autoTune({
+            inputFile: dataset.filePath,
+            model,
+            featureColumns,
+            targetColumn,
+            taskId,
+            paramGrid,
+          }).catch((error) => {
+            logger.error({ error, taskId }, `Failed to execute tune task`);
+          });
+        });
+      }
 
       return c.json(
         {
@@ -201,19 +223,38 @@ const tune = new Hono()
 
       const taskId = insertedTask.id;
 
-      // Execute training task in background
-      setImmediate(() => {
-        manualTune({
-          inputFile: dataset.filePath,
-          model,
-          featureColumns,
-          targetColumn,
-          taskId,
-          parameters,
-        }).catch((error) => {
-          logger.error({ error, taskId }, `Failed to execute manual tune task`);
+      // Execute training task - use FC async invoke if available, otherwise local execution
+      if (fcInvokeService.isAvailable()) {
+        // FC async invoke (production)
+        const storageKey = `datasets/${datasetId}/${dataset.fileName}`;
+        const inputFile = storage.getFilesystemPath(storageKey);
+
+        await fcInvokeService.invokeAsync({
+          functionName: 'manual-tune-worker',
+          payload: {
+            taskId,
+            inputFile, // OSS mount path: /mnt/oss/datasets/...
+            model,
+            featureColumns,
+            targetColumn,
+            params: parameters,
+          },
         });
-      });
+      } else {
+        // Local execution (development)
+        setImmediate(() => {
+          manualTune({
+            inputFile: dataset.filePath,
+            model,
+            featureColumns,
+            targetColumn,
+            taskId,
+            parameters,
+          }).catch((error) => {
+            logger.error({ error, taskId }, `Failed to execute manual tune task`);
+          });
+        });
+      }
 
       return c.json(
         {
