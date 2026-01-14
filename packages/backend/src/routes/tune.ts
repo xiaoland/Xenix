@@ -107,7 +107,7 @@ const tune = new Hono()
         const inputFile = storage.getFilesystemPath(storageKey);
 
         await fcInvokeService.invokeAsync({
-          functionName: 'auto-tune-worker',
+          functionName: 'ml-auto-tune-worker',
           payload: {
             taskId,
             inputFile, // OSS mount path: /mnt/oss/datasets/...
@@ -230,7 +230,7 @@ const tune = new Hono()
         const inputFile = storage.getFilesystemPath(storageKey);
 
         await fcInvokeService.invokeAsync({
-          functionName: 'manual-tune-worker',
+          functionName: 'ml-manual-tune-worker',
           payload: {
             taskId,
             inputFile, // OSS mount path: /mnt/oss/datasets/...

@@ -1,80 +1,56 @@
-import path from 'path';
+/**
+ * ML operations wrapper
+ * Re-exports ML functions from @xenix/ml-backend with backend-specific context
+ */
 
-import { executePythonTask } from '../../utils/pythonExecutor';
+import path from "path";
+
 import {
+  batchTrain as mlBatchTrain,
+  singleTrain as mlSingleTrain,
+  predict as mlPredict,
+  createLogger,
+} from "@xenix/ml-backend";
+
+import type {
   AutoTuneOptions,
   ManualTuneOptions,
-  PredictFileOptions,
-  PredictInlineOptions,
   PredictOptions,
-} from './types';
+  PredictInlineOptions,
+  PredictFileOptions,
+} from "./types";
 
 /**
- * Helper function to get ML directory based on environment
- * For FC deployment, scripts are in dist-fc/ml/
- * For local dev, scripts are in src/business/ml/
- */
-function getMLDirectory(): string {
-  // Check if running in Aliyun FC environment
-  if (process.env.NODE_ENV === 'production' && process.env.FC_FUNC_CODE_PATH) {
-    // FC environment - scripts are in ml/ subdirectory
-    return path.join(process.env.FC_FUNC_CODE_PATH, 'ml');
-  }
-
-  // Local development - use src directory
-  return path.join(process.cwd(), 'src', 'business', 'ml');
-}
-
-// Constants for ML script paths
-const ML_MODELS_DIR = getMLDirectory();
-
-/**
- * Helper function to get script path
- */
-function getScriptPath(scriptName: string): string {
-  return path.join(ML_MODELS_DIR, scriptName);
-}
-
-/**
- * Helper function to get working directory
- */
-function getWorkingDirectory(): string {
-  return ML_MODELS_DIR;
-}
-
-/**
- * High-level function to auto-tune a machine learning model
- *
- * @param options - Auto-tuning configuration options
- * @returns Promise that resolves when auto-tuning task is started
+ * Auto-tune (batch training with GridSearchCV)
  */
 export async function autoTune(options: AutoTuneOptions): Promise<void> {
-  const { inputFile, model, featureColumns, targetColumn, taskId, paramGrid } =
-    options;
-
-  // Prepare stdin data for Python script
-  const stdinData = {
+  const {
     inputFile,
-    model: model.toLowerCase(),
+    model,
     featureColumns,
     targetColumn,
-    ...(paramGrid && { paramGrid }), // Include paramGrid if provided
-  };
-
-  // Execute Python task with auto_tune_model.py
-  await executePythonTask({
-    script: getScriptPath('auto_tune_model.py'),
-    stdinData,
     taskId,
-    cwd: getWorkingDirectory(),
+    paramGrid,
+  } = options;
+
+  const logger = createLogger(taskId, {
+    databaseUrl: process.env.DATABASE_URL!,
+    serviceName: "xenix-backend",
+  });
+
+  await mlBatchTrain({
+    inputFile,
+    model,
+    featureColumns,
+    targetColumn,
+    paramGrid: paramGrid || {},
+    taskId,
+    logger,
   });
 }
 
 /**
- * High-level function to manually tune a machine learning model with specific parameters
- *
- * @param options - Manual tuning configuration options
- * @returns Promise that resolves when manual tuning task is started
+ * Manual-tune (single training with specific parameters)
  */
 export async function manualTune(options: ManualTuneOptions): Promise<void> {
   const {
@@ -87,30 +63,25 @@ export async function manualTune(options: ManualTuneOptions): Promise<void> {
     parentTaskId,
   } = options;
 
-  // Prepare stdin data for Python script
-  const stdinData = {
+  const logger = createLogger(taskId, {
+    databaseUrl: process.env.DATABASE_URL!,
+    serviceName: "xenix-backend",
+  });
+
+  await mlSingleTrain({
     inputFile,
-    model: model.toLowerCase(),
+    model,
     featureColumns,
     targetColumn,
-    parameters, // Single parameter values
-    ...(parentTaskId && { parentTaskId }),
-  };
-
-  // Execute Python task with manual_tune_model.py
-  await executePythonTask({
-    script: getScriptPath('manual_tune_model.py'),
-    stdinData,
+    params: parameters,
     taskId,
-    cwd: getWorkingDirectory(),
+    logger,
+    parentTaskId,
   });
 }
 
 /**
- * High-level function to make predictions using a trained model
- *
- * @param options - Prediction configuration options
- * @returns Promise that resolves when prediction task is started
+ * Predict (file-based prediction)
  */
 export async function predict(options: PredictOptions): Promise<void> {
   const {
@@ -124,69 +95,35 @@ export async function predict(options: PredictOptions): Promise<void> {
     taskId,
   } = options;
 
-  // Prepare stdin data for Python script
-  const stdinData = {
-    trainingDataPath,
-    predictionDataPath,
-    outputPath,
-    model: model.toLowerCase(),
-    params,
-    featureColumns,
-    targetColumn,
-  };
-
-  // Execute Python task
-  await executePythonTask({
-    script: getScriptPath('predict.py'),
-    stdinData,
-    taskId,
-    cwd: getWorkingDirectory(),
+  const logger = createLogger(taskId, {
+    databaseUrl: process.env.DATABASE_URL!,
+    serviceName: "xenix-backend",
   });
-}
 
-/**
- * High-level function to make predictions using a trained model with file-based input
- *
- * @param options - File-based prediction configuration options
- * @returns Promise that resolves when prediction task is started
- */
-export async function predictFile(options: PredictFileOptions): Promise<void> {
-  const {
-    trainingDataPath,
-    predictionDataPath,
+  await mlPredict({
+    trainData: trainingDataPath,
+    predictData: predictionDataPath,
     outputPath,
     model,
     params,
     featureColumns,
     targetColumn,
     taskId,
-  } = options;
-
-  // Prepare stdin data for Python script
-  const stdinData = {
-    trainingDataPath,
-    predictionDataPath,
-    outputPath,
-    model: model.toLowerCase(),
-    params,
-    featureColumns,
-    targetColumn,
-  };
-
-  // Execute Python task with predict_on_file.py
-  await executePythonTask({
-    script: getScriptPath('predict_on_file.py'),
-    stdinData,
-    taskId,
-    cwd: getWorkingDirectory(),
+    logger,
   });
 }
 
 /**
- * High-level function to make predictions using a trained model with inline JSON data
- *
- * @param options - Inline prediction configuration options
- * @returns Promise that resolves when prediction task is started
+ * Predict with file (alias for predict)
+ */
+export async function predictFile(
+  options: PredictFileOptions
+): Promise<void> {
+  return predict(options as PredictOptions);
+}
+
+/**
+ * Predict with inline JSON data
  */
 export async function predictInline(
   options: PredictInlineOptions
@@ -202,42 +139,43 @@ export async function predictInline(
     taskId,
   } = options;
 
-  // Prepare stdin data for Python script
-  const stdinData = {
-    trainingDataPath,
-    predictionData,
+  const logger = createLogger(taskId, {
+    databaseUrl: process.env.DATABASE_URL!,
+    serviceName: "xenix-backend",
+  });
+
+  await mlPredict({
+    trainData: trainingDataPath,
+    predictData: predictionData, // Pass inline array directly
     outputPath,
-    model: model.toLowerCase(),
+    model,
     params,
     featureColumns,
     targetColumn,
-  };
-
-  // Execute Python task with predict_on_json.py
-  await executePythonTask({
-    script: getScriptPath('predict_on_json.py'),
-    stdinData,
     taskId,
-    cwd: getWorkingDirectory(),
+    logger,
   });
 }
 
 /**
- * Get available ML models
+ * Get available models by scanning Python modules
+ * Uses executePythonSync from ml-backend
  */
 export function getAvailableModels(): string[] {
+  // For now, return hardcoded list of models
+  // This can be enhanced to use scan_models.py from ml-backend
   return [
-    'regression.linear_regression_hyperparameter_tuning',
-    'regression.ridge',
-    'regression.lasso',
-    'regression.bayesian_ridge_regression',
-    'regression.k_nearest_neighbors',
-    'regression.regression_decision_tree',
-    'regression.random_forest',
-    'regression.gbdt',
-    'regression.adaboost',
-    'regression.xgboost',
-    'regression.lightgbm',
-    'regression.polynomial_regression',
+    "regression.ridge",
+    "regression.lasso",
+    "regression.linear_regression_hyperparameter_tuning",
+    "regression.polynomial_regression",
+    "regression.k_nearest_neighbors",
+    "regression.regression_decision_tree",
+    "regression.random_forest",
+    "regression.adaboost",
+    "regression.gbdt",
+    "regression.xgboost",
+    "regression.lightgbm",
+    "regression.bayesian_ridge_regression",
   ];
 }

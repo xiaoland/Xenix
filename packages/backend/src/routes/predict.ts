@@ -142,7 +142,7 @@ const predict = new Hono()
       const outputFilePath = storage.getFilesystemPath(outputFile);
 
       await fcInvokeService.invokeAsync({
-        functionName: 'predict-worker',
+        functionName: 'ml-predict-worker',
         payload: {
           taskId,
           trainingDataFile, // OSS mount path: /mnt/oss/datasets/...
