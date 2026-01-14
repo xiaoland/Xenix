@@ -2,18 +2,18 @@
  * Auth Service
  * Business logic for authentication and authorization
  */
-import bcrypt from 'bcrypt';
-import { eq, or } from 'drizzle-orm';
-import jwt from 'jsonwebtoken';
+import bcrypt from "bcrypt";
+import { eq, or } from "drizzle-orm";
+import jwt from "jsonwebtoken";
 
-import type { SignInDto, SignUpDto } from '@xenix/shared';
+import type { SignInDto, SignUpDto } from "@xenix/shared";
 
-import { db, schema } from '../database/index.js';
+import { db, schema } from "../database";
 import {
   ConflictError,
   InternalServerError,
   UnauthorizedError,
-} from '../errors/index.js';
+} from "../errors";
 
 export class AuthService {
   /**
@@ -35,23 +35,23 @@ export class AuthService {
       .limit(1);
 
     if (!user) {
-      throw new UnauthorizedError('Invalid credentials');
+      throw new UnauthorizedError("Invalid credentials");
     }
 
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw new UnauthorizedError('Invalid credentials');
+      throw new UnauthorizedError("Invalid credentials");
     }
 
     // Generate JWT token
     const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
-      throw new InternalServerError('Server configuration error');
+      throw new InternalServerError("Server configuration error");
     }
 
     const token = jwt.sign({ userId: user.id }, jwtSecret, {
-      expiresIn: '7d',
+      expiresIn: "7d",
     });
 
     return { token };
@@ -68,12 +68,12 @@ export class AuthService {
       .select()
       .from(schema.users)
       .where(
-        or(eq(schema.users.email, email), eq(schema.users.phone, phone || ''))
+        or(eq(schema.users.email, email), eq(schema.users.phone, phone || ""))
       )
       .limit(1);
 
     if (existingUser.length > 0) {
-      throw new ConflictError('User with this email or phone already exists');
+      throw new ConflictError("User with this email or phone already exists");
     }
 
     // Hash password
@@ -92,11 +92,11 @@ export class AuthService {
     // Generate JWT token
     const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
-      throw new InternalServerError('Server configuration error');
+      throw new InternalServerError("Server configuration error");
     }
 
     const token = jwt.sign({ userId: newUser.id }, jwtSecret, {
-      expiresIn: '7d',
+      expiresIn: "7d",
     });
 
     return { token };
@@ -108,14 +108,14 @@ export class AuthService {
   verifyToken(token: string): { userId: string } {
     const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
-      throw new InternalServerError('Server configuration error');
+      throw new InternalServerError("Server configuration error");
     }
 
     try {
       const decoded = jwt.verify(token, jwtSecret) as { userId: string };
       return decoded;
     } catch (error) {
-      throw new UnauthorizedError('Invalid or expired token');
+      throw new UnauthorizedError("Invalid or expired token");
     }
   }
 }

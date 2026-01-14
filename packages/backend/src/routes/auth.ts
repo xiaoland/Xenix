@@ -3,7 +3,7 @@ import { Hono } from "hono";
 
 import { SignInSchema, SignUpSchema } from "@xenix/shared";
 
-import { AuthService } from "../services/index.js";
+import { AuthService } from "../services";
 
 const authService = new AuthService();
 

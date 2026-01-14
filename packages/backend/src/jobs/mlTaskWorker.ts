@@ -2,11 +2,11 @@
  * ML Task Worker
  * Worker process that consumes jobs from the ML tasks queue
  */
-import { Worker } from 'bullmq';
+import { Worker } from "bullmq";
 
-import { QUEUE_NAMES, connection } from '../queues/index.js';
-import logger from '../utils/logger/index.js';
-import { MLTaskData, processMLTask } from './mlTaskProcessor.js';
+import { QUEUE_NAMES, connection } from "../queues";
+import logger from "../utils/logger";
+import { MLTaskData, processMLTask } from "./mlTaskProcessor";
 
 // Create worker
 export const mlTaskWorker = new Worker<MLTaskData>(
@@ -24,22 +24,22 @@ export const mlTaskWorker = new Worker<MLTaskData>(
   }
 );
 
-mlTaskWorker.on('completed', (job) => {
-  logger.info({ jobId: job.id }, 'Worker completed job');
+mlTaskWorker.on("completed", (job) => {
+  logger.info({ jobId: job.id }, "Worker completed job");
 });
 
-mlTaskWorker.on('failed', (job, err) => {
-  logger.error({ jobId: job?.id, error: err }, 'Worker failed to process job');
+mlTaskWorker.on("failed", (job, err) => {
+  logger.error({ jobId: job?.id, error: err }, "Worker failed to process job");
 });
 
-mlTaskWorker.on('error', (err) => {
-  logger.error({ error: err }, 'Worker error');
+mlTaskWorker.on("error", (err) => {
+  logger.error({ error: err }, "Worker error");
 });
 
-logger.info('ML task worker started');
+logger.info("ML task worker started");
 
 // Graceful shutdown
-process.on('SIGTERM', async () => {
-  logger.info('SIGTERM received, closing worker');
+process.on("SIGTERM", async () => {
+  logger.info("SIGTERM received, closing worker");
   await mlTaskWorker.close();
 });

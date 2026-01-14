@@ -1,10 +1,10 @@
-import { spawn } from 'child_process';
-import { eq } from 'drizzle-orm';
-import path from 'path';
+import { spawn } from "child_process";
+import { eq } from "drizzle-orm";
+import path from "path";
 
-import { db, schema } from '../database';
-import logger from './logger/index.js';
-import { generateTraceId } from './taskUtils';
+import { db, schema } from "../database";
+import logger from "./logger";
+import { generateTraceId } from "./taskUtils";
 
 export interface PythonTaskOptions {
   script: string;
@@ -15,7 +15,7 @@ export interface PythonTaskOptions {
 
 // Pattern for structured output from Python scripts
 interface StructuredOutput {
-  type: 'log' | 'status' | 'result';
+  type: "log" | "status" | "result";
   data: any;
 }
 
@@ -32,15 +32,15 @@ export async function executePythonTask(
     await db
       .update(schema.tasks)
       .set({
-        status: 'running',
+        status: "running",
         startedAt: new Date(),
       })
       .where(eq(schema.tasks.id, taskId));
 
     // Use python3 explicitly or from environment variable
-    const pythonCmd = (process.env.PYTHON_EXECUTABLE || 'python3').replace(
+    const pythonCmd = (process.env.PYTHON_EXECUTABLE || "python3").replace(
       /\\/g,
-      '/'
+      "/"
     );
 
     // Execute Python script (no CLI args, use stdin instead)
@@ -48,7 +48,7 @@ export async function executePythonTask(
       cwd: cwd || process.cwd(),
       env: {
         ...process.env,
-        PATH: `${path.dirname(process.env.PYTHON_EXECUTABLE || 'python3')};${
+        PATH: `${path.dirname(process.env.PYTHON_EXECUTABLE || "python3")};${
           process.env.PATH
         }`,
       },
@@ -61,16 +61,16 @@ export async function executePythonTask(
       pythonProcess.stdin.end();
     }
 
-    let stdoutBuffer = '';
-    let stderrBuffer = '';
+    let stdoutBuffer = "";
+    let stderrBuffer = "";
 
-    pythonProcess.stdout.on('data', async (data) => {
+    pythonProcess.stdout.on("data", async (data) => {
       const output = data.toString();
       stdoutBuffer += output;
 
       // Process line by line
-      const lines = stdoutBuffer.split('\n');
-      stdoutBuffer = lines.pop() || ''; // Keep incomplete line in buffer
+      const lines = stdoutBuffer.split("\n");
+      stdoutBuffer = lines.pop() || ""; // Keep incomplete line in buffer
 
       for (const line of lines) {
         if (line.trim()) {
@@ -80,19 +80,19 @@ export async function executePythonTask(
             await handleStructuredOutput(parsed, taskId);
           } catch {
             // Not JSON, just log as plain text
-            logger.info({ traceId, line }, 'Python stdout');
+            logger.info({ traceId, line }, "Python stdout");
           }
         }
       }
     });
 
-    pythonProcess.stderr.on('data', async (data) => {
+    pythonProcess.stderr.on("data", async (data) => {
       const output = data.toString();
       stderrBuffer += output;
 
       // Process line by line
-      const lines = stderrBuffer.split('\n');
-      stderrBuffer = lines.pop() || ''; // Keep incomplete line in buffer
+      const lines = stderrBuffer.split("\n");
+      stderrBuffer = lines.pop() || ""; // Keep incomplete line in buffer
 
       for (const line of lines) {
         if (line.trim()) {
@@ -102,13 +102,13 @@ export async function executePythonTask(
             await handleStructuredOutput(parsed, taskId);
           } catch {
             // Not JSON, just log as error
-            logger.error({ traceId, line }, 'Python stderr');
+            logger.error({ traceId, line }, "Python stderr");
           }
         }
       }
     });
 
-    pythonProcess.on('close', async (code) => {
+    pythonProcess.on("close", async (code) => {
       if (taskCompleted) return; // Prevent duplicate updates
       taskCompleted = true;
 
@@ -117,28 +117,28 @@ export async function executePythonTask(
         await db
           .update(schema.tasks)
           .set({
-            status: 'completed',
+            status: "completed",
             endAt: new Date(),
           })
           .where(eq(schema.tasks.id, taskId));
 
-        logger.info({ traceId }, 'Task completed successfully');
+        logger.info({ traceId }, "Task completed successfully");
       } else {
         // Task failed
         await db
           .update(schema.tasks)
           .set({
-            status: 'failed',
+            status: "failed",
             error: stderrBuffer || `Process exited with code ${code}`,
             endAt: new Date(),
           })
           .where(eq(schema.tasks.id, taskId));
 
-        logger.error({ traceId, exitCode: code }, 'Task failed');
+        logger.error({ traceId, exitCode: code }, "Task failed");
       }
     });
 
-    pythonProcess.on('error', async (error) => {
+    pythonProcess.on("error", async (error) => {
       if (taskCompleted) return; // Prevent duplicate updates
       taskCompleted = true;
 
@@ -146,13 +146,13 @@ export async function executePythonTask(
       await db
         .update(schema.tasks)
         .set({
-          status: 'failed',
+          status: "failed",
           error: error.message,
           endAt: new Date(),
         })
         .where(eq(schema.tasks.id, taskId));
 
-      logger.error({ traceId, error }, 'Failed to start task');
+      logger.error({ traceId, error }, "Failed to start task");
     });
   } catch (error) {
     if (taskCompleted) return; // Prevent duplicate updates
@@ -162,8 +162,8 @@ export async function executePythonTask(
     await db
       .update(schema.tasks)
       .set({
-        status: 'failed',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        status: "failed",
+        error: error instanceof Error ? error.message : "Unknown error",
         endAt: new Date(),
       })
       .where(eq(schema.tasks.id, taskId));
@@ -180,12 +180,12 @@ async function handleStructuredOutput(
 
   try {
     switch (output.type) {
-      case 'log':
+      case "log":
         // Store log in database with task.{id} trace format
         await storeLog(output.data, taskId);
         break;
 
-      case 'status':
+      case "status":
         // Update task status
         await db
           .update(schema.tasks)
@@ -196,7 +196,7 @@ async function handleStructuredOutput(
           .where(eq(schema.tasks.id, taskId));
         break;
 
-      case 'result':
+      case "result":
         // Store the raw result payload directly in tasks.result
         await db
           .update(schema.tasks)
@@ -207,7 +207,7 @@ async function handleStructuredOutput(
         break;
     }
   } catch (error) {
-    logger.error({ traceId, error }, 'Error handling structured output');
+    logger.error({ traceId, error }, "Error handling structured output");
   }
 }
 
@@ -228,7 +228,7 @@ async function storeLog(logData: any, taskId: number) {
       createdAt: new Date(),
     });
   } catch (error) {
-    logger.error({ traceId, error }, 'Error storing log');
+    logger.error({ traceId, error }, "Error storing log");
   }
 }
 
@@ -241,16 +241,16 @@ export async function executePythonScript(
   stdinData: any
 ): Promise<any> {
   return new Promise((resolve, reject) => {
-    const pythonCmd = (process.env.PYTHON_EXECUTABLE || 'python3').replace(
+    const pythonCmd = (process.env.PYTHON_EXECUTABLE || "python3").replace(
       /\\/g,
-      '/'
+      "/"
     );
 
     const pythonProcess = spawn(pythonCmd, [scriptPath], {
       cwd: process.cwd(),
       env: {
         ...process.env,
-        PATH: `${path.dirname(process.env.PYTHON_EXECUTABLE || 'python3')};${
+        PATH: `${path.dirname(process.env.PYTHON_EXECUTABLE || "python3")};${
           process.env.PATH
         }`,
       },
@@ -263,18 +263,18 @@ export async function executePythonScript(
       pythonProcess.stdin.end();
     }
 
-    let stdoutBuffer = '';
-    let stderrBuffer = '';
+    let stdoutBuffer = "";
+    let stderrBuffer = "";
 
-    pythonProcess.stdout.on('data', (data) => {
+    pythonProcess.stdout.on("data", (data) => {
       stdoutBuffer += data.toString();
     });
 
-    pythonProcess.stderr.on('data', (data) => {
+    pythonProcess.stderr.on("data", (data) => {
       stderrBuffer += data.toString();
     });
 
-    pythonProcess.on('close', (code) => {
+    pythonProcess.on("close", (code) => {
       if (code === 0) {
         try {
           const result = JSON.parse(stdoutBuffer);
@@ -289,7 +289,7 @@ export async function executePythonScript(
       }
     });
 
-    pythonProcess.on('error', (error) => {
+    pythonProcess.on("error", (error) => {
       reject(new Error(`Failed to execute Python script: ${error.message}`));
     });
   });

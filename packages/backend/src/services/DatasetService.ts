@@ -2,13 +2,13 @@
  * Dataset Service
  * Business logic for dataset operations
  */
-import fs from 'fs/promises';
+import fs from "fs/promises";
 
-import { NotFoundError } from '../errors/index.js';
-import { DatasetRepository } from '../repositories/index.js';
-import { analyzeExcelFile } from '../utils/datasetUtils.js';
-import logger from '../utils/logger/index.js';
-import { saveUploadedFile, validateExcelFile } from '../utils/taskUtils.js';
+import { NotFoundError } from "../errors";
+import { DatasetRepository } from "../repositories";
+import { analyzeExcelFile } from "../utils/datasetUtils";
+import logger from "../utils/logger";
+import { saveUploadedFile, validateExcelFile } from "../utils/taskUtils";
 
 export class DatasetService {
   private datasetRepo: DatasetRepository;
@@ -25,7 +25,7 @@ export class DatasetService {
     const dataset = await this.datasetRepo.findById(id);
 
     if (!dataset) {
-      throw new NotFoundError('Dataset');
+      throw new NotFoundError("Dataset");
     }
 
     return dataset;
@@ -41,7 +41,7 @@ export class DatasetService {
     // Validate file
     if (!validateExcelFile(file.name)) {
       throw new Error(
-        'Invalid file type. Only Excel files (.xlsx, .xls) are allowed.'
+        "Invalid file type. Only Excel files (.xlsx, .xls) are allowed."
       );
     }
 
@@ -72,7 +72,7 @@ export class DatasetService {
     const dataset = await this.datasetRepo.findById(id);
 
     if (!dataset) {
-      throw new NotFoundError('Dataset');
+      throw new NotFoundError("Dataset");
     }
 
     // Delete the file from filesystem if it exists
@@ -80,10 +80,10 @@ export class DatasetService {
       await fs.unlink(dataset.filePath);
     } catch (fileError: any) {
       // Ignore ENOENT (file not found) errors, but log others
-      if (fileError.code !== 'ENOENT') {
+      if (fileError.code !== "ENOENT") {
         logger.warn(
           { error: fileError, filePath: dataset.filePath },
-          'Failed to delete file'
+          "Failed to delete file"
         );
       }
     }
@@ -93,4 +93,3 @@ export class DatasetService {
     return dataset;
   }
 }
-

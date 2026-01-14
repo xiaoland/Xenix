@@ -3,8 +3,8 @@ import { Hono } from "hono";
 
 import { ModelIdParamSchema } from "@xenix/shared";
 
-import { authMiddleware } from "../middleware/auth.js";
-import { ModelService } from "../services/index.js";
+import { authMiddleware } from "../middleware/auth";
+import { ModelService } from "../services";
 
 const modelService = new ModelService();
 

@@ -1,26 +1,26 @@
-import { eq } from 'drizzle-orm';
+import { eq } from "drizzle-orm";
 
-import { zValidator } from '@hono/zod-validator';
-import { Hono } from 'hono';
+import { zValidator } from "@hono/zod-validator";
+import { Hono } from "hono";
 
 import {
   CreateAutoTuneTaskSchema,
   CreateManualTuneTaskSchema,
-} from '@xenix/shared';
+} from "@xenix/shared";
 
-import { autoTune, manualTune } from '../business/ml/index.js';
-import { db, schema } from '../database/index.js';
-import { BadRequestError, NotFoundError } from '../errors/index.js';
-import { authMiddleware } from '../middleware/auth.js';
-import logger from '../utils/logger/index.js';
+import { autoTune, manualTune } from "../business/ml";
+import { db, schema } from "../database";
+import { BadRequestError, NotFoundError } from "../errors";
+import { authMiddleware } from "../middleware/auth";
+import logger from "../utils/logger";
 
 const tune = new Hono()
-  .use('*', authMiddleware)
+  .use("*", authMiddleware)
 
   // Auto-tune endpoint
   .post(
-    '/auto-tune',
-    zValidator('json', CreateAutoTuneTaskSchema),
+    "/auto-tune",
+    zValidator("json", CreateAutoTuneTaskSchema),
     async (c) => {
       let {
         datasetId,
@@ -29,7 +29,7 @@ const tune = new Hono()
         model,
         paramGrid,
         workItemId,
-      } = c.req.valid('json');
+      } = c.req.valid("json");
 
       // If workItemId provided, try to fill missing values from the work item
       if (workItemId) {
@@ -54,17 +54,17 @@ const tune = new Hono()
 
       // Validate required parameters (after trying to fill from work item)
       if (!datasetId) {
-        throw new BadRequestError('datasetId is required');
+        throw new BadRequestError("datasetId is required");
       }
 
       if (!featureColumns || featureColumns.length === 0) {
         throw new BadRequestError(
-          'featureColumns array is required and must not be empty'
+          "featureColumns array is required and must not be empty"
         );
       }
 
       if (!targetColumn) {
-        throw new BadRequestError('targetColumn is required');
+        throw new BadRequestError("targetColumn is required");
       }
 
       // Verify dataset exists
@@ -75,7 +75,7 @@ const tune = new Hono()
         .limit(1);
 
       if (!dataset) {
-        throw new NotFoundError('Dataset');
+        throw new NotFoundError("Dataset");
       }
 
       // Create task record with auto-tune type
@@ -83,8 +83,8 @@ const tune = new Hono()
         .insert(schema.tasks)
         .values({
           workItemId: workItemId || null,
-          type: 'auto-tune',
-          status: 'pending',
+          type: "auto-tune",
+          status: "pending",
           parameter: {
             model,
             datasetId,
@@ -114,7 +114,7 @@ const tune = new Hono()
       return c.json(
         {
           taskId,
-          message: 'Auto-tune started',
+          message: "Auto-tune started",
         },
         201
       );
@@ -123,8 +123,8 @@ const tune = new Hono()
 
   // Manual-tune endpoint
   .post(
-    '/manual-tune',
-    zValidator('json', CreateManualTuneTaskSchema),
+    "/manual-tune",
+    zValidator("json", CreateManualTuneTaskSchema),
     async (c) => {
       let {
         datasetId,
@@ -133,7 +133,7 @@ const tune = new Hono()
         model,
         parameters,
         workItemId,
-      } = c.req.valid('json');
+      } = c.req.valid("json");
 
       // If workItemId provided, try to fill missing values from the work item
       if (workItemId) {
@@ -158,17 +158,17 @@ const tune = new Hono()
 
       // Validate required parameters (after trying to fill from work item)
       if (!datasetId) {
-        throw new BadRequestError('datasetId is required');
+        throw new BadRequestError("datasetId is required");
       }
 
       if (!featureColumns || featureColumns.length === 0) {
         throw new BadRequestError(
-          'featureColumns array is required and must not be empty'
+          "featureColumns array is required and must not be empty"
         );
       }
 
       if (!targetColumn) {
-        throw new BadRequestError('targetColumn is required');
+        throw new BadRequestError("targetColumn is required");
       }
 
       // Verify dataset exists
@@ -179,7 +179,7 @@ const tune = new Hono()
         .limit(1);
 
       if (!dataset) {
-        throw new NotFoundError('Dataset');
+        throw new NotFoundError("Dataset");
       }
 
       // Create task record with manual-tune type
@@ -187,8 +187,8 @@ const tune = new Hono()
         .insert(schema.tasks)
         .values({
           workItemId: workItemId || null,
-          type: 'manual-tune',
-          status: 'pending',
+          type: "manual-tune",
+          status: "pending",
           parameter: {
             model,
             datasetId,
@@ -218,7 +218,7 @@ const tune = new Hono()
       return c.json(
         {
           taskId,
-          message: 'Manual tuning started',
+          message: "Manual tuning started",
         },
         201
       );

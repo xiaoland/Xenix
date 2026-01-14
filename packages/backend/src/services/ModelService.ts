@@ -2,11 +2,11 @@
  * Model Service
  * Business logic for model metadata operations
  */
-import { eq } from 'drizzle-orm';
+import { eq } from "drizzle-orm";
 
-import { db, schema } from '../database/index.js';
-import { NotFoundError } from '../errors/index.js';
-import { syncModelMetadata } from '../utils/syncModels.js';
+import { db, schema } from "../database";
+import { NotFoundError } from "../errors";
+import { syncModelMetadata } from "../utils/syncModels";
 
 export class ModelService {
   async getAllModels() {
@@ -21,7 +21,7 @@ export class ModelService {
       .limit(1);
 
     if (!model) {
-      throw new NotFoundError('Model');
+      throw new NotFoundError("Model");
     }
 
     return model;

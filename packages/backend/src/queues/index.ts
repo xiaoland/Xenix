@@ -2,11 +2,11 @@
  * Queue Configuration
  * Centralized Redis connection and queue setup
  */
-import { Queue, QueueEvents } from 'bullmq';
+import { Queue, QueueEvents } from "bullmq";
 
-import { config } from '../config/index.js';
-import { QUEUE_CONFIG, REDIS_DEFAULTS } from '../constants/config.js';
-import logger from '../utils/logger/index.js';
+import { config } from "../config";
+import { QUEUE_CONFIG, REDIS_DEFAULTS } from "../constants/config";
+import logger from "../utils/logger";
 
 // Parse Redis URL once
 const redisUrl = new URL(config.REDIS_URL);
@@ -19,7 +19,7 @@ export const connection = {
 
 // Queue names
 export const QUEUE_NAMES = {
-  ML_TASKS: 'ml-tasks',
+  ML_TASKS: "ml-tasks",
 } as const;
 
 // Create ML tasks queue
@@ -28,7 +28,7 @@ export const mlTasksQueue = new Queue(QUEUE_NAMES.ML_TASKS, {
   defaultJobOptions: {
     attempts: 3,
     backoff: {
-      type: 'exponential',
+      type: "exponential",
       delay: QUEUE_CONFIG.RETRY_DELAY,
     },
     removeOnComplete: {
@@ -46,12 +46,12 @@ export const mlTasksQueueEvents = new QueueEvents(QUEUE_NAMES.ML_TASKS, {
   connection,
 });
 
-mlTasksQueueEvents.on('completed', ({ jobId }) => {
-  logger.info({ jobId }, 'Job completed');
+mlTasksQueueEvents.on("completed", ({ jobId }) => {
+  logger.info({ jobId }, "Job completed");
 });
 
-mlTasksQueueEvents.on('failed', ({ jobId, failedReason }) => {
-  logger.error({ jobId, failedReason }, 'Job failed');
+mlTasksQueueEvents.on("failed", ({ jobId, failedReason }) => {
+  logger.error({ jobId, failedReason }, "Job failed");
 });
 
-logger.info('BullMQ queues initialized');
+logger.info("BullMQ queues initialized");

@@ -2,10 +2,10 @@
  * Project Service
  * Business logic for project operations
  */
-import type { CreateProjectDto, UpdateProjectDto } from '@xenix/shared';
+import type { CreateProjectDto, UpdateProjectDto } from "@xenix/shared";
 
-import { ForbiddenError, NotFoundError } from '../errors/index.js';
-import { ProjectRepository } from '../repositories/index.js';
+import { ForbiddenError, NotFoundError } from "../errors";
+import { ProjectRepository } from "../repositories";
 
 export class ProjectService {
   private projectRepo: ProjectRepository;
@@ -22,11 +22,11 @@ export class ProjectService {
     const project = await this.projectRepo.findByIdWithRelations(id);
 
     if (!project) {
-      throw new NotFoundError('Project');
+      throw new NotFoundError("Project");
     }
 
     if (project.createdBy !== userId) {
-      throw new ForbiddenError('Access denied');
+      throw new ForbiddenError("Access denied");
     }
 
     return project;
@@ -36,7 +36,7 @@ export class ProjectService {
     return await this.projectRepo.create({
       name: data.name,
       description: data.description || null,
-      status: 'active',
+      status: "active",
       createdBy: userId,
     });
   }
@@ -45,11 +45,11 @@ export class ProjectService {
     const project = await this.projectRepo.findById(id);
 
     if (!project) {
-      throw new NotFoundError('Project');
+      throw new NotFoundError("Project");
     }
 
     if (project.createdBy !== userId) {
-      throw new ForbiddenError('Access denied');
+      throw new ForbiddenError("Access denied");
     }
 
     return await this.projectRepo.update(id, {
@@ -62,11 +62,11 @@ export class ProjectService {
     const project = await this.projectRepo.findById(id);
 
     if (!project) {
-      throw new NotFoundError('Project');
+      throw new NotFoundError("Project");
     }
 
     if (project.createdBy !== userId) {
-      throw new ForbiddenError('Access denied');
+      throw new ForbiddenError("Access denied");
     }
 
     await this.projectRepo.delete(id);

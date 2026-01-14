@@ -2,8 +2,8 @@
  * Task Service
  * Business logic for task operations
  */
-import { NotFoundError } from '../errors/index.js';
-import { TaskRepository } from '../repositories/index.js';
+import { NotFoundError } from "../errors";
+import { TaskRepository } from "../repositories";
 
 export class TaskService {
   private taskRepo: TaskRepository;
@@ -20,7 +20,7 @@ export class TaskService {
     const task = await this.taskRepo.findById(id);
 
     if (!task) {
-      throw new NotFoundError('Task');
+      throw new NotFoundError("Task");
     }
 
     return task;
@@ -34,7 +34,7 @@ export class TaskService {
     const task = await this.taskRepo.findById(id);
 
     if (!task) {
-      throw new NotFoundError('Task');
+      throw new NotFoundError("Task");
     }
 
     return await this.taskRepo.update(id, data);
@@ -44,7 +44,7 @@ export class TaskService {
     const task = await this.taskRepo.findById(id);
 
     if (!task) {
-      throw new NotFoundError('Task');
+      throw new NotFoundError("Task");
     }
 
     await this.taskRepo.delete(id);

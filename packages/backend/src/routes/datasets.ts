@@ -5,10 +5,10 @@ import { Hono } from "hono";
 
 import { DatasetIdParamSchema } from "@xenix/shared";
 
-import { BadRequestError } from "../errors/index.js";
-import { authMiddleware } from "../middleware/auth.js";
-import { DatasetService } from "../services/index.js";
-import { parseDatasetColumns } from "../utils/datasetUtils.js";
+import { BadRequestError } from "../errors";
+import { authMiddleware } from "../middleware/auth";
+import { DatasetService } from "../services";
+import { parseDatasetColumns } from "../utils/datasetUtils";
 
 const datasetService = new DatasetService();
 

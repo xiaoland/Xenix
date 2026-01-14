@@ -7,4 +7,4 @@ export {
   ConflictError,
   ValidationError,
   InternalServerError,
-} from './AppError.js';
+} from "./AppError";

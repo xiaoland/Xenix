@@ -2,10 +2,10 @@
  * Task Repository
  * Handles database operations for tasks
  */
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from "drizzle-orm";
 
-import { db, schema } from '../database/index.js';
-import { BaseRepository } from './BaseRepository.js';
+import { db, schema } from "../database";
+import { BaseRepository } from "./BaseRepository";
 
 type Task = typeof schema.tasks.$inferSelect;
 
@@ -41,7 +41,7 @@ export class TaskRepository extends BaseRepository<Task> {
 
   async markAsRunning(id: number) {
     return await this.update(id, {
-      status: 'running',
+      status: "running",
       startedAt: new Date(),
     });
   }
@@ -52,7 +52,7 @@ export class TaskRepository extends BaseRepository<Task> {
       .where(
         and(
           eq(schema.tasks.workItemId, workItemId),
-          eq(schema.tasks.status, 'failed')
+          eq(schema.tasks.status, "failed")
         )
       );
   }

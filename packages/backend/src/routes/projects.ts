@@ -7,8 +7,8 @@ import {
   UpdateProjectSchema,
 } from "@xenix/shared";
 
-import { authMiddleware, requireAuth } from "../middleware/auth.js";
-import { ProjectService } from "../services/index.js";
+import { authMiddleware, requireAuth } from "../middleware/auth";
+import { ProjectService } from "../services";
 
 const projectService = new ProjectService();
 

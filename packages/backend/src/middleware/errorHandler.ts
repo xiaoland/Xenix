@@ -1,7 +1,7 @@
-import { Context } from 'hono';
+import { Context } from "hono";
 
-import { AppError } from '../errors/index.js';
-import logger from '../utils/logger/index.js';
+import { AppError } from "../errors";
+import logger from "../utils/logger";
 
 /**
  * Global error handler middleware
@@ -19,9 +19,9 @@ export const errorHandler = (err: Error, c: Context) => {
     return c.json(
       {
         code: err.name
-          .replace('Error', '')
+          .replace("Error", "")
           .toUpperCase()
-          .replace(/([A-Z])/g, '_$1')
+          .replace(/([A-Z])/g, "_$1")
           .substring(1),
         error: err.message,
       },
@@ -30,11 +30,11 @@ export const errorHandler = (err: Error, c: Context) => {
   }
 
   // Handle Zod validation errors
-  if (err.name === 'ZodError') {
+  if (err.name === "ZodError") {
     return c.json(
       {
-        code: 'VALIDATION_ERROR',
-        error: 'Validation failed',
+        code: "VALIDATION_ERROR",
+        error: "Validation failed",
         details: (err as any).errors,
       },
       { status: 400 }
@@ -42,13 +42,13 @@ export const errorHandler = (err: Error, c: Context) => {
   }
 
   // Log unexpected errors
-  logger.error({ err }, 'Unexpected error');
+  logger.error({ err }, "Unexpected error");
 
   // Handle unexpected errors
   return c.json(
     {
-      code: 'INTERNAL_SERVER_ERROR',
-      error: 'Internal Server Error',
+      code: "INTERNAL_SERVER_ERROR",
+      error: "Internal Server Error",
     },
     { status: 500 }
   );

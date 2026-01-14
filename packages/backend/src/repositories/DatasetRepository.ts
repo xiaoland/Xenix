@@ -2,10 +2,10 @@
  * Dataset Repository
  * Handles database operations for datasets
  */
-import { desc } from 'drizzle-orm';
+import { desc } from "drizzle-orm";
 
-import { db, schema } from '../database/index.js';
-import { BaseRepository } from './BaseRepository.js';
+import { db, schema } from "../database";
+import { BaseRepository } from "./BaseRepository";
 
 type Dataset = typeof schema.datasets.$inferSelect;
 

@@ -2,20 +2,20 @@
  * Queue Helper
  * Utility functions for adding jobs to queues
  */
-import { randomUUID } from 'crypto';
+import { randomUUID } from "crypto";
 
-import type { MLTaskData } from '../jobs/index.js';
-import { mlTasksQueue } from '../queues/index.js';
-import logger from '../utils/logger/index.js';
+import type { MLTaskData } from "../jobs";
+import { mlTasksQueue } from "../queues";
+import logger from "../utils/logger";
 
 export async function addMLTask(data: MLTaskData) {
-  const job = await mlTasksQueue.add('ml-task', data, {
+  const job = await mlTasksQueue.add("ml-task", data, {
     jobId: `ml-task-${data.taskId}-${randomUUID()}`,
   });
 
   logger.info(
     { jobId: job.id, taskId: data.taskId, type: data.type },
-    'Added ML task to queue'
+    "Added ML task to queue"
   );
 
   return job;

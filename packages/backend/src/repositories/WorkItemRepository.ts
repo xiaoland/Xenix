@@ -2,10 +2,10 @@
  * Work Item Repository
  * Handles database operations for work items
  */
-import { desc, eq, inArray } from 'drizzle-orm';
+import { desc, eq, inArray } from "drizzle-orm";
 
-import { db, schema } from '../database/index.js';
-import { BaseRepository } from './BaseRepository.js';
+import { db, schema } from "../database";
+import { BaseRepository } from "./BaseRepository";
 
 type WorkItem = typeof schema.workItems.$inferSelect;
 

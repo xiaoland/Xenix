@@ -7,8 +7,8 @@ import {
   WorkItemIdParamSchema,
 } from "@xenix/shared";
 
-import { authMiddleware, requireAuth } from "../middleware/auth.js";
-import { WorkItemService } from "../services/index.js";
+import { authMiddleware, requireAuth } from "../middleware/auth";
+import { WorkItemService } from "../services";
 
 const workItemService = new WorkItemService();
 

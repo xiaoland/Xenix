@@ -2,13 +2,10 @@
  * Work Item Service
  * Business logic for work item operations
  */
-import type { CreateWorkItemDto, UpdateWorkItemDto } from '@xenix/shared';
+import type { CreateWorkItemDto, UpdateWorkItemDto } from "@xenix/shared";
 
-import { ForbiddenError, NotFoundError } from '../errors/index.js';
-import {
-  ProjectRepository,
-  WorkItemRepository,
-} from '../repositories/index.js';
+import { ForbiddenError, NotFoundError } from "../errors";
+import { ProjectRepository, WorkItemRepository } from "../repositories";
 
 export class WorkItemService {
   private workItemRepo: WorkItemRepository;
@@ -29,7 +26,7 @@ export class WorkItemService {
 
     if (projectId) {
       if (!userProjectIds.includes(projectId)) {
-        throw new ForbiddenError('Access denied');
+        throw new ForbiddenError("Access denied");
       }
       return await this.workItemRepo.findByProject(projectId);
     }
@@ -41,11 +38,11 @@ export class WorkItemService {
     const result = await this.workItemRepo.findByIdWithProject(id);
 
     if (!result) {
-      throw new NotFoundError('Work item');
+      throw new NotFoundError("Work item");
     }
 
     if (result.projectCreatedBy !== userId) {
-      throw new ForbiddenError('Access denied');
+      throw new ForbiddenError("Access denied");
     }
 
     return result.workItem;
@@ -56,18 +53,18 @@ export class WorkItemService {
     const project = await this.projectRepo.findById(data.projectId);
 
     if (!project) {
-      throw new NotFoundError('Project');
+      throw new NotFoundError("Project");
     }
 
     if (project.createdBy !== userId) {
-      throw new ForbiddenError('Access denied');
+      throw new ForbiddenError("Access denied");
     }
 
     return await this.workItemRepo.create({
       projectId: data.projectId,
       name: data.name,
       description: data.description || null,
-      status: 'active',
+      status: "active",
     });
   }
 
@@ -75,11 +72,11 @@ export class WorkItemService {
     const result = await this.workItemRepo.findByIdWithProject(id);
 
     if (!result) {
-      throw new NotFoundError('Work item');
+      throw new NotFoundError("Work item");
     }
 
     if (result.projectCreatedBy !== userId) {
-      throw new ForbiddenError('Access denied');
+      throw new ForbiddenError("Access denied");
     }
 
     return await this.workItemRepo.update(id, {
@@ -92,11 +89,11 @@ export class WorkItemService {
     const result = await this.workItemRepo.findByIdWithProject(id);
 
     if (!result) {
-      throw new NotFoundError('Work item');
+      throw new NotFoundError("Work item");
     }
 
     if (result.projectCreatedBy !== userId) {
-      throw new ForbiddenError('Access denied');
+      throw new ForbiddenError("Access denied");
     }
 
     await this.workItemRepo.delete(id);
