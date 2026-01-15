@@ -20,7 +20,7 @@
     "build:layer": "node scripts/build-python-layer.js",
     "build:workers": "pnpm run copy:ml",
     "deploy:layer": "s deploy xenix-python-layer --use-local",
-    "deploy:workers": "s deploy auto-tune-worker manual-tune-worker predict-worker --use-local",
+    "deploy:workers": "echo 'DEPRECATED: Use packages/ml-backend for ML worker deployment'",
     "deploy:backend": "pnpm run package:fc && s deploy xenix-backend --use-local",
     "deploy:all": "pnpm run build:layer && pnpm run build:workers && pnpm run package:fc && s deploy --all --use-local",
     "start": "node dist/index.js",

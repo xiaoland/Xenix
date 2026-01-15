@@ -1,3 +1,7 @@
+# DEPRECATED: This deployment configuration is for the old architecture
+# ML workers have been extracted to packages/ml-backend
+# See packages/ml-backend/s.yaml for ML worker deployment configuration
+
 edition: 3.0.0
 name: xenix-backend-app
 access: default  # Run 's config add' to configure Aliyun credentials

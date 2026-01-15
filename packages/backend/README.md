@@ -104,8 +104,8 @@ pnpm start
 
 ### Training
 
-- `POST /api/auto-tune` - Start auto-tune training
-- `POST /api/manual-tune` - Start manual-tune training
+- `POST /api/batch-train` - Start batch training (GridSearchCV)
+- `POST /api/single-train` - Start single training (specific parameters)
 
 ### Prediction
 
