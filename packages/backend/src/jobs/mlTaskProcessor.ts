@@ -4,14 +4,14 @@
  */
 import { Job } from "bullmq";
 
-import { autoTune, manualTune, predictInline } from "../business/ml";
+import { batchTrain, singleTrain, predictInline } from "../business/ml";
 import { TaskRepository } from "../repositories";
 import logger from "../utils/logger";
 
 const taskRepo = new TaskRepository();
 
 export interface MLTaskData {
-  type: "auto-tune" | "manual-tune" | "predict-inline";
+  type: "batch-train" | "single-train" | "predict-inline";
   taskId: number;
   params: any;
 }
@@ -28,8 +28,8 @@ export async function processMLTask(job: Job<MLTaskData>) {
     let result;
 
     switch (type) {
-      case "auto-tune":
-        result = await autoTune({
+      case "batch-train":
+        result = await batchTrain({
           inputFile: params.inputFile,
           model: params.model,
           featureColumns: params.featureColumns,
@@ -39,8 +39,8 @@ export async function processMLTask(job: Job<MLTaskData>) {
         });
         break;
 
-      case "manual-tune":
-        result = await manualTune({
+      case "single-train":
+        result = await singleTrain({
           inputFile: params.inputFile,
           model: params.model,
           featureColumns: params.featureColumns,

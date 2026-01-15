@@ -60,7 +60,7 @@ export class AliyunFCAdapter implements MLBackendAdapter {
 
     logger.info(
       { taskId: options.taskId, model: options.model },
-      "Auto-tune task invoked via FC"
+      "Batch-train task invoked via FC"
     );
   }
 
@@ -85,7 +85,7 @@ export class AliyunFCAdapter implements MLBackendAdapter {
 
     logger.info(
       { taskId: options.taskId, model: options.model },
-      "Manual-tune task invoked via FC"
+      "Single-train task invoked via FC"
     );
   }
 

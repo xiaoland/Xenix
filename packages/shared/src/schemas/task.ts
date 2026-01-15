@@ -10,7 +10,7 @@ export const TaskStatusSchema = z.enum([
   "failed",
 ]);
 
-export const AutoTuneTaskParameterSchema = z.object({
+export const BatchTrainTaskParameterSchema = z.object({
   model: z.string(),
   datasetId: z.number(),
   featureColumns: z.array(z.string()),
@@ -18,7 +18,7 @@ export const AutoTuneTaskParameterSchema = z.object({
   paramGrid: z.record(z.array(z.any())).optional(),
 });
 
-export const ManualTuneTaskParameterSchema = z.object({
+export const SingleTrainTaskParameterSchema = z.object({
   model: z.string(),
   datasetId: z.number(),
   featureColumns: z.array(z.string()),
@@ -35,13 +35,13 @@ export const PredictTaskParameterSchema = z.object({
   parameters: z.record(z.any()),
 });
 
-export const AutoTuneTaskResultSchema = z.object({
+export const BatchTrainTaskResultSchema = z.object({
   params: z.record(z.any()),
   metrics: z.record(z.any()),
   bestScore: z.number().optional(),
 });
 
-export const ManualTuneTaskResultSchema = z.object({
+export const SingleTrainTaskResultSchema = z.object({
   params: z.record(z.any()),
   metrics: z.record(z.any()),
 });
@@ -51,24 +51,24 @@ export const PredictTaskResultSchema = z.object({
   rowCount: z.number(),
 });
 
-export const AutoTuneTaskSchema = z.object({
+export const BatchTrainTaskSchema = z.object({
   id: z.number(),
   workItemId: z.number().optional(),
-  type: z.literal("auto-tune"),
+  type: z.literal("batch-train"),
   status: TaskStatusSchema,
-  parameter: AutoTuneTaskParameterSchema,
-  result: AutoTuneTaskResultSchema.optional(),
+  parameter: BatchTrainTaskParameterSchema,
+  result: BatchTrainTaskResultSchema.optional(),
   error: z.string().optional(),
   createdAt: z.string().datetime().optional(),
 });
 
-export const ManualTuneTaskSchema = z.object({
+export const SingleTrainTaskSchema = z.object({
   id: z.number(),
   workItemId: z.number().optional(),
-  type: z.literal("manual-tune"),
+  type: z.literal("single-train"),
   status: TaskStatusSchema,
-  parameter: ManualTuneTaskParameterSchema,
-  result: ManualTuneTaskResultSchema.optional(),
+  parameter: SingleTrainTaskParameterSchema,
+  result: SingleTrainTaskResultSchema.optional(),
   error: z.string().optional(),
   createdAt: z.string().datetime().optional(),
 });
@@ -85,12 +85,12 @@ export const PredictTaskSchema = z.object({
 });
 
 export const TaskSchema = z.discriminatedUnion("type", [
-  AutoTuneTaskSchema,
-  ManualTuneTaskSchema,
+  BatchTrainTaskSchema,
+  SingleTrainTaskSchema,
   PredictTaskSchema,
 ]);
 
-export const CreateAutoTuneTaskSchema = z.object({
+export const CreateBatchTrainTaskSchema = z.object({
   workItemId: z.number().optional(),
   model: z.string(),
   datasetId: z.number().optional(),
@@ -99,7 +99,7 @@ export const CreateAutoTuneTaskSchema = z.object({
   paramGrid: z.record(z.array(z.any())).optional(),
 });
 
-export const CreateManualTuneTaskSchema = z.object({
+export const CreateSingleTrainTaskSchema = z.object({
   workItemId: z.number().optional(),
   model: z.string(),
   datasetId: z.number().optional(),
@@ -119,21 +119,21 @@ export const CreatePredictTaskSchema = z.object({
 });
 
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
-export type AutoTuneTaskParameter = z.infer<typeof AutoTuneTaskParameterSchema>;
-export type ManualTuneTaskParameter = z.infer<
-  typeof ManualTuneTaskParameterSchema
+export type BatchTrainTaskParameter = z.infer<typeof BatchTrainTaskParameterSchema>;
+export type SingleTrainTaskParameter = z.infer<
+  typeof SingleTrainTaskParameterSchema
 >;
 export type PredictTaskParameter = z.infer<typeof PredictTaskParameterSchema>;
-export type AutoTuneTaskResult = z.infer<typeof AutoTuneTaskResultSchema>;
-export type ManualTuneTaskResult = z.infer<typeof ManualTuneTaskResultSchema>;
+export type BatchTrainTaskResult = z.infer<typeof BatchTrainTaskResultSchema>;
+export type SingleTrainTaskResult = z.infer<typeof SingleTrainTaskResultSchema>;
 export type PredictTaskResult = z.infer<typeof PredictTaskResultSchema>;
-export type AutoTuneTask = z.infer<typeof AutoTuneTaskSchema>;
-export type ManualTuneTask = z.infer<typeof ManualTuneTaskSchema>;
+export type BatchTrainTask = z.infer<typeof BatchTrainTaskSchema>;
+export type SingleTrainTask = z.infer<typeof SingleTrainTaskSchema>;
 export type PredictTask = z.infer<typeof PredictTaskSchema>;
 export type Task = z.infer<typeof TaskSchema>;
-export type CreateAutoTuneTaskDto = z.infer<typeof CreateAutoTuneTaskSchema>;
-export type CreateManualTuneTaskDto = z.infer<
-  typeof CreateManualTuneTaskSchema
+export type CreateBatchTrainTaskDto = z.infer<typeof CreateBatchTrainTaskSchema>;
+export type CreateSingleTrainTaskDto = z.infer<
+  typeof CreateSingleTrainTaskSchema
 >;
 export type CreatePredictTaskDto = z.infer<typeof CreatePredictTaskSchema>;
 
