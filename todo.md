@@ -31,6 +31,13 @@
   - [ ] 手动训练死翘翘
   - [ ] 自动训练又不能修改参数了
   - [ ] TuningStep 不要不停的 poll tasks
-  - [ ] 移除对 redis 的依赖，使用 pgsql
+  - [ ] 移除对 redis, bullMQ，使用 pgsql tasks 表即可
+  - [ ] xenix
+  - [ ] schema to shared, frontend also uses Zod
+  - [ ] Simplify API (especially train)
+- [ ] Add ml-backend
+  - [ ] ml-backend does not has adapter, it's pure python script only IO is stdio and file system.(Always save locally, but with base path)
+  - [ ] backend call ml-backend like local function with adapter
+  - [ ] every user has a list of ml backends；完整列表就是官方的加上用户本地的，官方的backend需要计费（task会有字段）
 - [ ] 计算阿里云Serverless方案的费用
   - 按照当前定价模型和用户画像，会付费的用户的使用频率、数据量是多少
