@@ -86,7 +86,7 @@ ML operation tasks (tuning, prediction).
 | ---------- | --------- | ------------------------------------------- |
 | id         | INTEGER   | Primary key                                 |
 | workItemId | INTEGER   | FK to workItems                             |
-| type       | TEXT      | 'auto-tune', 'manual-tune', 'predict'       |
+| type       | TEXT      | 'batch-train', 'single-train', 'predict'    |
 | parameter  | JSON      | Task input parameters                       |
 | result     | JSON      | Task output (metrics, etc.)                 |
 | status     | TEXT      | 'pending', 'running', 'completed', 'failed' |
@@ -160,7 +160,7 @@ const [newTask] = await db
   .insert(schema.tasks)
   .values({
     workItemId: workItemId,
-    type: 'auto-tune',
+    type: 'batch-train',
     parameter: { model, datasetId, featureColumns, targetColumn },
     status: 'pending',
   })

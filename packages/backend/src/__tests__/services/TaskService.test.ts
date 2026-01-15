@@ -19,7 +19,7 @@ describe('TaskService', () => {
   describe('getTasksByWorkItem', () => {
     it('should return all tasks for a work item', async () => {
       const mockTasks = [
-        { id: 1, workItemId: 1, type: 'auto-tune', status: 'completed' },
+        { id: 1, workItemId: 1, type: 'batch-train', status: 'completed' },
         { id: 2, workItemId: 1, type: 'predict', status: 'running' },
       ];
       mockTaskRepo.findByWorkItem = vi.fn().mockResolvedValue(mockTasks);
@@ -32,22 +32,22 @@ describe('TaskService', () => {
 
     it('should filter tasks by types', async () => {
       const mockTasks = [
-        { id: 1, workItemId: 1, type: 'auto-tune', status: 'completed' },
+        { id: 1, workItemId: 1, type: 'batch-train', status: 'completed' },
       ];
       mockTaskRepo.findByWorkItem = vi.fn().mockResolvedValue(mockTasks);
 
-      const result = await taskService.getTasksByWorkItem(1, ['auto-tune']);
+      const result = await taskService.getTasksByWorkItem(1, ['batch-train']);
 
       expect(result).toEqual(mockTasks);
       expect(mockTaskRepo.findByWorkItem).toHaveBeenCalledWith(1, [
-        'auto-tune',
+        'batch-train',
       ]);
     });
   });
 
   describe('getTaskById', () => {
     it('should return a task when found', async () => {
-      const mockTask = { id: 1, type: 'auto-tune', status: 'completed' };
+      const mockTask = { id: 1, type: 'batch-train', status: 'completed' };
       mockTaskRepo.findById = vi.fn().mockResolvedValue(mockTask);
 
       const result = await taskService.getTaskById(1);
@@ -68,7 +68,7 @@ describe('TaskService', () => {
     it('should create a new task', async () => {
       const taskData = {
         workItemId: 1,
-        type: 'auto-tune',
+        type: 'batch-train',
         model: 'linear_regression',
       };
       const createdTask = { id: 1, ...taskData, status: 'pending' };

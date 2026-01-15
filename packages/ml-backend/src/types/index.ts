@@ -47,7 +47,7 @@ export interface SingleTrainInput {
   params: Record<string, any>; // Single parameter set
   taskId: number;
   logger: MLLogger;
-  parentTaskId?: number; // Optional parent task (if this is a manual tune from auto-tune)
+  parentTaskId?: number; // Optional parent task (if this is a single-train from batch-train)
 }
 
 /**

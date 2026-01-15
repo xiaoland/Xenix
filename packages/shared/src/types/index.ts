@@ -2,7 +2,7 @@
  * Core type definitions for the application
  *
  * Types are organized by domain for better maintainability:
- * - task.ts: Task-related types (AutoTuneTask, ManualTuneTask, PredictTask, etc.)
+ * - task.ts: Task-related types (BatchTrainTask, SingleTrainTask, PredictTask, etc.)
  * - dataset.ts: Dataset-related types
  * - model.ts: Model-related types
  * - project.ts: Project and WorkItem types

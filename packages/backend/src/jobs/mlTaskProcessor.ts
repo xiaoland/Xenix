@@ -1,6 +1,6 @@
 /**
  * ML Task Job Processor
- * Handles ML tasks (auto-tune, manual-tune, predict) in background
+ * Handles ML tasks (batch-train, single-train, predict) in background
  */
 import { Job } from "bullmq";
 
