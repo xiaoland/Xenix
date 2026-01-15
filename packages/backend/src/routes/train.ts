@@ -13,11 +13,9 @@ import { db, schema } from "../database";
 import { BadRequestError, NotFoundError } from "../errors";
 import { authMiddleware } from "../middleware/auth";
 import logger from "../utils/logger";
-import { fcInvokeService } from "../services/FCInvokeService";
 import { storage } from "../storage";
-import { config } from "../config";
 
-const tune = new Hono()
+const train = new Hono()
   .use("*", authMiddleware)
 
   // Batch-train endpoint
@@ -100,38 +98,16 @@ const tune = new Hono()
 
       const taskId = insertedTask.id;
 
-      // Execute tuning task - use FC async invoke if available, otherwise local execution
-      if (fcInvokeService.isAvailable()) {
-        // FC async invoke (production)
-        const storageKey = `datasets/${datasetId}/${dataset.fileName}`;
-        const inputFile = storage.getFilesystemPath(storageKey);
-
-        await fcInvokeService.invokeAsync({
-          functionName: 'ml-batch-train-worker',
-          payload: {
-            taskId,
-            inputFile, // OSS mount path: /mnt/oss/datasets/...
-            model,
-            featureColumns,
-            targetColumn,
-            paramGrid,
-          },
-        });
-      } else {
-        // Local execution (development)
-        setImmediate(() => {
-          batchTrain({
-            inputFile: dataset.filePath,
-            model,
-            featureColumns,
-            targetColumn,
-            taskId,
-            paramGrid,
-          }).catch((error) => {
-            logger.error({ error, taskId }, `Failed to execute tune task`);
-          });
-        });
-      }
+      batchTrain({
+        inputFile: dataset.filePath,
+        model,
+        featureColumns,
+        targetColumn,
+        taskId,
+        paramGrid,
+      }).catch((error) => {
+        logger.error({ error, taskId }, `Failed to execute tune task`);
+      });
 
       return c.json(
         {
@@ -224,9 +200,12 @@ const tune = new Hono()
       const taskId = insertedTask.id;
 
       // Determine input file path based on storage type
-      const inputFile = storage.getType() === 'oss'
-        ? storage.getFilesystemPath(`datasets/${datasetId}/${dataset.fileName}`) // OSS: /mnt/oss/datasets/...
-        : dataset.filePath; // Local: full file path
+      const inputFile =
+        storage.getType() === "oss"
+          ? storage.getFilesystemPath(
+              `datasets/${datasetId}/${dataset.fileName}`
+            ) // OSS: /mnt/oss/datasets/...
+          : dataset.filePath; // Local: full file path
 
       // Invoke ML task via adapter (automatically chooses FC or spawn)
       setImmediate(() => {
@@ -252,4 +231,4 @@ const tune = new Hono()
     }
   );
 
-export default tune;
+export default train;
