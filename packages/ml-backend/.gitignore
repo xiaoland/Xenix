@@ -34,3 +34,7 @@ models/
 .idea/
 *.swp
 *.swo
+
+# Serverless Devs build artifacts
+python/
+.s/

@@ -1,230 +1,243 @@
 # ML Backend Deployment
 
-## Aliyun FC Deployment
+Deploy ml-backend to Aliyun Function Compute using Serverless Devs.
 
-Deploy ml-backend as Aliyun Function Compute handler.
+## Prerequisites
 
-### Prepare
+**Required**:
+- Aliyun account with Function Compute access
+- Aliyun NAS with OSS mount configured
+- [Serverless Devs](https://www.serverless-devs.com/) installed
 
-Install dependencies:
-
+**Install Serverless Devs**:
 ```bash
-pip install -r requirements.txt -t ./package
-cp -r ml_backend ./package/
-cp fc_handler.py ./package/
-cd package && zip -r ../ml-backend-fc.zip . && cd ..
+npm install -g @serverless-devs/s
 ```
 
-### Deploy with Aliyun CLI
-
+**Configure Aliyun access**:
 ```bash
-# Create function
-aliyun fc create-function \
-  --service-name xenix \
-  --function-name ml-backend \
-  --runtime python3.10 \
-  --handler fc_handler.handler \
-  --memory-size 1024 \
-  --timeout 300 \
-  --code-zip-file ml-backend-fc.zip
-
-# Update function
-aliyun fc update-function \
-  --service-name xenix \
-  --function-name ml-backend \
-  --code-zip-file ml-backend-fc.zip
+s config add
+# Follow prompts to add Aliyun AccessKey
 ```
 
-### FC Configuration
+## Build Python Layer
 
-**Runtime**: Python 3.10 (or 3.9)
+Build dependencies layer for FC:
 
-**Memory**: 1024MB minimum (recommended: 2048MB for large datasets)
-
-**Timeout**: 300 seconds (5 minutes)
-
-**Handler**: `fc_handler.handler`
-
-**Environment Variables**:
 ```bash
-ML_BASE_PATH=/tmp/ml-backend
-MODEL_STORAGE_PATH=/tmp/ml-backend/models
-DATA_STORAGE_PATH=/tmp/ml-backend/data
-LOG_LEVEL=INFO
+./build_layer.sh
 ```
 
-### NAS/OSS Mount (Optional)
+This creates a `python/` directory with all dependencies (pandas, scikit-learn, xgboost, lightgbm, etc.).
 
-Mount OSS for persistent model storage:
+## Deploy
+
+### 1. Deploy Python Dependencies Layer
 
 ```bash
-# Mount OSS bucket to /mnt/oss
+s deploy xenix-ml-python-layer
+```
+
+This creates a layer with all Python dependencies that will be shared across all functions.
+
+### 2. Deploy ML Functions
+
+Deploy all three functions (batch-train, single-train, predict):
+
+```bash
+s deploy
+```
+
+Or deploy individual functions:
+
+```bash
+s deploy ml-batch-train
+s deploy ml-single-train
+s deploy ml-predict
+```
+
+## Configuration
+
+### Environment Variables
+
+Set these in `.env` file or as environment variables:
+
+```bash
+# Required
+OSS_NAS_SERVER_ADDR=your-nas-server.cn-hangzhou.nas.aliyuncs.com
+DATABASE_URL=postgresql://user:pass@host/xenix
+
+# Optional (defaults shown)
 ML_BASE_PATH=/mnt/oss/ml-backend
 MODEL_STORAGE_PATH=/mnt/oss/ml-backend/models
 DATA_STORAGE_PATH=/mnt/oss/ml-backend/data
+LOG_LEVEL=INFO
 ```
 
-### Test Invocation
+### Function Configuration
+
+All three functions use the same settings (configured in `s.yaml`):
+
+- **Runtime**: Python 3.10
+- **Handler**: `fc_handler.handler`
+- **Memory**: 4096MB
+- **Timeout**: 600 seconds (10 minutes)
+- **Code**: Current directory (./)
+- **NAS Mount**: `/mnt/oss` (mapped to OSS bucket)
+
+## Test Functions
+
+Test batch training:
 
 ```bash
-aliyun fc invoke-function \
-  --service-name xenix \
-  --function-name ml-backend \
-  --event '{
-    "operation": "batch-train",
-    "data": {
-      "task_id": 123,
-      "input_file": "/mnt/oss/data/train.csv",
-      "model": "regression.ridge",
-      "feature_columns": ["x1", "x2"],
-      "target_column": "y",
-      "param_grid": {"alpha": [0.1, 1.0, 10.0]}
-    }
-  }'
+s invoke ml-batch-train --event '{
+  "operation": "batch-train",
+  "data": {
+    "task_id": 123,
+    "input_file": "/mnt/oss/data/train.csv",
+    "model": "regression.ridge",
+    "feature_columns": ["x1", "x2"],
+    "target_column": "y",
+    "param_grid": {"alpha": [0.1, 1.0, 10.0]}
+  }
+}'
 ```
 
-## Docker Deployment
-
-Self-hosted deployment with Docker.
-
-### Dockerfile
-
-```dockerfile
-FROM python:3.10-slim
-
-WORKDIR /app
-
-# Install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application
-COPY ml_backend ./ml_backend
-COPY main.py .
-
-# Set environment
-ENV ML_BASE_PATH=/data
-ENV MODEL_STORAGE_PATH=/data/models
-ENV DATA_STORAGE_PATH=/data/datasets
-
-# Create directories
-RUN mkdir -p /data/models /data/datasets
-
-CMD ["python", "main.py"]
-```
-
-### Build and Run
+Test single training:
 
 ```bash
-# Build image
-docker build -t xenix-ml-backend:2.0.0 .
-
-# Run container
-docker run -i \
-  -v $(pwd)/data:/data \
-  -e LOG_LEVEL=INFO \
-  xenix-ml-backend:2.0.0 < input.json
+s invoke ml-single-train --event '{
+  "operation": "single-train",
+  "data": {
+    "task_id": 124,
+    "input_file": "/mnt/oss/data/train.csv",
+    "model": "regression.xgboost",
+    "feature_columns": ["x1", "x2"],
+    "target_column": "y",
+    "params": {"n_estimators": 100, "max_depth": 5}
+  }
+}'
 ```
 
-## Environment Variables
+Test prediction:
 
-**ML_BASE_PATH** - Base path for file operations
-Default: `/tmp/ml-backend`
-
-**MODEL_STORAGE_PATH** - Model storage directory
-Default: `{BASE_PATH}/models`
-
-**DATA_STORAGE_PATH** - Data storage directory
-Default: `{BASE_PATH}/data`
-
-**LOG_LEVEL** - Logging level
-Default: `INFO`
-Options: `DEBUG`, `INFO`, `WARNING`, `ERROR`
-
-**DATABASE_URL** - PostgreSQL connection (optional)
-Format: `postgresql://user:pass@host/db`
+```bash
+s invoke ml-predict --event '{
+  "operation": "predict",
+  "data": {
+    "task_id": 125,
+    "train_data": "/mnt/oss/data/train.csv",
+    "predict_data": "/mnt/oss/data/predict.csv",
+    "output_path": "/mnt/oss/output/predictions.csv",
+    "model": "regression.ridge",
+    "params": {"alpha": 1.0},
+    "feature_columns": ["x1", "x2"],
+    "target_column": "y"
+  }
+}'
+```
 
 ## Monitoring
-
-### Aliyun FC Logs
 
 View function logs:
 
 ```bash
-# Recent logs
-aliyun fc get-function-logs \
-  --service-name xenix \
-  --function-name ml-backend \
-  --lines 100
-
-# Follow logs
-aliyun fc get-function-logs \
-  --service-name xenix \
-  --function-name ml-backend \
-  --follow
+s logs ml-batch-train
+s logs ml-single-train
+s logs ml-predict
 ```
 
-### Performance Metrics
+View metrics:
 
-Monitor:
-- Execution time
-- Memory usage
-- Error rates
-- Model training metrics (R², RMSE)
+```bash
+s metrics ml-batch-train
+```
 
-Logs include structured JSON with metrics.
+## Update Deployment
+
+After code changes, rebuild and redeploy:
+
+```bash
+# Update dependencies if requirements.txt changed
+./build_layer.sh
+s deploy xenix-ml-python-layer
+
+# Deploy updated functions
+s deploy
+```
+
+## Remove Deployment
+
+Remove all functions and layer:
+
+```bash
+s remove
+```
+
+## Architecture
+
+Three separate FC functions all use the same code (`fc_handler.py`) but can be invoked independently:
+
+```
+┌─────────────────────┐
+│  ml-batch-train     │──┐
+│  (FC Function)      │  │
+└─────────────────────┘  │
+                         │
+┌─────────────────────┐  │    ┌──────────────────┐
+│  ml-single-train    │──┼───→│  fc_handler.py   │
+│  (FC Function)      │  │    │  (shared code)   │
+└─────────────────────┘  │    └──────────────────┘
+                         │
+┌─────────────────────┐  │
+│  ml-predict         │──┘
+│  (FC Function)      │
+└─────────────────────┘
+
+All functions share:
+- Python dependencies layer (xenix-ml-python-deps)
+- NAS mount (/mnt/oss)
+- Same codebase (ml_backend/)
+```
+
+## File Storage
+
+Training data, models, and predictions are stored in NAS/OSS:
+
+```
+/mnt/oss/ml-backend/
+├── models/           # Trained models (.pkl files)
+├── data/             # Training data
+└── output/           # Predictions
+```
 
 ## Troubleshooting
 
-### Timeout Errors
-
-Increase timeout or reduce dataset size:
-
+**Layer build fails**:
 ```bash
-aliyun fc update-function \
-  --service-name xenix \
-  --function-name ml-backend \
-  --timeout 600
+# Use Python 3.10 environment
+python3.10 -m venv venv
+source venv/bin/activate
+./build_layer.sh
 ```
 
-### Out of Memory
+**Function timeout**:
+- Increase timeout in `s.yaml` (max 600 seconds)
+- Check data file size (large files need more time)
+- Monitor memory usage in FC console
 
-Increase memory allocation:
+**NAS mount error**:
+- Verify `OSS_NAS_SERVER_ADDR` is correct
+- Check NAS permissions (userId/groupId must match)
+- Ensure NAS and FC function in same VPC
 
-```bash
-aliyun fc update-function \
-  --service-name xenix \
-  --function-name ml-backend \
-  --memory-size 2048
-```
+**Import errors**:
+- Verify layer deployed successfully: `s info xenix-ml-python-layer`
+- Check `PYTHONPATH` includes `/opt/python` and `/code`
+- Rebuild layer if requirements.txt changed
 
-### Module Not Found
+## Resources
 
-Ensure all dependencies in requirements.txt are installed in package.
-
-### File Not Found
-
-Check ML_BASE_PATH and file paths. Use absolute paths or ensure relative paths resolve correctly.
-
-## Rollback
-
-Revert to previous version:
-
-```bash
-# List versions
-aliyun fc list-function-versions \
-  --service-name xenix \
-  --function-name ml-backend
-
-# Publish version
-aliyun fc publish-function-version \
-  --service-name xenix \
-  --function-name ml-backend
-
-# Create alias to specific version
-aliyun fc create-alias \
-  --service-name xenix \
-  --function-name ml-backend \
-  --alias-name production \
-  --version-id 2
-```
+- [Serverless Devs Documentation](https://docs.serverless-devs.com/)
+- [Aliyun FC Documentation](https://help.aliyun.com/product/50980.html)
+- [FC Python Runtime](https://help.aliyun.com/zh/functioncompute/fc/user-guide/event-handlers-1-1)

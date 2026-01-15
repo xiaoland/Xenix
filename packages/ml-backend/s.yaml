@@ -1,0 +1,106 @@
+edition: 3.0.0
+name: xenix-ml-backend
+access: default
+
+vars:
+  region: cn-hangzhou
+
+resources:
+  # Python dependencies layer
+  xenix-ml-python-layer:
+    component: fc3
+    props:
+      region: ${vars.region}
+      layerName: xenix-ml-python-deps
+      description: Python ML dependencies (pandas, sklearn, xgboost, lightgbm, etc.)
+      compatibleRuntime: [python3.9, python3.10]
+      code: ./
+      # Layer should contain requirements.txt and will be installed to /opt/python
+      # Note: Build the layer by running: pip install -r requirements.txt -t python/
+
+  # Batch training worker
+  ml-batch-train:
+    component: fc3
+    props:
+      region: ${vars.region}
+      functionName: ml-batch-train
+      description: Batch training with GridSearchCV hyperparameter tuning
+      runtime: python3.10
+      handler: fc_handler.handler
+      memorySize: 4096
+      timeout: 600
+      code: ./
+      layers:
+        - ${resources.xenix-ml-python-layer.output.arn}
+      environmentVariables:
+        PYTHONPATH: /opt/python:/code
+        ML_BASE_PATH: /mnt/oss/ml-backend
+        MODEL_STORAGE_PATH: /mnt/oss/ml-backend/models
+        DATA_STORAGE_PATH: /mnt/oss/ml-backend/data
+        DATABASE_URL: ${env.DATABASE_URL}
+        LOG_LEVEL: INFO
+      nasConfig:
+        userId: 10003
+        groupId: 10003
+        mountPoints:
+          - serverAddr: ${env.OSS_NAS_SERVER_ADDR}
+            nasDir: /xenix-oss
+            fcDir: /mnt/oss
+
+  # Single training worker
+  ml-single-train:
+    component: fc3
+    props:
+      region: ${vars.region}
+      functionName: ml-single-train
+      description: Single training with specific parameters
+      runtime: python3.10
+      handler: fc_handler.handler
+      memorySize: 4096
+      timeout: 600
+      code: ./
+      layers:
+        - ${resources.xenix-ml-python-layer.output.arn}
+      environmentVariables:
+        PYTHONPATH: /opt/python:/code
+        ML_BASE_PATH: /mnt/oss/ml-backend
+        MODEL_STORAGE_PATH: /mnt/oss/ml-backend/models
+        DATA_STORAGE_PATH: /mnt/oss/ml-backend/data
+        DATABASE_URL: ${env.DATABASE_URL}
+        LOG_LEVEL: INFO
+      nasConfig:
+        userId: 10003
+        groupId: 10003
+        mountPoints:
+          - serverAddr: ${env.OSS_NAS_SERVER_ADDR}
+            nasDir: /xenix-oss
+            fcDir: /mnt/oss
+
+  # Prediction worker
+  ml-predict:
+    component: fc3
+    props:
+      region: ${vars.region}
+      functionName: ml-predict
+      description: ML prediction worker
+      runtime: python3.10
+      handler: fc_handler.handler
+      memorySize: 4096
+      timeout: 600
+      code: ./
+      layers:
+        - ${resources.xenix-ml-python-layer.output.arn}
+      environmentVariables:
+        PYTHONPATH: /opt/python:/code
+        ML_BASE_PATH: /mnt/oss/ml-backend
+        MODEL_STORAGE_PATH: /mnt/oss/ml-backend/models
+        DATA_STORAGE_PATH: /mnt/oss/ml-backend/data
+        DATABASE_URL: ${env.DATABASE_URL}
+        LOG_LEVEL: INFO
+      nasConfig:
+        userId: 10003
+        groupId: 10003
+        mountPoints:
+          - serverAddr: ${env.OSS_NAS_SERVER_ADDR}
+            nasDir: /xenix-oss
+            fcDir: /mnt/oss
