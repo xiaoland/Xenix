@@ -1,5 +1,7 @@
 # Xenix Backend - Aliyun FC Deployment Guide
 
+> **DEPRECATED**: This deployment guide is for the old architecture. ML workers have been extracted to `packages/ml-backend`. See `packages/ml-backend/DEPLOYMENT.md` for current ML worker deployment.
+
 This guide covers deploying the Xenix backend to Aliyun Function Compute (FC) with OSS storage and Python ML workers.
 
 ## Architecture Overview

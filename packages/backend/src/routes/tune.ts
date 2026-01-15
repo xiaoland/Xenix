@@ -4,11 +4,11 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 
 import {
-  CreateAutoTuneTaskSchema,
-  CreateManualTuneTaskSchema,
+  CreateBatchTrainTaskSchema,
+  CreateSingleTrainTaskSchema,
 } from "@xenix/shared";
 
-import { autoTune, manualTune } from "../business/ml";
+import { batchTrain, singleTrain } from "../business/ml";
 import { db, schema } from "../database";
 import { BadRequestError, NotFoundError } from "../errors";
 import { authMiddleware } from "../middleware/auth";
@@ -20,10 +20,10 @@ import { config } from "../config";
 const tune = new Hono()
   .use("*", authMiddleware)
 
-  // Auto-tune endpoint
+  // Batch-train endpoint
   .post(
-    "/auto-tune",
-    zValidator("json", CreateAutoTuneTaskSchema),
+    "/batch-train",
+    zValidator("json", CreateBatchTrainTaskSchema),
     async (c) => {
       let {
         datasetId,
@@ -81,12 +81,12 @@ const tune = new Hono()
         throw new NotFoundError("Dataset");
       }
 
-      // Create task record with auto-tune type
+      // Create task record with batch-train type
       const [insertedTask] = await db
         .insert(schema.tasks)
         .values({
           workItemId: workItemId || null,
-          type: "auto-tune",
+          type: "batch-train",
           status: "pending",
           parameter: {
             model,
@@ -107,7 +107,7 @@ const tune = new Hono()
         const inputFile = storage.getFilesystemPath(storageKey);
 
         await fcInvokeService.invokeAsync({
-          functionName: 'auto-tune-worker',
+          functionName: 'ml-batch-train-worker',
           payload: {
             taskId,
             inputFile, // OSS mount path: /mnt/oss/datasets/...
@@ -120,7 +120,7 @@ const tune = new Hono()
       } else {
         // Local execution (development)
         setImmediate(() => {
-          autoTune({
+          batchTrain({
             inputFile: dataset.filePath,
             model,
             featureColumns,
@@ -136,17 +136,17 @@ const tune = new Hono()
       return c.json(
         {
           taskId,
-          message: "Auto-tune started",
+          message: "Batch training started",
         },
         201
       );
     }
   )
 
-  // Manual-tune endpoint
+  // Single-train endpoint
   .post(
-    "/manual-tune",
-    zValidator("json", CreateManualTuneTaskSchema),
+    "/single-train",
+    zValidator("json", CreateSingleTrainTaskSchema),
     async (c) => {
       let {
         datasetId,
@@ -204,12 +204,12 @@ const tune = new Hono()
         throw new NotFoundError("Dataset");
       }
 
-      // Create task record with manual-tune type
+      // Create task record with single-train type
       const [insertedTask] = await db
         .insert(schema.tasks)
         .values({
           workItemId: workItemId || null,
-          type: "manual-tune",
+          type: "single-train",
           status: "pending",
           parameter: {
             model,
@@ -223,43 +223,29 @@ const tune = new Hono()
 
       const taskId = insertedTask.id;
 
-      // Execute training task - use FC async invoke if available, otherwise local execution
-      if (fcInvokeService.isAvailable()) {
-        // FC async invoke (production)
-        const storageKey = `datasets/${datasetId}/${dataset.fileName}`;
-        const inputFile = storage.getFilesystemPath(storageKey);
+      // Determine input file path based on storage type
+      const inputFile = storage.getType() === 'oss'
+        ? storage.getFilesystemPath(`datasets/${datasetId}/${dataset.fileName}`) // OSS: /mnt/oss/datasets/...
+        : dataset.filePath; // Local: full file path
 
-        await fcInvokeService.invokeAsync({
-          functionName: 'manual-tune-worker',
-          payload: {
-            taskId,
-            inputFile, // OSS mount path: /mnt/oss/datasets/...
-            model,
-            featureColumns,
-            targetColumn,
-            params: parameters,
-          },
+      // Invoke ML task via adapter (automatically chooses FC or spawn)
+      setImmediate(() => {
+        singleTrain({
+          inputFile,
+          model,
+          featureColumns,
+          targetColumn,
+          taskId,
+          parameters,
+        }).catch((error) => {
+          logger.error({ error, taskId }, `Failed to execute manual tune task`);
         });
-      } else {
-        // Local execution (development)
-        setImmediate(() => {
-          manualTune({
-            inputFile: dataset.filePath,
-            model,
-            featureColumns,
-            targetColumn,
-            taskId,
-            parameters,
-          }).catch((error) => {
-            logger.error({ error, taskId }, `Failed to execute manual tune task`);
-          });
-        });
-      }
+      });
 
       return c.json(
         {
           taskId,
-          message: "Manual tuning started",
+          message: "Single training started",
         },
         201
       );
