@@ -1,293 +1,216 @@
-# Xenix Monorepo Architecture
+# Xenix Architecture
 
-## Before (Nuxt.js Fullstack)
+> Last updated at UTC+8 2026-01-15 13:08
 
-```text
-┌─────────────────────────────────────────┐
-│          Nuxt.js Application            │
-├─────────────────────────────────────────┤
-│  Frontend (SSR/SSG)                     │
-│  - Vue 3 Components                     │
-│  - Auto-imports                         │
-│  - Server-side rendering                │
-├─────────────────────────────────────────┤
-│  Backend (Nitro)                        │
-│  - API Routes (H3 handlers)             │
-│  - File-based routing                   │
-│  - Database (DrizzleORM)                │
-│  - Python ML execution                  │
-└─────────────────────────────────────────┘
+## System Overview
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                        Xenix ML Platform                           │
+│                     (Monorepo: pnpm workspace)                     │
+└────────────────────────────────────────────────────────────────────┘
+     │                    │                     │                    │
+     ▼                    ▼                     ▼                    ▼
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│   Frontend   │  │   Backend    │  │   Shared     │  │  ML-Backend  │
+│   (Vue 3)    │  │   (Hono)     │  │   (Types)    │  │  (Standalone)│
+├──────────────┤  ├──────────────┤  ├──────────────┤  ├──────────────┤
+│• Vite        │  │• REST API    │  │• Zod schemas │  │• Training    │
+│• TanStack    │  │• PostgreSQL  │  │• TypeScript  │  │• Prediction  │
+│  Query       │  │• DrizzleORM  │  │• Shared DTOs │  │• Python exec │
+│• Pinia       │  │• JWT Auth    │  │• Error types │  │              │
+│• Vue Router  │  │• ML Adapters │  │• Constants   │  │              │
+│• Ant Design  │  │• File upload │  │              │  │              │
+└──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘
+     Port 5173        Port 3000
 ```
 
-## After (Monorepo)
+## Data Flow: ML Workflow
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│                      Xenix Monorepo                          │
-└──────────────────────────────────────────────────────────────┘
-           │                  │                  │
-           │                  │                  │
-           ▼                  ▼                  ▼
-┌──────────────────┐  ┌──────────────────┐  ┌──────────────┐
-│   @xenix/frontend│  │   @xenix/backend │  │@xenix/shared │
-├──────────────────┤  ├──────────────────┤  ├──────────────┤
-│ Vite + Vue 3 SPA │  │  Hono API Server │  │    Types     │
-├──────────────────┤  ├──────────────────┤  ├──────────────┤
-│ • Vue Router     │  │ • REST API       │  │ • User       │
-│ • Pinia Store    │  │ • JWT Auth       │  │ • Project    │
-│ • Ant Design     │  │ • DrizzleORM     │  │ • Dataset    │
-│ • UnoCSS         │  │ • PostgreSQL     │  │ • Model      │
-│ • Vue I18n       │  │ • Python ML      │  │ • Task       │
-│ • SCSS           │  │ • Background Job │  │              │
-├──────────────────┤  ├──────────────────┤  └──────────────┘
-│   Port: 5173     │  │   Port: 3000     │
-└──────────────────┘  └──────────────────┘
-           │                  │
-           │    HTTP API      │
-           └──────────────────┘
+### 1. Prepare (Upload & Configure)
+
+```
+User Upload
+  ↓
+Frontend: POST /data/upload (multipart)
+  ↓
+Backend: Store file (local or OSS)
+  ↓
+Database: datasets record
+  ↓
+Frontend: Display columns (useDatasets hook)
 ```
 
-## Request Flow
+### 2. Tune (Auto or Manual Training)
 
-### Client-Side Rendering (SPA)
-
-```text
-┌─────────┐         ┌──────────┐         ┌──────────┐         ┌─────────┐
-│ Browser │ ──────> │ Frontend │ ──────> │ Backend  │ ──────> │Database │
-│         │  HTTP   │  (Vite)  │  /api/* │  (Hono)  │   SQL   │  (PG)   │
-└─────────┘         └──────────┘         └──────────┘         └─────────┘
-     ▲                                          │
-     │                                          │ executes
-     │                                          ▼
-     │                                    ┌──────────┐
-     └──────────── JSON Response ─────── │  Python  │
-                                          │   ML     │
-                                          └──────────┘
+```
+Frontend: Select features, target, model
+  ↓
+POST /train/batch-train or /train/manual-train
+  ↓
+Backend: Create task (status=pending)
+  ↓
+MLBackendAdapter selector:
+  ├─ Development: SpawnAdapter (local Node.js process)
+  └─ Production: AliyunFCAdapter (invoke FC function)
+  ↓
+ml-backend: Execute Python script
+  ↓
+Python: GridSearchCV or manual training
+  ↓
+Results: Write to DB + file storage
+  ↓
+Frontend: Poll useTasks (5s interval) → Display results
 ```
 
-### Authentication Flow
+### 3. Predict (Batch Prediction)
 
-```text
-1. User signs in
-   └─> Frontend sends POST /api/auth/signin
-       └─> Backend verifies credentials
-           └─> Returns JWT token
-               └─> Frontend stores in localStorage
-                   └─> Subsequent requests include "Authorization: Bearer <token>"
-                       └─> Backend middleware validates JWT
-                           └─> Extracts user from token
-                               └─> Route handler receives authenticated user
+```
+Frontend: Submit new data
+  ↓
+POST /predict (with model params)
+  ↓
+Backend: Create predict task
+  ↓
+ML Backend: Load model → predict() → save CSV
+  ↓
+Frontend: Download via /download endpoint
 ```
 
-## Technology Stack Comparison
+## Technology Stack
 
-| Component              | Before (Nuxt.js)     | After (Monorepo)       |
-| ---------------------- | -------------------- | ---------------------- |
-| **Frontend Framework** | Nuxt.js 4.2 (SSR)    | Vite 6 + Vue 3.5 (SPA) |
-| **Backend Framework**  | Nitro (built-in)     | Hono 4.6               |
-| **Routing**            | File-based (auto)    | Vue Router 4.6         |
-| **State Management**   | Pinia (auto)         | Pinia 2.3              |
-| **Build Tool**         | Webpack/Rollup       | Vite                   |
-| **API Style**          | H3 event handlers    | Hono handlers          |
-| **Auto-imports**       | Yes                  | No (explicit)          |
-| **Type Safety**        | TypeScript           | TypeScript             |
-| **Database**           | PostgreSQL + Drizzle | PostgreSQL + Drizzle   |
-| **ORM**                | DrizzleORM 0.45      | DrizzleORM 0.45        |
-| **Auth**               | JWT (custom)         | JWT (custom)           |
-| **i18n**               | @nuxtjs/i18n         | vue-i18n 11            |
-| **CSS**                | UnoCSS + SCSS        | UnoCSS + SCSS          |
-| **UI Library**         | Ant Design Vue       | Ant Design Vue         |
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| **Frontend** | Vue 3 + Vite | SPA UI |
+| **State** | Pinia + TanStack Query | App & server state |
+| **API** | Hono RPC client | Type-safe communication |
+| **Backend** | Hono + Node.js | REST API server |
+| **Database** | PostgreSQL + DrizzleORM | Data persistence |
+| **Auth** | JWT + localStorage | Authentication |
+| **ML** | Python (scikit-learn, XGBoost, LightGBM) | Model training |
+| **ML Execution** | Spawn / Aliyun FC | ML operation delivery |
+| **Jobs** | BullMQ + Redis | Task queue (configured) |
+| **File Storage** | Local / Aliyun OSS | Dataset & model storage |
+| **UI** | Ant Design Vue + UnoCSS | Component library |
+| **i18n** | vue-i18n | Internationalization |
 
-## Benefits of New Architecture
+## Package Structure
 
-### 1. Separation of Concerns
-
-- **Before**: Frontend and backend tightly coupled
-- **After**: Clear boundaries, independent development
-
-### 2. Build Performance
-
-- **Before**: Nuxt build ~30-60s
-- **After**: Vite build ~5-10s (6x faster)
-
-### 3. Deployment Flexibility
-
-- **Before**: Must deploy as single unit
-- **After**:
-  - Frontend → Static hosting (CDN, Vercel, Netlify)
-  - Backend → Node.js server (anywhere)
-  - Independent scaling
-
-### 4. Development Experience
-
-- **Before**: Full server restart on backend changes
-- **After**:
-  - Frontend: Hot module replacement (instant)
-  - Backend: Watch mode with tsx (fast restart)
-
-### 5. Bundle Size
-
-- **Before**: Large SSR bundle
-- **After**: Optimized SPA with code splitting
-
-### 6. Team Workflow
-
-- **Before**: Single codebase, potential conflicts
-- **After**:
-  - Frontend team works in `packages/frontend/`
-  - Backend team works in `packages/backend/`
-  - Shared types in `packages/shared/`
-
-## Migration Path
-
-```text
-┌─────────────────┐
-│ Nuxt.js App     │
-│ (Monolithic)    │
-└────────┬────────┘
-         │
-         │ Phase 1: Setup Monorepo
-         ▼
-┌─────────────────┐
-│ Monorepo        │
-│ (3 packages)    │
-└────────┬────────┘
-         │
-         │ Phase 2: Migrate Backend
-         ▼
-┌─────────────────┐
-│ Hono API        │
-│ (Routes copied) │
-└────────┬────────┘
-         │
-         │ Phase 3: Migrate Frontend
-         ▼
-┌─────────────────┐
-│ Vite + Vue SPA  │
-│ (Pages copied)  │
-└────────┬────────┘
-         │
-         │ Testing & Refinement
-         ▼
-┌─────────────────┐
-│ Production      │
-│ (Fully migrated)│
-└─────────────────┘
+```
+packages/
+├── shared/              # Shared across all packages
+│   ├── schemas/         # Zod validation schemas
+│   ├── types/           # TypeScript type definitions
+│   └── package.json     # @xenix/shared
+│
+├── frontend/            # Vue 3 SPA application
+│   ├── src/
+│   │   ├── main.ts      # App bootstrap
+│   │   ├── api/         # Hono RPC client
+│   │   ├── composables/ # Data fetching hooks (TanStack Query)
+│   │   ├── stores/      # Pinia stores
+│   │   ├── router/      # Vue Router config
+│   │   ├── views/       # Page components
+│   │   ├── components/  # Reusable components
+│   │   └── styles/      # SCSS styles
+│   └── package.json     # @xenix/frontend
+│
+├── backend/             # Hono REST API server
+│   ├── src/
+│   │   ├── index.ts     # App entry + routing
+│   │   ├── config/      # Zod-validated config
+│   │   ├── routes/      # Explicit route handlers
+│   │   ├── middleware/  # Auth + error handling
+│   │   ├── services/    # Business logic
+│   │   ├── repositories/# Data access layer
+│   │   ├── business/ml/ # ML operations abstraction
+│   │   ├── adapters/    # ML execution adapters
+│   │   ├── database/    # DrizzleORM schema
+│   │   ├── errors/      # Custom error classes
+│   │   ├── jobs/        # BullMQ job processors
+│   │   ├── queues/      # Queue initialization
+│   │   ├── storage/     # File handling
+│   │   └── utils/       # Logger, utilities
+│   └── package.json     # @xenix/backend
+│
+└── ml-backend/          # Standalone ML operations
+    ├── src/
+    │   ├── core/        # batch-train, single-train, predict
+    │   ├── adapters/    # stdio, aliyun-fc I/O
+    │   ├── types/       # Type definitions
+    │   ├── utils/       # Python executor, logger
+    │   └── python/      # Python scripts (side-by-side)
+    └── package.json     # @xenix/ml-backend
 ```
 
-## Package Dependencies
+## Architectural Patterns
 
-```text
-┌──────────────────┐
-│  @xenix/frontend │
-│                  │
-│  depends on:     │
-│  • @xenix/shared │
-└──────────────────┘
+**Frontend: Composable-Based Data Fetching**
 
-┌──────────────────┐
-│  @xenix/backend  │
-│                  │
-│  depends on:     │
-│  • @xenix/shared │
-└──────────────────┘
+- TanStack Query for caching, invalidation, polling
+- Composables wrap all API calls
+- Automatic refetch for long-running tasks
 
-┌──────────────────┐
-│  @xenix/shared   │
-│                  │
-│  depends on:     │
-│  • (none)        │
-└──────────────────┘
-```
+**Backend: Service → Repository → DB**
 
-## File Structure Comparison
+- Services contain business logic
+- Repositories handle data access
+- Direct instantiation (no DI container yet)
 
-### Before
+**ML Execution: Adapter Factory Pattern**
 
-```text
-Xenix/
-├── app/
-│   ├── components/
-│   ├── composables/
-│   ├── pages/         # File-based routes
-│   ├── services/
-│   └── stores/
-├── server/
-│   ├── api/           # H3 handlers
-│   ├── business/ml/   # Python scripts
-│   └── database/
-└── nuxt.config.ts
-```
+- Single adapter selected at startup
+- SpawnAdapter: spawns local Node.js process
+- AliyunFCAdapter: invokes FC function asynchronously
 
-### After
+**Error Handling: Custom Hierarchy**
 
-```text
-Xenix/
-├── packages/
-│   ├── frontend/
-│   │   ├── src/
-│   │   │   ├── views/      # Manual routes
-│   │   │   ├── router/
-│   │   │   ├── components/
-│   │   │   ├── composables/
-│   │   │   ├── services/
-│   │   │   └── stores/
-│   │   └── vite.config.ts
-│   ├── backend/
-│   │   ├── src/
-│   │   │   ├── routes/     # Hono handlers
-│   │   │   ├── middleware/
-│   │   │   ├── business/ml/
-│   │   │   └── database/
-│   │   └── tsconfig.json
-│   └── shared/
-│       └── src/types/
-└── package.json
-```
+- Response format: `{code: string, error: string, details?: unknown}`
+- Automatic Zod error handling
+- Global error handler catches all exceptions
 
-## Development Workflow
+**Authentication: JWT + Context Injection**
 
-### Before (Nuxt.js)
+- JWT verification + user lookup per request
+- User stored in Hono context for route handlers
 
-```bash
-# Single command for everything
-pnpm dev
+## Deployment
 
-# Everything restarts on changes
-# Slower feedback loop
-```
+For comprehensive deployment information, see [DEPLOYMENT.md](./DEPLOYMENT.md):
 
-### After (Monorepo Development)
+- Development setup
+- Production on Aliyun FC
+- Database configuration
+- CI/CD pipeline
+- Monitoring and security
 
-```bash
-# Run everything
-pnpm dev
+✅ **Monorepo (pnpm workspace)**: Shared types prevent drift, independent development, unified deployment
+✅ **Hono Framework**: Lightweight, fast, composable middleware, type-safe routing
+✅ **TanStack Query**: Automatic caching/invalidation, polling support, simple refetch logic
+✅ **DrizzleORM**: Type-safe queries, migration support, PostgreSQL integration
+✅ **ML Adapter Pattern**: Flexible execution (local/cloud), extensible, consistent interface
 
-# Or run separately in different terminals
-pnpm dev:frontend  # Terminal 1
-pnpm dev:backend   # Terminal 2
+## Known Architectural Gaps
 
-# Faster feedback loop
-# Frontend: Instant HMR
-# Backend: Quick restart with tsx
-```
+⚠️ **Dependency Injection**: Services instantiate repositories directly (consider DI container)
+⚠️ **N+1 Queries**: Auth middleware does user lookup per request
+⚠️ **Job Queue**: BullMQ configured but not actively integrated with routes
+⚠️ **Fire-and-Forget**: ML tasks may not be properly tracked through job queue
+⚠️ **Type Safety**: Some `any` types in auth store (frontend)
+⚠️ **Token Refresh**: No automatic JWT refresh mechanism
 
-## Summary
+## Testing Strategy
 
-The new monorepo architecture provides:
+- **Vitest**: Unit tests configured for all packages
+- **@vue/test-utils**: Vue component testing
+- **Test files**: `__tests__/` folders in each package
+- **Coverage**: Configured but not extensively documented
 
-- ✅ Better separation of concerns
-- ✅ Faster build times (6x improvement)
-- ✅ Independent deployment options
-- ✅ Improved developer experience
-- ✅ Better team collaboration
-- ✅ Clearer project structure
-- ✅ Type safety across packages
+## Development Guidelines
 
-While maintaining:
+See package-specific ARCHITECTURE.md files:
 
-- ✅ All existing functionality
-- ✅ PostgreSQL database
-- ✅ Python ML scripts
-- ✅ Authentication system
-- ✅ UI components and styling
+- [Frontend Architecture](packages/frontend/ARCHITECTURE.md)
+- [Backend Architecture](packages/backend/ARCHITECTURE.md)
+- [Shared Architecture](packages/shared/ARCHITECTURE.md)
+- [ML Backend Architecture](packages/ml-backend/ARCHITECTURE.md)
