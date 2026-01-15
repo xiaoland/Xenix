@@ -27,12 +27,29 @@ Output (stdout JSON lines / FC response)
 ml_backend/
 ├── config.py           # Configuration (base path, env vars)
 ├── types.py            # Pydantic models for I/O validation
-├── operations/         # Core ML operations
-│   ├── batch_train.py  # GridSearchCV with hyperparameter tuning
-│   ├── single_train.py # Training with fixed parameters
-│   └── predict.py      # Batch predictions
-├── models/             # Model registry
-│   └── registry.py     # 12 regression models + param grids
+├── controllers/        # Operation controllers
+│   ├── batch_train.py  # Batch training controller
+│   ├── single_train.py # Single training controller
+│   └── predict.py      # Prediction controller
+├── services/           # Model services (service-oriented)
+│   ├── regression/     # Regression models service
+│   │   ├── base.py     # Abstract base class
+│   │   ├── ridge.py    # Ridge regression
+│   │   ├── lasso.py    # Lasso regression
+│   │   ├── linear.py   # Linear regression
+│   │   ├── polynomial.py # Polynomial regression
+│   │   ├── knn.py      # K-Nearest Neighbors
+│   │   ├── decision_tree.py
+│   │   ├── random_forest.py
+│   │   ├── adaboost.py
+│   │   ├── gbdt.py
+│   │   ├── xgboost.py
+│   │   ├── lightgbm.py
+│   │   └── bayesian_ridge.py
+│   └── classification/ # Classification models service
+│       ├── base.py     # Abstract base class
+│       ├── logistic_regression.py
+│       └── random_forest.py
 └── utils/
     ├── logger.py       # Structured logging to stdout
     └── file_io.py      # File system operations
@@ -149,6 +166,23 @@ Batch predictions using trained model.
 5. Save predictions to file system
 6. Calculate metrics if target available
 
+## Service-Oriented Architecture
+
+ml-backend uses a service-oriented architecture where each model is a service that implements standard interfaces.
+
+**Controllers** handle request routing and file I/O. They delegate ML operations to model services.
+
+**Services** implement model-specific training and prediction logic. Each service:
+- Extends base class (`RegressionModelBase` or `ClassificationModelBase`)
+- Implements `batch_train()`, `single_train()`, and `predict()` methods
+- Defines model class, default parameters, and parameter grid
+
+This design allows:
+- Easy addition of new models (implement base class)
+- Consistent API across all models
+- Separation of concerns (controllers handle I/O, services handle ML)
+- Model-specific optimizations (e.g., polynomial uses pipeline)
+
 ## Model Registry
 
 12 regression models with default parameter grids:
@@ -175,10 +209,14 @@ Batch predictions using trained model.
 - `regression.xgboost` - XGBoost
 - `regression.lightgbm` - LightGBM
 
-Each model has:
-- Model class (sklearn/xgboost/lightgbm)
-- Default parameters
-- Parameter grid for GridSearchCV
+**Classification models** (basic support):
+- `classification.logistic_regression` - Logistic Regression
+- `classification.random_forest` - Random Forest Classifier
+
+Each model service:
+- Extends base class with abstract methods
+- Implements model class, default parameters, and parameter grid
+- Provides batch_train(), single_train(), and predict() methods
 
 ## File System I/O
 

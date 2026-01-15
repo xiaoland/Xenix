@@ -10,13 +10,17 @@ Pure Python ML backend for Xenix. Performs machine learning operations (training
 
 ## Models
 
-12 regression models supported:
+**12 regression models**:
 - Linear Regression, Ridge, Lasso
 - Polynomial Regression
 - Bayesian Ridge Regression
 - K-Nearest Neighbors
 - Decision Tree, Random Forest
 - AdaBoost, GBDT, XGBoost, LightGBM
+
+**2 classification models**:
+- Logistic Regression
+- Random Forest Classifier
 
 ## Installation
 
@@ -97,6 +101,8 @@ Environment variables:
 
 ## Architecture
 
+Service-oriented design with controllers and model services:
+
 ```
 ml-backend/
 ├── main.py              # stdio entry point
@@ -104,12 +110,18 @@ ml-backend/
 ├── ml_backend/          # Core package
 │   ├── config.py        # Configuration
 │   ├── types.py         # Type definitions (Pydantic)
-│   ├── operations/      # ML operations
+│   ├── controllers/     # Operation controllers
 │   │   ├── batch_train.py
 │   │   ├── single_train.py
 │   │   └── predict.py
-│   ├── models/          # Model registry
-│   │   └── registry.py
+│   ├── services/        # Model services (service-oriented)
+│   │   ├── regression/  # Regression models
+│   │   │   ├── base.py  # Abstract base class
+│   │   │   ├── ridge.py, lasso.py, linear.py
+│   │   │   └── ...      # 12 models total
+│   │   └── classification/  # Classification models
+│   │       ├── base.py
+│   │       └── ...      # 2 models total
 │   └── utils/           # Utilities
 │       ├── logger.py
 │       └── file_io.py

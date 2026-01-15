@@ -1,20 +1,20 @@
-"""Prediction operation"""
+"""Prediction controller - delegates to model services"""
 
-import os
-import joblib
 import pandas as pd
 from datetime import datetime
-from typing import Union, List, Dict, Any
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+import numpy as np
 
 from ..types import PredictInput, PredictOutput
-from ..models import get_model
+from ..services import get_model
 from ..utils import log, read_data, write_predictions
-from ..config import Config
 
 
 def predict(input_data: PredictInput) -> PredictOutput:
     """
-    Make predictions using a trained model or train a new model
+    Make predictions using a trained model
+
+    Delegates to the appropriate model service for prediction
 
     Args:
         input_data: Prediction input parameters
@@ -33,14 +33,6 @@ def predict(input_data: PredictInput) -> PredictOutput:
         log(f"Reading training data from {input_data.train_data}", "INFO")
         train_df = read_data(input_data.train_data)
 
-        # Train model
-        X_train = train_df[input_data.feature_columns]
-        y_train = train_df[input_data.target_column]
-
-        log(f"Training model with params: {input_data.params}", "INFO")
-        model = get_model(input_data.model, input_data.params)
-        model.fit(X_train, y_train)
-
         # Read prediction data
         if isinstance(input_data.predict_data, str):
             # File path
@@ -51,31 +43,31 @@ def predict(input_data: PredictInput) -> PredictOutput:
             log(f"Using inline prediction data ({len(input_data.predict_data)} records)", "INFO")
             predict_df = pd.DataFrame(input_data.predict_data)
 
-        # Make predictions
-        X_predict = predict_df[input_data.feature_columns]
-        predictions = model.predict(X_predict)
+        # Get model service
+        model_service = get_model(input_data.model)
 
-        # Add predictions to dataframe
-        predict_df[f'predicted_{input_data.target_column}'] = predictions
+        log(f"Using model service: {model_service.__class__.__name__}", "INFO")
 
-        log(f"Generated {len(predictions)} predictions", "INFO")
+        # Delegate prediction to model service
+        predict_df_with_predictions = model_service.predict(train_df, predict_df, input_data)
+
+        log(f"Generated predictions for {len(predict_df_with_predictions)} records", "INFO")
 
         # Write predictions to file
-        predictions_path = write_predictions(predict_df, input_data.output_path)
+        predictions_path = write_predictions(predict_df_with_predictions, input_data.output_path)
         log(f"Predictions saved to {predictions_path}", "INFO")
 
         # Calculate metrics if target column exists in predict data
         metrics = None
         if input_data.target_column in predict_df.columns:
-            from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-            import numpy as np
-
             y_true = predict_df[input_data.target_column]
+            y_pred = predict_df_with_predictions[f'predicted_{input_data.target_column}']
+
             metrics = {
-                "r2": float(r2_score(y_true, predictions)),
-                "mse": float(mean_squared_error(y_true, predictions)),
-                "mae": float(mean_absolute_error(y_true, predictions)),
-                "rmse": float(np.sqrt(mean_squared_error(y_true, predictions)))
+                "r2": float(r2_score(y_true, y_pred)),
+                "mse": float(mean_squared_error(y_true, y_pred)),
+                "mae": float(mean_absolute_error(y_true, y_pred)),
+                "rmse": float(np.sqrt(mean_squared_error(y_true, y_pred)))
             }
             log(f"Prediction metrics: R²={metrics['r2']:.4f}, RMSE={metrics['rmse']:.4f}", "INFO")
 
@@ -83,7 +75,7 @@ def predict(input_data: PredictInput) -> PredictOutput:
         output = PredictOutput(
             task_id=input_data.task_id,
             predictions_path=predictions_path,
-            record_count=len(predictions),
+            record_count=len(predict_df_with_predictions),
             metrics=metrics,
             timestamp=datetime.now().isoformat()
         )

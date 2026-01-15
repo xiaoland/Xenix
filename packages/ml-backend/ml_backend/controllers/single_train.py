@@ -1,14 +1,11 @@
-"""Single training with specific parameters"""
+"""Single training controller - delegates to model services"""
 
 import os
 import joblib
 from datetime import datetime
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-import numpy as np
 
 from ..types import SingleTrainInput, SingleTrainOutput
-from ..models import get_model
+from ..services import get_model
 from ..utils import log, read_data
 from ..config import Config
 
@@ -16,6 +13,8 @@ from ..config import Config
 def single_train(input_data: SingleTrainInput) -> SingleTrainOutput:
     """
     Single training with specific parameters (no tuning)
+
+    Delegates to the appropriate model service for training
 
     Args:
         input_data: Single training input parameters
@@ -35,36 +34,17 @@ def single_train(input_data: SingleTrainInput) -> SingleTrainOutput:
         log(f"Reading training data from {input_data.input_file}", "INFO")
         df = read_data(input_data.input_file)
 
-        # Prepare features and target
-        X = df[input_data.feature_columns]
-        y = df[input_data.target_column]
+        log(f"Training data loaded: {len(df)} rows, {len(df.columns)} columns", "INFO")
 
-        # Split data for validation
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
-        )
+        # Get model service
+        model_service = get_model(input_data.model)
 
-        log(f"Training data shape: {X_train.shape}, Test data shape: {X_test.shape}", "INFO")
+        log(f"Using model service: {model_service.__class__.__name__}", "INFO")
 
-        # Get model with specified parameters
-        model = get_model(input_data.model, input_data.params)
+        # Delegate training to model service
+        result = model_service.single_train(df, input_data)
 
-        log(f"Training model with params: {input_data.params}", "INFO")
-
-        # Train model
-        model.fit(X_train, y_train)
-
-        # Evaluate on test set
-        y_pred = model.predict(X_test)
-
-        metrics = {
-            "r2": float(r2_score(y_test, y_pred)),
-            "mse": float(mean_squared_error(y_test, y_pred)),
-            "mae": float(mean_absolute_error(y_test, y_pred)),
-            "rmse": float(np.sqrt(mean_squared_error(y_test, y_pred)))
-        }
-
-        log(f"Model metrics: R²={metrics['r2']:.4f}, RMSE={metrics['rmse']:.4f}, MAE={metrics['mae']:.4f}", "INFO")
+        log(f"Model metrics: {result['metrics']}", "INFO")
 
         # Save model
         Config.ensure_directories()
@@ -72,13 +52,13 @@ def single_train(input_data: SingleTrainInput) -> SingleTrainOutput:
         model_filename = f"model_{input_data.task_id}_{timestamp}.pkl"
         model_path = os.path.join(Config.MODEL_STORAGE_PATH, model_filename)
 
-        joblib.dump(model, model_path)
+        joblib.dump(result['model'], model_path)
         log(f"Model saved to {model_path}", "INFO")
 
         # Return result
         output = SingleTrainOutput(
             task_id=input_data.task_id,
-            metrics=metrics,
+            metrics=result['metrics'],
             model_path=model_path,
             timestamp=datetime.now().isoformat()
         )

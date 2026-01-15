@@ -17,7 +17,7 @@ from ml_backend.types import (
     SingleTrainInput,
     PredictInput
 )
-from ml_backend.operations import batch_train, single_train, predict
+from ml_backend.controllers import batch_train, single_train, predict
 from ml_backend.utils import init_logger, log
 
 
