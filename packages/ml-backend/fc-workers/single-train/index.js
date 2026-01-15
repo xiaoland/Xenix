@@ -6,7 +6,7 @@ import {
   createLogger
 } from "../../chunk-YVWWAEX3.js";
 
-// src/adapters/aliyun-fc/manual-tune.ts
+// src/adapters/aliyun-fc/single-train.ts
 async function handler(event, context) {
   try {
     const {
@@ -25,7 +25,7 @@ async function handler(event, context) {
       databaseUrl: process.env.DATABASE_URL || ""
     });
     await logger.log(
-      `FC manual-tune started: ${model}`,
+      `FC single-train started: ${model}`,
       "INFO",
       { requestId: context.requestId }
     );
@@ -40,7 +40,7 @@ async function handler(event, context) {
       parentTaskId
     });
     await logger.log(
-      `FC manual-tune completed: ${model}`,
+      `FC single-train completed: ${model}`,
       "INFO",
       { requestId: context.requestId, metrics: result.metrics }
     );
@@ -49,7 +49,7 @@ async function handler(event, context) {
       body: JSON.stringify(result)
     };
   } catch (error) {
-    console.error("FC manual-tune error:", error);
+    console.error("FC single-train error:", error);
     return {
       statusCode: 500,
       body: JSON.stringify({
@@ -62,4 +62,4 @@ async function handler(event, context) {
 export {
   handler
 };
-//# sourceMappingURL=manual-tune.js.map
+//# sourceMappingURL=single-train.js.map

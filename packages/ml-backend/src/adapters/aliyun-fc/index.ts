@@ -1,9 +1,3 @@
-/**
- * Aliyun FC Adapters
- *
- * Export all FC handlers
- */
-
-export { handler as autoTuneHandler } from './auto-tune';
-export { handler as manualTuneHandler } from './manual-tune';
+export { handler as batchTrainHandler } from './batch-train';
+export { handler as singleTrainHandler } from './single-train';
 export { handler as predictHandler } from './predict';

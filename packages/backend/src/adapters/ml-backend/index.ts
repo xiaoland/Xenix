@@ -49,7 +49,7 @@ export function getMLBackendAdapter(): MLBackendAdapter {
 // Re-export types
 export type {
   MLBackendAdapter,
-  AutoTuneRequest,
-  ManualTuneRequest,
+  BatchTrainRequest,
+  SingleTrainRequest,
   PredictRequest,
 } from "./interface";

@@ -5,20 +5,16 @@
 
 import { getMLBackendAdapter } from "../../adapters/ml-backend";
 import type {
-  AutoTuneOptions,
-  ManualTuneOptions,
+  BatchTrainOptions,
+  SingleTrainOptions,
   PredictOptions,
   PredictInlineOptions,
   PredictFileOptions,
 } from "./types";
 
-/**
- * Auto-tune (batch training with GridSearchCV)
- */
-export async function autoTune(options: AutoTuneOptions): Promise<void> {
+export async function batchTrain(options: BatchTrainOptions): Promise<void> {
   const adapter = getMLBackendAdapter();
-
-  await adapter.autoTune({
+  await adapter.batchTrain({
     taskId: options.taskId,
     inputFile: options.inputFile,
     model: options.model,
@@ -28,13 +24,9 @@ export async function autoTune(options: AutoTuneOptions): Promise<void> {
   });
 }
 
-/**
- * Manual-tune (single training with specific parameters)
- */
-export async function manualTune(options: ManualTuneOptions): Promise<void> {
+export async function singleTrain(options: SingleTrainOptions): Promise<void> {
   const adapter = getMLBackendAdapter();
-
-  await adapter.manualTune({
+  await adapter.singleTrain({
     taskId: options.taskId,
     inputFile: options.inputFile,
     model: options.model,
@@ -45,12 +37,8 @@ export async function manualTune(options: ManualTuneOptions): Promise<void> {
   });
 }
 
-/**
- * Predict (file-based prediction)
- */
 export async function predict(options: PredictOptions): Promise<void> {
   const adapter = getMLBackendAdapter();
-
   await adapter.predict({
     taskId: options.taskId,
     trainingDataPath: options.trainingDataPath,
@@ -63,27 +51,20 @@ export async function predict(options: PredictOptions): Promise<void> {
   });
 }
 
-/**
- * Predict with file (alias for predict)
- */
 export async function predictFile(
   options: PredictFileOptions
 ): Promise<void> {
   return predict(options as PredictOptions);
 }
 
-/**
- * Predict with inline JSON data
- */
 export async function predictInline(
   options: PredictInlineOptions
 ): Promise<void> {
   const adapter = getMLBackendAdapter();
-
   await adapter.predict({
     taskId: options.taskId,
     trainingDataPath: options.trainingDataPath,
-    predictionData: options.predictionData, // Pass inline array directly
+    predictionData: options.predictionData,
     outputPath: options.outputPath,
     model: options.model,
     params: options.params,
@@ -92,9 +73,6 @@ export async function predictInline(
   });
 }
 
-/**
- * Get available models
- */
 export function getAvailableModels(): string[] {
   return [
     "regression.ridge",

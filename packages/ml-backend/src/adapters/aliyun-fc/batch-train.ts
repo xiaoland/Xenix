@@ -1,66 +1,56 @@
 /**
- * Aliyun FC Manual-Tune Adapter
- *
- * Handles manual tuning (single training with specific parameters) requests from Aliyun Function Compute
+ * Aliyun FC Batch Train Adapter
+ * Handles batch training (GridSearchCV) requests from Aliyun Function Compute
  */
 
-import { singleTrain } from '../../core/single-train';
+import { batchTrain } from '../../core/batch-train';
 import { createLogger } from '../../utils/logger';
-import type { SingleTrainOutput } from '../../types';
+import type { BatchTrainOutput } from '../../types';
 
-/**
- * FC Handler for manual-tune operations
- */
 export async function handler(event: any, context: any) {
   try {
-    // Parse event payload
     const {
       taskId,
       inputFile,
       model,
       featureColumns,
       targetColumn,
-      params,
-      parentTaskId,
+      paramGrid,
     } = event;
 
-    // Validate required fields
     if (
       !taskId ||
       !inputFile ||
       !model ||
       !featureColumns ||
       !targetColumn ||
-      !params
+      !paramGrid
     ) {
       throw new Error('Missing required fields in event payload');
     }
 
-    // Create logger (use DATABASE_URL from environment)
     const logger = createLogger(taskId, {
       databaseUrl: process.env.DATABASE_URL || '',
     });
 
     await logger.log(
-      `FC manual-tune started: ${model}`,
+      `FC batch-train started: ${model}`,
       'INFO',
       { requestId: context.requestId }
     );
 
-    // Execute single training
-    const result: SingleTrainOutput = await singleTrain({
+    const result: BatchTrainOutput = await batchTrain({
       inputFile,
       model,
       featureColumns,
       targetColumn,
-      params,
+      paramGrid,
       taskId,
       logger,
-      parentTaskId,
     });
 
     await logger.log(
-      `FC manual-tune completed: ${model}`,
+      `FC batch-train completed: ${model}`,
       'INFO',
       { requestId: context.requestId, metrics: result.metrics }
     );
@@ -70,7 +60,7 @@ export async function handler(event: any, context: any) {
       body: JSON.stringify(result),
     };
   } catch (error) {
-    console.error('FC manual-tune error:', error);
+    console.error('FC batch-train error:', error);
 
     return {
       statusCode: 500,

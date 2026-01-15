@@ -6,62 +6,30 @@ vars:
   region: cn-hangzhou
 
 resources:
-  # Python Layer - ML dependencies (pandas, scikit-learn, xgboost, etc.)
   xenix-ml-python-layer:
     component: fc3
     props:
       region: ${vars.region}
       layerName: xenix-ml-python-deps
       code: ./python-layer
-      description: Python ML dependencies for Xenix
-      compatibleRuntime:
-        - python3.10
-        - custom.debian10
+      description: Python ML dependencies
+      compatibleRuntime: [python3.10, custom.debian10]
 
-  # ML Auto-tune Worker Function
-  ml-auto-tune-worker:
+  ml-batch-train-worker:
     component: fc3
     props:
       region: ${vars.region}
-      functionName: ml-auto-tune-worker
-      description: ML auto-tuning worker (GridSearchCV)
-      runtime: python3.10
-      handler: index.handler
-      memorySize: 4096
-      timeout: 600 # 10 minutes
-      code: ./fc-workers/auto-tune
-      layers:
-        - ${resources.xenix-ml-python-layer.output.arn}
-      environmentVariables:
-        PYTHONPATH: /opt/python
-        DATABASE_URL: ${env.DATABASE_URL}
-        PYTHON_EXECUTABLE: python3
-      nasConfig:
-        userId: 10003
-        groupId: 10003
-        mountPoints:
-          - serverAddr: ${env.OSS_NAS_SERVER_ADDR}
-            nasDir: /xenix-oss
-            fcDir: /mnt/oss
-
-  # ML Manual-tune Worker Function
-  ml-manual-tune-worker:
-    component: fc3
-    props:
-      region: ${vars.region}
-      functionName: ml-manual-tune-worker
-      description: ML manual-tuning worker (specific parameters)
+      functionName: ml-batch-train-worker
+      description: Batch training with GridSearchCV
       runtime: python3.10
       handler: index.handler
       memorySize: 4096
       timeout: 600
-      code: ./fc-workers/manual-tune
-      layers:
-        - ${resources.xenix-ml-python-layer.output.arn}
+      code: ./fc-workers/batch-train
+      layers: [${resources.xenix-ml-python-layer.output.arn}]
       environmentVariables:
         PYTHONPATH: /opt/python
         DATABASE_URL: ${env.DATABASE_URL}
-        PYTHON_EXECUTABLE: python3
       nasConfig:
         userId: 10003
         groupId: 10003
@@ -70,7 +38,29 @@ resources:
             nasDir: /xenix-oss
             fcDir: /mnt/oss
 
-  # ML Predict Worker Function
+  ml-single-train-worker:
+    component: fc3
+    props:
+      region: ${vars.region}
+      functionName: ml-single-train-worker
+      description: Single training with specific parameters
+      runtime: python3.10
+      handler: index.handler
+      memorySize: 4096
+      timeout: 600
+      code: ./fc-workers/single-train
+      layers: [${resources.xenix-ml-python-layer.output.arn}]
+      environmentVariables:
+        PYTHONPATH: /opt/python
+        DATABASE_URL: ${env.DATABASE_URL}
+      nasConfig:
+        userId: 10003
+        groupId: 10003
+        mountPoints:
+          - serverAddr: ${env.OSS_NAS_SERVER_ADDR}
+            nasDir: /xenix-oss
+            fcDir: /mnt/oss
+
   ml-predict-worker:
     component: fc3
     props:
@@ -82,12 +72,10 @@ resources:
       memorySize: 4096
       timeout: 600
       code: ./fc-workers/predict
-      layers:
-        - ${resources.xenix-ml-python-layer.output.arn}
+      layers: [${resources.xenix-ml-python-layer.output.arn}]
       environmentVariables:
         PYTHONPATH: /opt/python
         DATABASE_URL: ${env.DATABASE_URL}
-        PYTHON_EXECUTABLE: python3
       nasConfig:
         userId: 10003
         groupId: 10003

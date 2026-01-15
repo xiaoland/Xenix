@@ -16,8 +16,8 @@ import { fcInvokeService } from "../../services/FCInvokeService";
 import logger from "../../utils/logger";
 import type {
   MLBackendAdapter,
-  AutoTuneRequest,
-  ManualTuneRequest,
+  BatchTrainRequest,
+  SingleTrainRequest,
   PredictRequest,
 } from "./interface";
 
@@ -40,14 +40,14 @@ export class AliyunFCAdapter implements MLBackendAdapter {
     return fcInvokeService.isAvailable();
   }
 
-  async autoTune(options: AutoTuneRequest): Promise<void> {
+  async batchTrain(options: BatchTrainRequest): Promise<void> {
     if (!this.isAvailable()) {
       throw new Error("AliyunFCAdapter is not available");
     }
 
-    // Invoke ml-auto-tune-worker function
+    // Invoke ml-batch-train-worker function
     await fcInvokeService.invokeAsync({
-      functionName: "ml-auto-tune-worker",
+      functionName: "ml-batch-train-worker",
       payload: {
         taskId: options.taskId,
         inputFile: options.inputFile, // OSS key, FC will read from /mnt/oss/<key>
@@ -64,14 +64,14 @@ export class AliyunFCAdapter implements MLBackendAdapter {
     );
   }
 
-  async manualTune(options: ManualTuneRequest): Promise<void> {
+  async singleTrain(options: SingleTrainRequest): Promise<void> {
     if (!this.isAvailable()) {
       throw new Error("AliyunFCAdapter is not available");
     }
 
-    // Invoke ml-manual-tune-worker function
+    // Invoke ml-single-train-worker function
     await fcInvokeService.invokeAsync({
-      functionName: "ml-manual-tune-worker",
+      functionName: "ml-single-train-worker",
       payload: {
         taskId: options.taskId,
         inputFile: options.inputFile, // OSS key, FC will read from /mnt/oss/<key>

@@ -6,7 +6,7 @@ import {
   createLogger
 } from "../../chunk-YVWWAEX3.js";
 
-// src/adapters/aliyun-fc/auto-tune.ts
+// src/adapters/aliyun-fc/batch-train.ts
 async function handler(event, context) {
   try {
     const {
@@ -24,7 +24,7 @@ async function handler(event, context) {
       databaseUrl: process.env.DATABASE_URL || ""
     });
     await logger.log(
-      `FC auto-tune started: ${model}`,
+      `FC batch-train started: ${model}`,
       "INFO",
       { requestId: context.requestId }
     );
@@ -38,7 +38,7 @@ async function handler(event, context) {
       logger
     });
     await logger.log(
-      `FC auto-tune completed: ${model}`,
+      `FC batch-train completed: ${model}`,
       "INFO",
       { requestId: context.requestId, metrics: result.metrics }
     );
@@ -47,7 +47,7 @@ async function handler(event, context) {
       body: JSON.stringify(result)
     };
   } catch (error) {
-    console.error("FC auto-tune error:", error);
+    console.error("FC batch-train error:", error);
     return {
       statusCode: 500,
       body: JSON.stringify({
@@ -60,4 +60,4 @@ async function handler(event, context) {
 export {
   handler
 };
-//# sourceMappingURL=auto-tune.js.map
+//# sourceMappingURL=batch-train.js.map

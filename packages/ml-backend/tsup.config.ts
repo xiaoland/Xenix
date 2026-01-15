@@ -4,8 +4,8 @@ export default defineConfig({
   entry: [
     'src/index.ts',
     'src/adapters/stdio/index.ts',
-    'src/adapters/aliyun-fc/auto-tune.ts',
-    'src/adapters/aliyun-fc/manual-tune.ts',
+    'src/adapters/aliyun-fc/batch-train.ts',
+    'src/adapters/aliyun-fc/single-train.ts',
     'src/adapters/aliyun-fc/predict.ts',
     'src/utils/logger.ts',
   ],

@@ -8,7 +8,7 @@ import {
   CreateManualTuneTaskSchema,
 } from "@xenix/shared";
 
-import { autoTune, manualTune } from "../business/ml";
+import { batchTrain, singleTrain } from "../business/ml";
 import { db, schema } from "../database";
 import { BadRequestError, NotFoundError } from "../errors";
 import { authMiddleware } from "../middleware/auth";
@@ -120,7 +120,7 @@ const tune = new Hono()
       } else {
         // Local execution (development)
         setImmediate(() => {
-          autoTune({
+          batchTrain({
             inputFile: dataset.filePath,
             model,
             featureColumns,
@@ -230,7 +230,7 @@ const tune = new Hono()
 
       // Invoke ML task via adapter (automatically chooses FC or spawn)
       setImmediate(() => {
-        manualTune({
+        singleTrain({
           inputFile,
           model,
           featureColumns,

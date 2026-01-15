@@ -19,8 +19,8 @@ import logger from "../../utils/logger";
 import { generateTraceId } from "../../utils/taskUtils";
 import type {
   MLBackendAdapter,
-  AutoTuneRequest,
-  ManualTuneRequest,
+  BatchTrainRequest,
+  SingleTrainRequest,
   PredictRequest,
 } from "./interface";
 import { eq } from "drizzle-orm";
@@ -60,7 +60,7 @@ export class SpawnAdapter implements MLBackendAdapter {
     return true;
   }
 
-  async autoTune(options: AutoTuneRequest): Promise<void> {
+  async batchTrain(options: BatchTrainRequest): Promise<void> {
     const operation = {
       operation: "batch-train",
       taskId: options.taskId,
@@ -75,7 +75,7 @@ export class SpawnAdapter implements MLBackendAdapter {
     await this.executeOperation(operation, options.taskId);
   }
 
-  async manualTune(options: ManualTuneRequest): Promise<void> {
+  async singleTrain(options: SingleTrainRequest): Promise<void> {
     const operation = {
       operation: "single-train",
       taskId: options.taskId,

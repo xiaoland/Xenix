@@ -1,64 +1,58 @@
 /**
- * Aliyun FC Auto-Tune Adapter
- *
- * Handles auto-tuning (batch training with GridSearchCV) requests from Aliyun Function Compute
+ * Aliyun FC Single Train Adapter
+ * Handles single training (specific parameters) requests from Aliyun Function Compute
  */
 
-import { batchTrain } from '../../core/batch-train';
+import { singleTrain } from '../../core/single-train';
 import { createLogger } from '../../utils/logger';
-import type { BatchTrainOutput } from '../../types';
+import type { SingleTrainOutput } from '../../types';
 
-/**
- * FC Handler for auto-tune operations
- */
 export async function handler(event: any, context: any) {
   try {
-    // Parse event payload
     const {
       taskId,
       inputFile,
       model,
       featureColumns,
       targetColumn,
-      paramGrid,
+      params,
+      parentTaskId,
     } = event;
 
-    // Validate required fields
     if (
       !taskId ||
       !inputFile ||
       !model ||
       !featureColumns ||
       !targetColumn ||
-      !paramGrid
+      !params
     ) {
       throw new Error('Missing required fields in event payload');
     }
 
-    // Create logger (use DATABASE_URL from environment)
     const logger = createLogger(taskId, {
       databaseUrl: process.env.DATABASE_URL || '',
     });
 
     await logger.log(
-      `FC auto-tune started: ${model}`,
+      `FC single-train started: ${model}`,
       'INFO',
       { requestId: context.requestId }
     );
 
-    // Execute batch training
-    const result: BatchTrainOutput = await batchTrain({
+    const result: SingleTrainOutput = await singleTrain({
       inputFile,
       model,
       featureColumns,
       targetColumn,
-      paramGrid,
+      params,
       taskId,
       logger,
+      parentTaskId,
     });
 
     await logger.log(
-      `FC auto-tune completed: ${model}`,
+      `FC single-train completed: ${model}`,
       'INFO',
       { requestId: context.requestId, metrics: result.metrics }
     );
@@ -68,7 +62,7 @@ export async function handler(event: any, context: any) {
       body: JSON.stringify(result),
     };
   } catch (error) {
-    console.error('FC auto-tune error:', error);
+    console.error('FC single-train error:', error);
 
     return {
       statusCode: 500,
