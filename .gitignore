@@ -32,6 +32,8 @@ logs/
 # Local Data
 .browser-profile
 data/*
+*.pdf
+
 
 # PDM
 .pdm-python
@@ -56,8 +58,6 @@ uploads/
 /datasets/
 *.xlsx
 *.xls
-!Customer\ Value\ Data\ Table.xlsx
-!Customer\ Value\ Data\ Table\ -\ test.xlsx
 
 # Model outputs
 *.json
