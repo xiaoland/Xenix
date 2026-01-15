@@ -56,9 +56,9 @@ adapter.manualTune()  → adapter.singleTrain()
 ## Files Deleted
 
 ### Backend (old duplicates)
-- `packages/backend/src/business/ml/*.py` - All Python files
-- `packages/backend/src/business/ml/regression/` - All regression models
-- `packages/backend/python-workers/` - Entire directory
+- `packages/backend/src/business/ml/*.py` - All Python files (22 files)
+- `packages/backend/src/business/ml/regression/` - All regression models (13 files)
+- `packages/backend/python-workers/` - Entire directory (3 workers × 26 files each = 78 files)
 
 ### ML-Backend (renamed)
 - Old FC worker directories deleted, recreated with new names
@@ -108,9 +108,64 @@ ML backend now has exactly three operations:
 2. **single-train** - Train with specific parameter values
 3. **predict** - Make predictions with trained model
 
+## Comprehensive Cleanup - Phase 2
+
+Extended cleanup to shared and backend packages:
+
+### Shared Package
+**Schemas (packages/shared/src/schemas/task.ts)**:
+- AutoTuneTaskParameterSchema → BatchTrainTaskParameterSchema
+- ManualTuneTaskParameterSchema → SingleTrainTaskParameterSchema
+- AutoTuneTaskResultSchema → BatchTrainTaskResultSchema
+- ManualTuneTaskResultSchema → SingleTrainTaskResultSchema
+- AutoTuneTaskSchema → BatchTrainTaskSchema (with type: "batch-train")
+- ManualTuneTaskSchema → SingleTrainTaskSchema (with type: "single-train")
+- CreateAutoTuneTaskSchema → CreateBatchTrainTaskSchema
+- CreateManualTuneTaskSchema → CreateSingleTrainTaskSchema
+- All corresponding type exports updated
+
+**Types (packages/shared/src/types/task.ts)**:
+- AutoTuneTaskParameter → BatchTrainTaskParameter
+- ManualTuneTaskParameter → SingleTrainTaskParameter
+- AutoTuneTaskResult → BatchTrainTaskResult
+- ManualTuneTaskResult → SingleTrainTaskResult
+- AutoTuneTask → BatchTrainTask (with type: "batch-train")
+- ManualTuneTask → SingleTrainTask (with type: "single-train")
+- Updated Task union type and TaskInfo interface
+
+### Backend Package
+**Routes (packages/backend/src/routes/tune.ts)**:
+- Endpoint: /auto-tune → /batch-train
+- Endpoint: /manual-tune → /single-train
+- Import: CreateAutoTuneTaskSchema → CreateBatchTrainTaskSchema
+- Import: CreateManualTuneTaskSchema → CreateSingleTrainTaskSchema
+- Task type: "auto-tune" → "batch-train"
+- Task type: "manual-tune" → "single-train"
+- FC function: ml-auto-tune-worker → ml-batch-train-worker
+- FC function: ml-manual-tune-worker → ml-single-train-worker
+- Response messages updated
+
+**Job Processor (packages/backend/src/jobs/mlTaskProcessor.ts)**:
+- Import: autoTune, manualTune → batchTrain, singleTrain
+- MLTaskData type: "auto-tune" | "manual-tune" → "batch-train" | "single-train"
+- Switch cases updated to use new function names
+
+**Database Schema (packages/backend/src/database/schema.ts)**:
+- Comment updated: 'auto-tune', 'train', 'predict' → 'batch-train', 'single-train', 'predict'
+
+**ML Backend Adapter (packages/backend/src/adapters/ml-backend/aliyun-fc-adapter.ts)**:
+- Log message: "Auto-tune task invoked via FC" → "Batch-train task invoked via FC"
+- Log message: "Manual-tune task invoked via FC" → "Single-train task invoked via FC"
+
+### Files Deleted (108 files total)
+- packages/backend/python-workers/ - Entire directory (78 files)
+- packages/backend/src/business/ml/*.py - 10 Python scripts
+- packages/backend/src/business/ml/regression/ - 13 regression model files
+
 ## Commits
 
 - `8b211fd` - refactor: remove auto-tune/manual-tune naming, use batch-train/single-train
+- `0cb82fe` - refactor: complete auto-tune/manual-tune to batch-train/single-train cleanup
 
 ## Result
 
