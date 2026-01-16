@@ -1,15 +1,5 @@
 # TODO of Xenix
 
-## 原型功能
-
-第一项功能肯定是：
-
-- 给一组历史数据
-- 分成训练组和测试组
-- 微调出各个模型效果最佳的参数组合
-- 对各个模型在其最佳参数下进行训练并对比效果
-- 选择最好的模型，对数据进行批量预测
-
 - [ ] test_size: float = 0.2, random_state: int = 42, n_jobs: int = -1
 - [ ] 提供在线 Table 编辑，提供 Features ，可单独预测（predict_on_file, predict_on_json）
 - [ ] 云端部署
@@ -41,3 +31,7 @@
   - [ ] every user has a list of ml backends；完整列表就是官方的加上用户本地的，官方的backend需要计费（task会有字段）
 - [ ] 计算阿里云Serverless方案的费用
   - 按照当前定价模型和用户画像，会付费的用户的使用频率、数据量是多少
+
+## ML Backend
+
+- [ ] 构建时产出 model_metadata.json 让 backend 读取并自动化推送到数据库

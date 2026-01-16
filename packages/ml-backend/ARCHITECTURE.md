@@ -1,163 +1,326 @@
 # ML Backend Architecture
 
-> **Package**: `@xenix/ml-backend`
-> **Purpose**: Standalone ML operations (training, prediction) executable locally or via Aliyun FC
+Pure Python ML backend for Xenix. Input/output through stdio and file system only.
 
 ## Overview
 
-Core ML functionality package used by the main backend. Provides training and prediction operations with pluggable I/O adapters (stdio for local, FC for cloud).
+Standalone ML operations package. No TypeScript, no HTTP, no external dependencies beyond Python ML libraries.
 
 ```
-Input (Node.js backend)
+Input (stdin/FC event)
   ↓
-ml-backend interface:
-  - batchTrain() - GridSearchCV
-  - singleTrain() - Manual params
-  - predict() - Batch prediction
+Entry point (main.py or fc_handler.py)
   ↓
-Adapter selector:
-  ├─ stdio - stdin/stdout communication
-  └─ aliyun-fc - environment detection
+Operation router
+  ├─ batch-train → GridSearchCV auto-tuning
+  ├─ single-train → Train with specific params
+  └─ predict → Make predictions
   ↓
-Python executor
+File system I/O (configurable base path)
   ↓
-Python scripts (scikit-learn, XGBoost, etc.)
-  ↓
-Output (CSV, JSON, database)
+Output (stdout JSON lines / FC response)
 ```
 
 ## Structure
 
 ```
-src/
-├── index.ts              # Core function exports
-├── core/                 # ML operation implementations
-│   ├── batch-train.ts    # GridSearchCV auto-tuning
-│   ├── single-train.ts   # Manual parameter training
-│   └── predict.ts        # Batch prediction
-├── adapters/             # I/O strategy (stdin/FC)
-│   ├── stdio/index.ts    # stdin/stdout protocol
-│   └── aliyun-fc/index.ts # FC environment setup
-├── types/
-│   ├── index.ts
-│   ├── input.ts          # Input types
-│   ├── output.ts         # Output types
-│   └── ...
-├── utils/
-│   ├── python-executor.ts # Spawn Python subprocess
-│   ├── logger.ts         # Database + console logging
-│   └── ...
-├── python/               # Python scripts (side-by-side)
-│   ├── auto_tune_model.py
-│   ├── manual_tune_model.py
-│   ├── predict.py
-│   └── requirements.txt
-└── __tests__/
+ml_backend/
+├── config.py           # Configuration (base path, env vars)
+├── types.py            # Pydantic models for I/O validation
+├── controllers/        # Operation controllers
+│   ├── batch_train.py  # Batch training controller
+│   ├── single_train.py # Single training controller
+│   └── predict.py      # Prediction controller
+├── services/           # Model services (service-oriented)
+│   ├── regression/     # Regression models service
+│   │   ├── base.py     # Abstract base class
+│   │   ├── ridge.py    # Ridge regression
+│   │   ├── lasso.py    # Lasso regression
+│   │   ├── linear.py   # Linear regression
+│   │   ├── polynomial.py # Polynomial regression
+│   │   ├── knn.py      # K-Nearest Neighbors
+│   │   ├── decision_tree.py
+│   │   ├── random_forest.py
+│   │   ├── adaboost.py
+│   │   ├── gbdt.py
+│   │   ├── xgboost.py
+│   │   ├── lightgbm.py
+│   │   └── bayesian_ridge.py
+│   └── classification/ # Classification models service
+│       ├── base.py     # Abstract base class
+│       ├── logistic_regression.py
+│       └── random_forest.py
+└── utils/
+    ├── logger.py       # Structured logging to stdout
+    └── file_io.py      # File system operations
 ```
 
-## Core Functions
+## Entry Points
 
-**Batch Training (Auto-Tuning)**
+### main.py - stdio/shell
 
-- Executes GridSearchCV for hyperparameter optimization
-- Receives: input file path, model name, feature columns, target, parameter grid
-- Returns: best parameters, metrics (r2, rmse, mae, cv_scores), model path
+Reads JSON from stdin, executes operation, outputs JSON lines to stdout.
 
-Type definition:
-
-```typescript
-export interface BatchTrainOutput {
-  task_id: string;
-  best_params: Record<string, any>;
-  metrics: { r2_score?: number; rmse?: number; mae?: number; cv_scores?: number[] };
-  model_path: string;
-  timestamp: string;
+**Input**: Single JSON object via stdin
+```json
+{
+  "operation": "batch-train",
+  "data": {
+    "task_id": 123,
+    "input_file": "data.xlsx",
+    "model": "regression.ridge",
+    ...
+  }
 }
 ```
 
-**Single Training (Manual)**
-
-- Trains with specific parameters (no tuning)
-- Receives: same as batch but with fixed parameters instead of grid
-- Returns: trained model, metrics
-
-**Prediction**
-
-- Loads trained model and applies to new data
-- Receives: training data path, prediction data, model name, parameters
-- Returns: predictions file path, record count
-
-## Python Executor
-
-Spawns Python subprocess with JSON communication via stdin/stdout:
-
-- Input: JSON object via stdin (task configuration)
-- Output: Structured JSON lines (logs, status, result)
-- Error handling: Capture stderr and exit code, propagate to backend
-- Timeout: Configurable (default 300 seconds)
-- Event callbacks: onLog for capturing real-time logs during execution
-
+**Output**: JSON lines to stdout
+```json
+{"type": "log", "severity_text": "INFO", "body": "Starting batch training...", ...}
+{"type": "log", "severity_text": "INFO", "body": "Model metrics: R²=0.92", ...}
+{"type": "result", "data": {"task_id": 123, "best_params": {...}, ...}}
 ```
 
-## Adapters
+### fc_handler.py - Aliyun FC
 
-Two adapter implementations for different execution environments:
+Event handler following Aliyun FC Python conventions.
 
-### 1. Stdio Adapter
+**Signature**: `handler(event, context) -> dict`
 
-Local process spawning with stdin/stdout JSON communication. Synchronous operation (waits for result). Used in development environment via SpawnAdapter in backend.
+**Input**: FC event (dict or bytes)
+```python
+{
+  "operation": "batch-train",
+  "data": {...}
+}
+```
 
-### 2. Aliyun FC Adapter
+**Output**: FC response
+```python
+{
+  "statusCode": 200,
+  "headers": {"Content-Type": "application/json"},
+  "body": "{\"success\": true, \"data\": {...}}"
+}
+```
 
-Detects Aliyun FC environment (checks for FC-specific variables). Uses OSS mount point at `/mnt/oss` for model and data storage. Python available in FC runtime. Used in production deployment via AliyunFCAdapter in backend.
+## Operations
+
+### Batch Training
+
+GridSearchCV hyperparameter optimization.
+
+**Input**:
+- `input_file` - Training data path (xlsx/csv)
+- `model` - Model name (e.g., `regression.ridge`)
+- `feature_columns` - Feature column names
+- `target_column` - Target column name
+- `param_grid` - Parameter grid for tuning
+
+**Output**:
+- `best_params` - Best parameters found
+- `metrics` - r2, mse, mae, rmse, cv_scores
+- `model_path` - Saved model file path
+
+**Process**:
+1. Read training data from file system
+2. Split into train/test (80/20)
+3. Run GridSearchCV with 5-fold CV
+4. Evaluate on test set
+5. Save model to file system
+6. Return metrics and model path
+
+### Single Training
+
+Training with specific parameters (no tuning).
+
+**Input**: Same as batch training but `params` instead of `param_grid`
+
+**Output**: Same as batch training (without cv_scores)
+
+**Process**: Same as batch training but skips GridSearchCV
+
+### Prediction
+
+Batch predictions using trained model.
+
+**Input**:
+- `train_data` - Training data path
+- `predict_data` - Prediction data path or inline JSON array
+- `output_path` - Where to save predictions
+- `model` - Model name
+- `params` - Model parameters
+- `feature_columns` - Feature columns
+- `target_column` - Target column
+
+**Output**:
+- `predictions_path` - Saved predictions file path
+- `record_count` - Number of predictions
+- `metrics` - Optional (if target exists in predict data)
+
+**Process**:
+1. Read training data
+2. Train model with specified params
+3. Read prediction data (file or inline)
+4. Generate predictions
+5. Save predictions to file system
+6. Calculate metrics if target available
+
+## Service-Oriented Architecture
+
+ml-backend uses a service-oriented architecture where each model is a service that implements standard interfaces.
+
+**Controllers** handle request routing and file I/O. They delegate ML operations to model services.
+
+**Services** implement model-specific training and prediction logic. Each service:
+- Extends base class (`RegressionModelBase` or `ClassificationModelBase`)
+- Implements `batch_train()`, `single_train()`, and `predict()` methods
+- Defines model class, default parameters, and parameter grid
+
+This design allows:
+- Easy addition of new models (implement base class)
+- Consistent API across all models
+- Separation of concerns (controllers handle I/O, services handle ML)
+- Model-specific optimizations (e.g., polynomial uses pipeline)
+
+## Model Registry
+
+12 regression models with default parameter grids:
+
+**Linear Models**:
+- `regression.linear` - Linear Regression
+- `regression.ridge` - Ridge Regression
+- `regression.lasso` - Lasso Regression
+- `regression.bayesian_ridge` - Bayesian Ridge
+
+**Polynomial**:
+- `regression.polynomial` - Polynomial Regression (pipeline)
+
+**Instance-based**:
+- `regression.knn` - K-Nearest Neighbors
+
+**Tree-based**:
+- `regression.decision_tree` - Decision Tree
+- `regression.random_forest` - Random Forest
+
+**Boosting**:
+- `regression.adaboost` - AdaBoost
+- `regression.gbdt` - Gradient Boosting (GBDT)
+- `regression.xgboost` - XGBoost
+- `regression.lightgbm` - LightGBM
+
+**Classification models** (basic support):
+- `classification.logistic_regression` - Logistic Regression
+- `classification.random_forest` - Random Forest Classifier
+
+Each model service:
+- Extends base class with abstract methods
+- Implements model class, default parameters, and parameter grid
+- Provides batch_train(), single_train(), and predict() methods
+
+## File System I/O
+
+All file operations use configurable base path.
+
+**Path Resolution**:
+- Absolute paths used as-is
+- Relative paths resolved from `ML_BASE_PATH`
+
+**Supported Formats**:
+- Input: `.xlsx`, `.xls`, `.csv`
+- Output: `.xlsx`, `.csv` (default: csv)
+
+**Directories**:
+- `ML_BASE_PATH` - Base directory (default: `/tmp/ml-backend`)
+- `MODEL_STORAGE_PATH` - Model storage (default: `{BASE_PATH}/models`)
+- `DATA_STORAGE_PATH` - Data storage (default: `{BASE_PATH}/data`)
+
+All directories created automatically on startup.
 
 ## Logging
 
-Pluggable logging strategy with two implementations:
+Structured logging to stdout using OpenTelemetry-like format.
 
-Interface:
-```typescript
-export interface MLLogger {
-  log(message: string, level: string, context?: Record<string, any>): Promise<void>;
+**Log Entry**:
+```json
+{
+  "type": "log",
+  "timestamp": 1234567890123456789,
+  "observed_timestamp": 1234567890123456789,
+  "severity_text": "INFO",
+  "severity_number": 9,
+  "body": "Log message",
+  "resource": {
+    "service.name": "ml-backend",
+    "service.version": "2.0.0"
+  },
+  "attributes": {
+    "task_id": 123,
+    ...
+  }
 }
 ```
 
-- **DatabaseLogger**: Writes logs to task_logs table for persistence and audit
-- **ConsoleLogger**: Writes to stdout for development environments
-- **Configuration**: createLogger() selects implementation based on config.type
+**Severity Levels**:
+- DEBUG (5)
+- INFO (9)
+- WARNING (13)
+- ERROR (17)
+- CRITICAL (21)
 
-## Python Scripts
+Logs written to stdout, one JSON object per line. External systems can parse and store logs as needed.
 
-Located in `ml/` directory (sibling to TypeScript). Three primary scripts handle model operations:
+## Configuration
 
-- **auto_tune_model.py**: Executes GridSearchCV hyperparameter tuning. Receives model name, feature columns, target column, and parameter grid via stdin; outputs best parameters and metrics via stdout (JSON lines).
-- **manual_tune_model.py**: Trains model with fixed parameters (no grid search).
-- **predict.py**: Loads trained model and applies to new data for batch predictions.
+Environment variables:
 
-All scripts communicate via stdin/stdout JSON lines protocol.
+**Required**: None (all have defaults)
 
-## Data Flow
+**Optional**:
+- `ML_BASE_PATH` - Base path for file operations
+- `MODEL_STORAGE_PATH` - Model storage directory
+- `DATA_STORAGE_PATH` - Data storage directory
+- `DATABASE_URL` - PostgreSQL connection (for future DB logging)
+- `LOG_LEVEL` - Logging level (DEBUG/INFO/WARNING/ERROR)
 
-**Batch Training Workflow**: Backend receives POST request → calls batchTrain() → executes auto_tune_model.py via SpawnAdapter → Python runs GridSearchCV → outputs structured logs and results → backend saves to database → frontend polls for completion.
+## Error Handling
 
-**Prediction in Aliyun FC**: Backend receives prediction request → invokes AliyunFCAdapter asynchronously → FC environment loads model from OSS → executes predict.py → saves predictions to OSS and database → backend returns 202 Accepted → frontend polls task status.
+**Validation Errors**: Pydantic validates all inputs. Invalid data raises validation error with details.
 
-## Development & Deployment
+**File Errors**: Missing files, unsupported formats raise specific errors.
 
-For development and deployment instructions, see:
+**Model Errors**: Unknown models, invalid parameters raise descriptive errors.
 
-- [DEVELOPMENT.md](../../DEVELOPMENT.md) - Building and testing locally
-- [DEPLOYMENT.md](../../DEPLOYMENT.md) - Aliyun FC deployment and configuration
+**Training Errors**: Failures during training (e.g., convergence issues) propagated with full traceback.
 
-Key environment variables:
+**Error Output**:
+```json
+{
+  "type": "error",
+  "error": "Error message",
+  "traceback": "Full traceback..."
+}
+```
 
-- `PYTHON_PATH`: Python executable location (e.g., `/usr/bin/python3`)
-- `ML_TIMEOUT`: Maximum execution time in milliseconds (default 300000)
-- `OSS_ENDPOINT`, `OSS_BUCKET`, `OSS_ACCESS_KEY_ID`: OSS configuration for model and data storage
+Exit code 1 for shell, statusCode 500 for FC.
 
-## Known Limitations
+## Performance
 
-⚠️ Large datasets: Memory-bounded by Node.js/Python process
-⚠️ Long training: May timeout on very large datasets
-⚠️ Error handling: Python stderr might not propagate fully
-⚠️ Logging: Database logger requires table schema
+**Parallel Training**: GridSearchCV uses `n_jobs=-1` (all cores)
+
+**Memory**: Models and data loaded into memory. Large datasets may require more RAM.
+
+**File I/O**: Single-threaded file operations. Fast for typical dataset sizes (<100MB).
+
+**Optimization**:
+- Use CSV instead of Excel for faster I/O
+- Reduce parameter grid size for faster tuning
+- Use single-train for production (skip tuning)
+
+## Deployment
+
+**Local/Shell**: Run `main.py` directly with Python 3.8+
+
+**Aliyun FC**: Deploy `fc_handler.py` as Python 3.9/3.10 function
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for deployment instructions.

@@ -38,6 +38,9 @@ importers:
       prettier:
         specifier: ^3.7.4
         version: 3.7.4
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
       vue-eslint-parser:
         specifier: ^10.2.0
         version: 10.2.0(eslint@9.39.2(jiti@2.6.1))

@@ -1,101 +1,135 @@
-# @xenix/ml-backend
+# Xenix ML Backend
 
-Standalone ML backend package for Xenix. Provides machine learning operations (training, prediction) with multiple delivery adapters.
+Pure Python ML backend for Xenix. Performs machine learning operations (training, prediction) through stdio and file system.
 
-## Features
+## Operations
 
-- **Three Core Operations**:
-  - `batchTrain` - Auto-tuning with GridSearchCV
-  - `singleTrain` - Training with specific parameters
-  - `predict` - Predictions with trained models
+- **batch-train** - Auto-tuning with GridSearchCV
+- **single-train** - Training with specific parameters
+- **predict** - Predictions with trained models
 
-- **Multiple Adapters**:
-  - **stdio** - Local development (stdin/stdout)
-  - **Aliyun FC** - Serverless deployment
-  - **HTTP** (future) - Direct API
-  - **Message Queue** (future) - Async processing
+## Models
 
-- **Database Logging** - Direct writes to PostgreSQL using OpenTelemetry format
+**12 regression models**:
+- Linear Regression, Ridge, Lasso
+- Polynomial Regression
+- Bayesian Ridge Regression
+- K-Nearest Neighbors
+- Decision Tree, Random Forest
+- AdaBoost, GBDT, XGBoost, LightGBM
 
-- **12 Regression Models**:
-  - Linear Regression, Ridge, Lasso
-  - Polynomial Regression
-  - K-Nearest Neighbors
-  - Decision Tree, Random Forest
-  - AdaBoost, GBDT, XGBoost, LightGBM
-  - Bayesian Ridge Regression
+**2 classification models**:
+- Logistic Regression
+- Random Forest Classifier
 
 ## Installation
 
 ```bash
-pnpm install
-```
-
-## Development
-
-```bash
-# Build TypeScript
-pnpm build
-
-# Build and prepare FC workers
-pnpm build:fc
-
-# Watch mode
-pnpm dev
+pip install -r requirements.txt
 ```
 
 ## Usage
 
-### As a Library
-
-```typescript
-import { batchTrain, createLogger } from '@xenix/ml-backend';
-
-const logger = createLogger(taskId, {
-  databaseUrl: process.env.DATABASE_URL,
-});
-
-const result = await batchTrain({
-  inputFile: '/path/to/data.xlsx',
-  model: 'regression.ridge',
-  featureColumns: ['age', 'income'],
-  targetColumn: 'score',
-  paramGrid: { 'model__alpha': [0.1, 1.0, 10.0] },
-  taskId: 123,
-  logger,
-});
-```
-
-### stdio Adapter (Local)
+### Shell/stdio (Local)
 
 ```bash
-echo '{"operation":"batch-train","taskId":123,...}' | node dist/adapters/stdio/index.js
+# Batch training
+echo '{
+  "operation": "batch-train",
+  "data": {
+    "task_id": 123,
+    "input_file": "data/training.xlsx",
+    "model": "regression.ridge",
+    "feature_columns": ["age", "income"],
+    "target_column": "score",
+    "param_grid": {"alpha": [0.1, 1.0, 10.0]}
+  }
+}' | python main.py
+
+# Single training
+echo '{
+  "operation": "single-train",
+  "data": {
+    "task_id": 124,
+    "input_file": "data/training.csv",
+    "model": "regression.xgboost",
+    "feature_columns": ["x1", "x2"],
+    "target_column": "y",
+    "params": {"n_estimators": 100, "max_depth": 5}
+  }
+}' | python main.py
+
+# Prediction
+echo '{
+  "operation": "predict",
+  "data": {
+    "task_id": 125,
+    "train_data": "data/train.csv",
+    "predict_data": "data/predict.csv",
+    "output_path": "output/predictions.csv",
+    "model": "regression.ridge",
+    "params": {"alpha": 1.0},
+    "feature_columns": ["age", "income"],
+    "target_column": "score"
+  }
+}' | python main.py
 ```
 
-### Aliyun FC Deployment
+### Aliyun FC
 
-```bash
-# Deploy Python layer
-pnpm run deploy:layer
+Deploy `fc_handler.py` as Aliyun Function Compute handler.
 
-# Deploy workers
-pnpm run deploy:workers
-```
+See [DEPLOYMENT.md](DEPLOYMENT.md) for deployment instructions.
+
+## Input/Output
+
+**Input**: JSON via stdin (for main.py) or FC event (for fc_handler.py)
+
+**Output**: JSON lines to stdout
+- Logs: `{"type": "log", "severity_text": "INFO", "body": "message", ...}`
+- Result: `{"type": "result", "data": {...}}`
+- Error: `{"type": "error", "error": "message", "traceback": "..."}`
+
+## Configuration
+
+Environment variables:
+- `ML_BASE_PATH` - Base path for file operations (default: `/tmp/ml-backend`)
+- `MODEL_STORAGE_PATH` - Model storage path (default: `{BASE_PATH}/models`)
+- `DATA_STORAGE_PATH` - Data storage path (default: `{BASE_PATH}/data`)
+- `DATABASE_URL` - PostgreSQL connection (optional, for logging)
+- `LOG_LEVEL` - Logging level (default: `INFO`)
 
 ## Architecture
 
+Service-oriented design with controllers and model services:
+
 ```
-packages/ml-backend/
-├── src/
-│   ├── core/          # Core ML functions
-│   ├── adapters/      # Delivery adapters
-│   ├── python/        # Python ML scripts
-│   ├── utils/         # Utilities (logger, executor)
-│   └── types/         # TypeScript types
-├── fc-workers/        # FC worker packages (generated)
-├── python-layer/      # Python dependencies
-└── scripts/           # Build scripts
+ml-backend/
+├── main.py              # stdio entry point
+├── fc_handler.py        # Aliyun FC entry point
+├── ml_backend/          # Core package
+│   ├── config.py        # Configuration
+│   ├── types.py         # Type definitions (Pydantic)
+│   ├── controllers/     # Operation controllers
+│   │   ├── batch_train.py
+│   │   ├── single_train.py
+│   │   └── predict.py
+│   ├── services/        # Model services (service-oriented)
+│   │   ├── regression/  # Regression models
+│   │   │   ├── base.py  # Abstract base class
+│   │   │   ├── ridge.py, lasso.py, linear.py
+│   │   │   └── ...      # 12 models total
+│   │   └── classification/  # Classification models
+│   │       ├── base.py
+│   │       └── ...      # 2 models total
+│   └── utils/           # Utilities
+│       ├── logger.py
+│       └── file_io.py
+├── requirements.txt     # Dependencies
+└── tests/               # Tests
 ```
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture.
 
 ## License
 
