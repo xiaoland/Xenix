@@ -2,8 +2,8 @@
   <div class="space-y-6">
     <!-- Info Alert -->
     <a-alert
-      :message="$t('components.ml.prepare.title')"
-      :description="$t('components.ml.prepare.description')"
+      :message="$t('ml.prepare.title')"
+      :description="$t('ml.prepare.description')"
       type="info"
       show-icon
       class="mb-4"
@@ -12,7 +12,7 @@
     <!-- Dataset Selection -->
     <div v-if="!selectedDatasetId">
       <h3 class="text-lg font-semibold mb-4">
-        {{ $t("components.ml.prepare.step1") }}
+        {{ $t("ml.prepare.step1") }}
       </h3>
       <dataset-selector
         :project-id="workItem.projectId"
@@ -22,7 +22,7 @@
         <router-link :to="'/projects/' + workItem.projectId + '/datasets'">
           <a-button type="default" class="inline-flex items-center">
             <span class="i-mdi-cloud-upload mr-2"></span>
-            {{ $t("components.ml.prepare.uploadNew") }}
+            {{ $t("ml.prepare.uploadNew") }}
           </a-button>
         </router-link>
       </div>
@@ -31,19 +31,19 @@
     <!-- Column Selection -->
     <div v-else>
       <h3 class="text-lg font-semibold mb-4">
-        {{ $t("components.ml.prepare.step2") }}
+        {{ $t("ml.prepare.step2") }}
       </h3>
 
       <div class="bg-gray-50 p-4 rounded mb-4">
         <div class="flex items-center justify-between">
           <div>
             <span class="font-medium"
-              >{{ $t("components.ml.prepare.selectedDataset") }}:</span
+              >{{ $t("ml.prepare.selectedDataset") }}:</span
             >
             <span class="ml-2">{{ selectedDatasetName }}</span>
           </div>
           <a-button size="small" @click="changeDataset">{{
-            $t("components.ml.prepare.change")
+            $t("ml.prepare.change")
           }}</a-button>
         </div>
       </div>

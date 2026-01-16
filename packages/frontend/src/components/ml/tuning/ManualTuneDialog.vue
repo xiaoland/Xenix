@@ -1,23 +1,20 @@
 <template>
   <a-modal
     v-model:open="visible"
-    :title="$t('components.ml.tuning.manualTuneDialog.title')"
+    :title="$t('ml.tuning.manualTuneDialog.title')"
     width="700px"
     :footer="null"
   >
     <div class="manual-tune-dialog-content">
       <p class="mb-4 text-gray-600">
-        {{ $t("components.ml.tuning.manualTuneDialog.description") }}
+        {{ $t("ml.tuning.manualTuneDialog.description") }}
       </p>
 
       <!-- Model Selection -->
-      <a-form-item
-        :label="$t('components.ml.tuning.selectModel')"
-        class="mb-4"
-      >
+      <a-form-item :label="$t('ml.tuning.selectModel')" class="mb-4">
         <a-select
           v-model:value="selectedModel"
-          :placeholder="$t('components.ml.tuning.selectPlaceholder')"
+          :placeholder="$t('ml.tuning.selectPlaceholder')"
           style="width: 100%"
           @change="handleModelChange"
         >
@@ -34,7 +31,7 @@
       <!-- Parameter Form -->
       <div v-if="selectedModel" class="mb-4">
         <h4 class="text-sm font-medium mb-2">
-          {{ $t("components.ml.tuning.modelParameters") }}
+          {{ $t("ml.tuning.modelParameters") }}
         </h4>
         <ModelParamForm
           ref="formRef"
@@ -55,7 +52,7 @@
           @click="handleTune"
         >
           <span class="i-mdi-play mr-1"></span>
-          {{ $t("components.ml.tuning.manualTuneDialog.tuneButton") }}
+          {{ $t("ml.tuning.manualTuneDialog.tuneButton") }}
         </a-button>
       </div>
     </div>

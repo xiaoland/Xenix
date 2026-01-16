@@ -1,11 +1,11 @@
 <template>
   <div class="space-y-6">
     <h2 class="text-2xl font-semibold mb-4">
-      {{ $t("components.ml.tuning.title") }}
+      {{ $t("ml.tuning.title") }}
     </h2>
 
     <a-alert
-      :message="$t('components.ml.tuning.trainDescription')"
+      :message="$t('ml.tuning.trainDescription')"
       type="info"
       show-icon
       class="mb-4"
@@ -14,12 +14,12 @@
     <!-- Model Selection and Actions -->
     <div class="bg-white rounded-lg border p-4 mb-4">
       <h3 class="text-lg font-medium mb-3">
-        {{ $t("components.ml.tuning.selectModels") }}
+        {{ $t("ml.tuning.selectModels") }}
       </h3>
       <a-select
         v-model:value="selectedModels"
         mode="multiple"
-        :placeholder="$t('components.ml.tuning.selectPlaceholder')"
+        :placeholder="$t('ml.tuning.selectPlaceholder')"
         style="width: 100%"
         :options="availableModels"
         class="mb-3"
@@ -34,14 +34,14 @@
           @click="handleStartAutoTune"
         >
           <span class="i-mdi-auto-fix mr-1"></span>
-          {{ $t("components.ml.tuning.startAutoTune") }}
+          {{ $t("ml.tuning.startAutoTune") }}
         </a-button>
         <a-button
           class="inline-flex items-center"
           @click="showManualTuneDialog = true"
         >
           <span class="i-mdi-tune mr-1"></span>
-          {{ $t("components.ml.tuning.manualTune") }}
+          {{ $t("ml.tuning.manualTune") }}
         </a-button>
         <a-button
           :disabled="tasks?.length === 0"
@@ -50,7 +50,7 @@
           @click="handleClearFailedTasks"
         >
           <span class="i-mdi-delete-outline mr-1"></span>
-          {{ $t("components.ml.tuning.clearFailedTasks") }}
+          {{ $t("ml.tuning.clearFailedTasks") }}
         </a-button>
       </div>
     </div>
@@ -59,7 +59,7 @@
     <div class="bg-white rounded-lg border">
       <div class="px-4 py-3 border-b bg-gray-50">
         <h3 class="text-lg font-medium">
-          {{ $t("components.ml.tuning.trainingTasks") }}
+          {{ $t("ml.tuning.trainingTasks") }}
         </h3>
       </div>
 
@@ -86,21 +86,21 @@
               color="blue"
               class="min-w-[60px] text-center"
             >
-              {{ $t("components.ml.tuning.type.auto") }}
+              {{ $t("ml.tuning.type.auto") }}
             </a-tag>
             <a-tag
               v-else-if="record.type === 'manual-tune'"
               color="green"
               class="min-w-[60px] text-center"
             >
-              {{ $t("components.ml.tuning.type.manual") }}
+              {{ $t("ml.tuning.type.manual") }}
             </a-tag>
           </template>
 
           <!-- Status Column -->
           <template v-else-if="column.key === 'status'">
             <a-tag :color="getStatusColor(record.status)">
-              {{ $t(`components.ml.tuning.status.${record.status}`) }}
+              {{ $t(`ml.tuning.status.${record.status}`) }}
             </a-tag>
           </template>
 
@@ -129,7 +129,7 @@
               v-else-if="record.status === 'running'"
               class="text-blue-500 text-sm"
             >
-              {{ $t("components.ml.tuning.training") }}
+              {{ $t("ml.tuning.training") }}
             </span>
             <span v-else class="text-gray-400 text-sm">-</span>
           </template>
@@ -142,7 +142,7 @@
                 :disabled="record.status !== 'completed'"
                 @click="handleSelectTask(record.id)"
               >
-                {{ $t("components.ml.tuning.select") }}
+                {{ $t("ml.tuning.select") }}
               </a-radio>
               <a-button
                 v-if="
@@ -155,7 +155,7 @@
                 @click="handleViewParams(record)"
               >
                 <span class="i-mdi-eye-outline mr-1"></span>
-                {{ $t("components.ml.tuning.viewParams") }}
+                {{ $t("ml.tuning.viewParams") }}
               </a-button>
             </div>
           </template>
@@ -166,41 +166,38 @@
         v-if="tasks?.length === 0 && !loading"
         class="text-center py-8 text-gray-500"
       >
-        {{ $t("components.ml.tuning.noTasks") }}
+        {{ $t("ml.tuning.noTasks") }}
       </div>
     </div>
 
     <!-- Navigation -->
     <div class="flex justify-between">
       <a-button @click="emit('back')">
-        {{ $t("components.ml.tuning.backToPrepare") }}
+        {{ $t("ml.tuning.backToPrepare") }}
       </a-button>
       <a-button
         type="primary"
         :disabled="!selectedTaskId"
         @click="handleContinue"
       >
-        {{ $t("components.ml.tuning.continueToPredict") }}
+        {{ $t("ml.tuning.continueToPredict") }}
       </a-button>
     </div>
 
     <!-- Manual Tune Dialog -->
-    <ManualTuneDialog
-      v-model="showManualTuneDialog"
-      @tune="handleManualTune"
-    />
+    <ManualTuneDialog v-model="showManualTuneDialog" @tune="handleManualTune" />
 
     <!-- View Params Modal -->
     <a-modal
       v-model:open="showParamsModal"
-      :title="$t('components.ml.tuning.paramsModalTitle')"
+      :title="$t('ml.tuning.paramsModalTitle')"
       width="600px"
       :footer="null"
     >
       <div v-if="selectedTaskForParams" class="params-display">
         <div class="mb-4">
           <h4 class="text-sm font-medium mb-2">
-            {{ $t("components.ml.tuning.model") }}:
+            {{ $t("ml.tuning.model") }}:
             {{ formatModelName(selectedTaskForParams.parameter?.model) }}
           </h4>
           <a-tag :color="getStatusColor(selectedTaskForParams.status)">
@@ -211,21 +208,21 @@
             color="blue"
             class="ml-2"
           >
-            {{ $t("components.ml.tuning.type.auto") }}
+            {{ $t("ml.tuning.type.auto") }}
           </a-tag>
           <a-tag
             v-else-if="selectedTaskForParams.type === 'manual-tune'"
             color="green"
             class="ml-2"
           >
-            {{ $t("components.ml.tuning.type.manual") }}
+            {{ $t("ml.tuning.type.manual") }}
           </a-tag>
         </div>
 
         <!-- Parameters -->
         <div class="bg-gray-50 rounded p-4 mb-4">
           <h4 class="text-sm font-semibold mb-3">
-            {{ $t("components.ml.tuning.parameters") }}
+            {{ $t("ml.tuning.parameters") }}
           </h4>
           <div
             v-for="(value, key) in selectedTaskForParams.result?.params"
@@ -245,7 +242,7 @@
           class="bg-blue-50 rounded p-4"
         >
           <h4 class="text-sm font-semibold mb-3">
-            {{ $t("components.ml.tuning.metrics") }}
+            {{ $t("ml.tuning.metrics") }}
           </h4>
           <div
             v-for="(value, key) in selectedTaskForParams.result.metrics"
@@ -450,11 +447,11 @@ const handleContinue = async () => {
       param: { id: String(selectedTaskId.value) },
     });
     if (!response.ok) throw new Error("Failed to fetch task");
-    const data = (await response.json()) as any;
-    if (data.task) {
+    const data = await response.json();
+    if (data) {
       emit("continue", {
-        model: data.task.parameter?.model || "",
-        parameters: data.task.result?.params || {},
+        model: data.parameter?.model || "",
+        parameters: data.result?.params || {},
         taskId: selectedTaskId.value,
       });
     }

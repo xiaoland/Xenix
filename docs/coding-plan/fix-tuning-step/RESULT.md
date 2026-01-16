@@ -1,9 +1,11 @@
 # Fix TuningStep Issues - Results
 
 ## Status
+
 ✅ Completed
 
 ## Completed Tasks
+
 - [x] Created implementation plan
 - [x] Create custom Steps component
 - [x] Update WorkItemDetailView to use custom Steps
@@ -108,7 +110,8 @@ All three issues have been successfully resolved:
 The implementation follows the reference examples from commit `9fdcacdee415f6e5b6cc50c298ecd1ebd28b2781` while adapting to the current codebase structure. All components are properly typed with TypeScript and follow Vue 3 Composition API patterns.
 
 **Note**: Some i18n translation keys may need to be added to the translation files for full localization support. The code references the following translation paths:
-- `components.ml.tuning.*`
+
+- `ml.tuning.*`
 - `steps.*.title/description`
 - `common.cancel`
 
