@@ -14,7 +14,7 @@ class BayesianRidgeParams(BaseModel):
     alpha_2: float = Field(default=1e-6, description="Hyperparameter for Gamma distribution prior over alpha")
     lambda_1: float = Field(default=1e-6, description="Hyperparameter for Gamma distribution prior over lambda")
     lambda_2: float = Field(default=1e-6, description="Hyperparameter for Gamma distribution prior over lambda")
-    n_iter: int = Field(default=300, description="Maximum number of iterations")
+    max_iter: int = Field(default=300, description="Maximum number of iterations")
     tol: float = Field(default=0.001, description="Tolerance for stopping criterion")
     fit_intercept: bool = Field(default=True, description="Whether to calculate intercept")
     compute_score: bool = Field(default=False, description="Whether to compute log marginal likelihood")
