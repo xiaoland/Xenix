@@ -26,12 +26,16 @@
   - [ ] schema to shared, frontend also uses Zod
   - [ ] Simplify API (especially train)
 - [ ] Add ml-backend
-  - [ ] ml-backend does not has adapter, it's pure python script only IO is stdio and file system.(Always save locally, but with base path)
+  - [x] ml-backend does not has adapter, it's pure python script only IO is stdio and file system.(Always save locally, but with base path)
   - [ ] backend call ml-backend like local function with adapter
-  - [ ] every user has a list of ml backends；完整列表就是官方的加上用户本地的，官方的backend需要计费（task会有字段）
 - [ ] 计算阿里云Serverless方案的费用
   - 按照当前定价模型和用户画像，会付费的用户的使用频率、数据量是多少
 
+## Frontend
+
+- [ ] 在创建任务时要选择 ml-backend worker
+  - every user has a list of ml backends；完整列表就是官方的加上用户本地的，官方的backend需要计费（task会有字段）
+
 ## ML Backend
 
-- [ ] 构建时产出 model_metadata.json 让 backend 读取并自动化推送到数据库
+- [x] 构建时产出 model_metadata.json 让 backend 读取并自动化推送到数据库
