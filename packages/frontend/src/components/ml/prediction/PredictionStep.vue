@@ -273,7 +273,33 @@ const startPredictionFromFile = async () => {
 
   isPredicting.value = true;
   try {
-    throw new Error("File prediction not implemented");
+    const file = fileList.value[0].originFileObj;
+    if (!file) {
+      throw new Error("No file selected");
+    }
+
+    // Create FormData for file upload
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("workItemId", String(props.workItemId));
+    formData.append("model", props.selectedModel);
+    formData.append("tuningTaskId", String(props.taskId));
+
+    // Call the API
+    const response = await fetch("/api/predict/file", {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Failed to start prediction");
+    }
+
+    const data = await response.json();
+    message.success("File prediction started successfully");
+    predictionTaskId.value = data.taskId;
   } catch (error: any) {
     console.error("Prediction failed:", error);
     message.error(error.message || "Failed to start prediction");
