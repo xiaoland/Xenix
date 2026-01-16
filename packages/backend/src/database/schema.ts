@@ -1,5 +1,7 @@
 // PostgreSQL database schema for Xenix
 import {
+  boolean,
+  index,
   integer,
   jsonb,
   pgTable,
@@ -58,22 +60,55 @@ export const datasets = pgTable('datasets', {
     .notNull(),
 });
 
+// ML Backend Workers table - tracks available ML backend execution environments
+export const mlBackendWorkers = pgTable(
+  'ml_backend_workers',
+  {
+    id: serial('id').primaryKey(),
+    name: text('name').notNull().unique(),
+    createdBy: uuid('created_by').references(() => users.id),
+    adapter: text('adapter').notNull(), // 'aliyun-fc' | 'spawn'
+    adapterParams: jsonb('adapter_params').notNull().default({}),
+    isDefault: boolean('is_default').notNull().default(false),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at', { mode: 'date' })
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: timestamp('updated_at', { mode: 'date' })
+      .$defaultFn(() => new Date())
+      .notNull(),
+  },
+  (table) => ({
+    adapterIdx: index('idx_ml_backend_workers_adapter').on(table.adapter),
+    defaultIdx: index('idx_ml_backend_workers_default').on(table.isDefault),
+  }),
+);
+
 // Consolidated tasks table
 // Type values: 'batch-train', 'single-train', 'predict'
-export const tasks = pgTable('tasks', {
-  id: serial('id').primaryKey(),
-  workItemId: integer('work_item_id'), // Reference to work item
-  type: text('type').notNull(), // 'batch-train', 'single-train', 'predict'
-  parameter: jsonb('parameter'), // Task parameters as JSON object
-  result: jsonb('result'), // Task results/metrics as JSON object
-  status: text('status').notNull().default('pending'),
-  error: text('error'),
-  createdAt: timestamp('created_at', { mode: 'date' })
-    .$defaultFn(() => new Date())
-    .notNull(),
-  startedAt: timestamp('started_at', { mode: 'date' }),
-  endAt: timestamp('end_at', { mode: 'date' }),
-});
+export const tasks = pgTable(
+  'tasks',
+  {
+    id: serial('id').primaryKey(),
+    workItemId: integer('work_item_id'), // Reference to work item
+    mlBackendWorkerId: integer('ml_backend_worker_id').references(
+      () => mlBackendWorkers.id,
+    ), // Reference to ML backend worker
+    type: text('type').notNull(), // 'batch-train', 'single-train', 'predict'
+    parameter: jsonb('parameter'), // Task parameters as JSON object
+    result: jsonb('result'), // Task results/metrics as JSON object
+    status: text('status').notNull().default('pending'),
+    error: text('error'),
+    createdAt: timestamp('created_at', { mode: 'date' })
+      .$defaultFn(() => new Date())
+      .notNull(),
+    startedAt: timestamp('started_at', { mode: 'date' }),
+    endAt: timestamp('end_at', { mode: 'date' }),
+  },
+  (table) => ({
+    workerIdx: index('idx_tasks_worker').on(table.mlBackendWorkerId),
+  }),
+);
 
 // OpenTelemetry-compliant logs table
 // trace_id format: task.{task.id} for task-related logs

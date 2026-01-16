@@ -1,7 +1,7 @@
 /**
  * Spawn Adapter for ML Backend
  *
- * Invokes ml-backend by spawning local processes using the stdio adapter.
+ * Invokes ml-backend by spawning Python processes using stdio.
  * Used for local development.
  *
  * I/O Characteristics:
@@ -23,35 +23,46 @@ import type {
   SingleTrainRequest,
   PredictRequest,
 } from "./interface";
+import type { SpawnAdapterParams } from "../../types/ml-backend";
 import { eq } from "drizzle-orm";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 interface StructuredOutput {
-  type: "log" | "status" | "result";
-  data: any;
+  type: "log" | "status" | "result" | "error";
+  data?: any;
+  error?: string;
+  traceback?: string;
 }
 
 /**
- * Spawn Adapter - Invokes ml-backend by spawning Node.js processes locally
+ * Spawn Adapter - Invokes ml-backend by spawning Python processes locally
  */
 export class SpawnAdapter implements MLBackendAdapter {
+  private pythonPath: string;
   private mlBackendPath: string;
+  private basePath?: string;
 
-  constructor() {
-    // Path to ml-backend's stdio adapter entry point
-    this.mlBackendPath = path.join(
+  constructor(params: SpawnAdapterParams = {}) {
+    this.pythonPath = params.pythonPath || "python3";
+    this.mlBackendPath =
+      params.mlBackendPath || this.detectMLBackendPath();
+    this.basePath = params.basePath;
+  }
+
+  /**
+   * Auto-detect ml-backend main.py path
+   */
+  private detectMLBackendPath(): string {
+    return path.join(
       __dirname,
       "..",
       "..",
       "..",
       "..",
       "ml-backend",
-      "dist",
-      "adapters",
-      "stdio",
-      "index.js"
+      "main.py"
     );
   }
 
@@ -63,13 +74,14 @@ export class SpawnAdapter implements MLBackendAdapter {
   async batchTrain(options: BatchTrainRequest): Promise<void> {
     const operation = {
       operation: "batch-train",
-      taskId: options.taskId,
-      inputFile: options.inputFile,
-      model: options.model,
-      featureColumns: options.featureColumns,
-      targetColumn: options.targetColumn,
-      paramGrid: options.paramGrid || {},
-      databaseUrl: process.env.DATABASE_URL,
+      data: {
+        task_id: options.taskId,
+        input_file: options.inputFile,
+        model: options.model,
+        feature_columns: options.featureColumns,
+        target_column: options.targetColumn,
+        param_grid: options.paramGrid || {},
+      },
     };
 
     await this.executeOperation(operation, options.taskId);
@@ -78,14 +90,15 @@ export class SpawnAdapter implements MLBackendAdapter {
   async singleTrain(options: SingleTrainRequest): Promise<void> {
     const operation = {
       operation: "single-train",
-      taskId: options.taskId,
-      inputFile: options.inputFile,
-      model: options.model,
-      featureColumns: options.featureColumns,
-      targetColumn: options.targetColumn,
-      params: options.parameters,
-      parentTaskId: options.parentTaskId,
-      databaseUrl: process.env.DATABASE_URL,
+      data: {
+        task_id: options.taskId,
+        input_file: options.inputFile,
+        model: options.model,
+        feature_columns: options.featureColumns,
+        target_column: options.targetColumn,
+        parameters: options.parameters,
+        parent_task_id: options.parentTaskId,
+      },
     };
 
     await this.executeOperation(operation, options.taskId);
@@ -94,22 +107,23 @@ export class SpawnAdapter implements MLBackendAdapter {
   async predict(options: PredictRequest): Promise<void> {
     const operation = {
       operation: "predict",
-      taskId: options.taskId,
-      trainData: options.trainingDataPath,
-      predictData: options.predictionData,
-      outputPath: options.outputPath,
-      model: options.model,
-      params: options.params,
-      featureColumns: options.featureColumns,
-      targetColumn: options.targetColumn,
-      databaseUrl: process.env.DATABASE_URL,
+      data: {
+        task_id: options.taskId,
+        training_data_path: options.trainingDataPath,
+        prediction_data: options.predictionData,
+        output_path: options.outputPath,
+        model: options.model,
+        parameters: options.params,
+        feature_columns: options.featureColumns,
+        target_column: options.targetColumn,
+      },
     };
 
     await this.executeOperation(operation, options.taskId);
   }
 
   /**
-   * Execute an ML operation by spawning ml-backend stdio adapter
+   * Execute an ML operation by spawning Python ml-backend
    */
   private async executeOperation(
     operation: any,
@@ -128,23 +142,31 @@ export class SpawnAdapter implements MLBackendAdapter {
         })
         .where(eq(schema.tasks.id, taskId));
 
-      // Spawn Node.js process with ml-backend stdio adapter
-      const nodeProcess = spawn("node", [this.mlBackendPath], {
+      // Build Python command arguments
+      const pythonArgs = [this.mlBackendPath];
+
+      // Add --base-path argument if configured
+      if (this.basePath) {
+        pythonArgs.push("--base-path", this.basePath);
+      }
+
+      // Spawn Python process with ml-backend
+      const pythonProcess = spawn(this.pythonPath, pythonArgs, {
         stdio: ["pipe", "pipe", "pipe"],
         env: {
           ...process.env,
-          NODE_ENV: process.env.NODE_ENV || "development",
+          DATABASE_URL: process.env.DATABASE_URL,
         },
       });
 
       // Write operation JSON to stdin
-      nodeProcess.stdin.write(JSON.stringify(operation));
-      nodeProcess.stdin.end();
+      pythonProcess.stdin.write(JSON.stringify(operation));
+      pythonProcess.stdin.end();
 
       let stdoutBuffer = "";
       let stderrBuffer = "";
 
-      nodeProcess.stdout.on("data", async (data) => {
+      pythonProcess.stdout.on("data", async (data) => {
         const output = data.toString();
         stdoutBuffer += output;
 
@@ -164,7 +186,7 @@ export class SpawnAdapter implements MLBackendAdapter {
         }
       });
 
-      nodeProcess.stderr.on("data", async (data) => {
+      pythonProcess.stderr.on("data", async (data) => {
         const output = data.toString();
         stderrBuffer += output;
 
@@ -183,7 +205,7 @@ export class SpawnAdapter implements MLBackendAdapter {
         }
       });
 
-      nodeProcess.on("close", async (code) => {
+      pythonProcess.on("close", async (code) => {
         if (taskCompleted) return;
         taskCompleted = true;
 
@@ -211,7 +233,7 @@ export class SpawnAdapter implements MLBackendAdapter {
         }
       });
 
-      nodeProcess.on("error", async (error) => {
+      pythonProcess.on("error", async (error) => {
         if (taskCompleted) return;
         taskCompleted = true;
 
@@ -255,8 +277,10 @@ export class SpawnAdapter implements MLBackendAdapter {
     try {
       switch (output.type) {
         case "log":
-          // Store log in database
-          await this.storeLog(output.data, taskId);
+          // Store log in database (if output.data is structured log)
+          if (output.data) {
+            await this.storeLog(output.data, taskId);
+          }
           break;
 
         case "status":
@@ -276,8 +300,24 @@ export class SpawnAdapter implements MLBackendAdapter {
             .update(schema.tasks)
             .set({
               result: output.data,
+              status: "completed",
+              endAt: new Date(),
             })
             .where(eq(schema.tasks.id, taskId));
+          break;
+
+        case "error":
+          // Handle error output from Python ml-backend
+          await db
+            .update(schema.tasks)
+            .set({
+              status: "failed",
+              error: output.error || "Unknown error",
+              endAt: new Date(),
+            })
+            .where(eq(schema.tasks.id, taskId));
+
+          logger.error({ traceId, error: output.error }, "ML task error");
           break;
       }
     } catch (error) {

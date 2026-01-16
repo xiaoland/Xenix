@@ -5,6 +5,7 @@ export interface BatchTrainOptions {
   targetColumn: string;
   taskId: number;
   paramGrid?: Record<string, any[]>;
+  workerId?: number; // Optional ML backend worker ID (uses default if not specified)
 }
 
 export interface SingleTrainOptions {
@@ -15,6 +16,7 @@ export interface SingleTrainOptions {
   taskId: number;
   parameters: Record<string, any>;
   parentTaskId?: number;
+  workerId?: number; // Optional ML backend worker ID (uses default if not specified)
 }
 
 export interface PredictOptions {
@@ -26,6 +28,7 @@ export interface PredictOptions {
   featureColumns: string[];
   targetColumn: string;
   taskId: number;
+  workerId?: number; // Optional ML backend worker ID (uses default if not specified)
 }
 
 export interface PredictFileOptions {
@@ -37,6 +40,7 @@ export interface PredictFileOptions {
   featureColumns: string[];
   targetColumn: string;
   taskId: number;
+  workerId?: number; // Optional ML backend worker ID (uses default if not specified)
 }
 
 export interface PredictInlineOptions {
@@ -48,4 +52,5 @@ export interface PredictInlineOptions {
   featureColumns: string[];
   targetColumn: string;
   taskId: number;
+  workerId?: number; // Optional ML backend worker ID (uses default if not specified)
 }

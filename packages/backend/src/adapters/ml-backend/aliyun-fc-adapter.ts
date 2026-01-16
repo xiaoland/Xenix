@@ -5,10 +5,10 @@
  * Used for production deployment.
  *
  * I/O Characteristics:
- * - Uses OSS object keys (not full paths)
+ * - Uses task-specific base paths: /mnt/oss/tasks/{taskId}
  * - OSS bucket is mounted at /mnt/oss in FC environment
- * - ml-backend reads from /mnt/oss/<key>
- * - Results (best-params, metrics) are saved to database directly by ml-backend
+ * - ml-backend reads from base_path (passed via fc_handler.py)
+ * - Results are saved to database directly by ml-backend
  * - Logs are written to database directly by ml-backend
  */
 
@@ -20,15 +20,23 @@ import type {
   SingleTrainRequest,
   PredictRequest,
 } from "./interface";
+import type { AliyunFCAdapterParams } from "../../types/ml-backend";
 
 /**
  * Aliyun FC Adapter - Invokes ml-backend via Aliyun Function Compute
  */
 export class AliyunFCAdapter implements MLBackendAdapter {
-  constructor() {
+  private params: AliyunFCAdapterParams;
+
+  constructor(params: AliyunFCAdapterParams) {
+    this.params = params;
+
     // Check if FC is configured
     if (this.isAvailable()) {
-      logger.info("AliyunFCAdapter initialized");
+      logger.info(
+        { serviceName: params.serviceName },
+        "AliyunFCAdapter initialized"
+      );
     } else {
       logger.warn(
         "AliyunFCAdapter not available - FC client not configured"
@@ -40,26 +48,44 @@ export class AliyunFCAdapter implements MLBackendAdapter {
     return fcInvokeService.isAvailable();
   }
 
+  /**
+   * Get task-specific base path for FC environment
+   */
+  private getTaskBasePath(taskId: number): string {
+    const baseOSSPath = this.params.basePath || "/mnt/oss";
+    return `${baseOSSPath}/tasks/${taskId}`;
+  }
+
   async batchTrain(options: BatchTrainRequest): Promise<void> {
     if (!this.isAvailable()) {
       throw new Error("AliyunFCAdapter is not available");
     }
 
-    // Invoke ml-batch-train-worker function
+    const taskBasePath = this.getTaskBasePath(options.taskId);
+
+    // Invoke ml-batch-train-worker function with new Python format
     await fcInvokeService.invokeAsync({
       functionName: "ml-batch-train-worker",
       payload: {
-        taskId: options.taskId,
-        inputFile: options.inputFile, // OSS key, FC will read from /mnt/oss/<key>
-        model: options.model,
-        featureColumns: options.featureColumns,
-        targetColumn: options.targetColumn,
-        paramGrid: options.paramGrid || {},
+        operation: "batch-train",
+        basePath: taskBasePath,
+        data: {
+          task_id: options.taskId,
+          input_file: options.inputFile,
+          model: options.model,
+          feature_columns: options.featureColumns,
+          target_column: options.targetColumn,
+          param_grid: options.paramGrid || {},
+        },
       },
     });
 
     logger.info(
-      { taskId: options.taskId, model: options.model },
+      {
+        taskId: options.taskId,
+        model: options.model,
+        basePath: taskBasePath,
+      },
       "Batch-train task invoked via FC"
     );
   }
@@ -69,22 +95,32 @@ export class AliyunFCAdapter implements MLBackendAdapter {
       throw new Error("AliyunFCAdapter is not available");
     }
 
-    // Invoke ml-single-train-worker function
+    const taskBasePath = this.getTaskBasePath(options.taskId);
+
+    // Invoke ml-single-train-worker function with new Python format
     await fcInvokeService.invokeAsync({
       functionName: "ml-single-train-worker",
       payload: {
-        taskId: options.taskId,
-        inputFile: options.inputFile, // OSS key, FC will read from /mnt/oss/<key>
-        model: options.model,
-        featureColumns: options.featureColumns,
-        targetColumn: options.targetColumn,
-        params: options.parameters,
-        parentTaskId: options.parentTaskId,
+        operation: "single-train",
+        basePath: taskBasePath,
+        data: {
+          task_id: options.taskId,
+          input_file: options.inputFile,
+          model: options.model,
+          feature_columns: options.featureColumns,
+          target_column: options.targetColumn,
+          parameters: options.parameters,
+          parent_task_id: options.parentTaskId,
+        },
       },
     });
 
     logger.info(
-      { taskId: options.taskId, model: options.model },
+      {
+        taskId: options.taskId,
+        model: options.model,
+        basePath: taskBasePath,
+      },
       "Single-train task invoked via FC"
     );
   }
@@ -94,23 +130,33 @@ export class AliyunFCAdapter implements MLBackendAdapter {
       throw new Error("AliyunFCAdapter is not available");
     }
 
-    // Invoke ml-predict-worker function
+    const taskBasePath = this.getTaskBasePath(options.taskId);
+
+    // Invoke ml-predict-worker function with new Python format
     await fcInvokeService.invokeAsync({
       functionName: "ml-predict-worker",
       payload: {
-        taskId: options.taskId,
-        trainData: options.trainingDataPath, // OSS key
-        predictData: options.predictionData, // OSS key or inline data
-        outputPath: options.outputPath, // OSS key
-        model: options.model,
-        params: options.params,
-        featureColumns: options.featureColumns,
-        targetColumn: options.targetColumn,
+        operation: "predict",
+        basePath: taskBasePath,
+        data: {
+          task_id: options.taskId,
+          training_data_path: options.trainingDataPath,
+          prediction_data: options.predictionData,
+          output_path: options.outputPath,
+          model: options.model,
+          parameters: options.params,
+          feature_columns: options.featureColumns,
+          target_column: options.targetColumn,
+        },
       },
     });
 
     logger.info(
-      { taskId: options.taskId, model: options.model },
+      {
+        taskId: options.taskId,
+        model: options.model,
+        basePath: taskBasePath,
+      },
       "Predict task invoked via FC"
     );
   }

@@ -3,7 +3,10 @@
  * Uses ML Backend adapters to invoke operations (local spawn or FC invoke)
  */
 
-import { getMLBackendAdapter } from "../../adapters/ml-backend";
+import {
+  getMLBackendAdapter,
+  getDefaultMLBackendAdapter,
+} from "../../adapters/ml-backend";
 import type {
   BatchTrainOptions,
   SingleTrainOptions,
@@ -13,7 +16,10 @@ import type {
 } from "./types";
 
 export async function batchTrain(options: BatchTrainOptions): Promise<void> {
-  const adapter = getMLBackendAdapter();
+  const adapter = options.workerId
+    ? await getMLBackendAdapter(options.workerId)
+    : await getDefaultMLBackendAdapter();
+
   await adapter.batchTrain({
     taskId: options.taskId,
     inputFile: options.inputFile,
@@ -25,7 +31,10 @@ export async function batchTrain(options: BatchTrainOptions): Promise<void> {
 }
 
 export async function singleTrain(options: SingleTrainOptions): Promise<void> {
-  const adapter = getMLBackendAdapter();
+  const adapter = options.workerId
+    ? await getMLBackendAdapter(options.workerId)
+    : await getDefaultMLBackendAdapter();
+
   await adapter.singleTrain({
     taskId: options.taskId,
     inputFile: options.inputFile,
@@ -38,7 +47,10 @@ export async function singleTrain(options: SingleTrainOptions): Promise<void> {
 }
 
 export async function predict(options: PredictOptions): Promise<void> {
-  const adapter = getMLBackendAdapter();
+  const adapter = options.workerId
+    ? await getMLBackendAdapter(options.workerId)
+    : await getDefaultMLBackendAdapter();
+
   await adapter.predict({
     taskId: options.taskId,
     trainingDataPath: options.trainingDataPath,
@@ -60,7 +72,10 @@ export async function predictFile(
 export async function predictInline(
   options: PredictInlineOptions
 ): Promise<void> {
-  const adapter = getMLBackendAdapter();
+  const adapter = options.workerId
+    ? await getMLBackendAdapter(options.workerId)
+    : await getDefaultMLBackendAdapter();
+
   await adapter.predict({
     taskId: options.taskId,
     trainingDataPath: options.trainingDataPath,

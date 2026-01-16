@@ -44,6 +44,7 @@ def handler(event, context) -> Dict[str, Any]:
         # Extract operation and data
         operation = event_data.get("operation")
         data = event_data.get("data", {})
+        base_path = event_data.get("basePath")
 
         if not operation:
             raise ValueError("Missing 'operation' field in event")
@@ -52,6 +53,10 @@ def handler(event, context) -> Dict[str, Any]:
         task_id = data.get("task_id")
         if not task_id:
             raise ValueError("Missing 'task_id' in data")
+
+        # Set base path if provided (e.g., /mnt/oss/tasks/{task_id})
+        if base_path:
+            Config.set_base_path(base_path)
 
         # Initialize logger
         init_logger(task_id)

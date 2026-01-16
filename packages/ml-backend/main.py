@@ -5,13 +5,18 @@ ML Backend - Main entry point for stdio/shell interface
 Usage:
     echo '{"operation": "batch-train", "data": {...}}' | python main.py
     cat input.json | python main.py
+    echo '{"operation": "batch-train", "data": {...}}' | python main.py --base-path /custom/path
 
 Input: JSON via stdin
 Output: JSON lines to stdout (logs + result)
+
+Arguments:
+    --base-path PATH    Override base path for file operations (default: from ML_BASE_PATH env var or /tmp/ml-backend)
 """
 
 import sys
 import json
+import argparse
 import traceback
 
 from ml_backend.config import Config
@@ -28,6 +33,15 @@ from ml_backend.utils import init_logger, log, output_result
 def main():
     """Main entry point - reads from stdin, outputs to stdout"""
     try:
+        # Parse command line arguments
+        parser = argparse.ArgumentParser(description='ML Backend - stdio interface')
+        parser.add_argument('--base-path', type=str, help='Base path for file operations')
+        args = parser.parse_args()
+
+        # Override base path if provided via CLI
+        if args.base_path:
+            Config.set_base_path(args.base_path)
+
         # Read input from stdin
         input_text = sys.stdin.read()
 
