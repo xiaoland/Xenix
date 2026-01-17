@@ -16,8 +16,8 @@ import type {
 } from "./types";
 
 export async function batchTrain(options: BatchTrainOptions): Promise<void> {
-  const adapter = options.workerId
-    ? await getMLBackendAdapter(options.workerId)
+  const adapter = options.deploymentId
+    ? await getMLBackendAdapter(options.deploymentId)
     : await getDefaultMLBackendAdapter();
 
   await adapter.batchTrain({
@@ -31,8 +31,8 @@ export async function batchTrain(options: BatchTrainOptions): Promise<void> {
 }
 
 export async function singleTrain(options: SingleTrainOptions): Promise<void> {
-  const adapter = options.workerId
-    ? await getMLBackendAdapter(options.workerId)
+  const adapter = options.deploymentId
+    ? await getMLBackendAdapter(options.deploymentId)
     : await getDefaultMLBackendAdapter();
 
   await adapter.singleTrain({
@@ -47,8 +47,8 @@ export async function singleTrain(options: SingleTrainOptions): Promise<void> {
 }
 
 export async function predict(options: PredictOptions): Promise<void> {
-  const adapter = options.workerId
-    ? await getMLBackendAdapter(options.workerId)
+  const adapter = options.deploymentId
+    ? await getMLBackendAdapter(options.deploymentId)
     : await getDefaultMLBackendAdapter();
 
   await adapter.predict({
@@ -72,8 +72,8 @@ export async function predictFile(
 export async function predictInline(
   options: PredictInlineOptions
 ): Promise<void> {
-  const adapter = options.workerId
-    ? await getMLBackendAdapter(options.workerId)
+  const adapter = options.deploymentId
+    ? await getMLBackendAdapter(options.deploymentId)
     : await getDefaultMLBackendAdapter();
 
   await adapter.predict({

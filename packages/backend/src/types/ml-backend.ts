@@ -1,18 +1,18 @@
 /**
- * ML Backend adapter types and interfaces
+ * ML Backend deployment types and interfaces
  */
 
-export type MLBackendAdapterType = 'aliyun-fc' | 'spawn';
+export type MLBackendDeploymentType = 'http' | 'http-proxy-frontend';
 
 /**
- * ML Backend Worker database model
+ * ML Backend Deployment database model
  */
-export interface MLBackendWorker {
+export interface MLBackendDeployment {
   id: number;
   name: string;
   created_by: string | null; // UUID
-  adapter: MLBackendAdapterType;
-  adapter_params: Record<string, any>;
+  deployment_type: MLBackendDeploymentType;
+  deployment_params: DeploymentParams;
   is_default: boolean;
   is_active: boolean;
   created_at: Date;
@@ -20,7 +20,16 @@ export interface MLBackendWorker {
 }
 
 /**
- * Spawn adapter configuration parameters
+ * HTTP deployment configuration parameters
+ */
+export interface DeploymentParams {
+  apiUrl: string; // HTTP endpoint URL
+  proxy?: string; // HTTP proxy URL or 'frontend://this'
+  basePath?: string; // Base path for file operations
+}
+
+/**
+ * Legacy: Spawn adapter configuration parameters (for backwards compatibility during migration)
  */
 export interface SpawnAdapterParams {
   pythonPath?: string; // Path to Python executable (default: 'python3')
@@ -29,7 +38,7 @@ export interface SpawnAdapterParams {
 }
 
 /**
- * Aliyun Function Compute adapter configuration parameters
+ * Legacy: Aliyun Function Compute adapter configuration parameters (for backwards compatibility during migration)
  */
 export interface AliyunFCAdapterParams {
   serviceName: string; // FC service name (e.g., 'xenix')
@@ -38,23 +47,23 @@ export interface AliyunFCAdapterParams {
 }
 
 /**
- * DTO for creating a new ML backend worker
+ * DTO for creating a new ML backend deployment
  */
-export interface CreateMLBackendWorkerDTO {
+export interface CreateMLBackendDeploymentDTO {
   name: string;
-  created_by?: string | null; // UUID of user who created this worker
-  adapter: MLBackendAdapterType;
-  adapter_params: SpawnAdapterParams | AliyunFCAdapterParams;
+  created_by?: string | null; // UUID of user who created this deployment
+  deployment_type: MLBackendDeploymentType;
+  deployment_params: DeploymentParams;
   is_default?: boolean;
   is_active?: boolean;
 }
 
 /**
- * DTO for updating an existing ML backend worker
+ * DTO for updating an existing ML backend deployment
  */
-export interface UpdateMLBackendWorkerDTO {
+export interface UpdateMLBackendDeploymentDTO {
   name?: string;
-  adapter_params?: SpawnAdapterParams | AliyunFCAdapterParams;
+  deployment_params?: DeploymentParams;
   is_default?: boolean;
   is_active?: boolean;
 }

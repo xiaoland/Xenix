@@ -1,12 +1,12 @@
 /**
  * ML Backend Adapter Factory
  *
- * Creates the appropriate adapter based on database worker configuration.
+ * Creates the appropriate adapter based on database deployment configuration.
  * Adapters determine how to invoke ml-backend operations (local spawn vs FC invoke).
  */
 
 import logger from "../../utils/logger";
-import { MLBackendWorkerRepository } from "../../repositories/MLBackendWorkerRepository";
+import { MLBackendDeploymentRepository } from "../../repositories/MLBackendDeploymentRepository";
 import type {
   SpawnAdapterParams,
   AliyunFCAdapterParams,
@@ -16,64 +16,66 @@ import type { MLBackendAdapter } from "./interface";
 import { SpawnAdapter } from "./spawn-adapter";
 
 /**
- * Get ML Backend adapter based on worker configuration from database
+ * Get ML Backend adapter based on deployment configuration from database
  *
- * @param workerId - ID of the ml_backend_worker to use
- * @returns MLBackendAdapter instance configured for the specified worker
- * @throws Error if worker not found or inactive
+ * @param deploymentId - ID of the ml_backend_deployment to use
+ * @returns MLBackendAdapter instance configured for the specified deployment
+ * @throws Error if deployment not found or inactive
  */
 export async function getMLBackendAdapter(
-  workerId: number
+  deploymentId: number
 ): Promise<MLBackendAdapter> {
-  const workerRepo = new MLBackendWorkerRepository();
-  const worker = await workerRepo.findById(workerId);
+  const deploymentRepo = new MLBackendDeploymentRepository();
+  const deployment = await deploymentRepo.findById(deploymentId);
 
-  if (!worker) {
-    throw new Error(`ML backend worker ${workerId} not found`);
+  if (!deployment) {
+    throw new Error(`ML backend deployment ${deploymentId} not found`);
   }
 
-  if (!worker.is_active) {
+  if (!deployment.is_active) {
     throw new Error(
-      `ML backend worker ${workerId} (${worker.name}) is inactive`
+      `ML backend deployment ${deploymentId} (${deployment.name}) is inactive`
     );
   }
 
   logger.info(
-    { workerId, workerName: worker.name, adapter: worker.adapter },
+    { deploymentId, deploymentName: deployment.name, deploymentType: deployment.deployment_type },
     "Creating ML backend adapter"
   );
 
-  switch (worker.adapter) {
-    case "aliyun-fc":
-      return new AliyunFCAdapter(worker.adapter_params as AliyunFCAdapterParams);
+  // Legacy support: map old deployment types to adapter types
+  const deploymentType = deployment.deployment_type;
+  const params = deployment.deployment_params;
 
-    case "spawn":
-      return new SpawnAdapter(worker.adapter_params as SpawnAdapterParams);
-
-    default:
-      throw new Error(
-        `Unknown adapter type: ${worker.adapter} for worker ${workerId}`
-      );
+  // For now, keep adapter logic for backwards compatibility
+  // This will be replaced with HTTP calls in the next phase
+  if (deploymentType === 'http' || deploymentType === 'http-proxy-frontend') {
+    // Temporary: treat http deployments as spawn for now
+    return new SpawnAdapter(params as SpawnAdapterParams);
   }
+
+  throw new Error(
+    `Unknown deployment type: ${deploymentType} for deployment ${deploymentId}`
+  );
 }
 
 /**
- * Get the default ML backend worker and create its adapter
+ * Get the default ML backend deployment and create its adapter
  *
- * @returns MLBackendAdapter instance for the default worker
- * @throws Error if no default worker configured
+ * @returns MLBackendAdapter instance for the default deployment
+ * @throws Error if no default deployment configured
  */
 export async function getDefaultMLBackendAdapter(): Promise<MLBackendAdapter> {
-  const workerRepo = new MLBackendWorkerRepository();
-  const defaultWorker = await workerRepo.findDefaultWorker();
+  const deploymentRepo = new MLBackendDeploymentRepository();
+  const defaultDeployment = await deploymentRepo.findDefaultDeployment();
 
-  if (!defaultWorker) {
+  if (!defaultDeployment) {
     throw new Error(
-      "No default ML backend worker configured. Please configure a default worker in ml_backend_workers table."
+      "No default ML backend deployment configured. Please configure a default deployment in ml_backend_deployments table."
     );
   }
 
-  return getMLBackendAdapter(defaultWorker.id);
+  return getMLBackendAdapter(defaultDeployment.id);
 }
 
 // Re-export types
