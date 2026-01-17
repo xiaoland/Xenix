@@ -1,0 +1,144 @@
+# DEPRECATED: This deployment configuration is for the old architecture
+# ML workers have been extracted to packages/ml-backend
+# See packages/ml-backend/s.yaml for ML worker deployment configuration
+
+edition: 3.0.0
+name: xenix-backend-app
+access: default  # Run 's config add' to configure Aliyun credentials
+
+vars:
+  region: cn-hangzhou
+  serviceName: xenix
+
+resources:
+  # Python Layer - ML dependencies (pandas, scikit-learn, xgboost, etc.)
+  xenix-python-layer:
+    component: fc3
+    props:
+      region: ${vars.region}
+      layerName: xenix-python-deps
+      code: ./python-layer
+      description: Python ML dependencies for Xenix workers
+      compatibleRuntime:
+        - python3.10
+        - custom.debian10
+
+  # Auto-tune Worker Function
+  auto-tune-worker:
+    component: fc3
+    props:
+      region: ${vars.region}
+      functionName: auto-tune-worker
+      description: ML auto-tuning worker
+      runtime: python3.10
+      handler: index.handler
+      memorySize: 4096
+      timeout: 600  # 10 minutes
+      code: ./python-workers/auto_tune
+      layers:
+        - ${resources.xenix-python-layer.output.arn}
+      environmentVariables:
+        PYTHONPATH: /opt/python
+      nasConfig:
+        userId: 10003
+        groupId: 10003
+        mountPoints:
+          - serverAddr: ${env.OSS_NAS_SERVER_ADDR}  # e.g., 0123456-abc.cn-hangzhou.nas.aliyuncs.com
+            nasDir: /xenix-oss
+            fcDir: /mnt/oss
+
+  # Manual-tune Worker Function
+  manual-tune-worker:
+    component: fc3
+    props:
+      region: ${vars.region}
+      functionName: manual-tune-worker
+      description: ML manual-tuning worker
+      runtime: python3.10
+      handler: index.handler
+      memorySize: 4096
+      timeout: 600
+      code: ./python-workers/manual_tune
+      layers:
+        - ${resources.xenix-python-layer.output.arn}
+      environmentVariables:
+        PYTHONPATH: /opt/python
+      nasConfig:
+        userId: 10003
+        groupId: 10003
+        mountPoints:
+          - serverAddr: ${env.OSS_NAS_SERVER_ADDR}
+            nasDir: /xenix-oss
+            fcDir: /mnt/oss
+
+  # Predict Worker Function
+  predict-worker:
+    component: fc3
+    props:
+      region: ${vars.region}
+      functionName: predict-worker
+      description: ML prediction worker
+      runtime: python3.10
+      handler: index.handler
+      memorySize: 4096
+      timeout: 600
+      code: ./python-workers/predict
+      layers:
+        - ${resources.xenix-python-layer.output.arn}
+      environmentVariables:
+        PYTHONPATH: /opt/python
+      nasConfig:
+        userId: 10003
+        groupId: 10003
+        mountPoints:
+          - serverAddr: ${env.OSS_NAS_SERVER_ADDR}
+            nasDir: /xenix-oss
+            fcDir: /mnt/oss
+
+  # Main Backend HTTP Function
+  xenix-backend:
+    component: fc3
+    props:
+      region: ${vars.region}
+      functionName: xenix-backend
+      description: Xenix main HTTP backend
+      runtime: custom.debian10
+      handler: index.handler
+      memorySize: 2048
+      timeout: 60
+      code: ./fc-deploy.zip
+      layers:
+        - ${resources.xenix-python-layer.output.arn}
+      environmentVariables:
+        NODE_ENV: production
+        BACKEND_PORT: "9000"
+        STORAGE_TYPE: oss
+        OSS_REGION: ${env.OSS_REGION}
+        OSS_ACCESS_KEY_ID: ${env.OSS_ACCESS_KEY_ID}
+        OSS_ACCESS_KEY_SECRET: ${env.OSS_ACCESS_KEY_SECRET}
+        OSS_BUCKET: ${env.OSS_BUCKET}
+        OSS_ENDPOINT: ${env.OSS_ENDPOINT}
+        OSS_MOUNT_POINT: /mnt/oss
+        DATABASE_URL: ${env.DATABASE_URL}
+        JWT_SECRET: ${env.JWT_SECRET}
+        REDIS_URL: ${env.REDIS_URL}
+        PYTHON_PATH: /usr/bin/python3
+        ML_TIMEOUT: "300000"
+      nasConfig:
+        userId: 10003
+        groupId: 10003
+        mountPoints:
+          - serverAddr: ${env.OSS_NAS_SERVER_ADDR}
+            nasDir: /xenix-oss
+            fcDir: /mnt/oss
+      triggers:
+        - triggerConfig:
+            methods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - PATCH
+            authType: anonymous
+          triggerName: httpTrigger
+          triggerType: http

@@ -59,11 +59,11 @@ export const datasets = pgTable('datasets', {
 });
 
 // Consolidated tasks table
-// Type values: 'auto-tune', 'train', 'predict'
+// Type values: 'batch-train', 'single-train', 'predict'
 export const tasks = pgTable('tasks', {
   id: serial('id').primaryKey(),
   workItemId: integer('work_item_id'), // Reference to work item
-  type: text('type').notNull(), // 'auto-tune', 'train', 'predict'
+  type: text('type').notNull(), // 'batch-train', 'single-train', 'predict'
   parameter: jsonb('parameter'), // Task parameters as JSON object
   result: jsonb('result'), // Task results/metrics as JSON object
   status: text('status').notNull().default('pending'),

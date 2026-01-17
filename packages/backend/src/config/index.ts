@@ -31,6 +31,17 @@ const configSchema = z.object({
       process.env.NODE_ENV === 'production' ? '/tmp/uploads' : './uploads'
     ),
 
+  // Storage
+  STORAGE_TYPE: z.enum(['local', 'oss']).default('local'),
+
+  // OSS Configuration (required when STORAGE_TYPE=oss)
+  OSS_REGION: z.string().optional(),
+  OSS_ACCESS_KEY_ID: z.string().optional(),
+  OSS_ACCESS_KEY_SECRET: z.string().optional(),
+  OSS_BUCKET: z.string().optional(),
+  OSS_ENDPOINT: z.string().optional(),
+  OSS_MOUNT_POINT: z.string().default('/mnt/oss'),
+
   // ML
   PYTHON_PATH: z.string().default('/usr/bin/python3'),
   ML_TIMEOUT: z.coerce.number().default(300000), // 5 minutes

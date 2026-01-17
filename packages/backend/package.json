@@ -14,8 +14,15 @@
     "build:fc": "pnpm run build:shared && tsup --config tsup.config.fc.ts && pnpm run copy:assets",
     "build:shared": "cd ../shared && pnpm run build",
     "copy:assets": "node scripts/copy-assets.js",
+    "copy:ml": "node scripts/copy-ml-to-workers.js",
     "package:fc": "pnpm run build:fc && node scripts/package-fc.js",
     "test:fc": "node scripts/test-fc-local.js",
+    "build:layer": "node scripts/build-python-layer.js",
+    "build:workers": "pnpm run copy:ml",
+    "deploy:layer": "s deploy xenix-python-layer --use-local",
+    "deploy:workers": "echo 'DEPRECATED: Use packages/ml-backend for ML worker deployment'",
+    "deploy:backend": "pnpm run package:fc && s deploy xenix-backend --use-local",
+    "deploy:all": "pnpm run build:layer && pnpm run build:workers && pnpm run package:fc && s deploy --all --use-local",
     "start": "node dist/index.js",
     "db:generate": "pnpm exec drizzle-kit generate",
     "db:migrate": "pnpm exec drizzle-kit migrate",
@@ -24,9 +31,12 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@alicloud/fc2": "^2.6.6",
     "@hono/node-server": "^1.14.0",
     "@hono/zod-validator": "^0.4.1",
+    "@xenix/ml-backend": "workspace:*",
     "@xenix/shared": "workspace:*",
+    "ali-oss": "^6.23.0",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.38.1",
     "drizzle-orm": "^0.45.1",
@@ -41,6 +51,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@types/ali-oss": "^6.23.0",
     "@types/archiver": "^7.0.0",
     "@types/bcrypt": "^6.0.0",
     "@types/fs-extra": "^11.0.4",

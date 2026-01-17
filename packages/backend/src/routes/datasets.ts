@@ -2,6 +2,7 @@ import path from "path";
 
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
+import { z } from "zod";
 
 import { DatasetIdParamSchema } from "@xenix/shared";
 
@@ -9,6 +10,7 @@ import { BadRequestError } from "../errors";
 import { authMiddleware } from "../middleware/auth";
 import { DatasetService } from "../services";
 import { parseDatasetColumns } from "../utils/datasetUtils";
+import { storage, presignedUrlRequestSchema } from "../storage";
 
 const datasetService = new DatasetService();
 
@@ -26,6 +28,19 @@ const datasets = new Hono()
     }));
 
     return c.json(datasetsWithParsedColumns);
+  })
+
+  // Generate presigned URL for dataset upload
+  .post("/upload-url", async (c) => {
+    const body = await c.req.json();
+
+    // Validate request
+    const validated = presignedUrlRequestSchema.parse(body);
+
+    // Generate presigned URL
+    const result = await storage.generatePresignedUploadUrl(validated);
+
+    return c.json(result);
   })
 
   // Upload dataset

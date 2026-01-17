@@ -11,6 +11,9 @@ import { db, schema } from "../database";
 import { BadRequestError, NotFoundError } from "../errors";
 import { authMiddleware } from "../middleware/auth";
 import logger from "../utils/logger";
+import { fcInvokeService } from "../services/FCInvokeService";
+import { storage } from "../storage";
+import { config } from "../config";
 
 const predict = new Hono()
   .use("*", authMiddleware)
@@ -104,13 +107,21 @@ const predict = new Hono()
 
     const taskId = insertedTask.id;
 
-    // Generate output file path with taskId
+    // Generate output file path/key
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const outputFile = path.join(
-      process.cwd(),
-      "uploads",
-      `inline_prediction_${workItemId}_${taskId}_${timestamp}.xlsx`,
-    );
+    let outputFile: string;
+
+    if (fcInvokeService.isAvailable()) {
+      // OSS storage key for production
+      outputFile = `predictions/${taskId}/inline_prediction_${workItemId}_${taskId}_${timestamp}.xlsx`;
+    } else {
+      // Local file path for development
+      outputFile = path.join(
+        process.cwd(),
+        "uploads",
+        `inline_prediction_${workItemId}_${taskId}_${timestamp}.xlsx`,
+      );
+    }
 
     // Update task with outputFile
     await db
@@ -123,24 +134,46 @@ const predict = new Hono()
       })
       .where(eq(schema.tasks.id, taskId));
 
-    // Call predictInline() in background with setImmediate
-    setImmediate(() => {
-      predictInline({
-        trainingDataPath,
-        predictionData,
-        outputPath: outputFile,
-        model,
-        params,
-        featureColumns,
-        targetColumn,
-        taskId,
-      }).catch((error) => {
-        logger.error(
-          { error, taskId },
-          `Failed to execute inline prediction task`,
-        );
+    // Execute prediction - use FC async invoke if available, otherwise local execution
+    if (fcInvokeService.isAvailable()) {
+      // FC async invoke (production)
+      const trainingStorageKey = `datasets/${workItem.datasetId}/${trainingDataset.fileName}`;
+      const trainingDataFile = storage.getFilesystemPath(trainingStorageKey);
+      const outputFilePath = storage.getFilesystemPath(outputFile);
+
+      await fcInvokeService.invokeAsync({
+        functionName: "ml-predict-worker",
+        payload: {
+          taskId,
+          trainingDataFile, // OSS mount path: /mnt/oss/datasets/...
+          predictionData,
+          outputFile: outputFilePath, // OSS mount path: /mnt/oss/predictions/...
+          model,
+          params,
+          featureColumns,
+          targetColumn,
+        },
       });
-    });
+    } else {
+      // Local execution (development)
+      setImmediate(() => {
+        predictInline({
+          trainingDataPath,
+          predictionData,
+          outputPath: outputFile,
+          model,
+          params,
+          featureColumns,
+          targetColumn,
+          taskId,
+        }).catch((error) => {
+          logger.error(
+            { error, taskId },
+            `Failed to execute inline prediction task`,
+          );
+        });
+      });
+    }
 
     return c.json(
       {

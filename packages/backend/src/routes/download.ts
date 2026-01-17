@@ -11,6 +11,8 @@ import { db, schema } from "../database";
 import { BadRequestError, NotFoundError } from "../errors";
 import { authMiddleware } from "../middleware/auth";
 import logger from "../utils/logger";
+import { storage } from "../storage";
+import { config } from "../config";
 
 const download = new Hono()
   .use("*", authMiddleware)
@@ -49,7 +51,14 @@ const download = new Hono()
       throw new NotFoundError("Output file");
     }
 
-    // Read the file
+    // For OSS storage, generate presigned URL and redirect
+    if (config.STORAGE_TYPE === 'oss') {
+      // Assume outputFile is a storage key
+      const downloadUrl = await storage.generatePresignedDownloadUrl(outputFile, 3600);
+      return c.redirect(downloadUrl);
+    }
+
+    // For local storage, serve file directly
     const filePath = resolve(outputFile);
     const fileBuffer = await readFile(filePath);
     const fileName = outputFile.split(/[\\/]/).pop() || "predictions.xlsx";

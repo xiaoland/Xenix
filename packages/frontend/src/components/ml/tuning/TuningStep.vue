@@ -355,7 +355,7 @@ const handleStartAutoTune = async () => {
   try {
     // Start training for each selected model
     for (const model of selectedModels.value) {
-      const response = await client.tune["auto-tune"].$post({
+      const response = await client.train["auto-tune"].$post({
         json: {
           datasetId: props.datasetId ?? undefined,
           featureColumns: props.featureColumns,
