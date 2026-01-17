@@ -27,7 +27,7 @@ from ml_backend.types import (
     PredictInput
 )
 from ml_backend.controllers import batch_train, single_train, predict
-from ml_backend.utils import init_logger, log, output_result
+from ml_backend.utils import init_logger, log, output_result, flush_logs
 
 
 def main():
@@ -62,8 +62,8 @@ def main():
         if not task_id:
             raise ValueError("Missing task_id in request data")
 
-        # Initialize logger
-        init_logger(task_id)
+        # Initialize logger with base_path for log file
+        init_logger(task_id, base_path=Config.BASE_PATH)
 
         # Ensure directories exist
         Config.ensure_directories()

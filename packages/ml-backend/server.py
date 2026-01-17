@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 from ml_backend.config import Config
 from ml_backend.types import BatchTrainInput, SingleTrainInput, PredictInput
 from ml_backend.controllers import batch_train, single_train, predict
-from ml_backend.utils import init_logger, log
+from ml_backend.utils import init_logger, log, flush_logs
 
 app = FastAPI(title="ML Backend API", version="1.0.0")
 
@@ -63,8 +63,8 @@ async def execute_task_async(operation: str, data: Dict[str, Any], base_path: st
         # Set base path for this task
         Config.set_base_path(base_path)
 
-        # Initialize logger
-        init_logger(task_id)
+        # Initialize logger with base_path for log file
+        init_logger(task_id, base_path=base_path)
 
         # Ensure directories exist
         Config.ensure_directories()
@@ -106,6 +106,9 @@ async def execute_task_async(operation: str, data: Dict[str, Any], base_path: st
             "task_id": task_id
         })
 
+        # Flush any remaining logs to file
+        flush_logs()
+
     except Exception as e:
         # Store error result
         error_msg = str(e)
@@ -133,6 +136,9 @@ async def execute_task_async(operation: str, data: Dict[str, Any], base_path: st
         except Exception as write_error:
             # Log but don't raise - task already failed
             print(f"Failed to write error result: {write_error}", flush=True)
+
+        # Flush any remaining logs to file
+        flush_logs()
 
 
 @app.middleware("http")

@@ -1,18 +1,36 @@
-"""Logging utilities - outputs structured JSON logs to stdout"""
+"""Logging utilities - collects logs in memory and writes to filesystem in batches"""
 
 import json
 import sys
 import time
-from typing import Any, Dict, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 
 _task_id: Optional[int] = None
+_logs_buffer: List[Dict[str, Any]] = []
+_log_file_path: Optional[Path] = None
+_batch_size: int = 10  # Write to file every N logs
 
 
-def init_logger(task_id: int):
-    """Initialize logger with task ID"""
-    global _task_id
+def init_logger(task_id: int, base_path: Optional[str] = None):
+    """
+    Initialize logger with task ID and optional base path for log file
+
+    Args:
+        task_id: Task ID for logging context
+        base_path: Base path for log file (if provided, logs will be written to {base_path}/logs.jsonl)
+    """
+    global _task_id, _log_file_path, _logs_buffer
     _task_id = task_id
+    _logs_buffer = []
+
+    if base_path:
+        _log_file_path = Path(base_path) / "logs.jsonl"
+        # Ensure directory exists
+        _log_file_path.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        _log_file_path = None
 
 
 def log(
@@ -21,17 +39,15 @@ def log(
     attributes: Optional[Dict[str, Any]] = None
 ):
     """
-    Log a structured message to stdout
+    Log a structured message
 
-    Outputs JSON line with OpenTelemetry-like format:
-    {
-        "type": "log",
-        "timestamp": <nanoseconds>,
-        "severity_text": "INFO",
-        "severity_number": 9,
-        "body": "message",
-        "attributes": {...}
-    }
+    Collects logs in memory buffer and writes to filesystem in batches.
+    Also outputs to stdout for backward compatibility.
+
+    Args:
+        message: Log message
+        level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        attributes: Additional attributes to include in log
     """
     severity_map = {
         "DEBUG": 5,
@@ -58,8 +74,40 @@ def log(
     if _task_id is not None:
         log_entry["attributes"]["task_id"] = _task_id
 
-    # Write to stdout as JSON line
+    # Add to buffer
+    _logs_buffer.append(log_entry)
+
+    # Write to stdout for backward compatibility
     print(json.dumps(log_entry), file=sys.stdout, flush=True)
+
+    # Check if we should flush to file
+    if _log_file_path and len(_logs_buffer) >= _batch_size:
+        _flush_logs_to_file()
+
+
+def _flush_logs_to_file():
+    """Write buffered logs to file"""
+    global _logs_buffer
+
+    if not _log_file_path or not _logs_buffer:
+        return
+
+    try:
+        # Append logs to file (JSONL format - one JSON object per line)
+        with open(_log_file_path, 'a') as f:
+            for log_entry in _logs_buffer:
+                f.write(json.dumps(log_entry) + '\n')
+
+        # Clear buffer after successful write
+        _logs_buffer = []
+    except Exception as e:
+        # Don't crash if logging fails
+        print(f"Failed to write logs to file: {e}", file=sys.stderr, flush=True)
+
+
+def flush_logs():
+    """Force flush any remaining logs to file"""
+    _flush_logs_to_file()
 
 
 def output_result(result: Dict[str, Any]):
@@ -77,3 +125,28 @@ def output_result(result: Dict[str, Any]):
         "data": result
     }
     print(json.dumps(result_output), file=sys.stdout, flush=True)
+
+
+def get_logs() -> List[Dict[str, Any]]:
+    """
+    Get all logs (from buffer and file if exists)
+
+    Returns:
+        List of log entries
+    """
+    logs = []
+
+    # Read from file if exists
+    if _log_file_path and _log_file_path.exists():
+        try:
+            with open(_log_file_path, 'r') as f:
+                for line in f:
+                    if line.strip():
+                        logs.append(json.loads(line))
+        except Exception as e:
+            print(f"Failed to read logs from file: {e}", file=sys.stderr, flush=True)
+
+    # Add buffered logs
+    logs.extend(_logs_buffer)
+
+    return logs
