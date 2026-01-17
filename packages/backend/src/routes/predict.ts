@@ -37,7 +37,7 @@ const predict = new Hono()
 
     if (!workItem.featureColumns || !workItem.targetColumn) {
       throw new BadRequestError(
-        "Work item does not have feature columns or target column configured"
+        "Work item does not have feature columns or target column configured",
       );
     }
 
@@ -50,7 +50,7 @@ const predict = new Hono()
       for (const col of featureColumns) {
         if (!(col in item)) {
           throw new BadRequestError(
-            `Item at index ${i} is missing required feature column: ${col}`
+            `Item at index ${i} is missing required feature column: ${col}`,
           );
         }
       }
@@ -109,7 +109,7 @@ const predict = new Hono()
     const outputFile = path.join(
       process.cwd(),
       "uploads",
-      `inline_prediction_${workItemId}_${taskId}_${timestamp}.xlsx`
+      `inline_prediction_${workItemId}_${taskId}_${timestamp}.xlsx`,
     );
 
     // Update task with outputFile
@@ -137,7 +137,7 @@ const predict = new Hono()
       }).catch((error) => {
         logger.error(
           { error, taskId },
-          `Failed to execute inline prediction task`
+          `Failed to execute inline prediction task`,
         );
       });
     });
@@ -147,9 +147,9 @@ const predict = new Hono()
         taskId,
         message: "Inline prediction started",
       },
-      201
+      201,
     );
-  });
+  })
 
   // File-based prediction (uploaded file)
   .post("/file", async (c) => {
@@ -165,7 +165,7 @@ const predict = new Hono()
 
     if (!workItemIdStr || !model || !tuningTaskIdStr) {
       throw new BadRequestError(
-        "Missing required fields: workItemId, model, or tuningTaskId"
+        "Missing required fields: workItemId, model, or tuningTaskId",
       );
     }
 
@@ -189,7 +189,7 @@ const predict = new Hono()
 
     if (!workItem.featureColumns || !workItem.targetColumn) {
       throw new BadRequestError(
-        "Work item does not have feature columns or target column configured"
+        "Work item does not have feature columns or target column configured",
       );
     }
 
@@ -260,7 +260,7 @@ const predict = new Hono()
     // Generate output file path with taskId
     const outputFile = path.join(
       uploadsDir,
-      `file_prediction_${workItemId}_${taskId}_${timestamp}.xlsx`
+      `file_prediction_${workItemId}_${taskId}_${timestamp}.xlsx`,
     );
 
     // Update task with outputFile
@@ -288,7 +288,7 @@ const predict = new Hono()
       }).catch((error) => {
         logger.error(
           { error, taskId },
-          `Failed to execute file prediction task`
+          `Failed to execute file prediction task`,
         );
       });
     });
@@ -298,7 +298,7 @@ const predict = new Hono()
         taskId,
         message: "File prediction started",
       },
-      201
+      201,
     );
   });
 
