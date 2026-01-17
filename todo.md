@@ -27,10 +27,7 @@
 - [ ] Add ml-backend
   - [x] ml-backend does not has adapter, it's pure python script only IO is stdio and file system.(Always save locally, but with base path)
   - [x] backend call ml-backend like local function with adapter
-    - 异步调用，结果与状态更新怎么做？
-      - 日志
-      - 状态更新：成功/失败
-        - Aliyun FC: 回调 backend API Endpoint
+    - 异步调用，结果与状态更新怎么做？全部都存在 Filesystem 里面
 - [ ] 计算阿里云Serverless方案的费用
   - 按照当前定价模型和用户画像，会付费的用户的使用频率、数据量是多少
 
