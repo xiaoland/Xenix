@@ -1,397 +1,242 @@
 # ML Backend Architecture
 
-HTTP-based ML backend for Xenix with process isolation and fire-and-forget execution.
+HTTP-based ML backend with process isolation and fire-and-forget execution.
 
 ## Overview
 
-FastAPI HTTP server that spawns isolated Python processes for CPU-intensive ML tasks. Each task runs independently with its own logger and filesystem isolation.
+FastAPI server spawns isolated Python processes for CPU-intensive ML tasks. Each task runs independently with task-specific logger and filesystem.
 
 ```
-HTTP Request (POST /execute)
-  ↓
-FastAPI Server (server.py)
-  ↓ 202 Accepted (immediate response)
-  ↓
-Spawn subprocess → python main.py --base-path /tasks/{task_id}
-  ↓
-Isolated ML Process (main.py)
-  ├─ Task-specific logger
-  ├─ Task-specific filesystem
-  └─ CPU-intensive ML operations
-  ↓
-Write results to filesystem
-  ├─ result.json (task result)
-  └─ logs.jsonl (batched logs)
-  ↓
-Process exits
+HTTP Request → Server → Spawn Process → Isolated Execution
+              ↓ 202
+         Return Immediately
 ```
 
-Client polls `GET /tasks/{task_id}/result` to check completion.
+Client polls for result via GET endpoint.
 
-## Key Design Principles
+## Design Principles
 
 ### 1. Process Isolation
-Each ML task runs in a **separate Python process**:
-- Prevents CPU-intensive work from blocking the HTTP server
-- No shared state between tasks (no race conditions)
-- Python GIL doesn't affect concurrency
-- If one task crashes, server continues running
+- Separate Python process per ML task
+- No CPU blocking on HTTP server
+- No shared state between tasks
+- Task crash doesn't affect server
 
 ### 2. Fire-and-Forget HTTP
-Server returns immediately, task runs in background:
-- `POST /execute` → 202 Accepted (instant response)
-- Task executes asynchronously in subprocess
-- Client polls `GET /tasks/{task_id}/result` for completion
-- Connection can be closed after response without error
+- POST /execute → 202 Accepted (immediate)
+- Task executes in background subprocess
+- Client polls GET /tasks/{id}/result
+- Connection close after response allowed
 
-### 3. Filesystem-Based Communication
-No in-memory state, all communication via filesystem:
-- Request data sent via stdin to subprocess
-- Results written to `{base_path}/result.json`
-- Logs written to `{base_path}/logs.jsonl`
-- Enables stateless server (can restart without losing tasks)
+### 3. Filesystem Communication
+- Request data via stdin
+- Results via result.json
+- Logs via logs.jsonl
+- Stateless server (restartable)
 
-### 4. Task-Specific Isolation
-Each task gets its own directory:
-- Base path: `/tmp/ml-backend/tasks/{task_id}/`
-- Logs: `{base_path}/logs.jsonl`
-- Results: `{base_path}/result.json`
-- Models: `{base_path}/models/`
-- Complete isolation between tasks
+### 4. Task Isolation
+- Per-task directory: `/tasks/{task_id}/`
+- Isolated logs, results, models
+- No file path conflicts
 
-## Architecture Components
+## Components
 
 ### HTTP Server (server.py)
 
-Lightweight FastAPI server - does NOT execute ML code directly.
-
 **Responsibilities**:
 - Accept HTTP requests
-- Calculate task-specific base paths
-- Spawn subprocess with `python main.py --base-path {task_base_path}`
+- Calculate task base paths
+- Spawn subprocess: `main.py --base-path {task_path}`
 - Send operation data via stdin
-- Return 202 Accepted immediately
-- Provide result retrieval endpoint
+- Return 202 immediately
+- Serve result endpoint
 
-**Key Code**:
-```python
-# Calculate task-specific base path
-base_path = get_task_base_path(task_id)  # → /tmp/ml-backend/tasks/{task_id}
-
-# Spawn subprocess
-process = await asyncio.create_subprocess_exec(
-    sys.executable,
-    "main.py",
-    "--base-path", base_path,
-    stdin=subprocess.PIPE
-)
-
-# Send data and return immediately
-await process.communicate(input=json.dumps(request).encode())
+**Interface**:
+```
+spawn_subprocess(task_id, operation, data):
+    base_path = calculate_task_path(task_id)
+    process = create_subprocess("main.py", "--base-path", base_path)
+    process.stdin.write(json(operation, data))
+    return 202_ACCEPTED
 ```
 
 ### ML Script (main.py)
 
-Standalone ML execution script - runs in separate process.
-
 **Responsibilities**:
-- Parse `--base-path` argument
-- Read operation data from stdin
+- Parse --base-path CLI arg
+- Read operation from stdin
 - Create TaskLogger instance
-- Execute ML operations (batch-train, single-train, predict)
-- Write results to `result.json`
-- Flush logs to `logs.jsonl`
+- Execute ML operation
+- Write result.json
+- Flush logs.jsonl
 - Exit with status code
 
-**Key Code**:
-```python
-# Parse CLI args
-args = parser.parse_args()
-Config.set_base_path(args.base_path)  # Task-specific path
-
-# Create task-specific logger
-logger = TaskLogger(task_id, base_path=Config.BASE_PATH)
-
-# Execute operation
-result = batch_train(input_data, logger)
-
-# Write result
-result_file = Path(Config.BASE_PATH) / "result.json"
-with open(result_file, 'w') as f:
-    json.dump({"status": "completed", "result": result.model_dump()}, f)
-
-# Flush logs and exit
-logger.flush()
-sys.exit(0)
+**Interface**:
+```
+main():
+    base_path = parse_cli_args()
+    request = read_stdin()
+    logger = TaskLogger(task_id, base_path)
+    result = execute_operation(request, logger)
+    write_result(result)
+    logger.flush()
+    exit(0)
 ```
 
 ### Controllers
 
 Request routing and file I/O coordination.
 
-**Controllers**:
-- `batch_train.py` - GridSearchCV hyperparameter tuning
-- `single_train.py` - Training with specific parameters
-- `predict.py` - Batch predictions
+**Available**:
+- batch_train - GridSearchCV tuning
+- single_train - Fixed parameters
+- predict - Batch predictions
 
-**Signature**: All controllers accept `(input_data, logger: TaskLogger)`
+**Signature**: `(input_data, logger: TaskLogger) → Output`
 
-**Responsibilities**:
-- Validate input
-- Log progress
-- Delegate to model services
-- Save trained models
-- Return structured results
+**Workflow**:
+1. Validate input
+2. Log progress
+3. Delegate to model service
+4. Save trained model
+5. Return structured result
 
 ### Services (Model Registry)
 
-Model-specific training and prediction logic.
+Model-specific training/prediction logic.
 
-**Service Architecture**:
+**Base Interface**:
 ```
-services/
-├── regression/
-│   ├── base.py              # RegressionModelBase (abstract)
-│   ├── linear.py            # Linear Regression
-│   ├── ridge.py             # Ridge Regression
-│   ├── lasso.py             # Lasso Regression
-│   ├── polynomial.py        # Polynomial Regression
-│   ├── knn.py               # K-Nearest Neighbors
-│   ├── decision_tree.py     # Decision Tree
-│   ├── random_forest.py     # Random Forest
-│   ├── adaboost.py          # AdaBoost
-│   ├── gbdt.py              # Gradient Boosting
-│   ├── xgboost.py           # XGBoost
-│   ├── lightgbm.py          # LightGBM
-│   └── bayesian_ridge.py    # Bayesian Ridge
-└── classification/
-    ├── base.py              # ClassificationModelBase (abstract)
-    ├── logistic_regression.py
-    └── random_forest.py
+abstract class ModelBase:
+    abstract batch_train(dataframe, input) → {model, best_params, metrics}
+    abstract single_train(dataframe, input) → {model, metrics}
+    abstract predict(train_df, predict_df, input) → predictions_df
 ```
 
-**Base Class Contract**:
-```python
-class RegressionModelBase(ABC):
-    @abstractmethod
-    def batch_train(self, df, input_data) -> dict
+**Available Models**:
+- Linear: linear, ridge, lasso, bayesian_ridge
+- Polynomial: polynomial
+- Instance-based: knn
+- Tree-based: decision_tree, random_forest
+- Boosting: adaboost, gbdt, xgboost, lightgbm
 
-    @abstractmethod
-    def single_train(self, df, input_data) -> dict
-
-    @abstractmethod
-    def predict(self, train_df, predict_df, input_data) -> DataFrame
-```
-
-### TaskLogger (Class-Based Logging)
+### TaskLogger
 
 Per-task logger instance with batch writes.
 
 **Features**:
-- Instance-based (no global state)
-- Buffers logs in memory
-- Writes to filesystem in batches (default: 10 logs)
-- JSONL format (one JSON object per line)
-- Also outputs to stdout for backward compatibility
+- Instance-based (no globals)
+- Memory buffer (size: 10)
+- Batch writes to logs.jsonl
+- JSONL format
+- Stdout passthrough
 
-**Usage**:
-```python
-# Create logger for task
-logger = TaskLogger(task_id=123, base_path="/tmp/ml-backend/tasks/123")
-
-# Log messages (buffered)
-logger.log("Training started", "INFO")
-logger.log("Model metrics", "INFO", {"r2": 0.95})
-
-# Force flush remaining logs
-logger.flush()
+**Interface**:
 ```
-
-**Log Format**:
-```json
-{
-  "type": "log",
-  "timestamp": 1234567890123456789,
-  "severity_text": "INFO",
-  "severity_number": 9,
-  "body": "Training started",
-  "resource": {"service.name": "ml-backend", "service.version": "2.0.0"},
-  "attributes": {"task_id": 123}
-}
+class TaskLogger:
+    init(task_id, base_path, batch_size=10)
+    log(message, level, attributes)
+    flush()
+    get_logs() → [log_entries]
 ```
 
 ## Request Flow
 
-### Complete Request Lifecycle
+### Lifecycle
 
-1. **Client sends request**:
-```bash
-POST http://localhost:8000/execute
-{
-  "operation": "batch-train",
-  "data": {
-    "task_id": 123,
-    "input_file": "data.csv",
-    "model": "regression.ridge",
-    ...
-  }
-}
+1. **Client request**: POST /execute with task_id
+2. **Server response**: 202 Accepted immediately
+3. **Background spawn**: `python main.py --base-path /tasks/{id}`
+4. **Subprocess executes**: Sets config, creates logger, runs operation
+5. **Writes results**: result.json, logs.jsonl, model.pkl
+6. **Process exits**: Status code 0 (success) or 1 (failure)
+7. **Client polls**: GET /tasks/{id}/result until complete
+
+### Data Flow
+
+```
+Client
+  ↓ POST /execute
+Server (server.py)
+  ↓ spawn with stdin
+Subprocess (main.py)
+  ↓ write files
+Filesystem
+  ├─ result.json
+  ├─ logs.jsonl
+  └─ models/model.pkl
+  ↑ read files
+Server (GET /tasks/{id}/result)
+  ↑ return JSON
+Client
 ```
 
-2. **Server processes** (server.py):
-   - Middleware calculates base path: `/tmp/ml-backend/tasks/123`
-   - Returns 202 Accepted immediately
-   - Spawns subprocess in background: `python main.py --base-path /tmp/ml-backend/tasks/123`
-
-3. **Subprocess executes** (main.py):
-   - Sets `Config.BASE_PATH = /tmp/ml-backend/tasks/123`
-   - Creates `TaskLogger(123, base_path="/tmp/ml-backend/tasks/123")`
-   - Reads operation data from stdin
-   - Executes: `batch_train(input_data, logger)`
-   - Writes: `/tmp/ml-backend/tasks/123/result.json`
-   - Writes: `/tmp/ml-backend/tasks/123/logs.jsonl`
-   - Exits
-
-4. **Client polls for result**:
-```bash
-GET http://localhost:8000/tasks/123/result
-```
-
-Returns:
-```json
-{
-  "status": "completed",
-  "result": {
-    "task_id": 123,
-    "best_params": {...},
-    "metrics": {...},
-    "model_path": "/tmp/ml-backend/tasks/123/models/model_123_20260117_123456.pkl"
-  }
-}
-```
-
-## HTTP API Endpoints
+## HTTP API
 
 ### POST /execute
-Execute ML operation (fire-and-forget).
+Fire-and-forget execution.
 
-**Request**:
-```json
-{
-  "operation": "batch-train",  // batch-train | single-train | predict
-  "data": {
-    "task_id": 123,
-    ...operation-specific fields
-  }
-}
-```
-
-**Response** (202 Accepted):
-```json
-{
-  "status": "accepted",
-  "task_id": 123,
-  "message": "Task 123 accepted for processing"
-}
-```
+**Request**: `{operation, data: {task_id, ...}}`
+**Response**: `{status: "accepted", task_id}`
+**Status**: 202 Accepted
 
 ### GET /tasks/{task_id}/result
-Check task completion status.
+Check completion.
 
-**Response** (pending):
-```json
-{
-  "status": "pending",
-  "message": "Result not available yet"
-}
-```
-
-**Response** (completed):
-```json
-{
-  "status": "completed",
-  "result": {...}
-}
-```
-
-**Response** (failed):
-```json
-{
-  "status": "failed",
-  "error": "Error message",
-  "traceback": "Full traceback..."
-}
-```
+**Pending**: `{status: "pending"}`
+**Success**: `{status: "completed", result: {...}}`
+**Failure**: `{status: "failed", error, traceback}`
 
 ### GET /health
-Health check endpoint.
+Health check.
 
-**Response**:
-```json
-{
-  "status": "healthy"
-}
-```
+**Response**: `{status: "healthy"}`
 
 ## Error Handling
 
 ### Server Errors
-- Failed to spawn subprocess → writes error to `result.json`
-- Logs subprocess stdout/stderr for debugging
-- Server continues running even if subprocess crashes
+- Spawn failure → write error to result.json
+- Log subprocess stdout/stderr
+- Server continues running
 
 ### Subprocess Errors
-- Validation errors (Pydantic) → captured with traceback
+- Validation errors → captured with traceback
 - File I/O errors → captured with traceback
-- ML training errors → captured with traceback
-- All errors written to `result.json` with `status: "failed"`
-- Logs also written to `logs.jsonl` before exit
+- Training errors → captured with traceback
+- All errors → result.json with status: "failed"
+- Logs written before exit
 
-### Error Result Format
-```json
-{
-  "status": "failed",
-  "error": "Missing required field: input_file",
-  "traceback": "Traceback (most recent call last):\n..."
-}
-```
+**Error Format**: `{status: "failed", error: "message", traceback: "..."}`
 
 ## Configuration
 
-**Environment Variables**:
-- `ML_BASE_PATH` - Global base directory (default: `/tmp/ml-backend`)
-- `PORT` - HTTP server port (default: 8000)
-- `HOST` - HTTP server host (default: 0.0.0.0)
+**Environment**:
+- ML_BASE_PATH - Global base (default: /tmp/ml-backend)
+- PORT - Server port (default: 8000)
+- HOST - Server host (default: 0.0.0.0)
 
-**Task-Specific Paths**:
-Calculated per-task: `{ML_BASE_PATH}/tasks/{task_id}`
+**Task Paths**: `{ML_BASE_PATH}/tasks/{task_id}`
 
-**CLI Arguments** (main.py):
-- `--base-path` - Override base path (required when spawned by server)
+**CLI Args**: `main.py --base-path {path}`
 
 ## Performance
 
 ### Concurrency
-- **Multiple concurrent tasks**: Each in separate process, no GIL contention
-- **Non-blocking HTTP**: Server handles thousands of requests/sec
-- **CPU utilization**: GridSearchCV uses all cores (`n_jobs=-1`)
+- Multiple tasks: Separate processes, no GIL contention
+- HTTP server: Thousands requests/sec (async I/O)
+- CPU: GridSearchCV uses all cores
 
 ### Scalability
-- **Horizontal**: Run multiple server instances behind load balancer
-- **Vertical**: CPU-bound tasks scale with core count
-- **Memory**: Each subprocess has independent memory space
+- Horizontal: Multiple servers behind load balancer
+- Vertical: CPU scales with core count
+- Memory: Independent per subprocess
 
-### Optimization Tips
-- Use CSV instead of Excel for faster I/O
-- Reduce parameter grid size for faster tuning
-- Use single-train for production (skip hyperparameter search)
+### Optimization
+- Use CSV over Excel (faster I/O)
+- Smaller parameter grids (faster tuning)
+- Single-train for production (skip tuning)
 
-## Deployment
+## Related
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for deployment instructions.
-
-## Related Documentation
-
-- [FILESYSTEM.md](FILESYSTEM.md) - File system structure and I/O
-- [DEVELOPMENT.md](DEVELOPMENT.md) - Development guide
-- [README.md](README.md) - Getting started guide
+- [FILESYSTEM.md](FILESYSTEM.md) - Filesystem structure
+- [PROCESSES.md](PROCESSES.md) - Process model

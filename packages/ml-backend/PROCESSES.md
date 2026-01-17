@@ -1,362 +1,286 @@
 # Process Model
 
-Quick reference for ML Backend process isolation and execution model.
+Process isolation and execution model for ML Backend.
 
 ## Process Architecture
 
 ```
-[HTTP Server Process]              [ML Task Process]
-server.py (FastAPI)                main.py (Python)
-Port 8000                          Spawned per-request
-├─ HTTP handler                    ├─ Parse --base-path
-├─ Calculate task path             ├─ Create TaskLogger
-├─ Spawn subprocess ───stdin──────>├─ Read operation data
-└─ Return 202                      ├─ Execute ML operation
-                                   ├─ Write result.json
-                                   ├─ Write logs.jsonl
-                                   └─ Exit (0 or 1)
+[Server Process]              [Task Process]
+server.py                     main.py
+FastAPI on port 8000          Spawned per-request
+├─ HTTP handler               ├─ Parse CLI args
+├─ Calculate task path        ├─ Create logger
+├─ Spawn subprocess ─stdin──→ ├─ Read stdin
+└─ Return 202                 ├─ Execute operation
+                              ├─ Write result.json
+                              ├─ Write logs.jsonl
+                              └─ Exit (0 or 1)
 ```
 
-**Key Principle**: Server NEVER executes ML code. Each task runs in isolated subprocess.
+**Principle**: Server NEVER executes ML code. Tasks run in isolated subprocesses.
 
 ## Process Spawning
 
 ### Server Side (server.py)
 
-```python
-# Calculate task-specific path
-task_id = data.get("task_id")
-base_path = get_task_base_path(task_id)  # /tmp/ml-backend/tasks/{task_id}
+```
+execute_task_async(operation, data, base_path):
+    task_id = data.task_id
 
-# Prepare request payload
-request_payload = {
-    "operation": "batch-train",
-    "data": {...}
-}
+    # Prepare payload
+    request = {operation, data}
 
-# Spawn subprocess
-process = await asyncio.create_subprocess_exec(
-    sys.executable,              # Python interpreter
-    "main.py",                   # ML script
-    "--base-path", base_path,    # Task-specific path
-    stdin=subprocess.PIPE,
-    stdout=subprocess.PIPE,
-    stderr=subprocess.PIPE
-)
+    # Spawn subprocess
+    process = spawn_subprocess(
+        python_interpreter,
+        "main.py",
+        "--base-path", base_path,
+        stdin=PIPE
+    )
 
-# Send data and wait
-stdout, stderr = await process.communicate(
-    input=json.dumps(request_payload).encode()
-)
+    # Send data and wait
+    stdout, stderr = process.communicate(json_encode(request))
 
-# Check exit code
-if process.returncode != 0:
-    # Task failed
-    print(f"Task {task_id} failed with code {process.returncode}")
+    # Check exit code
+    if process.returncode != 0:
+        log_error(task_id, returncode)
 ```
 
 ### Subprocess Side (main.py)
 
-```python
-# Parse CLI args
-parser = argparse.ArgumentParser()
-parser.add_argument('--base-path', required=True)
-args = parser.parse_args()
+```
+main():
+    # Parse args
+    args = parse_args("--base-path")
+    Config.set_base_path(args.base_path)
 
-# Set config
-Config.set_base_path(args.base_path)
+    # Read stdin
+    request = json_decode(stdin.read())
 
-# Read stdin
-input_text = sys.stdin.read()
-request = json.loads(input_text)
+    # Setup
+    task_id = request.data.task_id
+    logger = TaskLogger(task_id, Config.BASE_PATH)
 
-# Extract data
-task_id = request["data"]["task_id"]
-operation = request["operation"]
+    # Execute
+    result = execute_operation(request.operation, request.data, logger)
 
-# Create logger
-logger = TaskLogger(task_id, base_path=Config.BASE_PATH)
+    # Write result
+    write_file(BASE_PATH + "/result.json", {status: "completed", result})
 
-# Execute operation
-if operation == "batch-train":
-    result = batch_train(BatchTrainInput(**request["data"]), logger)
-
-# Write result
-result_file = Path(Config.BASE_PATH) / "result.json"
-with open(result_file, 'w') as f:
-    json.dump({"status": "completed", "result": result.model_dump()}, f)
-
-# Flush logs and exit
-logger.flush()
-sys.exit(0)
+    # Cleanup
+    logger.flush()
+    exit(0)
 ```
 
 ## Process Lifecycle
 
-### 1. HTTP Request
-```http
-POST /execute
-{"operation": "batch-train", "data": {"task_id": 123, ...}}
+### Timeline
+
+```
+0ms      - HTTP request received
+1ms      - 202 Accepted returned
+10ms     - Subprocess spawned
+50ms     - Config set, logger created
+100ms    - Data loaded
+30s      - Model training (CPU-intensive)
+30.5s    - Result/logs written
+30.6s    - Process exits
 ```
 
-### 2. Server Response (Immediate)
-```http
-202 Accepted
-{"status": "accepted", "task_id": 123}
-```
+### Client Polling
 
-### 3. Subprocess Execution (Async)
 ```
-Time: 0ms     - Subprocess spawned
-Time: 10ms    - Config set, logger created
-Time: 100ms   - Data loaded
-Time: 30s     - Model training (CPU-intensive)
-Time: 30.5s   - Result written, logs flushed
-Time: 30.6s   - Process exits
-```
-
-### 4. Client Polls (Until Complete)
-```http
-GET /tasks/123/result
-→ {"status": "pending"}  (before 30.6s)
-→ {"status": "completed", "result": {...}}  (after 30.6s)
+GET /tasks/{id}/result
+→ Before 30.6s: {status: "pending"}
+→ After 30.6s:  {status: "completed", result}
 ```
 
 ## Process Isolation Benefits
 
 ### No Shared State
-```python
-# Server process
-task_123_logger = None  # ✓ Server has no logger
+```
+Server:        logger = None          ✓ No logger
+Subprocess A:  logger = TaskLogger(123, path_123)
+Subprocess B:  logger = TaskLogger(124, path_124)
 
-# Subprocess A (task 123)
-logger = TaskLogger(123, "/tmp/ml-backend/tasks/123")
-
-# Subprocess B (task 124)
-logger = TaskLogger(124, "/tmp/ml-backend/tasks/124")
-
-# No interference - separate memory spaces
+→ Separate memory spaces
+→ No interference
 ```
 
 ### No GIL Contention
-```python
-# Multiple concurrent tasks
-Task 123: CPU-intensive training → Process 1 (100% CPU)
-Task 124: CPU-intensive training → Process 2 (100% CPU)
-Task 125: CPU-intensive training → Process 3 (100% CPU)
+```
+Task 123: Process 1 → 100% CPU on Core 1
+Task 124: Process 2 → 100% CPU on Core 2
+Task 125: Process 3 → 100% CPU on Core 3
 
-# Total: 300% CPU utilization (3 cores)
-# No Python GIL blocking
+Total: 300% CPU (3 cores, no GIL blocking)
 ```
 
 ### Crash Isolation
-```python
-# Task 123 crashes with segfault
-→ Process exits with code -11
-→ Server continues running
-→ Other tasks unaffected
+```
+Task 123: Segfault → Process exits with -11
+Server:   Continues running
+Task 124: Unaffected
 ```
 
 ## Communication Patterns
 
 ### Server → Subprocess (stdin)
-```python
-# server.py
-request_json = json.dumps({"operation": "batch-train", "data": {...}})
-await process.communicate(input=request_json.encode())
 ```
+server:
+    payload = json({operation, data})
+    process.stdin.write(payload)
 
-```python
-# main.py
-input_text = sys.stdin.read()
-request = json.loads(input_text)
+subprocess:
+    request = json_decode(stdin.read())
 ```
 
 ### Subprocess → Server (filesystem)
-```python
-# main.py writes
-result_file = Path(base_path) / "result.json"
-with open(result_file, 'w') as f:
-    json.dump(result_data, f)
+```
+subprocess:
+    write_file("result.json", result_data)
+
+server:
+    return read_file("result.json")
 ```
 
-```python
-# server.py reads
-with open(result_file, 'r') as f:
-    return json.load(f)
+### Subprocess ↔ Subprocess
+```
+None. Tasks completely isolated.
 ```
 
-### Subprocess → Subprocess (none)
-```
-No communication between tasks.
-Each task is completely isolated.
-```
-
-## TaskLogger Instance Model
+## TaskLogger Model
 
 ### Old (Global - Broken)
-```python
-# BAD: Global state
+```
+# Global state
 _task_id = None
-_logs_buffer = []
+_buffer = []
 
-def init_logger(task_id):
-    global _task_id
+init_logger(task_id):
     _task_id = task_id  # Race condition!
 ```
 
 ### New (Instance - Safe)
-```python
-# GOOD: Instance per task
+```
 class TaskLogger:
-    def __init__(self, task_id, base_path):
-        self.task_id = task_id
-        self.logs_buffer = []
-        self.log_file_path = Path(base_path) / "logs.jsonl"
+    task_id
+    buffer
+    log_file_path
 
-# Each subprocess creates its own instance
-logger = TaskLogger(123, "/tmp/ml-backend/tasks/123")
+    init(task_id, base_path):
+        self.task_id = task_id
+        self.buffer = []
+        self.log_file_path = base_path + "/logs.jsonl"
+
+# Each subprocess creates instance
+logger = TaskLogger(123, path)
 ```
 
 ## Process Exit Codes
 
-```python
-# Success
-sys.exit(0)  # → result.json has status: "completed"
-
-# Failure
-sys.exit(1)  # → result.json has status: "failed"
-
-# Crash (server logs stderr)
-# → result.json may not exist or incomplete
+```
+Success:   exit(0) → result.json has status: "completed"
+Failure:   exit(1) → result.json has status: "failed"
+Crash:     exit(-N) → result.json may not exist
 ```
 
 ## Concurrency Model
 
 ### HTTP Server (Async I/O)
-```python
-# server.py - handles 1000s of concurrent connections
-async def execute(request):
-    # Non-blocking
-    background_tasks.add_task(execute_task_async, ...)
-    return 202  # Immediate
+```
+async execute(request):
+    background_tasks.add_task(spawn_subprocess, ...)
+    return 202  # Immediate, non-blocking
 ```
 
 ### ML Subprocess (CPU-bound)
-```python
-# main.py - blocks on CPU work
-result = batch_train(...)  # Blocking, but in separate process
-# No impact on server responsiveness
+```
+result = batch_train(...)  # Blocking in separate process
+# No impact on server
 ```
 
 ### Parallelism
 ```
-CPU Cores: 8
-Concurrent HTTP Requests: 10000 (async I/O)
-Concurrent ML Tasks: 8 (CPU-bound, one per core)
+CPU Cores:         8
+HTTP Connections:  10000 (async I/O)
+ML Tasks:          8 (one per core, CPU-bound)
 ```
 
 ## Error Handling
 
 ### Server Error (spawn failure)
-```python
+```
 try:
-    process = await asyncio.create_subprocess_exec(...)
-except Exception as e:
-    # Write error to result.json
-    result_file = Path(base_path) / "result.json"
-    with open(result_file, 'w') as f:
-        json.dump({"status": "failed", "error": str(e)}, f)
+    process = spawn_subprocess(...)
+catch:
+    write_file("result.json", {status: "failed", error})
 ```
 
 ### Subprocess Error (execution failure)
-```python
+```
 try:
     result = batch_train(...)
-    # Write success
-except Exception as e:
-    # Write error to result.json
-    error_data = {
-        "status": "failed",
-        "error": str(e),
-        "traceback": traceback.format_exc()
-    }
-    with open(result_file, 'w') as f:
-        json.dump(error_data, f)
-    sys.exit(1)
+    write_file("result.json", {status: "completed", result})
+catch:
+    write_file("result.json", {status: "failed", error, traceback})
+    exit(1)
 ```
 
 ## Process Management
 
-### No Auto-Cleanup
-```python
-# Completed tasks leave files on disk
-/tmp/ml-backend/tasks/123/  # Remains after process exits
-```
-
-### Manual Cleanup
+### Cleanup
 ```bash
-# Delete single task
+# Delete task
 rm -rf /tmp/ml-backend/tasks/123
 
-# Delete all completed tasks
-find /tmp/ml-backend/tasks -name "result.json" -exec dirname {} \; | xargs rm -rf
+# Delete completed tasks
+find /tmp/ml-backend/tasks -name "result.json" | xargs dirname | xargs rm -rf
 
 # Delete old tasks (>30 days)
-find /tmp/ml-backend/tasks -type d -mtime +30 -exec rm -rf {} \;
+find /tmp/ml-backend/tasks -mtime +30 -type d -exec rm -rf {} \;
 ```
 
-### Process Monitoring
+### Monitoring
 ```bash
 # List running ML processes
 ps aux | grep "python.*main.py"
 
-# Monitor specific task
+# Monitor task
 tail -f /tmp/ml-backend/tasks/123/logs.jsonl
 ```
 
 ## Performance Characteristics
 
-### Process Startup Overhead
+### Overhead
 ```
-Spawn time: ~50-100ms
-Python import time: ~200-500ms
-Total overhead: ~250-600ms per task
-```
-
-### Memory Isolation
-```
-Server: ~50 MB base
-Task process: ~200-500 MB (depends on dataset size)
-Total for 10 tasks: ~2-5 GB
+Spawn:        ~50-100ms
+Python import: ~200-500ms
+Total:        ~250-600ms per task
 ```
 
-### CPU Utilization
+### Memory
 ```
-Server: <5% CPU (I/O bound)
-Task process: 100-800% CPU (GridSearchCV uses all cores)
+Server:       ~50 MB
+Task process: ~200-500 MB (dataset-dependent)
+10 tasks:     ~2-5 GB total
 ```
 
-## Testing Process Spawning
+### CPU
+```
+Server:       <5% (I/O bound)
+Task process: 100-800% (GridSearchCV, all cores)
+```
 
-### Test Spawn
+## Testing
+
+### Test Subprocess
 ```bash
-# Prepare test input
-cat > /tmp/test_input.json <<EOF
-{
-  "operation": "batch-train",
-  "data": {
-    "task_id": 999,
-    "input_file": "test_data.csv",
-    "model": "regression.linear",
-    "feature_columns": ["x"],
-    "target_column": "y"
-  }
-}
-EOF
+# Prepare input
+echo '{"operation": "batch-train", "data": {...}}' > input.json
 
-# Test subprocess execution
-python main.py --base-path /tmp/ml-backend/tasks/999 < /tmp/test_input.json
+# Execute
+python main.py --base-path /tmp/ml-backend/tasks/999 < input.json
 
 # Check result
 cat /tmp/ml-backend/tasks/999/result.json
@@ -365,15 +289,14 @@ cat /tmp/ml-backend/tasks/999/logs.jsonl
 
 ### Test Server
 ```bash
-# Start server
+# Start
 python server.py
 
-# Send request
+# Request
 curl -X POST http://localhost:8000/execute \
-  -H "Content-Type: application/json" \
-  -d '{"operation": "batch-train", "data": {"task_id": 999, ...}}'
+  -d '{"operation": "batch-train", "data": {...}}'
 
-# Poll result
+# Poll
 curl http://localhost:8000/tasks/999/result
 ```
 
