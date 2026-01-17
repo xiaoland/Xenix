@@ -26,6 +26,15 @@ CREATE TABLE "logs" (
 	"created_at" timestamp NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "ml_backend_deployments" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"created_by" uuid,
+	"api_url" text NOT NULL,
+	"proxy" text,
+	"created_at" timestamp NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "model_metadata" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"category" text NOT NULL,
@@ -40,6 +49,7 @@ CREATE TABLE "model_metadata" (
 --> statement-breakpoint
 CREATE TABLE "projects" (
 	"id" serial PRIMARY KEY NOT NULL,
+	"created_by" uuid,
 	"name" text NOT NULL,
 	"description" text,
 	"status" text DEFAULT 'active' NOT NULL,
@@ -50,6 +60,7 @@ CREATE TABLE "projects" (
 CREATE TABLE "tasks" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"work_item_id" integer,
+	"ml_backend_deployment_id" integer,
 	"type" text NOT NULL,
 	"parameter" jsonb,
 	"result" jsonb,
@@ -58,6 +69,16 @@ CREATE TABLE "tasks" (
 	"created_at" timestamp NOT NULL,
 	"started_at" timestamp,
 	"end_at" timestamp
+);
+--> statement-breakpoint
+CREATE TABLE "users" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"email" text NOT NULL,
+	"phone" text,
+	"password" text NOT NULL,
+	"created_at" timestamp NOT NULL,
+	"updated_at" timestamp NOT NULL,
+	CONSTRAINT "users_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
 CREATE TABLE "work_items" (
@@ -73,3 +94,8 @@ CREATE TABLE "work_items" (
 	"created_at" timestamp NOT NULL,
 	"updated_at" timestamp NOT NULL
 );
+--> statement-breakpoint
+ALTER TABLE "ml_backend_deployments" ADD CONSTRAINT "ml_backend_deployments_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "projects" ADD CONSTRAINT "projects_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_ml_backend_deployment_id_ml_backend_deployments_id_fk" FOREIGN KEY ("ml_backend_deployment_id") REFERENCES "public"."ml_backend_deployments"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "idx_tasks_deployment" ON "tasks" USING btree ("ml_backend_deployment_id");

@@ -6,7 +6,7 @@ import { Hono } from "hono";
 
 import { InlinePredictSchema, FilePredictSchema } from "@xenix/shared";
 
-import { predictInline, predictFile } from "../business/ml";
+import { getMLBackendService } from "../services/MLBackendService";
 import { db, schema } from "../database";
 import { BadRequestError, NotFoundError } from "../errors";
 import { authMiddleware } from "../middleware/auth";
@@ -86,55 +86,28 @@ const predict = new Hono()
     const result: any = tuningTask.result;
     const params = result.params;
 
-    // Create task record first to get taskId
-    const [insertedTask] = await db
-      .insert(schema.tasks)
-      .values({
-        workItemId,
-        type: "predict",
-        status: "pending",
-        parameter: {
-          model,
-          trainingDatasetId: workItem.datasetId,
-          featureColumns,
-          targetColumn,
-          tuningTaskId,
-          predictionType: "inline",
-          predictionDataCount: predictionData.length,
-        },
-      })
-      .returning();
+    // Get deployment ID from environment variable
+    const deploymentId = Number(process.env.ML_BACKEND_DEPLOYMENT_ID) || 1;
+    const mlService = getMLBackendService();
 
-    const taskId = insertedTask.id;
-
-    // Generate output file path/key
+    // Generate temporary task ID and output file path
+    const tempTaskId = Date.now();
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     let outputFile: string;
 
     if (fcInvokeService.isAvailable()) {
       // OSS storage key for production
-      outputFile = `predictions/${taskId}/inline_prediction_${workItemId}_${taskId}_${timestamp}.xlsx`;
+      outputFile = `predictions/${tempTaskId}/inline_prediction_${workItemId}_${tempTaskId}_${timestamp}.xlsx`;
     } else {
       // Local file path for development
       outputFile = path.join(
         process.cwd(),
         "uploads",
-        `inline_prediction_${workItemId}_${taskId}_${timestamp}.xlsx`,
+        `inline_prediction_${workItemId}_${tempTaskId}_${timestamp}.xlsx`,
       );
     }
 
-    // Update task with outputFile
-    await db
-      .update(schema.tasks)
-      .set({
-        parameter: {
-          ...(insertedTask.parameter as any),
-          outputFile,
-        },
-      })
-      .where(eq(schema.tasks.id, taskId));
-
-    // Execute prediction - use FC async invoke if available, otherwise local execution
+    // Execute prediction - use FC async invoke if available, otherwise ml-backend
     if (fcInvokeService.isAvailable()) {
       // FC async invoke (production)
       const trainingStorageKey = `datasets/${workItem.datasetId}/${trainingDataset.fileName}`;
@@ -144,7 +117,7 @@ const predict = new Hono()
       await fcInvokeService.invokeAsync({
         functionName: "ml-predict-worker",
         payload: {
-          taskId,
+          taskId: tempTaskId,
           trainingDataFile, // OSS mount path: /mnt/oss/datasets/...
           predictionData,
           outputFile: outputFilePath, // OSS mount path: /mnt/oss/predictions/...
@@ -155,29 +128,60 @@ const predict = new Hono()
         },
       });
     } else {
-      // Local execution (development)
-      setImmediate(() => {
-        predictInline({
-          trainingDataPath,
-          predictionData,
-          outputPath: outputFile,
+      // Local execution via ml-backend
+      const mlRequest = mlService.predictInline(deploymentId, tempTaskId, {
+        trainingDataPath,
+        predictionData,
+        outputPath: outputFile,
+        model,
+        params,
+        featureColumns,
+        targetColumn,
+      });
+
+      // Wait 5s to check for errors (fire-and-forget pattern)
+      let hasError = false;
+      await Promise.race([
+        mlRequest.catch((error) => {
+          hasError = true;
+          logger.error(
+            { error: error.message, tempTaskId },
+            "ML backend request failed",
+          );
+          throw error;
+        }),
+        new Promise((resolve) => setTimeout(resolve, 5000)),
+      ]);
+
+      if (hasError) {
+        throw new Error("ML backend request failed");
+      }
+    }
+
+    // Create task record only after successful ML backend request
+    const [insertedTask] = await db
+      .insert(schema.tasks)
+      .values({
+        workItemId,
+        mlBackendDeploymentId: fcInvokeService.isAvailable() ? null : deploymentId,
+        type: "predict",
+        status: "pending",
+        parameter: {
           model,
-          params,
+          trainingDatasetId: workItem.datasetId,
           featureColumns,
           targetColumn,
-          taskId,
-        }).catch((error) => {
-          logger.error(
-            { error, taskId },
-            `Failed to execute inline prediction task`,
-          );
-        });
-      });
-    }
+          tuningTaskId,
+          predictionType: "inline",
+          predictionDataCount: predictionData.length,
+          outputFile,
+        },
+      })
+      .returning();
 
     return c.json(
       {
-        taskId,
+        taskId: insertedTask.id,
         message: "Inline prediction started",
       },
       201,
@@ -269,11 +273,52 @@ const predict = new Hono()
     await fs.mkdir(uploadsDir, { recursive: true });
     await fs.writeFile(predictionDataPath, buffer);
 
-    // Create task record first to get taskId
+    // Get deployment ID from environment variable
+    const deploymentId = Number(process.env.ML_BACKEND_DEPLOYMENT_ID) || 1;
+    const mlService = getMLBackendService();
+
+    // Generate temporary task ID and output file path
+    const tempTaskId = Date.now();
+    const outputFile = path.join(
+      uploadsDir,
+      `file_prediction_${workItemId}_${tempTaskId}_${timestamp}.xlsx`,
+    );
+
+    // Fire ml-backend request
+    const mlRequest = mlService.predictFile(deploymentId, tempTaskId, {
+      trainingDataPath,
+      predictionDataPath,
+      outputPath: outputFile,
+      model,
+      params,
+      featureColumns,
+      targetColumn,
+    });
+
+    // Wait 5s to check for errors (fire-and-forget pattern)
+    let hasError = false;
+    await Promise.race([
+      mlRequest.catch((error) => {
+        hasError = true;
+        logger.error(
+          { error: error.message, tempTaskId },
+          "ML backend request failed",
+        );
+        throw error;
+      }),
+      new Promise((resolve) => setTimeout(resolve, 5000)),
+    ]);
+
+    if (hasError) {
+      throw new Error("ML backend request failed");
+    }
+
+    // Create task record only after successful ML backend request
     const [insertedTask] = await db
       .insert(schema.tasks)
       .values({
         workItemId,
+        mlBackendDeploymentId: deploymentId,
         type: "predict",
         status: "pending",
         parameter: {
@@ -284,51 +329,14 @@ const predict = new Hono()
           tuningTaskId,
           predictionType: "file",
           predictionDataPath,
+          outputFile,
         },
       })
       .returning();
 
-    const taskId = insertedTask.id;
-
-    // Generate output file path with taskId
-    const outputFile = path.join(
-      uploadsDir,
-      `file_prediction_${workItemId}_${taskId}_${timestamp}.xlsx`,
-    );
-
-    // Update task with outputFile
-    await db
-      .update(schema.tasks)
-      .set({
-        parameter: {
-          ...(insertedTask.parameter as any),
-          outputFile,
-        },
-      })
-      .where(eq(schema.tasks.id, taskId));
-
-    // Call predictFile() in background with setImmediate
-    setImmediate(() => {
-      predictFile({
-        trainingDataPath,
-        predictionDataPath,
-        outputPath: outputFile,
-        model,
-        params,
-        featureColumns,
-        targetColumn,
-        taskId,
-      }).catch((error) => {
-        logger.error(
-          { error, taskId },
-          `Failed to execute file prediction task`,
-        );
-      });
-    });
-
     return c.json(
       {
-        taskId,
+        taskId: insertedTask.id,
         message: "File prediction started",
       },
       201,

@@ -1,6 +1,5 @@
 // PostgreSQL database schema for Xenix
 import {
-  boolean,
   index,
   integer,
   jsonb,
@@ -61,28 +60,16 @@ export const datasets = pgTable('datasets', {
 });
 
 // ML Backend Deployments table - tracks available ML backend HTTP deployments
-export const mlBackendDeployments = pgTable(
-  'ml_backend_deployments',
-  {
-    id: serial('id').primaryKey(),
-    name: text('name').notNull().unique(),
-    createdBy: uuid('created_by').references(() => users.id),
-    deploymentType: text('deployment_type').notNull(), // 'http' | 'http-proxy-frontend'
-    deploymentParams: jsonb('deployment_params').notNull().default({}),
-    isDefault: boolean('is_default').notNull().default(false),
-    isActive: boolean('is_active').notNull().default(true),
-    createdAt: timestamp('created_at', { mode: 'date' })
-      .$defaultFn(() => new Date())
-      .notNull(),
-    updatedAt: timestamp('updated_at', { mode: 'date' })
-      .$defaultFn(() => new Date())
-      .notNull(),
-  },
-  (table) => ({
-    typeIdx: index('idx_ml_backend_deployments_type').on(table.deploymentType),
-    defaultIdx: index('idx_ml_backend_deployments_default').on(table.isDefault),
-  }),
-);
+export const mlBackendDeployments = pgTable('ml_backend_deployments', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  createdBy: uuid('created_by').references(() => users.id),
+  apiUrl: text('api_url').notNull(),
+  proxy: text('proxy'),
+  createdAt: timestamp('created_at', { mode: 'date' })
+    .$defaultFn(() => new Date())
+    .notNull(),
+});
 
 // Consolidated tasks table
 // Type values: 'batch-train', 'single-train', 'predict'
@@ -105,9 +92,9 @@ export const tasks = pgTable(
     startedAt: timestamp('started_at', { mode: 'date' }),
     endAt: timestamp('end_at', { mode: 'date' }),
   },
-  (table) => ({
-    deploymentIdx: index('idx_tasks_deployment').on(table.mlBackendDeploymentId),
-  }),
+  (table) => [
+    index('idx_tasks_deployment').on(table.mlBackendDeploymentId),
+  ],
 );
 
 // OpenTelemetry-compliant logs table

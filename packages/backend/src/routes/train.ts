@@ -8,7 +8,7 @@ import {
   CreateSingleTrainTaskSchema,
 } from "@xenix/shared";
 
-import { batchTrain, singleTrain } from "../business/ml";
+import { getMLBackendService } from "../services/MLBackendService";
 import { db, schema } from "../database";
 import { BadRequestError, NotFoundError } from "../errors";
 import { authMiddleware } from "../middleware/auth";
@@ -19,71 +19,100 @@ const train = new Hono()
   .use("*", authMiddleware)
 
   // Batch-train endpoint
-  .post(
-    "/batch-train",
-    zValidator("json", CreateBatchTrainTaskSchema),
-    async (c) => {
-      let {
-        datasetId,
-        featureColumns,
-        targetColumn,
-        model,
-        paramGrid,
-        workItemId,
-      } = c.req.valid("json");
+  .post("/batch", zValidator("json", CreateBatchTrainTaskSchema), async (c) => {
+    let {
+      datasetId,
+      featureColumns,
+      targetColumn,
+      model,
+      paramGrid,
+      workItemId,
+    } = c.req.valid("json");
 
-      // If workItemId provided, try to fill missing values from the work item
-      if (workItemId) {
-        const [workItem] = await db
-          .select()
-          .from(schema.workItems)
-          .where(eq(schema.workItems.id, workItemId))
-          .limit(1);
-
-        if (workItem) {
-          if (!datasetId && workItem.datasetId) datasetId = workItem.datasetId;
-          if (
-            (!featureColumns || featureColumns.length === 0) &&
-            workItem.featureColumns
-          ) {
-            featureColumns = workItem.featureColumns as string[];
-          }
-          if (!targetColumn && workItem.targetColumn)
-            targetColumn = workItem.targetColumn as string;
-        }
-      }
-
-      // Validate required parameters (after trying to fill from work item)
-      if (!datasetId) {
-        throw new BadRequestError("datasetId is required");
-      }
-
-      if (!featureColumns || featureColumns.length === 0) {
-        throw new BadRequestError(
-          "featureColumns array is required and must not be empty"
-        );
-      }
-
-      if (!targetColumn) {
-        throw new BadRequestError("targetColumn is required");
-      }
-
-      // Verify dataset exists
-      const [dataset] = await db
+    // If workItemId provided, try to fill missing values from the work item
+    if (workItemId) {
+      const [workItem] = await db
         .select()
-        .from(schema.datasets)
-        .where(eq(schema.datasets.id, datasetId))
+        .from(schema.workItems)
+        .where(eq(schema.workItems.id, workItemId))
         .limit(1);
 
-      if (!dataset) {
-        throw new NotFoundError("Dataset");
+      if (workItem) {
+        if (!datasetId && workItem.datasetId) datasetId = workItem.datasetId;
+        if (
+          (!featureColumns || featureColumns.length === 0) &&
+          workItem.featureColumns
+        ) {
+          featureColumns = workItem.featureColumns as string[];
+        }
+        if (!targetColumn && workItem.targetColumn)
+          targetColumn = workItem.targetColumn as string;
       }
+    }
 
-      // Create task record with batch-train type
+    // Validate required parameters (after trying to fill from work item)
+    if (!datasetId) {
+      throw new BadRequestError("datasetId is required");
+    }
+
+    if (!featureColumns || featureColumns.length === 0) {
+      throw new BadRequestError(
+        "featureColumns array is required and must not be empty",
+      );
+    }
+
+    if (!targetColumn) {
+      throw new BadRequestError("targetColumn is required");
+    }
+
+    // Verify dataset exists
+    const [dataset] = await db
+      .select()
+      .from(schema.datasets)
+      .where(eq(schema.datasets.id, datasetId))
+      .limit(1);
+
+    if (!dataset) {
+      throw new NotFoundError("Dataset");
+    }
+
+    // Get deployment ID from environment variable
+    const deploymentId = Number(process.env.ML_BACKEND_DEPLOYMENT_ID) || 0;
+    const mlService = getMLBackendService();
+
+    // Generate temporary task ID for ml-backend request
+    const tempTaskId = Date.now();
+
+    // Fire ml-backend request
+    const mlRequest = mlService.batchTrain(deploymentId, tempTaskId, {
+      inputFile: dataset.filePath,
+      model,
+      featureColumns,
+      targetColumn,
+      paramGrid,
+    });
+
+    // Wait 5s to check for errors (fire-and-forget pattern)
+    let hasError = false;
+    await Promise.race([
+      mlRequest.catch((error) => {
+        hasError = true;
+        logger.error(
+          { error: error.message, tempTaskId },
+          "ML backend request failed",
+        );
+        throw error;
+      }),
+      new Promise((resolve) => setTimeout(resolve, 5000)),
+    ]);
+
+    // Only create task record if no error in 5s
+    if (!hasError) {
       const [insertedTask] = await db
         .insert(schema.tasks)
         .values({
           workItemId: workItemId || null,
+          mlBackendDeploymentId: deploymentId,
           type: "batch-train",
           status: "pending",
           parameter: {
@@ -96,32 +125,22 @@ const train = new Hono()
         })
         .returning();
 
-      const taskId = insertedTask.id;
-
-      batchTrain({
-        inputFile: dataset.filePath,
-        model,
-        featureColumns,
-        targetColumn,
-        taskId,
-        paramGrid,
-      }).catch((error) => {
-        logger.error({ error, taskId }, `Failed to execute tune task`);
-      });
-
       return c.json(
         {
-          taskId,
+          taskId: insertedTask.id,
           message: "Batch training started",
         },
-        201
+        201,
       );
+    } else {
+      // This shouldn't be reached due to throw, but for safety
+      throw new Error("ML backend request failed");
     }
-  )
+  })
 
   // Single-train endpoint
   .post(
-    "/single-train",
+    "/single",
     zValidator("json", CreateSingleTrainTaskSchema),
     async (c) => {
       let {
@@ -161,7 +180,7 @@ const train = new Hono()
 
       if (!featureColumns || featureColumns.length === 0) {
         throw new BadRequestError(
-          "featureColumns array is required and must not be empty"
+          "featureColumns array is required and must not be empty",
         );
       }
 
@@ -180,55 +199,75 @@ const train = new Hono()
         throw new NotFoundError("Dataset");
       }
 
-      // Create task record with single-train type
-      const [insertedTask] = await db
-        .insert(schema.tasks)
-        .values({
-          workItemId: workItemId || null,
-          type: "single-train",
-          status: "pending",
-          parameter: {
-            model,
-            datasetId,
-            featureColumns,
-            targetColumn,
-            parameters,
-          },
-        })
-        .returning();
-
-      const taskId = insertedTask.id;
+      // Get deployment ID from environment variable
+      const deploymentId = Number(process.env.ML_BACKEND_DEPLOYMENT_ID) || 1;
+      const mlService = getMLBackendService();
 
       // Determine input file path based on storage type
       const inputFile =
         storage.getType() === "oss"
           ? storage.getFilesystemPath(
-              `datasets/${datasetId}/${dataset.fileName}`
+              `datasets/${datasetId}/${dataset.fileName}`,
             ) // OSS: /mnt/oss/datasets/...
           : dataset.filePath; // Local: full file path
 
-      // Invoke ML task via adapter (automatically chooses FC or spawn)
-      setImmediate(() => {
-        singleTrain({
-          inputFile,
-          model,
-          featureColumns,
-          targetColumn,
-          taskId,
-          parameters,
-        }).catch((error) => {
-          logger.error({ error, taskId }, `Failed to execute manual tune task`);
-        });
+      // Generate temporary task ID for ml-backend request
+      const tempTaskId = Date.now();
+
+      // Fire ml-backend request
+      const mlRequest = mlService.singleTrain(deploymentId, tempTaskId, {
+        inputFile,
+        model,
+        featureColumns,
+        targetColumn,
+        parameters,
       });
 
-      return c.json(
-        {
-          taskId,
-          message: "Single training started",
-        },
-        201
-      );
-    }
+      // Wait 5s to check for errors (fire-and-forget pattern)
+      let hasError = false;
+      await Promise.race([
+        mlRequest.catch((error) => {
+          hasError = true;
+          logger.error(
+            { error: error.message, tempTaskId },
+            "ML backend request failed",
+          );
+          throw error;
+        }),
+        new Promise((resolve) => setTimeout(resolve, 5000)),
+      ]);
+
+      // Only create task record if no error in 5s
+      if (!hasError) {
+        const [insertedTask] = await db
+          .insert(schema.tasks)
+          .values({
+            workItemId: workItemId || null,
+            mlBackendDeploymentId: deploymentId,
+            type: "single-train",
+            status: "pending",
+            parameter: {
+              model,
+              datasetId,
+              featureColumns,
+              targetColumn,
+              parameters,
+            },
+          })
+          .returning();
+
+        return c.json(
+          {
+            taskId: insertedTask.id,
+            message: "Single training started",
+          },
+          201,
+        );
+      } else {
+        // This shouldn't be reached due to throw, but for safety
+        throw new Error("ML backend request failed");
+      }
+    },
   );
 
 export default train;

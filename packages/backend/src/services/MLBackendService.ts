@@ -5,8 +5,12 @@
  * Supports fire-and-forget execution with result checking.
  */
 
+import type { InferSelectModel } from 'drizzle-orm';
+import { MLBackendDeploymentRepository } from '../repositories/MLBackendDeploymentRepository';
+import { mlBackendDeployments } from '../database/schema';
 import logger from '../utils/logger';
-import type { MLBackendDeployment } from '../types/ml-backend';
+
+type MLBackendDeployment = InferSelectModel<typeof mlBackendDeployments>;
 
 export interface ExecuteOptions {
   operation: string; // 'batch-train', 'single-train', 'predict'
@@ -22,6 +26,23 @@ export interface TaskResult {
 }
 
 export class MLBackendService {
+  private deploymentRepo: MLBackendDeploymentRepository;
+
+  constructor() {
+    this.deploymentRepo = new MLBackendDeploymentRepository();
+  }
+
+  /**
+   * Get deployment by ID
+   */
+  private async getDeployment(deploymentId: number): Promise<MLBackendDeployment> {
+    const deployment = await this.deploymentRepo.findById(deploymentId);
+    if (!deployment) {
+      throw new Error(`Deployment ${deploymentId} not found`);
+    }
+    return deployment;
+  }
+
   /**
    * Execute ML operation via HTTP
    *
@@ -30,7 +51,7 @@ export class MLBackendService {
    *
    * @param deployment - ML backend deployment configuration
    * @param options - Operation type and data
-   * @returns Promise that resolves when request is accepted (202)
+   * @returns Promise that resolves when request is accepted (200)
    */
   async execute(
     deployment: MLBackendDeployment,
@@ -42,10 +63,10 @@ export class MLBackendService {
       throw new Error('task_id is required in operation data');
     }
 
-    const apiUrl = deployment.deployment_params.apiUrl;
+    const apiUrl = deployment.apiUrl;
     if (!apiUrl) {
       throw new Error(
-        `Deployment ${deployment.name} has no apiUrl configured`,
+        `Deployment ${deployment.name} has no api_url configured`,
       );
     }
 
@@ -124,7 +145,7 @@ export class MLBackendService {
     deployment: MLBackendDeployment,
     taskId: number,
   ): Promise<TaskResult | null> {
-    const apiUrl = deployment.deployment_params.apiUrl;
+    const apiUrl = deployment.apiUrl;
     if (!apiUrl) {
       return null;
     }
@@ -178,6 +199,151 @@ export class MLBackendService {
       // Don't log errors for result checking - it's expected to fail sometimes
       return null;
     }
+  }
+
+  /**
+   * Batch train operation
+   */
+  async batchTrain(
+    deploymentId: number,
+    taskId: number,
+    options: {
+      inputFile: string;
+      model: string;
+      featureColumns: string[];
+      targetColumn: string;
+      paramGrid?: Record<string, any[]>;
+    },
+  ): Promise<void> {
+    const deployment = await this.getDeployment(deploymentId);
+
+    await this.execute(deployment, {
+      operation: 'batch-train',
+      data: {
+        task_id: taskId,
+        input_file: options.inputFile,
+        model: options.model,
+        feature_columns: options.featureColumns,
+        target_column: options.targetColumn,
+        param_grid: options.paramGrid || {},
+      },
+    });
+  }
+
+  /**
+   * Single train operation
+   */
+  async singleTrain(
+    deploymentId: number,
+    taskId: number,
+    options: {
+      inputFile: string;
+      model: string;
+      featureColumns: string[];
+      targetColumn: string;
+      parameters: Record<string, any>;
+      parentTaskId?: number;
+    },
+  ): Promise<void> {
+    const deployment = await this.getDeployment(deploymentId);
+
+    await this.execute(deployment, {
+      operation: 'single-train',
+      data: {
+        task_id: taskId,
+        input_file: options.inputFile,
+        model: options.model,
+        feature_columns: options.featureColumns,
+        target_column: options.targetColumn,
+        parameters: options.parameters,
+        parent_task_id: options.parentTaskId,
+      },
+    });
+  }
+
+  /**
+   * Predict operation (file-based)
+   */
+  async predict(
+    deploymentId: number,
+    taskId: number,
+    options: {
+      trainingDataPath: string;
+      predictionDataPath: string;
+      outputPath: string;
+      model: string;
+      params: Record<string, any>;
+      featureColumns: string[];
+      targetColumn: string;
+    },
+  ): Promise<void> {
+    const deployment = await this.getDeployment(deploymentId);
+
+    await this.execute(deployment, {
+      operation: 'predict',
+      data: {
+        task_id: taskId,
+        training_data_path: options.trainingDataPath,
+        prediction_data_path: options.predictionDataPath,
+        output_path: options.outputPath,
+        model: options.model,
+        parameters: options.params,
+        feature_columns: options.featureColumns,
+        target_column: options.targetColumn,
+      },
+    });
+  }
+
+  /**
+   * Predict operation (file-based) - alias for predict
+   */
+  async predictFile(
+    deploymentId: number,
+    taskId: number,
+    options: {
+      trainingDataPath: string;
+      predictionDataPath: string;
+      outputPath: string;
+      model: string;
+      params: Record<string, any>;
+      featureColumns: string[];
+      targetColumn: string;
+    },
+  ): Promise<void> {
+    return this.predict(deploymentId, taskId, options);
+  }
+
+  /**
+   * Predict operation (inline data)
+   */
+  async predictInline(
+    deploymentId: number,
+    taskId: number,
+    options: {
+      trainingDataPath: string;
+      predictionData: any[];
+      outputPath: string;
+      model: string;
+      params: Record<string, any>;
+      featureColumns: string[];
+      targetColumn: string;
+    },
+  ): Promise<void> {
+    const deployment = await this.getDeployment(deploymentId);
+
+    await this.execute(deployment, {
+      operation: 'predict',
+      data: {
+        task_id: taskId,
+        training_data_path: options.trainingDataPath,
+        prediction_data: options.predictionData,
+        output_path: options.outputPath,
+        model: options.model,
+        parameters: options.params,
+        feature_columns: options.featureColumns,
+        target_column: options.targetColumn,
+      },
+    });
   }
 }
 

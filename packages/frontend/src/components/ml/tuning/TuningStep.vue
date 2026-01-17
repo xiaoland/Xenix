@@ -355,7 +355,7 @@ const handleStartAutoTune = async () => {
   try {
     // Start training for each selected model
     for (const model of selectedModels.value) {
-      const response = await client.train["auto-tune"].$post({
+      const response = await client.train["batch"].$post({
         json: {
           datasetId: props.datasetId ?? undefined,
           featureColumns: props.featureColumns,
@@ -367,7 +367,7 @@ const handleStartAutoTune = async () => {
       if (!response.ok) throw new Error("Failed to start auto tune");
     }
     message.success(
-      `Started training for ${selectedModels.value.length} model(s)`
+      `Started training for ${selectedModels.value.length} model(s)`,
     );
     selectedModels.value = [];
     await fetchTasks();
@@ -388,7 +388,7 @@ const handleManualTune = async (data: {
   parameters: Record<string, any>;
 }) => {
   try {
-    const response = await client.tune["manual-tune"].$post({
+    const response = await client.train["single"].$post({
       json: {
         datasetId: props.datasetId ?? undefined,
         featureColumns: props.featureColumns,
@@ -468,7 +468,7 @@ const startPolling = () => {
   if (pollInterval) return;
   pollInterval = window.setInterval(() => {
     const hasRunningTasks = (tasks.value ?? []).some(
-      (t) => t.status === "pending" || t.status === "running"
+      (t) => t.status === "pending" || t.status === "running",
     );
     if (hasRunningTasks) {
       fetchTasks();
@@ -568,7 +568,7 @@ const getDisplayMetrics = (metrics: Record<string, any>) => {
 
   // If we have less than 3 metrics, add others
   const otherKeys = Object.keys(metrics).filter(
-    (k) => !priorityKeys.includes(k)
+    (k) => !priorityKeys.includes(k),
   );
   let count = Object.keys(display).length;
   for (const key of otherKeys) {
@@ -584,7 +584,7 @@ const getDisplayMetrics = (metrics: Record<string, any>) => {
 onMounted(async () => {
   await fetchTasks();
   const hasRunningTasks = (tasks.value ?? []).some(
-    (t) => t.status === "pending" || t.status === "running"
+    (t) => t.status === "pending" || t.status === "running",
   );
   if (hasRunningTasks) {
     startPolling();
