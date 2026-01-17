@@ -7,46 +7,43 @@
   >
     <a-form :model="formData" layout="vertical">
       <a-form-item
-        :label="$t('components.project.form.name')"
+        :label="$t('project.form.name')"
         name="name"
         :rules="[
           {
             required: true,
-            message: $t('components.project.form.nameRequired'),
+            message: $t('project.form.nameRequired'),
           },
         ]"
       >
         <a-input
           v-model:value="formData.name"
-          :placeholder="$t('components.project.form.namePlaceholder')"
+          :placeholder="$t('project.form.namePlaceholder')"
         />
       </a-form-item>
 
-      <a-form-item
-        :label="$t('components.project.form.description')"
-        name="description"
-      >
+      <a-form-item :label="$t('project.form.description')" name="description">
         <a-textarea
           v-model:value="formData.description"
-          :placeholder="$t('components.project.form.descriptionPlaceholder')"
+          :placeholder="$t('project.form.descriptionPlaceholder')"
           :rows="3"
         />
       </a-form-item>
 
       <a-form-item
         v-if="showStatus"
-        :label="$t('components.project.form.status')"
+        :label="$t('project.form.status')"
         name="status"
       >
         <a-select v-model:value="formData.status">
           <a-select-option value="active">{{
-            $t("components.project.form.active")
+            $t("project.form.active")
           }}</a-select-option>
           <a-select-option value="completed">{{
-            $t("components.project.form.completed")
+            $t("project.form.completed")
           }}</a-select-option>
           <a-select-option value="archived">{{
-            $t("components.project.form.archived")
+            $t("project.form.archived")
           }}</a-select-option>
         </a-select>
       </a-form-item>

@@ -17,14 +17,14 @@
         <div class="text-xs text-gray-400 ml-7">
           <span v-if="(project as any).datasets"
             >{{ (project as any).datasets.length }}
-            {{ $t("components.project.card.datasets") }}</span
+            {{ $t("project.card.datasets") }}</span
           >
           <span v-if="(project as any).workItems">
             · {{ (project as any).workItems.length }}
-            {{ $t("components.project.card.workItems") }}</span
+            {{ $t("project.card.workItems") }}</span
           >
           <span>
-            · {{ $t("components.project.card.created") }}
+            · {{ $t("project.card.created") }}
             {{ formatDate(project.createdAt) }}</span
           >
         </div>
@@ -37,7 +37,7 @@
           @click="$emit('manage-datasets', project.id)"
         >
           <span class="i-mdi-database mr-1" />
-          {{ $t("components.project.card.manageDatasets") }}
+          {{ $t("project.card.manageDatasets") }}
         </a-button>
         <a-button
           size="small"
@@ -45,15 +45,15 @@
           @click="$emit('edit', project)"
         >
           <span class="i-mdi-pencil mr-1" />
-          {{ $t("components.project.card.edit") }}
+          {{ $t("project.card.edit") }}
         </a-button>
         <a-popconfirm
-          :title="$t('components.project.card.deleteConfirm')"
+          :title="$t('project.card.deleteConfirm')"
           @confirm="$emit('delete', project.id)"
         >
           <a-button size="small" danger class="inline-flex items-center">
             <span class="i-mdi-delete mr-1" />
-            {{ $t("components.project.card.delete") }}
+            {{ $t("project.card.delete") }}
           </a-button>
         </a-popconfirm>
       </div>

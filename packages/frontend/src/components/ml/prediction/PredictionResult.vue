@@ -16,7 +16,7 @@
     >
       <a-spin size="large" />
       <p class="mt-4 text-gray-600">
-        {{ $t("components.ml.prediction.processing") }}
+        {{ $t("ml.prediction.processing") }}
       </p>
     </div>
 
@@ -31,7 +31,7 @@
           @click="handleDownload"
         >
           <span class="i-mdi-download mr-2"></span>
-          {{ $t("components.ml.prediction.downloadResults") }}
+          {{ $t("ml.prediction.downloadResults") }}
         </a-button>
       </div>
 
@@ -41,7 +41,7 @@
         class="bg-white rounded-lg border p-4"
       >
         <h4 class="text-md font-medium mb-3">
-          {{ $t("components.ml.prediction.results") }}
+          {{ $t("ml.prediction.results") }}
         </h4>
         <a-table
           :columns="resultColumns"

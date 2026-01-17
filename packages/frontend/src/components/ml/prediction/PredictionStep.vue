@@ -1,13 +1,13 @@
 <template>
   <div class="space-y-6">
     <h2 class="text-2xl font-semibold mb-4">
-      {{ $t("components.ml.prediction.title") }}
+      {{ $t("ml.prediction.title") }}
     </h2>
 
     <a-alert
       v-if="selectedModel"
       :message="
-        $t('components.ml.prediction.usingModel', {
+        $t('ml.prediction.usingModel', {
           model: formatModelName(selectedModel),
         })
       "
@@ -19,19 +19,19 @@
     <!-- Mode Selector -->
     <div class="bg-white rounded-lg border p-4">
       <label class="block text-sm font-medium text-gray-700 mb-2">
-        {{ $t("components.ml.prediction.mode") }}
+        {{ $t("ml.prediction.mode") }}
       </label>
       <a-radio-group v-model:value="predictionMode" button-style="solid">
         <a-radio-button value="file">
           <span class="inline-flex items-center">
             <span class="i-mdi-file-upload mr-2"></span>
-            {{ $t("components.ml.prediction.uploadFile") }}
+            {{ $t("ml.prediction.uploadFile") }}
           </span>
         </a-radio-button>
         <a-radio-button value="inline">
           <span class="inline-flex items-center">
             <span class="i-mdi-table-edit mr-2"></span>
-            {{ $t("components.ml.prediction.manualInput") }}
+            {{ $t("ml.prediction.manualInput") }}
           </span>
         </a-radio-button>
       </a-radio-group>
@@ -56,10 +56,10 @@
           ></span>
         </p>
         <p class="ant-upload-text">
-          {{ $t("components.ml.prediction.dragHint") }}
+          {{ $t("ml.prediction.dragHint") }}
         </p>
         <p class="ant-upload-hint">
-          {{ $t("components.ml.prediction.supportedFormats") }}
+          {{ $t("ml.prediction.supportedFormats") }}
         </p>
       </a-upload-dragger>
 
@@ -73,7 +73,7 @@
         @click="startPredictionFromFile"
       >
         <span class="i-mdi-chart-line mr-2" />
-        {{ $t("components.ml.prediction.startPrediction") }}
+        {{ $t("ml.prediction.startPrediction") }}
       </a-button>
     </div>
 
@@ -84,7 +84,7 @@
     >
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-lg font-medium">
-          {{ $t("components.ml.prediction.enterData") }}
+          {{ $t("ml.prediction.enterData") }}
         </h3>
         <a-button
           type="primary"
@@ -96,7 +96,7 @@
         </a-button>
       </div>
       <p class="text-sm text-gray-600 mb-4">
-        {{ $t("components.ml.prediction.inputHint") }}
+        {{ $t("ml.prediction.inputHint") }}
       </p>
 
       <a-table
@@ -175,6 +175,7 @@ import { computed, ref } from "vue";
 
 import { client } from "../../../api/client";
 import { AVAILABLE_MODELS } from "../../../constants/models";
+import { API_CONFIG } from "../../../constants/config";
 import PredictionResult from "./PredictionResult.vue";
 
 const props = defineProps<{
@@ -273,7 +274,39 @@ const startPredictionFromFile = async () => {
 
   isPredicting.value = true;
   try {
-    throw new Error("File prediction not implemented");
+    const file = fileList.value[0].originFileObj;
+    if (!file) {
+      throw new Error("No file selected");
+    }
+
+    // Create FormData for file upload
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("workItemId", String(props.workItemId));
+    formData.append("model", props.selectedModel);
+    formData.append("tuningTaskId", String(props.taskId));
+
+    // Use fetch directly for FormData to ensure proper Content-Type with boundary
+    const token = localStorage.getItem("auth_token");
+    const apiUrl = import.meta.env.VITE_API_URL || API_CONFIG.DEFAULT_URL;
+
+    const response = await fetch(`${apiUrl}/predict/file`, {
+      method: "POST",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        // Don't set Content-Type - let browser set it with boundary
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Failed to start prediction");
+    }
+
+    const data = await response.json();
+    message.success("File prediction started successfully");
+    predictionTaskId.value = data.taskId;
   } catch (error: any) {
     console.error("Prediction failed:", error);
     message.error(error.message || "Failed to start prediction");
