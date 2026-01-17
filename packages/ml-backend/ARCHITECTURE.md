@@ -1,326 +1,242 @@
 # ML Backend Architecture
 
-Pure Python ML backend for Xenix. Input/output through stdio and file system only.
+HTTP-based ML backend with process isolation and fire-and-forget execution.
 
 ## Overview
 
-Standalone ML operations package. No TypeScript, no HTTP, no external dependencies beyond Python ML libraries.
+FastAPI server spawns isolated Python processes for CPU-intensive ML tasks. Each task runs independently with task-specific logger and filesystem.
 
 ```
-Input (stdin/FC event)
-  ↓
-Entry point (main.py or fc_handler.py)
-  ↓
-Operation router
-  ├─ batch-train → GridSearchCV auto-tuning
-  ├─ single-train → Train with specific params
-  └─ predict → Make predictions
-  ↓
-File system I/O (configurable base path)
-  ↓
-Output (stdout JSON lines / FC response)
+HTTP Request → Server → Spawn Process → Isolated Execution
+              ↓ 202
+         Return Immediately
 ```
 
-## Structure
+Client polls for result via GET endpoint.
 
+## Design Principles
+
+### 1. Process Isolation
+- Separate Python process per ML task
+- No CPU blocking on HTTP server
+- No shared state between tasks
+- Task crash doesn't affect server
+
+### 2. Fire-and-Forget HTTP
+- POST /execute → 202 Accepted (immediate)
+- Task executes in background subprocess
+- Client polls GET /tasks/{id}/result
+- Connection close after response allowed
+
+### 3. Filesystem Communication
+- Request data via stdin
+- Results via result.json
+- Logs via logs.jsonl
+- Stateless server (restartable)
+
+### 4. Task Isolation
+- Per-task directory: `/tasks/{task_id}/`
+- Isolated logs, results, models
+- No file path conflicts
+
+## Components
+
+### HTTP Server (server.py)
+
+**Responsibilities**:
+- Accept HTTP requests
+- Calculate task base paths
+- Spawn subprocess: `main.py --base-path {task_path}`
+- Send operation data via stdin
+- Return 202 immediately
+- Serve result endpoint
+
+**Interface**:
 ```
-ml_backend/
-├── config.py           # Configuration (base path, env vars)
-├── types.py            # Pydantic models for I/O validation
-├── controllers/        # Operation controllers
-│   ├── batch_train.py  # Batch training controller
-│   ├── single_train.py # Single training controller
-│   └── predict.py      # Prediction controller
-├── services/           # Model services (service-oriented)
-│   ├── regression/     # Regression models service
-│   │   ├── base.py     # Abstract base class
-│   │   ├── ridge.py    # Ridge regression
-│   │   ├── lasso.py    # Lasso regression
-│   │   ├── linear.py   # Linear regression
-│   │   ├── polynomial.py # Polynomial regression
-│   │   ├── knn.py      # K-Nearest Neighbors
-│   │   ├── decision_tree.py
-│   │   ├── random_forest.py
-│   │   ├── adaboost.py
-│   │   ├── gbdt.py
-│   │   ├── xgboost.py
-│   │   ├── lightgbm.py
-│   │   └── bayesian_ridge.py
-│   └── classification/ # Classification models service
-│       ├── base.py     # Abstract base class
-│       ├── logistic_regression.py
-│       └── random_forest.py
-└── utils/
-    ├── logger.py       # Structured logging to stdout
-    └── file_io.py      # File system operations
-```
-
-## Entry Points
-
-### main.py - stdio/shell
-
-Reads JSON from stdin, executes operation, outputs JSON lines to stdout.
-
-**Input**: Single JSON object via stdin
-```json
-{
-  "operation": "batch-train",
-  "data": {
-    "task_id": 123,
-    "input_file": "data.xlsx",
-    "model": "regression.ridge",
-    ...
-  }
-}
+spawn_subprocess(task_id, operation, data):
+    base_path = calculate_task_path(task_id)
+    process = create_subprocess("main.py", "--base-path", base_path)
+    process.stdin.write(json(operation, data))
+    return 202_ACCEPTED
 ```
 
-**Output**: JSON lines to stdout
-```json
-{"type": "log", "severity_text": "INFO", "body": "Starting batch training...", ...}
-{"type": "log", "severity_text": "INFO", "body": "Model metrics: R²=0.92", ...}
-{"type": "result", "data": {"task_id": 123, "best_params": {...}, ...}}
+### ML Script (main.py)
+
+**Responsibilities**:
+- Parse --base-path CLI arg
+- Read operation from stdin
+- Create TaskLogger instance
+- Execute ML operation
+- Write result.json
+- Flush logs.jsonl
+- Exit with status code
+
+**Interface**:
+```
+main():
+    base_path = parse_cli_args()
+    request = read_stdin()
+    logger = TaskLogger(task_id, base_path)
+    result = execute_operation(request, logger)
+    write_result(result)
+    logger.flush()
+    exit(0)
 ```
 
-### fc_handler.py - Aliyun FC
+### Controllers
 
-Event handler following Aliyun FC Python conventions.
+Request routing and file I/O coordination.
 
-**Signature**: `handler(event, context) -> dict`
+**Available**:
+- batch_train - GridSearchCV tuning
+- single_train - Fixed parameters
+- predict - Batch predictions
 
-**Input**: FC event (dict or bytes)
-```python
-{
-  "operation": "batch-train",
-  "data": {...}
-}
+**Signature**: `(input_data, logger: TaskLogger) → Output`
+
+**Workflow**:
+1. Validate input
+2. Log progress
+3. Delegate to model service
+4. Save trained model
+5. Return structured result
+
+### Services (Model Registry)
+
+Model-specific training/prediction logic.
+
+**Base Interface**:
+```
+abstract class ModelBase:
+    abstract batch_train(dataframe, input) → {model, best_params, metrics}
+    abstract single_train(dataframe, input) → {model, metrics}
+    abstract predict(train_df, predict_df, input) → predictions_df
 ```
 
-**Output**: FC response
-```python
-{
-  "statusCode": 200,
-  "headers": {"Content-Type": "application/json"},
-  "body": "{\"success\": true, \"data\": {...}}"
-}
+**Available Models**:
+- Linear: linear, ridge, lasso, bayesian_ridge
+- Polynomial: polynomial
+- Instance-based: knn
+- Tree-based: decision_tree, random_forest
+- Boosting: adaboost, gbdt, xgboost, lightgbm
+
+### TaskLogger
+
+Per-task logger instance with batch writes.
+
+**Features**:
+- Instance-based (no globals)
+- Memory buffer (size: 10)
+- Batch writes to logs.jsonl
+- JSONL format
+- Stdout passthrough
+
+**Interface**:
+```
+class TaskLogger:
+    init(task_id, base_path, batch_size=10)
+    log(message, level, attributes)
+    flush()
+    get_logs() → [log_entries]
 ```
 
-## Operations
+## Request Flow
 
-### Batch Training
+### Lifecycle
 
-GridSearchCV hyperparameter optimization.
+1. **Client request**: POST /execute with task_id
+2. **Server response**: 202 Accepted immediately
+3. **Background spawn**: `python main.py --base-path /tasks/{id}`
+4. **Subprocess executes**: Sets config, creates logger, runs operation
+5. **Writes results**: result.json, logs.jsonl, model.pkl
+6. **Process exits**: Status code 0 (success) or 1 (failure)
+7. **Client polls**: GET /tasks/{id}/result until complete
 
-**Input**:
-- `input_file` - Training data path (xlsx/csv)
-- `model` - Model name (e.g., `regression.ridge`)
-- `feature_columns` - Feature column names
-- `target_column` - Target column name
-- `param_grid` - Parameter grid for tuning
+### Data Flow
 
-**Output**:
-- `best_params` - Best parameters found
-- `metrics` - r2, mse, mae, rmse, cv_scores
-- `model_path` - Saved model file path
-
-**Process**:
-1. Read training data from file system
-2. Split into train/test (80/20)
-3. Run GridSearchCV with 5-fold CV
-4. Evaluate on test set
-5. Save model to file system
-6. Return metrics and model path
-
-### Single Training
-
-Training with specific parameters (no tuning).
-
-**Input**: Same as batch training but `params` instead of `param_grid`
-
-**Output**: Same as batch training (without cv_scores)
-
-**Process**: Same as batch training but skips GridSearchCV
-
-### Prediction
-
-Batch predictions using trained model.
-
-**Input**:
-- `train_data` - Training data path
-- `predict_data` - Prediction data path or inline JSON array
-- `output_path` - Where to save predictions
-- `model` - Model name
-- `params` - Model parameters
-- `feature_columns` - Feature columns
-- `target_column` - Target column
-
-**Output**:
-- `predictions_path` - Saved predictions file path
-- `record_count` - Number of predictions
-- `metrics` - Optional (if target exists in predict data)
-
-**Process**:
-1. Read training data
-2. Train model with specified params
-3. Read prediction data (file or inline)
-4. Generate predictions
-5. Save predictions to file system
-6. Calculate metrics if target available
-
-## Service-Oriented Architecture
-
-ml-backend uses a service-oriented architecture where each model is a service that implements standard interfaces.
-
-**Controllers** handle request routing and file I/O. They delegate ML operations to model services.
-
-**Services** implement model-specific training and prediction logic. Each service:
-- Extends base class (`RegressionModelBase` or `ClassificationModelBase`)
-- Implements `batch_train()`, `single_train()`, and `predict()` methods
-- Defines model class, default parameters, and parameter grid
-
-This design allows:
-- Easy addition of new models (implement base class)
-- Consistent API across all models
-- Separation of concerns (controllers handle I/O, services handle ML)
-- Model-specific optimizations (e.g., polynomial uses pipeline)
-
-## Model Registry
-
-12 regression models with default parameter grids:
-
-**Linear Models**:
-- `regression.linear` - Linear Regression
-- `regression.ridge` - Ridge Regression
-- `regression.lasso` - Lasso Regression
-- `regression.bayesian_ridge` - Bayesian Ridge
-
-**Polynomial**:
-- `regression.polynomial` - Polynomial Regression (pipeline)
-
-**Instance-based**:
-- `regression.knn` - K-Nearest Neighbors
-
-**Tree-based**:
-- `regression.decision_tree` - Decision Tree
-- `regression.random_forest` - Random Forest
-
-**Boosting**:
-- `regression.adaboost` - AdaBoost
-- `regression.gbdt` - Gradient Boosting (GBDT)
-- `regression.xgboost` - XGBoost
-- `regression.lightgbm` - LightGBM
-
-**Classification models** (basic support):
-- `classification.logistic_regression` - Logistic Regression
-- `classification.random_forest` - Random Forest Classifier
-
-Each model service:
-- Extends base class with abstract methods
-- Implements model class, default parameters, and parameter grid
-- Provides batch_train(), single_train(), and predict() methods
-
-## File System I/O
-
-All file operations use configurable base path.
-
-**Path Resolution**:
-- Absolute paths used as-is
-- Relative paths resolved from `ML_BASE_PATH`
-
-**Supported Formats**:
-- Input: `.xlsx`, `.xls`, `.csv`
-- Output: `.xlsx`, `.csv` (default: csv)
-
-**Directories**:
-- `ML_BASE_PATH` - Base directory (default: `/tmp/ml-backend`)
-- `MODEL_STORAGE_PATH` - Model storage (default: `{BASE_PATH}/models`)
-- `DATA_STORAGE_PATH` - Data storage (default: `{BASE_PATH}/data`)
-
-All directories created automatically on startup.
-
-## Logging
-
-Structured logging to stdout using OpenTelemetry-like format.
-
-**Log Entry**:
-```json
-{
-  "type": "log",
-  "timestamp": 1234567890123456789,
-  "observed_timestamp": 1234567890123456789,
-  "severity_text": "INFO",
-  "severity_number": 9,
-  "body": "Log message",
-  "resource": {
-    "service.name": "ml-backend",
-    "service.version": "2.0.0"
-  },
-  "attributes": {
-    "task_id": 123,
-    ...
-  }
-}
+```
+Client
+  ↓ POST /execute
+Server (server.py)
+  ↓ spawn with stdin
+Subprocess (main.py)
+  ↓ write files
+Filesystem
+  ├─ result.json
+  ├─ logs.jsonl
+  └─ models/model.pkl
+  ↑ read files
+Server (GET /tasks/{id}/result)
+  ↑ return JSON
+Client
 ```
 
-**Severity Levels**:
-- DEBUG (5)
-- INFO (9)
-- WARNING (13)
-- ERROR (17)
-- CRITICAL (21)
+## HTTP API
 
-Logs written to stdout, one JSON object per line. External systems can parse and store logs as needed.
+### POST /execute
+Fire-and-forget execution.
 
-## Configuration
+**Request**: `{operation, data: {task_id, ...}}`
+**Response**: `{status: "accepted", task_id}`
+**Status**: 202 Accepted
 
-Environment variables:
+### GET /tasks/{task_id}/result
+Check completion.
 
-**Required**: None (all have defaults)
+**Pending**: `{status: "pending"}`
+**Success**: `{status: "completed", result: {...}}`
+**Failure**: `{status: "failed", error, traceback}`
 
-**Optional**:
-- `ML_BASE_PATH` - Base path for file operations
-- `MODEL_STORAGE_PATH` - Model storage directory
-- `DATA_STORAGE_PATH` - Data storage directory
-- `DATABASE_URL` - PostgreSQL connection (for future DB logging)
-- `LOG_LEVEL` - Logging level (DEBUG/INFO/WARNING/ERROR)
+### GET /health
+Health check.
+
+**Response**: `{status: "healthy"}`
 
 ## Error Handling
 
-**Validation Errors**: Pydantic validates all inputs. Invalid data raises validation error with details.
+### Server Errors
+- Spawn failure → write error to result.json
+- Log subprocess stdout/stderr
+- Server continues running
 
-**File Errors**: Missing files, unsupported formats raise specific errors.
+### Subprocess Errors
+- Validation errors → captured with traceback
+- File I/O errors → captured with traceback
+- Training errors → captured with traceback
+- All errors → result.json with status: "failed"
+- Logs written before exit
 
-**Model Errors**: Unknown models, invalid parameters raise descriptive errors.
+**Error Format**: `{status: "failed", error: "message", traceback: "..."}`
 
-**Training Errors**: Failures during training (e.g., convergence issues) propagated with full traceback.
+## Configuration
 
-**Error Output**:
-```json
-{
-  "type": "error",
-  "error": "Error message",
-  "traceback": "Full traceback..."
-}
-```
+**Environment**:
+- ML_BASE_PATH - Global base (default: /tmp/ml-backend)
+- PORT - Server port (default: 8000)
+- HOST - Server host (default: 0.0.0.0)
 
-Exit code 1 for shell, statusCode 500 for FC.
+**Task Paths**: `{ML_BASE_PATH}/tasks/{task_id}`
+
+**CLI Args**: `main.py --base-path {path}`
 
 ## Performance
 
-**Parallel Training**: GridSearchCV uses `n_jobs=-1` (all cores)
+### Concurrency
+- Multiple tasks: Separate processes, no GIL contention
+- HTTP server: Thousands requests/sec (async I/O)
+- CPU: GridSearchCV uses all cores
 
-**Memory**: Models and data loaded into memory. Large datasets may require more RAM.
+### Scalability
+- Horizontal: Multiple servers behind load balancer
+- Vertical: CPU scales with core count
+- Memory: Independent per subprocess
 
-**File I/O**: Single-threaded file operations. Fast for typical dataset sizes (<100MB).
+### Optimization
+- Use CSV over Excel (faster I/O)
+- Smaller parameter grids (faster tuning)
+- Single-train for production (skip tuning)
 
-**Optimization**:
-- Use CSV instead of Excel for faster I/O
-- Reduce parameter grid size for faster tuning
-- Use single-train for production (skip tuning)
+## Related
 
-## Deployment
-
-**Local/Shell**: Run `main.py` directly with Python 3.8+
-
-**Aliyun FC**: Deploy `fc_handler.py` as Python 3.9/3.10 function
-
-See [DEPLOYMENT.md](DEPLOYMENT.md) for deployment instructions.
+- [FILESYSTEM.md](FILESYSTEM.md) - Filesystem structure
+- [PROCESSES.md](PROCESSES.md) - Process model
