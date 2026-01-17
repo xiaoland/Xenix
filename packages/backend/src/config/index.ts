@@ -17,9 +17,6 @@ const configSchema = z.object({
   // Database
   DATABASE_URL: z.string().url(),
 
-  // Redis
-  REDIS_URL: z.string().url().default('redis://localhost:6379'),
-
   // Authentication
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
 

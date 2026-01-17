@@ -26,6 +26,26 @@ class Config:
     IS_FC_ENV: bool = os.getenv("FC_FUNC_CODE_PATH") is not None
 
     @classmethod
+    def set_base_path(cls, base_path: str):
+        """
+        Set base path and recalculate dependent paths
+
+        Args:
+            base_path: New base path for file operations
+        """
+        cls.BASE_PATH = base_path
+
+        # Recalculate dependent paths (only if not explicitly set via env vars)
+        if not os.getenv("MODEL_STORAGE_PATH"):
+            cls.MODEL_STORAGE_PATH = f"{base_path}/models"
+
+        if not os.getenv("DATA_STORAGE_PATH"):
+            cls.DATA_STORAGE_PATH = f"{base_path}/data"
+
+        # Ensure directories exist with new paths
+        cls.ensure_directories()
+
+    @classmethod
     def ensure_directories(cls):
         """Ensure all required directories exist"""
         os.makedirs(cls.BASE_PATH, exist_ok=True)

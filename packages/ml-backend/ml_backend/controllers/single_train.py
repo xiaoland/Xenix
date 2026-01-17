@@ -6,11 +6,12 @@ from datetime import datetime
 
 from ..types import SingleTrainInput, SingleTrainOutput
 from ..services import get_model
-from ..utils import log, read_data
+from ..utils import read_data
+from ..utils.logger import TaskLogger
 from ..config import Config
 
 
-def single_train(input_data: SingleTrainInput) -> SingleTrainOutput:
+def single_train(input_data: SingleTrainInput, logger: TaskLogger) -> SingleTrainOutput:
     """
     Single training with specific parameters (no tuning)
 
@@ -22,7 +23,7 @@ def single_train(input_data: SingleTrainInput) -> SingleTrainOutput:
     Returns:
         Single training output with metrics
     """
-    log(f"Starting single training for model {input_data.model}", "INFO", {
+    logger.log(f"Starting single training for model {input_data.model}", "INFO", {
         "model": input_data.model,
         "features": input_data.feature_columns,
         "target": input_data.target_column,
@@ -31,20 +32,20 @@ def single_train(input_data: SingleTrainInput) -> SingleTrainOutput:
 
     try:
         # Read training data
-        log(f"Reading training data from {input_data.input_file}", "INFO")
+        logger.log(f"Reading training data from {input_data.input_file}", "INFO")
         df = read_data(input_data.input_file)
 
-        log(f"Training data loaded: {len(df)} rows, {len(df.columns)} columns", "INFO")
+        logger.log(f"Training data loaded: {len(df)} rows, {len(df.columns)} columns", "INFO")
 
         # Get model service
         model_service = get_model(input_data.model)
 
-        log(f"Using model service: {model_service.__class__.__name__}", "INFO")
+        logger.log(f"Using model service: {model_service.__class__.__name__}", "INFO")
 
         # Delegate training to model service
         result = model_service.single_train(df, input_data)
 
-        log(f"Model metrics: {result['metrics']}", "INFO")
+        logger.log(f"Model metrics: {result['metrics']}", "INFO")
 
         # Save model
         Config.ensure_directories()
@@ -53,7 +54,7 @@ def single_train(input_data: SingleTrainInput) -> SingleTrainOutput:
         model_path = os.path.join(Config.MODEL_STORAGE_PATH, model_filename)
 
         joblib.dump(result['model'], model_path)
-        log(f"Model saved to {model_path}", "INFO")
+        logger.log(f"Model saved to {model_path}", "INFO")
 
         # Return result
         output = SingleTrainOutput(
@@ -63,9 +64,9 @@ def single_train(input_data: SingleTrainInput) -> SingleTrainOutput:
             timestamp=datetime.now().isoformat()
         )
 
-        log("Single training completed successfully", "INFO")
+        logger.log("Single training completed successfully", "INFO")
         return output
 
     except Exception as e:
-        log(f"Single training failed: {str(e)}", "ERROR", {"error": str(e)})
+        logger.log(f"Single training failed: {str(e)}", "ERROR", {"error": str(e)})
         raise
