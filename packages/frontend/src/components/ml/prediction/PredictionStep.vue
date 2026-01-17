@@ -175,6 +175,7 @@ import { computed, ref } from "vue";
 
 import { client } from "../../../api/client";
 import { AVAILABLE_MODELS } from "../../../constants/models";
+import { API_CONFIG } from "../../../constants/config";
 import PredictionResult from "./PredictionResult.vue";
 
 const props = defineProps<{
@@ -285,11 +286,17 @@ const startPredictionFromFile = async () => {
     formData.append("model", props.selectedModel);
     formData.append("tuningTaskId", String(props.taskId));
 
-    // Call the API
-    const response = await fetch("/api/predict/file", {
+    // Use fetch directly for FormData to ensure proper Content-Type with boundary
+    const token = localStorage.getItem("auth_token");
+    const apiUrl = import.meta.env.VITE_API_URL || API_CONFIG.DEFAULT_URL;
+
+    const response = await fetch(`${apiUrl}/predict/file`, {
       method: "POST",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        // Don't set Content-Type - let browser set it with boundary
+      },
       body: formData,
-      credentials: "include",
     });
 
     if (!response.ok) {
