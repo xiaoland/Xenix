@@ -6,6 +6,7 @@ This is a monorepo containing the Xenix ML Platform packages.
 
 ```bash
 packages/
+├── ml-backend/  # FastAPI + Python ML Scripts
 ├── backend/     # Hono API server
 ├── frontend/    # Vite + Vue 3 SPA
 └── shared/      # Shared TypeScript types
@@ -96,18 +97,3 @@ Vite + Vue 3 single-page application with:
 ### Shared (`@xenix/shared`)
 
 Common TypeScript types and utilities shared between frontend and backend.
-
-## Migration from Nuxt.js
-
-This project was migrated from a Nuxt.js fullstack application to a monorepo structure. Key changes:
-
-- **Frontend**: Nuxt.js SSR/SSG → Vite + Vue 3 SPA
-- **Backend**: Nitro → Hono
-- **Structure**: Monolithic → Monorepo
-
-Benefits:
-
-- Faster build times with Vite
-- Independent deployment of frontend and backend
-- Clearer separation of concerns
-- Lightweight backend with Hono

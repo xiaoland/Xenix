@@ -15,8 +15,8 @@ resources:
       description: Python ML dependencies (pandas, sklearn, xgboost, lightgbm, etc.)
       compatibleRuntime: [python3.9, python3.10]
       code: ./
-      # Layer should contain requirements.txt and will be installed to /opt/python
-      # Note: Build the layer by running: pip install -r requirements.txt -t python/
+      # Layer should contain dependencies installed to /opt/python
+      # Note: Build the layer by running: ./build_layer.sh (PDM export + pip install)
 
   # Batch training worker
   ml-batch-train:

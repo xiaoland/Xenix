@@ -11,6 +11,7 @@ Pure Python ML backend for Xenix. Performs machine learning operations (training
 ## Models
 
 **12 regression models**:
+
 - Linear Regression, Ridge, Lasso
 - Polynomial Regression
 - Bayesian Ridge Regression
@@ -19,13 +20,23 @@ Pure Python ML backend for Xenix. Performs machine learning operations (training
 - AdaBoost, GBDT, XGBoost, LightGBM
 
 **2 classification models**:
+
 - Logistic Regression
 - Random Forest Classifier
 
 ## Installation
 
+Using PDM (recommended, pyproject.toml is the single source of truth):
+
 ```bash
-pip install -r requirements.txt
+pdm install
+```
+
+If you need a pip-compatible file, export from PDM first:
+
+```bash
+pdm export -f requirements --without-hashes -o /tmp/ml-backend-deps.txt
+pip install -r /tmp/ml-backend-deps.txt
 ```
 
 ## Usage
@@ -86,6 +97,7 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for deployment instructions.
 **Input**: JSON via stdin (for main.py) or FC event (for fc_handler.py)
 
 **Output**: JSON lines to stdout
+
 - Logs: `{"type": "log", "severity_text": "INFO", "body": "message", ...}`
 - Result: `{"type": "result", "data": {...}}`
 - Error: `{"type": "error", "error": "message", "traceback": "..."}`
@@ -93,6 +105,7 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for deployment instructions.
 ## Configuration
 
 Environment variables:
+
 - `ML_BASE_PATH` - Base path for file operations (default: `/tmp/ml-backend`)
 - `MODEL_STORAGE_PATH` - Model storage path (default: `{BASE_PATH}/models`)
 - `DATA_STORAGE_PATH` - Data storage path (default: `{BASE_PATH}/data`)
@@ -125,7 +138,6 @@ ml-backend/
 │   └── utils/           # Utilities
 │       ├── logger.py
 │       └── file_io.py
-├── requirements.txt     # Dependencies
 └── tests/               # Tests
 ```
 

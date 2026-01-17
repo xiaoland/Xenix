@@ -5,16 +5,19 @@ Deploy ml-backend to Aliyun Function Compute using Serverless Devs.
 ## Prerequisites
 
 **Required**:
+
 - Aliyun account with Function Compute access
 - Aliyun NAS with OSS mount configured
 - [Serverless Devs](https://www.serverless-devs.com/) installed
 
 **Install Serverless Devs**:
+
 ```bash
 npm install -g @serverless-devs/s
 ```
 
 **Configure Aliyun access**:
+
 ```bash
 s config add
 # Follow prompts to add Aliyun AccessKey
@@ -158,7 +161,7 @@ s metrics ml-batch-train
 After code changes, rebuild and redeploy:
 
 ```bash
-# Update dependencies if requirements.txt changed
+# Re-export dependencies from pyproject.toml and rebuild the layer
 ./build_layer.sh
 s deploy xenix-ml-python-layer
 
@@ -214,6 +217,7 @@ Training data, models, and predictions are stored in NAS/OSS:
 ## Troubleshooting
 
 **Layer build fails**:
+
 ```bash
 # Use Python 3.10 environment
 python3.10 -m venv venv
@@ -222,19 +226,22 @@ source venv/bin/activate
 ```
 
 **Function timeout**:
+
 - Increase timeout in `s.yaml` (max 600 seconds)
 - Check data file size (large files need more time)
 - Monitor memory usage in FC console
 
 **NAS mount error**:
+
 - Verify `OSS_NAS_SERVER_ADDR` is correct
 - Check NAS permissions (userId/groupId must match)
 - Ensure NAS and FC function in same VPC
 
 **Import errors**:
+
 - Verify layer deployed successfully: `s info xenix-ml-python-layer`
 - Check `PYTHONPATH` includes `/opt/python` and `/code`
-- Rebuild layer if requirements.txt changed
+- Rebuild layer after dependency changes in pyproject.toml
 
 ## Resources
 

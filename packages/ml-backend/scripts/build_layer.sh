@@ -10,9 +10,19 @@ echo "Building Python layer for Aliyun FC..."
 rm -rf python/
 mkdir -p python/
 
+tmp_dir=".pdm-export"
+req_file="${tmp_dir}/requirements.txt"
+
+echo "Exporting dependencies from pyproject.toml with PDM..."
+mkdir -p "${tmp_dir}"
+pdm export -f requirements --without-hashes -o "${req_file}"
+
 # Install dependencies to python/ directory
 echo "Installing dependencies to python/ directory..."
-pip install -r requirements.txt -t python/ --upgrade
+pip install -r "${req_file}" -t python/ --upgrade
+
+# Cleanup exported requirements
+rm -rf "${tmp_dir}"
 
 echo "Python layer built successfully at ./python/"
 echo "Layer size:"

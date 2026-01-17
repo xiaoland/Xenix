@@ -4,13 +4,22 @@
 
 ### Prerequisites
 
-- Python 3.8+
-- pip
+- Python 3.12+
+- [PDM](https://pdm.fming.dev/latest/) (preferred)
 
 ### Install
 
+Recommended:
+
 ```bash
-pip install -r requirements.txt
+pdm install
+```
+
+If you must use pip, export from PDM first so pyproject.toml stays the single source of truth:
+
+```bash
+pdm export -f requirements --without-hashes -o /tmp/ml-backend-deps.txt
+pip install -r /tmp/ml-backend-deps.txt
 ```
 
 ## Development
@@ -121,7 +130,6 @@ ml-backend/
 │       ├── __init__.py
 │       ├── logger.py
 │       └── file_io.py
-├── requirements.txt     # Dependencies
 └── tests/               # Unit tests
 ```
 
@@ -163,6 +171,7 @@ echo '...' | python main.py
 ```
 
 Output includes:
+
 - Log entries with timestamps
 - Model parameters
 - Training metrics
