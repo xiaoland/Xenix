@@ -163,8 +163,8 @@ async function handleSignup() {
     });
 
     if (result.success) {
-      // Redirect to signin with success message
-      await router.push('/auth/signin?signup=success');
+      // Auto-login successful - redirect to home
+      await router.push('/');
     } else {
       errorMessage.value = result.error || t('auth.signup.signupError');
     }
