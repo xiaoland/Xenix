@@ -42,8 +42,7 @@ UPDATE ml_backend_deployments
 SET
   deployment_type = 'http',
   deployment_params = jsonb_build_object(
-    'apiUrl', 'http://localhost:8000',
-    'basePath', deployment_params->>'basePath'
+    'apiUrl', 'http://localhost:8000'
   )
 WHERE name = 'local-spawn';
 
@@ -51,7 +50,6 @@ UPDATE ml_backend_deployments
 SET
   deployment_type = 'http',
   deployment_params = jsonb_build_object(
-    'apiUrl', 'https://your-fc-domain.aliyuncs.com',
-    'basePath', deployment_params->>'basePath'
+    'apiUrl', 'https://ml-backend.example.com'
   )
 WHERE name = 'aliyun-fc-prod';

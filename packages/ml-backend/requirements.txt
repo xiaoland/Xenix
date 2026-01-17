@@ -16,5 +16,9 @@ joblib>=1.4.2
 # Validation and data modeling
 pydantic>=2.12.5
 
+# HTTP Server
+fastapi>=0.115.0
+uvicorn[standard]>=0.34.0
+
 # Database (optional, for logging)
 psycopg2-binary>=2.9.10
