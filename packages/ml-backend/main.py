@@ -19,6 +19,8 @@ import json
 import argparse
 import traceback
 
+from pathlib import Path
+
 from ml_backend.config import Config
 from ml_backend.types import (
     OperationRequest,
@@ -27,11 +29,14 @@ from ml_backend.types import (
     PredictInput
 )
 from ml_backend.controllers import batch_train, single_train, predict
-from ml_backend.utils import init_logger, log, output_result, flush_logs
+from ml_backend.utils.logger import TaskLogger
 
 
 def main():
-    """Main entry point - reads from stdin, outputs to stdout"""
+    """Main entry point - reads from stdin, writes results to result.json"""
+    logger = None
+    task_id = None
+
     try:
         # Parse command line arguments
         parser = argparse.ArgumentParser(description='ML Backend - stdio interface')
@@ -62,13 +67,13 @@ def main():
         if not task_id:
             raise ValueError("Missing task_id in request data")
 
-        # Initialize logger with base_path for log file
-        init_logger(task_id, base_path=Config.BASE_PATH)
+        # Create logger instance for this task
+        logger = TaskLogger(task_id, base_path=Config.BASE_PATH)
 
         # Ensure directories exist
         Config.ensure_directories()
 
-        log(f"Processing {request.operation} operation", "INFO", {
+        logger.log(f"Processing {request.operation} operation", "INFO", {
             "operation": request.operation,
             "task_id": task_id
         })
@@ -78,15 +83,15 @@ def main():
 
         if request.operation == "batch-train":
             input_data = BatchTrainInput(**request.data)
-            result = batch_train(input_data)
+            result = batch_train(input_data, logger)
 
         elif request.operation == "single-train":
             input_data = SingleTrainInput(**request.data)
-            result = single_train(input_data)
+            result = single_train(input_data, logger)
 
         elif request.operation == "predict":
             input_data = PredictInput(**request.data)
-            result = predict(input_data)
+            result = predict(input_data, logger)
 
         else:
             raise ValueError(
@@ -94,8 +99,22 @@ def main():
                 f"Supported: batch-train, single-train, predict"
             )
 
-        # Output result
-        output_result(result.model_dump())
+        # Store successful result in result.json
+        result_file = Path(Config.BASE_PATH) / "result.json"
+        result_file.parent.mkdir(parents=True, exist_ok=True)
+
+        result_data = {
+            "status": "completed",
+            "result": result.model_dump() if result else None
+        }
+
+        with open(result_file, 'w') as f:
+            json.dump(result_data, f, indent=2)
+
+        logger.log("Operation completed successfully", "INFO")
+
+        # Flush any remaining logs
+        logger.flush()
 
         # Exit successfully
         sys.exit(0)
@@ -105,18 +124,37 @@ def main():
         error_msg = str(e)
         error_trace = traceback.format_exc()
 
-        log(f"Operation failed: {error_msg}", "ERROR", {
-            "error": error_msg,
-            "traceback": error_trace
-        })
+        # Log using logger if available
+        if logger:
+            logger.log(f"Operation failed: {error_msg}", "ERROR", {
+                "error": error_msg,
+                "traceback": error_trace
+            })
 
-        # Output error result
-        error_output = {
-            "type": "error",
-            "error": error_msg,
-            "traceback": error_trace
-        }
-        print(json.dumps(error_output), file=sys.stdout, flush=True)
+        # Print to stderr for debugging
+        print(f"ERROR: {error_msg}", file=sys.stderr, flush=True)
+        print(error_trace, file=sys.stderr, flush=True)
+
+        # Store error result in result.json
+        if Config.BASE_PATH:
+            result_file = Path(Config.BASE_PATH) / "result.json"
+            result_file.parent.mkdir(parents=True, exist_ok=True)
+
+            error_data = {
+                "status": "failed",
+                "error": error_msg,
+                "traceback": error_trace
+            }
+
+            try:
+                with open(result_file, 'w') as f:
+                    json.dump(error_data, f, indent=2)
+            except Exception as write_error:
+                print(f"Failed to write error result: {write_error}", file=sys.stderr, flush=True)
+
+        # Flush logs if logger exists
+        if logger:
+            logger.flush()
 
         # Exit with error
         sys.exit(1)

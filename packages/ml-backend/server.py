@@ -10,18 +10,14 @@ Usage:
 
 import os
 import json
-import traceback
+import subprocess
+import sys
 from pathlib import Path
 from typing import Dict, Any
 import asyncio
 
 from fastapi import FastAPI, Request, BackgroundTasks, Response
 from pydantic import BaseModel, Field
-
-from ml_backend.config import Config
-from ml_backend.types import BatchTrainInput, SingleTrainInput, PredictInput
-from ml_backend.controllers import batch_train, single_train, predict
-from ml_backend.utils import init_logger, log, flush_logs
 
 app = FastAPI(title="ML Backend API", version="1.0.0")
 
@@ -49,7 +45,10 @@ def get_task_base_path(task_id: int) -> str:
 
 async def execute_task_async(operation: str, data: Dict[str, Any], base_path: str):
     """
-    Execute ML task asynchronously in background
+    Execute ML task asynchronously in a separate process
+
+    Spawns a new Python process to run main.py with the operation data.
+    This ensures CPU-intensive ML tasks don't block the FastAPI event loop.
 
     Args:
         operation: Operation type
@@ -57,88 +56,60 @@ async def execute_task_async(operation: str, data: Dict[str, Any], base_path: st
         base_path: Base path for task files
     """
     task_id = data.get("task_id")
-    result_file = Path(base_path) / "result.json"
+
+    # Prepare request payload for main.py
+    request_payload = {
+        "operation": operation,
+        "data": data
+    }
+    input_json = json.dumps(request_payload)
+
+    # Get path to main.py
+    server_dir = Path(__file__).parent
+    main_py_path = server_dir / "main.py"
 
     try:
-        # Set base path for this task
-        Config.set_base_path(base_path)
+        # Spawn subprocess to execute the task
+        process = await asyncio.create_subprocess_exec(
+            sys.executable,  # Python interpreter
+            str(main_py_path),
+            "--base-path", base_path,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
 
-        # Initialize logger with base_path for log file
-        init_logger(task_id, base_path=base_path)
+        # Send input data via stdin and wait for completion
+        stdout, stderr = await process.communicate(input=input_json.encode())
 
-        # Ensure directories exist
-        Config.ensure_directories()
+        # Log subprocess output for debugging
+        if stdout:
+            print(f"[Task {task_id}] stdout:", stdout.decode(), flush=True)
+        if stderr:
+            print(f"[Task {task_id}] stderr:", stderr.decode(), flush=True)
 
-        log(f"Starting {operation} operation", "INFO", {
-            "operation": operation,
-            "task_id": task_id,
-            "base_path": base_path
-        })
-
-        # Execute operation
-        result = None
-        if operation == "batch-train":
-            input_data = BatchTrainInput(**data)
-            result = batch_train(input_data)
-        elif operation == "single-train":
-            input_data = SingleTrainInput(**data)
-            result = single_train(input_data)
-        elif operation == "predict":
-            input_data = PredictInput(**data)
-            result = predict(input_data)
-        else:
-            raise ValueError(f"Unknown operation: {operation}")
-
-        # Store successful result
-        result_data = {
-            "status": "completed",
-            "result": result.model_dump() if result else None
-        }
-
-        # Ensure result directory exists
-        result_file.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(result_file, 'w') as f:
-            json.dump(result_data, f, indent=2)
-
-        log(f"Completed {operation} operation", "INFO", {
-            "operation": operation,
-            "task_id": task_id
-        })
-
-        # Flush any remaining logs to file
-        flush_logs()
+        # Check exit code
+        if process.returncode != 0:
+            print(f"[Task {task_id}] Process exited with code {process.returncode}", flush=True)
 
     except Exception as e:
-        # Store error result
-        error_msg = str(e)
-        error_trace = traceback.format_exc()
+        error_msg = f"Failed to spawn task process: {str(e)}"
+        print(f"[Task {task_id}] {error_msg}", flush=True)
 
-        log(f"Failed {operation} operation: {error_msg}", "ERROR", {
-            "operation": operation,
-            "task_id": task_id,
-            "error": error_msg,
-            "traceback": error_trace
-        })
+        # Write error to result.json
+        result_file = Path(base_path) / "result.json"
+        result_file.parent.mkdir(parents=True, exist_ok=True)
 
         error_data = {
             "status": "failed",
-            "error": error_msg,
-            "traceback": error_trace
+            "error": error_msg
         }
-
-        # Ensure result directory exists
-        result_file.parent.mkdir(parents=True, exist_ok=True)
 
         try:
             with open(result_file, 'w') as f:
                 json.dump(error_data, f, indent=2)
         except Exception as write_error:
-            # Log but don't raise - task already failed
             print(f"Failed to write error result: {write_error}", flush=True)
-
-        # Flush any remaining logs to file
-        flush_logs()
 
 
 @app.middleware("http")
