@@ -71,4 +71,24 @@ export class LocalStorage implements StorageService {
     // Copy file
     await fs.copyFile(sourcePath, destPath);
   }
+
+  async fetch(key: string, options?: { timeout?: number }): Promise<Response> {
+    // For local storage, read file from filesystem and return as Response
+    const filePath = this.getFilesystemPath(key);
+
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      return new Response(content, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        return new Response(null, { status: 404 });
+      }
+      throw error;
+    }
+  }
 }

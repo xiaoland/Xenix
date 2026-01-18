@@ -66,6 +66,7 @@ export const mlBackendDeployments = pgTable('ml_backend_deployments', {
   createdBy: uuid('created_by').references(() => users.id),
   apiUrl: text('api_url').notNull(),
   proxy: text('proxy'),
+  storage: text('storage').notNull().default('local'),
   createdAt: timestamp('created_at', { mode: 'date' })
     .$defaultFn(() => new Date())
     .notNull(),

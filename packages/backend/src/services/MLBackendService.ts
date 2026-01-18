@@ -8,6 +8,7 @@
 import type { InferSelectModel } from 'drizzle-orm';
 import { MLBackendDeploymentRepository } from '../repositories/MLBackendDeploymentRepository';
 import { mlBackendDeployments } from '../database/schema';
+import { storage } from '../storage';
 import logger from '../utils/logger';
 
 type MLBackendDeployment = InferSelectModel<typeof mlBackendDeployments>;
@@ -133,15 +134,31 @@ export class MLBackendService {
 
   /**
    * Check for task result
-   *
-   * Attempts to read result.json from the deployment.
-   * Returns null if result not available yet.
+   * Retrieves result based on deployment's storage configuration:
+   * - 'local': HTTP GET to {apiUrl}/tasks/{taskId}/result
+   * - 'oss': Signed GET request to OSS bucket
    *
    * @param deployment - ML backend deployment configuration
    * @param taskId - Task ID
    * @returns Task result or null if not available
    */
   async checkResult(
+    deployment: MLBackendDeployment,
+    taskId: number,
+  ): Promise<TaskResult | null> {
+    const storageType = deployment.storage || 'local';
+
+    if (storageType === 'oss') {
+      return this.checkResultFromOSS(taskId);
+    } else {
+      return this.checkResultFromHTTP(deployment, taskId);
+    }
+  }
+
+  /**
+   * Check result via HTTP (local deployments)
+   */
+  private async checkResultFromHTTP(
     deployment: MLBackendDeployment,
     taskId: number,
   ): Promise<TaskResult | null> {
@@ -158,11 +175,10 @@ export class MLBackendService {
         headers: {
           'Accept': 'application/json',
         },
-        signal: AbortSignal.timeout(3000), // 3 second timeout
+        signal: AbortSignal.timeout(3000),
       });
 
       if (response.status === 404 || response.status === 204) {
-        // Result not available yet
         return null;
       }
 
@@ -173,14 +189,13 @@ export class MLBackendService {
             taskId,
             status: response.status,
           },
-          'Failed to check task result',
+          'Failed to check task result via HTTP',
         );
         return null;
       }
 
-      const result: TaskResult = await response.json();
+      const result = await response.json() as TaskResult;
 
-      // If status is still pending, return null
       if (result.status === 'pending') {
         return null;
       }
@@ -191,12 +206,68 @@ export class MLBackendService {
           taskId,
           resultStatus: result.status,
         },
-        'Retrieved task result from ML backend',
+        'Retrieved task result from ML backend via HTTP',
       );
 
       return result;
     } catch (error) {
-      // Don't log errors for result checking - it's expected to fail sometimes
+      return null;
+    }
+  }
+
+  /**
+   * Check result from OSS storage (cloud deployments)
+   * Uses storage service to fetch results
+   */
+  private async checkResultFromOSS(
+    taskId: number,
+  ): Promise<TaskResult | null> {
+    const resultKey = `tasks/${taskId}/result.json`;
+
+    try {
+      // Fetch result from storage (uses aws4fetch internally for OSS)
+      const response = await storage.fetch(resultKey, { timeout: 3000 });
+
+      if (response.status === 404 || response.status === 204) {
+        // Result not available yet
+        return null;
+      }
+
+      if (!response.ok) {
+        logger.warn(
+          {
+            taskId,
+            status: response.status,
+          },
+          'Failed to check task result from storage',
+        );
+        return null;
+      }
+
+      const result = await response.json() as TaskResult;
+
+      if (result.status === 'pending') {
+        return null;
+      }
+
+      logger.info(
+        {
+          taskId,
+          resultStatus: result.status,
+          storageKey: resultKey,
+        },
+        'Retrieved task result from storage',
+      );
+
+      return result;
+    } catch (error) {
+      logger.debug(
+        {
+          taskId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Failed to read task result from storage',
+      );
       return null;
     }
   }

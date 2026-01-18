@@ -61,4 +61,12 @@ export interface StorageService {
    * @param destKey - Destination storage key
    */
   copy(sourceKey: string, destKey: string): Promise<void>;
+
+  /**
+   * Fetch file content from storage
+   * @param key - Storage key
+   * @param options - Fetch options (timeout, etc.)
+   * @returns Response object with file content
+   */
+  fetch(key: string, options?: { timeout?: number }): Promise<Response>;
 }

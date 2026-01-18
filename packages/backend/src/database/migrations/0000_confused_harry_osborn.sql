@@ -32,6 +32,7 @@ CREATE TABLE "ml_backend_deployments" (
 	"created_by" uuid,
 	"api_url" text NOT NULL,
 	"proxy" text,
+	"storage" text DEFAULT 'local' NOT NULL,
 	"created_at" timestamp NOT NULL
 );
 --> statement-breakpoint

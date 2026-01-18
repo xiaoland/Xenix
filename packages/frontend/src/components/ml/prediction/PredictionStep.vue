@@ -174,7 +174,7 @@ import type { UploadProps } from "ant-design-vue";
 import { computed, ref } from "vue";
 
 import { client } from "../../../api/client";
-import { AVAILABLE_MODELS } from "../../../constants/models";
+import { useModels } from "@/composables";
 import { API_CONFIG } from "../../../constants/config";
 import PredictionResult from "./PredictionResult.vue";
 
@@ -214,11 +214,14 @@ const inputColumns = computed(() => {
   return cols;
 });
 
+// Fetch available models from backend
+const { data: availableModels } = useModels();
+
 /**
  * Format model name for display
  */
 const formatModelName = (modelValue: string) => {
-  const model = AVAILABLE_MODELS.find((m) => m.value === modelValue);
+  const model = availableModels.value?.find((m) => m.value === modelValue);
   return model ? model.label : modelValue;
 };
 

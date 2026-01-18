@@ -173,8 +173,7 @@ import { message } from "ant-design-vue";
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
-import { useFormatters, useTasks } from "../../composables";
-import { AVAILABLE_MODELS } from "../../constants/models";
+import { useFormatters, useTasks, useModels } from "../../composables";
 import DefaultLayout from "../../layouts/DefaultLayout.vue";
 
 const { t } = useI18n();
@@ -249,11 +248,14 @@ const getStatusColor = (status: string) => {
   }
 };
 
+// Fetch available models from backend
+const { data: availableModels } = useModels();
+
 /**
  * Format model name
  */
 const formatModelName = (modelValue: string) => {
-  const model = AVAILABLE_MODELS.find((m) => m.value === modelValue);
+  const model = availableModels.value?.find((m) => m.value === modelValue);
   return model ? model.label : modelValue;
 };
 

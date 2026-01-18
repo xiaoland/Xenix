@@ -16,16 +16,10 @@
           v-model:value="selectedModel"
           :placeholder="$t('ml.tuning.selectPlaceholder')"
           style="width: 100%"
+          :options="availableModels"
+          :loading="isLoadingModels"
           @change="handleModelChange"
-        >
-          <a-select-option
-            v-for="model in availableModels"
-            :key="model.value"
-            :value="model.value"
-          >
-            {{ model.label }}
-          </a-select-option>
-        </a-select>
+        />
       </a-form-item>
 
       <!-- Parameter Form -->
@@ -61,7 +55,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { AVAILABLE_MODELS } from "../../../constants/models";
+import { useGroupedModels } from "@/composables";
 import ModelParamForm from "./ModelParamForm.vue";
 
 const props = defineProps<{
@@ -83,7 +77,8 @@ const formRef = ref();
 const formData = ref<Record<string, any>>({});
 const loading = ref(false);
 
-const availableModels = AVAILABLE_MODELS;
+// Fetch available models from backend (grouped by category)
+const { data: availableModels, isLoading: isLoadingModels } = useGroupedModels();
 
 const handleModelChange = () => {
   // Reset form data when model changes
