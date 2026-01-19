@@ -39,3 +39,7 @@
 ## ML Backend
 
 - [x] 构建时产出 model_metadata.json 让 backend 读取并自动化推送到数据库
+
+## Shared
+
+- [ ] 不要构建，直接引用源文件；backend、frontend打包的时候都带上

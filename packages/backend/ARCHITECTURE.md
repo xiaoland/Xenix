@@ -37,7 +37,7 @@ src/
 │   ├── DatasetService.ts
 │   ├── TaskService.ts
 │   ├── ModelService.ts
-│   ├── FCInvokeService.ts
+│   ├── MLBackendService.ts
 │   └── index.ts
 ├── repositories/        # Data access layer
 │   ├── BaseRepository.ts
@@ -149,9 +149,9 @@ Response:
 **ML Operations Flow**
 
 - Task created immediately (status=pending)
-- ML operation fired asynchronously
-- Returns 202 Accepted (not waiting for result)
-- Adapter selected at startup (can't switch during runtime)
+- ML operation fired asynchronously via MLBackendService
+- Returns 201 Created (not waiting for result)
+- MLBackendService handles both local HTTP and OSS-based deployments
 
 **Configuration**
 
@@ -311,39 +311,40 @@ Key points:
 
 ## ML Operations
 
-### Adapter Pattern
+### MLBackendService
 
-```
+MLBackendService provides a unified HTTP-based interface for communicating with ML backend deployments.
+
+```text
 User Request
   ↓
-batchTrain() called
+Route Handler (/train, /predict)
   ↓
-getMLBackendAdapter() selects:
-  ├─ SpawnAdapter (dev): spawn Node.js child process
-  │    ↓
-  │    Stdio protocol (JSONL)
-  │    Input: {task_id, input_file, model, ...}
-  │    Output: {type: "log|status|result", data}
-  │
-  └─ AliyunFCAdapter (prod): invoke FC function
-       ↓
-       Async invocation
-       FC reads from OSS
-       Results written to DB directly
+MLBackendService.execute()
+  ↓
+POST {deployment.apiUrl}/execute
+  - operation: 'batch-train' | 'single-train' | 'predict'
+  - data: { task_id, input_file, model, ... }
+  ↓
+ML Backend (local or cloud):
+  - Processes request asynchronously
+  - Writes results to storage (local or OSS)
+  - Updates task status in database
 ```
 
-### SpawnAdapter
+### Deployment Types
 
-- Spawns local Node.js process running ml-backend
-- Communication via stdio (JSON lines)
-- Blocks on result completion
+#### Local Deployment (storage='local')
+
+- ML backend runs as HTTP server on localhost
+- Results fetched via HTTP: `GET {apiUrl}/tasks/{taskId}/result`
 - Used for development
 
-### AliyunFCAdapter
+#### OSS Deployment (storage='oss')
 
-- Invokes Aliyun FC function asynchronously
-- FC handles: OSS read, Python exec, DB write
-- Non-blocking (fire-and-forget)
+- ML backend runs on Aliyun FC or other cloud infrastructure
+- Results stored in OSS bucket: `tasks/{taskId}/result.json`
+- MLBackendService fetches results directly from OSS
 - Used for production
 
 ## Job Queue (BullMQ)

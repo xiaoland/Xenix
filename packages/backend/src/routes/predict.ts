@@ -11,7 +11,6 @@ import { db, schema } from "../database";
 import { BadRequestError, NotFoundError } from "../errors";
 import { authMiddleware } from "../middleware/auth";
 import logger from "../utils/logger";
-import { fcInvokeService } from "../services/FCInvokeService";
 import { storage } from "../storage";
 import { config } from "../config";
 
@@ -93,69 +92,39 @@ const predict = new Hono()
     // Generate temporary task ID and output file path
     const tempTaskId = Date.now();
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    let outputFile: string;
+    const outputFile = path.join(
+      process.cwd(),
+      "uploads",
+      `inline_prediction_${workItemId}_${tempTaskId}_${timestamp}.xlsx`,
+    );
 
-    if (fcInvokeService.isAvailable()) {
-      // OSS storage key for production
-      outputFile = `predictions/${tempTaskId}/inline_prediction_${workItemId}_${tempTaskId}_${timestamp}.xlsx`;
-    } else {
-      // Local file path for development
-      outputFile = path.join(
-        process.cwd(),
-        "uploads",
-        `inline_prediction_${workItemId}_${tempTaskId}_${timestamp}.xlsx`,
-      );
-    }
+    // Execute prediction via ML backend
+    const mlRequest = mlService.predictInline(deploymentId, tempTaskId, {
+      trainingDataPath,
+      predictionData,
+      outputPath: outputFile,
+      model,
+      params,
+      featureColumns,
+      targetColumn,
+    });
 
-    // Execute prediction - use FC async invoke if available, otherwise ml-backend
-    if (fcInvokeService.isAvailable()) {
-      // FC async invoke (production)
-      const trainingStorageKey = `datasets/${workItem.datasetId}/${trainingDataset.fileName}`;
-      const trainingDataFile = storage.getFilesystemPath(trainingStorageKey);
-      const outputFilePath = storage.getFilesystemPath(outputFile);
+    // Wait 5s to check for errors (fire-and-forget pattern)
+    let hasError = false;
+    await Promise.race([
+      mlRequest.catch((error) => {
+        hasError = true;
+        logger.error(
+          { error: error.message, tempTaskId },
+          "ML backend request failed",
+        );
+        throw error;
+      }),
+      new Promise((resolve) => setTimeout(resolve, 5000)),
+    ]);
 
-      await fcInvokeService.invokeAsync({
-        functionName: "ml-predict-worker",
-        payload: {
-          taskId: tempTaskId,
-          trainingDataFile, // OSS mount path: /mnt/oss/datasets/...
-          predictionData,
-          outputFile: outputFilePath, // OSS mount path: /mnt/oss/predictions/...
-          model,
-          params,
-          featureColumns,
-          targetColumn,
-        },
-      });
-    } else {
-      // Local execution via ml-backend
-      const mlRequest = mlService.predictInline(deploymentId, tempTaskId, {
-        trainingDataPath,
-        predictionData,
-        outputPath: outputFile,
-        model,
-        params,
-        featureColumns,
-        targetColumn,
-      });
-
-      // Wait 5s to check for errors (fire-and-forget pattern)
-      let hasError = false;
-      await Promise.race([
-        mlRequest.catch((error) => {
-          hasError = true;
-          logger.error(
-            { error: error.message, tempTaskId },
-            "ML backend request failed",
-          );
-          throw error;
-        }),
-        new Promise((resolve) => setTimeout(resolve, 5000)),
-      ]);
-
-      if (hasError) {
-        throw new Error("ML backend request failed");
-      }
+    if (hasError) {
+      throw new Error("ML backend request failed");
     }
 
     // Create task record only after successful ML backend request
@@ -163,7 +132,7 @@ const predict = new Hono()
       .insert(schema.tasks)
       .values({
         workItemId,
-        mlBackendDeploymentId: fcInvokeService.isAvailable() ? null : deploymentId,
+        mlBackendDeploymentId: deploymentId,
         type: "predict",
         status: "pending",
         parameter: {

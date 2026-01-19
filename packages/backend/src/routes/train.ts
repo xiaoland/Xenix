@@ -80,11 +80,26 @@ const train = new Hono()
     const deploymentId = Number(process.env.ML_BACKEND_DEPLOYMENT_ID) || 0;
     const mlService = getMLBackendService();
 
-    // Generate temporary task ID for ml-backend request
-    const tempTaskId = Date.now();
+    // Create task record FIRST to get actual task ID
+    const [insertedTask] = await db
+      .insert(schema.tasks)
+      .values({
+        workItemId: workItemId,
+        mlBackendDeploymentId: deploymentId,
+        type: "batch-train",
+        status: "pending",
+        parameter: {
+          model,
+          datasetId,
+          featureColumns,
+          targetColumn,
+          paramGrid,
+        },
+      })
+      .returning();
 
-    // Fire ml-backend request
-    const mlRequest = mlService.batchTrain(deploymentId, tempTaskId, {
+    // Fire ml-backend request with actual task ID
+    const mlRequest = mlService.batchTrain(deploymentId, insertedTask.id, {
       inputFile: dataset.filePath,
       model,
       featureColumns,
@@ -94,11 +109,13 @@ const train = new Hono()
 
     // Wait 5s to check for errors (fire-and-forget pattern)
     let hasError = false;
+    let errorMessage = "";
     await Promise.race([
       mlRequest.catch((error) => {
         hasError = true;
+        errorMessage = error.message;
         logger.error(
-          { error: error.message, tempTaskId },
+          { error: error.message, taskId: insertedTask.id },
           "ML backend request failed",
         );
         throw error;
@@ -106,36 +123,30 @@ const train = new Hono()
       new Promise((resolve) => setTimeout(resolve, 5000)),
     ]);
 
-    // Only create task record if no error in 5s
-    if (!hasError) {
-      const [insertedTask] = await db
-        .insert(schema.tasks)
-        .values({
-          workItemId: workItemId || null,
-          mlBackendDeploymentId: deploymentId,
-          type: "batch-train",
-          status: "pending",
-          parameter: {
-            model,
-            datasetId,
-            featureColumns,
-            targetColumn,
-            paramGrid,
-          },
+    // Update task status based on error outcome
+    if (hasError) {
+      await db
+        .update(schema.tasks)
+        .set({
+          status: "failed",
+          error: errorMessage,
+          endAt: new Date(),
         })
-        .returning();
-
-      return c.json(
-        {
-          taskId: insertedTask.id,
-          message: "Batch training started",
-        },
-        201,
-      );
+        .where(eq(schema.tasks.id, insertedTask.id));
     } else {
-      // This shouldn't be reached due to throw, but for safety
-      throw new Error("ML backend request failed");
+      await db
+        .update(schema.tasks)
+        .set({ status: "running" })
+        .where(eq(schema.tasks.id, insertedTask.id));
     }
+
+    return c.json(
+      {
+        taskId: insertedTask.id,
+        message: "Batch training started",
+      },
+      201,
+    );
   })
 
   // Single-train endpoint
@@ -211,11 +222,26 @@ const train = new Hono()
             ) // OSS: /mnt/oss/datasets/...
           : dataset.filePath; // Local: full file path
 
-      // Generate temporary task ID for ml-backend request
-      const tempTaskId = Date.now();
+      // Create task record FIRST to get actual task ID
+      const [insertedTask] = await db
+        .insert(schema.tasks)
+        .values({
+          workItemId: workItemId || null,
+          mlBackendDeploymentId: deploymentId,
+          type: "single-train",
+          status: "pending",
+          parameter: {
+            model,
+            datasetId,
+            featureColumns,
+            targetColumn,
+            parameters,
+          },
+        })
+        .returning();
 
-      // Fire ml-backend request
-      const mlRequest = mlService.singleTrain(deploymentId, tempTaskId, {
+      // Fire ml-backend request with actual task ID
+      const mlRequest = mlService.singleTrain(deploymentId, insertedTask.id, {
         inputFile,
         model,
         featureColumns,
@@ -225,11 +251,13 @@ const train = new Hono()
 
       // Wait 5s to check for errors (fire-and-forget pattern)
       let hasError = false;
+      let errorMessage = "";
       await Promise.race([
         mlRequest.catch((error) => {
           hasError = true;
+          errorMessage = error.message;
           logger.error(
-            { error: error.message, tempTaskId },
+            { error: error.message, taskId: insertedTask.id },
             "ML backend request failed",
           );
           throw error;
@@ -237,36 +265,30 @@ const train = new Hono()
         new Promise((resolve) => setTimeout(resolve, 5000)),
       ]);
 
-      // Only create task record if no error in 5s
-      if (!hasError) {
-        const [insertedTask] = await db
-          .insert(schema.tasks)
-          .values({
-            workItemId: workItemId || null,
-            mlBackendDeploymentId: deploymentId,
-            type: "single-train",
-            status: "pending",
-            parameter: {
-              model,
-              datasetId,
-              featureColumns,
-              targetColumn,
-              parameters,
-            },
+      // Update task status based on error outcome
+      if (hasError) {
+        await db
+          .update(schema.tasks)
+          .set({
+            status: "failed",
+            error: errorMessage,
+            endAt: new Date(),
           })
-          .returning();
-
-        return c.json(
-          {
-            taskId: insertedTask.id,
-            message: "Single training started",
-          },
-          201,
-        );
+          .where(eq(schema.tasks.id, insertedTask.id));
       } else {
-        // This shouldn't be reached due to throw, but for safety
-        throw new Error("ML backend request failed");
+        await db
+          .update(schema.tasks)
+          .set({ status: "running" })
+          .where(eq(schema.tasks.id, insertedTask.id));
       }
+
+      return c.json(
+        {
+          taskId: insertedTask.id,
+          message: "Single training started",
+        },
+        201,
+      );
     },
   );
 

@@ -5,11 +5,11 @@
  * Supports fire-and-forget execution with result checking.
  */
 
-import type { InferSelectModel } from 'drizzle-orm';
-import { MLBackendDeploymentRepository } from '../repositories/MLBackendDeploymentRepository';
-import { mlBackendDeployments } from '../database/schema';
-import { storage } from '../storage';
-import logger from '../utils/logger';
+import type { InferSelectModel } from "drizzle-orm";
+import { MLBackendDeploymentRepository } from "../repositories/MLBackendDeploymentRepository";
+import { mlBackendDeployments } from "../database/schema";
+import { storage } from "../storage";
+import logger from "../utils/logger";
 
 type MLBackendDeployment = InferSelectModel<typeof mlBackendDeployments>;
 
@@ -19,7 +19,7 @@ export interface ExecuteOptions {
 }
 
 export interface TaskResult {
-  status: 'pending' | 'completed' | 'failed' | 'error';
+  status: "pending" | "completed" | "failed" | "error";
   result?: any;
   error?: string;
   traceback?: string;
@@ -36,7 +36,9 @@ export class MLBackendService {
   /**
    * Get deployment by ID
    */
-  private async getDeployment(deploymentId: number): Promise<MLBackendDeployment> {
+  private async getDeployment(
+    deploymentId: number,
+  ): Promise<MLBackendDeployment> {
     const deployment = await this.deploymentRepo.findById(deploymentId);
     if (!deployment) {
       throw new Error(`Deployment ${deploymentId} not found`);
@@ -61,7 +63,7 @@ export class MLBackendService {
     const taskId = options.data.task_id;
 
     if (!taskId) {
-      throw new Error('task_id is required in operation data');
+      throw new Error("task_id is required in operation data");
     }
 
     const apiUrl = deployment.apiUrl;
@@ -86,13 +88,13 @@ export class MLBackendService {
           operation: options.operation,
           taskId,
         },
-        'Executing ML operation via HTTP',
+        "Executing ML operation via HTTP",
       );
 
       const response = await fetch(url, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
         // Allow connection to close after response
@@ -101,9 +103,7 @@ export class MLBackendService {
 
       if (response.status !== 200) {
         const text = await response.text();
-        throw new Error(
-          `ML backend returned ${response.status}: ${text}`,
-        );
+        throw new Error(`ML backend returned ${response.status}: ${text}`);
       }
 
       const result = await response.json();
@@ -114,7 +114,7 @@ export class MLBackendService {
           taskId,
           status: result.status,
         },
-        'ML operation accepted by backend',
+        "ML operation accepted by backend",
       );
 
       return { accepted: true, taskId };
@@ -125,7 +125,7 @@ export class MLBackendService {
           taskId,
           error: error instanceof Error ? error.message : String(error),
         },
-        'Failed to execute ML operation via HTTP',
+        "Failed to execute ML operation via HTTP",
       );
 
       throw error;
@@ -146,12 +146,16 @@ export class MLBackendService {
     deployment: MLBackendDeployment,
     taskId: number,
   ): Promise<TaskResult | null> {
-    const storageType = deployment.storage || 'local';
+    const storageType = deployment.storage || "local";
 
-    if (storageType === 'oss') {
+    if (storageType === "oss") {
       return this.checkResultFromOSS(taskId);
-    } else {
+    } else if (storageType === "local") {
       return this.checkResultFromHTTP(deployment, taskId);
+    } else {
+      throw new Error(
+        `Unknown storage type '${storageType}' for deployment ${deployment.id}`,
+      );
     }
   }
 
@@ -171,9 +175,9 @@ export class MLBackendService {
 
     try {
       const response = await fetch(url, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Accept': 'application/json',
+          Accept: "application/json",
         },
         signal: AbortSignal.timeout(3000),
       });
@@ -189,14 +193,14 @@ export class MLBackendService {
             taskId,
             status: response.status,
           },
-          'Failed to check task result via HTTP',
+          "Failed to check task result via HTTP",
         );
         return null;
       }
 
-      const result = await response.json() as TaskResult;
+      const result = (await response.json()) as TaskResult;
 
-      if (result.status === 'pending') {
+      if (result.status === "pending") {
         return null;
       }
 
@@ -206,7 +210,7 @@ export class MLBackendService {
           taskId,
           resultStatus: result.status,
         },
-        'Retrieved task result from ML backend via HTTP',
+        "Retrieved task result from ML backend via HTTP",
       );
 
       return result;
@@ -219,9 +223,7 @@ export class MLBackendService {
    * Check result from OSS storage (cloud deployments)
    * Uses storage service to fetch results
    */
-  private async checkResultFromOSS(
-    taskId: number,
-  ): Promise<TaskResult | null> {
+  private async checkResultFromOSS(taskId: number): Promise<TaskResult | null> {
     const resultKey = `tasks/${taskId}/result.json`;
 
     try {
@@ -239,14 +241,14 @@ export class MLBackendService {
             taskId,
             status: response.status,
           },
-          'Failed to check task result from storage',
+          "Failed to check task result from storage",
         );
         return null;
       }
 
-      const result = await response.json() as TaskResult;
+      const result = (await response.json()) as TaskResult;
 
-      if (result.status === 'pending') {
+      if (result.status === "pending") {
         return null;
       }
 
@@ -256,7 +258,7 @@ export class MLBackendService {
           resultStatus: result.status,
           storageKey: resultKey,
         },
-        'Retrieved task result from storage',
+        "Retrieved task result from storage",
       );
 
       return result;
@@ -266,7 +268,7 @@ export class MLBackendService {
           taskId,
           error: error instanceof Error ? error.message : String(error),
         },
-        'Failed to read task result from storage',
+        "Failed to read task result from storage",
       );
       return null;
     }
@@ -289,7 +291,7 @@ export class MLBackendService {
     const deployment = await this.getDeployment(deploymentId);
 
     await this.execute(deployment, {
-      operation: 'batch-train',
+      operation: "batch-train",
       data: {
         task_id: taskId,
         input_file: options.inputFile,
@@ -319,7 +321,7 @@ export class MLBackendService {
     const deployment = await this.getDeployment(deploymentId);
 
     await this.execute(deployment, {
-      operation: 'single-train',
+      operation: "single-train",
       data: {
         task_id: taskId,
         input_file: options.inputFile,
@@ -351,7 +353,7 @@ export class MLBackendService {
     const deployment = await this.getDeployment(deploymentId);
 
     await this.execute(deployment, {
-      operation: 'predict',
+      operation: "predict",
       data: {
         task_id: taskId,
         training_data_path: options.trainingDataPath,
@@ -403,7 +405,7 @@ export class MLBackendService {
     const deployment = await this.getDeployment(deploymentId);
 
     await this.execute(deployment, {
-      operation: 'predict',
+      operation: "predict",
       data: {
         task_id: taskId,
         training_data_path: options.trainingDataPath,

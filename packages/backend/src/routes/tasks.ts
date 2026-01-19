@@ -64,17 +64,15 @@ const tasks = new Hono()
       // Fire-and-forget result checking
       setImmediate(async () => {
         try {
-          if (!task.mlBackendDeploymentId) {
-            return; // No deployment configured, skip
-          }
-
           const deploymentRepo = new MLBackendDeploymentRepository();
           const deployment = await deploymentRepo.findById(
             task.mlBackendDeploymentId,
           );
 
           if (!deployment) {
-            return; // Deployment not found, skip
+            throw new Error(
+              `Deployment ${task.mlBackendDeploymentId} not found`,
+            );
           }
 
           const mlService = getMLBackendService();
@@ -126,14 +124,14 @@ const tasks = new Hono()
         .where(
           and(
             eq(schema.tasks.workItemId, Number(workItemIdStr)),
-            eq(schema.tasks.status, "failed")
-          )
+            eq(schema.tasks.status, "failed"),
+          ),
         );
 
       return c.json({
         message: "Failed tasks deleted successfully",
       });
-    }
+    },
   )
 
   // Delete tasks by model
@@ -149,14 +147,14 @@ const tasks = new Hono()
         .where(
           and(
             eq(schema.tasks.workItemId, Number(workItemIdStr)),
-            sql`${schema.tasks.parameter} ->> 'model' = ${model}`
-          )
+            sql`${schema.tasks.parameter} ->> 'model' = ${model}`,
+          ),
         );
 
       return c.json({
         message: `Tasks for model ${model} deleted successfully`,
       });
-    }
+    },
   );
 
 export default tasks;
