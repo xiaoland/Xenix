@@ -45,7 +45,6 @@
           {{ $t("ml.tuning.manualTune") }}
         </a-button>
         <a-button
-          :disabled="tasks?.length === 0"
           danger
           class="inline-flex items-center"
           @click="handleClearFailedTasks"
@@ -58,6 +57,7 @@
 
     <!-- Tasks Table -->
     <ModelTuningTable
+      ref="tuningTableRef"
       :work-item-id="workItemId"
       :selected-task-id="selectedTaskId"
       @select-task="handleSelectTask"
@@ -111,9 +111,11 @@ const selectedModels = ref<string[]>([]);
 const selectedTaskId = ref<number | null>(null);
 const isTraining = ref(false);
 const showManualTuneDialog = ref(false);
+const tuningTableRef = ref<InstanceType<typeof ModelTuningTable>>();
 
 // Fetch available models from backend (grouped by category)
-const { data: availableModels, isLoading: isLoadingModels } = useGroupedModels();
+const { data: availableModels, isLoading: isLoadingModels } =
+  useGroupedModels();
 
 /**
  * Start auto-tune for selected models
@@ -138,7 +140,8 @@ const handleStartAutoTune = async () => {
       `Started training for ${selectedModels.value.length} model(s)`,
     );
     selectedModels.value = [];
-    // Tasks will be updated via ModelTuningTable's initial fetch and per-row polling
+    // Refresh tasks table
+    tuningTableRef.value?.refetch();
   } catch (error: any) {
     console.error("Failed to start training:", error);
     message.error(error.message || "Failed to start training");
@@ -168,7 +171,8 @@ const handleManualTune = async (data: {
     if (!response.ok) throw new Error("Failed to start manual tune");
 
     message.success("Manual training started");
-    // Tasks will be updated via ModelTuningTable's initial fetch and per-row polling
+    // Refresh tasks table
+    tuningTableRef.value?.refetch();
   } catch (error: any) {
     console.error("Failed to start manual tune:", error);
     message.error(error.message || "Failed to start manual training");
@@ -218,7 +222,6 @@ const handleContinue = async () => {
     message.error(error.message || "Failed to fetch task details");
   }
 };
-
 </script>
 
 <style scoped>

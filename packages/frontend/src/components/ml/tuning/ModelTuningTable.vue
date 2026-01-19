@@ -62,7 +62,11 @@ const emit = defineEmits<{
 }>();
 
 // Fetch tasks once on mount - NO polling at table level
-const { data: tasks, isLoading: loading } = useTasks(
+const {
+  data: tasks,
+  isLoading: loading,
+  refetch,
+} = useTasks(
   {
     workItemId: String(props.workItemId),
     type: "batch-train,single-train",
@@ -71,6 +75,11 @@ const { data: tasks, isLoading: loading } = useTasks(
     refetchInterval: false, // Disable polling - ModelTuningRow handles updates
   },
 );
+
+// Expose refetch method to parent component
+defineExpose({
+  refetch,
+});
 
 // Local modal state
 const showParamsModal = ref(false);
