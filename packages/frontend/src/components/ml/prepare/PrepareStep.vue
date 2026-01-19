@@ -74,9 +74,9 @@
 <script setup lang="ts">
 import { message } from "ant-design-vue";
 
-import { computed, ref } from "vue";
+import { computed, ref, watchEffect } from "vue";
 
-import { useUpdateWorkItem } from "../../../composables";
+import { useUpdateWorkItem, useDataset } from "../../../composables";
 import DatasetSelector from "../../dataset/DatasetSelector.vue";
 import ColumnSelector from "./ColumnSelector.vue";
 
@@ -107,6 +107,18 @@ const selectedDatasetName = ref<string>("");
 const datasetColumns = ref<string[]>([]);
 const featureColumns = ref<string[]>(props.workItem.featureColumns || []);
 const targetColumn = ref<string | undefined>(props.workItem.targetColumn);
+
+// Fetch dataset if already selected
+const { data: datasetData } = useDataset(
+  computed(() => selectedDatasetId.value),
+);
+
+watchEffect(() => {
+  if (datasetData.value) {
+    selectedDatasetName.value = datasetData.value.name;
+    datasetColumns.value = datasetData.value.columns;
+  }
+});
 
 // Use composable for updating work item
 const { mutate: updateWorkItem, isPending: saving } = useUpdateWorkItem();
@@ -158,7 +170,7 @@ const handleConfirm = () => {
         console.error("Failed to save configuration:", error);
         message.error("Failed to save configuration");
       },
-    }
+    },
   );
 };
 </script>
