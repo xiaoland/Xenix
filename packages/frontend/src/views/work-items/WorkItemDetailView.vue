@@ -92,7 +92,7 @@
 <script setup lang="ts">
 import { message } from "ant-design-vue";
 
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import type { WorkItem } from "@xenix/shared";
@@ -156,7 +156,9 @@ const checkWorkItemStep = () => {
   if (
     workItem.value?.datasetId &&
     workItem.value?.featureColumns &&
-    workItem.value?.targetColumn
+    workItem.value.featureColumns.length > 0 &&
+    workItem.value?.targetColumn &&
+    workItem.value.targetColumn.trim() !== ""
   ) {
     // Skip to tuning step
     currentStep.value = 1;
@@ -165,9 +167,15 @@ const checkWorkItemStep = () => {
 };
 
 // Watch for work item data and check step
-if (workItem.value) {
-  checkWorkItemStep();
-}
+watch(
+  workItem,
+  (newWorkItem) => {
+    if (newWorkItem) {
+      checkWorkItemStep();
+    }
+  },
+  { immediate: true },
+);
 
 const getStatusColor = (status: string) => {
   switch (status) {
