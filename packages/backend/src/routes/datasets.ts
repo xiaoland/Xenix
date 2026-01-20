@@ -1,5 +1,3 @@
-import path from "path";
-
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -9,7 +7,8 @@ import { DatasetIdParamSchema } from "@xenix/shared";
 import { BadRequestError } from "../errors";
 import { authMiddleware } from "../middleware/auth";
 import { DatasetService } from "../services";
-import { parseDatasetColumns } from "../utils/datasetUtils";
+import { parseDatasetColumns, analyzeExcelFile } from "../utils/datasetUtils";
+import { validateExcelFile } from "../utils/taskUtils";
 import { storage, presignedUrlRequestSchema } from "../storage";
 
 const datasetService = new DatasetService();
@@ -43,34 +42,49 @@ const datasets = new Hono()
     return c.json(result);
   })
 
-  // Upload dataset
-  .post("/", async (c) => {
-    const formData = await c.req.formData();
-    const file = formData.get("file") as File;
-    const name = formData.get("name") as string;
-    const description = (formData.get("description") as string) || null;
-    const projectIdStr = (formData.get("projectId") as string) || null;
-    const projectId = projectIdStr ? Number(projectIdStr) : null;
+  // Confirm dataset upload to OSS
+  .post("/confirm-upload", async (c) => {
+    const body = await c.req.json();
 
-    if (!file) {
-      throw new BadRequestError("No file uploaded");
+    // Validate request
+    const validated = z.object({
+      key: z.string(),
+      name: z.string(),
+      projectId: z.number().nullable(),
+      fileName: z.string(),
+      fileSize: z.number(),
+    }).parse(body);
+
+    // Verify file exists in OSS
+    const fileExists = await storage.exists(validated.key);
+    if (!fileExists) {
+      throw new BadRequestError("File not found in storage");
     }
 
-    if (!name) {
-      throw new BadRequestError("Dataset name is required");
+    // Get filesystem path for analysis (OSS is mounted)
+    const filePath = storage.getFilesystemPath(validated.key);
+
+    // Validate Excel file
+    if (!validateExcelFile(validated.fileName)) {
+      throw new BadRequestError(
+        "Invalid file type. Only Excel files (.xlsx, .xls) are allowed."
+      );
     }
 
-    // Get datasets directory path
-    const datasetsDir = path.join(process.cwd(), "datasets");
+    // Analyze the Excel file
+    const { columns, rowCount } = await analyzeExcelFile(filePath);
 
-    // Create dataset using service
-    const dataset = await datasetService.createDataset(
-      file,
-      name,
-      description,
-      projectId,
-      datasetsDir
-    );
+    // Create dataset record directly with OSS key
+    const dataset = await datasetService.createDatasetFromOSSKey({
+      key: validated.key,
+      name: validated.name,
+      description: null,
+      projectId: validated.projectId,
+      fileName: validated.fileName,
+      fileSize: validated.fileSize,
+      columns,
+      rowCount,
+    });
 
     return c.json(
       {

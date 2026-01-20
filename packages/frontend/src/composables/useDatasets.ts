@@ -6,7 +6,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { MaybeRef, unref } from "vue";
 
 import { client } from "../api/client";
-import { API_CONFIG } from "../constants/config";
 
 export function useDatasets() {
   return useQuery({
@@ -41,25 +40,60 @@ export function useUploadDataset() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (formData: FormData) => {
-      // Use fetch directly for FormData to ensure proper Content-Type with boundary
-      const token = localStorage.getItem("auth_token");
-      const apiUrl = import.meta.env.VITE_API_URL || API_CONFIG.DEFAULT_URL;
+    mutationFn: async (params: {
+      file: File;
+      name: string;
+      projectId: number;
+    }) => {
+      // Generate simple OSS key with UUID
+      const uuid = crypto.randomUUID();
+      const key = `datasets/${uuid}`;
 
-      const response = await fetch(`${apiUrl}/data`, {
-        method: "POST",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          // Don't set Content-Type - let browser set it with boundary
+      // Step 1: Get presigned URL
+      const presignedResponse = await client.data["upload-url"].$post({
+        json: {
+          key,
+          contentType: params.file.type,
         },
-        body: formData,
       });
 
-      if (!response.ok) {
-        const error = (await response.json()) as any;
-        throw new Error(error.error || "Failed to upload dataset");
+      if (!presignedResponse.ok) {
+        const error = await presignedResponse.json();
+        throw new Error(error.error || "Failed to get upload URL");
       }
-      return response.json();
+
+      const presignedData = await presignedResponse.json();
+
+      // Step 2: Upload directly to OSS
+      const uploadResponse = await fetch(presignedData.url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": params.file.type,
+        },
+        body: params.file,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+      }
+
+      // Step 3: Confirm upload to backend
+      const confirmResponse = await client.data["confirm-upload"].$post({
+        json: {
+          key: presignedData.key,
+          name: params.name,
+          projectId: params.projectId,
+          fileName: params.file.name,
+          fileSize: params.file.size,
+        },
+      });
+
+      if (!confirmResponse.ok) {
+        const error = await confirmResponse.json();
+        throw new Error(error.error || "Failed to confirm upload");
+      }
+
+      return confirmResponse.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["datasets"] });

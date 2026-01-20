@@ -96,24 +96,26 @@ const beforeUpload: UploadProps["beforeUpload"] = (file) => {
 const handleUpload = () => {
   if (!canUpload.value) return;
 
-  const formData = new FormData();
-  formData.append("file", fileList.value[0].originFileObj);
-  formData.append("name", datasetName.value);
-  formData.append("projectId", String(props.projectId));
-
-  uploadDataset(formData, {
-    onSuccess: () => {
-      message.success("Dataset uploaded successfully");
-      emit("success");
-
-      // Reset form
-      datasetName.value = "";
-      fileList.value = [];
+  uploadDataset(
+    {
+      file: fileList.value[0].originFileObj,
+      name: datasetName.value,
+      projectId: props.projectId,
     },
-    onError: (error: any) => {
-      console.error("Upload failed:", error);
-      message.error("Failed to upload dataset");
-    },
-  });
+    {
+      onSuccess: () => {
+        message.success("Dataset uploaded successfully");
+        emit("success");
+
+        // Reset form
+        datasetName.value = "";
+        fileList.value = [];
+      },
+      onError: (error: any) => {
+        console.error("Upload failed:", error);
+        message.error(error.message || "Failed to upload dataset");
+      },
+    }
+  );
 };
 </script>
