@@ -6,6 +6,7 @@
  * - dataset.ts: Dataset-related types
  * - model.ts: Model-related types
  * - project.ts: Project and WorkItem types
+ * - deployment.ts: ML Backend Deployment types
  */
 
 // Re-export all types from domain-specific files
@@ -14,3 +15,4 @@ export * from './dataset';
 export * from './model';
 export * from './project';
 export * from './user';
+export * from './deployment';

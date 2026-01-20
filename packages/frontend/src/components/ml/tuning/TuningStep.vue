@@ -125,13 +125,13 @@ const handleStartAutoTune = async () => {
   try {
     // Start training for each selected model
     for (const model of selectedModels.value) {
-      const response = await client.train["batch"].$post({
+      const response = await client["work-items"][":id"]["train"]["batch"].$post({
+        param: { id: String(props.workItemId) },
         json: {
           datasetId: props.datasetId ?? undefined,
           featureColumns: props.featureColumns,
           targetColumn: props.targetColumn,
           model,
-          workItemId: props.workItemId,
         },
       });
       if (!response.ok) throw new Error("Failed to start auto tune");
@@ -158,14 +158,14 @@ const handleManualTune = async (data: {
   parameters: Record<string, any>;
 }) => {
   try {
-    const response = await client.train["single"].$post({
+    const response = await client["work-items"][":id"]["train"]["single"].$post({
+      param: { id: String(props.workItemId) },
       json: {
         datasetId: props.datasetId ?? undefined,
         featureColumns: props.featureColumns,
         targetColumn: props.targetColumn,
         model: data.model,
         parameters: data.parameters,
-        workItemId: props.workItemId,
       },
     });
     if (!response.ok) throw new Error("Failed to start manual tune");

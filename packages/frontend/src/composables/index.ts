@@ -10,3 +10,4 @@ export * from './useTasks';
 export * from './useModels';
 export * from './useFormatters';
 export * from './useTaskFormatting';
+export * from './useMLBackendDeployments';

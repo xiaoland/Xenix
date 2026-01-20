@@ -8,3 +8,4 @@ export { ProjectRepository } from "./ProjectRepository";
 export { WorkItemRepository } from "./WorkItemRepository";
 export { DatasetRepository } from "./DatasetRepository";
 export { TaskRepository } from "./TaskRepository";
+export { MLBackendDeploymentRepository } from "./MLBackendDeploymentRepository";

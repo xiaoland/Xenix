@@ -293,7 +293,7 @@ const startPredictionFromFile = async () => {
     const token = localStorage.getItem("auth_token");
     const apiUrl = import.meta.env.VITE_API_URL || API_CONFIG.DEFAULT_URL;
 
-    const response = await fetch(`${apiUrl}/predict/file`, {
+    const response = await fetch(`${apiUrl}/work-items/${props.workItemId}/predict/file`, {
       method: "POST",
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -346,7 +346,8 @@ const predictInline = async () => {
       return rest;
     });
 
-    const response = await client.predict.inline.$post({
+    const response = await client["work-items"][":id"]["predict"]["inline"].$post({
+      param: { id: String(props.workItemId) },
       json: {
         predictionData: cleanData,
         model: props.selectedModel,

@@ -10,12 +10,11 @@ import { errorHandler } from "./middleware/errorHandler";
 // Routes
 import authRoutes from "./routes/auth";
 import datasetsRoutes from "./routes/datasets";
+import mlBackendDeploymentsRoutes from "./routes/ml-backend-deployments";
 import modelsRoutes from "./routes/models";
 import obsrvRoutes from "./routes/obsrv";
-import predictRoutes from "./routes/predict";
 import projectsRoutes from "./routes/projects";
 import tasksRoutes from "./routes/tasks";
-import trainRoutes from "./routes/train";
 import workItemsRoutes from "./routes/work-items";
 import logger from "./utils/logger";
 
@@ -54,8 +53,7 @@ const routes = app
   .route("/data", datasetsRoutes)
   .route("/models", modelsRoutes)
   .route("/tasks", tasksRoutes)
-  .route("/train", trainRoutes)
-  .route("/predict", predictRoutes)
+  .route("/ml-backend-deployments", mlBackendDeploymentsRoutes)
   .route("/obsrv", obsrvRoutes);
 
 // Error handler (must be last)

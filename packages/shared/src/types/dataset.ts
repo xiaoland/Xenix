@@ -11,6 +11,7 @@ export interface Dataset {
   fileSize: number;
   columns: string[];
   rowCount: number;
+  storage: "local" | "oss"; // Storage type: 'local' (user's device) or 'oss' (cloud storage)
   createdAt: string;
 }
 

@@ -3,7 +3,7 @@
  * Handles CRUD operations for ml_backend_deployments table
  */
 
-import { eq } from 'drizzle-orm';
+import { eq, or, isNull } from 'drizzle-orm';
 import type { InferSelectModel, InferInsertModel } from 'drizzle-orm';
 import { db } from '../database';
 import { mlBackendDeployments } from '../database/schema';
@@ -12,6 +12,23 @@ type MLBackendDeployment = InferSelectModel<typeof mlBackendDeployments>;
 type CreateMLBackendDeploymentDTO = InferInsertModel<typeof mlBackendDeployments>;
 
 export class MLBackendDeploymentRepository {
+  /**
+   * Find all deployments available to a user (public + user's private ones)
+   */
+  async findAvailableForUser(userId: string): Promise<MLBackendDeployment[]> {
+    const result = await db
+      .select()
+      .from(mlBackendDeployments)
+      .where(
+        or(
+          isNull(mlBackendDeployments.createdBy), // Public deployments
+          eq(mlBackendDeployments.createdBy, userId) // User's private deployments
+        )
+      );
+
+    return result;
+  }
+
   /**
    * Find a deployment by ID
    */
