@@ -46,7 +46,7 @@
     {
         "name": "xenix",
         "installCommand": "pnpm install",
-        "buildCommand": "pnpm run build",
+        "buildCommand": "pnpm run --filter frontend build",
         "assets": {
             "directory": "./dist",
             "notFoundStrategy": "singlePageApplication"

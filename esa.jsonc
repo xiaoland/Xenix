@@ -1,0 +1,10 @@
+// For deploying packages/frontend to Aliyun ESA
+{
+    "name": "xenix",
+    "installCommand": "pnpm install",
+    "buildCommand": "pnpm run --filter frontend build",
+    "assets": {
+        "directory": "./dist",
+        "notFoundStrategy": "singlePageApplication"
+    }
+}
