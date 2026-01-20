@@ -248,7 +248,7 @@ const predict = new Hono()
     const params = result.bestParams || result.params || {};
 
     // Save uploaded prediction file as a dataset using DatasetService
-    const datasetsDir = path.join(process.cwd(), "datasets");
+    const datasetsDir = storage.getFilesystemPath("datasets");
     const predictionDataset = await datasetService.createDataset(
       file,
       `Prediction Input - ${file.name}`,

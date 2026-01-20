@@ -2,8 +2,13 @@
  * Dataset Service
  * Business logic for dataset operations
  */
+import { randomUUID } from "crypto";
+import fs from "fs/promises";
+import path from "path";
+
 import { NotFoundError } from "../errors";
 import { DatasetRepository } from "../repositories";
+import { analyzeExcelFile } from "../utils/datasetUtils";
 import logger from "../utils/logger";
 
 export class DatasetService {
@@ -39,7 +44,8 @@ export class DatasetService {
   }) {
     // Create dataset record with the OSS key as filePath
     return await this.datasetRepo.create({
-      projectId: params.projectId && !isNaN(params.projectId) ? params.projectId : null,
+      projectId:
+        params.projectId && !isNaN(params.projectId) ? params.projectId : null,
       name: params.name,
       description: params.description,
       filePath: params.key, // Store OSS key directly
@@ -47,6 +53,39 @@ export class DatasetService {
       fileSize: params.fileSize,
       columns: params.columns,
       rowCount: params.rowCount,
+    });
+  }
+
+  async createDataset(
+    file: File,
+    name: string,
+    description: string | null,
+    projectId: number | null,
+    datasetsDir: string,
+  ) {
+    const fileId = randomUUID();
+    const filePath = path.join(datasetsDir, fileId, file.name);
+
+    // Ensure directory exists
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+
+    // Save file
+    const buffer = await file.arrayBuffer();
+    await fs.writeFile(filePath, Buffer.from(buffer));
+
+    // Analyze the Excel file
+    const { columns, rowCount } = await analyzeExcelFile(filePath);
+
+    // Create dataset record
+    return await this.datasetRepo.create({
+      projectId: projectId && !isNaN(projectId) ? projectId : null,
+      name,
+      description,
+      filePath: `datasets/${fileId}/${file.name}`,
+      fileName: file.name,
+      fileSize: file.size,
+      columns,
+      rowCount,
     });
   }
 

@@ -59,7 +59,7 @@ export function useUploadDataset() {
 
       if (!presignedResponse.ok) {
         const error = await presignedResponse.json();
-        throw new Error(error.error || "Failed to get upload URL");
+        throw new Error((error as any).error || "Failed to get upload URL");
       }
 
       const presignedData = await presignedResponse.json();
@@ -90,7 +90,7 @@ export function useUploadDataset() {
 
       if (!confirmResponse.ok) {
         const error = await confirmResponse.json();
-        throw new Error(error.error || "Failed to confirm upload");
+        throw new Error((error as any).error || "Failed to confirm upload");
       }
 
       return confirmResponse.json();
