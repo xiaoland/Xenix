@@ -2,7 +2,7 @@
   <!-- Model Column -->
   <template v-if="column.key === 'model'">
     <span class="font-medium">{{
-      formatModelName(task?.parameter?.model)
+      formatModelName((task?.parameter as any)?.model)
     }}</span>
   </template>
 
@@ -26,19 +26,19 @@
 
   <!-- Status Column -->
   <template v-else-if="column.key === 'status'">
-    <a-tag :color="getStatusColor(task?.status || 'pending')">
-      {{ $t(`ml.tuning.status.${task?.status || 'pending'}`) }}
+    <a-tag :color="getStatusColor((task?.status as TaskStatus) || 'pending')">
+      {{ $t(`ml.tuning.status.${task?.status || "pending"}`) }}
     </a-tag>
   </template>
 
   <!-- Metrics Column -->
   <template v-else-if="column.key === 'metrics'">
     <div
-      v-if="task?.status === 'completed' && task.result?.metrics"
+      v-if="task?.status === 'completed' && (task.result as any)?.metrics"
       class="text-sm"
     >
       <div
-        v-for="(value, key) in getDisplayMetrics(task.result.metrics)"
+        v-for="(value, key) in getDisplayMetrics((task.result as any).metrics)"
         :key="key"
         class="inline-block mr-3"
       >
@@ -46,16 +46,10 @@
         <span class="ml-1 font-medium">{{ formatMetric(value) }}</span>
       </div>
     </div>
-    <span
-      v-else-if="task?.status === 'failed'"
-      class="text-red-500 text-sm"
-    >
+    <span v-else-if="task?.status === 'failed'" class="text-red-500 text-sm">
       {{ task.error || "Training failed" }}
     </span>
-    <span
-      v-else-if="task?.status === 'running'"
-      class="text-blue-500 text-sm"
-    >
+    <span v-else-if="task?.status === 'running'" class="text-blue-500 text-sm">
       {{ $t("ml.tuning.training") }}
     </span>
     <span v-else class="text-gray-400 text-sm">-</span>
@@ -74,8 +68,8 @@
       <a-button
         v-if="
           task?.status === 'completed' &&
-          task.result?.params &&
-          Object.keys(task.result.params).length > 0
+          (task.result as any)?.params &&
+          Object.keys((task.result as any).params).length > 0
         "
         size="small"
         class="inline-flex items-center"
@@ -91,7 +85,7 @@
 <script setup lang="ts">
 import { useQuery } from "@tanstack/vue-query";
 
-import type { Task } from "@xenix/shared";
+import type { Task, TaskStatus } from "@xenix/shared";
 
 import { client } from "@/api/client";
 import { useTaskFormatting } from "@/composables";
@@ -142,7 +136,7 @@ const handleSelect = () => {
 
 const handleViewParams = () => {
   if (task.value) {
-    emit("view-params", task.value);
+    emit("view-params", task as unknown as Task);
   }
 };
 </script>

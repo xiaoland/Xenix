@@ -99,7 +99,7 @@ const fetchModelSchema = async () => {
     if (response.ok) {
       const data = await response.json();
       if (data.paramSchema) {
-        paramSchema.value = data.paramSchema;
+        paramSchema.value = data.paramSchema as Record<string, ParamSchema>;
         // Initialize with default values
         initializeValues();
       }
@@ -148,7 +148,7 @@ watch(
   (newValue) => {
     emit("update:modelValue", newValue);
   },
-  { deep: true }
+  { deep: true },
 );
 
 // Watch for model changes
@@ -157,7 +157,7 @@ watch(
   () => {
     fetchModelSchema();
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 // Expose validate method for parent component

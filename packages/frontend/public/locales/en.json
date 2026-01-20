@@ -189,6 +189,7 @@
     "downloadResult": "Download",
     "results": "Results",
     "fileResultsReady": "Prediction results are ready for download",
+    "filePathCopied": "File path copied to clipboard. Please open it manually in your file explorer.",
     "loading": "Loading prediction details..."
   },
   "models": {

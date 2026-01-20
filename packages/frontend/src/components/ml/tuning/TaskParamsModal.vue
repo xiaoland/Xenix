@@ -15,11 +15,11 @@
         <a-tag :color="getStatusColor(task.status)">
           {{ task.status }}
         </a-tag>
-        <a-tag v-if="task.type === 'auto-tune'" color="blue" class="ml-2">
+        <a-tag v-if="task.type === 'batch-train'" color="blue" class="ml-2">
           {{ $t("ml.tuning.type.auto") }}
         </a-tag>
         <a-tag
-          v-else-if="task.type === 'manual-tune'"
+          v-else-if="task.type === 'single-train'"
           color="green"
           class="ml-2"
         >
@@ -33,7 +33,7 @@
           {{ $t("ml.tuning.parameters") }}
         </h4>
         <div
-          v-for="(value, key) in task.result?.params"
+          v-for="(value, key) in (task.result as any)?.params"
           :key="key"
           class="param-row py-2 border-b border-gray-200 last:border-0"
         >
@@ -45,17 +45,17 @@
       </div>
 
       <!-- Metrics -->
-      <div v-if="task.result?.metrics" class="bg-blue-50 rounded p-4">
+      <div v-if="(task.result as any)?.metrics" class="bg-blue-50 rounded p-4">
         <h4 class="text-sm font-semibold mb-3">
           {{ $t("ml.tuning.metrics") }}
         </h4>
         <div
-          v-for="(value, key) in task.result.metrics"
+          v-for="(value, key) in (task.result as any).metrics"
           :key="key"
           class="metric-row py-2 border-b border-blue-100 last:border-0"
         >
           <span class="metric-key text-gray-600 font-medium">{{
-            formatMetricKey(key)
+            formatMetricKey(String(key))
           }}</span
           >:
           <span class="metric-value ml-2 font-mono text-sm font-medium">{{

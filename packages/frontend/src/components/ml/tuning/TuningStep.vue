@@ -212,8 +212,8 @@ const handleContinue = async () => {
     const data = await response.json();
     if (data) {
       emit("continue", {
-        model: data.parameter?.model || "",
-        parameters: data.result?.params || {},
+        model: (data.parameter as any)?.model || "",
+        parameters: (data.result as any)?.params || {},
         taskId: selectedTaskId.value,
       });
     }

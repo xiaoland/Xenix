@@ -41,8 +41,16 @@ export interface SingleTrainTaskResult {
 }
 
 export interface PredictTaskResult {
-  outputFile: string; // Path to prediction output file
-  rowCount: number; // Number of predictions made
+  // For file-based predictions
+  predictedDataPath?: string; // Path to prediction output file
+  fittedModelPath?: string; // Path to fitted model file
+
+  // For inline predictions
+  predictedData?: any[]; // Inline prediction results
+
+  // Legacy field (backward compatibility)
+  outputFile?: string; // Path to prediction output file
+  rowCount?: number; // Number of predictions made
 }
 
 // Specific task types

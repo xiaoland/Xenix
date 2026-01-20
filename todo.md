@@ -36,6 +36,7 @@
   - targetColumn 不需要 predicted_ (这是 ml-backend 的锅)
   - 多了个 Prediction column
 - [ ] Prediction History
+- [ ] 橙色为主题色
 
 ## Backend
 
