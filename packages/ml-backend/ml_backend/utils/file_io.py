@@ -54,13 +54,27 @@ def write_predictions(
     """
     Write predictions to file
 
+    IMPORTANT: output_path MUST be relative to ensure all outputs
+    are written within the task's base_path for proper isolation.
+
     Args:
         predictions: Predictions data (DataFrame or list of dicts)
-        output_path: Output file path
+        output_path: Output file path (MUST be relative, NOT absolute)
 
     Returns:
         Absolute path to output file
+
+    Raises:
+        ValueError: If output_path is absolute (security/convention violation)
     """
+    # SECURITY: Reject absolute paths to enforce base_path convention
+    if os.path.isabs(output_path):
+        raise ValueError(
+            f"output_path must be relative to base_path, got absolute path: {output_path}. "
+            f"This violates the ml-backend filesystem convention where all results "
+            f"must be written within the task base_path."
+        )
+
     resolved_path = resolve_path(output_path)
 
     # Ensure directory exists
@@ -76,7 +90,9 @@ def write_predictions(
     ext = os.path.splitext(resolved_path)[1].lower()
 
     if ext in ['.xlsx', '.xls']:
-        df.to_excel(resolved_path, index=False)
+        # Use openpyxl engine explicitly for xlsx files
+        # and ensure proper Excel format
+        df.to_excel(resolved_path, index=False, engine='openpyxl')
     elif ext == '.csv':
         df.to_csv(resolved_path, index=False)
     else:

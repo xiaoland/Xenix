@@ -7,12 +7,15 @@ import { Hono } from "hono";
 import { InlinePredictSchema, FilePredictSchema } from "@xenix/shared";
 
 import { getMLBackendService } from "../services/MLBackendService";
+import { DatasetService } from "../services";
 import { db, schema } from "../database";
 import { BadRequestError, NotFoundError } from "../errors";
 import { authMiddleware } from "../middleware/auth";
 import logger from "../utils/logger";
 import { storage } from "../storage";
 import { config } from "../config";
+
+const datasetService = new DatasetService();
 
 const predict = new Hono()
   .use("*", authMiddleware)
@@ -69,7 +72,13 @@ const predict = new Hono()
       throw new NotFoundError("Training dataset");
     }
 
-    const trainingDataPath = trainingDataset.filePath;
+    // Determine train data path based on storage type
+    const trainDataPath =
+      config.STORAGE_TYPE === "oss"
+        ? storage.getFilesystemPath(
+            `datasets/${workItem.datasetId}/${trainingDataset.fileName}`,
+          ) // OSS: /mnt/oss/datasets/...
+        : trainingDataset.filePath; // Local: full file path
 
     // Load tuning task to get params (result.params)
     const [tuningTask] = await db
@@ -83,26 +92,35 @@ const predict = new Hono()
     }
 
     const result: any = tuningTask.result;
-    const params = result.params;
+    const params = result.bestParams || result.params || {};
 
     // Get deployment ID from environment variable
-    const deploymentId = Number(process.env.ML_BACKEND_DEPLOYMENT_ID) || 1;
+    const deploymentId = Number(process.env.ML_BACKEND_DEPLOYMENT_ID) || 0;
     const mlService = getMLBackendService();
 
-    // Generate temporary task ID and output file path
-    const tempTaskId = Date.now();
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const outputFile = path.join(
-      process.cwd(),
-      "uploads",
-      `inline_prediction_${workItemId}_${tempTaskId}_${timestamp}.xlsx`,
-    );
+    // Create task record FIRST to get actual task ID
+    const [insertedTask] = await db
+      .insert(schema.tasks)
+      .values({
+        workItemId,
+        mlBackendDeploymentId: deploymentId,
+        type: "predict-inline",
+        status: "pending",
+        parameter: {
+          model,
+          trainingDatasetId: workItem.datasetId,
+          featureColumns,
+          targetColumn,
+          tuningTaskId,
+          predictionDataCount: predictionData.length,
+        },
+      })
+      .returning();
 
-    // Execute prediction via ML backend
-    const mlRequest = mlService.predictInline(deploymentId, tempTaskId, {
-      trainingDataPath,
-      predictionData,
-      outputPath: outputFile,
+    // Execute prediction via ML backend with actual task ID
+    const mlRequest = mlService.predictInline(deploymentId, insertedTask.id, {
+      trainDataPath,
+      toPredictData: predictionData,
       model,
       params,
       featureColumns,
@@ -111,11 +129,13 @@ const predict = new Hono()
 
     // Wait 5s to check for errors (fire-and-forget pattern)
     let hasError = false;
+    let errorMessage = "";
     await Promise.race([
       mlRequest.catch((error) => {
         hasError = true;
+        errorMessage = error.message;
         logger.error(
-          { error: error.message, tempTaskId },
+          { error: error.message, taskId: insertedTask.id },
           "ML backend request failed",
         );
         throw error;
@@ -123,30 +143,22 @@ const predict = new Hono()
       new Promise((resolve) => setTimeout(resolve, 5000)),
     ]);
 
+    // Update task status based on error outcome
     if (hasError) {
-      throw new Error("ML backend request failed");
+      await db
+        .update(schema.tasks)
+        .set({
+          status: "failed",
+          error: errorMessage,
+          endAt: new Date(),
+        })
+        .where(eq(schema.tasks.id, insertedTask.id));
+    } else {
+      await db
+        .update(schema.tasks)
+        .set({ status: "running" })
+        .where(eq(schema.tasks.id, insertedTask.id));
     }
-
-    // Create task record only after successful ML backend request
-    const [insertedTask] = await db
-      .insert(schema.tasks)
-      .values({
-        workItemId,
-        mlBackendDeploymentId: deploymentId,
-        type: "predict",
-        status: "pending",
-        parameter: {
-          model,
-          trainingDatasetId: workItem.datasetId,
-          featureColumns,
-          targetColumn,
-          tuningTaskId,
-          predictionType: "inline",
-          predictionDataCount: predictionData.length,
-          outputFile,
-        },
-      })
-      .returning();
 
     return c.json(
       {
@@ -213,7 +225,13 @@ const predict = new Hono()
       throw new NotFoundError("Training dataset");
     }
 
-    const trainingDataPath = trainingDataset.filePath;
+    // Determine train data path based on storage type
+    const trainDataPath =
+      config.STORAGE_TYPE === "oss"
+        ? storage.getFilesystemPath(
+            `datasets/${workItem.datasetId}/${trainingDataset.fileName}`,
+          ) // OSS: /mnt/oss/datasets/...
+        : trainingDataset.filePath; // Local: full file path
 
     // Load tuning task to get params (result.params)
     const [tuningTask] = await db
@@ -227,37 +245,53 @@ const predict = new Hono()
     }
 
     const result: any = tuningTask.result;
-    const params = result.params;
+    const params = result.bestParams || result.params || {};
 
-    // Save uploaded prediction file
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const uploadsDir = path.join(process.cwd(), "uploads");
-    const predictionFileName = `prediction_input_${workItemId}_${timestamp}_${file.name}`;
-    const predictionDataPath = path.join(uploadsDir, predictionFileName);
-
-    // Save file to disk
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const fs = await import("fs/promises");
-    await fs.mkdir(uploadsDir, { recursive: true });
-    await fs.writeFile(predictionDataPath, buffer);
-
-    // Get deployment ID from environment variable
-    const deploymentId = Number(process.env.ML_BACKEND_DEPLOYMENT_ID) || 1;
-    const mlService = getMLBackendService();
-
-    // Generate temporary task ID and output file path
-    const tempTaskId = Date.now();
-    const outputFile = path.join(
-      uploadsDir,
-      `file_prediction_${workItemId}_${tempTaskId}_${timestamp}.xlsx`,
+    // Save uploaded prediction file as a dataset using DatasetService
+    const datasetsDir = path.join(process.cwd(), "datasets");
+    const predictionDataset = await datasetService.createDataset(
+      file,
+      `Prediction Input - ${file.name}`,
+      `Prediction input for work item ${workItemId}`,
+      null, // No project association
+      datasetsDir,
     );
 
-    // Fire ml-backend request
-    const mlRequest = mlService.predictFile(deploymentId, tempTaskId, {
-      trainingDataPath,
-      predictionDataPath,
-      outputPath: outputFile,
+    // Get the prediction data path for ML backend
+    const toPredictDataPath =
+      config.STORAGE_TYPE === "oss"
+        ? storage.getFilesystemPath(
+            `datasets/${predictionDataset.id}/${predictionDataset.fileName}`,
+          ) // OSS: /mnt/oss/datasets/...
+        : predictionDataset.filePath; // Local: full file path
+
+    // Get deployment ID from environment variable
+    const deploymentId = Number(process.env.ML_BACKEND_DEPLOYMENT_ID) || 0;
+    const mlService = getMLBackendService();
+
+    // Create task record FIRST to get actual task ID
+    const [insertedTask] = await db
+      .insert(schema.tasks)
+      .values({
+        workItemId,
+        mlBackendDeploymentId: deploymentId,
+        type: "predict-file",
+        status: "pending",
+        parameter: {
+          model,
+          trainingDatasetId: workItem.datasetId,
+          predictionDatasetId: predictionDataset.id,
+          featureColumns,
+          targetColumn,
+          tuningTaskId,
+        },
+      })
+      .returning();
+
+    // Fire ml-backend request with actual task ID
+    const mlRequest = mlService.predictFile(deploymentId, insertedTask.id, {
+      trainDataPath,
+      toPredictDataPath,
       model,
       params,
       featureColumns,
@@ -266,11 +300,13 @@ const predict = new Hono()
 
     // Wait 5s to check for errors (fire-and-forget pattern)
     let hasError = false;
+    let errorMessage = "";
     await Promise.race([
       mlRequest.catch((error) => {
         hasError = true;
+        errorMessage = error.message;
         logger.error(
-          { error: error.message, tempTaskId },
+          { error: error.message, taskId: insertedTask.id },
           "ML backend request failed",
         );
         throw error;
@@ -278,30 +314,22 @@ const predict = new Hono()
       new Promise((resolve) => setTimeout(resolve, 5000)),
     ]);
 
+    // Update task status based on error outcome
     if (hasError) {
-      throw new Error("ML backend request failed");
+      await db
+        .update(schema.tasks)
+        .set({
+          status: "failed",
+          error: errorMessage,
+          endAt: new Date(),
+        })
+        .where(eq(schema.tasks.id, insertedTask.id));
+    } else {
+      await db
+        .update(schema.tasks)
+        .set({ status: "running" })
+        .where(eq(schema.tasks.id, insertedTask.id));
     }
-
-    // Create task record only after successful ML backend request
-    const [insertedTask] = await db
-      .insert(schema.tasks)
-      .values({
-        workItemId,
-        mlBackendDeploymentId: deploymentId,
-        type: "predict",
-        status: "pending",
-        parameter: {
-          model,
-          trainingDatasetId: workItem.datasetId,
-          featureColumns,
-          targetColumn,
-          tuningTaskId,
-          predictionType: "file",
-          predictionDataPath,
-          outputFile,
-        },
-      })
-      .returning();
 
     return c.json(
       {

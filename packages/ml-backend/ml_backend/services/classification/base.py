@@ -10,7 +10,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 import numpy as np
 from pydantic import BaseModel
 
-from ...types import BatchTrainInput, SingleTrainInput
+from ...types import BatchTrainInput, SingleTrainInput, PredictFileInput, PredictInlineInput
 
 
 # Type variable for model type
@@ -109,7 +109,9 @@ class ClassificationModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]
         """
         # Prepare data
         X = df[input_data.feature_columns]
-        y = df[input_data.target_column]
+        # Support multi-target (use first target for single-target models)
+        target_col = input_data.target_columns[0] if len(input_data.target_columns) == 1 else input_data.target_columns
+        y = df[target_col]
 
         # Split train/test
         X_train, X_test, y_train, y_test = train_test_split(
@@ -182,7 +184,9 @@ class ClassificationModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]
         """
         # Prepare data
         X = df[input_data.feature_columns]
-        y = df[input_data.target_column]
+        # Support multi-target (use first target for single-target models)
+        target_col = input_data.target_columns[0] if len(input_data.target_columns) == 1 else input_data.target_columns
+        y = df[target_col]
 
         # Split train/test
         X_train, X_test, y_train, y_test = train_test_split(
@@ -222,26 +226,28 @@ class ClassificationModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]
             'model': model
         }
 
-    def predict(
+    def train_and_get_model(
         self,
-        train_df: pd.DataFrame,
-        predict_df: pd.DataFrame,
-        input_data
-    ) -> pd.DataFrame:
+        df: pd.DataFrame,
+        input_data: Union[PredictFileInput, PredictInlineInput]
+    ) -> ModelType:
         """
-        Make predictions
+        Train model and return fitted model instance (no saving)
+
+        Used by prediction operations to train model on full dataset.
 
         Args:
-            train_df: Training dataframe
-            predict_df: Prediction dataframe
+            df: Training dataframe
             input_data: Input parameters with params
 
         Returns:
-            Prediction dataframe with predictions added
+            Fitted model instance
         """
-        # Train model
-        X_train = train_df[input_data.feature_columns]
-        y_train = train_df[input_data.target_column]
+        # Prepare training data
+        X = df[input_data.feature_columns]
+        # Support multi-target (use first target for single-target models)
+        target_col = input_data.target_columns[0] if len(input_data.target_columns) == 1 else input_data.target_columns
+        y = df[target_col]
 
         # Get default params and merge with user params
         default_params = self.get_default_params()
@@ -253,17 +259,43 @@ class ClassificationModel(ABC, Generic[ModelType, ModelParamType, ParamGridType]
         # Validate and create params model
         params = self.__modelparam__(**params_dict)
 
-        # Create and train model
+        # Create and train model on full dataset (no train/test split for prediction)
         model = self.create_model(params)
-        model.fit(X_train, y_train)
+        model.fit(X, y)
 
+        return model
+
+    def predict_with_model(
+        self,
+        model: ModelType,
+        predict_df: pd.DataFrame,
+        input_data: Union[PredictFileInput, PredictInlineInput]
+    ) -> pd.DataFrame:
+        """
+        Make predictions using fitted model
+
+        Args:
+            model: Fitted model instance
+            predict_df: Prediction dataframe
+            input_data: Input parameters
+
+        Returns:
+            Prediction dataframe with predictions added
+        """
         # Make predictions
         X_predict = predict_df[input_data.feature_columns]
         predictions = model.predict(X_predict)
 
         # Add predictions to dataframe
         predict_df = predict_df.copy()
-        predict_df[f'predicted_{input_data.target_column}'] = predictions
+
+        # Handle multiple target columns
+        if len(input_data.target_columns) == 1:
+            predict_df[input_data.target_columns[0]] = predictions
+        else:
+            # Multi-target prediction
+            for i, target in enumerate(input_data.target_columns):
+                predict_df[target] = predictions[:, i]
 
         # Add prediction probabilities if available
         if hasattr(model, 'predict_proba'):

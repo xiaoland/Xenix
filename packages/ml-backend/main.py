@@ -15,6 +15,7 @@ Arguments:
 """
 
 import sys
+import os
 import json
 import argparse
 import traceback
@@ -26,16 +27,19 @@ from ml_backend.types import (
     OperationRequest,
     BatchTrainInput,
     SingleTrainInput,
-    PredictInput
+    PredictFileInput,
+    PredictInlineInput
 )
-from ml_backend.controllers import batch_train, single_train, predict
+from ml_backend.controllers import batch_train, single_train, predict_file, predict_inline
 from ml_backend.utils.logger import TaskLogger
+from ml_backend.utils import StatusManager, TaskStatus
 
 
 def main():
     """Main entry point - reads from stdin, writes results to result.json"""
     logger = None
     task_id = None
+    status_manager = None
 
     try:
         # Parse command line arguments
@@ -43,11 +47,7 @@ def main():
         parser.add_argument('--base-path', type=str, help='Base path for file operations')
         args = parser.parse_args()
 
-        # Override base path if provided via CLI
-        if args.base_path:
-            Config.set_base_path(args.base_path)
-
-        # Read input from stdin
+        # Read input from stdin first to get task_id
         input_text = sys.stdin.read()
 
         if not input_text.strip():
@@ -62,13 +62,27 @@ def main():
         # Validate request structure
         request = OperationRequest(**request_data)
 
-        # Extract task_id for logger initialization
+        # Extract task_id for setting up task-specific directory
         task_id = request.data.get("task_id")
         if not task_id:
             raise ValueError("Missing task_id in request data")
 
+        # Set BASE_PATH to task-specific directory: {ML_BASE_PATH}/tasks/{task_id}
+        default_base = os.getenv("ML_BASE_PATH", "/tmp/ml-backend")
+        if args.base_path:
+            default_base = args.base_path
+
+        task_base_path = os.path.join(default_base, "tasks", str(task_id))
+        Config.set_base_path(task_base_path)
+
         # Create logger instance for this task
         logger = TaskLogger(task_id, base_path=Config.BASE_PATH)
+
+        # Create status manager for atomic status updates
+        status_manager = StatusManager(Config.BASE_PATH)
+
+        # Write initial status: running
+        status_manager.write_status(TaskStatus.RUNNING)
 
         # Ensure directories exist
         Config.ensure_directories()
@@ -89,27 +103,31 @@ def main():
             input_data = SingleTrainInput(**request.data)
             result = single_train(input_data, logger)
 
-        elif request.operation == "predict":
-            input_data = PredictInput(**request.data)
-            result = predict(input_data, logger)
+        elif request.operation == "predict-file":
+            input_data = PredictFileInput(**request.data)
+            result = predict_file(input_data, logger)
+
+        elif request.operation == "predict-inline":
+            input_data = PredictInlineInput(**request.data)
+            result = predict_inline(input_data, logger)
 
         else:
             raise ValueError(
                 f"Unknown operation: {request.operation}. "
-                f"Supported: batch-train, single-train, predict"
+                f"Supported: batch-train, single-train, predict-file, predict-inline"
             )
 
         # Store successful result in result.json
         result_file = Path(Config.BASE_PATH) / "result.json"
         result_file.parent.mkdir(parents=True, exist_ok=True)
 
-        result_data = {
-            "status": "completed",
-            "result": result.model_dump() if result else None
-        }
+        result_data = result.model_dump() if result else {}
 
         with open(result_file, 'w') as f:
             json.dump(result_data, f, indent=2)
+
+        # Write completed status
+        status_manager.write_status(TaskStatus.COMPLETED)
 
         logger.log("Operation completed successfully", "INFO")
 
@@ -134,6 +152,10 @@ def main():
         # Print to stderr for debugging
         print(f"ERROR: {error_msg}", file=sys.stderr, flush=True)
         print(error_trace, file=sys.stderr, flush=True)
+
+        # Write failed status
+        if status_manager:
+            status_manager.write_status(TaskStatus.FAILED)
 
         # Store error result in result.json
         if Config.BASE_PATH:

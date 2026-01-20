@@ -78,7 +78,7 @@ export const tasks = pgTable(
   "tasks",
   {
     id: serial("id").primaryKey(),
-    workItemId: integer("work_item_id").notNull(), // Reference to work item
+    workItemId: integer("work_item_id"), // Reference to work item
     mlBackendDeploymentId: integer("ml_backend_deployment_id")
       .references(() => mlBackendDeployments.id)
       .notNull(), // Reference to ML backend deployment

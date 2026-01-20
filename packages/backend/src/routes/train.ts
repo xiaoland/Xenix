@@ -14,6 +14,7 @@ import { BadRequestError, NotFoundError } from "../errors";
 import { authMiddleware } from "../middleware/auth";
 import logger from "../utils/logger";
 import { storage } from "../storage";
+import { config } from "../config";
 
 const train = new Hono()
   .use("*", authMiddleware)
@@ -80,11 +81,17 @@ const train = new Hono()
     const deploymentId = Number(process.env.ML_BACKEND_DEPLOYMENT_ID) || 0;
     const mlService = getMLBackendService();
 
+    // Determine train data path based on storage type
+    const trainDataPath =
+      config.STORAGE_TYPE === "oss"
+        ? storage.getFilesystemPath(`datasets/${datasetId}/${dataset.fileName}`) // OSS: /mnt/oss/datasets/...
+        : dataset.filePath; // Local: full file path
+
     // Create task record FIRST to get actual task ID
     const [insertedTask] = await db
       .insert(schema.tasks)
       .values({
-        workItemId: workItemId,
+        workItemId: workItemId ?? null,
         mlBackendDeploymentId: deploymentId,
         type: "batch-train",
         status: "pending",
@@ -100,7 +107,7 @@ const train = new Hono()
 
     // Fire ml-backend request with actual task ID
     const mlRequest = mlService.batchTrain(deploymentId, insertedTask.id, {
-      inputFile: dataset.filePath,
+      trainDataPath,
       model,
       featureColumns,
       targetColumn,
@@ -211,12 +218,12 @@ const train = new Hono()
       }
 
       // Get deployment ID from environment variable
-      const deploymentId = Number(process.env.ML_BACKEND_DEPLOYMENT_ID) || 1;
+      const deploymentId = Number(process.env.ML_BACKEND_DEPLOYMENT_ID) || 0;
       const mlService = getMLBackendService();
 
-      // Determine input file path based on storage type
-      const inputFile =
-        storage.getType() === "oss"
+      // Determine train data path based on storage type
+      const trainDataPath =
+        config.STORAGE_TYPE === "oss"
           ? storage.getFilesystemPath(
               `datasets/${datasetId}/${dataset.fileName}`,
             ) // OSS: /mnt/oss/datasets/...
@@ -242,11 +249,11 @@ const train = new Hono()
 
       // Fire ml-backend request with actual task ID
       const mlRequest = mlService.singleTrain(deploymentId, insertedTask.id, {
-        inputFile,
+        trainDataPath,
         model,
         featureColumns,
         targetColumn,
-        parameters,
+        params: parameters,
       });
 
       // Wait 5s to check for errors (fire-and-forget pattern)

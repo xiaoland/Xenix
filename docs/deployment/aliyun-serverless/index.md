@@ -7,18 +7,23 @@
 - OSS（对象存储）：存储用户上传的、计算得到的数据文件
 - RDS PostgreSQL：数据库
 
-## FC
+## Backend
 
-### 难点
+> 基于 Aliyun FC
 
-- 需要 Node.js 运行时
-- 文件上传（body大小的限制）与存放
-  - 文件存储在阿里云 OSS 中
-  - Python 需要执行的时候
-- Python 的执行需要的依赖
-- 数据库访问
+- 自定义层
+- 运行时：自定义运行时 (Debian 12 Node.js 22)
+- 配置
+  - 启动命令：`./fc-start.sh`
+    - 在该 shell 脚本中执行了 node_modules 软链接，因为 ESMJS 不支持 NODE_PATH 环境变量
+  - 数据库 (Aliyun RDS)
+  - 层
+    - 公共层
+- 配置触发器
 
-### 配置层
+## ML Backend
+
+### 自定义层
 
 目前所需的 [Python 依赖](../../pyproject.toml) ，[公共层](https://github.com/awesome-fc/awesome-layers/blob/main/README.md) 不能满足需求，需要打包自定义层。
 
@@ -30,7 +35,9 @@
 
 ### 挂载 OSS
 
-## ESA
+## Frontend
+
+> 基于 Aliyun ESA
 
 1. 添加：
 

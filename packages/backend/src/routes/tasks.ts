@@ -1,4 +1,5 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
+import path from "path";
 
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
@@ -16,6 +17,68 @@ import { authMiddleware } from "../middleware/auth";
 import { MLBackendDeploymentRepository } from "../repositories/MLBackendDeploymentRepository";
 import { getMLBackendService } from "../services/MLBackendService";
 import logger from "../utils/logger";
+import type { InferSelectModel } from "drizzle-orm";
+import { mlBackendDeployments } from "../database/schema";
+import { storage } from "../storage";
+
+type MLBackendDeployment = InferSelectModel<typeof mlBackendDeployments>;
+
+/**
+ * Transform file paths in result based on deployment storage type
+ * - Local: Convert relative paths to absolute file paths
+ * - OSS: Convert storage keys to HTTP URLs
+ */
+async function transformResultPaths(
+  result: any,
+  deployment: MLBackendDeployment,
+  taskId: number
+): Promise<any> {
+  if (!result) return result;
+
+  const storageType = deployment.storage || 'local';
+
+  // For local storage, transform relative paths to absolute file paths
+  if (storageType === 'local') {
+    // Get ML_BASE_PATH from environment or use default
+    const mlBasePath = process.env.ML_BASE_PATH || '/tmp/ml-backend';
+    const taskBasePath = path.join(mlBasePath, 'tasks', String(taskId));
+
+    const transformed = { ...result };
+
+    // Transform predictedDataPath if exists and is relative
+    if (result.predictedDataPath && !path.isAbsolute(result.predictedDataPath)) {
+      transformed.predictedDataPath = path.join(taskBasePath, result.predictedDataPath);
+    }
+
+    // Transform fittedModelPath if exists and is relative
+    if (result.fittedModelPath && !path.isAbsolute(result.fittedModelPath)) {
+      transformed.fittedModelPath = path.join(taskBasePath, result.fittedModelPath);
+    }
+
+    return transformed;
+  }
+
+  // For OSS storage, transform storage keys to presigned HTTP URLs
+  if (storageType === 'oss') {
+    const transformed = { ...result };
+
+    // Transform predictedDataPath to presigned URL (24 hour expiry)
+    if (result.predictedDataPath) {
+      const key = `tasks/${taskId}/${result.predictedDataPath}`;
+      transformed.predictedDataPath = await storage.generatePresignedDownloadUrl(key, 86400);
+    }
+
+    // Transform fittedModelPath to presigned URL (24 hour expiry)
+    if (result.fittedModelPath) {
+      const key = `tasks/${taskId}/${result.fittedModelPath}`;
+      transformed.fittedModelPath = await storage.generatePresignedDownloadUrl(key, 86400);
+    }
+
+    return transformed;
+  }
+
+  return result;
+}
 
 const tasks = new Hono()
   .use("*", authMiddleware)
@@ -76,23 +139,62 @@ const tasks = new Hono()
           }
 
           const mlService = getMLBackendService();
-          const result = await mlService.checkResult(deployment, taskId);
 
-          if (result && result.status !== "pending") {
-            // Update task with result
+          // First check status to see if task is completed
+          const status = await mlService.checkStatus(deployment, taskId);
+
+          if (status === "completed") {
+            // Task completed - fetch result
+            const result = await mlService.checkResult(deployment, taskId);
+
+            if (result) {
+              // Transform file paths based on storage type
+              const transformedResult = await transformResultPaths(result, deployment, taskId);
+
+              await db
+                .update(schema.tasks)
+                .set({
+                  status: "completed",
+                  result: transformedResult,
+                  endAt: new Date(),
+                })
+                .where(eq(schema.tasks.id, taskId));
+
+              logger.info(
+                { taskId },
+                "Updated task with ML backend result",
+              );
+            }
+          } else if (status === "failed") {
+            // Task failed - fetch error details
+            const result = await mlService.checkResult(deployment, taskId);
+
             await db
               .update(schema.tasks)
               .set({
-                status: result.status,
-                result: result.result || null,
-                error: result.error || null,
+                status: "failed",
+                error: result?.error || "Task failed",
                 endAt: new Date(),
               })
               .where(eq(schema.tasks.id, taskId));
 
+            logger.warn(
+              { taskId, error: result?.error },
+              "Task failed in ML backend",
+            );
+          } else if (status === "running" && task.status === "pending") {
+            // Update status from pending to running
+            await db
+              .update(schema.tasks)
+              .set({
+                status: "running",
+                startedAt: new Date(),
+              })
+              .where(eq(schema.tasks.id, taskId));
+
             logger.info(
-              { taskId, status: result.status },
-              "Updated task with ML backend result",
+              { taskId },
+              "Task started running in ML backend",
             );
           }
         } catch (error) {
