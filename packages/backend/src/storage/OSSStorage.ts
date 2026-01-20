@@ -1,13 +1,13 @@
-import { AwsClient } from 'aws4fetch';
-import path from 'path';
-import fs from 'fs/promises';
-import type { StorageService } from './StorageService';
+import { AwsClient } from "aws4fetch";
+import path from "path";
+import fs from "fs/promises";
+import type { StorageService } from "./StorageService";
 import type {
   FileMetadata,
   PresignedUrlRequest,
   PresignedUrlResponse,
   OSSConfig,
-} from './schemas';
+} from "./schemas";
 
 /**
  * Aliyun OSS storage implementation using aws4fetch
@@ -19,30 +19,34 @@ export class OSSStorage implements StorageService {
   private endpoint: string;
   private bucket: string;
 
-  constructor(config: OSSConfig, mountPoint = '/mnt/oss') {
+  constructor(config: OSSConfig, mountPoint = "/mnt/oss") {
     this.awsClient = new AwsClient({
       accessKeyId: config.accessKeyId,
       secretAccessKey: config.accessKeySecret,
-      region: config.region || 'cn-hangzhou',
-      service: 'oss',
+      region: config.region || "cn-hangzhou",
+      service: "oss",
     });
     this.mountPoint = mountPoint;
-    this.endpoint = config.endpoint || `https://${config.bucket}.oss-${config.region || 'cn-hangzhou'}.aliyuncs.com`;
+    this.endpoint =
+      config.endpoint ||
+      `https://${config.bucket}.oss-${config.region || "cn-hangzhou"}.aliyuncs.com`;
     this.bucket = config.bucket;
   }
 
   async generatePresignedUploadUrl(
-    request: PresignedUrlRequest
+    request: PresignedUrlRequest,
   ): Promise<PresignedUrlResponse> {
     // Generate presigned PUT URL for direct upload from frontend
     const url = `${this.endpoint}/${request.key}`;
 
     // Create a signed URL using aws4fetch
+    const headers: Record<string, string> = {};
+    if (request.contentType) {
+      headers["Content-Type"] = request.contentType;
+    }
     const signedUrl = await this.awsClient.sign(url, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': request.contentType,
-      },
+      method: "PUT",
+      headers,
     });
 
     const expiresAt = new Date(Date.now() + request.expiresIn * 1000);
@@ -56,13 +60,13 @@ export class OSSStorage implements StorageService {
 
   async generatePresignedDownloadUrl(
     key: string,
-    expiresIn = 3600
+    expiresIn = 3600,
   ): Promise<string> {
     // Generate presigned GET URL for direct download from frontend
     const url = `${this.endpoint}/${key}`;
 
     const signedUrl = await this.awsClient.sign(url, {
-      method: 'GET',
+      method: "GET",
     });
 
     return signedUrl.url;
@@ -81,7 +85,7 @@ export class OSSStorage implements StorageService {
   async delete(key: string): Promise<void> {
     // Delete from OSS using aws4fetch
     const url = `${this.endpoint}/${key}`;
-    await this.awsClient.fetch(url, { method: 'DELETE' });
+    await this.awsClient.fetch(url, { method: "DELETE" });
   }
 
   async stat(key: string): Promise<FileMetadata> {
@@ -102,9 +106,9 @@ export class OSSStorage implements StorageService {
     // Use OSS copy operation via aws4fetch
     const url = `${this.endpoint}/${destKey}`;
     await this.awsClient.fetch(url, {
-      method: 'PUT',
+      method: "PUT",
       headers: {
-        'x-oss-copy-source': `/${this.bucket}/${sourceKey}`,
+        "x-oss-copy-source": `/${this.bucket}/${sourceKey}`,
       },
     });
   }
@@ -113,7 +117,7 @@ export class OSSStorage implements StorageService {
     // Fetch file content from OSS
     const url = `${this.endpoint}/${key}`;
     const fetchOptions: RequestInit = {
-      method: 'GET',
+      method: "GET",
     };
 
     if (options?.timeout) {

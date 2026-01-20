@@ -10,7 +10,6 @@ import { errorHandler } from "./middleware/errorHandler";
 // Routes
 import authRoutes from "./routes/auth";
 import datasetsRoutes from "./routes/datasets";
-import downloadRoutes from "./routes/download";
 import modelsRoutes from "./routes/models";
 import obsrvRoutes from "./routes/obsrv";
 import predictRoutes from "./routes/predict";
@@ -57,7 +56,6 @@ const routes = app
   .route("/tasks", tasksRoutes)
   .route("/train", trainRoutes)
   .route("/predict", predictRoutes)
-  .route("/download", downloadRoutes)
   .route("/obsrv", obsrvRoutes);
 
 // Error handler (must be last)

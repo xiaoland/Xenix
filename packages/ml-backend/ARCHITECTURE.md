@@ -87,31 +87,60 @@ main():
 
 Request routing and file I/O coordination.
 
-**Available**:
-- batch_train - GridSearchCV tuning
-- single_train - Fixed parameters
-- predict - Batch predictions
+**Available Operations**:
+- **batch-train** - GridSearchCV hyperparameter tuning (returns metrics + best_params, NO model saving)
+- **single-train** - Fixed parameter training (returns metrics only, NO model saving)
+- **predict-file** - File-based prediction (trains model, saves fitted model + prediction file)
+- **predict-inline** - Inline data prediction (trains model, saves fitted model, returns predictions as JSON)
 
 **Signature**: `(input_data, logger: TaskLogger) → Output`
 
-**Workflow**:
+**Key Design Decisions**:
+1. **Model Saving Location**: Models saved ONLY during prediction operations, NOT during training
+   - Training operations focus on finding optimal parameters/evaluating metrics
+   - Prediction operations train on full dataset and persist the fitted model
+2. **Target Columns as Array**: Changed from single string to array for future multi-target support
+3. **Split Predict Operations**: Separate `predict-file` and `predict-inline` for clarity and type safety
+4. **Task-Specific Directories**: All files isolated in `{BASE_PATH}/tasks/{task_id}/`
+5. **Auto-Generated Filenames**: No `outputPath` parameter - backend generates timestamped filenames
+
+**Training Workflow** (batch-train, single-train):
 1. Validate input
-2. Log progress
-3. Delegate to model service
-4. Save trained model
-5. Return structured result
+2. Read training data
+3. Train model and evaluate metrics
+4. Return metrics (and best_params for batch-train)
+5. NO model saving
+
+**Prediction Workflow** (predict-file, predict-inline):
+1. Validate input
+2. Read training data
+3. Read/parse prediction data
+4. Train model on full training dataset
+5. Make predictions
+6. Save fitted model (model_{timestamp}.pkl)
+7. Save/return predictions
+8. Return result with model path and prediction data/path
 
 ### Services (Model Registry)
 
 Model-specific training/prediction logic.
 
 **Base Interface**:
-```
+```python
 abstract class ModelBase:
-    abstract batch_train(dataframe, input) → {model, best_params, metrics}
-    abstract single_train(dataframe, input) → {model, metrics}
-    abstract predict(train_df, predict_df, input) → predictions_df
+    # Training methods (NO model return, only metrics)
+    abstract batch_train(dataframe, input) → {best_params, metrics}
+    abstract single_train(dataframe, input) → {metrics}
+
+    # Prediction methods (train + return fitted model)
+    abstract train_and_get_model(dataframe, input) → fitted_model
+    abstract predict_with_model(model, predict_df, input) → predictions_df
 ```
+
+**Key Changes**:
+- Training methods (`batch_train`, `single_train`) return metrics only, NO model object
+- New `train_and_get_model()` trains on full dataset and returns fitted model instance
+- New `predict_with_model()` makes predictions with a fitted model
 
 **Available Models**:
 - Linear: linear, ridge, lasso, bayesian_ridge
@@ -171,6 +200,69 @@ Server (GET /tasks/{id}/result)
 Client
 ```
 
+## Output File Structure
+
+All operations write to task-specific directory: `{ML_BASE_PATH}/tasks/{task_id}/`
+
+### Common Files (All Operations)
+
+- **status.txt** - Current task status (pending/running/completed/failed)
+- **result.json** - Operation results in JSON format
+- **logs.jsonl** - Structured logs in JSONL format
+
+### Operation-Specific Files
+
+**Training Operations** (batch-train, single-train):
+- Only common files (no model saving)
+
+**Prediction Operations** (predict-file, predict-inline):
+- **model_{timestamp}.pkl** - Fitted model (joblib format)
+- **predictions_{timestamp}.xlsx** - Prediction results (predict-file only)
+
+### Result.json Formats
+
+**batch-train**:
+```json
+{
+  "metrics": {"r2": 0.95, "mse": 0.05, "mae": 0.1},
+  "best_params": {"alpha": 1.0, "max_iter": 100}
+}
+```
+
+**single-train**:
+```json
+{
+  "metrics": {"r2": 0.93, "mse": 0.07, "mae": 0.12}
+}
+```
+
+**predict-file**:
+```json
+{
+  "fitted_model_path": "model_20260119_120000.pkl",
+  "predicted_data_path": "predictions_20260119_120000.xlsx"
+}
+```
+
+**predict-inline**:
+```json
+{
+  "fitted_model_path": "model_20260119_120000.pkl",
+  "predicted_data": [
+    {"col1": 1.5, "col2": 2.0, "prediction": 3.2},
+    {"col1": 1.8, "col2": 2.2, "prediction": 3.5}
+  ]
+}
+```
+
+**Error**:
+```json
+{
+  "error": "Error message",
+  "traceback": "Full traceback..."
+}
+```
+
 ## HTTP API
 
 ### POST /execute
@@ -180,12 +272,21 @@ Fire-and-forget execution.
 **Response**: `{status: "accepted", task_id}`
 **Status**: 202 Accepted
 
-### GET /tasks/{task_id}/result
-Check completion.
+**Supported Operations**:
+- `batch-train` - GridSearchCV hyperparameter tuning
+- `single-train` - Fixed parameter training
+- `predict-file` - File-based prediction
+- `predict-inline` - Inline data prediction
 
-**Pending**: `{status: "pending"}`
-**Success**: `{status: "completed", result: {...}}`
-**Failure**: `{status: "failed", error, traceback}`
+### GET /tasks/{task_id}/result
+Check completion and retrieve results.
+
+**Returns**: Contents of result.json (format depends on operation type)
+
+### GET /tasks/{task_id}/status
+Check task status.
+
+**Returns**: Contents of status.txt (pending/running/completed/failed)
 
 ### GET /health
 Health check.

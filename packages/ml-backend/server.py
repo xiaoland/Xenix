@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Dict, Any
 import asyncio
 
-from fastapi import FastAPI, Request, BackgroundTasks, Response
+from fastapi import FastAPI, BackgroundTasks, Response
 from pydantic import BaseModel, Field
 
 app = FastAPI(title="ML Backend API", version="1.0.0")
@@ -43,17 +43,18 @@ def get_task_base_path(task_id: int) -> str:
     return str(Path(base_dir) / "tasks" / str(task_id))
 
 
-async def execute_task_async(operation: str, data: Dict[str, Any], base_path: str):
+async def execute_task_async(operation: str, data: Dict[str, Any]):
     """
     Execute ML task asynchronously in a separate process
 
     Spawns a new Python process to run main.py with the operation data.
     This ensures CPU-intensive ML tasks don't block the FastAPI event loop.
 
+    NOTE: main.py will construct the full task path as {ML_BASE_PATH}/tasks/{task_id}
+
     Args:
         operation: Operation type
         data: Operation data
-        base_path: Base path for task files
     """
     task_id = data.get("task_id")
 
@@ -70,10 +71,10 @@ async def execute_task_async(operation: str, data: Dict[str, Any], base_path: st
 
     try:
         # Spawn subprocess to execute the task
+        # NOTE: Do NOT pass --base-path here - main.py will construct it from task_id
         process = await asyncio.create_subprocess_exec(
             sys.executable,  # Python interpreter
             str(main_py_path),
-            "--base-path", base_path,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
@@ -97,7 +98,8 @@ async def execute_task_async(operation: str, data: Dict[str, Any], base_path: st
         print(f"[Task {task_id}] {error_msg}", flush=True)
 
         # Write error to result.json
-        result_file = Path(base_path) / "result.json"
+        task_base_path = get_task_base_path(task_id)
+        result_file = Path(task_base_path) / "result.json"
         result_file.parent.mkdir(parents=True, exist_ok=True)
 
         error_data = {
@@ -112,40 +114,8 @@ async def execute_task_async(operation: str, data: Dict[str, Any], base_path: st
             print(f"Failed to write error result: {write_error}", flush=True)
 
 
-@app.middleware("http")
-async def add_task_base_path(request: Request, call_next):
-    """
-    Middleware to calculate and store task base path in request state
-    """
-    # Only process for execute endpoint
-    if request.url.path == "/execute" and request.method == "POST":
-        try:
-            # Parse body to get task_id
-            body = await request.body()
-            data = json.loads(body)
-
-            task_id = data.get("data", {}).get("task_id")
-            if task_id:
-                base_path = get_task_base_path(task_id)
-                request.state.base_path = base_path
-
-            # Recreate request with original body
-            async def receive():
-                return {"type": "http.request", "body": body}
-
-            request._receive = receive
-
-        except Exception as e:
-            # Don't block request if middleware fails
-            print(f"Middleware error: {e}", flush=True)
-
-    response = await call_next(request)
-    return response
-
-
 @app.post("/execute")
 async def execute(
-    request: Request,
     execute_request: ExecuteRequest,
     background_tasks: BackgroundTasks
 ) -> Dict[str, Any]:
@@ -171,15 +141,11 @@ async def execute(
             media_type="application/json"
         )
 
-    # Get base path from request state (set by middleware)
-    base_path = getattr(request.state, "base_path", get_task_base_path(task_id))
-
     # Schedule background task
     background_tasks.add_task(
         execute_task_async,
         execute_request.operation,
-        execute_request.data,
-        base_path
+        execute_request.data
     )
 
     # Return immediately
@@ -224,6 +190,36 @@ async def get_result(task_id: int) -> Dict[str, Any]:
             "status": "error",
             "error": f"Failed to read result: {str(e)}"
         }
+
+
+@app.get("/tasks/{task_id}/status")
+async def get_status(task_id: int) -> Response:
+    """
+    Get task status from status.txt
+
+    Args:
+        task_id: Task ID
+
+    Returns:
+        Plain text status (pending/running/completed/failed)
+    """
+    base_path = get_task_base_path(task_id)
+    status_file = Path(base_path) / "status.txt"
+
+    if not status_file.exists():
+        # No status file yet - task is pending
+        return Response(content="pending", media_type="text/plain")
+
+    try:
+        with open(status_file, 'r') as f:
+            status = f.read().strip()
+            return Response(content=status, media_type="text/plain")
+    except Exception as e:
+        return Response(
+            content="error",
+            media_type="text/plain",
+            status_code=500
+        )
 
 
 if __name__ == "__main__":

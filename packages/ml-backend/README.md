@@ -107,8 +107,6 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for deployment instructions.
 Environment variables:
 
 - `ML_BASE_PATH` - Base path for file operations (default: `/tmp/ml-backend`)
-- `MODEL_STORAGE_PATH` - Model storage path (default: `{BASE_PATH}/models`)
-- `DATA_STORAGE_PATH` - Data storage path (default: `{BASE_PATH}/data`)
 - `DATABASE_URL` - PostgreSQL connection (optional, for logging)
 - `LOG_LEVEL` - Logging level (default: `INFO`)
 

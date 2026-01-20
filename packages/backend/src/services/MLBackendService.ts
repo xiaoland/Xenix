@@ -19,11 +19,18 @@ export interface ExecuteOptions {
 }
 
 export interface TaskResult {
-  status: "pending" | "completed" | "failed" | "error";
-  result?: any;
+  // For training operations
+  metrics?: { r2?: number; mse?: number; mae?: number; [key: string]: any };
+  bestParams?: Record<string, any>; // batch-train only (camelCase converted from best_params)
+
+  // For predict operations
+  fittedModelPath?: string; // camelCase converted from fitted_model_path
+  predictedDataPath?: string; // predict-file only (camelCase converted from predicted_data_path)
+  predictedData?: any[]; // predict-inline only (camelCase converted from predicted_data)
+
+  // Error handling
   error?: string;
   traceback?: string;
-  message?: string;
 }
 
 export class MLBackendService {
@@ -160,6 +167,48 @@ export class MLBackendService {
   }
 
   /**
+   * Convert snake_case keys to camelCase
+   */
+  private convertSnakeToCamel(obj: any): any {
+    if (obj === null || obj === undefined) return obj;
+    if (Array.isArray(obj))
+      return obj.map((item) => this.convertSnakeToCamel(item));
+    if (typeof obj !== "object") return obj;
+
+    const converted: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      const camelKey = key.replace(/_([a-z])/g, (_, letter) =>
+        letter.toUpperCase(),
+      );
+      converted[camelKey] = this.convertSnakeToCamel(value);
+    }
+    return converted;
+  }
+
+  /**
+   * Transform file path based on storage type
+   * - OSS: Convert /mnt/oss/path to OSS URL
+   * - Local: Pass through unchanged
+   */
+  private async transformPathForStorage(
+    path: string,
+    deployment: MLBackendDeployment,
+  ): Promise<string> {
+    if (deployment.storage === "oss") {
+      // Extract key from /mnt/oss/ mount point
+      const ossPrefix = "/mnt/oss/";
+      if (path.startsWith(ossPrefix)) {
+        const key = path.substring(ossPrefix.length);
+        // Get OSS URL from storage service
+        const url = await storage.generatePresignedDownloadUrl(key);
+        return url;
+      }
+    }
+    // Local storage: pass through unchanged
+    return path;
+  }
+
+  /**
    * Check result via HTTP (local deployments)
    */
   private async checkResultFromHTTP(
@@ -198,17 +247,15 @@ export class MLBackendService {
         return null;
       }
 
-      const result = (await response.json()) as TaskResult;
+      const rawResult = await response.json();
 
-      if (result.status === "pending") {
-        return null;
-      }
+      // Convert snake_case to camelCase
+      const result = this.convertSnakeToCamel(rawResult) as TaskResult;
 
       logger.info(
         {
           deploymentId: deployment.id,
           taskId,
-          resultStatus: result.status,
         },
         "Retrieved task result from ML backend via HTTP",
       );
@@ -246,16 +293,14 @@ export class MLBackendService {
         return null;
       }
 
-      const result = (await response.json()) as TaskResult;
+      const rawResult = await response.json();
 
-      if (result.status === "pending") {
-        return null;
-      }
+      // Convert snake_case to camelCase
+      const result = this.convertSnakeToCamel(rawResult) as TaskResult;
 
       logger.info(
         {
           taskId,
-          resultStatus: result.status,
           storageKey: resultKey,
         },
         "Retrieved task result from storage",
@@ -275,13 +320,43 @@ export class MLBackendService {
   }
 
   /**
+   * Check task status from status.txt file
+   */
+  async checkStatus(
+    deployment: MLBackendDeployment,
+    taskId: number,
+  ): Promise<"pending" | "running" | "completed" | "failed" | null> {
+    const storageType = deployment.storage || "local";
+
+    try {
+      if (storageType === "oss") {
+        const statusKey = `tasks/${taskId}/status.txt`;
+        const response = await storage.fetch(statusKey, { timeout: 2000 });
+        if (!response.ok) return null;
+        const text = await response.text();
+        return text.trim() as any;
+      } else {
+        const url = `${deployment.apiUrl}/tasks/${taskId}/status`;
+        const response = await fetch(url, {
+          signal: AbortSignal.timeout(2000),
+        });
+        if (!response.ok) return null;
+        const text = await response.text();
+        return text.trim() as any;
+      }
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
    * Batch train operation
    */
   async batchTrain(
     deploymentId: number,
     taskId: number,
     options: {
-      inputFile: string;
+      trainDataPath: string;
       model: string;
       featureColumns: string[];
       targetColumn: string;
@@ -290,14 +365,20 @@ export class MLBackendService {
   ): Promise<void> {
     const deployment = await this.getDeployment(deploymentId);
 
+    // Transform path for storage type
+    const transformedPath = await this.transformPathForStorage(
+      options.trainDataPath,
+      deployment,
+    );
+
     await this.execute(deployment, {
       operation: "batch-train",
       data: {
         task_id: taskId,
-        input_file: options.inputFile,
+        train_data_path: transformedPath,
         model: options.model,
         feature_columns: options.featureColumns,
-        target_column: options.targetColumn,
+        target_columns: [options.targetColumn],
         param_grid: options.paramGrid || {},
       },
     });
@@ -310,25 +391,31 @@ export class MLBackendService {
     deploymentId: number,
     taskId: number,
     options: {
-      inputFile: string;
+      trainDataPath: string;
       model: string;
       featureColumns: string[];
       targetColumn: string;
-      parameters: Record<string, any>;
+      params: Record<string, any>;
       parentTaskId?: number;
     },
   ): Promise<void> {
     const deployment = await this.getDeployment(deploymentId);
 
+    // Transform path for storage type
+    const transformedPath = await this.transformPathForStorage(
+      options.trainDataPath,
+      deployment,
+    );
+
     await this.execute(deployment, {
       operation: "single-train",
       data: {
         task_id: taskId,
-        input_file: options.inputFile,
+        train_data_path: transformedPath,
         model: options.model,
         feature_columns: options.featureColumns,
-        target_column: options.targetColumn,
-        parameters: options.parameters,
+        target_columns: [options.targetColumn],
+        params: options.params,
         parent_task_id: options.parentTaskId,
       },
     });
@@ -337,13 +424,12 @@ export class MLBackendService {
   /**
    * Predict operation (file-based)
    */
-  async predict(
+  async predictFile(
     deploymentId: number,
     taskId: number,
     options: {
-      trainingDataPath: string;
-      predictionDataPath: string;
-      outputPath: string;
+      trainDataPath: string;
+      toPredictDataPath: string;
       model: string;
       params: Record<string, any>;
       featureColumns: string[];
@@ -352,38 +438,28 @@ export class MLBackendService {
   ): Promise<void> {
     const deployment = await this.getDeployment(deploymentId);
 
+    // Transform paths for storage type
+    const transformedTrainPath = await this.transformPathForStorage(
+      options.trainDataPath,
+      deployment,
+    );
+    const transformedPredictPath = await this.transformPathForStorage(
+      options.toPredictDataPath,
+      deployment,
+    );
+
     await this.execute(deployment, {
-      operation: "predict",
+      operation: "predict-file",
       data: {
         task_id: taskId,
-        training_data_path: options.trainingDataPath,
-        prediction_data_path: options.predictionDataPath,
-        output_path: options.outputPath,
+        train_data_path: transformedTrainPath,
+        to_predict_data_path: transformedPredictPath,
         model: options.model,
-        parameters: options.params,
+        params: options.params,
         feature_columns: options.featureColumns,
-        target_column: options.targetColumn,
+        target_columns: [options.targetColumn],
       },
     });
-  }
-
-  /**
-   * Predict operation (file-based) - alias for predict
-   */
-  async predictFile(
-    deploymentId: number,
-    taskId: number,
-    options: {
-      trainingDataPath: string;
-      predictionDataPath: string;
-      outputPath: string;
-      model: string;
-      params: Record<string, any>;
-      featureColumns: string[];
-      targetColumn: string;
-    },
-  ): Promise<void> {
-    return this.predict(deploymentId, taskId, options);
   }
 
   /**
@@ -393,9 +469,8 @@ export class MLBackendService {
     deploymentId: number,
     taskId: number,
     options: {
-      trainingDataPath: string;
-      predictionData: any[];
-      outputPath: string;
+      trainDataPath: string;
+      toPredictData: any[];
       model: string;
       params: Record<string, any>;
       featureColumns: string[];
@@ -404,17 +479,22 @@ export class MLBackendService {
   ): Promise<void> {
     const deployment = await this.getDeployment(deploymentId);
 
+    // Transform train data path for storage type
+    const transformedTrainPath = await this.transformPathForStorage(
+      options.trainDataPath,
+      deployment,
+    );
+
     await this.execute(deployment, {
-      operation: "predict",
+      operation: "predict-inline",
       data: {
         task_id: taskId,
-        training_data_path: options.trainingDataPath,
-        prediction_data: options.predictionData,
-        output_path: options.outputPath,
+        train_data_path: transformedTrainPath,
+        to_predict_data: options.toPredictData,
         model: options.model,
-        parameters: options.params,
+        params: options.params,
         feature_columns: options.featureColumns,
-        target_column: options.targetColumn,
+        target_columns: [options.targetColumn],
       },
     });
   }
