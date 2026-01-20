@@ -46,22 +46,21 @@ pnpm -F @xenix/frontend build
 # Backend production build
 pnpm -F @xenix/backend build
 # Output: dist/index.js
+
+# Note: @xenix/shared uses source dependencies pattern
+# No separate build step needed - consumed directly from TypeScript source
 ```
 
 ### Aliyun FC Deployment
 
 ```bash
-# Build with FC configuration
-pnpm build:fc
-
-# Package for FC
-pnpm package:fc
-
 # Deploy backend to FC
-pnpm deploy:backend
+cd packages/backend
+pnpm run deploy
 
 # Deploy ml-backend to FC
-pnpm deploy:ml-backend
+cd packages/ml-backend
+pnpm run deploy
 ```
 
 ## Environment Configuration
@@ -120,20 +119,17 @@ VITE_ENV=production
 # 1. Configure Aliyun credentials
 aliyun configure
 
-# 2. Build for FC
-pnpm build:fc
+# 2. Deploy backend
+cd packages/backend
+pnpm run deploy
 
-# 3. Package function
-pnpm package:fc
+# 3. Deploy ml-backend
+cd packages/ml-backend
+pnpm run deploy
 
-# 4. Deploy backend function
-pnpm deploy:backend
-
-# 5. Deploy ml-backend function
-pnpm deploy:ml-backend
-
-# 6. Deploy frontend
-pnpm -F @xenix/frontend build
+# 4. Deploy frontend
+cd packages/frontend
+pnpm run build
 # Upload dist/ to OSS or CDN
 ```
 
@@ -185,33 +181,8 @@ aliyun oss mb oss://xenix-data
 
 # Create directories
 aliyun oss mkdir oss://xenix-data/datasets/
-aliyun oss mkdir oss://xenix-data/models/
-aliyun oss mkdir oss://xenix-data/predictions/
+aliyun oss mkdir oss://xenix-data/ml-backend/
 ```
-
-## CDN Configuration
-
-### Frontend Deployment
-
-1. Build frontend:
-
-```bash
-pnpm -F @xenix/frontend build
-```
-
-1. Upload to OSS:
-
-```bash
-aliyun oss cp -r dist/ oss://xenix-data/frontend/
-```
-
-1. Configure CDN in Aliyun console:
-
-- Accelerate: oss://xenix-data/frontend/
-- Cache rules: 1 hour for HTML, 7 days for static assets
-- HTTPS: Enable and configure certificate
-
-## CI/CD Pipeline
 
 ### GitHub Actions Example
 

@@ -139,13 +139,9 @@ All errors follow:
 
 ## Development
 
-For development setup and commands, see [DEVELOPMENT.md](../../DEVELOPMENT.md).
+For development setup and commands, see [DEVELOPMENT.md](./DEVELOPMENT.md).
 
-Key note: Build shared first when dependencies change:
-```bash
-cd packages/shared && pnpm build
-cd packages/backend && pnpm build:shared
-```
+**Source Dependencies Pattern**: This package uses source dependencies - consumers import directly from TypeScript source files. No build step required ever. This package is logically part of backend/frontend, just physically separated for code organization. Changes reflect immediately in both development and production builds.
 
 ## Usage
 

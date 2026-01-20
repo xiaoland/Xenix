@@ -33,5 +33,6 @@ Ship a easy-to-use, out-of-box ML workflow platform with separate frontend/backe
 
 - Vue components use `<script setup lang="ts">` and Composition API; fetch logic through TanStack Query composables (useProjects, useWorkItems, etc.).
 - Hono routes are explicit files; runtime validation should align with `packages/shared` Zod schemas.
-- All user-facing copy routes through `$t('key')`/`t('key')`; prefer UnoCSS utilities, reserve SCSS for complex layout.
+- Avoid hard-encoded user-facing text, use i18n instead ( `$t('key')`/`t('key')` ).
+- Prefer UnoCSS utilities, reserve SCSS for complex layout.
 - Type imports should come from `@xenix/shared`; prefer TypeScript-first edits and keep linting from ESLint config up to date.# AGENTS.md for `Xenix`

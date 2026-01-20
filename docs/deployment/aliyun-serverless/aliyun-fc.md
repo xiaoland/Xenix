@@ -31,33 +31,19 @@ This guide provides detailed instructions for deploying the Xenix backend to Ali
 ### Deployment Package Structure
 
 ```
-fc-deploy.zip
-├── index.js              # Bundled Node.js application (all dependencies)
-├── package.json          # Minimal package.json
-├── requirements.txt      # Python dependencies
-└── ml/                   # Python ML scripts
-    ├── auto_tune_model.py
-    ├── manual_tune_model.py
-    ├── predict.py
-    ├── predict_on_file.py
-    ├── predict_on_json.py
-    ├── base.py
-    ├── structured_io.py
-    ├── predict_helpers.py
-    ├── scan_models.py
-    └── regression/
-        ├── __init__.py
-        ├── base.py
-        └── [12 regression model files].py
+dist/
+├── index.js              # Bundled Node.js HTTP server with @xenix/shared inlined
+├── index.js.map          # Source map
+└── package.json          # Minimal package.json (created by FC)
 ```
 
 ### Key Design Decisions
 
-1. **Single Bundle**: All Node.js dependencies bundled into `index.js` (FC requirement)
-2. **Python Scripts**: Included as separate `.py` files in `ml/` directory
-3. **File Storage**: Uses `/tmp/uploads` for temporary file storage in FC
-4. **Managed Services**: Connects to external Aliyun RDS (PostgreSQL) and Redis
-5. **Python Packages**: Installed via FC Layer or bootstrap script
+1. **Simple Node.js HTTP Server**: Backend is a standalone HTTP server (Hono-based)
+2. **Source Dependencies**: `@xenix/shared` bundled directly from TypeScript source
+3. **External Dependencies**: Other Node.js packages loaded from `node_modules` (via layer)
+4. **ML Backend Separated**: Python ML scripts are in separate `packages/ml-backend` package
+5. **Managed Services**: Connects to external Aliyun RDS (PostgreSQL) and Redis
 
 ---
 
@@ -111,69 +97,47 @@ cp .env.fc.example .env.fc
 ```bash
 # From packages/backend directory
 
-# 1. Build for FC (builds shared, bundles dependencies, copies Python scripts)
-pnpm run build:fc
+# Build backend (bundles @xenix/shared from source)
+pnpm run build
 
-# 2. Create deployment package
-pnpm run package:fc
+# Deploy to Aliyun FC
+pnpm run deploy
 ```
 
 ### Detailed Build Steps
 
-#### Step 1: Build @xenix/shared Package
+#### Build with tsup
 
-The backend depends on the shared workspace package, which must be built first:
+The tsup configuration ([tsup.config.ts](tsup.config.ts)) bundles the application:
 
 ```bash
-cd ../shared
 pnpm run build
-cd ../backend
 ```
 
-Or use the built-in script:
+This creates `dist/index.js`:
 
-```bash
-pnpm run build:shared
-```
-
-#### Step 2: Bundle with tsup
-
-The FC-specific tsup configuration ([tsup.config.fc.ts](tsup.config.fc.ts)) bundles all dependencies:
-
-```bash
-tsup --config tsup.config.fc.ts
-```
-
-This creates:
-
-- `dist-fc/index.js` - Single bundled file with all Node.js code
+- Bundled HTTP server with `@xenix/shared` inlined
+- Other dependencies remain external (loaded from `node_modules`)
 
 Key configuration:
 
-- `noExternal: [/.*/]` - Bundles ALL dependencies
+- `noExternal: ['@xenix/shared']` - Bundles only the shared package from TypeScript source
+- Other Node.js dependencies: external (must be in layer or dependencies)
 - `external: [...]` - Excludes Node.js built-ins
-- Injects `__dirname` and `__filename` for Python path resolution
 
-#### Step 3: Copy Python Scripts
+**Note**: `@xenix/shared` uses source dependencies pattern - bundled directly from TypeScript source, no pre-compilation needed.
 
-```bash
-pnpm run copy:assets
-```
-
-This copies all `.py` files from `src/business/ml/` to `dist-fc/ml/`, preserving directory structure.
-
-#### Step 4: Create Deployment Package
+#### Deploy to FC
 
 ```bash
-pnpm run package:fc
+pnpm run deploy
 ```
 
-This creates `fc-deploy.zip` containing:
+This runs `s deploy` which:
 
-- Bundled `index.js`
-- Minimal `package.json`
-- Python scripts in `ml/` directory
-- `requirements.txt` for Python dependencies
+- Uploads `dist/` directory to FC
+- Applies configuration from [s.yaml](s.yaml)
+- Creates/updates the FC function
 
 ---
 

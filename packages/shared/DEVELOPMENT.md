@@ -8,8 +8,8 @@
 # From root directory
 pnpm install
 
-# Build shared package
-cd packages/shared && pnpm build
+# No build step required - uses source dependencies pattern
+# Backend and frontend consume TypeScript sources directly
 ```
 
 ## Overview
@@ -42,29 +42,31 @@ src/
 
 ## Development
 
-### Build
+### Source Dependencies Pattern
+
+This package uses the **source dependencies** pattern - consuming packages import directly from TypeScript source files (not compiled output).
+
+**Benefits:**
+
+- Changes reflect immediately in backend/frontend without rebuild
+- Faster development iteration
+- Better IDE jump-to-definition experience
+- Simpler mental model
+
+**How it works:**
+
+- `package.json` exports point to `./src/index.ts` (not `./dist/index.js`)
+- Bundlers (tsup, Vite) handle TypeScript sources natively during their own builds
+- This package is logically part of backend/frontend, just physically separated for organization
+
+### Type Checking
 
 ```bash
-# Build shared package
-pnpm build
+# Type-check shared package
+pnpm type-check
 
-# Build in watch mode
-pnpm build:watch
-```
-
-### Important: Build Order
-
-When shared package changes, rebuild dependents:
-
-```bash
-# 1. Build shared
-cd packages/shared && pnpm build
-
-# 2. Rebuild backend
-cd packages/backend && pnpm build:shared
-
-# 3. Rebuild frontend (if needed)
-pnpm install
+# Note: No build step needed for development
+# Changes are immediately available to consumers
 ```
 
 ## Creating Validation Schemas
@@ -266,23 +268,38 @@ export const OldSchema = z.object({ /* ... */ })
 
 ## Build & Deployment
 
-No special deployment needed - shared package is bundled with frontend and backend during their builds.
+### Source Dependencies Workflow
 
-### Rebuild After Changes
+With source dependencies, changes to `@xenix/shared` are immediately available:
 
 ```bash
 # After editing src/schemas or src/types:
 
-# 1. Build shared
-pnpm build
+# 1. Save changes (no build needed)
 
-# 2. Rebuild dependent packages
-cd packages/backend && pnpm build:shared
-cd packages/frontend && pnpm install
+# 2. Dev servers hot-reload automatically
+# Backend: tsx watch picks up changes
+# Frontend: Vite HMR picks up changes
 
-# 3. Verify types in dependents
-pnpm -F @xenix/backend type-check
+# 3. For production builds, shared is bundled automatically
+pnpm -F @xenix/backend build  # Bundles @xenix/shared from source
+pnpm -F @xenix/frontend build # Bundles @xenix/shared from source
 ```
+
+### Production Build Strategy
+
+**Backend Build:**
+
+- `@xenix/shared` is bundled into output from TypeScript source
+- Other dependencies remain external (imported from `node_modules`)
+- See [tsup.config.ts](../../backend/tsup.config.ts): `noExternal: ['@xenix/shared']`
+
+**Frontend Build:**
+
+- Vite bundles `@xenix/shared` TypeScript sources automatically
+- No pre-compilation needed
+
+**Important:** There is no separate build step for `@xenix/shared`. It's logically part of backend/frontend, just physically separated for code organization.
 
 ## Resources
 
