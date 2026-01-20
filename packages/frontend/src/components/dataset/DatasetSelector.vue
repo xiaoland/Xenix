@@ -3,7 +3,7 @@
     <div v-if="loading" class="text-center py-8">
       <a-spin />
       <p class="mt-2 text-gray-600">
-        {{ $t("components.dataset.selector.loading") }}
+        {{ $t("dataset.selector.loading") }}
       </p>
     </div>
 
@@ -13,7 +13,7 @@
           <span class="i-mdi-database-off text-6xl text-gray-400"></span>
         </template>
         <p class="text-gray-600 mb-4">
-          {{ $t("components.dataset.selector.uploadHint") }}
+          {{ $t("dataset.selector.uploadHint") }}
         </p>
       </a-empty>
     </div>
@@ -39,10 +39,10 @@
         <div class="text-sm text-gray-500">
           <p>
             {{ dataset.columns.length }}
-            {{ $t("components.dataset.selector.columns") }}
+            {{ $t("dataset.selector.columns") }}
           </p>
           <p v-if="dataset.createdAt">
-            {{ $t("components.dataset.selector.uploaded") }}:
+            {{ $t("dataset.selector.uploaded") }}:
             {{ new Date(dataset.createdAt).toLocaleDateString() }}
           </p>
         </div>

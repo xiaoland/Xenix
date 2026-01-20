@@ -1,0 +1,55 @@
+# DEPRECATED: This deployment configuration is for the old architecture
+# ML workers have been extracted to packages/ml-backend
+# See packages/ml-backend/s.yaml for ML worker deployment configuration
+
+edition: 3.0.0
+name: xenix-backend-app
+access: default # Run 's config add' to configure Aliyun credentials
+
+vars:
+  region: cn-hangzhou
+  serviceName: xenix
+
+resources:
+  xenix-backend:
+    component: fc3
+    props:
+      region: ${vars.region}
+      functionName: xenix-backend
+      description: Xenix main HTTP backend (Node.js HTTP server)
+      runtime: nodejs20
+      handler: index.handler
+      memorySize: 512
+      timeout: 60
+      code: ./dist
+      environmentVariables:
+        NODE_ENV: production
+        BACKEND_PORT: "9000"
+        STORAGE_TYPE: oss
+        OSS_REGION: ${env.OSS_REGION}
+        OSS_ACCESS_KEY_ID: ${env.OSS_ACCESS_KEY_ID}
+        OSS_ACCESS_KEY_SECRET: ${env.OSS_ACCESS_KEY_SECRET}
+        OSS_BUCKET: ${env.OSS_BUCKET}
+        OSS_ENDPOINT: ${env.OSS_ENDPOINT}
+        OSS_MOUNT_POINT: /mnt/oss
+        DATABASE_URL: ${env.DATABASE_URL}
+        JWT_SECRET: ${env.JWT_SECRET}
+        ML_TIMEOUT: "300000"
+      nasConfig:
+        userId: 10003
+        groupId: 10003
+        mountPoints:
+          - serverAddr: ${env.OSS_NAS_SERVER_ADDR}
+            nasDir: /xenix-oss
+            fcDir: /mnt/oss
+      triggers:
+        - triggerConfig:
+            methods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - PATCH
+            authType: anonymous
+          triggerName: httpTrigger
+          triggerType: http

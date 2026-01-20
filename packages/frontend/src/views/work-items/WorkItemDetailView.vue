@@ -46,20 +46,7 @@
 
         <!-- Workflow Steps -->
         <a-card class="mb-6">
-          <a-steps :current="currentStep" class="mb-8">
-            <a-step
-              :title="$t('steps.prepare.title')"
-              :description="$t('steps.prepare.description')"
-            />
-            <a-step
-              :title="$t('steps.tune.title')"
-              :description="$t('steps.tune.description')"
-            />
-            <a-step
-              :title="$t('steps.predict.title')"
-              :description="$t('steps.predict.description')"
-            />
-          </a-steps>
+          <Steps :current="currentStep" :items="stepItems" class="mb-8" />
 
           <!-- Step Content -->
           <div class="mt-6">
@@ -105,7 +92,7 @@
 <script setup lang="ts">
 import { message } from "ant-design-vue";
 
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import type { WorkItem } from "@xenix/shared";
@@ -113,11 +100,30 @@ import type { WorkItem } from "@xenix/shared";
 import PredictionStep from "../../components/ml/prediction/PredictionStep.vue";
 import PrepareStep from "../../components/ml/prepare/PrepareStep.vue";
 import TuningStep from "../../components/ml/tuning/TuningStep.vue";
+import Steps from "../../components/common/Steps.vue";
 import { useWorkItem } from "../../composables";
+import { useI18n } from "vue-i18n";
 import DefaultLayout from "../../layouts/DefaultLayout.vue";
 
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
+
+// Step items for custom Steps component
+const stepItems = computed(() => [
+  {
+    title: t("steps.prepare.title"),
+    description: t("steps.prepare.description"),
+  },
+  {
+    title: t("steps.tune.title"),
+    description: t("steps.tune.description"),
+  },
+  {
+    title: t("steps.predict.title"),
+    description: t("steps.predict.description"),
+  },
+]);
 
 // Use composable for fetching work item
 const workItemId = computed(() => Number(route.params.id));
@@ -150,7 +156,9 @@ const checkWorkItemStep = () => {
   if (
     workItem.value?.datasetId &&
     workItem.value?.featureColumns &&
-    workItem.value?.targetColumn
+    workItem.value.featureColumns.length > 0 &&
+    workItem.value?.targetColumn &&
+    workItem.value.targetColumn.trim() !== ""
   ) {
     // Skip to tuning step
     currentStep.value = 1;
@@ -159,9 +167,15 @@ const checkWorkItemStep = () => {
 };
 
 // Watch for work item data and check step
-if (workItem.value) {
-  checkWorkItemStep();
-}
+watch(
+  workItem,
+  (newWorkItem) => {
+    if (newWorkItem) {
+      checkWorkItemStep();
+    }
+  },
+  { immediate: true },
+);
 
 const getStatusColor = (status: string) => {
   switch (status) {

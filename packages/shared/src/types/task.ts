@@ -3,7 +3,7 @@
  */
 
 // Task parameter types
-export interface AutoTuneTaskParameter {
+export interface BatchTrainTaskParameter {
   model: string;
   datasetId: number;
   featureColumns: string[];
@@ -11,7 +11,7 @@ export interface AutoTuneTaskParameter {
   paramGrid?: Record<string, any[]>; // Parameter grid with arrays of values
 }
 
-export interface ManualTuneTaskParameter {
+export interface SingleTrainTaskParameter {
   model: string;
   datasetId: number;
   featureColumns: string[];
@@ -29,41 +29,49 @@ export interface PredictTaskParameter {
 }
 
 // Task result types
-export interface AutoTuneTaskResult {
+export interface BatchTrainTaskResult {
   params: Record<string, any>; // Best parameters found
   metrics: Record<string, any>;
   bestScore?: number;
 }
 
-export interface ManualTuneTaskResult {
+export interface SingleTrainTaskResult {
   params: Record<string, any>; // Parameters used
   metrics: Record<string, any>;
 }
 
 export interface PredictTaskResult {
-  outputFile: string; // Path to prediction output file
-  rowCount: number; // Number of predictions made
+  // For file-based predictions
+  predictedDataPath?: string; // Path to prediction output file
+  fittedModelPath?: string; // Path to fitted model file
+
+  // For inline predictions
+  predictedData?: any[]; // Inline prediction results
+
+  // Legacy field (backward compatibility)
+  outputFile?: string; // Path to prediction output file
+  rowCount?: number; // Number of predictions made
 }
 
 // Specific task types
-export interface AutoTuneTask {
+export interface BatchTrainTask {
   id: number;
   workItemId?: number;
-  type: "auto-tune";
+  type: "batch-train";
   status: TaskStatus;
-  parameter: AutoTuneTaskParameter;
-  result?: AutoTuneTaskResult;
+  parameter: BatchTrainTaskParameter;
+  result?: BatchTrainTaskResult;
   error?: string;
   createdAt?: string;
 }
 
-export interface ManualTuneTask {
+export interface SingleTrainTask {
   id: number;
   workItemId?: number;
-  type: "manual-tune";
+  type: "single-train";
   status: TaskStatus;
-  parameter: ManualTuneTaskParameter;
-  result?: ManualTuneTaskResult;
+  parameter: SingleTrainTaskParameter;
+  result?: SingleTrainTaskResult;
   error?: string;
   createdAt?: string;
 }
@@ -80,7 +88,7 @@ export interface PredictTask {
 }
 
 // Union type for all tasks
-export type Task = AutoTuneTask | ManualTuneTask | PredictTask;
+export type Task = BatchTrainTask | SingleTrainTask | PredictTask;
 
 // Generic task info (backward compatibility)
 export interface TaskInfo {
@@ -88,10 +96,10 @@ export interface TaskInfo {
   workItemId?: number;
   type: string;
   status: string;
-  result?: AutoTuneTaskResult | ManualTuneTaskResult | PredictTaskResult | any;
+  result?: BatchTrainTaskResult | SingleTrainTaskResult | PredictTaskResult | any;
   parameter?:
-    | AutoTuneTaskParameter
-    | ManualTuneTaskParameter
+    | BatchTrainTaskParameter
+    | SingleTrainTaskParameter
     | PredictTaskParameter
     | any;
   error?: string;

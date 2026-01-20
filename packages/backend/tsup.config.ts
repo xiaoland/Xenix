@@ -11,6 +11,6 @@ export default defineConfig({
   treeshake: false,
   minify: false,
   dts: false,
-  // Don't bundle any dependencies
-  noExternal: [],
+  // Bundle only @xenix/shared (source dependencies pattern)
+  noExternal: ['@xenix/shared'],
 });

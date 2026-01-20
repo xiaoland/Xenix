@@ -70,6 +70,12 @@ export const useAuthStore = defineStore("auth", () => {
 
       // HTTP semantics: success response is {token} directly
       const data = await response.json();
+      token.value = data.token;
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("auth_token", token.value);
+      }
+
       return { success: true, data };
     } catch (error) {
       return { success: false, error: (error as Error).message };

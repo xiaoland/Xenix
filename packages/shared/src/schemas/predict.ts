@@ -19,3 +19,11 @@ export const InlinePredictSchema = z.object({
 });
 
 export type InlinePredictDto = z.infer<typeof InlinePredictSchema>;
+
+export const FilePredictSchema = z.object({
+  workItemId: z.number(),
+  model: z.string(),
+  tuningTaskId: z.number(),
+});
+
+export type FilePredictDto = z.infer<typeof FilePredictSchema>;

@@ -183,6 +183,7 @@
     "downloadResult": "下载",
     "results": "结果",
     "fileResultsReady": "预测结果已准备好下载",
+    "filePathCopied": "文件路径已复制到剪贴板。请手动在文件资源管理器中打开。",
     "loading": "正在加载预测详情..."
   },
   "models": {
@@ -324,152 +325,69 @@
     "orUploadNew": "或上传新文件",
     "paramGridColumn": "参数网格"
   },
-  "components": {
-    "project": {
-      "form": {
-        "name": "项目名称",
-        "namePlaceholder": "输入项目名称",
-        "nameRequired": "请输入项目名称",
-        "description": "描述",
-        "descriptionPlaceholder": "输入项目描述（可选）",
-        "status": "状态",
-        "active": "活动",
+  "ml": {
+    "prepare": {
+      "title": "准备您的数据",
+      "description": "选择数据集并为您的机器学习模型选择特征列和目标列。",
+      "step1": "步骤1：选择数据集",
+      "uploadNew": "上传新数据集",
+      "step2": "步骤2：选择列",
+      "selectedDataset": "已选择数据集",
+      "change": "更改"
+    },
+    "columnSelector": {
+      "featureColumns": "特征列",
+      "featureColumnsRequired": "选择将用作模型输入特征的列。",
+      "featurePlaceholder": "选择特征列",
+      "selectedCount": "已选择：{count} 列",
+      "targetColumn": "目标列",
+      "targetColumnRequired": "选择模型应预测的列。",
+      "targetPlaceholder": "选择目标列",
+      "summary": "配置摘要",
+      "features": "特征",
+      "target": "目标"
+    },
+    "tuning": {
+      "title": "模型调优",
+      "trainDescription": "选择模型并配置超参数在您的数据集上训练。选择已完成的任务继续进行预测。",
+      "selectModels": "选择要调优的模型",
+      "selectPlaceholder": "选择模型",
+      "startAutoTune": "开始自动调优",
+      "manualTune": "手动调优",
+      "clearFailedTasks": "清除失败任务",
+      "type": {
+        "auto": "自动",
+        "manual": "手动"
+      },
+      "status": {
         "completed": "已完成",
-        "archived": "已归档"
+        "running": "运行中",
+        "pending": "待处理",
+        "failed": "失败"
       },
-      "card": {
-        "datasets": "个数据集",
-        "workItems": "个工作项",
-        "created": "创建时间",
-        "manageDatasets": "数据集",
-        "edit": "编辑",
-        "delete": "删除",
-        "deleteConfirm": "确定要删除此项目吗？"
-      }
+      "select": "选中",
+      "viewParams": "查看参数",
+      "continueToPredict": "基于选中模型与参数进行预测",
+      "backToPrepare": "返回：准备数据",
+      "trainingTasks": "调优任务",
+      "traning": "训练中"
     },
-    "dataset": {
-      "selector": {
-        "loading": "加载数据集中...",
-        "noDatasets": "未找到数据集",
-        "uploadHint": "上传数据集开始使用。",
-        "selected": "已选择",
-        "columns": "列",
-        "uploaded": "上传时间"
-      },
-      "upload": {
-        "name": "数据集名称",
-        "namePlaceholder": "输入数据集名称",
-        "file": "选择文件",
-        "selectFile": "选择文件",
-        "supportedFormats": "支持格式：CSV、Excel（.xlsx、.xls）",
-        "cancel": "取消",
-        "upload": "上传"
-      }
-    },
-    "ml": {
-      "prepare": {
-        "title": "准备您的数据",
-        "description": "选择数据集并为您的机器学习模型选择特征列和目标列。",
-        "step1": "步骤1：选择数据集",
-        "uploadNew": "上传新数据集",
-        "step2": "步骤2：选择列",
-        "selectedDataset": "已选择数据集",
-        "change": "更改"
-      },
-      "columnSelector": {
-        "featureColumns": "特征列",
-        "featureColumnsRequired": "选择将用作模型输入特征的列。",
-        "featurePlaceholder": "选择特征列",
-        "selectedCount": "已选择：{count} 列",
-        "targetColumn": "目标列",
-        "targetColumnRequired": "选择模型应预测的列。",
-        "targetPlaceholder": "选择目标列",
-        "summary": "配置摘要",
-        "features": "特征",
-        "target": "目标"
-      },
-      "tuning": {
-        "title": "模型调优",
-        "trainDescription": "选择模型并配置超参数在您的数据集上训练。选择已完成的任务继续进行预测。",
-        "selectModels": "选择要训练的模型",
-        "selectPlaceholder": "选择要训练的模型",
-        "startAutoTune": "开始自动调优",
-        "clearFailedTasks": "清除失败任务"
-      },
-      "prediction": {
-        "title": "进行预测",
-        "usingModel": "使用训练模型：{model}",
-        "mode": "预测模式",
-        "uploadFile": "上传文件",
-        "manualInput": "手动输入",
-        "uploadData": "上传预测数据",
-        "dragHint": "点击或拖拽文件上传",
-        "supportedFormats": "支持格式：Excel（.xlsx、.xls）、CSV",
-        "or": "或",
-        "enterData": "手动输入数据",
-        "inputHint": "为每个特征列输入值",
-        "startPrediction": "开始预测",
-        "processing": "处理预测中...",
-        "downloadResults": "下载结果",
-        "results": "预测结果"
-      }
-    }
-  },
-  "tuning": {
-    "title": "模型调优",
-    "modelSelectionAndTuning": "调优模型参数，基于最佳参数进行预测",
-    "model": "模型",
-    "tuneType": "类型及参数",
-    "tuning": "调优",
-    "metrics": "指标",
-    "startTune": "开始调优",
-    "autoTune": "自动",
-    "manualTune": "手动",
-    "viewLogs": "日志",
-    "selectModels": "选择要调优的模型",
-    "startTuning": "开始超参数调优",
-    "viewResults": "查看调优结果",
-    "selectBest": "选择最佳模型",
-    "selectBestForPrediction": "选择最佳模型进行预测",
-    "viewParams": "参数",
-    "tuningResults": "调优结果",
-    "modelColumn": "模型",
-    "r2Test": "R² (测试)",
-    "mseTest": "MSE (测试)",
-    "maeTest": "MAE (测试)",
-    "statusColumn": "状态",
-    "selectModelInstruction": "从上方表格中选择一个模型用于预测",
-    "selectModelPlaceholder": "选择用于预测的模型",
-    "back": "重选数据",
-    "continue": "预测",
-    "trainingHistory": "训练历史",
-    "noHistory": "尚无训练历史",
-    "selectModelToAdd": "选择要添加的模型",
-    "addModel": "添加模型",
-    "noModelsAdded": "尚未添加模型。请在上方选择模型以开始。",
-    "clearFailedTasks": "清除失败的调优",
-    "paramsTitle": "模型参数",
-    "autoTuneDialog": {
-      "title": "自动调优 - {model}",
-      "description": "配置此模型的超参数搜索空间。每个字段接受一个要尝试的值列表。",
-      "loading": "加载参数模式...",
-      "createButton": "创建自动调优任务"
-    },
-    "manualTuneDialog": {
-      "title": "手动调优 - {model}",
-      "description": "输入特定参数值以手动调优模型。",
-      "loading": "加载参数模式...",
-      "tuneButton": "调优模型"
-    },
-    "paramGrid": {
-      "title": "编辑参数网格 - {model}",
-      "description": "配置此模型的超参数搜索空间。每个字段接受一个要尝试的值列表。",
-      "loading": "加载参数模式...",
-      "noDescription": "无可用描述",
-      "defaultValue": "默认值",
-      "arrayPlaceholder": "输入值并按添加",
-      "emptyArray": "无值。使用上方输入添加值。",
-      "editButton": "编辑"
+    "prediction": {
+      "title": "进行预测",
+      "usingModel": "使用训练模型：{model}",
+      "mode": "预测模式",
+      "uploadFile": "上传文件",
+      "manualInput": "手动输入",
+      "uploadData": "上传预测数据",
+      "dragHint": "点击或拖拽文件上传",
+      "supportedFormats": "支持格式：Excel（.xlsx、.xls）、CSV",
+      "or": "或",
+      "enterData": "手动输入数据",
+      "inputHint": "为每个特征列输入值",
+      "startPrediction": "开始预测",
+      "processing": "处理预测中...",
+      "downloadResults": "下载结果",
+      "results": "预测结果"
     }
   },
   "task": {
@@ -481,49 +399,9 @@
     }
   },
   "modelParamGridForm.noSchema": "这个模型没有参数网格",
-  "tuning.tuneType": "类型与参数",
-  "tuning.tuning": "调优",
-  "tuning.type.auto": "自动",
-  "tuning.type.manual": "手动",
   "ml.modelSelector.selectModel": "选择一个模型以添加",
   "common.noData": "N/A",
   "common.confirm": "确认",
-  "tuning.confirmClearFailedTasks": "确认要删除所有本工作中失败的调优任务吗？",
-  "tuning.confirmRemoveModel": "确认要删除此模型吗？所有相关的任务将被删除。",
-  "tuning.modelRemoved": "模型删除成功",
-  "tuning.removeModelError": "删除模型失败",
-  "pythonEnv": {
-    "title": "Python 环境管理",
-    "pdmInstalled": "PDM 已安装",
-    "envReady": "环境就绪",
-    "initialized": "已初始化",
-    "pyPackagesDir": "__pypackages__ 目录",
-    "pdmLockFile": "pdm.lock 文件",
-    "yes": "是",
-    "no": "否",
-    "exists": "存在",
-    "notFound": "未找到",
-    "refreshStatus": "刷新状态",
-    "setupEnvironment": "设置环境",
-    "reinstallDependencies": "重新安装依赖",
-    "syncModels": "同步模型",
-    "statusRefreshed": "状态刷新成功",
-    "fetchStatusFailed": "获取状态失败：{error}",
-    "setupCompleted": "环境设置完成",
-    "setupFailed": "环境设置失败：{error}",
-    "reinstallCompleted": "环境重新安装成功",
-    "reinstallFailed": "环境重新安装失败：{error}",
-    "syncFailed": "同步模型失败：{error}",
-    "logsTitle": "环境日志：",
-    "logStartingSetup": "[信息] 开始环境设置...",
-    "logSetupSuccess": "[成功] 环境设置完成",
-    "logStartingReinstall": "[信息] 开始环境重新安装...",
-    "logReinstallNote": "[信息] 这可能需要几分钟...",
-    "logReinstallSuccess": "[成功] 环境重新安装完成",
-    "logStartingSync": "[信息] 开始模型元数据同步...",
-    "logSyncSuccess": "[成功] {message}",
-    "logError": "[错误] {error}"
-  },
   "prediction.resultsReady": "预测结果已就绪",
   "prediction.createdAt": "开始时间",
   "prediction.status": "状态",

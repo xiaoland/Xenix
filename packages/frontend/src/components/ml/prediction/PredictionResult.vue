@@ -16,14 +16,14 @@
     >
       <a-spin size="large" />
       <p class="mt-4 text-gray-600">
-        {{ $t("components.ml.prediction.processing") }}
+        {{ $t("ml.prediction.processing") }}
       </p>
     </div>
 
     <!-- Results -->
     <div v-else-if="task && task.status === 'completed'">
       <!-- Download Button (for file mode) -->
-      <div v-if="(task.result as PredictTaskResult)?.outputFile" class="mb-4">
+      <div v-if="(task.result as any)?.predictedDataPath" class="mb-4">
         <a-button
           type="primary"
           class="inline-flex items-center"
@@ -31,17 +31,17 @@
           @click="handleDownload"
         >
           <span class="i-mdi-download mr-2"></span>
-          {{ $t("components.ml.prediction.downloadResults") }}
+          {{ $t("ml.prediction.downloadResults") }}
         </a-button>
       </div>
 
       <!-- Inline Results (for inline mode) -->
       <div
-        v-if="(task.result as any)?.predictions"
+        v-if="(task.result as any)?.predictedData"
         class="bg-white rounded-lg border p-4"
       >
         <h4 class="text-md font-medium mb-3">
-          {{ $t("components.ml.prediction.results") }}
+          {{ $t("ml.prediction.results") }}
         </h4>
         <a-table
           :columns="resultColumns"
@@ -62,7 +62,7 @@
 
       <!-- Summary Stats -->
       <div
-        v-if="(task.result as any)?.predictions"
+        v-if="(task.result as any)?.predictedData"
         class="bg-gray-50 rounded-lg p-4 mt-4"
       >
         <h4 class="text-md font-medium mb-2">Summary</h4>
@@ -70,10 +70,10 @@
           <div>
             <span class="text-gray-600">Total Predictions:</span>
             <span class="ml-2 font-medium">{{
-              (task.result as any).predictions.length
+              (task.result as any).predictedData.length
             }}</span>
           </div>
-          <div v-if="(task.result as any).predictions.length > 0">
+          <div v-if="(task.result as any).predictedData.length > 0">
             <span class="text-gray-600">Avg Prediction:</span>
             <span class="ml-2 font-medium">{{ avgPrediction }}</span>
           </div>
@@ -97,11 +97,14 @@
 <script setup lang="ts">
 import { message } from "ant-design-vue";
 
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 
 import type { PredictTaskResult, Task } from "@xenix/shared";
 
 import { client } from "../../../api/client";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   taskId: number;
@@ -115,6 +118,30 @@ const loading = ref(false);
 
 // Polling interval
 let pollInterval: number | null = null;
+
+/**
+ * Fetch task status and manage polling
+ */
+const fetchAndPollTask = async () => {
+  stopPolling();
+  task.value = null;
+  await fetchTaskStatus();
+  if (
+    task.value &&
+    ((task.value as Task).status === "pending" ||
+      (task.value as Task).status === "running")
+  ) {
+    startPolling();
+  }
+};
+
+// Watch for taskId changes
+watch(
+  () => props.taskId,
+  () => {
+    fetchAndPollTask();
+  },
+);
 
 // Computed
 const statusMessage = computed(() => {
@@ -151,11 +178,14 @@ const statusType = computed(() => {
 
 const resultColumns = computed(() => {
   const predictResult = task.value?.result as any;
-  if (!predictResult?.predictions || predictResult.predictions.length === 0) {
+  if (
+    !predictResult?.predictedData ||
+    predictResult.predictedData.length === 0
+  ) {
     return [];
   }
 
-  const firstRow = predictResult.predictions[0];
+  const firstRow = predictResult.predictedData[0];
   const cols: any[] = Object.keys(firstRow)
     .filter((key) => key !== "prediction")
     .map((key) => ({
@@ -164,19 +194,13 @@ const resultColumns = computed(() => {
       key,
     }));
 
-  cols.push({
-    title: "Prediction",
-    dataIndex: "prediction",
-    key: "prediction",
-  });
-
   return cols;
 });
 
 const formattedResults = computed(() => {
   const predictResult = task.value?.result as any;
-  if (!predictResult?.predictions) return [];
-  return predictResult.predictions.map((pred: any, index: number) => ({
+  if (!predictResult?.predictedData) return [];
+  return predictResult.predictedData.map((pred: any, index: number) => ({
     ...pred,
     key: index,
   }));
@@ -184,11 +208,14 @@ const formattedResults = computed(() => {
 
 const avgPrediction = computed(() => {
   const predictResult = task.value?.result as any;
-  if (!predictResult?.predictions || predictResult.predictions.length === 0) {
+  if (
+    !predictResult?.predictedData ||
+    predictResult.predictedData.length === 0
+  ) {
     return "-";
   }
 
-  const predictions = predictResult.predictions.map((p: any) => p.prediction);
+  const predictions = predictResult.predictedData.map((p: any) => p.prediction);
   const sum = predictions.reduce((acc: number, val: number) => acc + val, 0);
   const avg = sum / predictions.length;
   return avg.toFixed(4);
@@ -221,7 +248,8 @@ const startPolling = () => {
   pollInterval = window.setInterval(() => {
     if (
       task.value &&
-      (task.value.status === "pending" || task.value.status === "running")
+      ((task.value as Task).status === "pending" ||
+        (task.value as Task).status === "running")
     ) {
       fetchTaskStatus();
     } else {
@@ -241,26 +269,38 @@ const stopPolling = () => {
 };
 
 /**
- * Download result file
+ * Download or open result file
+ *
+ * The backend transforms paths based on deployment storage type:
+ * - Local storage: Absolute file path (e.g., /tmp/ml-backend/tasks/123/predictions.xlsx)
+ * - OSS storage: Presigned HTTP URL (e.g., https://...)
  */
 const handleDownload = async () => {
   const predictResult = task.value?.result as any;
-  if (!predictResult?.outputFile) return;
+  if (!predictResult?.predictedDataPath) return;
 
   downloading.value = true;
   try {
-    // Create download link
-    const link = document.createElement("a");
-    link.href = `/api/download/${task.value!.id}`;
-    link.download = predictResult.outputFile;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const filePath = predictResult.predictedDataPath;
 
-    message.success("Download started");
+    // Check if it's an HTTP URL (OSS storage)
+    if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
+      // OSS storage: Download from presigned URL
+      const link = document.createElement("a");
+      link.href = filePath;
+      link.download = filePath.split("/").pop() || "predictions.xlsx";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      message.success("Download started");
+    } else {
+      // Local storage: Copy path to clipboard since browsers can't open local files
+      await navigator.clipboard.writeText(filePath);
+      message.success(t("prediction.filePathCopied"));
+    }
   } catch (error: any) {
-    console.error("Download failed:", error);
-    message.error(error.message || "Failed to download file");
+    console.error("Download/open failed:", error);
+    message.error(error.message || "Failed to open file");
   } finally {
     downloading.value = false;
   }
@@ -268,13 +308,7 @@ const handleDownload = async () => {
 
 // Lifecycle
 onMounted(async () => {
-  await fetchTaskStatus();
-  if (
-    task.value &&
-    (task.value.status === "pending" || task.value.status === "running")
-  ) {
-    startPolling();
-  }
+  await fetchAndPollTask();
 });
 
 onUnmounted(() => {

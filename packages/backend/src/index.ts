@@ -16,7 +16,7 @@ import obsrvRoutes from "./routes/obsrv";
 import predictRoutes from "./routes/predict";
 import projectsRoutes from "./routes/projects";
 import tasksRoutes from "./routes/tasks";
-import tuneRoutes from "./routes/tune";
+import trainRoutes from "./routes/train";
 import workItemsRoutes from "./routes/work-items";
 import logger from "./utils/logger";
 
@@ -55,7 +55,7 @@ const routes = app
   .route("/data", datasetsRoutes)
   .route("/models", modelsRoutes)
   .route("/tasks", tasksRoutes)
-  .route("/tune", tuneRoutes)
+  .route("/train", trainRoutes)
   .route("/predict", predictRoutes)
   .route("/download", downloadRoutes)
   .route("/obsrv", obsrvRoutes);

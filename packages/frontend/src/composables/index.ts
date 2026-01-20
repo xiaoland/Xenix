@@ -7,4 +7,6 @@ export * from './useProjects';
 export * from './useWorkItems';
 export * from './useDatasets';
 export * from './useTasks';
+export * from './useModels';
 export * from './useFormatters';
+export * from './useTaskFormatting';

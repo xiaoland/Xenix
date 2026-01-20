@@ -13,6 +13,8 @@ import {
 import { db, schema } from "../database";
 import { BadRequestError, NotFoundError } from "../errors";
 import { authMiddleware } from "../middleware/auth";
+import { MLBackendDeploymentRepository } from "../repositories/MLBackendDeploymentRepository";
+import { getMLBackendService } from "../services/MLBackendService";
 import logger from "../utils/logger";
 
 const tasks = new Hono()
@@ -57,6 +59,55 @@ const tasks = new Hono()
       throw new NotFoundError("Task");
     }
 
+    // If task is pending or running, try to check for results (fire-and-forget)
+    if (task.status === "pending" || task.status === "running") {
+      // Fire-and-forget result checking
+      setImmediate(async () => {
+        try {
+          const deploymentRepo = new MLBackendDeploymentRepository();
+          const deployment = await deploymentRepo.findById(
+            task.mlBackendDeploymentId,
+          );
+
+          if (!deployment) {
+            throw new Error(
+              `Deployment ${task.mlBackendDeploymentId} not found`,
+            );
+          }
+
+          const mlService = getMLBackendService();
+          const result = await mlService.checkResult(deployment, taskId);
+
+          if (result && result.status !== "pending") {
+            // Update task with result
+            await db
+              .update(schema.tasks)
+              .set({
+                status: result.status,
+                result: result.result || null,
+                error: result.error || null,
+                endAt: new Date(),
+              })
+              .where(eq(schema.tasks.id, taskId));
+
+            logger.info(
+              { taskId, status: result.status },
+              "Updated task with ML backend result",
+            );
+          }
+        } catch (error) {
+          // Silently ignore errors in result checking
+          logger.debug(
+            {
+              taskId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            "Failed to check task result (non-critical)",
+          );
+        }
+      });
+    }
+
     return c.json(task);
   })
 
@@ -73,14 +124,14 @@ const tasks = new Hono()
         .where(
           and(
             eq(schema.tasks.workItemId, Number(workItemIdStr)),
-            eq(schema.tasks.status, "failed")
-          )
+            eq(schema.tasks.status, "failed"),
+          ),
         );
 
       return c.json({
         message: "Failed tasks deleted successfully",
       });
-    }
+    },
   )
 
   // Delete tasks by model
@@ -96,14 +147,14 @@ const tasks = new Hono()
         .where(
           and(
             eq(schema.tasks.workItemId, Number(workItemIdStr)),
-            sql`${schema.tasks.parameter} ->> 'model' = ${model}`
-          )
+            sql`${schema.tasks.parameter} ->> 'model' = ${model}`,
+          ),
         );
 
       return c.json({
         message: `Tasks for model ${model} deleted successfully`,
       });
-    }
+    },
   );
 
 export default tasks;

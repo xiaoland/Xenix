@@ -7,7 +7,10 @@ import { useQuery } from "@tanstack/vue-query";
 import { client } from "../api/client";
 import { POLLING_CONFIG } from "../constants/config";
 
-export function useTasks(params?: { workItemId: string; type?: string }) {
+export function useTasks(
+  params?: { workItemId: string; type?: string },
+  options?: { refetchInterval?: number | false }
+) {
   return useQuery({
     queryKey: ["tasks", params],
     queryFn: async () => {
@@ -17,7 +20,7 @@ export function useTasks(params?: { workItemId: string; type?: string }) {
       }
       return response.json();
     },
-    refetchInterval: 5000, // Refetch every 5 seconds to get task updates
+    refetchInterval: options?.refetchInterval ?? 5000, // Default 5s, can be disabled
     placeholderData: [],
   });
 }
