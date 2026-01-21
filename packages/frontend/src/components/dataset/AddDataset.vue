@@ -35,18 +35,8 @@
         />
       </a-form-item>
 
-      <!-- File Path (for local) or Upload (for OSS) -->
-      <a-form-item v-if="storageType === 'local'" :label="$t('dataset.add.filePath')" required>
-        <a-input
-          v-model:value="filePath"
-          :placeholder="$t('dataset.add.filePathPlaceholder')"
-        />
-        <div class="text-sm text-gray-500 mt-1">
-          {{ $t('dataset.add.filePathHint') }}
-        </div>
-      </a-form-item>
-
-      <a-form-item v-else :label="$t('dataset.add.uploadFile')" required>
+      <!-- File Upload (for both local and OSS) -->
+      <a-form-item :label="$t('dataset.add.selectFile')" required>
         <a-upload-dragger
           v-model:file-list="fileList"
           :before-upload="beforeUpload"
@@ -56,7 +46,10 @@
           @change="handleFileChange"
         >
           <p class="ant-upload-drag-icon">
-            <span class="i-mdi-cloud-upload text-4xl text-gray-400"></span>
+            <span
+              :class="storageType === 'local' ? 'i-mdi-file-document' : 'i-mdi-cloud-upload'"
+              class="text-4xl text-gray-400"
+            ></span>
           </p>
           <p class="ant-upload-text">
             {{ $t('dataset.add.dragDrop') }}
@@ -74,6 +67,12 @@
           <div><strong>{{ $t('dataset.add.columns') }}:</strong> {{ metadata.columns.length }}</div>
           <div><strong>{{ $t('dataset.add.rows') }}:</strong> {{ metadata.rowCount }}</div>
           <div><strong>{{ $t('dataset.add.size') }}:</strong> {{ formatFileSize(metadata.fileSize) }}</div>
+          <div v-if="selectedFilePath" class="mt-2">
+            <strong>{{ $t('dataset.add.filePath') }}:</strong>
+            <div class="text-xs text-gray-600 mt-1 font-mono break-all">
+              {{ selectedFilePath }}
+            </div>
+          </div>
           <div class="mt-2">
             <strong>{{ $t('dataset.add.columnNames') }}:</strong>
             <div class="mt-1 flex flex-wrap gap-1">
@@ -125,22 +124,17 @@ const { t } = useI18n();
 
 const storageType = ref<'local' | 'oss'>('oss');
 const datasetName = ref("");
-const filePath = ref("");
 const fileList = ref<any[]>([]);
 const metadata = ref<DatasetMetadata | null>(null);
+const selectedFilePath = ref<string>("");
 
 // Use composable for dataset creation
 const { mutate: createDataset, isPending: creating } = useCreateDataset();
 
 const canCreate = computed(() => {
-  if (!datasetName.value.trim()) return false;
-  if (!metadata.value) return false;
-
-  if (storageType.value === 'local') {
-    return filePath.value.trim() !== "";
-  } else {
-    return fileList.value.length > 0;
-  }
+  return datasetName.value.trim() !== "" &&
+         metadata.value !== null &&
+         fileList.value.length > 0;
 });
 
 const formatFileSize = (bytes: number): string => {
@@ -177,26 +171,38 @@ const handleFileChange = async () => {
     try {
       const file = fileList.value[0].originFileObj;
       message.loading({ content: t('dataset.add.analyzingFile'), key: 'analyze' });
+
+      // Extract metadata from the file
       metadata.value = await extractDatasetMetadata(file);
+
+      // For local storage, store the file path (or name as reference)
+      // In browser context, we can't get the actual file system path for security reasons
+      // So we use the file name as a reference
+      selectedFilePath.value = file.name;
+
       message.success({ content: t('dataset.add.fileAnalyzed'), key: 'analyze' });
     } catch (error: any) {
       message.error({ content: error.message || t('dataset.add.analyzeFailed'), key: 'analyze' });
       metadata.value = null;
+      selectedFilePath.value = "";
     }
   } else {
     metadata.value = null;
+    selectedFilePath.value = "";
   }
 };
 
 const handleCreate = async () => {
   if (!canCreate.value || !metadata.value) return;
 
+  const file = fileList.value[0].originFileObj;
+
   const params = {
     name: datasetName.value,
     projectId: props.projectId,
     storage: storageType.value,
-    filePath: storageType.value === 'local' ? filePath.value : '',
-    file: storageType.value === 'oss' ? fileList.value[0].originFileObj : null,
+    filePath: selectedFilePath.value, // For local, this is the file name/reference
+    file: storageType.value === 'oss' ? file : null, // Only upload for OSS
     columns: metadata.value.columns,
     rowCount: metadata.value.rowCount,
     fileSize: metadata.value.fileSize,
@@ -209,41 +215,14 @@ const handleCreate = async () => {
 
       // Reset form
       datasetName.value = "";
-      filePath.value = "";
       fileList.value = [];
       metadata.value = null;
+      selectedFilePath.value = "";
     },
     onError: (error: any) => {
       console.error("Creation failed:", error);
       message.error(error.message || t('dataset.add.createFailed'));
     },
   });
-};
-
-// For local storage, allow manual metadata input or file selection for analysis
-const handleLocalFileSelect = async () => {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.csv,.xlsx,.xls';
-
-  input.onchange = async (e: any) => {
-    const file = e.target.files[0];
-    if (file) {
-      try {
-        message.loading({ content: t('dataset.add.analyzingFile'), key: 'analyze' });
-        metadata.value = await extractDatasetMetadata(file);
-        message.success({ content: t('dataset.add.fileAnalyzed'), key: 'analyze' });
-
-        // Auto-fill file path with file name (user can edit)
-        if (!filePath.value) {
-          filePath.value = file.name;
-        }
-      } catch (error: any) {
-        message.error({ content: error.message || t('dataset.add.analyzeFailed'), key: 'analyze' });
-      }
-    }
-  };
-
-  input.click();
 };
 </script>
