@@ -19,6 +19,7 @@ import { db, schema } from "../database";
 import { BadRequestError, NotFoundError } from "../errors";
 import logger from "../utils/logger";
 import { storage } from "../storage";
+import { analyzeFileFromBuffer } from "../utils/datasetUtils";
 
 const workItemService = new WorkItemService();
 const datasetService = new DatasetService();
@@ -69,10 +70,10 @@ const workItems = new Hono()
       const updatedWorkItem = await workItemService.updateWorkItem(
         id,
         user.id,
-        data
+        data,
       );
       return c.json(updatedWorkItem);
-    }
+    },
   )
 
   // Delete work item
@@ -114,7 +115,7 @@ const workItems = new Hono()
       // Validate ML backend deployment is selected
       if (!workItem.mlBackendDeploymentId) {
         throw new BadRequestError(
-          "ML backend deployment must be selected for this work item before starting ML operations"
+          "ML backend deployment must be selected for this work item before starting ML operations",
         );
       }
 
@@ -136,7 +137,7 @@ const workItems = new Hono()
 
       if (!featureColumns || featureColumns.length === 0) {
         throw new BadRequestError(
-          "featureColumns array is required and must not be empty"
+          "featureColumns array is required and must not be empty",
         );
       }
 
@@ -159,7 +160,9 @@ const workItems = new Hono()
       const [deployment] = await db
         .select()
         .from(schema.mlBackendDeployments)
-        .where(eq(schema.mlBackendDeployments.id, workItem.mlBackendDeploymentId))
+        .where(
+          eq(schema.mlBackendDeployments.id, workItem.mlBackendDeploymentId),
+        )
         .limit(1);
 
       if (!deployment) {
@@ -202,7 +205,7 @@ const workItems = new Hono()
           featureColumns,
           targetColumn,
           paramGrid,
-        }
+        },
       );
 
       // Wait 5s to check for errors
@@ -214,7 +217,7 @@ const workItems = new Hono()
           errorMessage = error.message;
           logger.error(
             { error: error.message, taskId: insertedTask.id },
-            "ML backend request failed"
+            "ML backend request failed",
           );
           throw error;
         }),
@@ -243,9 +246,9 @@ const workItems = new Hono()
           taskId: insertedTask.id,
           message: "Batch training started",
         },
-        201
+        201,
       );
-    }
+    },
   )
 
   // Single train endpoint
@@ -274,7 +277,7 @@ const workItems = new Hono()
       // Validate ML backend deployment is selected
       if (!workItem.mlBackendDeploymentId) {
         throw new BadRequestError(
-          "ML backend deployment must be selected for this work item before starting ML operations"
+          "ML backend deployment must be selected for this work item before starting ML operations",
         );
       }
 
@@ -296,7 +299,7 @@ const workItems = new Hono()
 
       if (!featureColumns || featureColumns.length === 0) {
         throw new BadRequestError(
-          "featureColumns array is required and must not be empty"
+          "featureColumns array is required and must not be empty",
         );
       }
 
@@ -319,7 +322,9 @@ const workItems = new Hono()
       const [deployment] = await db
         .select()
         .from(schema.mlBackendDeployments)
-        .where(eq(schema.mlBackendDeployments.id, workItem.mlBackendDeploymentId))
+        .where(
+          eq(schema.mlBackendDeployments.id, workItem.mlBackendDeploymentId),
+        )
         .limit(1);
 
       if (!deployment) {
@@ -362,7 +367,7 @@ const workItems = new Hono()
           featureColumns,
           targetColumn,
           params: parameters,
-        }
+        },
       );
 
       // Wait 5s to check for errors
@@ -374,7 +379,7 @@ const workItems = new Hono()
           errorMessage = error.message;
           logger.error(
             { error: error.message, taskId: insertedTask.id },
-            "ML backend request failed"
+            "ML backend request failed",
           );
           throw error;
         }),
@@ -403,9 +408,9 @@ const workItems = new Hono()
           taskId: insertedTask.id,
           message: "Single training started",
         },
-        201
+        201,
       );
-    }
+    },
   )
 
   // Inline prediction endpoint
@@ -433,7 +438,7 @@ const workItems = new Hono()
       // Validate ML backend deployment is selected
       if (!workItem.mlBackendDeploymentId) {
         throw new BadRequestError(
-          "ML backend deployment must be selected for this work item before starting ML operations"
+          "ML backend deployment must be selected for this work item before starting ML operations",
         );
       }
 
@@ -443,7 +448,7 @@ const workItems = new Hono()
 
       if (!workItem.featureColumns || !workItem.targetColumn) {
         throw new BadRequestError(
-          "Work item does not have feature columns or target column configured"
+          "Work item does not have feature columns or target column configured",
         );
       }
 
@@ -456,7 +461,7 @@ const workItems = new Hono()
         for (const col of featureColumns) {
           if (!(col in item)) {
             throw new BadRequestError(
-              `Item at index ${i} is missing required feature column: ${col}`
+              `Item at index ${i} is missing required feature column: ${col}`,
             );
           }
         }
@@ -477,7 +482,9 @@ const workItems = new Hono()
       const [deployment] = await db
         .select()
         .from(schema.mlBackendDeployments)
-        .where(eq(schema.mlBackendDeployments.id, workItem.mlBackendDeploymentId))
+        .where(
+          eq(schema.mlBackendDeployments.id, workItem.mlBackendDeploymentId),
+        )
         .limit(1);
 
       if (!deployment) {
@@ -487,9 +494,7 @@ const workItems = new Hono()
       // Determine train data path based on deployment storage type
       const trainDataPath =
         deployment.storage === "oss"
-          ? storage.getFilesystemPath(
-              trainingDataset.filePath
-            )
+          ? storage.getFilesystemPath(trainingDataset.filePath)
           : trainingDataset.filePath;
 
       // Load tuning task to get params
@@ -538,7 +543,7 @@ const workItems = new Hono()
           params,
           featureColumns,
           targetColumn,
-        }
+        },
       );
 
       // Wait 5s to check for errors
@@ -550,7 +555,7 @@ const workItems = new Hono()
           errorMessage = error.message;
           logger.error(
             { error: error.message, taskId: insertedTask.id },
-            "ML backend request failed"
+            "ML backend request failed",
           );
           throw error;
         }),
@@ -579,9 +584,9 @@ const workItems = new Hono()
           taskId: insertedTask.id,
           message: "Inline prediction started",
         },
-        201
+        201,
       );
-    }
+    },
   )
 
   // File-based prediction endpoint
@@ -595,15 +600,18 @@ const workItems = new Hono()
 
       const formData = await c.req.formData();
       const file = formData.get("file") as File;
+      const filePath = formData.get("filePath") as string;
+      const fileName = formData.get("fileName") as string;
+      const fileSizeStr = formData.get("fileSize") as string;
+      const columnsStr = formData.get("columns") as string;
+      const rowCountStr = formData.get("rowCount") as string;
       const model = formData.get("model") as string;
       const tuningTaskIdStr = formData.get("tuningTaskId") as string;
 
-      if (!file) {
-        throw new BadRequestError("No file uploaded");
-      }
-
       if (!model || !tuningTaskIdStr) {
-        throw new BadRequestError("Missing required fields: model or tuningTaskId");
+        throw new BadRequestError(
+          "Missing required fields: model or tuningTaskId",
+        );
       }
 
       const tuningTaskId = Number(tuningTaskIdStr);
@@ -622,7 +630,7 @@ const workItems = new Hono()
       // Validate ML backend deployment is selected
       if (!workItem.mlBackendDeploymentId) {
         throw new BadRequestError(
-          "ML backend deployment must be selected for this work item before starting ML operations"
+          "ML backend deployment must be selected for this work item before starting ML operations",
         );
       }
 
@@ -632,7 +640,7 @@ const workItems = new Hono()
 
       if (!workItem.featureColumns || !workItem.targetColumn) {
         throw new BadRequestError(
-          "Work item does not have feature columns or target column configured"
+          "Work item does not have feature columns or target column configured",
         );
       }
 
@@ -654,7 +662,9 @@ const workItems = new Hono()
       const [deployment] = await db
         .select()
         .from(schema.mlBackendDeployments)
-        .where(eq(schema.mlBackendDeployments.id, workItem.mlBackendDeploymentId))
+        .where(
+          eq(schema.mlBackendDeployments.id, workItem.mlBackendDeploymentId),
+        )
         .limit(1);
 
       if (!deployment) {
@@ -664,9 +674,7 @@ const workItems = new Hono()
       // Determine train data path based on deployment storage type
       const trainDataPath =
         deployment.storage === "oss"
-          ? storage.getFilesystemPath(
-              trainingDataset.filePath
-            )
+          ? storage.getFilesystemPath(trainingDataset.filePath)
           : trainingDataset.filePath;
 
       // Load tuning task to get params
@@ -683,22 +691,48 @@ const workItems = new Hono()
       const result: any = tuningTask.result;
       const params = result.bestParams || result.params || {};
 
-      // Save uploaded prediction file as a dataset
-      const datasetsDir = storage.getFilesystemPath("datasets");
-      const predictionDataset = await datasetService.createDataset(
-        file,
-        `Prediction Input - ${file.name}`,
-        `Prediction input for work item ${workItemId}`,
-        null,
-        datasetsDir
-      );
+      let predictionDataset;
+
+      if (deployment.storage === "oss") {
+        // Extract metadata from uploaded file
+        const buffer = await file.arrayBuffer();
+        const { columns, rowCount } = await analyzeFileFromBuffer(
+          buffer,
+          file.name,
+        );
+
+        // Save uploaded prediction file as a dataset
+        const datasetsDir = storage.getFilesystemPath("datasets");
+        predictionDataset = await datasetService.createDataset(
+          file,
+          `Prediction Input - ${file.name}`,
+          `Prediction input for work item ${workItemId}`,
+          null,
+          datasetsDir,
+          columns,
+          rowCount,
+        );
+      } else {
+        // For local storage, create dataset record with provided file path
+        const columns = JSON.parse(columnsStr);
+        const rowCount = parseInt(rowCountStr);
+        const fileSize = parseInt(fileSizeStr);
+
+        predictionDataset = await datasetService.createDatasetFromOSSKey({
+          key: filePath,
+          name: `Prediction Input - ${fileName}`,
+          description: `Prediction input for work item ${workItemId}`,
+          projectId: null,
+          fileSize,
+          columns,
+          rowCount,
+        });
+      }
 
       // Get the prediction data path
       const toPredictDataPath =
         deployment.storage === "oss"
-          ? storage.getFilesystemPath(
-              predictionDataset.filePath
-            )
+          ? storage.getFilesystemPath(predictionDataset.filePath)
           : predictionDataset.filePath;
 
       const mlService = getMLBackendService();
@@ -733,7 +767,7 @@ const workItems = new Hono()
           params,
           featureColumns,
           targetColumn,
-        }
+        },
       );
 
       // Wait 5s to check for errors
@@ -745,7 +779,7 @@ const workItems = new Hono()
           errorMessage = error.message;
           logger.error(
             { error: error.message, taskId: insertedTask.id },
-            "ML backend request failed"
+            "ML backend request failed",
           );
           throw error;
         }),
@@ -774,9 +808,9 @@ const workItems = new Hono()
           taskId: insertedTask.id,
           message: "File prediction started",
         },
-        201
+        201,
       );
-    }
+    },
   );
 
 export default workItems;
