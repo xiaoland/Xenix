@@ -47,7 +47,10 @@
     "createError": "创建项目失败",
     "updateError": "更新项目失败",
     "deleteError": "删除项目失败",
-    "fetchError": "获取项目失败"
+    "fetchError": "获取项目失败",
+    "edit": "编辑",
+    "delete": "删除",
+    "addWorkItem": "添加工作项"
   },
   "workItems": {
     "title": "工作项",
