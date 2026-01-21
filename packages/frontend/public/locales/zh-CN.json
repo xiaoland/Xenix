@@ -286,9 +286,12 @@
       "storageOssHint": "数据集将被上传到云存储。",
       "name": "数据集名称",
       "namePlaceholder": "输入数据集名称",
+      "selectFile": "选择文件",
+      "localFilePath": "本地文件路径",
+      "filePathPlaceholder": "例如：/home/user/data 或 C:\\Users\\user\\data",
+      "filePathHint": "输入数据集文件所在的文件夹路径（不包含文件名）",
+      "filePathGuide": "如何找到文件路径：",
       "filePath": "文件路径",
-      "filePathPlaceholder": "例如：/path/to/dataset.xlsx 或 C:\\data\\dataset.csv",
-      "filePathHint": "输入数据集文件在本地系统上的完整路径",
       "uploadFile": "上传文件",
       "dragDrop": "点击或拖拽文件上传",
       "supportedFormats": "支持格式：CSV、Excel（.xlsx、.xls）",
@@ -400,7 +403,7 @@
       "continueToPredict": "基于选中模型与参数进行预测",
       "backToPrepare": "返回：准备数据",
       "trainingTasks": "调优任务",
-      "traning": "训练中"
+      "training": "训练中"
     },
     "prediction": {
       "title": "进行预测",

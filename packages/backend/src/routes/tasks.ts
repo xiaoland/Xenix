@@ -19,7 +19,7 @@ import { getMLBackendService } from "../services/MLBackendService";
 import logger from "../utils/logger";
 import type { InferSelectModel } from "drizzle-orm";
 import { mlBackendDeployments } from "../database/schema";
-import { storage } from "../storage";
+import { createStorageService } from "../storage";
 
 type MLBackendDeployment = InferSelectModel<typeof mlBackendDeployments>;
 
@@ -60,6 +60,7 @@ async function transformResultPaths(
 
   // For OSS storage, transform storage keys to presigned HTTP URLs
   if (storageType === 'oss') {
+    const storage = createStorageService('oss');
     const transformed = { ...result };
 
     // Transform predictedDataPath to presigned URL (24 hour expiry)

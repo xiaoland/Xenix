@@ -47,7 +47,6 @@
         <!-- ML Backend Deployment Selector -->
         <a-card class="mb-6">
           <h3 class="text-lg font-semibold mb-4">ML Backend Configuration</h3>
-          <!-- FIXME -->
           <MLBackendDeploymentSelector
             v-model="selectedDeploymentId"
             :dataset-storage="datasetStorage"
@@ -177,7 +176,7 @@ const datasetId = computed(() => workItem.value?.datasetId);
 const { data: datasetData } = useDataset(datasetId);
 const datasetStorage = computed(() => {
   if (!datasetData.value) return null;
-  return datasetData.value.storage;
+  return datasetData.value.storage as "local" | "oss" | null;
 });
 
 // Handle deployment change
@@ -188,7 +187,7 @@ const handleDeploymentChange = async (deploymentId: number | null) => {
     updateWorkItem(
       {
         id: workItem.value.id,
-        data: {
+        updates: {
           mlBackendDeploymentId: deploymentId ?? undefined,
         },
       },

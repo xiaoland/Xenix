@@ -1,0 +1,67 @@
+name: Deploy ML Backend to Aliyun FC
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'packages/ml-backend/**'
+      - 's.yaml'
+      - '.github/workflows/deploy-ml-backend.yml'
+      - '.github/scripts/check-layer-hash-ml-backend.sh'
+      - '.github/scripts/prune-layer-versions.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup Node.js (for Serverless Devs)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Serverless Devs CLI
+        run: npm install -g @serverless-devs/s
+
+      - name: Configure Serverless Devs credentials
+        run: |
+          s config add \
+            --AccountID ${{ secrets.ALIYUN_ACCOUNT_ID }} \
+            --AccessKeyID ${{ secrets.ALIYUN_ACCESS_KEY_ID }} \
+            --AccessKeySecret ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }} \
+            --aliasName default
+
+      - name: Set environment variables
+        run: |
+          echo "OSS_REGION=${{ secrets.OSS_REGION }}" >> $GITHUB_ENV
+          echo "OSS_ACCESS_KEY_ID=${{ secrets.OSS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+          echo "OSS_ACCESS_KEY_SECRET=${{ secrets.OSS_ACCESS_KEY_SECRET }}" >> $GITHUB_ENV
+          echo "OSS_BUCKET=${{ secrets.OSS_BUCKET }}" >> $GITHUB_ENV
+          echo "OSS_ENDPOINT=${{ secrets.OSS_ENDPOINT }}" >> $GITHUB_ENV
+
+      - name: Build ML backend function
+        run: s build xenix-ml-backend --use-docker
+
+      - name: Deploy ML backend function
+        run: s deploy xenix-ml-backend -y
+
+      - name: Deployment summary
+        run: |
+          echo "✅ ML backend deployed successfully!"
+          echo "🚀 ML backend function deployed to Aliyun Function Compute"

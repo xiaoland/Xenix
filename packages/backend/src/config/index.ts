@@ -28,10 +28,7 @@ const configSchema = z.object({
       process.env.NODE_ENV === 'production' ? '/tmp/uploads' : './uploads'
     ),
 
-  // Storage
-  STORAGE_TYPE: z.enum(['local', 'oss']).default('local'),
-
-  // OSS Configuration (required when STORAGE_TYPE=oss)
+  // OSS Configuration (required when dataset or deployment uses OSS storage)
   OSS_REGION: z.string().optional(),
   OSS_ACCESS_KEY_ID: z.string().optional(),
   OSS_ACCESS_KEY_SECRET: z.string().optional(),

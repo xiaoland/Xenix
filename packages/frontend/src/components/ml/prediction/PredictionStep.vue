@@ -43,25 +43,93 @@
       class="bg-white rounded-lg border p-4"
     >
       <h3 class="text-lg font-medium mb-3">Upload Prediction Data</h3>
-      <a-upload-dragger
-        v-model:file-list="fileList"
-        name="file"
-        :before-upload="beforeUpload"
-        :max-count="1"
-        accept=".xlsx,.xls,.csv"
-      >
-        <p class="ant-upload-drag-icon">
-          <span
-            class="i-mdi-file-table text-6xl text-green-500 inline-block"
-          ></span>
-        </p>
-        <p class="ant-upload-text">
-          {{ $t("ml.prediction.dragHint") }}
-        </p>
-        <p class="ant-upload-hint">
-          {{ $t("ml.prediction.supportedFormats") }}
-        </p>
-      </a-upload-dragger>
+
+      <!-- For OSS storage: File Upload -->
+      <template v-if="storageType === 'oss'">
+        <a-upload-dragger
+          v-model:file-list="fileList"
+          name="file"
+          :before-upload="beforeUpload"
+          :max-count="1"
+          accept=".xlsx,.xls,.csv"
+        >
+          <p class="ant-upload-drag-icon">
+            <span
+              class="i-mdi-file-table text-6xl text-green-500 inline-block"
+            ></span>
+          </p>
+          <p class="ant-upload-text">
+            {{ $t("ml.prediction.dragHint") }}
+          </p>
+          <p class="ant-upload-hint">
+            {{ $t("ml.prediction.supportedFormats") }}
+          </p>
+        </a-upload-dragger>
+      </template>
+
+      <!-- For Local storage: File Path Input -->
+      <template v-else-if="storageType === 'local'">
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              Select Prediction File
+            </label>
+            <a-upload-dragger
+              v-model:file-list="fileList"
+              name="file"
+              :before-upload="beforeUpload"
+              :max-count="1"
+              accept=".xlsx,.xls,.csv"
+              :show-upload-list="false"
+              @change="handleFileChange"
+            >
+              <p class="ant-upload-drag-icon">
+                <span
+                  class="i-mdi-file-document text-6xl text-blue-500 inline-block"
+                ></span>
+              </p>
+              <p class="ant-upload-text">Select prediction file</p>
+              <p class="ant-upload-hint">
+                {{ $t("ml.prediction.supportedFormats") }}
+              </p>
+            </a-upload-dragger>
+          </div>
+
+          <div v-if="fileList.length > 0">
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              File Path
+            </label>
+            <a-tooltip
+              v-model:open="showPathTooltip"
+              placement="top"
+              trigger="focus"
+            >
+              <template #title>
+                <div class="p-2 min-w-[600px]">
+                  <p class="mb-2 text-sm">
+                    {{ $t("dataset.add.filePathGuide") }}
+                  </p>
+                  <img
+                    src="/file-path-guiding.jpg"
+                    alt="File path guide"
+                    class="w-full h-auto rounded border"
+                  />
+                </div>
+              </template>
+              <a-input
+                v-model:value="selectedFilePath"
+                :placeholder="$t('dataset.add.filePathPlaceholder')"
+                @focus="showPathTooltip = true"
+                @blur="showPathTooltip = false"
+                class="mb-2"
+              />
+            </a-tooltip>
+            <div class="text-xs text-gray-500">
+              Selected file: {{ fileList[0]?.name }}
+            </div>
+          </div>
+        </div>
+      </template>
 
       <a-button
         class="mt-4 inline-flex items-center justify-center"
@@ -69,7 +137,13 @@
         size="large"
         block
         :loading="isPredicting"
-        :disabled="fileList.length === 0"
+        :disabled="
+          (storageType === 'oss' && fileList.length === 0) ||
+          (storageType === 'local' &&
+            (fileList.length === 0 ||
+              !selectedFilePath.trim() ||
+              !predictionMetadata))
+        "
         @click="startPredictionFromFile"
       >
         <span class="i-mdi-chart-line mr-2" />
@@ -174,8 +248,9 @@ import type { UploadProps } from "ant-design-vue";
 import { computed, ref } from "vue";
 
 import { client } from "../../../api/client";
-import { useModels } from "@/composables";
+import { useModels, useWorkItem, useMLBackendDeployments } from "@/composables";
 import { API_CONFIG } from "../../../constants/config";
+import { extractDatasetMetadata } from "../../../utils/datasetUtils";
 import PredictionResult from "./PredictionResult.vue";
 
 const props = defineProps<{
@@ -194,9 +269,12 @@ const emit = defineEmits<{
 // State
 const predictionMode = ref<"file" | "inline">("file");
 const fileList = ref<any[]>([]);
+const selectedFilePath = ref("");
 const inputData = ref<Record<string, any>[]>([]);
 const isPredicting = ref(false);
 const predictionTaskId = ref<number | null>(null);
+const predictionMetadata = ref<any>(null);
+const showPathTooltip = ref(false);
 
 // Computed
 const inputColumns = computed(() => {
@@ -216,6 +294,21 @@ const inputColumns = computed(() => {
 
 // Fetch available models from backend
 const { data: availableModels } = useModels();
+
+// Fetch work item details
+const { data: workItem } = useWorkItem(props.workItemId);
+
+// Fetch ML backend deployments
+const { data: deployments } = useMLBackendDeployments();
+
+// Computed
+const storageType = computed(() => {
+  if (!workItem.value?.mlBackendDeploymentId || !deployments.value) return null;
+  const deployment = deployments.value.find(
+    (d) => d.id === workItem.value.mlBackendDeploymentId,
+  );
+  return deployment?.storage || null;
+});
 
 /**
  * Format model name for display
@@ -268,39 +361,106 @@ const beforeUpload: UploadProps["beforeUpload"] = (file) => {
 };
 
 /**
+ * Handle file change for metadata extraction
+ */
+const handleFileChange = async () => {
+  if (fileList.value.length > 0 && storageType.value === "local") {
+    try {
+      const file = fileList.value[0].originFileObj;
+      message.loading({
+        content: "Analyzing prediction file...",
+        key: "analyze",
+      });
+
+      // Extract metadata from the file
+      predictionMetadata.value = await extractDatasetMetadata(file);
+
+      message.success({
+        content: "File analyzed successfully",
+        key: "analyze",
+      });
+    } catch (error: any) {
+      message.error({
+        content: error.message || "Failed to analyze file",
+        key: "analyze",
+      });
+      predictionMetadata.value = null;
+    }
+  } else {
+    predictionMetadata.value = null;
+  }
+};
+
+/**
  * Start prediction from uploaded file
  */
 const startPredictionFromFile = async () => {
-  if (fileList.value.length === 0 || !props.selectedModel || !props.taskId) {
+  if (!props.selectedModel || !props.taskId) {
+    return;
+  }
+
+  // For OSS: require file upload
+  // For local: require file selection, file path, and metadata
+  if (
+    (storageType.value === "oss" && fileList.value.length === 0) ||
+    (storageType.value === "local" &&
+      (fileList.value.length === 0 ||
+        !selectedFilePath.value.trim() ||
+        !predictionMetadata.value))
+  ) {
     return;
   }
 
   isPredicting.value = true;
   try {
-    const file = fileList.value[0].originFileObj;
-    if (!file) {
-      throw new Error("No file selected");
-    }
+    const file = fileList.value[0]?.originFileObj;
 
-    // Create FormData for file upload
+    // Create FormData
     const formData = new FormData();
-    formData.append("file", file);
     formData.append("workItemId", String(props.workItemId));
     formData.append("model", props.selectedModel);
     formData.append("tuningTaskId", String(props.taskId));
+
+    if (storageType.value === "oss") {
+      // For OSS: upload the file
+      if (!file) {
+        throw new Error("No file selected");
+      }
+      formData.append("file", file);
+    } else {
+      // For local: send file path and metadata
+      const filePath = `${selectedFilePath.value.trim()}/${fileList.value[0].name}`;
+      formData.append("filePath", filePath);
+      formData.append("fileName", fileList.value[0].name);
+      formData.append(
+        "fileSize",
+        String(predictionMetadata.value?.fileSize || 0),
+      );
+      formData.append(
+        "columns",
+        JSON.stringify(predictionMetadata.value?.columns || []),
+      );
+      formData.append(
+        "rowCount",
+        String(predictionMetadata.value?.rowCount || 0),
+      );
+    }
 
     // Use fetch directly for FormData to ensure proper Content-Type with boundary
     const token = localStorage.getItem("auth_token");
     const apiUrl = import.meta.env.VITE_API_URL || API_CONFIG.DEFAULT_URL;
 
-    const response = await fetch(`${apiUrl}/work-items/${props.workItemId}/predict/file`, {
-      method: "POST",
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        // Don't set Content-Type - let browser set it with boundary
+    const response = await fetch(
+      `${apiUrl}/work-items/${props.workItemId}/predict/file`,
+      {
+        method: "POST",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          // Don't set Content-Type - let browser set it with boundary
+        },
+        body: formData,
       },
-      body: formData,
-    });
+    );
 
     if (!response.ok) {
       const errorData = await response.json();
@@ -329,8 +489,8 @@ const predictInline = async () => {
   // Validate that all fields are filled
   const hasEmptyFields = inputData.value.some((row) =>
     props.featureColumns.some(
-      (col) => row[col] === null || row[col] === undefined
-    )
+      (col) => row[col] === null || row[col] === undefined,
+    ),
   );
 
   if (hasEmptyFields) {
@@ -346,7 +506,9 @@ const predictInline = async () => {
       return rest;
     });
 
-    const response = await client["work-items"][":id"]["predict"]["inline"].$post({
+    const response = await client["work-items"][":id"]["predict"][
+      "inline"
+    ].$post({
       param: { id: String(props.workItemId) },
       json: {
         predictionData: cleanData,
@@ -374,3 +536,8 @@ const handleReset = () => {
   emit("reset");
 };
 </script>
+<style>
+.ant-tooltip-inner {
+  min-width: fit-content !important;
+}
+</style>

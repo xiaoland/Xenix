@@ -8,7 +8,7 @@
 import type { InferSelectModel } from "drizzle-orm";
 import { MLBackendDeploymentRepository } from "../repositories/MLBackendDeploymentRepository";
 import { mlBackendDeployments } from "../database/schema";
-import { storage } from "../storage";
+import { createStorageService } from "../storage";
 import logger from "../utils/logger";
 
 type MLBackendDeployment = InferSelectModel<typeof mlBackendDeployments>;
@@ -51,6 +51,27 @@ export class MLBackendService {
       throw new Error(`Deployment ${deploymentId} not found`);
     }
     return deployment;
+  }
+
+  /**
+   * Prepare HTTP headers with custom headers from deployment configuration
+   */
+  private prepareHeaders(
+    deployment: MLBackendDeployment,
+    baseHeaders: Record<string, string> = {},
+  ): Record<string, string> {
+    const headers = { ...baseHeaders };
+
+    // Add custom headers from deployment configuration
+    if (deployment.headers && typeof deployment.headers === 'object') {
+      Object.entries(deployment.headers).forEach(([key, value]) => {
+        if (typeof value === 'string') {
+          headers[key] = value;
+        }
+      });
+    }
+
+    return headers;
   }
 
   /**
@@ -98,11 +119,14 @@ export class MLBackendService {
         "Executing ML operation via HTTP",
       );
 
+      // Prepare headers with custom headers from deployment
+      const headers = this.prepareHeaders(deployment, {
+        "Content-Type": "application/json",
+      });
+
       const response = await fetch(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify(payload),
         // Allow connection to close after response
         signal: AbortSignal.timeout(5000), // 5 second timeout for initial response
@@ -200,6 +224,7 @@ export class MLBackendService {
       if (path.startsWith(ossPrefix)) {
         const key = path.substring(ossPrefix.length);
         // Get OSS URL from storage service
+        const storage = createStorageService('oss');
         const url = await storage.generatePresignedDownloadUrl(key);
         return url;
       }
@@ -223,11 +248,14 @@ export class MLBackendService {
     const url = `${apiUrl}/tasks/${taskId}/result`;
 
     try {
+      // Prepare headers with custom headers from deployment
+      const headers = this.prepareHeaders(deployment, {
+        Accept: "application/json",
+      });
+
       const response = await fetch(url, {
         method: "GET",
-        headers: {
-          Accept: "application/json",
-        },
+        headers,
         signal: AbortSignal.timeout(3000),
       });
 
@@ -272,6 +300,7 @@ export class MLBackendService {
    */
   private async checkResultFromOSS(taskId: number): Promise<TaskResult | null> {
     const resultKey = `tasks/${taskId}/result.json`;
+    const storage = createStorageService('oss');
 
     try {
       // Fetch result from storage (uses aws4fetch internally for OSS)
@@ -330,6 +359,7 @@ export class MLBackendService {
 
     try {
       if (storageType === "oss") {
+        const storage = createStorageService('oss');
         const statusKey = `tasks/${taskId}/status.txt`;
         const response = await storage.fetch(statusKey, { timeout: 2000 });
         if (!response.ok) return null;
@@ -337,7 +367,12 @@ export class MLBackendService {
         return text.trim() as any;
       } else {
         const url = `${deployment.apiUrl}/tasks/${taskId}/status`;
+        
+        // Prepare headers with custom headers from deployment
+        const headers = this.prepareHeaders(deployment);
+
         const response = await fetch(url, {
+          headers: Object.keys(headers).length > 0 ? headers : undefined,
           signal: AbortSignal.timeout(2000),
         });
         if (!response.ok) return null;
