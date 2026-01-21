@@ -2,51 +2,51 @@
   <div class="space-y-4">
     <a-form layout="vertical">
       <!-- Storage Type Selector -->
-      <a-form-item label="Storage Type" required>
+      <a-form-item :label="$t('dataset.add.storageType')" required>
         <a-radio-group v-model:value="storageType" button-style="solid">
           <a-radio-button value="local">
             <span class="inline-flex items-center">
               <span class="i-mdi-harddisk mr-2"></span>
-              Local (User's Device)
+              {{ $t('dataset.add.storageLocal') }}
             </span>
           </a-radio-button>
           <a-radio-button value="oss">
             <span class="inline-flex items-center">
               <span class="i-mdi-cloud mr-2"></span>
-              OSS (Cloud Storage)
+              {{ $t('dataset.add.storageOss') }}
             </span>
           </a-radio-button>
         </a-radio-group>
         <div class="text-sm text-gray-500 mt-1">
           <span v-if="storageType === 'local'">
-            Dataset will reference a file on your local device. Upload step will be skipped.
+            {{ $t('dataset.add.storageLocalHint') }}
           </span>
           <span v-else>
-            Dataset will be uploaded to cloud storage.
+            {{ $t('dataset.add.storageOssHint') }}
           </span>
         </div>
       </a-form-item>
 
       <!-- Dataset Name -->
-      <a-form-item label="Dataset Name" required>
+      <a-form-item :label="$t('dataset.add.name')" required>
         <a-input
           v-model:value="datasetName"
-          placeholder="Enter dataset name"
+          :placeholder="$t('dataset.add.namePlaceholder')"
         />
       </a-form-item>
 
       <!-- File Path (for local) or Upload (for OSS) -->
-      <a-form-item v-if="storageType === 'local'" label="File Path" required>
+      <a-form-item v-if="storageType === 'local'" :label="$t('dataset.add.filePath')" required>
         <a-input
           v-model:value="filePath"
-          placeholder="e.g., /path/to/dataset.xlsx or C:\data\dataset.csv"
+          :placeholder="$t('dataset.add.filePathPlaceholder')"
         />
         <div class="text-sm text-gray-500 mt-1">
-          Enter the full path to the dataset file on your local system
+          {{ $t('dataset.add.filePathHint') }}
         </div>
       </a-form-item>
 
-      <a-form-item v-else label="Upload File" required>
+      <a-form-item v-else :label="$t('dataset.add.uploadFile')" required>
         <a-upload-dragger
           v-model:file-list="fileList"
           :before-upload="beforeUpload"
@@ -59,23 +59,23 @@
             <span class="i-mdi-cloud-upload text-4xl text-gray-400"></span>
           </p>
           <p class="ant-upload-text">
-            Click or drag file to upload
+            {{ $t('dataset.add.dragDrop') }}
           </p>
           <p class="ant-upload-hint">
-            Supported formats: CSV, Excel (.xlsx, .xls)
+            {{ $t('dataset.add.supportedFormats') }}
           </p>
         </a-upload-dragger>
       </a-form-item>
 
       <!-- Metadata Display (auto-extracted) -->
       <div v-if="metadata" class="bg-gray-50 p-4 rounded-lg border">
-        <h4 class="text-sm font-semibold mb-2">Dataset Information</h4>
+        <h4 class="text-sm font-semibold mb-2">{{ $t('dataset.add.datasetInfo') }}</h4>
         <div class="space-y-1 text-sm">
-          <div><strong>Columns:</strong> {{ metadata.columns.length }}</div>
-          <div><strong>Rows:</strong> {{ metadata.rowCount }}</div>
-          <div><strong>Size:</strong> {{ formatFileSize(metadata.fileSize) }}</div>
+          <div><strong>{{ $t('dataset.add.columns') }}:</strong> {{ metadata.columns.length }}</div>
+          <div><strong>{{ $t('dataset.add.rows') }}:</strong> {{ metadata.rowCount }}</div>
+          <div><strong>{{ $t('dataset.add.size') }}:</strong> {{ formatFileSize(metadata.fileSize) }}</div>
           <div class="mt-2">
-            <strong>Column Names:</strong>
+            <strong>{{ $t('dataset.add.columnNames') }}:</strong>
             <div class="mt-1 flex flex-wrap gap-1">
               <a-tag v-for="col in metadata.columns" :key="col" size="small">
                 {{ col }}
@@ -88,7 +88,7 @@
 
     <div class="flex justify-end space-x-2">
       <a-button @click="emit('cancel')">
-        Cancel
+        {{ $t('dataset.add.cancel') }}
       </a-button>
       <a-button
         type="primary"
@@ -96,7 +96,7 @@
         :disabled="!canCreate"
         @click="handleCreate"
       >
-        {{ storageType === 'local' ? 'Create Dataset' : 'Upload & Create' }}
+        {{ storageType === 'local' ? $t('dataset.add.createDataset') : $t('dataset.add.uploadAndCreate') }}
       </a-button>
     </div>
   </div>
@@ -107,6 +107,7 @@ import { message } from "ant-design-vue";
 import type { UploadProps } from "ant-design-vue";
 
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 
 import { useCreateDataset } from "../../composables";
 import { extractDatasetMetadata, type DatasetMetadata } from "../../utils/datasetUtils";
@@ -119,6 +120,8 @@ const emit = defineEmits<{
   success: [];
   cancel: [];
 }>();
+
+const { t } = useI18n();
 
 const storageType = ref<'local' | 'oss'>('oss');
 const datasetName = ref("");
@@ -156,13 +159,13 @@ const beforeUpload: UploadProps["beforeUpload"] = (file) => {
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
   if (!isValidFormat) {
-    message.error("You can only upload CSV or Excel files!");
+    message.error(t('dataset.add.invalidFileFormat'));
     return false;
   }
 
   const isLt10M = file.size / 1024 / 1024 < 10;
   if (!isLt10M) {
-    message.error("File must be smaller than 10MB!");
+    message.error(t('dataset.add.fileTooLarge'));
     return false;
   }
 
@@ -173,11 +176,11 @@ const handleFileChange = async () => {
   if (fileList.value.length > 0) {
     try {
       const file = fileList.value[0].originFileObj;
-      message.loading({ content: 'Analyzing file...', key: 'analyze' });
+      message.loading({ content: t('dataset.add.analyzingFile'), key: 'analyze' });
       metadata.value = await extractDatasetMetadata(file);
-      message.success({ content: 'File analyzed successfully', key: 'analyze' });
+      message.success({ content: t('dataset.add.fileAnalyzed'), key: 'analyze' });
     } catch (error: any) {
-      message.error({ content: error.message || 'Failed to analyze file', key: 'analyze' });
+      message.error({ content: error.message || t('dataset.add.analyzeFailed'), key: 'analyze' });
       metadata.value = null;
     }
   } else {
@@ -201,7 +204,7 @@ const handleCreate = async () => {
 
   createDataset(params, {
     onSuccess: () => {
-      message.success("Dataset created successfully");
+      message.success(t('dataset.add.createSuccess'));
       emit("success");
 
       // Reset form
@@ -212,7 +215,7 @@ const handleCreate = async () => {
     },
     onError: (error: any) => {
       console.error("Creation failed:", error);
-      message.error(error.message || "Failed to create dataset");
+      message.error(error.message || t('dataset.add.createFailed'));
     },
   });
 };
@@ -227,16 +230,16 @@ const handleLocalFileSelect = async () => {
     const file = e.target.files[0];
     if (file) {
       try {
-        message.loading({ content: 'Analyzing file...', key: 'analyze' });
+        message.loading({ content: t('dataset.add.analyzingFile'), key: 'analyze' });
         metadata.value = await extractDatasetMetadata(file);
-        message.success({ content: 'File analyzed successfully', key: 'analyze' });
+        message.success({ content: t('dataset.add.fileAnalyzed'), key: 'analyze' });
 
         // Auto-fill file path with file name (user can edit)
         if (!filePath.value) {
           filePath.value = file.name;
         }
       } catch (error: any) {
-        message.error({ content: error.message || 'Failed to analyze file', key: 'analyze' });
+        message.error({ content: error.message || t('dataset.add.analyzeFailed'), key: 'analyze' });
       }
     }
   };
