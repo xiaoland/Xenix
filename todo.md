@@ -26,22 +26,24 @@
 - [ ] 统一日志<https://gemini.google.com/u/1/app/a3f5372ad3492fd2>
 - [ ] Simplify API (especially train)
 - [ ] schema to shared, frontend also uses Zod
+- [ ] WorkItem 应该保存的是 column index 而不是 header name
 
 ## Frontend
 
-- [ ] 在workItem级别选择 ml-backend deployment，前端默认带 workItem 的 deployment （未来可以允许 task 级别选择）
+- [x] 在workItem级别选择 ml-backend deployment，前端默认带 workItem 的 deployment （未来可以允许 task 级别选择）
   - every user has a list of ml backends；完整列表就是官方的加上用户本地的，官方的backend需要计费（task会有字段）
-- [ ] 如果是 local path，直接打开，不要下载
+- [x] 如果是 local path，提示复制路径本地打开
 - [x] Inline predict 的结果展示不正确
   - targetColumn 不需要 predicted_ (这是 ml-backend 的锅)
   - 多了个 Prediction column
 - [ ] Prediction History
 - [ ] 橙色为主题色
+- [ ] MLBackendDeployment Selector 没有使用 AntDesign 组件
 
 ## Backend
 
 - [ ] 不要区分 fc build
-- [ ] Add endpoints for database migration (protected with password)
+- [ ] 在 CI/CD 中运行 Database Migration （别忘了 model metadata migration）
 
 ## ML Backend
 
@@ -51,8 +53,7 @@
     - 异步调用，结果与状态更新怎么做？全部都存在 Filesystem 里面
 - [x] 构建时产出 model_metadata.json 让 backend 读取并自动化推送到数据库
 - [ ] 不要马上 Accepted，要先运行5s（如果在运行了就返回 202 Accepted），而且这样 backend 也就不用自己等待了
-- [ ] 添加 Brearer 认证保护（ deployment 中配置 brearer column）（不着急，因为禁止了公网访问）
-- [ ] Add fc handler 并开启异步任务
+- [ ] 开启异步任务
 
 ## Shared
 

@@ -3,12 +3,11 @@ CREATE TABLE "datasets" (
 	"project_id" integer,
 	"name" text NOT NULL,
 	"description" text,
+	"storage" text DEFAULT 'local' NOT NULL,
 	"file_path" text NOT NULL,
-	"file_name" text NOT NULL,
 	"file_size" integer,
 	"columns" jsonb,
 	"row_count" integer,
-	"storage" text DEFAULT 'local' NOT NULL,
 	"created_at" timestamp NOT NULL,
 	"updated_at" timestamp NOT NULL
 );
@@ -33,6 +32,7 @@ CREATE TABLE "ml_backend_deployments" (
 	"created_by" uuid,
 	"api_url" text NOT NULL,
 	"proxy" text,
+	"headers" jsonb,
 	"storage" text DEFAULT 'local' NOT NULL,
 	"created_at" timestamp NOT NULL
 );

@@ -1,1 +1,0 @@
-ALTER TABLE "datasets" DROP COLUMN "file_name";
