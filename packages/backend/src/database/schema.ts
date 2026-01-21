@@ -46,12 +46,14 @@ export const datasets = pgTable("datasets", {
   projectId: integer("project_id"), // Reference to project
   name: text("name").notNull(),
   description: text("description"),
-  filePath: text("file_path").notNull(),
-  fileName: text("file_name").notNull(),
-  fileSize: integer("file_size"),
-  columns: jsonb("columns"),
-  rowCount: integer("row_count"),
   storage: text("storage").notNull().default("local"), // 'local' (user's device) or 'oss' (cloud storage)
+  filePath: text("file_path").notNull(), // key if storage is 'oss'; absolute path if storage is 'local'
+  // File metadata start
+  fileName: text("file_name").notNull(), // TODO remove, useless
+  fileSize: integer("file_size"),
+  columns: jsonb("columns"), // TODO allows no-header mode (will be like ['1', '2'] but not ['Data1', 'Data2'])
+  rowCount: integer("row_count"),
+  // File metadata ends
   createdAt: timestamp("created_at", { mode: "date" })
     .$defaultFn(() => new Date())
     .notNull(),
@@ -124,7 +126,9 @@ export const workItems = pgTable("work_items", {
   description: text("description"),
   status: text("status").notNull().default("active"), // 'active', 'completed', 'archived'
   // ML Backend Deployment selection
-  mlBackendDeploymentId: integer("ml_backend_deployment_id").references(() => mlBackendDeployments.id), // Selected ML backend deployment
+  mlBackendDeploymentId: integer("ml_backend_deployment_id").references(
+    () => mlBackendDeployments.id,
+  ), // Selected ML backend deployment
   // Upload step results - stored to skip upload step on return
   datasetId: integer("dataset_id"), // Selected dataset from upload step
   featureColumns: jsonb("feature_columns"), // Selected features as JSON array
