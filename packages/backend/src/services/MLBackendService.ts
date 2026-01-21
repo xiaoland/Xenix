@@ -54,6 +54,27 @@ export class MLBackendService {
   }
 
   /**
+   * Prepare HTTP headers with custom headers from deployment configuration
+   */
+  private prepareHeaders(
+    deployment: MLBackendDeployment,
+    baseHeaders: Record<string, string> = {},
+  ): Record<string, string> {
+    const headers = { ...baseHeaders };
+
+    // Add custom headers from deployment configuration
+    if (deployment.headers && typeof deployment.headers === 'object') {
+      Object.entries(deployment.headers).forEach(([key, value]) => {
+        if (typeof value === 'string') {
+          headers[key] = value;
+        }
+      });
+    }
+
+    return headers;
+  }
+
+  /**
    * Execute ML operation via HTTP
    *
    * Makes POST request to deployment's API URL and returns immediately.
@@ -98,19 +119,10 @@ export class MLBackendService {
         "Executing ML operation via HTTP",
       );
 
-      // Prepare headers
-      const headers: Record<string, string> = {
+      // Prepare headers with custom headers from deployment
+      const headers = this.prepareHeaders(deployment, {
         "Content-Type": "application/json",
-      };
-
-      // Add custom headers from deployment configuration
-      if (deployment.headers && typeof deployment.headers === 'object') {
-        Object.entries(deployment.headers).forEach(([key, value]) => {
-          if (typeof value === 'string') {
-            headers[key] = value;
-          }
-        });
-      }
+      });
 
       const response = await fetch(url, {
         method: "POST",
@@ -235,19 +247,10 @@ export class MLBackendService {
     const url = `${apiUrl}/tasks/${taskId}/result`;
 
     try {
-      // Prepare headers
-      const headers: Record<string, string> = {
+      // Prepare headers with custom headers from deployment
+      const headers = this.prepareHeaders(deployment, {
         Accept: "application/json",
-      };
-
-      // Add custom headers from deployment configuration
-      if (deployment.headers && typeof deployment.headers === 'object') {
-        Object.entries(deployment.headers).forEach(([key, value]) => {
-          if (typeof value === 'string') {
-            headers[key] = value;
-          }
-        });
-      }
+      });
 
       const response = await fetch(url, {
         method: "GET",
@@ -362,17 +365,8 @@ export class MLBackendService {
       } else {
         const url = `${deployment.apiUrl}/tasks/${taskId}/status`;
         
-        // Prepare headers
-        const headers: Record<string, string> = {};
-
-        // Add custom headers from deployment configuration
-        if (deployment.headers && typeof deployment.headers === 'object') {
-          Object.entries(deployment.headers).forEach(([key, value]) => {
-            if (typeof value === 'string') {
-              headers[key] = value;
-            }
-          });
-        }
+        // Prepare headers with custom headers from deployment
+        const headers = this.prepareHeaders(deployment);
 
         const response = await fetch(url, {
           headers: Object.keys(headers).length > 0 ? headers : undefined,
