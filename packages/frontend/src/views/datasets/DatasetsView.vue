@@ -92,7 +92,7 @@
         :footer="null"
         width="600px"
       >
-        <dataset-upload
+        <add-dataset
           :project-id="projectId"
           @success="handleUploadSuccess"
           @cancel="showUploadModal = false"
@@ -132,7 +132,7 @@ import { ref, computed } from "vue";
 import { useRoute } from "vue-router";
 import { message, Modal } from "ant-design-vue";
 import DefaultLayout from "../../layouts/DefaultLayout.vue";
-import DatasetUpload from "../../components/dataset/DatasetUpload.vue";
+import AddDataset from "../../components/dataset/AddDataset.vue";
 import { useDatasets, useDeleteDataset } from "../../composables";
 
 interface Dataset {
