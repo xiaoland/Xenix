@@ -7,40 +7,54 @@ vars:
   serviceName: xenix
 
 resources:
-  # Node.js dependencies layer for backend
-  xenix-backend-nodejs-layer:
+  # Node.js 22 runtime layer for custom runtime
+  xenix-nodejs22-runtime-layer:
     component: fc3
     actions:
       pre-deploy:
         - run: |
             mkdir -p opt/nodejs/bin
 
-            # Download and extract Node.js 20 for the layer
-            if [ ! -d "node-v20.18.1-linux-x64" ]; then
-              wget -q https://nodejs.org/dist/v20.18.1/node-v20.18.1-linux-x64.tar.xz
-              tar -xf node-v20.18.1-linux-x64.tar.xz
+            # Download and extract Node.js 22 for the runtime layer
+            if [ ! -d "node-v22.12.0-linux-x64" ]; then
+              wget -q https://nodejs.org/dist/v22.12.0/node-v22.12.0-linux-x64.tar.xz
+              tar -xf node-v22.12.0-linux-x64.tar.xz
             fi
 
             # Copy Node.js binaries to layer
-            cp -r node-v20.18.1-linux-x64/bin/* opt/nodejs/bin/
-            cp -r node-v20.18.1-linux-x64/lib opt/nodejs/
-            cp -r node-v20.18.1-linux-x64/include opt/nodejs/
+            cp -r node-v22.12.0-linux-x64/bin/* opt/nodejs/bin/
+            cp -r node-v22.12.0-linux-x64/lib opt/nodejs/
+            cp -r node-v22.12.0-linux-x64/include opt/nodejs/
 
-            # Install production dependencies
+            # Clean up
+            rm -rf node-v22.12.0-linux-x64.tar.xz
+          path: ./packages/backend
+    props:
+      region: ${vars.region}
+      layerName: xenix-nodejs22-runtime
+      description: Node.js 22 runtime for custom Debian 11
+      compatibleRuntime: [custom, custom.debian11]
+      code: ./packages/backend/opt
+
+  # Node.js dependencies layer for backend
+  xenix-backend-nodejs-deps-layer:
+    component: fc3
+    actions:
+      pre-deploy:
+        - run: |
+            mkdir -p opt/nodejs
+
+            # Install production dependencies only (no Node.js binary)
             cp package.json opt/nodejs/
             cd opt/nodejs
             npm install --production --omit=dev
             rm package.json
-
-            # Clean up
-            cd ../..
-            rm -rf node-v20.18.1-linux-x64.tar.xz
           path: ./packages/backend
     props:
       region: ${vars.region}
       layerName: xenix-backend-nodejs-deps
-      description: Node.js dependencies for Xenix backend
-      compatibleRuntime: [nodejs18, nodejs20, custom.debian10]
+      description: Node.js production dependencies for Xenix backend
+      compatibleRuntime: [nodejs18, nodejs20, nodejs22, custom, custom.debian11]
       code: ./packages/backend/opt
 
   # Python dependencies layer for ML backend
@@ -71,13 +85,14 @@ resources:
     props:
       region: ${vars.region}
       functionName: xenix-backend
-      description: Xenix main HTTP backend (Node.js HTTP server)
-      runtime: custom.debian10
+      description: Xenix main HTTP backend (Node.js HTTP server with custom runtime)
+      runtime: custom.debian11
       memorySize: 512
       timeout: 60
       code: ./packages/backend
       layers:
-        - ${resources.xenix-backend-nodejs-layer.output.arn}
+        - ${resources.xenix-nodejs22-runtime-layer.output.arn}
+        - ${resources.xenix-backend-nodejs-deps-layer.output.arn}
       customRuntimeConfig:
         command:
           - bash

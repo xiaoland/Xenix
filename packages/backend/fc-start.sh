@@ -1,15 +1,14 @@
 #!/bin/bash
 set -e
 
-# Symlink node_modules from layer
+# Add Node.js 22 runtime from layer to PATH
+export PATH="/opt/nodejs/bin:$PATH"
+
+# Symlink node_modules from dependencies layer
 ln -sf /opt/nodejs/node_modules ./node_modules
 
-# Use node from layer if available, otherwise use system node
-if [ -f "/opt/nodejs/bin/node" ]; then
-    NODE_BIN="/opt/nodejs/bin/node"
-else
-    NODE_BIN="node"
-fi
+# Verify Node.js version
+node --version
 
 # Start the application
-exec $NODE_BIN dist/index.js
+exec node dist/index.js
