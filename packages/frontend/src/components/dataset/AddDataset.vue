@@ -180,6 +180,13 @@ const handleFileChange = async () => {
       // So we use the file name as a reference
       selectedFilePath.value = file.name;
 
+      // Auto-populate dataset name from file name if user hasn't entered a name yet
+      if (datasetName.value.trim() === "") {
+        // Remove file extension from the name
+        const nameWithoutExtension = file.name.replace(/\.(csv|xlsx|xls)$/i, '');
+        datasetName.value = nameWithoutExtension;
+      }
+
       message.success({ content: t('dataset.add.fileAnalyzed'), key: 'analyze' });
     } catch (error: any) {
       message.error({ content: error.message || t('dataset.add.analyzeFailed'), key: 'analyze' });
