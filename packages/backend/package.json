@@ -13,9 +13,9 @@
     "build": "tsup",
     "deploy": "pnpm run build && s deploy --use-local",
     "start": "node dist/index.js",
-    "db:generate": "pnpm exec drizzle-kit generate",
-    "db:migrate": "pnpm exec drizzle-kit migrate",
-    "migrate:models": "dotenv -c development -- tsx scripts/migrate-model-metadata.ts",
+    "db:generate": "dotenv -- pnpm exec drizzle-kit generate",
+    "db:migrate": "dotenv -- pnpm exec drizzle-kit migrate",
+    "migrate:models": "dotenv -- tsx scripts/migrate-model-metadata.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"

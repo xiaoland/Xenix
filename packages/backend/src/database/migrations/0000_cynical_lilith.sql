@@ -8,6 +8,7 @@ CREATE TABLE "datasets" (
 	"file_size" integer,
 	"columns" jsonb,
 	"row_count" integer,
+	"storage" text DEFAULT 'local' NOT NULL,
 	"created_at" timestamp NOT NULL,
 	"updated_at" timestamp NOT NULL
 );
@@ -61,7 +62,7 @@ CREATE TABLE "projects" (
 CREATE TABLE "tasks" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"work_item_id" integer,
-	"ml_backend_deployment_id" integer,
+	"ml_backend_deployment_id" integer NOT NULL,
 	"type" text NOT NULL,
 	"parameter" jsonb,
 	"result" jsonb,
@@ -88,6 +89,7 @@ CREATE TABLE "work_items" (
 	"name" text NOT NULL,
 	"description" text,
 	"status" text DEFAULT 'active' NOT NULL,
+	"ml_backend_deployment_id" integer,
 	"dataset_id" integer,
 	"feature_columns" jsonb,
 	"target_column" text,
@@ -99,4 +101,5 @@ CREATE TABLE "work_items" (
 ALTER TABLE "ml_backend_deployments" ADD CONSTRAINT "ml_backend_deployments_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "projects" ADD CONSTRAINT "projects_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tasks" ADD CONSTRAINT "tasks_ml_backend_deployment_id_ml_backend_deployments_id_fk" FOREIGN KEY ("ml_backend_deployment_id") REFERENCES "public"."ml_backend_deployments"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "work_items" ADD CONSTRAINT "work_items_ml_backend_deployment_id_ml_backend_deployments_id_fk" FOREIGN KEY ("ml_backend_deployment_id") REFERENCES "public"."ml_backend_deployments"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "idx_tasks_deployment" ON "tasks" USING btree ("ml_backend_deployment_id");
