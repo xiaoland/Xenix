@@ -1,0 +1,102 @@
+name: Deploy Backend to Aliyun FC
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'packages/backend/**'
+      - 'packages/shared/**'
+      - 's.yaml'
+      - '.github/workflows/deploy-backend.yml'
+      - '.github/scripts/check-layer-hash-backend.sh'
+      - '.github/scripts/prune-layer-versions.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  LAYER_NAME: xenix-backend-nodejs-deps
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Serverless Devs CLI
+        run: npm install -g @serverless-devs/s
+
+      - name: Configure Serverless Devs credentials
+        run: |
+          s config add \
+            --AccountID ${{ secrets.ALIYUN_ACCOUNT_ID }} \
+            --AccessKeyID ${{ secrets.ALIYUN_ACCESS_KEY_ID }} \
+            --AccessKeySecret ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }} \
+            --aliasName default
+
+      - name: Set environment variables
+        run: |
+          echo "OSS_REGION=${{ secrets.OSS_REGION }}" >> $GITHUB_ENV
+          echo "OSS_ACCESS_KEY_ID=${{ secrets.OSS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+          echo "OSS_ACCESS_KEY_SECRET=${{ secrets.OSS_ACCESS_KEY_SECRET }}" >> $GITHUB_ENV
+          echo "OSS_BUCKET=${{ secrets.OSS_BUCKET }}" >> $GITHUB_ENV
+          echo "OSS_ENDPOINT=${{ secrets.OSS_ENDPOINT }}" >> $GITHUB_ENV
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> $GITHUB_ENV
+
+      - name: Restore layer hash cache
+        uses: actions/cache@v4
+        with:
+          path: .layer-hash-backend
+          key: layer-hash-backend-${{ hashFiles('packages/backend/package.json') }}
+          restore-keys: |
+            layer-hash-backend-
+
+      - name: Check if layer dependencies changed
+        id: check-layer
+        run: bash .github/scripts/check-layer-hash-backend.sh
+
+      - name: Build and deploy backend layer (conditional)
+        if: steps.check-layer.outputs.LAYER_CHANGED == 'true'
+        run: |
+          echo "Deploying backend layer..."
+          s build xenix-backend-nodejs-deps-layer --use-docker
+          s deploy xenix-backend-nodejs-deps-layer -y
+
+      - name: Prune old layer versions
+        if: steps.check-layer.outputs.LAYER_CHANGED == 'true'
+        run: bash .github/scripts/prune-layer-versions.sh "$LAYER_NAME" 5
+
+      - name: Build backend function
+        run: s build xenix-backend --use-docker
+
+      - name: Deploy backend function
+        run: s deploy xenix-backend -y
+
+      - name: Deployment summary
+        run: |
+          if [ "${{ steps.check-layer.outputs.LAYER_CHANGED }}" = "true" ]; then
+            echo "✅ Backend layer and function deployed successfully!"
+          else
+            echo "✅ Backend function deployed successfully (layer unchanged)!"
+          fi

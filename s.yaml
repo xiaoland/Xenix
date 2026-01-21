@@ -15,14 +15,7 @@ resources:
     component: fc3
     actions:
       pre-deploy:
-        - run: |
-            mkdir -p opt/nodejs
-
-            # Install production dependencies only (no Node.js binary)
-            cp package.json opt/nodejs/
-            cd opt/nodejs
-            npm install --production --omit=dev
-            rm package.json
+        - run: bash build-layer.sh
           path: ./packages/backend
     props:
       region: ${vars.region}
@@ -65,7 +58,6 @@ resources:
         OSS_ENDPOINT: ${env.OSS_ENDPOINT}
         DATABASE_URL: ${env.DATABASE_URL}
         JWT_SECRET: ${env.JWT_SECRET}
-        ML_TIMEOUT: "300000"
       triggers:
         - triggerConfig:
             methods:
@@ -83,11 +75,7 @@ resources:
     component: fc3
     actions:
       pre-deploy:
-        - run: |
-            # Install Python dependencies directly into function code
-            pip install pdm
-            pdm export --prod --format requirements --output requirements.txt
-            pip install -r requirements.txt -t .
+        - run: bash build-deps.sh
           path: ./packages/ml-backend
     props:
       region: ${vars.region}
@@ -95,7 +83,7 @@ resources:
       description: ML backend for training and prediction
       runtime: python3.12
       memorySize: 4096
-      timeout: 600
+      timeout: 86400
       code: ./packages/ml-backend
       layers:
         - ${vars.python312LayerArn}
