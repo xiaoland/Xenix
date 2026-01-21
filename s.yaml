@@ -7,6 +7,18 @@ vars:
   serviceName: xenix
 
 resources:
+  # Node.js dependencies layer for backend
+  xenix-backend-nodejs-layer:
+    component: fc3
+    props:
+      region: ${vars.region}
+      layerName: xenix-backend-nodejs-deps
+      description: Node.js dependencies for Xenix backend
+      compatibleRuntime: [nodejs18, nodejs20]
+      code: ./packages/backend
+      # Layer should contain dependencies installed to /opt/nodejs/node_modules
+      # Note: Build the layer by installing node_modules in packages/backend
+
   # Python dependencies layer for ML backend
   xenix-ml-python-layer:
     component: fc3
@@ -26,11 +38,17 @@ resources:
       region: ${vars.region}
       functionName: xenix-backend
       description: Xenix main HTTP backend (Node.js HTTP server)
-      runtime: nodejs20
-      handler: index.handler
+      runtime: custom.debian10
       memorySize: 512
       timeout: 60
-      code: ./packages/backend/dist
+      code: ./packages/backend
+      layers:
+        - ${resources.xenix-backend-nodejs-layer.output.arn}
+      customRuntimeConfig:
+        command:
+          - bash
+        args:
+          - fc-start.sh
       environmentVariables:
         NODE_ENV: production
         BACKEND_PORT: "9000"
