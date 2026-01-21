@@ -47,7 +47,8 @@
         <!-- ML Backend Deployment Selector -->
         <a-card class="mb-6">
           <h3 class="text-lg font-semibold mb-4">ML Backend Configuration</h3>
-          <ml-backend-deployment-selector
+          <!-- FIXME -->
+          <MLBackendDeploymentSelector
             v-model="selectedDeploymentId"
             :dataset-storage="datasetStorage"
             @update:model-value="handleDeploymentChange"
@@ -168,7 +169,7 @@ watch(
       selectedDeploymentId.value = newWorkItem.mlBackendDeploymentId;
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 // Get dataset storage type for filtering deployments
@@ -199,7 +200,7 @@ const handleDeploymentChange = async (deploymentId: number | null) => {
         onError: () => {
           message.error("Failed to update ML backend deployment");
         },
-      }
+      },
     );
   } catch (err) {
     message.error("Failed to update ML backend deployment");
