@@ -40,17 +40,9 @@ resources:
         OSS_ACCESS_KEY_SECRET: ${env.OSS_ACCESS_KEY_SECRET}
         OSS_BUCKET: ${env.OSS_BUCKET}
         OSS_ENDPOINT: ${env.OSS_ENDPOINT}
-        OSS_MOUNT_POINT: /mnt/oss
         DATABASE_URL: ${env.DATABASE_URL}
         JWT_SECRET: ${env.JWT_SECRET}
         ML_TIMEOUT: "300000"
-      nasConfig:
-        userId: 10003
-        groupId: 10003
-        mountPoints:
-          - serverAddr: ${env.OSS_NAS_SERVER_ADDR}
-            nasDir: /xenix-oss
-            fcDir: /mnt/oss
       triggers:
         - triggerConfig:
             methods:
@@ -78,12 +70,10 @@ resources:
         - ${resources.xenix-ml-python-layer.output.arn}
       environmentVariables:
         PYTHONPATH: /opt/python:/code
-        ML_BASE_PATH: /mnt/oss/ml-backend
+        ML_BASE_PATH: /tmp/ml-backend
         LOG_LEVEL: INFO
-      nasConfig:
-        userId: 10003
-        groupId: 10003
-        mountPoints:
-          - serverAddr: ${env.OSS_NAS_SERVER_ADDR}
-            nasDir: /xenix-oss
-            fcDir: /mnt/oss
+        OSS_REGION: ${env.OSS_REGION}
+        OSS_ACCESS_KEY_ID: ${env.OSS_ACCESS_KEY_ID}
+        OSS_ACCESS_KEY_SECRET: ${env.OSS_ACCESS_KEY_SECRET}
+        OSS_BUCKET: ${env.OSS_BUCKET}
+        OSS_ENDPOINT: ${env.OSS_ENDPOINT}
