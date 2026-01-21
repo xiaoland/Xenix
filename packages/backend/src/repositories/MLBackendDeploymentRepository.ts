@@ -53,6 +53,7 @@ export class MLBackendDeploymentRepository {
         createdBy: data.createdBy || null,
         apiUrl: data.apiUrl,
         proxy: data.proxy || null,
+        headers: data.headers || null,
         storage: data.storage || 'local',
       })
       .returning();
@@ -72,6 +73,7 @@ export class MLBackendDeploymentRepository {
     if (data.name !== undefined) updateData.name = data.name;
     if (data.apiUrl !== undefined) updateData.apiUrl = data.apiUrl;
     if (data.proxy !== undefined) updateData.proxy = data.proxy;
+    if (data.headers !== undefined) updateData.headers = data.headers;
     if (data.storage !== undefined) updateData.storage = data.storage;
 
     const result = await db

@@ -98,11 +98,23 @@ export class MLBackendService {
         "Executing ML operation via HTTP",
       );
 
+      // Prepare headers
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+
+      // Add custom headers from deployment configuration
+      if (deployment.headers && typeof deployment.headers === 'object') {
+        Object.entries(deployment.headers).forEach(([key, value]) => {
+          if (typeof value === 'string') {
+            headers[key] = value;
+          }
+        });
+      }
+
       const response = await fetch(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify(payload),
         // Allow connection to close after response
         signal: AbortSignal.timeout(5000), // 5 second timeout for initial response
@@ -223,11 +235,23 @@ export class MLBackendService {
     const url = `${apiUrl}/tasks/${taskId}/result`;
 
     try {
+      // Prepare headers
+      const headers: Record<string, string> = {
+        Accept: "application/json",
+      };
+
+      // Add custom headers from deployment configuration
+      if (deployment.headers && typeof deployment.headers === 'object') {
+        Object.entries(deployment.headers).forEach(([key, value]) => {
+          if (typeof value === 'string') {
+            headers[key] = value;
+          }
+        });
+      }
+
       const response = await fetch(url, {
         method: "GET",
-        headers: {
-          Accept: "application/json",
-        },
+        headers,
         signal: AbortSignal.timeout(3000),
       });
 
@@ -337,7 +361,21 @@ export class MLBackendService {
         return text.trim() as any;
       } else {
         const url = `${deployment.apiUrl}/tasks/${taskId}/status`;
+        
+        // Prepare headers
+        const headers: Record<string, string> = {};
+
+        // Add custom headers from deployment configuration
+        if (deployment.headers && typeof deployment.headers === 'object') {
+          Object.entries(deployment.headers).forEach(([key, value]) => {
+            if (typeof value === 'string') {
+              headers[key] = value;
+            }
+          });
+        }
+
         const response = await fetch(url, {
+          headers: Object.keys(headers).length > 0 ? headers : undefined,
           signal: AbortSignal.timeout(2000),
         });
         if (!response.ok) return null;
