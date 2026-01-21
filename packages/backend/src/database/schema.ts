@@ -46,8 +46,9 @@ export const datasets = pgTable("datasets", {
   projectId: integer("project_id"), // Reference to project
   name: text("name").notNull(),
   description: text("description"),
-  filePath: text("file_path").notNull(),
-  fileName: text("file_name").notNull(),
+  storage: text("storage").notNull().default("local"), // 'local' (user's device) or 'oss' (cloud storage)
+  filePath: text("file_path").notNull(), // key if storage is 'oss'; absolute path if storage is 'local'
+  // File metadata extracted from frontend
   fileSize: integer("file_size"),
   columns: jsonb("columns"),
   rowCount: integer("row_count"),
@@ -122,6 +123,10 @@ export const workItems = pgTable("work_items", {
   name: text("name").notNull(),
   description: text("description"),
   status: text("status").notNull().default("active"), // 'active', 'completed', 'archived'
+  // ML Backend Deployment selection
+  mlBackendDeploymentId: integer("ml_backend_deployment_id").references(
+    () => mlBackendDeployments.id,
+  ), // Selected ML backend deployment
   // Upload step results - stored to skip upload step on return
   datasetId: integer("dataset_id"), // Selected dataset from upload step
   featureColumns: jsonb("feature_columns"), // Selected features as JSON array

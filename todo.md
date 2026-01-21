@@ -41,6 +41,7 @@
 ## Backend
 
 - [ ] 不要区分 fc build
+- [ ] Add endpoints for database migration (protected with password)
 
 ## ML Backend
 

@@ -9,3 +9,4 @@ export { WorkItemService } from "./WorkItemService";
 export { DatasetService } from "./DatasetService";
 export { TaskService } from "./TaskService";
 export { ModelService } from "./ModelService";
+export { MLBackendDeploymentService } from "./MLBackendDeploymentService";

@@ -7,10 +7,11 @@ export interface Dataset {
   projectId?: number;
   name: string;
   description?: string;
-  fileName: string;
+  filePath: string;
   fileSize: number;
   columns: string[];
   rowCount: number;
+  storage: "local" | "oss"; // Storage type: 'local' (user's device) or 'oss' (cloud storage)
   createdAt: string;
 }
 

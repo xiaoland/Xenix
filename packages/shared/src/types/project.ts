@@ -10,6 +10,8 @@ export interface WorkItem {
   name: string;
   description?: string;
   status: "active" | "completed" | "archived";
+  // ML Backend Deployment selection
+  mlBackendDeploymentId?: number; // Selected ML backend deployment
   // Upload step results - stored to skip upload step on return
   datasetId?: number; // Selected dataset from upload step
   featureColumns?: string[]; // Selected features

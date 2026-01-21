@@ -44,6 +44,17 @@
           </a-tag>
         </div>
 
+        <!-- ML Backend Deployment Selector -->
+        <a-card class="mb-6">
+          <h3 class="text-lg font-semibold mb-4">ML Backend Configuration</h3>
+          <!-- FIXME -->
+          <MLBackendDeploymentSelector
+            v-model="selectedDeploymentId"
+            :dataset-storage="datasetStorage"
+            @update:model-value="handleDeploymentChange"
+          />
+        </a-card>
+
         <!-- Workflow Steps -->
         <a-card class="mb-6">
           <Steps :current="currentStep" :items="stepItems" class="mb-8" />
@@ -101,7 +112,8 @@ import PredictionStep from "../../components/ml/prediction/PredictionStep.vue";
 import PrepareStep from "../../components/ml/prepare/PrepareStep.vue";
 import TuningStep from "../../components/ml/tuning/TuningStep.vue";
 import Steps from "../../components/common/Steps.vue";
-import { useWorkItem } from "../../composables";
+import MLBackendDeploymentSelector from "../../components/common/MLBackendDeploymentSelector.vue";
+import { useWorkItem, useUpdateWorkItem, useDataset } from "../../composables";
 import { useI18n } from "vue-i18n";
 import DefaultLayout from "../../layouts/DefaultLayout.vue";
 
@@ -144,6 +156,56 @@ const workItem = computed((): WorkItem | undefined => {
   } as WorkItem;
 });
 const error = computed(() => !!fetchError.value);
+
+// ML Backend Deployment Selection
+const selectedDeploymentId = ref<number | null>(null);
+const { mutate: updateWorkItem } = useUpdateWorkItem();
+
+// Watch for work item data and set initial deployment
+watch(
+  workItem,
+  (newWorkItem) => {
+    if (newWorkItem && newWorkItem.mlBackendDeploymentId) {
+      selectedDeploymentId.value = newWorkItem.mlBackendDeploymentId;
+    }
+  },
+  { immediate: true },
+);
+
+// Get dataset storage type for filtering deployments
+const datasetId = computed(() => workItem.value?.datasetId);
+const { data: datasetData } = useDataset(datasetId);
+const datasetStorage = computed(() => {
+  if (!datasetData.value) return null;
+  return datasetData.value.storage;
+});
+
+// Handle deployment change
+const handleDeploymentChange = async (deploymentId: number | null) => {
+  if (!workItem.value) return;
+
+  try {
+    updateWorkItem(
+      {
+        id: workItem.value.id,
+        data: {
+          mlBackendDeploymentId: deploymentId ?? undefined,
+        },
+      },
+      {
+        onSuccess: () => {
+          message.success("ML backend deployment updated");
+          refetch();
+        },
+        onError: () => {
+          message.error("Failed to update ML backend deployment");
+        },
+      },
+    );
+  } catch (err) {
+    message.error("Failed to update ML backend deployment");
+  }
+};
 
 // Workflow state
 const currentStep = ref(0);

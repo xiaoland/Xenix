@@ -83,6 +83,19 @@ pnpm start
 - `PUT /api/work-items/:id` - Update work item
 - `DELETE /api/work-items/:id` - Delete work item
 
+#### Work Item ML Operations
+
+All ML operations are scoped under work items and require ML backend deployment selection:
+
+- `POST /api/work-items/:id/train/batch` - Start batch training
+- `POST /api/work-items/:id/train/single` - Start single model training
+- `POST /api/work-items/:id/predict/inline` - Inline prediction with JSON data
+- `POST /api/work-items/:id/predict/file` - File-based prediction
+
+### ML Backend Deployments
+
+- `GET /api/ml-backend-deployments` - List available ML backend deployments
+
 ### Datasets
 
 - `GET /api/data` - List datasets
@@ -101,20 +114,6 @@ pnpm start
 - `GET /api/tasks/:id` - Get task details
 - `DELETE /api/tasks/failed` - Delete failed tasks
 - `DELETE /api/tasks/:model` - Delete tasks by model
-
-### Training
-
-- `POST /api/batch-train` - Start batch training (GridSearchCV)
-- `POST /api/single-train` - Start single training (specific parameters)
-
-### Prediction
-
-- `POST /api/predict/inline` - Inline prediction with JSON data
-
-### Results
-
-- `GET /api/download/:id` - Download prediction results
-- `GET /api/obsrv/:id` - Get task observation logs
 
 ## Environment Variables
 

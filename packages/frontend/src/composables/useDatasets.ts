@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { MaybeRef, unref } from "vue";
 
 import { client } from "../api/client";
+import { extractDatasetMetadata } from "../utils/datasetUtils";
 
 export function useDatasets() {
   return useQuery({
@@ -45,9 +46,12 @@ export function useUploadDataset() {
       name: string;
       projectId: number;
     }) => {
+      // Extract metadata from file first
+      const metadata = await extractDatasetMetadata(params.file);
+
       // Generate simple OSS key with UUID
       const uuid = crypto.randomUUID();
-      const key = `datasets/${uuid}`;
+      const key = `datasets/${uuid}/${params.file.name}`;
 
       // Step 1: Get presigned URL
       const presignedResponse = await client.data["upload-url"].$post({
@@ -77,20 +81,105 @@ export function useUploadDataset() {
         throw new Error(`Upload failed: ${uploadResponse.statusText}`);
       }
 
-      // Step 3: Confirm upload to backend
+      // Step 3: Confirm upload to backend with metadata
       const confirmResponse = await client.data["confirm-upload"].$post({
         json: {
           key: presignedData.key,
           name: params.name,
           projectId: params.projectId,
-          fileName: params.file.name,
-          fileSize: params.file.size,
+          fileSize: metadata.fileSize,
+          columns: metadata.columns,
+          rowCount: metadata.rowCount,
+          storage: "oss",
         },
       });
 
       if (!confirmResponse.ok) {
         const error = await confirmResponse.json();
         throw new Error((error as any).error || "Failed to confirm upload");
+      }
+
+      return confirmResponse.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["datasets"] });
+    },
+  });
+}
+
+export function useCreateDataset() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      name: string;
+      projectId: number;
+      storage: "local" | "oss";
+      filePath: string;
+      file: File | null;
+      columns: string[];
+      rowCount: number;
+      fileSize: number;
+    }) => {
+      if (params.storage === "oss" && !params.file) {
+        throw new Error("File is required for OSS storage");
+      }
+
+      let key = params.filePath;
+
+      // For OSS storage, upload the file first
+      if (params.storage === "oss" && params.file) {
+        // Generate OSS key with UUID
+        const uuid = crypto.randomUUID();
+        key = `datasets/${uuid}/${params.file.name}`;
+
+        // Step 1: Get presigned URL
+        const presignedResponse = await client.data["upload-url"].$post({
+          json: {
+            key,
+            contentType: params.file.type,
+          },
+        });
+
+        if (!presignedResponse.ok) {
+          const error = await presignedResponse.json();
+          throw new Error((error as any).error || "Failed to get upload URL");
+        }
+
+        const presignedData = await presignedResponse.json();
+
+        // Step 2: Upload directly to OSS
+        const uploadResponse = await fetch(presignedData.url, {
+          method: "PUT",
+          headers: {
+            "Content-Type": params.file.type,
+          },
+          body: params.file,
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+        }
+
+        key = presignedData.key;
+      }
+
+      // Create dataset record with metadata
+      const confirmResponse = await client.data["confirm-upload"].$post({
+        json: {
+          key,
+          name: params.name,
+          projectId: params.projectId,
+          fileSize: params.fileSize,
+          columns: params.columns,
+          rowCount: params.rowCount,
+          storage: params.storage,
+        },
+      });
+
+      if (!confirmResponse.ok) {
+        const error = await confirmResponse.json();
+        throw new Error((error as any).error || "Failed to create dataset");
       }
 
       return confirmResponse.json();

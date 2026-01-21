@@ -8,10 +8,11 @@ export const DatasetSchema = z.object({
   projectId: z.number().optional(),
   name: z.string(),
   description: z.string().optional(),
-  fileName: z.string(),
+  filePath: z.string(),
   fileSize: z.number(),
   columns: z.array(z.string()),
   rowCount: z.number(),
+  storage: z.enum(["local", "oss"]),
   createdAt: z.string().datetime(),
 });
 
@@ -25,10 +26,11 @@ export const CreateDatasetSchema = z.object({
   projectId: z.number().optional(),
   name: z.string().min(1),
   description: z.string().optional(),
-  fileName: z.string(),
+  filePath: z.string(),
   fileSize: z.number().positive(),
   columns: z.array(z.string()),
   rowCount: z.number().nonnegative(),
+  storage: z.enum(["local", "oss"]).default("local"),
 });
 
 export type Dataset = z.infer<typeof DatasetSchema>;

@@ -37,7 +37,6 @@ export class DatasetService {
     name: string;
     description: string | null;
     projectId: number | null;
-    fileName: string;
     fileSize: number;
     columns: string[];
     rowCount: number;
@@ -49,7 +48,6 @@ export class DatasetService {
       name: params.name,
       description: params.description,
       filePath: params.key, // Store OSS key directly
-      fileName: params.fileName,
       fileSize: params.fileSize,
       columns: params.columns,
       rowCount: params.rowCount,
@@ -62,6 +60,8 @@ export class DatasetService {
     description: string | null,
     projectId: number | null,
     datasetsDir: string,
+    columns: string[],
+    rowCount: number,
   ) {
     const fileId = randomUUID();
     const filePath = path.join(datasetsDir, fileId, file.name);
@@ -73,16 +73,12 @@ export class DatasetService {
     const buffer = await file.arrayBuffer();
     await fs.writeFile(filePath, Buffer.from(buffer));
 
-    // Analyze the Excel file
-    const { columns, rowCount } = await analyzeExcelFile(filePath);
-
     // Create dataset record
     return await this.datasetRepo.create({
       projectId: projectId && !isNaN(projectId) ? projectId : null,
       name,
       description,
       filePath: `datasets/${fileId}/${file.name}`,
-      fileName: file.name,
       fileSize: file.size,
       columns,
       rowCount,
