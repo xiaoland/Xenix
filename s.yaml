@@ -5,38 +5,12 @@ access: default # Run 's config add' to configure Aliyun credentials
 vars:
   region: cn-hangzhou
   serviceName: xenix
+  # Official public layer ARNs for Aliyun FC
+  nodejs22LayerArn: acs:fc:${vars.region}:official:layers/Nodejs22/versions/1
+  python312LayerArn: acs:fc:${vars.region}:official:layers/Python312/versions/1
 
 resources:
-  # Node.js 22 runtime layer for custom runtime
-  xenix-nodejs22-runtime-layer:
-    component: fc3
-    actions:
-      pre-deploy:
-        - run: |
-            mkdir -p opt/nodejs/bin
-
-            # Download and extract Node.js 22 for the runtime layer
-            if [ ! -d "node-v22.12.0-linux-x64" ]; then
-              wget -q https://nodejs.org/dist/v22.12.0/node-v22.12.0-linux-x64.tar.xz
-              tar -xf node-v22.12.0-linux-x64.tar.xz
-            fi
-
-            # Copy Node.js binaries to layer
-            cp -r node-v22.12.0-linux-x64/bin/* opt/nodejs/bin/
-            cp -r node-v22.12.0-linux-x64/lib opt/nodejs/
-            cp -r node-v22.12.0-linux-x64/include opt/nodejs/
-
-            # Clean up
-            rm -rf node-v22.12.0-linux-x64.tar.xz
-          path: ./packages/backend
-    props:
-      region: ${vars.region}
-      layerName: xenix-nodejs22-runtime
-      description: Node.js 22 runtime for custom Debian 11
-      compatibleRuntime: [custom, custom.debian11]
-      code: ./packages/backend/opt
-
-  # Node.js dependencies layer for backend
+  # Node.js dependencies layer for backend (production node_modules only)
   xenix-backend-nodejs-deps-layer:
     component: fc3
     actions:
@@ -57,24 +31,6 @@ resources:
       compatibleRuntime: [nodejs18, nodejs20, nodejs22, custom, custom.debian11]
       code: ./packages/backend/opt
 
-  # Python dependencies layer for ML backend
-  xenix-ml-python-layer:
-    component: fc3
-    actions:
-      pre-deploy:
-        - run: |
-            pip install pdm
-            pdm export --prod --format requirements --output requirements.txt
-            mkdir -p python
-            pip install -r requirements.txt -t python/
-          path: ./packages/ml-backend
-    props:
-      region: ${vars.region}
-      layerName: xenix-ml-python-deps
-      description: Python ML dependencies (pandas, sklearn, xgboost, lightgbm, etc.)
-      compatibleRuntime: [python3.9, python3.10, python3.12]
-      code: ./packages/ml-backend/python
-
   # Main HTTP Backend (Node.js)
   xenix-backend:
     component: fc3
@@ -91,7 +47,7 @@ resources:
       timeout: 60
       code: ./packages/backend
       layers:
-        - ${resources.xenix-nodejs22-runtime-layer.output.arn}
+        - ${vars.nodejs22LayerArn}
         - ${resources.xenix-backend-nodejs-deps-layer.output.arn}
       customRuntimeConfig:
         command:
@@ -125,6 +81,14 @@ resources:
   # ML Backend (Python)
   xenix-ml-backend:
     component: fc3
+    actions:
+      pre-deploy:
+        - run: |
+            # Install Python dependencies directly into function code
+            pip install pdm
+            pdm export --prod --format requirements --output requirements.txt
+            pip install -r requirements.txt -t .
+          path: ./packages/ml-backend
     props:
       region: ${vars.region}
       functionName: xenix-ml-backend
@@ -134,7 +98,7 @@ resources:
       timeout: 600
       code: ./packages/ml-backend
       layers:
-        - ${resources.xenix-ml-python-layer.output.arn}
+        - ${vars.python312LayerArn}
       environmentVariables:
         PYTHONPATH: /opt/python:/code
         ML_BASE_PATH: /tmp/ml-backend
