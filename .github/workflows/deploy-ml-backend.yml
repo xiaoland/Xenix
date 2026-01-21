@@ -13,6 +13,9 @@ on:
       - '.github/scripts/prune-layer-versions.sh'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest

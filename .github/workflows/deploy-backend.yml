@@ -14,6 +14,9 @@ on:
       - '.github/scripts/prune-layer-versions.sh'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   LAYER_NAME: xenix-backend-nodejs-deps
 
