@@ -1,9 +1,5 @@
-# DEPRECATED: This deployment configuration is for the old architecture
-# ML workers have been extracted to packages/ml-backend
-# See packages/ml-backend/s.yaml for ML worker deployment configuration
-
 edition: 3.0.0
-name: xenix-backend-app
+name: xenix-app
 access: default # Run 's config add' to configure Aliyun credentials
 
 vars:
@@ -11,6 +7,19 @@ vars:
   serviceName: xenix
 
 resources:
+  # Python dependencies layer for ML backend
+  xenix-ml-python-layer:
+    component: fc3
+    props:
+      region: ${vars.region}
+      layerName: xenix-ml-python-deps
+      description: Python ML dependencies (pandas, sklearn, xgboost, lightgbm, etc.)
+      compatibleRuntime: [python3.9, python3.10, python3.12]
+      code: ./packages/ml-backend
+      # Layer should contain dependencies installed to /opt/python
+      # Note: Build the layer by running: cd packages/ml-backend && ./build_layer.sh
+
+  # Main HTTP Backend (Node.js)
   xenix-backend:
     component: fc3
     props:
@@ -21,7 +30,7 @@ resources:
       handler: index.handler
       memorySize: 512
       timeout: 60
-      code: ./dist
+      code: ./packages/backend/dist
       environmentVariables:
         NODE_ENV: production
         BACKEND_PORT: "9000"
@@ -53,3 +62,28 @@ resources:
             authType: anonymous
           triggerName: httpTrigger
           triggerType: http
+
+  # ML Backend (Python)
+  xenix-ml-backend:
+    component: fc3
+    props:
+      region: ${vars.region}
+      functionName: xenix-ml-backend
+      description: ML backend for training and prediction
+      runtime: python3.12
+      memorySize: 4096
+      timeout: 600
+      code: ./packages/ml-backend
+      layers:
+        - ${resources.xenix-ml-python-layer.output.arn}
+      environmentVariables:
+        PYTHONPATH: /opt/python:/code
+        ML_BASE_PATH: /mnt/oss/ml-backend
+        LOG_LEVEL: INFO
+      nasConfig:
+        userId: 10003
+        groupId: 10003
+        mountPoints:
+          - serverAddr: ${env.OSS_NAS_SERVER_ADDR}
+            nasDir: /xenix-oss
+            fcDir: /mnt/oss

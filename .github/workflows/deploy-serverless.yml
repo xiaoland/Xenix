@@ -1,0 +1,77 @@
+name: Deploy to Aliyun FC with Serverless Devs
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build backend
+        run: |
+          cd packages/backend
+          pnpm run build
+
+      - name: Install Python dependencies for ML backend
+        run: |
+          cd packages/ml-backend
+          pip install pdm
+          pdm export --prod --format requirements --output requirements.txt
+          mkdir -p python
+          pip install -r requirements.txt -t python/
+
+      - name: Install Serverless Devs CLI
+        run: npm install -g @serverless-devs/s
+
+      - name: Configure Serverless Devs credentials
+        run: |
+          s config add \
+            --AccountID ${{ secrets.ALIYUN_ACCOUNT_ID }} \
+            --AccessKeyID ${{ secrets.ALIYUN_ACCESS_KEY_ID }} \
+            --AccessKeySecret ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }} \
+            --aliasName default
+
+      - name: Set environment variables
+        run: |
+          echo "OSS_REGION=${{ secrets.OSS_REGION }}" >> $GITHUB_ENV
+          echo "OSS_ACCESS_KEY_ID=${{ secrets.OSS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+          echo "OSS_ACCESS_KEY_SECRET=${{ secrets.OSS_ACCESS_KEY_SECRET }}" >> $GITHUB_ENV
+          echo "OSS_BUCKET=${{ secrets.OSS_BUCKET }}" >> $GITHUB_ENV
+          echo "OSS_ENDPOINT=${{ secrets.OSS_ENDPOINT }}" >> $GITHUB_ENV
+          echo "OSS_NAS_SERVER_ADDR=${{ secrets.OSS_NAS_SERVER_ADDR }}" >> $GITHUB_ENV
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> $GITHUB_ENV
+
+      - name: Deploy to Aliyun Function Compute
+        run: s deploy --use-local -y
+
+      - name: Deployment summary
+        run: |
+          echo "✅ Deployment completed successfully!"
+          echo "🚀 Backend and ML backend deployed to Aliyun Function Compute"
