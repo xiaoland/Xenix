@@ -1,10 +1,16 @@
-name: Deploy to Aliyun FC with Serverless Devs
+name: Deploy ML Backend to Aliyun FC
 
 on:
   push:
     branches:
       - main
       - master
+    paths:
+      - 'packages/ml-backend/**'
+      - 's.yaml'
+      - '.github/workflows/deploy-ml-backend.yml'
+      - '.github/scripts/check-layer-hash-ml-backend.sh'
+      - '.github/scripts/prune-layer-versions.sh'
   workflow_dispatch:
 
 jobs:
@@ -14,24 +20,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 8
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup Node.js (for Serverless Devs)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
       - name: Install Serverless Devs CLI
         run: npm install -g @serverless-devs/s
@@ -51,16 +51,14 @@ jobs:
           echo "OSS_ACCESS_KEY_SECRET=${{ secrets.OSS_ACCESS_KEY_SECRET }}" >> $GITHUB_ENV
           echo "OSS_BUCKET=${{ secrets.OSS_BUCKET }}" >> $GITHUB_ENV
           echo "OSS_ENDPOINT=${{ secrets.OSS_ENDPOINT }}" >> $GITHUB_ENV
-          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
-          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> $GITHUB_ENV
 
-      - name: Build with Serverless Devs
-        run: s build --use-docker
+      - name: Build ML backend function
+        run: s build xenix-ml-backend --use-docker
 
-      - name: Deploy to Aliyun Function Compute
-        run: s deploy -y
+      - name: Deploy ML backend function
+        run: s deploy xenix-ml-backend -y
 
       - name: Deployment summary
         run: |
-          echo "✅ Deployment completed successfully!"
-          echo "🚀 Backend and ML backend deployed to Aliyun Function Compute"
+          echo "✅ ML backend deployed successfully!"
+          echo "🚀 ML backend function deployed to Aliyun Function Compute"

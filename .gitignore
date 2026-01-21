@@ -12,6 +12,7 @@ tsconfig.tsbuildinfo
 opt/
 node-v*.tar.xz
 node-v*-linux-x64/
+.layer-hash-*
 
 # Node dependencies
 node_modules
