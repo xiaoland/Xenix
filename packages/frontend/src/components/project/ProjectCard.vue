@@ -15,18 +15,18 @@
           {{ project.description }}
         </p>
         <div class="text-xs text-gray-400 ml-7">
-          <span v-if="(project as any).datasets"
-            >{{ (project as any).datasets.length }}
-            {{ $t("project.card.datasets") }}</span
-          >
+          <span v-if="(project as any).datasets">
+            {{ (project as any).datasets.length }}
+            {{ $t("projects.datasets") }}
+          </span>
           <span v-if="(project as any).workItems">
             · {{ (project as any).workItems.length }}
-            {{ $t("project.card.workItems") }}</span
-          >
+            {{ $t("projects.workItems") }}
+          </span>
           <span>
-            · {{ $t("project.card.created") }}
-            {{ formatDate(project.createdAt) }}</span
-          >
+            · {{ $t("projects.created") }}
+            {{ formatDate(project.createdAt) }}
+          </span>
         </div>
       </div>
 
@@ -37,7 +37,7 @@
           @click="$emit('manage-datasets', project.id)"
         >
           <span class="i-mdi-database mr-1" />
-          {{ $t("project.card.manageDatasets") }}
+          {{ $t("projects.manageDatasets") }}
         </a-button>
         <a-button
           size="small"
@@ -45,15 +45,15 @@
           @click="$emit('edit', project)"
         >
           <span class="i-mdi-pencil mr-1" />
-          {{ $t("project.card.edit") }}
+          {{ $t("projects.edit") }}
         </a-button>
         <a-popconfirm
-          :title="$t('project.card.deleteConfirm')"
+          :title="$t('projects.deleteConfirm')"
           @confirm="$emit('delete', project.id)"
         >
           <a-button size="small" danger class="inline-flex items-center">
             <span class="i-mdi-delete mr-1" />
-            {{ $t("project.card.delete") }}
+            {{ $t("projects.delete") }}
           </a-button>
         </a-popconfirm>
       </div>
@@ -80,7 +80,7 @@
         @click="$emit('add-work-item', project.id)"
       >
         <span class="i-mdi-plus mr-1" />
-        Add Work Item
+        {{ $t("projects.addWorkItem") }}
       </a-button>
     </div>
   </div>

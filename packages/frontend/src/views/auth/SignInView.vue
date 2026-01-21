@@ -2,6 +2,9 @@
   <div class="min-h-screen bg-gray-50 flex items-center justify-center py-8">
     <div class="max-w-md w-full px-4">
       <a-card class="shadow-lg">
+        <div class="flex justify-end mb-4">
+          <language-switcher />
+        </div>
         <div class="text-center mb-6">
           <h1 class="text-2xl font-bold text-gray-900 mb-2">
             {{ $t('auth.signin.title') }}
@@ -99,6 +102,7 @@ import { onMounted, reactive, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 
+import LanguageSwitcher from '../../components/common/LanguageSwitcher.vue';
 import { useAuthStore } from '../../stores/auth';
 
 const router = useRouter();
