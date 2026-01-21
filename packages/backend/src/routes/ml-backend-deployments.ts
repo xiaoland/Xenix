@@ -10,7 +10,8 @@ const mlBackendDeployments = new Hono()
 
   // Get all deployments available to the current user (public + user's private ones)
   .get("/", async (c) => {
-    const userId = c.get("userId");
+    const user = c.get("user");
+    const userId = user.id;
     const deployments = await deploymentService.getAvailableDeployments(userId);
 
     return c.json(deployments);

@@ -1,47 +1,52 @@
 <template>
   <div class="ml-backend-deployment-selector">
-    <label class="label">ML Backend Deployment</label>
-    <div class="select-wrapper">
-      <select
-        :value="modelValue"
-        @change="handleChange"
-        class="select"
-        :disabled="disabled || isLoading"
-      >
-        <option :value="null">Select ML Backend Deployment</option>
-        <option
-          v-for="deployment in filteredDeployments"
-          :key="deployment.id"
-          :value="deployment.id"
-        >
-          {{ deployment.name }} ({{ deployment.storage }})
-        </option>
-      </select>
+    <a-select
+      :value="modelValue"
+      :options="selectOptions"
+      placeholder="Select ML Backend Deployment"
+      :disabled="disabled || isLoading"
+      :loading="isLoading"
+      @change="handleChange"
+      allow-clear
+      @clear="handleClear"
+    />
 
-      <span v-if="isLoading" class="loading-indicator">Loading...</span>
-      <span v-else-if="error" class="error-message">Failed to load deployments</span>
-      <span v-else-if="datasetStorage && filteredDeployments.length === 0" class="info-message">
-        No {{ datasetStorage }} deployments available
-      </span>
-    </div>
+    <a-alert
+      v-if="error"
+      message="Failed to load deployments"
+      type="error"
+      show-icon
+      class="mt-2"
+    />
 
-    <p v-if="modelValue && selectedDeployment" class="help-text">
-      Selected: {{ selectedDeployment.name }}
-      <span v-if="selectedDeployment.apiUrl" class="api-url">
-        ({{ selectedDeployment.apiUrl }})
-      </span>
-    </p>
+    <a-alert
+      v-if="datasetStorage && filteredDeployments.length === 0 && !isLoading"
+      :message="`No ${datasetStorage} deployments available`"
+      type="info"
+      show-icon
+      class="mt-2"
+    />
+
+    <a-alert
+      v-if="modelValue && selectedDeployment"
+      :message="`Selected: ${selectedDeployment.name}${
+        selectedDeployment.apiUrl ? ` (${selectedDeployment.apiUrl})` : ''
+      }`"
+      type="success"
+      show-icon
+      class="mt-2"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import type { MLBackendDeployment } from '@xenix/shared';
-import { useMLBackendDeployments } from '@/composables';
+import { computed } from "vue";
+import type { MLBackendDeployment } from "@xenix/shared";
+import { useMLBackendDeployments } from "@/composables";
 
 interface Props {
   modelValue?: number | null;
-  datasetStorage?: 'local' | 'oss' | null;
+  datasetStorage?: "local" | "oss" | null;
   disabled?: boolean;
 }
 
@@ -52,7 +57,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  'update:modelValue': [value: number | null];
+  "update:modelValue": [value: number | null];
 }>();
 
 const { data: deployments, isLoading, error } = useMLBackendDeployments();
@@ -65,19 +70,33 @@ const filteredDeployments = computed(() => {
   }
 
   return deployments.value.filter(
-    (deployment: MLBackendDeployment) => deployment.storage === props.datasetStorage
+    (deployment: MLBackendDeployment) =>
+      deployment.storage === props.datasetStorage,
   );
+});
+
+const selectOptions = computed(() => {
+  return filteredDeployments.value.map((deployment: MLBackendDeployment) => ({
+    label: `${deployment.name} (${deployment.storage})`,
+    value: deployment.id,
+  }));
 });
 
 const selectedDeployment = computed(() => {
   if (!props.modelValue || !deployments.value) return null;
-  return deployments.value.find((d: MLBackendDeployment) => d.id === props.modelValue) || null;
+  return (
+    deployments.value.find(
+      (d: MLBackendDeployment) => d.id === props.modelValue,
+    ) || null
+  );
 });
 
-function handleChange(event: Event) {
-  const target = event.target as HTMLSelectElement;
-  const value = target.value === '' || target.value === 'null' ? null : Number(target.value);
-  emit('update:modelValue', value);
+function handleChange(value: number | null) {
+  emit("update:modelValue", value);
+}
+
+function handleClear() {
+  emit("update:modelValue", null);
 }
 </script>
 
@@ -86,72 +105,7 @@ function handleChange(event: Event) {
   margin-bottom: 1.5rem;
 }
 
-.label {
-  display: block;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  color: #374151;
-}
-
-.select-wrapper {
-  position: relative;
-}
-
-.select {
+:deep(.ant-select) {
   width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  background-color: white;
-  cursor: pointer;
-  transition: border-color 0.2s;
-}
-
-.select:hover:not(:disabled) {
-  border-color: #9ca3af;
-}
-
-.select:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.select:disabled {
-  background-color: #f3f4f6;
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.loading-indicator,
-.error-message,
-.info-message {
-  display: block;
-  margin-top: 0.25rem;
-  font-size: 0.75rem;
-}
-
-.loading-indicator {
-  color: #6b7280;
-}
-
-.error-message {
-  color: #ef4444;
-}
-
-.info-message {
-  color: #3b82f6;
-}
-
-.help-text {
-  margin-top: 0.5rem;
-  font-size: 0.75rem;
-  color: #6b7280;
-}
-
-.api-url {
-  color: #9ca3af;
-  font-family: monospace;
 }
 </style>

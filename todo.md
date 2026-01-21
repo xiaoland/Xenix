@@ -38,7 +38,8 @@
   - 多了个 Prediction column
 - [ ] Prediction History
 - [ ] 橙色为主题色
-- [ ] MLBackendDeployment Selector 没有使用 AntDesign 组件
+- [x] MLBackendDeployment Selector 没有使用 AntDesign 组件
+- [x] MLBackendDeployment Selector 的选择结果应该保存到 work_item.mlBackendDeploymentId
 
 ## Backend
 
