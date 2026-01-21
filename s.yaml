@@ -50,7 +50,6 @@ resources:
       environmentVariables:
         NODE_ENV: production
         BACKEND_PORT: "9000"
-        STORAGE_TYPE: oss
         OSS_REGION: ${env.OSS_REGION}
         OSS_ACCESS_KEY_ID: ${env.OSS_ACCESS_KEY_ID}
         OSS_ACCESS_KEY_SECRET: ${env.OSS_ACCESS_KEY_SECRET}

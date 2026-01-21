@@ -9,7 +9,7 @@ import { authMiddleware } from "../middleware/auth";
 import { DatasetService } from "../services";
 import { parseDatasetColumns, analyzeExcelFile } from "../utils/datasetUtils";
 import { validateExcelFile } from "../utils/taskUtils";
-import { storage, presignedUrlRequestSchema } from "../storage";
+import { createStorageService, presignedUrlRequestSchema } from "../storage";
 
 const datasetService = new DatasetService();
 
@@ -36,7 +36,8 @@ const datasets = new Hono()
     // Validate request
     const validated = presignedUrlRequestSchema.parse(body);
 
-    // Generate presigned URL
+    // Create OSS storage instance for presigned URL generation
+    const storage = createStorageService('oss');
     const result = await storage.generatePresignedUploadUrl(validated);
 
     return c.json(result);
@@ -59,6 +60,7 @@ const datasets = new Hono()
 
     // For OSS storage, verify file exists
     if (validated.storage === "oss") {
+      const storage = createStorageService('oss');
       const fileExists = await storage.exists(validated.key);
       if (!fileExists) {
         throw new BadRequestError("File not found in storage");

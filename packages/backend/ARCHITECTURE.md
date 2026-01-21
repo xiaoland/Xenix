@@ -295,7 +295,6 @@ const configSchema = z.object({
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url().default('redis://localhost:6379'),
   JWT_SECRET: z.string().min(32),
-  STORAGE_TYPE: z.enum(['local', 'oss']).default('local'),
   OSS_REGION: z.string().optional(),
   // ...
 });

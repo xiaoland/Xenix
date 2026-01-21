@@ -8,7 +8,7 @@
 import type { InferSelectModel } from "drizzle-orm";
 import { MLBackendDeploymentRepository } from "../repositories/MLBackendDeploymentRepository";
 import { mlBackendDeployments } from "../database/schema";
-import { storage } from "../storage";
+import { createStorageService } from "../storage";
 import logger from "../utils/logger";
 
 type MLBackendDeployment = InferSelectModel<typeof mlBackendDeployments>;
@@ -224,6 +224,7 @@ export class MLBackendService {
       if (path.startsWith(ossPrefix)) {
         const key = path.substring(ossPrefix.length);
         // Get OSS URL from storage service
+        const storage = createStorageService('oss');
         const url = await storage.generatePresignedDownloadUrl(key);
         return url;
       }
@@ -299,6 +300,7 @@ export class MLBackendService {
    */
   private async checkResultFromOSS(taskId: number): Promise<TaskResult | null> {
     const resultKey = `tasks/${taskId}/result.json`;
+    const storage = createStorageService('oss');
 
     try {
       // Fetch result from storage (uses aws4fetch internally for OSS)
@@ -357,6 +359,7 @@ export class MLBackendService {
 
     try {
       if (storageType === "oss") {
+        const storage = createStorageService('oss');
         const statusKey = `tasks/${taskId}/status.txt`;
         const response = await storage.fetch(statusKey, { timeout: 2000 });
         if (!response.ok) return null;

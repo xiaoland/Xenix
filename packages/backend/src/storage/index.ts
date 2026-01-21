@@ -5,12 +5,12 @@ import { config } from '../config';
 import { ossConfigSchema } from './schemas';
 
 /**
- * Create storage service based on configuration
- * - Returns LocalStorage for development (STORAGE_TYPE=local)
- * - Returns OSSStorage for production (STORAGE_TYPE=oss)
+ * Create storage service based on storage type
+ * - Returns LocalStorage for 'local' storage type
+ * - Returns OSSStorage for 'oss' storage type
  */
-export function createStorageService(): StorageService {
-  if (config.STORAGE_TYPE === 'oss') {
+export function createStorageService(storageType: 'local' | 'oss'): StorageService {
+  if (storageType === 'oss') {
     // Validate OSS configuration
     const ossConfig = ossConfigSchema.parse({
       region: config.OSS_REGION,
@@ -26,12 +26,6 @@ export function createStorageService(): StorageService {
   // Default to local storage
   return new LocalStorage(config.UPLOAD_DIR);
 }
-
-/**
- * Singleton storage service instance
- * Import and use this throughout the application
- */
-export const storage = createStorageService();
 
 // Re-export types and schemas
 export * from './StorageService';

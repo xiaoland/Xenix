@@ -324,10 +324,6 @@ ML_TIMEOUT=300000
 ### Optional
 
 ```bash
-# File Storage
-STORAGE_TYPE=local  # or 'oss'
-
-# Aliyun OSS (if STORAGE_TYPE=oss)
 OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
 OSS_BUCKET=xenix-data
 OSS_ACCESS_KEY_ID=xxx

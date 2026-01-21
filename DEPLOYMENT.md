@@ -78,8 +78,7 @@ JWT_SECRET=your-secret-key-at-least-32-chars
 FRONTEND_URL=https://your-domain.com
 CORS_ORIGIN=https://your-domain.com
 
-# File Storage
-STORAGE_TYPE=oss|local
+# OSS
 OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
 OSS_BUCKET=xenix-data
 OSS_ACCESS_KEY_ID=your-access-key
