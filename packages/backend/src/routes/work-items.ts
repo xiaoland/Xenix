@@ -171,7 +171,7 @@ const workItems = new Hono()
       // Determine train data path based on deployment storage type
       const trainDataPath =
         deployment.storage === "oss"
-          ? storage.getFilesystemPath(`datasets/${datasetId}/${dataset.fileName}`)
+          ? storage.getFilesystemPath(dataset.filePath)
           : dataset.filePath;
 
       // Create task record
@@ -331,7 +331,7 @@ const workItems = new Hono()
       // Determine train data path based on deployment storage type
       const trainDataPath =
         deployment.storage === "oss"
-          ? storage.getFilesystemPath(`datasets/${datasetId}/${dataset.fileName}`)
+          ? storage.getFilesystemPath(dataset.filePath)
           : dataset.filePath;
 
       // Create task record
@@ -488,7 +488,7 @@ const workItems = new Hono()
       const trainDataPath =
         deployment.storage === "oss"
           ? storage.getFilesystemPath(
-              `datasets/${workItem.datasetId}/${trainingDataset.fileName}`
+              trainingDataset.filePath
             )
           : trainingDataset.filePath;
 
@@ -665,7 +665,7 @@ const workItems = new Hono()
       const trainDataPath =
         deployment.storage === "oss"
           ? storage.getFilesystemPath(
-              `datasets/${workItem.datasetId}/${trainingDataset.fileName}`
+              trainingDataset.filePath
             )
           : trainingDataset.filePath;
 
@@ -697,7 +697,7 @@ const workItems = new Hono()
       const toPredictDataPath =
         deployment.storage === "oss"
           ? storage.getFilesystemPath(
-              `datasets/${predictionDataset.id}/${predictionDataset.fileName}`
+              predictionDataset.filePath
             )
           : predictionDataset.filePath;
 

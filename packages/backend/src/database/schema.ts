@@ -48,12 +48,10 @@ export const datasets = pgTable("datasets", {
   description: text("description"),
   storage: text("storage").notNull().default("local"), // 'local' (user's device) or 'oss' (cloud storage)
   filePath: text("file_path").notNull(), // key if storage is 'oss'; absolute path if storage is 'local'
-  // File metadata start
-  fileName: text("file_name").notNull(), // TODO remove, useless
+  // File metadata extracted from frontend
   fileSize: integer("file_size"),
-  columns: jsonb("columns"), // TODO allows no-header mode (will be like ['1', '2'] but not ['Data1', 'Data2'])
+  columns: jsonb("columns"),
   rowCount: integer("row_count"),
-  // File metadata ends
   createdAt: timestamp("created_at", { mode: "date" })
     .$defaultFn(() => new Date())
     .notNull(),
