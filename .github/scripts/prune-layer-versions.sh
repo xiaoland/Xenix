@@ -10,6 +10,12 @@ if [ -z "$LAYER_NAME" ]; then
     exit 1
 fi
 
+# Check if jq is available
+if ! command -v jq &> /dev/null; then
+    echo "Error: jq is required but not installed"
+    exit 1
+fi
+
 echo "Pruning old versions of layer: $LAYER_NAME (keeping latest $KEEP_VERSIONS)"
 
 # List all versions sorted by version number (descending)
