@@ -8,6 +8,11 @@ dist
 *.zip
 tsconfig.tsbuildinfo
 
+# Serverless build artifacts
+opt/
+node-v*.tar.xz
+node-v*-linux-x64/
+
 # Node dependencies
 node_modules
 
