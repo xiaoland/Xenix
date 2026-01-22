@@ -35,6 +35,7 @@ export class OSSStorage implements StorageService {
       accessKeyId: config.accessKeyId,
       accessKeySecret: config.accessKeySecret,
       bucket: config.bucket,
+      secure: true, // Use HTTPS
     });
 
     this.mountPoint = mountPoint;
