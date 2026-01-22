@@ -51,7 +51,8 @@ export function useUploadDataset() {
 
       // Generate simple OSS key with UUID
       const uuid = crypto.randomUUID();
-      const key = `datasets/${uuid}/${params.file.name}`;
+      const ext = params.file.name.split(".").pop() ?? "";
+      const key = ext ? `datasets/${uuid}.${ext}` : `datasets/${uuid}`;
 
       // Step 1: Get presigned URL
       const presignedResponse = await client.data["upload-url"].$post({
@@ -131,7 +132,8 @@ export function useCreateDataset() {
       if (params.storage === "oss" && params.file) {
         // Generate OSS key with UUID
         const uuid = crypto.randomUUID();
-        key = `datasets/${uuid}/${params.file.name}`;
+        const ext = params.file.name.split(".").pop() ?? "";
+        key = ext ? `datasets/${uuid}.${ext}` : `datasets/${uuid}`;
 
         // Step 1: Get presigned URL
         const presignedResponse = await client.data["upload-url"].$post({

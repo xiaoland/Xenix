@@ -83,6 +83,7 @@ resources:
       runtime: python3.12
       memorySize: 4096
       timeout: 86400
+      invocation-type: async
       code: ./packages/ml-backend
       layers:
         - ${vars.python312LayerArn}

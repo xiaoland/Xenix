@@ -36,15 +36,16 @@
 - [x] Inline predict 的结果展示不正确
   - targetColumn 不需要 predicted_ (这是 ml-backend 的锅)
   - 多了个 Prediction column
-- [ ] Prediction History
 - [ ] 橙色为主题色
 - [x] MLBackendDeployment Selector 没有使用 AntDesign 组件
 - [x] MLBackendDeployment Selector 的选择结果应该保存到 work_item.mlBackendDeploymentId
+- [ ] 对于 OSS Dataset ，不显示路径
 
 ## Backend
 
 - [ ] 不要区分 fc build
 - [ ] 在 CI/CD 中运行 Database Migration （别忘了 model metadata migration）
+- [ ] 删除 Dataset 时 OSS 中的文件也要一并删除
 
 ## ML Backend
 
