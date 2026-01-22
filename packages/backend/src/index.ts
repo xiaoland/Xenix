@@ -19,9 +19,12 @@ import workItemsRoutes from "./routes/work-items";
 import logger from "./utils/logger";
 
 // Ensure upload directory exists
-if (!fs.existsSync(config.UPLOAD_DIR)) {
-  fs.mkdirSync(config.UPLOAD_DIR, { recursive: true });
-  logger.info({ uploadDir: config.UPLOAD_DIR }, "Created upload directory");
+if (!fs.existsSync(config.STORAGE_BASE_PATH)) {
+  fs.mkdirSync(config.STORAGE_BASE_PATH, { recursive: true });
+  logger.info(
+    { uploadDir: config.STORAGE_BASE_PATH },
+    "Created upload directory",
+  );
 }
 
 const app = new Hono();
@@ -34,7 +37,7 @@ app.use(
   cors({
     origin: config.FRONTEND_URL,
     credentials: true,
-  })
+  }),
 );
 
 // API Routes
@@ -45,7 +48,7 @@ const routes = app
       timestamp: new Date().toISOString(),
       environment: config.NODE_ENV,
       version: process.env.FC_FUNCTION_VERSION || "dev",
-    })
+    }),
   )
   .route("/auth", authRoutes)
   .route("/projects", projectsRoutes)
@@ -61,7 +64,7 @@ app.onError(errorHandler);
 
 logger.info(
   { port: config.BACKEND_PORT, env: config.NODE_ENV },
-  "Starting server"
+  "Starting server",
 );
 
 serve({
