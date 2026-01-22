@@ -8,21 +8,22 @@ import type {
 } from './schemas';
 
 /**
- * Local filesystem storage implementation
- * Used for development environment
+ * Unified filesystem storage implementation
+ * Works with both local filesystem (development) and mounted OSS bucket (production)
+ * Base path is configurable via STORAGE_BASE_PATH environment variable
  */
-export class LocalStorage implements StorageService {
+export class FileSystemStorage implements StorageService {
   constructor(private basePath: string) {}
 
   async generatePresignedUploadUrl(
     request: PresignedUrlRequest
   ): Promise<PresignedUrlResponse> {
-    // For local dev, return a fake "presigned URL" that points to backend
-    // Frontend will actually POST to backend's upload endpoint
+    // For filesystem storage, return backend upload endpoint
+    // Frontend will POST to backend which saves to filesystem
     const expiresAt = new Date(Date.now() + request.expiresIn * 1000);
 
     return {
-      url: `http://localhost:3000/upload/local/${encodeURIComponent(request.key)}`,
+      url: `/upload/${encodeURIComponent(request.key)}`,
       key: request.key,
       expiresAt,
     };
@@ -32,8 +33,8 @@ export class LocalStorage implements StorageService {
     key: string,
     expiresIn = 3600
   ): Promise<string> {
-    // For local dev, return a URL that points to backend's download endpoint
-    return `http://localhost:3000/download/${encodeURIComponent(key)}`;
+    // Return backend download endpoint
+    return `/download/${encodeURIComponent(key)}`;
   }
 
   async exists(key: string): Promise<boolean> {
@@ -73,7 +74,7 @@ export class LocalStorage implements StorageService {
   }
 
   async fetch(key: string, options?: { timeout?: number }): Promise<Response> {
-    // For local storage, read file from filesystem and return as Response
+    // Read file from filesystem and return as Response
     const filePath = this.getFilesystemPath(key);
 
     try {
@@ -93,8 +94,12 @@ export class LocalStorage implements StorageService {
   }
 
   async upload(key: string, buffer: ArrayBuffer, contentType?: string): Promise<void> {
-    // Local storage does not support direct upload method
-    // Use file path approach with DatasetService.createDataset() instead
-    throw new Error("Direct upload not supported for local storage. Use file path approach instead.");
+    const filePath = this.getFilesystemPath(key);
+
+    // Ensure directory exists
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+
+    // Write buffer to filesystem
+    await fs.writeFile(filePath, Buffer.from(buffer));
   }
 }

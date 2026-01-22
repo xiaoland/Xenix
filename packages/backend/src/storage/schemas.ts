@@ -1,16 +1,5 @@
 import { z } from 'zod';
 
-// OSS configuration schema
-export const ossConfigSchema = z.object({
-  region: z.string(),
-  accessKeyId: z.string(),
-  accessKeySecret: z.string(),
-  bucket: z.string(),
-  endpoint: z.string().optional(),
-});
-
-export type OSSConfig = z.infer<typeof ossConfigSchema>;
-
 // Storage operation results
 export const fileMetadataSchema = z.object({
   size: z.number(),

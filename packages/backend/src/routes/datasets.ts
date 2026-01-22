@@ -55,8 +55,8 @@ const datasets = new Hono()
     // 5. Extract metadata from buffer (fail fast on invalid files)
     const { columns, rowCount } = await analyzeFileFromBuffer(buffer, file.name);
 
-    // 6. Upload to OSS using storage service
-    const storage = createStorageService('oss');
+    // 6. Upload to storage using filesystem
+    const storage = createStorageService();
     await storage.upload(key, buffer, file.type);
 
     // 7. Create dataset record in database

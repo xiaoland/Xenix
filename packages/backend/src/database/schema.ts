@@ -46,7 +46,7 @@ export const datasets = pgTable("datasets", {
   projectId: integer("project_id"), // Reference to project
   name: text("name").notNull(),
   description: text("description"),
-  storage: text("storage").notNull().default("local"), // 'local' (user's device) or 'oss' (cloud storage)
+  storage: text("storage").notNull().default("local"), // 'local' (user's device) or 'oss' (server storage via mounted OSS)
   filePath: text("file_path").notNull(), // key if storage is 'oss'; absolute path if storage is 'local'
   // File metadata extracted from frontend
   fileSize: integer("file_size"),
@@ -68,7 +68,7 @@ export const mlBackendDeployments = pgTable("ml_backend_deployments", {
   apiUrl: text("api_url").notNull(),
   proxy: text("proxy"),
   headers: jsonb("headers"), // Custom HTTP headers as JSON object
-  storage: text("storage").notNull().default("local"),
+  storage: text("storage").notNull().default("local"), // 'local' (user's device) or 'oss' (server storage via mounted OSS)
   createdAt: timestamp("created_at", { mode: "date" })
     .$defaultFn(() => new Date())
     .notNull(),

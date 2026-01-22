@@ -180,7 +180,7 @@ export class MLBackendService {
     const storageType = deployment.storage || "local";
 
     if (storageType === "oss") {
-      return this.checkResultFromOSS(taskId);
+      return this.checkResultFromFilesystem(taskId);
     } else if (storageType === "local") {
       return this.checkResultFromHTTP(deployment, taskId);
     } else {
@@ -210,26 +210,14 @@ export class MLBackendService {
   }
 
   /**
-   * Transform file path based on storage type
-   * - OSS: Convert /mnt/oss/path to OSS URL
-   * - Local: Pass through unchanged
+   * Transform file path for ML backend
+   * With mounted filesystem, paths are passed through unchanged
    */
   private async transformPathForStorage(
     path: string,
     deployment: MLBackendDeployment,
   ): Promise<string> {
-    if (deployment.storage === "oss") {
-      // Extract key from /mnt/oss/ mount point
-      const ossPrefix = "/mnt/oss/";
-      if (path.startsWith(ossPrefix)) {
-        const key = path.substring(ossPrefix.length);
-        // Get OSS URL from storage service
-        const storage = createStorageService('oss');
-        const url = await storage.generatePresignedDownloadUrl(key);
-        return url;
-      }
-    }
-    // Local storage: pass through unchanged
+    // All storage is now filesystem-based, pass through unchanged
     return path;
   }
 
@@ -295,15 +283,15 @@ export class MLBackendService {
   }
 
   /**
-   * Check result from OSS storage (cloud deployments)
-   * Uses storage service to fetch results
+   * Check result from filesystem storage
+   * Uses storage service to fetch results from mounted OSS or local filesystem
    */
-  private async checkResultFromOSS(taskId: number): Promise<TaskResult | null> {
+  private async checkResultFromFilesystem(taskId: number): Promise<TaskResult | null> {
     const resultKey = `tasks/${taskId}/result.json`;
-    const storage = createStorageService('oss');
+    const storage = createStorageService();
 
     try {
-      // Fetch result from storage (uses aws4fetch internally for OSS)
+      // Fetch result from filesystem storage
       const response = await storage.fetch(resultKey, { timeout: 3000 });
 
       if (response.status === 404 || response.status === 204) {
@@ -359,7 +347,7 @@ export class MLBackendService {
 
     try {
       if (storageType === "oss") {
-        const storage = createStorageService('oss');
+        const storage = createStorageService();
         const statusKey = `tasks/${taskId}/status.txt`;
         const response = await storage.fetch(statusKey, { timeout: 2000 });
         if (!response.ok) return null;
@@ -367,7 +355,7 @@ export class MLBackendService {
         return text.trim() as any;
       } else {
         const url = `${deployment.apiUrl}/tasks/${taskId}/status`;
-        
+
         // Prepare headers with custom headers from deployment
         const headers = this.prepareHeaders(deployment);
 

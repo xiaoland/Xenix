@@ -58,21 +58,21 @@ async function transformResultPaths(
     return transformed;
   }
 
-  // For OSS storage, transform storage keys to presigned HTTP URLs
+  // For OSS storage, transform storage keys to filesystem paths
   if (storageType === 'oss') {
-    const storage = createStorageService('oss');
+    const storage = createStorageService();
     const transformed = { ...result };
 
-    // Transform predictedDataPath to presigned URL (24 hour expiry)
+    // Transform predictedDataPath to filesystem path
     if (result.predictedDataPath) {
       const key = `tasks/${taskId}/${result.predictedDataPath}`;
-      transformed.predictedDataPath = await storage.generatePresignedDownloadUrl(key, 86400);
+      transformed.predictedDataPath = storage.getFilesystemPath(key);
     }
 
-    // Transform fittedModelPath to presigned URL (24 hour expiry)
+    // Transform fittedModelPath to filesystem path
     if (result.fittedModelPath) {
       const key = `tasks/${taskId}/${result.fittedModelPath}`;
-      transformed.fittedModelPath = await storage.generatePresignedDownloadUrl(key, 86400);
+      transformed.fittedModelPath = storage.getFilesystemPath(key);
     }
 
     return transformed;

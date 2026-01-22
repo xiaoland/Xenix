@@ -1,34 +1,16 @@
 import type { StorageService } from './StorageService';
-import { LocalStorage } from './LocalStorage';
-import { OSSStorage } from './OSSStorage';
+import { FileSystemStorage } from './FileSystemStorage';
 import { config } from '../config';
-import { ossConfigSchema } from './schemas';
 
 /**
- * Create storage service based on storage type
- * - Returns LocalStorage for 'local' storage type
- * - Returns OSSStorage for 'oss' storage type
+ * Create unified filesystem storage service
+ * Uses STORAGE_BASE_PATH from config (./uploads for dev, /mnt/oss for production)
  */
-export function createStorageService(storageType: 'local' | 'oss'): StorageService {
-  if (storageType === 'oss') {
-    // Validate OSS configuration
-    const ossConfig = ossConfigSchema.parse({
-      region: config.OSS_REGION,
-      accessKeyId: config.OSS_ACCESS_KEY_ID,
-      accessKeySecret: config.OSS_ACCESS_KEY_SECRET,
-      bucket: config.OSS_BUCKET,
-      endpoint: config.OSS_ENDPOINT,
-    });
-
-    return new OSSStorage(ossConfig, config.OSS_MOUNT_POINT);
-  }
-
-  // Default to local storage
-  return new LocalStorage(config.UPLOAD_DIR);
+export function createStorageService(): StorageService {
+  return new FileSystemStorage(config.STORAGE_BASE_PATH);
 }
 
 // Re-export types and schemas
 export * from './StorageService';
 export * from './schemas';
-export { LocalStorage } from './LocalStorage';
-export { OSSStorage } from './OSSStorage';
+export { FileSystemStorage } from './FileSystemStorage';

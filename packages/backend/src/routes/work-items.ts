@@ -171,10 +171,10 @@ const workItems = new Hono()
 
       const mlService = getMLBackendService();
 
-      // Determine train data path based on deployment storage type
+      // Get train data path based on storage type
       const trainDataPath =
         deployment.storage === "oss"
-          ? createStorageService('oss').getFilesystemPath(dataset.filePath)
+          ? createStorageService().getFilesystemPath(dataset.filePath)
           : dataset.filePath;
 
       // Create task record
@@ -333,10 +333,10 @@ const workItems = new Hono()
 
       const mlService = getMLBackendService();
 
-      // Determine train data path based on deployment storage type
+      // Get train data path based on storage type
       const trainDataPath =
         deployment.storage === "oss"
-          ? createStorageService('oss').getFilesystemPath(dataset.filePath)
+          ? createStorageService().getFilesystemPath(dataset.filePath)
           : dataset.filePath;
 
       // Create task record
@@ -494,7 +494,7 @@ const workItems = new Hono()
       // Determine train data path based on deployment storage type
       const trainDataPath =
         deployment.storage === "oss"
-          ? createStorageService('oss').getFilesystemPath(trainingDataset.filePath)
+          ? createStorageService().getFilesystemPath(trainingDataset.filePath)
           : trainingDataset.filePath;
 
       // Load tuning task to get params
@@ -674,7 +674,7 @@ const workItems = new Hono()
       // Determine train data path based on deployment storage type
       const trainDataPath =
         deployment.storage === "oss"
-          ? createStorageService('oss').getFilesystemPath(trainingDataset.filePath)
+          ? createStorageService().getFilesystemPath(trainingDataset.filePath)
           : trainingDataset.filePath;
 
       // Load tuning task to get params
@@ -702,7 +702,7 @@ const workItems = new Hono()
         );
 
         // Save uploaded prediction file as a dataset
-        const datasetsDir = createStorageService('oss').getFilesystemPath("datasets");
+        const datasetsDir = createStorageService().getFilesystemPath("datasets");
         predictionDataset = await datasetService.createDataset(
           file,
           `Prediction Input - ${file.name}`,
@@ -732,7 +732,7 @@ const workItems = new Hono()
       // Get the prediction data path
       const toPredictDataPath =
         deployment.storage === "oss"
-          ? createStorageService('oss').getFilesystemPath(predictionDataset.filePath)
+          ? createStorageService().getFilesystemPath(predictionDataset.filePath)
           : predictionDataset.filePath;
 
       const mlService = getMLBackendService();
