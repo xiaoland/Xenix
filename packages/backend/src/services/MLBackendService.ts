@@ -63,9 +63,9 @@ export class MLBackendService {
     const headers = { ...baseHeaders };
 
     // Add custom headers from deployment configuration
-    if (deployment.headers && typeof deployment.headers === 'object') {
+    if (deployment.headers && typeof deployment.headers === "object") {
       Object.entries(deployment.headers).forEach(([key, value]) => {
-        if (typeof value === 'string') {
+        if (typeof value === "string") {
           headers[key] = value;
         }
       });
@@ -132,7 +132,7 @@ export class MLBackendService {
         signal: AbortSignal.timeout(5000), // 5 second timeout for initial response
       });
 
-      if (response.status !== 200) {
+      if (!response.ok) {
         const text = await response.text();
         throw new Error(`ML backend returned ${response.status}: ${text}`);
       }
@@ -286,7 +286,9 @@ export class MLBackendService {
    * Check result from filesystem storage
    * Uses storage service to fetch results from mounted OSS or local filesystem
    */
-  private async checkResultFromFilesystem(taskId: number): Promise<TaskResult | null> {
+  private async checkResultFromFilesystem(
+    taskId: number,
+  ): Promise<TaskResult | null> {
     const resultKey = `tasks/${taskId}/result.json`;
     const storage = createStorageService();
 
