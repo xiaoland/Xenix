@@ -91,4 +91,10 @@ export class LocalStorage implements StorageService {
       throw error;
     }
   }
+
+  async upload(key: string, buffer: ArrayBuffer, contentType?: string): Promise<void> {
+    // Local storage does not support direct upload method
+    // Use file path approach with DatasetService.createDataset() instead
+    throw new Error("Direct upload not supported for local storage. Use file path approach instead.");
+  }
 }

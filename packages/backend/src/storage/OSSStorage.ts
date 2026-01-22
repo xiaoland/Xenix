@@ -1,4 +1,5 @@
 import { AwsClient } from "aws4fetch";
+import OSS from "ali-oss";
 import path from "path";
 import fs from "fs/promises";
 import type { StorageService } from "./StorageService";
@@ -15,6 +16,7 @@ import type {
  */
 export class OSSStorage implements StorageService {
   private awsClient: AwsClient;
+  private ossClient: OSS;
   private mountPoint: string;
   private endpoint: string;
   private bucket: string;
@@ -26,6 +28,15 @@ export class OSSStorage implements StorageService {
       region: config.region || "cn-hangzhou",
       service: "oss",
     });
+
+    // Initialize native OSS client for direct uploads
+    this.ossClient = new OSS({
+      region: config.region || "cn-hangzhou",
+      accessKeyId: config.accessKeyId,
+      accessKeySecret: config.accessKeySecret,
+      bucket: config.bucket,
+    });
+
     this.mountPoint = mountPoint;
     this.endpoint =
       config.endpoint ||
@@ -37,16 +48,22 @@ export class OSSStorage implements StorageService {
     request: PresignedUrlRequest,
   ): Promise<PresignedUrlResponse> {
     // Generate presigned PUT URL for direct upload from frontend
-    const url = `${this.endpoint}/${request.key}`;
+    // Add X-Amz-Expires query parameter before signing (required by OSS)
+    const url = `${this.endpoint}/${request.key}?X-Amz-Expires=${request.expiresIn}`;
 
     // Create a signed URL using aws4fetch
+    // Note: For presigned URLs, we only sign headers that will be sent by the client
     const headers: Record<string, string> = {};
     if (request.contentType) {
       headers["Content-Type"] = request.contentType;
     }
+
     const signedUrl = await this.awsClient.sign(url, {
       method: "PUT",
       headers,
+      aws: {
+        signQuery: true, // Sign query string instead of Authorization header for presigned URLs
+      },
     });
 
     const expiresAt = new Date(Date.now() + request.expiresIn * 1000);
@@ -125,5 +142,24 @@ export class OSSStorage implements StorageService {
     }
 
     return this.awsClient.fetch(url, fetchOptions);
+  }
+
+  async upload(key: string, buffer: ArrayBuffer, contentType?: string): Promise<void> {
+    // Upload file buffer directly to OSS using native SDK
+    // Convert ArrayBuffer to Buffer
+    const bodyBuffer = Buffer.from(buffer);
+
+    try {
+      const options: OSS.PutObjectOptions = {};
+      if (contentType) {
+        options.headers = {
+          "Content-Type": contentType,
+        };
+      }
+
+      await this.ossClient.put(key, bodyBuffer, options);
+    } catch (error: any) {
+      throw new Error(`OSS upload failed: ${error.message || error}`);
+    }
   }
 }

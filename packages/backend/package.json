@@ -24,6 +24,7 @@
     "@hono/node-server": "^1.14.0",
     "@hono/zod-validator": "^0.4.1",
     "@xenix/shared": "workspace:*",
+    "ali-oss": "^6.23.0",
     "aws4fetch": "^1.0.20",
     "bcrypt": "^6.0.0",
     "drizzle-orm": "^0.45.1",
@@ -37,6 +38,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@types/ali-oss": "^6.23.1",
     "@types/archiver": "^7.0.0",
     "@types/bcrypt": "^6.0.0",
     "@types/fs-extra": "^11.0.4",

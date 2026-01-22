@@ -1,15 +1,15 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
+import crypto from "crypto";
 
 import { DatasetIdParamSchema } from "@xenix/shared";
 
 import { BadRequestError } from "../errors";
 import { authMiddleware } from "../middleware/auth";
 import { DatasetService } from "../services";
-import { parseDatasetColumns, analyzeExcelFile } from "../utils/datasetUtils";
-import { validateExcelFile } from "../utils/taskUtils";
-import { createStorageService, presignedUrlRequestSchema } from "../storage";
+import { parseDatasetColumns, analyzeFileFromBuffer } from "../utils/datasetUtils";
+import { createStorageService } from "../storage";
 
 const datasetService = new DatasetService();
 
@@ -29,25 +29,62 @@ const datasets = new Hono()
     return c.json(datasetsWithParsedColumns);
   })
 
-  // Generate presigned URL for dataset upload
-  .post("/upload-url", async (c) => {
-    const body = await c.req.json();
+  // Upload dataset file to OSS
+  .post("/upload", async (c) => {
+    // 1. Parse FormData
+    const formData = await c.req.formData();
+    const file = formData.get("file") as File;
+    const name = formData.get("name") as string;
+    const projectIdStr = formData.get("projectId") as string;
 
-    // Validate request
-    const validated = presignedUrlRequestSchema.parse(body);
+    // 2. Validate inputs
+    if (!file || !name) {
+      throw new BadRequestError("Missing required fields: file or name");
+    }
 
-    // Create OSS storage instance for presigned URL generation
+    const projectId = projectIdStr ? parseInt(projectIdStr) : null;
+
+    // 3. Generate OSS key with UUID
+    const uuid = crypto.randomUUID();
+    const ext = file.name.split(".").pop() ?? "";
+    const key = ext ? `datasets/${uuid}.${ext}` : `datasets/${uuid}`;
+
+    // 4. Convert file to buffer
+    const buffer = await file.arrayBuffer();
+
+    // 5. Extract metadata from buffer (fail fast on invalid files)
+    const { columns, rowCount } = await analyzeFileFromBuffer(buffer, file.name);
+
+    // 6. Upload to OSS using storage service
     const storage = createStorageService('oss');
-    const result = await storage.generatePresignedUploadUrl(validated);
+    await storage.upload(key, buffer, file.type);
 
-    return c.json(result);
+    // 7. Create dataset record in database
+    const dataset = await datasetService.createDatasetFromOSSKey({
+      key,
+      name,
+      description: null,
+      projectId,
+      fileSize: file.size,
+      columns,
+      rowCount,
+    });
+
+    // 8. Return created dataset
+    return c.json(
+      {
+        ...dataset,
+        columns: parseDatasetColumns(dataset.columns),
+      },
+      201
+    );
   })
 
-  // Confirm dataset upload to OSS or create local dataset
+  // Create dataset from local filesystem path
   .post("/confirm-upload", async (c) => {
     const body = await c.req.json();
 
-    // Validate request - metadata now comes from frontend
+    // Validate request - only for local storage
     const validated = z.object({
       key: z.string(),
       name: z.string(),
@@ -55,17 +92,8 @@ const datasets = new Hono()
       fileSize: z.number(),
       columns: z.array(z.string()),
       rowCount: z.number(),
-      storage: z.enum(["local", "oss"]).default("oss"),
+      storage: z.enum(["local"]),
     }).parse(body);
-
-    // For OSS storage, verify file exists
-    if (validated.storage === "oss") {
-      const storage = createStorageService('oss');
-      const fileExists = await storage.exists(validated.key);
-      if (!fileExists) {
-        throw new BadRequestError("File not found in storage");
-      }
-    }
 
     // Create dataset record with provided metadata
     const dataset = await datasetService.createDatasetFromOSSKey({

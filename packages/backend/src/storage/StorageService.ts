@@ -69,4 +69,12 @@ export interface StorageService {
    * @returns Response object with file content
    */
   fetch(key: string, options?: { timeout?: number }): Promise<Response>;
+
+  /**
+   * Upload file buffer directly to storage
+   * @param key - Storage key
+   * @param buffer - File content as ArrayBuffer
+   * @param contentType - MIME type (optional)
+   */
+  upload(key: string, buffer: ArrayBuffer, contentType?: string): Promise<void>;
 }

@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { MaybeRef, unref } from "vue";
 
 import { client } from "../api/client";
-import { extractDatasetMetadata } from "../utils/datasetUtils";
+import { API_CONFIG } from "../constants/config";
 
 export function useDatasets() {
   return useQuery({
@@ -46,61 +46,30 @@ export function useUploadDataset() {
       name: string;
       projectId: number;
     }) => {
-      // Extract metadata from file first
-      const metadata = await extractDatasetMetadata(params.file);
+      // Create FormData
+      const formData = new FormData();
+      formData.append("file", params.file);
+      formData.append("name", params.name);
+      formData.append("projectId", params.projectId.toString());
 
-      // Generate simple OSS key with UUID
-      const uuid = crypto.randomUUID();
-      const ext = params.file.name.split(".").pop() ?? "";
-      const key = ext ? `datasets/${uuid}.${ext}` : `datasets/${uuid}`;
+      // Use fetch directly for FormData to ensure proper Content-Type with boundary
+      const token = localStorage.getItem("auth_token");
+      const apiUrl = import.meta.env.VITE_API_URL || API_CONFIG.DEFAULT_URL;
 
-      // Step 1: Get presigned URL
-      const presignedResponse = await client.data["upload-url"].$post({
-        json: {
-          key,
-          contentType: params.file.type,
-        },
-      });
-
-      if (!presignedResponse.ok) {
-        const error = await presignedResponse.json();
-        throw new Error((error as any).error || "Failed to get upload URL");
-      }
-
-      const presignedData = await presignedResponse.json();
-
-      // Step 2: Upload directly to OSS
-      const uploadResponse = await fetch(presignedData.url, {
-        method: "PUT",
+      const response = await fetch(`${apiUrl}/data/upload`, {
+        method: "POST",
         headers: {
-          "Content-Type": params.file.type,
+          Authorization: `Bearer ${token}`,
         },
-        body: params.file,
+        body: formData,
       });
 
-      if (!uploadResponse.ok) {
-        throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error((error as any).error || "Failed to upload dataset");
       }
 
-      // Step 3: Confirm upload to backend with metadata
-      const confirmResponse = await client.data["confirm-upload"].$post({
-        json: {
-          key: presignedData.key,
-          name: params.name,
-          projectId: params.projectId,
-          fileSize: metadata.fileSize,
-          columns: metadata.columns,
-          rowCount: metadata.rowCount,
-          storage: "oss",
-        },
-      });
-
-      if (!confirmResponse.ok) {
-        const error = await confirmResponse.json();
-        throw new Error((error as any).error || "Failed to confirm upload");
-      }
-
-      return confirmResponse.json();
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["datasets"] });
@@ -126,50 +95,37 @@ export function useCreateDataset() {
         throw new Error("File is required for OSS storage");
       }
 
-      let key = params.filePath;
-
-      // For OSS storage, upload the file first
+      // For OSS storage, use new upload endpoint
       if (params.storage === "oss" && params.file) {
-        // Generate OSS key with UUID
-        const uuid = crypto.randomUUID();
-        const ext = params.file.name.split(".").pop() ?? "";
-        key = ext ? `datasets/${uuid}.${ext}` : `datasets/${uuid}`;
+        const formData = new FormData();
+        formData.append("file", params.file);
+        formData.append("name", params.name);
+        formData.append("projectId", params.projectId.toString());
 
-        // Step 1: Get presigned URL
-        const presignedResponse = await client.data["upload-url"].$post({
-          json: {
-            key,
-            contentType: params.file.type,
-          },
-        });
+        // Use fetch directly for FormData to ensure proper Content-Type with boundary
+        const token = localStorage.getItem("auth_token");
+        const apiUrl = import.meta.env.VITE_API_URL || API_CONFIG.DEFAULT_URL;
 
-        if (!presignedResponse.ok) {
-          const error = await presignedResponse.json();
-          throw new Error((error as any).error || "Failed to get upload URL");
-        }
-
-        const presignedData = await presignedResponse.json();
-
-        // Step 2: Upload directly to OSS
-        const uploadResponse = await fetch(presignedData.url, {
-          method: "PUT",
+        const response = await fetch(`${apiUrl}/data/upload`, {
+          method: "POST",
           headers: {
-            "Content-Type": params.file.type,
+            Authorization: `Bearer ${token}`,
           },
-          body: params.file,
+          body: formData,
         });
 
-        if (!uploadResponse.ok) {
-          throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error((error as any).error || "Failed to upload dataset");
         }
 
-        key = presignedData.key;
+        return response.json();
       }
 
-      // Create dataset record with metadata
+      // For local storage, use existing confirm-upload endpoint
       const confirmResponse = await client.data["confirm-upload"].$post({
         json: {
-          key,
+          key: params.filePath,
           name: params.name,
           projectId: params.projectId,
           fileSize: params.fileSize,
