@@ -137,13 +137,10 @@ export class MLBackendService {
         throw new Error(`ML backend returned ${response.status}: ${text}`);
       }
 
-      const result = await response.json();
-
       logger.info(
         {
           deploymentId: deployment.id,
           taskId,
-          status: result.status,
         },
         "ML operation accepted by backend",
       );
