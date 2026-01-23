@@ -255,7 +255,7 @@ const startPolling = () => {
     } else {
       stopPolling();
     }
-  }, 2000);
+  }, 8000);
 };
 
 /**
@@ -282,9 +282,9 @@ const handleDownload = async () => {
   downloading.value = true;
   try {
     // Call download endpoint
-    const response = await client["work-items"][":workItemId"][
-      "predict-file"
-    ][":taskId"]["predicted"].$get({
+    const response = await client["work-items"][":workItemId"]["predict-file"][
+      ":taskId"
+    ]["predicted"].$get({
       param: {
         workItemId: String(props.workItemId),
         taskId: String(props.taskId),
