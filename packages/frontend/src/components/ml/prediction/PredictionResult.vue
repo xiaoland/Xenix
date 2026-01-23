@@ -271,9 +271,9 @@ const stopPolling = () => {
 /**
  * Download or open result file
  *
- * The backend transforms paths based on deployment storage type:
- * - Local storage: Absolute file path (e.g., /tmp/ml-backend/tasks/123/predictions.xlsx)
- * - OSS storage: Presigned HTTP URL (e.g., https://...)
+ * Calls the backend download endpoint which handles storage type:
+ * - Local storage: Returns file path for user to open locally
+ * - OSS storage: Streams file content for browser download
  */
 const handleDownload = async () => {
   const predictResult = task.value?.result as any;
@@ -281,26 +281,60 @@ const handleDownload = async () => {
 
   downloading.value = true;
   try {
-    const filePath = predictResult.predictedDataPath;
+    // Call download endpoint
+    const response = await client["work-items"][":workItemId"][
+      "predict-file"
+    ][":taskId"]["predicted"].$get({
+      param: {
+        workItemId: String(props.workItemId),
+        taskId: String(props.taskId),
+      },
+    });
 
-    // Check if it's an HTTP URL (OSS storage)
-    if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
-      // OSS storage: Download from presigned URL
+    if (!response.ok) {
+      throw new Error("Failed to download file");
+    }
+
+    // Check content type to determine response type
+    const contentType = response.headers.get("Content-Type");
+
+    if (contentType?.includes("application/json")) {
+      // Local storage: Backend returns JSON with file path
+      const data = await response.json();
+      if ((data as any).storageType === "local") {
+        const filePath = (data as any).filePath;
+        // Copy path to clipboard and show message
+        await navigator.clipboard.writeText(filePath);
+        message.info(
+          `File is stored locally at: ${filePath}\nPath copied to clipboard. Please open it from your file system.`,
+          10,
+        );
+      }
+    } else {
+      // OSS storage: Backend returns file content
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.href = filePath;
-      link.download = filePath.split("/").pop() || "predictions.xlsx";
+      link.href = url;
+
+      // Extract filename from Content-Disposition header or use default
+      const disposition = response.headers.get("Content-Disposition");
+      let filename = "predictions.xlsx";
+      if (disposition) {
+        const match = disposition.match(/filename="?(.+)"?/);
+        if (match) filename = match[1];
+      }
+
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
       message.success("Download started");
-    } else {
-      // Local storage: Copy path to clipboard since browsers can't open local files
-      await navigator.clipboard.writeText(filePath);
-      message.success(t("prediction.filePathCopied"));
     }
   } catch (error: any) {
-    console.error("Download/open failed:", error);
-    message.error(error.message || "Failed to open file");
+    console.error("Download failed:", error);
+    message.error(error.message || "Failed to download file");
   } finally {
     downloading.value = false;
   }

@@ -2,6 +2,8 @@ import { eq } from "drizzle-orm";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
+import fs from "fs/promises";
+import path from "path";
 
 import {
   CreateWorkItemSchema,
@@ -810,6 +812,128 @@ const workItems = new Hono()
         },
         201,
       );
+    },
+  )
+
+  // Download predicted data file
+  .get(
+    "/:workItemId/predict-file/:taskId/predicted",
+    zValidator(
+      "param",
+      z.object({
+        workItemId: z.string(),
+        taskId: z.string(),
+      }),
+    ),
+    async (c) => {
+      const user = requireAuth(c);
+      const { workItemId: workItemIdStr, taskId: taskIdStr } =
+        c.req.valid("param");
+      const workItemId = parseInt(workItemIdStr);
+      const taskId = parseInt(taskIdStr);
+
+      // Load work item
+      const [workItem] = await db
+        .select()
+        .from(schema.workItems)
+        .where(eq(schema.workItems.id, workItemId))
+        .limit(1);
+
+      if (!workItem) {
+        throw new NotFoundError("Work item");
+      }
+
+      // Load task
+      const [task] = await db
+        .select()
+        .from(schema.tasks)
+        .where(eq(schema.tasks.id, taskId))
+        .limit(1);
+
+      if (!task) {
+        throw new NotFoundError("Task");
+      }
+
+      // Verify task belongs to work item
+      if (task.workItemId !== workItemId) {
+        throw new BadRequestError("Task does not belong to work item");
+      }
+
+      // Verify task type
+      if (task.type !== "predict-file") {
+        throw new BadRequestError(
+          "Only predict-file tasks have downloadable predicted data",
+        );
+      }
+
+      // Verify task is completed
+      if (task.status !== "completed") {
+        throw new BadRequestError("Task is not completed yet");
+      }
+
+      // Get predicted data path from result
+      const result: any = task.result;
+      if (!result || !result.predictedDataPath) {
+        throw new NotFoundError("Predicted data file");
+      }
+
+      // Get deployment to determine storage type
+      const [deployment] = await db
+        .select()
+        .from(schema.mlBackendDeployments)
+        .where(eq(schema.mlBackendDeployments.id, task.mlBackendDeploymentId))
+        .limit(1);
+
+      if (!deployment) {
+        throw new NotFoundError("ML Backend Deployment");
+      }
+
+      const storageType = deployment.storage || "local";
+      const filePath = result.predictedDataPath;
+
+      // For local storage, return metadata instead of file content
+      if (storageType === "local") {
+        // Check if file exists
+        try {
+          await fs.access(filePath);
+        } catch (error) {
+          throw new NotFoundError(
+            "Predicted data file not found at local path",
+          );
+        }
+
+        return c.json({
+          storageType: "local",
+          filePath,
+          message: "File is stored locally on your device. Open it directly from the file system.",
+        });
+      }
+
+      // For OSS storage (mounted to filesystem), stream the file
+      if (storageType === "oss") {
+        // Check if file exists
+        try {
+          await fs.access(filePath);
+        } catch (error) {
+          throw new NotFoundError("Predicted data file not found");
+        }
+
+        // Read file and stream to client
+        const fileBuffer = await fs.readFile(filePath);
+        const fileName = path.basename(filePath);
+
+        // Set headers for file download
+        c.header("Content-Type", "application/octet-stream");
+        c.header(
+          "Content-Disposition",
+          `attachment; filename="${fileName}"`,
+        );
+        c.header("Content-Length", fileBuffer.length.toString());
+
+        return c.body(fileBuffer);
+      }
+
+      throw new BadRequestError(`Unsupported storage type: ${storageType}`);
     },
   );
 
