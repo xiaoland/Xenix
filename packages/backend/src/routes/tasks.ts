@@ -31,35 +31,44 @@ type MLBackendDeployment = InferSelectModel<typeof mlBackendDeployments>;
 async function transformResultPaths(
   result: any,
   deployment: MLBackendDeployment,
-  taskId: number
+  taskId: number,
 ): Promise<any> {
   if (!result) return result;
 
-  const storageType = deployment.storage || 'local';
+  const storageType = deployment.storage || "local";
 
   // For local storage, transform relative paths to absolute file paths
-  if (storageType === 'local') {
+  if (storageType === "local") {
     // Get ML_BASE_PATH from environment or use default
-    const mlBasePath = process.env.ML_BASE_PATH || '/tmp/ml-backend';
-    const taskBasePath = path.join(mlBasePath, 'tasks', String(taskId));
+    const mlBasePath = process.env.ML_BASE_PATH || "/tmp/ml-backend";
+    const taskBasePath = path.join(mlBasePath, "tasks", String(taskId));
 
     const transformed = { ...result };
 
     // Transform predictedDataPath if exists and is relative
-    if (result.predictedDataPath && !path.isAbsolute(result.predictedDataPath)) {
-      transformed.predictedDataPath = path.join(taskBasePath, result.predictedDataPath);
+    if (
+      result.predictedDataPath &&
+      !path.isAbsolute(result.predictedDataPath)
+    ) {
+      transformed.predictedDataPath = path.join(
+        taskBasePath,
+        result.predictedDataPath,
+      );
     }
 
     // Transform fittedModelPath if exists and is relative
     if (result.fittedModelPath && !path.isAbsolute(result.fittedModelPath)) {
-      transformed.fittedModelPath = path.join(taskBasePath, result.fittedModelPath);
+      transformed.fittedModelPath = path.join(
+        taskBasePath,
+        result.fittedModelPath,
+      );
     }
 
     return transformed;
   }
 
   // For OSS storage, transform storage keys to filesystem paths
-  if (storageType === 'oss') {
+  if (storageType === "oss") {
     const storage = createStorageService();
     const transformed = { ...result };
 
@@ -150,21 +159,18 @@ const tasks = new Hono()
 
             if (result) {
               // Transform file paths based on storage type
-              const transformedResult = await transformResultPaths(result, deployment, taskId);
+              // const transformedResult = await transformResultPaths(result, deployment, taskId);
 
               await db
                 .update(schema.tasks)
                 .set({
                   status: "completed",
-                  result: transformedResult,
+                  result: result,
                   endAt: new Date(),
                 })
                 .where(eq(schema.tasks.id, taskId));
 
-              logger.info(
-                { taskId },
-                "Updated task with ML backend result",
-              );
+              logger.info({ taskId }, "Updated task with ML backend result");
             }
           } else if (status === "failed") {
             // Task failed - fetch error details
@@ -193,10 +199,7 @@ const tasks = new Hono()
               })
               .where(eq(schema.tasks.id, taskId));
 
-            logger.info(
-              { taskId },
-              "Task started running in ML backend",
-            );
+            logger.info({ taskId }, "Task started running in ML backend");
           }
         } catch (error) {
           // Silently ignore errors in result checking

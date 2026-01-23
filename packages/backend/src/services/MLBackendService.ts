@@ -291,10 +291,7 @@ export class MLBackendService {
 
     try {
       // Fetch result from filesystem storage
-      const response = await storage.fetch(resultKey, {
-        timeout: 3000,
-        abs: true,
-      });
+      const response = await storage.fetch(resultKey, { timeout: 3000 });
 
       if (response.status === 404 || response.status === 204) {
         // Result not available yet
