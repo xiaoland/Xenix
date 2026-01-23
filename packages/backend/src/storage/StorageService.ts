@@ -2,7 +2,7 @@ import type {
   FileMetadata,
   PresignedUrlRequest,
   PresignedUrlResponse,
-} from './schemas';
+} from "./schemas";
 
 /**
  * Storage service interface for file operations
@@ -15,7 +15,7 @@ export interface StorageService {
    * @returns Presigned URL response with URL, key, and expiration time
    */
   generatePresignedUploadUrl(
-    request: PresignedUrlRequest
+    request: PresignedUrlRequest,
   ): Promise<PresignedUrlResponse>;
 
   /**
@@ -24,7 +24,10 @@ export interface StorageService {
    * @param expiresIn - URL expiration time in seconds (default: 3600)
    * @returns Presigned download URL
    */
-  generatePresignedDownloadUrl(key: string, expiresIn?: number): Promise<string>;
+  generatePresignedDownloadUrl(
+    key: string,
+    expiresIn?: number,
+  ): Promise<string>;
 
   /**
    * Check if file exists in storage
@@ -68,7 +71,10 @@ export interface StorageService {
    * @param options - Fetch options (timeout, etc.)
    * @returns Response object with file content
    */
-  fetch(key: string, options?: { timeout?: number }): Promise<Response>;
+  fetch(
+    key: string,
+    options?: { timeout?: number; abs?: boolean },
+  ): Promise<Response>;
 
   /**
    * Upload file buffer directly to storage

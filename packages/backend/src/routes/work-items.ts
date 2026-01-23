@@ -704,7 +704,8 @@ const workItems = new Hono()
         );
 
         // Save uploaded prediction file as a dataset
-        const datasetsDir = createStorageService().getFilesystemPath("datasets");
+        const datasetsDir =
+          createStorageService().getFilesystemPath("datasets");
         predictionDataset = await datasetService.createDataset(
           file,
           `Prediction Input - ${file.name}`,
@@ -893,19 +894,11 @@ const workItems = new Hono()
 
       // For local storage, return metadata instead of file content
       if (storageType === "local") {
-        // Check if file exists
-        try {
-          await fs.access(filePath);
-        } catch (error) {
-          throw new NotFoundError(
-            "Predicted data file not found at local path",
-          );
-        }
-
         return c.json({
           storageType: "local",
           filePath,
-          message: "File is stored locally on your device. Open it directly from the file system.",
+          message:
+            "File is stored locally on your device. Open it directly from the file system.",
         });
       }
 
@@ -924,10 +917,7 @@ const workItems = new Hono()
 
         // Set headers for file download
         c.header("Content-Type", "application/octet-stream");
-        c.header(
-          "Content-Disposition",
-          `attachment; filename="${fileName}"`,
-        );
+        c.header("Content-Disposition", `attachment; filename="${fileName}"`);
         c.header("Content-Length", fileBuffer.length.toString());
 
         return c.body(fileBuffer);

@@ -1,11 +1,11 @@
-import fs from 'fs/promises';
-import path from 'path';
-import type { StorageService } from './StorageService';
+import fs from "fs/promises";
+import path from "path";
+import type { StorageService } from "./StorageService";
 import type {
   FileMetadata,
   PresignedUrlRequest,
   PresignedUrlResponse,
-} from './schemas';
+} from "./schemas";
 
 /**
  * Unified filesystem storage implementation
@@ -16,7 +16,7 @@ export class FileSystemStorage implements StorageService {
   constructor(private basePath: string) {}
 
   async generatePresignedUploadUrl(
-    request: PresignedUrlRequest
+    request: PresignedUrlRequest,
   ): Promise<PresignedUrlResponse> {
     // For filesystem storage, return backend upload endpoint
     // Frontend will POST to backend which saves to filesystem
@@ -31,7 +31,7 @@ export class FileSystemStorage implements StorageService {
 
   async generatePresignedDownloadUrl(
     key: string,
-    expiresIn = 3600
+    expiresIn = 3600,
   ): Promise<string> {
     // Return backend download endpoint
     return `/download/${encodeURIComponent(key)}`;
@@ -73,27 +73,34 @@ export class FileSystemStorage implements StorageService {
     await fs.copyFile(sourcePath, destPath);
   }
 
-  async fetch(key: string, options?: { timeout?: number }): Promise<Response> {
+  async fetch(
+    key: string,
+    options?: { timeout?: number; abs?: boolean },
+  ): Promise<Response> {
     // Read file from filesystem and return as Response
-    const filePath = this.getFilesystemPath(key);
+    const filePath = options?.abs ? key : this.getFilesystemPath(key);
 
     try {
-      const content = await fs.readFile(filePath, 'utf-8');
+      const content = await fs.readFile(filePath, "utf-8");
       return new Response(content, {
         status: 200,
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
       });
     } catch (error: any) {
-      if (error.code === 'ENOENT') {
+      if (error.code === "ENOENT") {
         return new Response(null, { status: 404 });
       }
       throw error;
     }
   }
 
-  async upload(key: string, buffer: ArrayBuffer, contentType?: string): Promise<void> {
+  async upload(
+    key: string,
+    buffer: ArrayBuffer,
+    contentType?: string,
+  ): Promise<void> {
     const filePath = this.getFilesystemPath(key);
 
     // Ensure directory exists
