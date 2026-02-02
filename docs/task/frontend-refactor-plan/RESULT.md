@@ -9,6 +9,9 @@ This document captures the results of the ruthless frontend refactor according t
 ### 1. Documentation
 
 - **Created** `packages/frontend/src/AGENTS.md` with comprehensive tech stack, directory structure, and coding conventions
+- **Created** `docs/features/` with PRDs for all 6 features (auth, projects, work-items, datasets, tasks, ml)
+- **Created** `docs/modules/` with architecture documentation (frontend, backend, ml-pipeline)
+- **Created** `docs/decisions/` with 3 ADRs (feature-based architecture, TanStack Query, Hono RPC)
 
 ### 2. New Directory Structure
 
@@ -217,13 +220,137 @@ packages/frontend/src/
 └── vite-env.d.ts
 ```
 
+### Documentation Files Created
+
+```
+docs/
+├── features/
+│   ├── README.md
+│   ├── auth/PRD.md
+│   ├── projects/PRD.md
+│   ├── work-items/PRD.md
+│   ├── datasets/PRD.md
+│   ├── tasks/PRD.md
+│   └── ml/PRD.md
+├── modules/
+│   ├── README.md
+│   ├── frontend-architecture.md
+│   ├── backend-architecture.md
+│   └── ml-pipeline.md
+└── decisions/
+    ├── README.md
+    ├── 001-feature-based-frontend-architecture.md
+    ├── 002-tanstack-query-for-server-state.md
+    └── 003-hono-rpc-for-type-safe-apis.md
+```
+
 ## Migration Complete
 
 All components, views, and composables have been migrated to the new feature-based structure. The build passes successfully with no errors.
 
+## Gaps vs PLAN.md
+
+| Aspect                  | PLAN.md Target                                                                  | Current Status                                                                      | Priority |
+| ----------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------- |
+| **Docs Architecture**   | features/, modules/, decisions/ structure                                       | ✅ **Complete** - All created                                                       | Done     |
+| **Directory Structure** | app/, components/, layouts/, styles/, types/                                    | ⚠️ **Partial** - Missing app/, layouts/ (moved to features/common), styles/, types/ | Medium   |
+| **Feature Folders**     | api/, types/ subfolders                                                         | ⚠️ **Partial** - No api/, types/ folders in features                                | Low      |
+| **Quality Gates**       | ESLint + TS strict, route coverage, unused exports, i18n checks, bundle budgets | ✅ **Complete** - All 5 gates implemented with CI workflow                          | Done     |
+| **Refactor Phases**     | 4 phases: Audit, Structural Rewrite, Quality Hardening, Legacy Removal          | ⚠️ **Partial** - Only Structural Rewrite done                                       | Medium   |
+| **Dependency Purge**    | Remove unused packages                                                          | ❌ **Not done** - No audit performed                                                | Medium   |
+| **Success Metrics**     | 50-70% file reduction, 20% bundle size, >70% coverage                           | ❌ **Not verified** - No measurements taken                                         | Low      |
+
+### Key Missing Items
+
+1. **Quality Gates (CI)** - ✅ **COMPLETED** - All quality gates implemented:
+   - ESLint + TypeScript strict mode with enhanced rules
+   - Route coverage validation script
+   - Unused export detection
+   - i18n completeness validation
+   - Bundle size budgets with CI workflow
+   - GitHub Actions workflow for automated enforcement
+
+2. **Missing Target Folders**:
+   - `app/` - App bootstrapping folder
+   - `styles/` - Global styles and UnoCSS config
+   - `types/` - Local-only types folder
+   - Feature `api/` folders for feature-specific API calls
+
+3. **Phase 3 & 4 Not Started**:
+   - Quality hardening (lint rules, error boundaries)
+   - Legacy removal verification
+
+4. **No Verification**:
+   - File reduction percentage not measured
+   - Bundle size impact unknown
+   - Test coverage not checked
+
+## Quality Gates Implementation Summary
+
+### 1. ESLint + TypeScript Strict Mode
+
+- Enhanced `eslint.config.js` with stricter rules
+- Added `@typescript-eslint` plugin with strict type checking
+- Enabled `no-raw-text` rule for i18n enforcement
+- Added `no-unused-vars` as error (not warning)
+- Configured Vue-specific rules for unused components/vars
+
+### 2. Route Coverage Check
+
+- Created `scripts/check-route-coverage.ts`
+- Validates all routes map to existing feature pages
+- Checks route naming conventions (PascalCase)
+- Reports orphaned feature pages not used by routes
+
+### 3. Unused Export Detection
+
+- Created `scripts/check-unused-exports.ts`
+- Analyzes feature index.ts barrel exports
+- Detects components/functions not imported elsewhere
+- Reports potentially dead code
+
+### 4. i18n Completeness Validation
+
+- Created `scripts/check-i18n-completeness.ts`
+- Validates all locale files have consistent keys
+- Checks for unused i18n keys
+- Detects potential hardcoded strings in Vue templates
+- Complements ESLint `@intlify/vue-i18n/no-raw-text` rule
+
+### 5. Bundle Size Budgets
+
+- Created `packages/frontend/bundle-budget.json` with size limits
+- Updated `vite.config.ts` with chunk splitting strategy
+- Created `scripts/check-bundle-size.ts` for validation
+- Budgets:
+  - Main bundle: 500 KB
+  - Vendor chunks: 150-400 KB each
+  - Lazy chunks: 200 KB
+  - Total: 2 MB
+
+### 6. CI Workflow
+
+- Created `.github/workflows/quality-gates.yml`
+- Runs all 5 quality gates in parallel
+- Includes TypeScript type checking
+- Fails PRs that violate quality standards
+- Generates summary report
+
+### Commands Added
+
+```bash
+pnpm run quality:check      # Run all quality checks
+pnpm run quality:lint       # ESLint with zero warnings
+pnpm run quality:routes     # Route coverage validation
+pnpm run quality:exports    # Unused export detection
+pnpm run quality:i18n       # i18n completeness check
+pnpm run quality:bundle     # Bundle size validation
+```
+
 ## Next Steps (Optional)
 
-1. Add new tests for the refactored code
-2. Implement CI quality gates (lint, unused exports, route coverage, i18n checks)
-3. Add bundle size budgets
-4. Document any remaining technical debt
+1. ~~**High Priority**: Implement CI quality gates~~ ✅ **COMPLETED**
+2. **Medium Priority**: Add missing folder structure (app/, styles/, types/)
+3. **Medium Priority**: Audit and remove unused dependencies
+4. **Low Priority**: Verify success metrics (file reduction, bundle size, coverage)
+5. **Low Priority**: Add new tests for the refactored code
