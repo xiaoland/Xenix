@@ -8,7 +8,7 @@ import { createApp } from "vue";
 
 import App from "./App.vue";
 import i18n, { setupI18n } from "./i18n";
-import router from "./router";
+import router from "./routes";
 
 // Setup i18n with lazy loading
 setupI18n().then(() => {
