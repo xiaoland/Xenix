@@ -22,7 +22,13 @@
     "db:migrate": "pnpm --filter \"@xenix/backend\" db:migrate",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
-    "docker:logs": "docker compose logs -f"
+    "docker:logs": "docker compose logs -f",
+    "quality:check": "pnpm run quality:lint && pnpm run quality:routes && pnpm run quality:exports && pnpm run quality:i18n",
+    "quality:lint": "eslint . --max-warnings=0",
+    "quality:routes": "tsx scripts/check-route-coverage.ts",
+    "quality:exports": "tsx scripts/check-unused-exports.ts",
+    "quality:i18n": "pnpm run i18n:check && pnpm --filter @xenix/frontend run i18n:check",
+    "quality:bundle": "pnpm run build:frontend && tsx scripts/check-bundle-size.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
