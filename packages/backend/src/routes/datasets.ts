@@ -8,7 +8,11 @@ import { DatasetIdParamSchema } from "@xenix/shared";
 import { BadRequestError } from "../errors";
 import { authMiddleware } from "../middleware/auth";
 import { DatasetService } from "../services";
-import { parseDatasetColumns, analyzeFileFromBuffer } from "../utils/datasetUtils";
+import {
+  parseDatasetColumns,
+  analyzeFileFromBuffer,
+  removeDuplicateRowsFromBuffer,
+} from "../utils/datasetUtils";
 import { createStorageService } from "../storage";
 
 const datasetService = new DatasetService();
@@ -53,7 +57,8 @@ const datasets = new Hono()
     const buffer = await file.arrayBuffer();
 
     // 5. Extract metadata from buffer (fail fast on invalid files)
-    const { columns, rowCount } = await analyzeFileFromBuffer(buffer, file.name);
+    const { columns, rowCount, duplicateCount, duplicateRows } =
+      await analyzeFileFromBuffer(buffer, file.name);
 
     // 6. Upload to storage using filesystem
     const storage = createStorageService();
@@ -70,13 +75,17 @@ const datasets = new Hono()
       rowCount,
     });
 
-    // 8. Return created dataset
+    // 8. Return created dataset with duplicate info
     return c.json(
       {
         ...dataset,
         columns: parseDatasetColumns(dataset.columns),
+        duplicateInfo: {
+          duplicateCount,
+          duplicateRows: duplicateRows || [],
+        },
       },
-      201
+      201,
     );
   })
 
@@ -85,15 +94,17 @@ const datasets = new Hono()
     const body = await c.req.json();
 
     // Validate request - only for local storage
-    const validated = z.object({
-      key: z.string(),
-      name: z.string(),
-      projectId: z.number().nullable(),
-      fileSize: z.number(),
-      columns: z.array(z.string()),
-      rowCount: z.number(),
-      storage: z.enum(["local"]),
-    }).parse(body);
+    const validated = z
+      .object({
+        key: z.string(),
+        name: z.string(),
+        projectId: z.number().nullable(),
+        fileSize: z.number(),
+        columns: z.array(z.string()),
+        rowCount: z.number(),
+        storage: z.enum(["local"]),
+      })
+      .parse(body);
 
     // Create dataset record with provided metadata
     const dataset = await datasetService.createDatasetFromOSSKey({
@@ -111,7 +122,7 @@ const datasets = new Hono()
         ...dataset,
         columns: parseDatasetColumns(dataset.columns),
       },
-      201
+      201,
     );
   })
 
@@ -138,6 +149,81 @@ const datasets = new Hono()
     return c.json({
       message: "Dataset deleted successfully",
     });
-  });
+  })
+
+  // Remove duplicate rows from dataset
+  .post(
+    "/:id/remove-duplicates",
+    zValidator("param", DatasetIdParamSchema),
+    async (c) => {
+      const { id: idStr } = c.req.valid("param");
+      const id = parseInt(idStr);
+
+      // Get the dataset
+      const dataset = await datasetService.getDatasetById(id);
+
+      // Get the file from storage using filesystem path
+      const storage = createStorageService();
+      const filePath = storage.getFilesystemPath(dataset.filePath);
+      const fs = await import("fs/promises");
+      const fileBuffer = await fs.readFile(filePath);
+
+      // Remove duplicates
+      const {
+        buffer: cleanedBuffer,
+        originalRowCount,
+        removedCount,
+        newRowCount,
+      } = await removeDuplicateRowsFromBuffer(
+        fileBuffer.buffer.slice(
+          fileBuffer.byteOffset,
+          fileBuffer.byteOffset + fileBuffer.byteLength,
+        ),
+        dataset.filePath,
+      );
+
+      // Upload cleaned file back to storage
+      const uuid = crypto.randomUUID();
+      const ext = dataset.filePath.split(".").pop() ?? "";
+      const newKey = ext ? `datasets/${uuid}.${ext}` : `datasets/${uuid}`;
+
+      await storage.upload(
+        newKey,
+        cleanedBuffer,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+
+      // Re-analyze the cleaned file to get columns
+      const { columns } = await analyzeFileFromBuffer(
+        cleanedBuffer.buffer.slice(
+          cleanedBuffer.byteOffset,
+          cleanedBuffer.byteOffset + cleanedBuffer.byteLength,
+        ),
+        newKey,
+      );
+
+      // Create new dataset record
+      const newDataset = await datasetService.createDatasetFromOSSKey({
+        key: newKey,
+        name: `${dataset.name} (deduplicated)`,
+        description: dataset.description,
+        projectId: dataset.projectId,
+        fileSize: cleanedBuffer.length,
+        columns,
+        rowCount: newRowCount,
+      });
+
+      return c.json({
+        message: "Duplicates removed successfully",
+        originalRowCount,
+        removedCount,
+        newRowCount,
+        dataset: {
+          ...newDataset,
+          columns: parseDatasetColumns(newDataset.columns),
+        },
+      });
+    },
+  );
 
 export default datasets;

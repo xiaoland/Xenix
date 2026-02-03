@@ -23,7 +23,6 @@ resources:
       compatibleRuntime:
         [nodejs18, nodejs20, nodejs22, custom, custom.debian11, custom.debian12]
       code: ./opt
-      runtime: custom.debian12
 
   # Main HTTP Backend (Node.js)
   xenix-backend:

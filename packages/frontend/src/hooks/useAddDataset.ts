@@ -109,7 +109,7 @@ export function useAddDataset(projectId: number) {
   };
 
   const handleCreate = async (
-    onSuccess?: () => void,
+    onSuccess?: (data: any) => void,
     onError?: (error: any) => void,
   ) => {
     if (!canCreate.value || !metadata.value) return;
@@ -131,9 +131,9 @@ export function useAddDataset(projectId: number) {
     };
 
     createDataset(params, {
-      onSuccess: () => {
+      onSuccess: (data) => {
         message.success(t("dataset.add.createSuccess"));
-        onSuccess?.();
+        onSuccess?.(data);
 
         datasetName.value = "";
         fileList.value = [];

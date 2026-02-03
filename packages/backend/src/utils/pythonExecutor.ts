@@ -20,7 +20,7 @@ interface StructuredOutput {
 }
 
 export async function executePythonTask(
-  options: PythonTaskOptions
+  options: PythonTaskOptions,
 ): Promise<void> {
   const { script, stdinData, taskId, cwd } = options;
 
@@ -40,7 +40,7 @@ export async function executePythonTask(
     // Use python3 explicitly or from environment variable
     const pythonCmd = (process.env.PYTHON_EXECUTABLE || "python3").replace(
       /\\/g,
-      "/"
+      "/",
     );
 
     // Execute Python script (no CLI args, use stdin instead)
@@ -174,7 +174,7 @@ export async function executePythonTask(
 
 async function handleStructuredOutput(
   output: StructuredOutput,
-  taskId: number
+  taskId: number,
 ) {
   const traceId = generateTraceId(taskId);
 
@@ -238,12 +238,12 @@ async function storeLog(logData: any, taskId: number) {
  */
 export async function executePythonScript(
   scriptPath: string,
-  stdinData: any
+  stdinData: any,
 ): Promise<any> {
   return new Promise((resolve, reject) => {
     const pythonCmd = (process.env.PYTHON_EXECUTABLE || "python3").replace(
       /\\/g,
-      "/"
+      "/",
     );
 
     const pythonProcess = spawn(pythonCmd, [scriptPath], {
@@ -284,13 +284,138 @@ export async function executePythonScript(
         }
       } else {
         reject(
-          new Error(`Python script failed with code ${code}: ${stderrBuffer}`)
+          new Error(`Python script failed with code ${code}: ${stderrBuffer}`),
         );
       }
     });
 
     pythonProcess.on("error", (error) => {
       reject(new Error(`Failed to execute Python script: ${error.message}`));
+    });
+  });
+}
+
+export interface CodeExecutionOptions {
+  code: string;
+  inputs?: Record<string, any>;
+  timeout?: number;
+}
+
+export interface CodeExecutionResult {
+  output: string;
+  error?: string;
+  result?: any;
+  executionTime: number;
+}
+
+/**
+ * Execute Python code directly (not from a file) and return the result
+ * Used for code-execution tasks
+ */
+export async function executePythonCode(
+  options: CodeExecutionOptions,
+): Promise<CodeExecutionResult> {
+  const { code, inputs = {}, timeout = 300 } = options;
+  const startTime = Date.now();
+
+  return new Promise((resolve, reject) => {
+    const pythonCmd = (process.env.PYTHON_EXECUTABLE || "python3").replace(
+      /\\/g,
+      "/",
+    );
+
+    // Create a wrapper script that executes the provided code
+    const wrapperScript = `
+import sys
+import json
+
+# Read inputs from stdin
+try:
+    inputs = json.load(sys.stdin)
+except:
+    inputs = {}
+
+# Execute user code
+exec_globals = {"__builtins__": __builtins__, "inputs": inputs}
+exec_locals = {}
+
+try:
+    exec(inputs.get("code", ""), exec_globals, exec_locals)
+    
+    # Try to get the result variable if defined
+    result = exec_locals.get("result", None)
+    
+    # Output result as JSON
+    print(json.dumps({"success": True, "result": result}))
+except Exception as e:
+    print(json.dumps({"success": False, "error": str(e)}))
+    sys.exit(1)
+`;
+
+    const pythonProcess = spawn(pythonCmd, ["-c", wrapperScript], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        PATH: `${path.dirname(process.env.PYTHON_EXECUTABLE || "python3")};${
+          process.env.PATH
+        }`,
+      },
+      shell: true,
+    });
+
+    // Set timeout
+    const timeoutId = setTimeout(() => {
+      pythonProcess.kill();
+      reject(new Error(`Code execution timed out after ${timeout} seconds`));
+    }, timeout * 1000);
+
+    // Write code and inputs to stdin
+    const stdinData = { code, ...inputs };
+    pythonProcess.stdin.write(JSON.stringify(stdinData));
+    pythonProcess.stdin.end();
+
+    let stdoutBuffer = "";
+    let stderrBuffer = "";
+
+    pythonProcess.stdout.on("data", (data) => {
+      stdoutBuffer += data.toString();
+    });
+
+    pythonProcess.stderr.on("data", (data) => {
+      stderrBuffer += data.toString();
+    });
+
+    pythonProcess.on("close", (code) => {
+      clearTimeout(timeoutId);
+      const executionTime = Date.now() - startTime;
+
+      if (code === 0) {
+        try {
+          const parsedResult = JSON.parse(stdoutBuffer);
+          resolve({
+            output: stdoutBuffer,
+            result: parsedResult.result,
+            executionTime,
+          });
+        } catch (error) {
+          // If not valid JSON, return raw output
+          resolve({
+            output: stdoutBuffer,
+            executionTime,
+          });
+        }
+      } else {
+        resolve({
+          output: stdoutBuffer,
+          error: stderrBuffer || `Process exited with code ${code}`,
+          executionTime,
+        });
+      }
+    });
+
+    pythonProcess.on("error", (error) => {
+      clearTimeout(timeoutId);
+      reject(new Error(`Failed to execute Python code: ${error.message}`));
     });
   });
 }

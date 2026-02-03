@@ -9,6 +9,7 @@ import { config } from "./config";
 import { errorHandler } from "./middleware/errorHandler";
 // Routes
 import authRoutes from "./routes/auth";
+import codeExecutionRoutes from "./routes/code-execution";
 import datasetsRoutes from "./routes/datasets";
 import mlBackendDeploymentsRoutes from "./routes/ml-backend-deployments";
 import modelsRoutes from "./routes/models";
@@ -57,6 +58,7 @@ const routes = app
   .route("/models", modelsRoutes)
   .route("/tasks", tasksRoutes)
   .route("/ml-backend-deployments", mlBackendDeploymentsRoutes)
+  .route("/code-execution", codeExecutionRoutes)
   .route("/obsrv", obsrvRoutes);
 
 // Error handler (must be last)

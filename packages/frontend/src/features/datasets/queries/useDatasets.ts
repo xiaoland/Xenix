@@ -160,3 +160,32 @@ export function useDeleteDataset() {
     },
   });
 }
+
+export function useRemoveDuplicates() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: number | string) => {
+      const token = localStorage.getItem('auth_token');
+      const apiUrl = import.meta.env.VITE_API_URL || API_CONFIG.DEFAULT_URL;
+
+      const response = await fetch(`${apiUrl}/data/${id}/remove-duplicates`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error((error as any).error || 'Failed to remove duplicates');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['datasets'] });
+    },
+  });
+}

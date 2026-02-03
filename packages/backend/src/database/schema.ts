@@ -1,8 +1,10 @@
 // PostgreSQL database schema for Xenix
 import {
+  boolean,
   index,
   integer,
   jsonb,
+  pgEnum,
   pgTable,
   serial,
   text,
@@ -10,12 +12,18 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+// User role enum
+export const userRoleEnum = pgEnum("user_role", ["admin", "user"]);
+
 // Users table for authentication and user management
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   email: text("email").notNull().unique(),
   phone: text("phone"),
   password: text("password").notNull(),
+  role: userRoleEnum("role").notNull().default("user"),
+  isActive: boolean("is_active").notNull().default(true),
+  lastLoginAt: timestamp("last_login_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" })
     .$defaultFn(() => new Date())
     .notNull(),
@@ -23,6 +31,34 @@ export const users = pgTable("users", {
     .$defaultFn(() => new Date())
     .notNull(),
 });
+
+// Permissions table - defines available permissions
+export const permissions = pgTable("permissions", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  resource: text("resource").notNull(), // e.g., 'projects', 'users', 'datasets'
+  action: text("action").notNull(), // e.g., 'create', 'read', 'update', 'delete', 'manage'
+  createdAt: timestamp("created_at", { mode: "date" })
+    .$defaultFn(() => new Date())
+    .notNull(),
+});
+
+// Role permissions mapping table
+export const rolePermissions = pgTable(
+  "role_permissions",
+  {
+    id: serial("id").primaryKey(),
+    role: userRoleEnum("role").notNull(),
+    permissionId: integer("permission_id")
+      .references(() => permissions.id, { onDelete: "cascade" })
+      .notNull(),
+    createdAt: timestamp("created_at", { mode: "date" })
+      .$defaultFn(() => new Date())
+      .notNull(),
+  },
+  (table) => [index("idx_role_permissions_role").on(table.role)],
+);
 
 // Model metadata table for storing model information and ModelParam schemas
 export const modelMetadata = pgTable("model_metadata", {

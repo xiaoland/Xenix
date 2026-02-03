@@ -28,6 +28,12 @@ export interface PredictTaskParameter {
   parameters: Record<string, any>; // Model parameters used for prediction
 }
 
+export interface CodeExecutionTaskParameter {
+  code: string; // Python code to execute
+  inputs?: Record<string, any>; // Optional input data/variables to pass to the code
+  timeout?: number; // Optional timeout in seconds (default: 300)
+}
+
 // Task result types
 export interface BatchTrainTaskResult {
   params: Record<string, any>; // Best parameters found
@@ -51,6 +57,13 @@ export interface PredictTaskResult {
   // Legacy field (backward compatibility)
   outputFile?: string; // Path to prediction output file
   rowCount?: number; // Number of predictions made
+}
+
+export interface CodeExecutionTaskResult {
+  output?: string; // stdout from the Python code
+  error?: string; // stderr from the Python code
+  result?: any; // JSON-parsed result if the code outputs valid JSON
+  executionTime?: number; // Execution time in milliseconds
 }
 
 // Specific task types
@@ -87,8 +100,23 @@ export interface PredictTask {
   createdAt?: string;
 }
 
+export interface CodeExecutionTask {
+  id: number;
+  workItemId?: number;
+  type: "code-execution";
+  status: TaskStatus;
+  parameter: CodeExecutionTaskParameter;
+  result?: CodeExecutionTaskResult;
+  error?: string;
+  createdAt?: string;
+}
+
 // Union type for all tasks
-export type Task = BatchTrainTask | SingleTrainTask | PredictTask;
+export type Task =
+  | BatchTrainTask
+  | SingleTrainTask
+  | PredictTask
+  | CodeExecutionTask;
 
 // Generic task info (backward compatibility)
 export interface TaskInfo {
@@ -96,11 +124,17 @@ export interface TaskInfo {
   workItemId?: number;
   type: string;
   status: string;
-  result?: BatchTrainTaskResult | SingleTrainTaskResult | PredictTaskResult | any;
+  result?:
+    | BatchTrainTaskResult
+    | SingleTrainTaskResult
+    | PredictTaskResult
+    | CodeExecutionTaskResult
+    | any;
   parameter?:
     | BatchTrainTaskParameter
     | SingleTrainTaskParameter
     | PredictTaskParameter
+    | CodeExecutionTaskParameter
     | any;
   error?: string;
   createdAt?: string;

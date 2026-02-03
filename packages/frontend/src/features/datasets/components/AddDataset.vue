@@ -119,6 +119,30 @@
             <strong>{{ $t("dataset.add.size") }}:</strong>
             {{ formatFileSize(metadata.fileSize) }}
           </div>
+          <!-- Duplicate Detection Info -->
+          <div v-if="metadata.duplicateCount && metadata.duplicateCount > 0" class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
+            <div class="flex items-center gap-2 text-yellow-800">
+              <span class="i-mdi-alert text-lg"></span>
+              <strong>{{ $t("dataset.add.duplicatesFound") }}:</strong>
+              {{ metadata.duplicateCount }} {{ $t("dataset.add.duplicateRows") }}
+            </div>
+            <div class="mt-2 text-xs text-yellow-700">
+              <div class="font-medium mb-1">{{ $t("dataset.add.affectedRows") }}:</div>
+              <div class="font-mono bg-yellow-100 p-2 rounded max-h-20 overflow-y-auto">
+                {{ metadata.duplicateRows?.slice(0, 20).join(", ") }}
+                <span v-if="(metadata.duplicateRows?.length || 0) > 20">
+                  {{ $t("dataset.add.andMore", { count: metadata.duplicateRows!.length - 20 }) }}
+                </span>
+              </div>
+            </div>
+            <div class="mt-2 text-xs text-yellow-600">
+              {{ $t("dataset.add.duplicateHint") }}
+            </div>
+          </div>
+          <div v-else-if="metadata.duplicateCount === 0" class="mt-3 p-2 bg-green-50 border border-green-200 rounded text-green-700">
+            <span class="i-mdi-check-circle mr-1"></span>
+            {{ $t("dataset.add.noDuplicates") }}
+          </div>
           <div v-if="selectedFilePath" class="mt-2">
             <strong>{{ $t("dataset.add.filePath") }}:</strong>
             <div class="text-xs text-gray-600 mt-1 font-mono break-all">
@@ -147,7 +171,7 @@
         :disabled="!canCreate"
         @click="
           createDataset(
-            () => emit('success'),
+            (data) => emit('success', data),
             () => {},
           )
         "
@@ -167,12 +191,20 @@ import { useI18n } from "vue-i18n";
 
 import { useAddDataset } from "@/hooks";
 
+interface Dataset {
+  id: number;
+  name: string;
+  filePath?: string;
+  columns: string[];
+  createdAt?: string;
+}
+
 const props = defineProps<{
   projectId: number;
 }>();
 
 const emit = defineEmits<{
-  success: [];
+  success: [dataset: Dataset];
   cancel: [];
 }>();
 

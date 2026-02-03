@@ -314,7 +314,13 @@
       "fileAnalyzed": "File analyzed successfully",
       "analyzeFailed": "Failed to analyze file",
       "createSuccess": "Dataset created successfully",
-      "createFailed": "Failed to create dataset"
+      "createFailed": "Failed to create dataset",
+      "duplicatesFound": "Duplicate Rows Detected",
+      "duplicateRows": "duplicate rows",
+      "affectedRows": "Affected row numbers",
+      "andMore": "and {count} more",
+      "duplicateHint": "Consider removing duplicates before training to improve model accuracy",
+      "noDuplicates": "No duplicate rows found"
     }
   },
   "autoForm": {
@@ -536,7 +542,8 @@
       "signupLink": "Sign up here",
       "signinError": "Sign in failed",
       "identifierRequired": "Please enter your email or phone number",
-      "passwordRequired": "Please enter your password"
+      "passwordRequired": "Please enter your password",
+      "rememberMe": "Remember me"
     },
     "signup": {
       "title": "Sign Up",

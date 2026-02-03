@@ -54,6 +54,8 @@ export async function analyzeFileFromBuffer(
 ): Promise<{
   columns: string[];
   rowCount: number;
+  duplicateCount: number;
+  duplicateRows?: number[];
 }> {
   const workbook = XLSX.read(buffer, { type: "buffer" });
 
@@ -84,9 +86,105 @@ export async function analyzeFileFromBuffer(
     throw new Error("File has no columns");
   }
 
+  // Detect duplicate rows
+  const seen = new Map<string, number[]>();
+  const duplicateRows: number[] = [];
+
+  data.forEach((row: any, index: number) => {
+    // Create a unique key for each row by stringifying all values
+    const rowKey = columns.map((col) => String(row[col] ?? "")).join("|");
+
+    if (seen.has(rowKey)) {
+      // This is a duplicate - mark the current row index
+      duplicateRows.push(index + 1); // +1 because row numbers are 1-based for display
+      // Also mark the first occurrence if not already marked
+      const firstOccurrences = seen.get(rowKey)!;
+      if (firstOccurrences.length === 1) {
+        duplicateRows.push(firstOccurrences[0] + 1);
+      }
+      firstOccurrences.push(index);
+    } else {
+      seen.set(rowKey, [index]);
+    }
+  });
+
+  const uniqueDuplicateRows = [...new Set(duplicateRows)].sort((a, b) => a - b);
+  const duplicateCount = uniqueDuplicateRows.length;
   const rowCount = data.length; // Number of data rows (excluding header)
 
-  return { columns, rowCount };
+  return {
+    columns,
+    rowCount,
+    duplicateCount,
+    duplicateRows: duplicateCount > 0 ? uniqueDuplicateRows : undefined,
+  };
+}
+
+/**
+ * Remove duplicate rows from file buffer and return cleaned buffer
+ */
+export async function removeDuplicateRowsFromBuffer(
+  buffer: ArrayBuffer,
+  filename: string,
+): Promise<{
+  buffer: Buffer;
+  originalRowCount: number;
+  removedCount: number;
+  newRowCount: number;
+}> {
+  const workbook = XLSX.read(buffer, { type: "buffer" });
+
+  if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+    throw new Error("File contains no sheets");
+  }
+
+  const firstSheetName = workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[firstSheetName];
+
+  if (!worksheet) {
+    throw new Error("Unable to read worksheet");
+  }
+
+  const data = XLSX.utils.sheet_to_json(worksheet);
+  const originalRowCount = data.length;
+
+  if (data.length === 0) {
+    throw new Error("File contains no data rows");
+  }
+
+  const firstRow = data[0];
+  const columns = Object.keys(firstRow);
+
+  // Remove duplicates while keeping first occurrence
+  const seen = new Set<string>();
+  const uniqueData: any[] = [];
+
+  data.forEach((row: any) => {
+    const rowKey = columns.map((col) => String(row[col] ?? "")).join("|");
+
+    if (!seen.has(rowKey)) {
+      seen.add(rowKey);
+      uniqueData.push(row);
+    }
+  });
+
+  // Create new worksheet with unique data
+  const newWorksheet = XLSX.utils.json_to_sheet(uniqueData);
+  const newWorkbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, firstSheetName);
+
+  // Generate buffer
+  const newBuffer = XLSX.write(newWorkbook, {
+    type: "buffer",
+    bookType: "xlsx",
+  });
+
+  return {
+    buffer: Buffer.from(newBuffer),
+    originalRowCount,
+    removedCount: originalRowCount - uniqueData.length,
+    newRowCount: uniqueData.length,
+  };
 }
 
 export function parseDatasetColumns(columns: any): string[] {

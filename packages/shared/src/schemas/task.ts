@@ -35,6 +35,12 @@ export const PredictTaskParameterSchema = z.object({
   parameters: z.record(z.any()),
 });
 
+export const CodeExecutionTaskParameterSchema = z.object({
+  code: z.string().min(1, "Code is required"),
+  inputs: z.record(z.any()).optional(),
+  timeout: z.number().min(1).max(3600).optional(),
+});
+
 export const BatchTrainTaskResultSchema = z.object({
   params: z.record(z.any()),
   metrics: z.record(z.any()),
@@ -49,6 +55,13 @@ export const SingleTrainTaskResultSchema = z.object({
 export const PredictTaskResultSchema = z.object({
   outputFile: z.string(),
   rowCount: z.number(),
+});
+
+export const CodeExecutionTaskResultSchema = z.object({
+  output: z.string().optional(),
+  error: z.string().optional(),
+  result: z.any().optional(),
+  executionTime: z.number().optional(),
 });
 
 export const BatchTrainTaskSchema = z.object({
@@ -84,10 +97,22 @@ export const PredictTaskSchema = z.object({
   createdAt: z.string().datetime().optional(),
 });
 
+export const CodeExecutionTaskSchema = z.object({
+  id: z.number(),
+  workItemId: z.number().optional(),
+  type: z.literal("code-execution"),
+  status: TaskStatusSchema,
+  parameter: CodeExecutionTaskParameterSchema,
+  result: CodeExecutionTaskResultSchema.optional(),
+  error: z.string().optional(),
+  createdAt: z.string().datetime().optional(),
+});
+
 export const TaskSchema = z.discriminatedUnion("type", [
   BatchTrainTaskSchema,
   SingleTrainTaskSchema,
   PredictTaskSchema,
+  CodeExecutionTaskSchema,
 ]);
 
 export const CreateBatchTrainTaskSchema = z.object({
@@ -119,23 +144,45 @@ export const CreatePredictTaskSchema = z.object({
 });
 
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
-export type BatchTrainTaskParameter = z.infer<typeof BatchTrainTaskParameterSchema>;
+export type BatchTrainTaskParameter = z.infer<
+  typeof BatchTrainTaskParameterSchema
+>;
 export type SingleTrainTaskParameter = z.infer<
   typeof SingleTrainTaskParameterSchema
 >;
 export type PredictTaskParameter = z.infer<typeof PredictTaskParameterSchema>;
+export type CodeExecutionTaskParameter = z.infer<
+  typeof CodeExecutionTaskParameterSchema
+>;
 export type BatchTrainTaskResult = z.infer<typeof BatchTrainTaskResultSchema>;
 export type SingleTrainTaskResult = z.infer<typeof SingleTrainTaskResultSchema>;
 export type PredictTaskResult = z.infer<typeof PredictTaskResultSchema>;
+export type CodeExecutionTaskResult = z.infer<
+  typeof CodeExecutionTaskResultSchema
+>;
 export type BatchTrainTask = z.infer<typeof BatchTrainTaskSchema>;
 export type SingleTrainTask = z.infer<typeof SingleTrainTaskSchema>;
 export type PredictTask = z.infer<typeof PredictTaskSchema>;
+export type CodeExecutionTask = z.infer<typeof CodeExecutionTaskSchema>;
 export type Task = z.infer<typeof TaskSchema>;
-export type CreateBatchTrainTaskDto = z.infer<typeof CreateBatchTrainTaskSchema>;
+export type CreateBatchTrainTaskDto = z.infer<
+  typeof CreateBatchTrainTaskSchema
+>;
 export type CreateSingleTrainTaskDto = z.infer<
   typeof CreateSingleTrainTaskSchema
 >;
 export type CreatePredictTaskDto = z.infer<typeof CreatePredictTaskSchema>;
+
+export const CreateCodeExecutionTaskSchema = z.object({
+  workItemId: z.number().optional(),
+  code: z.string().min(1, "Code is required"),
+  inputs: z.record(z.any()).optional(),
+  timeout: z.number().min(1).max(3600).optional(),
+});
+
+export type CreateCodeExecutionTaskDto = z.infer<
+  typeof CreateCodeExecutionTaskSchema
+>;
 
 // Query validation schemas
 export const GetTasksQuerySchema = z.object({

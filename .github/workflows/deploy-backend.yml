@@ -85,7 +85,7 @@ jobs:
         if: steps.check-layer.outputs.LAYER_CHANGED == 'true'
         run: |
           echo "Deploying backend layer..."
-          s build xenix-backend-nodejs-deps-layer --use-docker
+          s build xenix-backend-nodejs-deps-layer
           s deploy xenix-backend-nodejs-deps-layer -y --use-local
 
       - name: Prune old layer versions
@@ -93,7 +93,7 @@ jobs:
         run: bash ../../.github/scripts/prune-layer-versions.sh "$LAYER_NAME" 3
 
       - name: Build backend function
-        run: s build xenix-backend --use-docker
+        run: s build xenix-backend
 
       - name: Deploy backend function
         run: s deploy xenix-backend -y --use-local

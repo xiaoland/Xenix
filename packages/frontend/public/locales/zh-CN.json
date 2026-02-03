@@ -312,7 +312,13 @@
       "fileAnalyzed": "文件分析成功",
       "analyzeFailed": "文件分析失败",
       "createSuccess": "数据集创建成功",
-      "createFailed": "创建数据集失败"
+      "createFailed": "创建数据集失败",
+      "duplicatesFound": "检测到重复行",
+      "duplicateRows": "重复行",
+      "affectedRows": "受影响的行号",
+      "andMore": "以及 {count} 行",
+      "duplicateHint": "建议在训练前移除重复行以提高模型准确性",
+      "noDuplicates": "未发现重复行"
     }
   },
   "autoForm": {
@@ -455,7 +461,8 @@
       "signupLink": "在这里注册",
       "signinError": "登录失败",
       "identifierRequired": "请输入邮箱或手机号",
-      "passwordRequired": "请输入密码"
+      "passwordRequired": "请输入密码",
+      "rememberMe": "记住我"
     },
     "signup": {
       "title": "注册",

@@ -42,6 +42,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: "/projects/:projectId/datasets/:id",
+    name: "DatasetDetail",
+    component: () => import("../features/datasets/pages/DatasetDetailView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
     path: "/tasks",
     name: "Tasks",
     component: () => import("../features/tasks/pages/TasksView.vue"),

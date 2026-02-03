@@ -43,6 +43,12 @@
           </a-form-item>
 
           <a-form-item>
+            <a-checkbox v-model:checked="formData.rememberMe">
+              {{ $t("auth.signin.rememberMe") }}
+            </a-checkbox>
+          </a-form-item>
+
+          <a-form-item>
             <a-button
               type="primary"
               html-type="submit"
@@ -110,6 +116,7 @@ const { t } = useI18n();
 const formData = reactive({
   identifier: "",
   password: "",
+  rememberMe: false,
 });
 
 const rules = {

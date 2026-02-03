@@ -54,14 +54,24 @@
           class="hover:shadow-lg transition-shadow"
         >
           <template #extra>
-            <a-button
-              type="text"
-              danger
-              size="small"
-              @click="handleDelete(dataset.id)"
-            >
-              <span class="i-mdi-delete"></span>
-            </a-button>
+            <a-space>
+              <a-button
+                type="text"
+                size="small"
+                @click="handleRemoveDuplicates(dataset)"
+                :loading="removingId === dataset.id"
+              >
+                <span class="i-mdi-content-duplicate"></span>
+              </a-button>
+              <a-button
+                type="text"
+                danger
+                size="small"
+                @click="handleDelete(dataset.id)"
+              >
+                <span class="i-mdi-delete"></span>
+              </a-button>
+            </a-space>
           </template>
           <div class="space-y-2">
             <p class="text-sm text-gray-600">
@@ -122,12 +132,12 @@
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { message, Modal } from "ant-design-vue";
 
 import DefaultLayout from "../../common/components/DefaultLayout.vue";
 import AddDataset from "../components/AddDataset.vue";
-import { useDatasets, useDeleteDataset } from "../queries";
+import { useDatasets, useDeleteDataset, useRemoveDuplicates } from "../queries";
 
 interface Dataset {
   id: number;
@@ -138,21 +148,26 @@ interface Dataset {
 }
 
 const route = useRoute();
+const router = useRouter();
 const projectId = Number(route.params.projectId);
 
 const { data: datasetsData, isLoading: loading, refetch } = useDatasets();
 const { mutate: deleteDataset } = useDeleteDataset();
+const { mutate: removeDuplicates } = useRemoveDuplicates();
 
 const datasets = computed(() => datasetsData.value || []);
 
 const showUploadModal = ref(false);
 const showDetailsModal = ref(false);
 const selectedDataset = ref<Dataset | null>(null);
+const removingId = ref<number | null>(null);
 
-const handleUploadSuccess = () => {
+const handleUploadSuccess = (dataset: Dataset) => {
   showUploadModal.value = false;
   message.success("Dataset uploaded successfully");
   refetch();
+  // Navigate to dataset detail page
+  router.push(`/projects/${projectId}/datasets/${dataset.id}`);
 };
 
 const viewDetails = (dataset: Dataset) => {
@@ -174,6 +189,29 @@ const handleDelete = (id: number) => {
         onError: (err: any) => {
           console.error('Failed to delete dataset:', err);
           message.error('Failed to delete dataset');
+        },
+      });
+    },
+  });
+};
+
+const handleRemoveDuplicates = (dataset: Dataset) => {
+  Modal.confirm({
+    title: "Remove Duplicates",
+    content: `This will create a new dataset "${dataset.name} (deduplicated)" with duplicate rows removed. The original dataset will remain unchanged.`,
+    okText: "Remove Duplicates",
+    onOk: () => {
+      removingId.value = dataset.id;
+      removeDuplicates(dataset.id, {
+        onSuccess: (result: any) => {
+          removingId.value = null;
+          message.success(`Duplicates removed: ${result.removedCount} rows removed from ${result.originalRowCount} total rows`);
+          refetch();
+        },
+        onError: (err: any) => {
+          removingId.value = null;
+          console.error('Failed to remove duplicates:', err);
+          message.error('Failed to remove duplicates');
         },
       });
     },

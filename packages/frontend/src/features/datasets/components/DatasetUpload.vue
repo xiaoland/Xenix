@@ -57,8 +57,16 @@ const props = defineProps<{
   projectId: number;
 }>();
 
+interface Dataset {
+  id: number;
+  name: string;
+  filePath?: string;
+  columns: string[];
+  createdAt?: string;
+}
+
 const emit = defineEmits<{
-  success: [];
+  success: [dataset: Dataset];
   cancel: [];
 }>();
 
@@ -103,9 +111,9 @@ const handleUpload = () => {
       projectId: props.projectId,
     },
     {
-      onSuccess: () => {
+      onSuccess: (data) => {
         message.success("Dataset uploaded successfully");
-        emit("success");
+        emit("success", data);
 
         // Reset form
         datasetName.value = "";
