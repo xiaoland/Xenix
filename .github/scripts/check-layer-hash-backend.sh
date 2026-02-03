@@ -3,7 +3,7 @@
 set -e
 
 HASH_FILE=".layer-hash-backend"
-PACKAGE_JSON="packages/backend/package.json"
+PACKAGE_JSON="package.json"
 
 # Calculate hash of package.json
 CURRENT_HASH=$(md5sum "$PACKAGE_JSON" | cut -d' ' -f1)

@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "i18n:extract": "vue-i18n-extract report --vueFiles 'src/**/*.vue' --languageFiles 'public/locales/*.json'",
-    "i18n:check": "npm run i18n:extract"
+    "i18n:check": "npm run i18n:extract",
+    "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
     "@tanstack/vue-query": "^5.64.3",

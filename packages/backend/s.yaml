@@ -1,0 +1,115 @@
+edition: 3.0.0
+name: xenix-backend
+access: default # Run 's config add' to configure Aliyun credentials
+
+vars:
+  region: cn-hangzhou
+  serviceName: xenix
+  # Official public layer ARNs for Aliyun FC
+  nodejs22LayerArn: acs:fc:${vars.region}:official:layers/Nodejs22/versions/1
+
+resources:
+  # Node.js dependencies layer for backend (production node_modules only)
+  xenix-backend-nodejs-deps-layer:
+    component: fc3
+    actions:
+      pre-deploy:
+        - run: bash build-layer.sh
+          path: .
+    props:
+      region: ${vars.region}
+      layerName: xenix-backend-nodejs-deps
+      description: Node.js production dependencies for Xenix backend
+      compatibleRuntime:
+        [nodejs18, nodejs20, nodejs22, custom, custom.debian11, custom.debian12]
+      code: ./opt
+      runtime: custom.debian12
+
+  # Main HTTP Backend (Node.js)
+  xenix-backend:
+    component: fc3
+    actions:
+      pre-deploy:
+        - run: pnpm run build
+          path: .
+    props:
+      region: ${vars.region}
+      functionName: xenix-backend
+      description: Xenix main HTTP backend (Node.js HTTP server with custom runtime)
+      runtime: custom.debian12
+      memorySize: 512
+      timeout: 60
+      diskSize: 512
+      cpu: 0.35
+      instanceConcurrency: 20
+      internetAccess: true
+      disableOndemand: false
+      sessionAffinity: NONE
+      instanceIsolationMode: SHARE
+      role: acs:ram::1565423279464166:role/xenix
+      resourceGroupId: rg-aekzl56w44dsiji
+      code: .
+      layers:
+        - ${vars.nodejs22LayerArn}
+        - ${resources.xenix-backend-nodejs-deps-layer.output.arn}
+      customRuntimeConfig:
+        port: 3000
+        command:
+          - ./fc-start.sh
+        healthCheckConfig: {}
+      ossMountConfig:
+        mountPoints:
+          - bucketName: xenix
+            endpoint: http://oss-cn-hangzhou-internal.aliyuncs.com
+            bucketPath: /
+            mountDir: /mnt/oss
+            readOnly: false
+      vpcConfig:
+        vpcId: vpc-bp1tsj2pl882nbcef8dq5
+        vSwitchIds:
+          - vsw-bp12xvmyzrs38s49jt0sv
+          - vsw-bp1lxa8mkjf7jscslhodf
+        securityGroupId: sg-bp1a4uihi9qzn74ho6zp
+      logConfig:
+        project: serverless-cn-hangzhou-c3462702-64dd-5f56-8bf5-90b0315b72c7
+        logstore: default-logs
+        enableRequestMetrics: true
+        enableInstanceMetrics: true
+        enableCustomExtraLog: true
+        enableLlmMetrics: false
+        logBeginRule: DefaultRegex
+      tags:
+        - Key: service
+          Value: backend
+      environmentVariables:
+        NODE_ENV: production
+        BACKEND_PORT: "3000"
+        OSS_REGION: ${env.OSS_REGION}
+        OSS_ACCESS_KEY_ID: ${env.OSS_ACCESS_KEY_ID}
+        OSS_ACCESS_KEY_SECRET: ${env.OSS_ACCESS_KEY_SECRET}
+        OSS_BUCKET: ${env.OSS_BUCKET}
+        OSS_ENDPOINT: ${env.OSS_ENDPOINT}
+        DATABASE_URL: ${env.DATABASE_URL}
+        JWT_SECRET: ${env.JWT_SECRET}
+        FRONTEND_URL: https://xenix.hadream.ltd
+        STORAGE_BASE_PATH: /mnt/oss
+        NODE_PATH: /opt/nodejs/node_modules
+        PATH: /var/fc/lang/nodejs22/bin:/usr/local/bin/apache-maven/bin:/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/ruby/bin:/opt/bin:/code:/code/bin
+        LD_LIBRARY_PATH: /code:/code/lib:/usr/lib:/opt/lib:/usr/local/lib
+        TZ: Asia/Shanghai
+      triggers:
+        - triggerConfig:
+            methods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - PATCH
+            authType: anonymous
+            disableURLInternet: false
+          triggerName: defaultTrigger
+          triggerType: http
+          description: ""
+          qualifier: LATEST

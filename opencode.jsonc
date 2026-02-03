@@ -1,0 +1,13 @@
+{
+    "$schema": "https://opencode.ai/config.json",
+    "mcp": {
+        "exa": {
+            "enabled": true,
+            "type": "remote",
+            "url": "https://mcp.context7.com/mcp",
+            "headers": {
+                "CONTEXT7_API_KEY": "ctx7sk-ff4e0a90-dca6-4d9b-89f2-a009fd3292cd"
+            }
+        }
+    },
+}

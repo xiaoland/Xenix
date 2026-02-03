@@ -1,0 +1,207 @@
+name: Quality Gates
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "packages/frontend/**"
+      - "packages/shared/**"
+      - "eslint.config.js"
+      - "scripts/**"
+      - ".github/workflows/quality-gates.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "packages/frontend/**"
+      - "packages/shared/**"
+      - "eslint.config.js"
+      - "scripts/**"
+
+jobs:
+  # Job 1: ESLint + TypeScript strict check
+  lint:
+    name: ESLint & TypeScript
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run ESLint
+        run: pnpm run quality:lint
+        env:
+          NODE_ENV: production
+
+  # Job 2: Route coverage check
+  route-coverage:
+    name: Route Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check route coverage
+        run: pnpm run quality:routes
+
+  # Job 3: Unused exports check
+  unused-exports:
+    name: Unused Exports
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check unused exports
+        run: pnpm run quality:exports
+
+  # Job 4: i18n completeness check
+  i18n-check:
+    name: i18n Completeness
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check i18n completeness
+        run: pnpm run quality:i18n
+
+  # Job 5: Bundle size check
+  bundle-size:
+    name: Bundle Size
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        run: pnpm run build:frontend
+
+      - name: Check bundle size
+        run: pnpm run quality:bundle
+
+  # Job 6: TypeScript type check
+  typecheck:
+    name: TypeScript Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run TypeScript check
+        run: pnpm run build:frontend
+        working-directory: packages/frontend
+
+  # Summary job
+  quality-gates-summary:
+    name: Quality Gates Summary
+    runs-on: ubuntu-latest
+    needs:
+      [lint, route-coverage, unused-exports, i18n-check, bundle-size, typecheck]
+    if: always()
+    steps:
+      - name: Check all quality gates
+        run: |
+          echo "Quality Gates Results:"
+          echo "  - ESLint & TypeScript: ${{ needs.lint.result }}"
+          echo "  - Route Coverage: ${{ needs.route-coverage.result }}"
+          echo "  - Unused Exports: ${{ needs.unused-exports.result }}"
+          echo "  - i18n Completeness: ${{ needs.i18n-check.result }}"
+          echo "  - Bundle Size: ${{ needs.bundle-size.result }}"
+          echo "  - TypeScript Type Check: ${{ needs.typecheck.result }}"
+
+          if [[ "${{ needs.lint.result }}" == "failure" ]] || \
+             [[ "${{ needs.route-coverage.result }}" == "failure" ]] || \
+             [[ "${{ needs.unused-exports.result }}" == "failure" ]] || \
+             [[ "${{ needs.i18n-check.result }}" == "failure" ]] || \
+             [[ "${{ needs.bundle-size.result }}" == "failure" ]] || \
+             [[ "${{ needs.typecheck.result }}" == "failure" ]]; then
+            echo "❌ Quality Gates FAILED"
+            exit 1
+          else
+            echo "✅ All Quality Gates PASSED"
+            exit 0
+          fi
