@@ -31,8 +31,8 @@ resources:
         PYTHONPATH: /opt/python:/code
         ML_BASE_PATH: /tmp/ml-backend
         LOG_LEVEL: INFO
-        OSS_REGION: ${env.OSS_REGION}
-        OSS_ACCESS_KEY_ID: ${env.OSS_ACCESS_KEY_ID}
-        OSS_ACCESS_KEY_SECRET: ${env.OSS_ACCESS_KEY_SECRET}
-        OSS_BUCKET: ${env.OSS_BUCKET}
-        OSS_ENDPOINT: ${env.OSS_ENDPOINT}
+        OSS_REGION: ${env('OSS_REGION')}
+        OSS_ACCESS_KEY_ID: ${env('OSS_ACCESS_KEY_ID')}
+        OSS_ACCESS_KEY_SECRET: ${env('OSS_ACCESS_KEY_SECRET')}
+        OSS_BUCKET: ${env('OSS_BUCKET')}
+        OSS_ENDPOINT: ${env('OSS_ENDPOINT')}

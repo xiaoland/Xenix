@@ -84,13 +84,13 @@ resources:
       environmentVariables:
         NODE_ENV: production
         BACKEND_PORT: "3000"
-        OSS_REGION: ${env.OSS_REGION}
-        OSS_ACCESS_KEY_ID: ${env.OSS_ACCESS_KEY_ID}
-        OSS_ACCESS_KEY_SECRET: ${env.OSS_ACCESS_KEY_SECRET}
-        OSS_BUCKET: ${env.OSS_BUCKET}
-        OSS_ENDPOINT: ${env.OSS_ENDPOINT}
-        DATABASE_URL: ${env.DATABASE_URL}
-        JWT_SECRET: ${env.JWT_SECRET}
+        OSS_REGION: ${env('OSS_REGION')}
+        OSS_ACCESS_KEY_ID: ${env('OSS_ACCESS_KEY_ID')}
+        OSS_ACCESS_KEY_SECRET: ${env('OSS_ACCESS_KEY_SECRET')}
+        OSS_BUCKET: ${env('OSS_BUCKET')}
+        OSS_ENDPOINT: ${env('OSS_ENDPOINT')}
+        DATABASE_URL: ${env('DATABASE_URL')}
+        JWT_SECRET: ${env('JWT_SECRET')}
         FRONTEND_URL: https://xenix.hadream.ltd
         STORAGE_BASE_PATH: /mnt/oss
         NODE_PATH: /opt/nodejs/node_modules
