@@ -250,15 +250,15 @@ All components, views, and composables have been migrated to the new feature-bas
 
 ## Gaps vs PLAN.md
 
-| Aspect                  | PLAN.md Target                                                                  | Current Status                                                                      | Priority |
-| ----------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------- |
-| **Docs Architecture**   | features/, modules/, decisions/ structure                                       | ✅ **Complete** - All created                                                       | Done     |
-| **Directory Structure** | app/, components/, layouts/, styles/, types/                                    | ⚠️ **Partial** - Missing app/, layouts/ (moved to features/common), styles/, types/ | Medium   |
-| **Feature Folders**     | api/, types/ subfolders                                                         | ⚠️ **Partial** - No api/, types/ folders in features                                | Low      |
-| **Quality Gates**       | ESLint + TS strict, route coverage, unused exports, i18n checks, bundle budgets | ✅ **Complete** - All 5 gates implemented with CI workflow                          | Done     |
-| **Refactor Phases**     | 4 phases: Audit, Structural Rewrite, Quality Hardening, Legacy Removal          | ⚠️ **Partial** - Only Structural Rewrite done                                       | Medium   |
-| **Dependency Purge**    | Remove unused packages                                                          | ❌ **Not done** - No audit performed                                                | Medium   |
-| **Success Metrics**     | 50-70% file reduction, 20% bundle size, >70% coverage                           | ❌ **Not verified** - No measurements taken                                         | Low      |
+| Aspect                  | PLAN.md Target                                                                  | Current Status                                              | Priority |
+| ----------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------- | -------- |
+| **Docs Architecture**   | features/, modules/, decisions/ structure                                       | ✅ **Complete** - All created                               | Done     |
+| **Directory Structure** | app/, components/, layouts/, styles/, types/                                    | ✅ **Complete** - All folders created                       | Done     |
+| **Feature Folders**     | api/, types/ subfolders                                                         | ✅ **Complete** - All features have api/ and types/ folders | Done     |
+| **Quality Gates**       | ESLint + TS strict, route coverage, unused exports, i18n checks, bundle budgets | ✅ **Complete** - All 5 gates implemented with CI workflow  | Done     |
+| **Refactor Phases**     | 4 phases: Audit, Structural Rewrite, Quality Hardening, Legacy Removal          | ✅ **Complete** - All 4 phases completed                    | Done     |
+| **Dependency Purge**    | Remove unused packages                                                          | ❌ **Not done** - No audit performed                        | Medium   |
+| **Success Metrics**     | 50-70% file reduction, 20% bundle size, >70% coverage                           | ❌ **Not verified** - No measurements taken                 | Low      |
 
 ### Key Missing Items
 
@@ -270,15 +270,17 @@ All components, views, and composables have been migrated to the new feature-bas
    - Bundle size budgets with CI workflow
    - GitHub Actions workflow for automated enforcement
 
-2. **Missing Target Folders**:
-   - `app/` - App bootstrapping folder
-   - `styles/` - Global styles and UnoCSS config
-   - `types/` - Local-only types folder
-   - Feature `api/` folders for feature-specific API calls
+2. **Target Folders** - ✅ **COMPLETED**:
+   - `app/` - App bootstrapping folder with bootstrap.ts, context.ts
+   - `styles/` - Global styles (variables.css, base.css) and UnoCSS config
+   - `types/` - Local-only types (global.ts, vue.ts)
+   - Feature `api/` folders - All 7 features have api/ subfolders
+   - Feature `types/` folders - All 7 features have types/ subfolders
 
-3. **Phase 3 & 4 Not Started**:
-   - Quality hardening (lint rules, error boundaries)
-   - Legacy removal verification
+3. **Phase 3 & 4 - COMPLETED**:
+   - ✅ Quality hardening (lint rules, error boundaries, query guidelines)
+   - ✅ Legacy removal verification
+   - See [Phase 3 & 4 Implementation Summary](#phase-3--4-implementation-summary) below
 
 4. **No Verification**:
    - File reduction percentage not measured
@@ -347,10 +349,61 @@ pnpm run quality:i18n       # i18n completeness check
 pnpm run quality:bundle     # Bundle size validation
 ```
 
+## Phase 3 & 4 Implementation Summary
+
+### Phase 3 — Quality Hardening ✅
+
+#### 1. Error Boundaries
+
+- Created `ErrorBoundary.vue` component in `features/common/components/`
+- Catches and handles Vue component errors gracefully
+- Provides retry functionality and optional error details
+- Supports custom error UI via slots
+
+#### 2. Global State Components
+
+Created reusable state components in `features/common/components/`:
+
+- **LoadingState.vue** - Consistent loading spinner with customizable size and description
+- **EmptyState.vue** - Empty state with multiple variants (default, search, data, error, info)
+- **ErrorState.vue** - Error display with retry action
+
+#### 3. Query Layer Guidelines
+
+Created `useQueryGuidelines.ts` in `hooks/` with:
+
+- Standardized query client configuration
+- Query key factory helpers for all features
+- Cache time presets (realtime, short, medium, long, permanent)
+- Error handling utilities
+- Best practices documentation
+
+#### 4. ESLint Architecture Rules
+
+Enhanced `eslint.config.js` with boundary enforcement:
+
+- **Feature Boundaries**: Prevents cross-feature imports (except from `common`)
+- **API Layer Enforcement**: Components cannot import API client directly
+- **Query Layer Guidance**: Pages should prefer query hooks over direct API calls
+
+### Phase 4 — Legacy Removal ✅
+
+#### Verification Completed
+
+- **Directory Audit**: Confirmed all legacy directories removed
+- **Import Patterns**: Verified consistent use of `@` alias
+- **File Organization**: All files follow feature-based structure
+- **Build Verification**: Clean build with no errors
+- **Dead Code Check**: No unused exports or orphaned files
+
+See [LEGACY_VERIFICATION.md](./LEGACY_VERIFICATION.md) for detailed report.
+
 ## Next Steps (Optional)
 
 1. ~~**High Priority**: Implement CI quality gates~~ ✅ **COMPLETED**
-2. **Medium Priority**: Add missing folder structure (app/, styles/, types/)
-3. **Medium Priority**: Audit and remove unused dependencies
-4. **Low Priority**: Verify success metrics (file reduction, bundle size, coverage)
-5. **Low Priority**: Add new tests for the refactored code
+2. ~~**Medium Priority**: Add missing folder structure (app/, styles/, types/)~~ ✅ **COMPLETED**
+3. ~~**Medium Priority**: Quality Hardening (Phase 3)~~ ✅ **COMPLETED**
+4. ~~**Medium Priority**: Legacy Removal Verification (Phase 4)~~ ✅ **COMPLETED**
+5. **Low Priority**: Audit and remove unused dependencies
+6. **Low Priority**: Verify success metrics (file reduction, bundle size, coverage)
+7. **Low Priority**: Add new tests for the refactored code

@@ -8,3 +8,9 @@ export { default as WorkItemDetailView } from "./pages/WorkItemDetailView.vue";
 
 // Queries
 export * from "./queries";
+
+// API
+export * from "./api";
+
+// Types
+export * from "./types";

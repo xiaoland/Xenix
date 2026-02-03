@@ -2,7 +2,14 @@
  * Common Components Index
  */
 
-export { default as DefaultLayout } from "./DefaultLayout.vue";
-export { default as LanguageSwitcher } from "./LanguageSwitcher.vue";
-export { default as MLBackendDeploymentSelector } from "./MLBackendDeploymentSelector.vue";
-export { default as Steps } from "./Steps.vue";
+// Components
+export { default as DefaultLayout } from "./components/DefaultLayout.vue";
+export { default as LanguageSwitcher } from "./components/LanguageSwitcher.vue";
+export { default as MLBackendDeploymentSelector } from "./components/MLBackendDeploymentSelector.vue";
+export { default as Steps } from "./components/Steps.vue";
+
+// API
+export * from "./api";
+
+// Types
+export * from "./types";

@@ -12,3 +12,9 @@ export { default as WorkItemRow } from "./components/WorkItemRow.vue";
 
 // Queries
 export * from "./queries";
+
+// API
+export * from "./api";
+
+// Types
+export * from "./types";

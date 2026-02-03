@@ -12,3 +12,9 @@ export { default as DatasetUpload } from './components/DatasetUpload.vue';
 
 // Queries
 export * from './queries';
+
+// API
+export * from './api';
+
+// Types
+export * from './types';

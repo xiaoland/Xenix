@@ -171,4 +171,71 @@ export default [
       },
     },
   },
+
+  // ============================================
+  // Architecture Boundary Rules (Phase 3)
+  // ============================================
+
+  // Feature folder boundaries - prevent cross-feature imports
+  {
+    files: ["packages/frontend/src/features/*/!(_index.ts)"],
+    rules: {
+      // Enforce that features can only import from:
+      // - Their own folder
+      // - features/common
+      // - hooks, services, types, utils, constants
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/features/*/!(common)/*"],
+              message:
+                "Features should not import from other features. Use the common feature for shared code.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // Enforce API layer usage - prevent direct client usage in components
+  {
+    files: ["packages/frontend/src/features/*/components/**/*.vue"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@/services/api-client",
+              importNames: ["client"],
+              message:
+                "Components should not use the API client directly. Use TanStack Query hooks from features/*/queries/ instead.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // Enforce query layer usage - pages should use queries, not api directly
+  {
+    files: ["packages/frontend/src/features/*/pages/**/*.vue"],
+    rules: {
+      "no-restricted-imports": [
+        "warn",
+        {
+          paths: [
+            {
+              name: "@/services/api-client",
+              importNames: ["client"],
+              message:
+                "Pages should prefer TanStack Query hooks over direct API client usage.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ];

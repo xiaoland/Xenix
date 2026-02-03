@@ -20,3 +20,9 @@ export { default as PredictionResult } from "./components/prediction/PredictionR
 
 // Queries
 export * from "./queries";
+
+// API
+export * from "./api";
+
+// Types
+export * from "./types";

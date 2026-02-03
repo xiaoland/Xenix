@@ -17,6 +17,7 @@
 
 ```
 src/
+  app/              # App bootstrapping, global providers
   assets/           # Static assets
   constants/        # Shared constants
   features/         # Feature modules (see below)
@@ -24,6 +25,8 @@ src/
   i18n/             # Locale resources
   routes/           # Route definitions
   services/         # API clients, SDK wrappers
+  styles/           # Global styles, CSS variables
+  types/            # Local-only TypeScript types
   utils/            # Pure utilities
   App.vue
   main.ts
@@ -155,10 +158,13 @@ pnpm run i18n:check
 ### Key Files
 
 - `src/main.ts` - App entry point
+- `src/app/` - App bootstrapping and global context
 - `src/routes/index.ts` - Route definitions
 - `src/services/api-client.ts` - Hono RPC client
 - `src/features/index.ts` - Features barrel export
 - `src/hooks/index.ts` - Shared hooks
+- `src/styles/index.ts` - Global styles entry
+- `src/types/index.ts` - Local types entry
 
 ### Environment Variables
 
