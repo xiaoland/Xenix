@@ -1,5 +1,5 @@
 edition: 3.0.0
-name: xenix-app
+name: xenix-backend
 access: default # Run 's config add' to configure Aliyun credentials
 
 vars:
@@ -7,7 +7,6 @@ vars:
   serviceName: xenix
   # Official public layer ARNs for Aliyun FC
   nodejs22LayerArn: acs:fc:${vars.region}:official:layers/Nodejs22/versions/1
-  python312LayerArn: acs:fc:${vars.region}:official:layers/Python312/versions/1
 
 resources:
   # Node.js dependencies layer for backend (production node_modules only)
@@ -16,13 +15,13 @@ resources:
     actions:
       pre-deploy:
         - run: bash build-layer.sh
-          path: ./packages/backend
+          path: .
     props:
       region: ${vars.region}
       layerName: xenix-backend-nodejs-deps
       description: Node.js production dependencies for Xenix backend
       compatibleRuntime: [nodejs18, nodejs20, nodejs22, custom, custom.debian11]
-      code: ./packages/backend/opt
+      code: ./opt
 
   # Main HTTP Backend (Node.js)
   xenix-backend:
@@ -30,7 +29,7 @@ resources:
     actions:
       pre-deploy:
         - run: pnpm run build
-          path: ./packages/backend
+          path: .
     props:
       region: ${vars.region}
       functionName: xenix-backend
@@ -38,7 +37,7 @@ resources:
       runtime: custom.debian11
       memorySize: 512
       timeout: 60
-      code: ./packages/backend
+      code: .
       layers:
         - ${vars.nodejs22LayerArn}
         - ${resources.xenix-backend-nodejs-deps-layer.output.arn}
@@ -68,31 +67,3 @@ resources:
             authType: anonymous
           triggerName: httpTrigger
           triggerType: http
-
-  # ML Backend (Python)
-  xenix-ml-backend:
-    component: fc3
-    actions:
-      pre-deploy:
-        - run: bash build-deps.sh
-          path: ./packages/ml-backend
-    props:
-      region: ${vars.region}
-      functionName: xenix-ml-backend
-      description: ML backend for training and prediction
-      runtime: python3.12
-      memorySize: 4096
-      timeout: 86400
-      invocation-type: async
-      code: ./packages/ml-backend
-      layers:
-        - ${vars.python312LayerArn}
-      environmentVariables:
-        PYTHONPATH: /opt/python:/code
-        ML_BASE_PATH: /tmp/ml-backend
-        LOG_LEVEL: INFO
-        OSS_REGION: ${env.OSS_REGION}
-        OSS_ACCESS_KEY_ID: ${env.OSS_ACCESS_KEY_ID}
-        OSS_ACCESS_KEY_SECRET: ${env.OSS_ACCESS_KEY_SECRET}
-        OSS_BUCKET: ${env.OSS_BUCKET}
-        OSS_ENDPOINT: ${env.OSS_ENDPOINT}
