@@ -3,6 +3,9 @@ set -e
 
 echo "Building backend layer with pnpm..."
 
+# Set CI mode to avoid TTY issues
+export CI=true
+
 # Create layer directory structure
 mkdir -p opt/nodejs
 
