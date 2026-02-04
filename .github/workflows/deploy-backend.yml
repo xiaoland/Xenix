@@ -82,9 +82,20 @@ jobs:
         run: |
           echo "Building backend layer..."
           bash packages/backend/build-layer.sh
+          echo "Verifying s CLI..."
+          which s
+          s --version
           echo "Publishing layer..."
+          set +e
           LAYER_OUTPUT=$(s layer publish --layer-name "$LAYER_NAME" --code ./opt --compatible-runtime nodejs22,custom.debian12 2>&1)
+          LAYER_EXIT_CODE=$?
+          set -e
+          echo "Exit code: $LAYER_EXIT_CODE"
           echo "$LAYER_OUTPUT"
+          if [ $LAYER_EXIT_CODE -ne 0 ]; then
+            echo "ERROR: Layer publish failed with exit code $LAYER_EXIT_CODE"
+            exit $LAYER_EXIT_CODE
+          fi
           # Extract version number from output
           NEW_VERSION=$(echo "$LAYER_OUTPUT" | grep -oP 'version:\s*\K[0-9]+' | tail -1)
           if [ -z "$NEW_VERSION" ]; then
