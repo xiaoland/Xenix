@@ -51,7 +51,7 @@ jobs:
           version: 9
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --prod=false
 
       - name: Install Serverless Devs CLI
         run: npm install -g @serverless-devs/s
