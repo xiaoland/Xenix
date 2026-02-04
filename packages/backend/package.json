@@ -10,7 +10,7 @@
   },
   "scripts": {
     "dev": "dotenv -c development -- tsx watch src/index.ts",
-    "build": "tsup",
+    "build": "pnpm exec tsup",
     "deploy": "pnpm run build && s deploy --use-local",
     "start": "node dist/index.js",
     "db:generate": "dotenv -- pnpm exec drizzle-kit generate",
