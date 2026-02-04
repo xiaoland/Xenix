@@ -74,14 +74,14 @@ jobs:
 
       - name: Check if layer dependencies changed
         id: check-layer
-        run: bash ../../.github/scripts/check-layer-hash-backend.sh
+        run: bash .github/scripts/check-layer-hash-backend.sh
 
       - name: Build and publish backend layer (conditional)
         if: steps.check-layer.outputs.LAYER_CHANGED == 'true'
         id: publish-layer
         run: |
           echo "Building backend layer..."
-          bash build-layer.sh
+          bash packages/backend/build-layer.sh
           echo "Publishing layer..."
           LAYER_OUTPUT=$(s layer publish --layer-name "$LAYER_NAME" --code ./opt --compatible-runtime nodejs22,custom.debian12 2>&1)
           echo "$LAYER_OUTPUT"
@@ -94,22 +94,22 @@ jobs:
           echo "New layer version: $NEW_VERSION"
           echo "LAYER_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Update layer version in s.yaml
+      - name: Update layer version in packages/backend/s.yaml
         if: steps.check-layer.outputs.LAYER_CHANGED == 'true' && steps.publish-layer.outputs.LAYER_VERSION != ''
         run: |
           NEW_VERSION=${{ steps.publish-layer.outputs.LAYER_VERSION }}
-          echo "Updating s.yaml with layer version: $NEW_VERSION"
-          # Update the layer ARN in s.yaml
-          sed -i "s|layers/xenix-backend-nodejs-deps/versions/[0-9]*|layers/xenix-backend-nodejs-deps/versions/$NEW_VERSION|g" s.yaml
+          echo "Updating packages/backend/s.yaml with layer version: $NEW_VERSION"
+          # Update the layer ARN in packages/backend/s.yaml
+          sed -i "s|layers/xenix-backend-nodejs-deps/versions/[0-9]*|layers/xenix-backend-nodejs-deps/versions/$NEW_VERSION|g" packages/backend/s.yaml
           # Show the change
-          grep "nodejsDepsLayerArn" s.yaml
+          grep "nodejsDepsLayerArn" packages/backend/s.yaml
 
       - name: Commit layer version update
         if: steps.check-layer.outputs.LAYER_CHANGED == 'true' && steps.publish-layer.outputs.LAYER_VERSION != ''
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add s.yaml
+          git add packages/backend/s.yaml
           git diff --cached --quiet || (git commit -m "chore: update backend layer version to ${{ steps.publish-layer.outputs.LAYER_VERSION }}" && git push)
 
       - name: Prune old layer versions
