@@ -19,12 +19,29 @@ fi
 echo "Pruning old versions of layer: $LAYER_NAME (keeping latest $KEEP_VERSIONS)"
 
 # List all versions sorted by version number (descending)
-VERSIONS=$(s layer versions list --layer-name "$LAYER_NAME" --output json | jq -r '.[].version' | sort -rn)
+LAYER_OUTPUT=$(s layer versions list --layer-name "$LAYER_NAME" --output json 2>&1) || {
+    echo "Warning: Failed to list layer versions: $LAYER_OUTPUT"
+    echo "Skipping pruning step."
+    exit 0
+}
 
-# Count total versions
-TOTAL_VERSIONS=$(echo "$VERSIONS" | wc -l)
+# Validate JSON output (disable set -e temporarily for this check)
+set +e
+JSON_VALID=$(echo "$LAYER_OUTPUT" | jq -e . > /dev/null 2>&1; echo $?)
+set -e
 
-if [ "$TOTAL_VERSIONS" -le "$KEEP_VERSIONS" ]; then
+if [ "$JSON_VALID" -ne 0 ]; then
+    echo "Warning: Invalid JSON output from layer list command: $LAYER_OUTPUT"
+    echo "Skipping pruning step."
+    exit 0
+fi
+
+VERSIONS=$(echo "$LAYER_OUTPUT" | jq -r '.[].version' | sort -rn)
+
+# Count total versions (handle empty case)
+TOTAL_VERSIONS=$(echo "$VERSIONS" | grep -c '^' || echo "0")
+
+if [ -z "$VERSIONS" ] || [ "$TOTAL_VERSIONS" -le "$KEEP_VERSIONS" ]; then
     echo "Total versions ($TOTAL_VERSIONS) <= keep versions ($KEEP_VERSIONS), no pruning needed"
     exit 0
 fi
