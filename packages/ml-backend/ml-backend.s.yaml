@@ -1,6 +1,12 @@
 edition: 3.0.0
 name: xenix-ml-backend
 access: default
+layers:
+  xenix-ml-backend:
+    path: .
+    build:
+      commands:
+        - bash .github/workflow/build-layer-ml-backend.sh
 resources:
   xenix-ml-backend:
     component: fc3

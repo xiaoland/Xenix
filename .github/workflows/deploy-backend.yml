@@ -84,7 +84,7 @@ jobs:
         id: publish-layer
         run: |
           echo "Building backend layer..."
-          bash .github/workflow/build-layer-backend.sh
+          s layer build --use-docker -t packages/backend/s.yaml --layer-name "$LAYER_NAME"
           echo "Verifying s CLI..."
           which s
           s --version

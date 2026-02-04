@@ -11,6 +11,13 @@ vars:
   # To publish: s layer publish --layer-name xenix-backend-nodejs-deps --code ./opt --compatible-runtime nodejs22,custom.debian12
   nodejsDepsLayerArn: acs:fc:${vars.region}:1565423279464166:layers/xenix-backend-nodejs-deps/versions/1
 
+layers:
+  xenix-backend-nodejs-deps:
+    path: .
+    build:
+      commands:
+        - bash .github/workflow/build-layer-backend.sh
+
 resources:
   # Main HTTP Backend (Node.js)
   xenix-backend:

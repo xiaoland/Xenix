@@ -16,14 +16,11 @@ mkdir -p "$BUILD_DIR/project"
 cp "$ML_BACKEND_DIR/pyproject.toml" "$BUILD_DIR/project/"
 cp "$ML_BACKEND_DIR/pdm.lock" "$BUILD_DIR/project/"
 
-DOCKER_IMAGE="${DOCKER_IMAGE:-python:3.12-bullseye}"
-echo "Using Docker image: $DOCKER_IMAGE"
-
-docker run --rm \
-  -v "$BUILD_DIR/project:/workspace" \
-  -w /workspace \
-  "$DOCKER_IMAGE" \
-  bash -c "pip install --no-cache-dir pdm && pdm export --prod --format requirements --without-hashes --output requirements.txt && mkdir -p /workspace/opt/python && pip install --no-cache-dir -r requirements.txt -t /workspace/opt/python"
+cd "$BUILD_DIR/project"
+pip install --no-cache-dir pdm
+pdm export --prod --format requirements --without-hashes --output requirements.txt
+mkdir -p "$BUILD_DIR/project/opt/python"
+pip install --no-cache-dir -r requirements.txt -t "$BUILD_DIR/project/opt/python"
 
 OUTPUT_DIR="$ROOT_DIR/opt"
 rm -rf "$OUTPUT_DIR"
