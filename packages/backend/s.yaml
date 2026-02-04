@@ -15,10 +15,6 @@ resources:
   # Main HTTP Backend (Node.js)
   xenix-backend:
     component: fc3
-    actions:
-      pre-deploy:
-        - run: pnpm run build
-          path: .
     props:
       region: ${vars.region}
       functionName: xenix-backend

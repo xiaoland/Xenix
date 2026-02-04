@@ -128,10 +128,10 @@ jobs:
         run: bash .github/scripts/prune-layer-versions.sh "$LAYER_NAME" 3
 
       - name: Build backend
-        run: pnpm --filter packages/backend run build
+        run: pnpm --filter backend run build
 
       - name: Deploy backend function
-        run: s deploy xenix-backend -y -t packages/backend/s.yaml
+        run: s deploy xenix-backend -y -t packages/backend/s.yaml --use-local
 
       - name: Deployment summary
         run: |
