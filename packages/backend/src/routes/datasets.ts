@@ -187,9 +187,14 @@ const datasets = new Hono()
       const ext = dataset.filePath.split(".").pop() ?? "";
       const newKey = ext ? `datasets/${uuid}.${ext}` : `datasets/${uuid}`;
 
+      const bufferToUpload = cleanedBuffer.buffer.slice(
+        cleanedBuffer.byteOffset,
+        cleanedBuffer.byteOffset + cleanedBuffer.byteLength,
+      ) as ArrayBuffer;
+
       await storage.upload(
         newKey,
-        cleanedBuffer,
+        bufferToUpload,
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       );
 
@@ -198,7 +203,7 @@ const datasets = new Hono()
         cleanedBuffer.buffer.slice(
           cleanedBuffer.byteOffset,
           cleanedBuffer.byteOffset + cleanedBuffer.byteLength,
-        ),
+        ) as ArrayBuffer,
         newKey,
       );
 

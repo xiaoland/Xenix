@@ -568,6 +568,32 @@
       "passwordsNotMatch": "Passwords do not match",
       "signupSuccess": "Account created successfully. Please sign in."
     },
-    "logout": "Logout"
+    "logout": "Logout",
+    "profile": "Profile",
+    "changePassword": "Change Password"
+  },
+  "users": {
+    "title": "User Management",
+    "createUser": "Create User",
+    "editUser": "Edit User",
+    "email": "Email",
+    "phone": "Phone",
+    "role": "Role",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "roleUser": "User",
+    "roleAdmin": "Admin",
+    "actions": "Actions",
+    "fetchError": "Failed to fetch users",
+    "createSuccess": "User created successfully",
+    "createError": "Failed to create user",
+    "updateSuccess": "User updated successfully",
+    "updateError": "Failed to update user",
+    "deleteSuccess": "User deleted successfully",
+    "deleteError": "Failed to delete user",
+    "deleteConfirm": "Delete User",
+    "deleteConfirmContent": "Are you sure you want to delete user {email}?",
+    "saveError": "Failed to save user"
   }
 }

@@ -487,6 +487,32 @@
       "passwordsNotMatch": "密码不匹配",
       "signupSuccess": "账户创建成功。请登录。"
     },
-    "logout": "登出"
+    "logout": "登出",
+    "profile": "个人资料",
+    "changePassword": "修改密码"
+  },
+  "users": {
+    "title": "用户管理",
+    "createUser": "创建用户",
+    "editUser": "编辑用户",
+    "email": "邮箱",
+    "phone": "手机号",
+    "role": "角色",
+    "status": "状态",
+    "active": "活跃",
+    "inactive": "禁用",
+    "roleUser": "普通用户",
+    "roleAdmin": "管理员",
+    "actions": "操作",
+    "fetchError": "获取用户列表失败",
+    "createSuccess": "用户创建成功",
+    "createError": "创建用户失败",
+    "updateSuccess": "用户更新成功",
+    "updateError": "更新用户失败",
+    "deleteSuccess": "用户删除成功",
+    "deleteError": "删除用户失败",
+    "deleteConfirm": "删除用户",
+    "deleteConfirmContent": "确定要删除用户 {email} 吗？",
+    "saveError": "保存用户失败"
   }
 }

@@ -53,6 +53,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import("../features/tasks/pages/TasksView.vue"),
     meta: { requiresAuth: true },
   },
+  {
+    path: "/admin/users",
+    name: "UserManagement",
+    component: () => import("../features/auth/pages/UsersView.vue"),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
 ];
 
 const router = createRouter({
@@ -62,9 +68,20 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem("auth_token");
+  const userStr = localStorage.getItem("auth_user");
+  let user = null;
+  if (userStr) {
+    try {
+      user = JSON.parse(userStr);
+    } catch (e) {
+      // Invalid user data
+    }
+  }
 
   if (to.meta.requiresAuth && !token) {
     next("/auth/signin");
+  } else if (to.meta.requiresAdmin && user?.role !== "admin") {
+    next("/");
   } else {
     next();
   }

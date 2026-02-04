@@ -153,7 +153,10 @@ export async function removeDuplicateRowsFromBuffer(
   }
 
   const firstRow = data[0];
-  const columns = Object.keys(firstRow);
+  if (!firstRow || typeof firstRow !== "object") {
+    throw new Error("Invalid file format");
+  }
+  const columns = Object.keys(firstRow as object);
 
   // Remove duplicates while keeping first occurrence
   const seen = new Set<string>();
