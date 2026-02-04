@@ -58,10 +58,6 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: .
 
-      - name: Install backend dev dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: packages/backend
-
       - name: Install Serverless Devs CLI
         run: npm install -g @serverless-devs/s
 
