@@ -19,21 +19,28 @@ echo "Building in isolated directory: $BUILD_DIR"
 # Create layer directory structure
 mkdir -p "$BUILD_DIR/nodejs"
 
+PACKAGE_JSON="$ROOT_DIR/packages/backend/package.json"
+
 # Copy only package.json (no workspace files!)
-cp "$SCRIPT_DIR/package.json" "$BUILD_DIR/nodejs/"
+cp "$PACKAGE_JSON" "$BUILD_DIR/nodejs/"
 
-cd "$BUILD_DIR/nodejs"
+# Build dependencies inside Docker to avoid native build mismatches
+DOCKER_IMAGE="${DOCKER_IMAGE:-node:20-bullseye}"
+echo "Using Docker image: $DOCKER_IMAGE"
 
-# Use npm for isolated install (not pnpm, to avoid workspace detection)
-npm install --omit=dev --ignore-scripts --no-optional --no-audit --no-fund
+docker run --rm \
+  -v "$BUILD_DIR/nodejs:/workspace" \
+  -w /workspace \
+  "$DOCKER_IMAGE" \
+  bash -c "npm install --omit=dev --ignore-scripts --no-optional --no-audit --no-fund"
 
 # Clean up package files, keep only node_modules
 rm -f package.json package-lock.json
 
 # Move the built layer to the expected location
-cd "$SCRIPT_DIR"
-rm -rf opt
-mkdir -p opt
-mv "$BUILD_DIR/nodejs" opt/
+OUTPUT_DIR="$ROOT_DIR/opt"
+rm -rf "$OUTPUT_DIR"
+mkdir -p "$OUTPUT_DIR"
+mv "$BUILD_DIR/nodejs" "$OUTPUT_DIR/"
 
 echo "Backend layer built successfully!"

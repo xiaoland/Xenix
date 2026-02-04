@@ -6,15 +6,27 @@ on:
       - main
       - master
     paths:
-      - 'packages/ml-backend/**'
-      - 's.yaml'
-      - '.github/workflows/deploy-ml-backend.yml'
-      - '.github/scripts/check-layer-hash-ml-backend.sh'
-      - '.github/scripts/prune-layer-versions.sh'
+      - "packages/ml-backend/**"
+      - ".github/workflows/deploy-ml-backend.yml"
+      - ".github/scripts/check-layer-hash-ml-backend.sh"
+      - ".github/scripts/prune-layer-versions.sh"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+
+env:
+  LAYER_NAME: xenix-ml-backend
+  # Aliyun credentials
+  ALIYUN_ACCOUNT_ID: ${{ secrets.ALIYUN_ACCOUNT_ID }}
+  ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
+  ALIYUN_ACCESS_KEY_SECRET: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
+  # Application environment variables
+  OSS_REGION: ${{ vars.OSS_REGION }}
+  OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
+  OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+  OSS_BUCKET: ${{ vars.OSS_BUCKET }}
+  OSS_ENDPOINT: ${{ vars.OSS_ENDPOINT }}
 
 jobs:
   deploy:
@@ -26,15 +38,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
       - name: Setup Node.js (for Serverless Devs)
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install Serverless Devs CLI
         run: npm install -g @serverless-devs/s
@@ -42,26 +49,74 @@ jobs:
       - name: Configure Serverless Devs credentials
         run: |
           s config add \
-            --AccountID ${{ secrets.ALIYUN_ACCOUNT_ID }} \
-            --AccessKeyID ${{ secrets.ALIYUN_ACCESS_KEY_ID }} \
-            --AccessKeySecret ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }} \
-            --aliasName default
+            --AccountID "$ALIYUN_ACCOUNT_ID" \
+            --AccessKeyID "$ALIYUN_ACCESS_KEY_ID" \
+            --AccessKeySecret "$ALIYUN_ACCESS_KEY_SECRET" \
+            -a default -f
 
-      - name: Set environment variables
+      - name: Restore layer hash cache
+        uses: actions/cache@v4
+        with:
+          path: packages/ml-backend/.layer-hash-ml-backend
+          key: layer-hash-ml-backend-${{ hashFiles('packages/ml-backend/pyproject.toml', 'packages/ml-backend/pdm.lock') }}
+          restore-keys: |
+            layer-hash-ml-backend-
+
+      - name: Check if layer dependencies changed
+        id: check-layer
+        run: bash .github/scripts/check-layer-hash-ml-backend.sh
+
+      - name: Build and publish ML backend layer (conditional)
+        if: steps.check-layer.outputs.LAYER_CHANGED == 'true'
+        id: publish-layer
         run: |
-          echo "OSS_REGION=${{ secrets.OSS_REGION }}" >> $GITHUB_ENV
-          echo "OSS_ACCESS_KEY_ID=${{ secrets.OSS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
-          echo "OSS_ACCESS_KEY_SECRET=${{ secrets.OSS_ACCESS_KEY_SECRET }}" >> $GITHUB_ENV
-          echo "OSS_BUCKET=${{ secrets.OSS_BUCKET }}" >> $GITHUB_ENV
-          echo "OSS_ENDPOINT=${{ secrets.OSS_ENDPOINT }}" >> $GITHUB_ENV
+          echo "Building ML backend layer..."
+          bash .github/workflow/build-layer-ml-backend.sh
+          echo "Publishing layer..."
+          set +e
+          LAYER_OUTPUT=$(s layer publish --layer-name "$LAYER_NAME" -t packages/ml-backend/ml-backend.s.yaml --code ./opt --compatible-runtime custom.debian11,python3.12 2>&1)
+          LAYER_EXIT_CODE=$?
+          set -e
+          echo "Exit code: $LAYER_EXIT_CODE"
+          echo "$LAYER_OUTPUT"
+          if [ $LAYER_EXIT_CODE -ne 0 ]; then
+            echo "ERROR: Layer publish failed with exit code $LAYER_EXIT_CODE"
+            exit $LAYER_EXIT_CODE
+          fi
+          NEW_VERSION=$(echo "$LAYER_OUTPUT" | grep -oP 'version:\s*\K[0-9]+' | tail -1)
+          if [ -z "$NEW_VERSION" ]; then
+            NEW_VERSION=$(echo "$LAYER_OUTPUT" | grep -oE 'versions/[0-9]+' | tail -1 | cut -d'/' -f2)
+          fi
+          echo "New layer version: $NEW_VERSION"
+          echo "LAYER_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Build ML backend function
-        run: s build xenix-ml-backend --use-docker
+      - name: Update layer version in packages/ml-backend/ml-backend.s.yaml
+        if: steps.check-layer.outputs.LAYER_CHANGED == 'true' && steps.publish-layer.outputs.LAYER_VERSION != ''
+        run: |
+          NEW_VERSION=${{ steps.publish-layer.outputs.LAYER_VERSION }}
+          echo "Updating packages/ml-backend/ml-backend.s.yaml with layer version: $NEW_VERSION"
+          sed -i "s|layers/xenix-ml-backend/versions/[0-9]*|layers/xenix-ml-backend/versions/$NEW_VERSION|g" packages/ml-backend/ml-backend.s.yaml
+          grep "xenix-ml-backend" packages/ml-backend/ml-backend.s.yaml
+
+      - name: Commit layer version update
+        if: steps.check-layer.outputs.LAYER_CHANGED == 'true' && steps.publish-layer.outputs.LAYER_VERSION != ''
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add packages/ml-backend/ml-backend.s.yaml
+          git diff --cached --quiet || (git commit -m "chore: update ml-backend layer version to ${{ steps.publish-layer.outputs.LAYER_VERSION }}" && git push)
+
+      - name: Prune old layer versions
+        if: steps.check-layer.outputs.LAYER_CHANGED == 'true'
+        run: bash .github/scripts/prune-layer-versions.sh "$LAYER_NAME" 3
 
       - name: Deploy ML backend function
-        run: s deploy xenix-ml-backend -y
+        run: s deploy xenix-ml-backend -y -t packages/ml-backend/ml-backend.s.yaml --use-local
 
       - name: Deployment summary
         run: |
-          echo "✅ ML backend deployed successfully!"
-          echo "🚀 ML backend function deployed to Aliyun Function Compute"
+          if [ "${{ steps.check-layer.outputs.LAYER_CHANGED }}" = "true" ]; then
+            echo "✅ ML backend layer and function deployed successfully!"
+          else
+            echo "✅ ML backend function deployed successfully (layer unchanged)!"
+          fi

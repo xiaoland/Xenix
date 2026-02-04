@@ -84,7 +84,7 @@ jobs:
         id: publish-layer
         run: |
           echo "Building backend layer..."
-          bash packages/backend/build-layer.sh
+          bash .github/workflow/build-layer-backend.sh
           echo "Verifying s CLI..."
           which s
           s --version
