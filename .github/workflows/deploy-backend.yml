@@ -121,8 +121,11 @@ jobs:
         if: steps.check-layer.outputs.LAYER_CHANGED == 'true'
         run: bash ../../.github/scripts/prune-layer-versions.sh "$LAYER_NAME" 3
 
+      - name: Build backend
+        run: pnpm run build
+
       - name: Deploy backend function
-        run: s deploy xenix-backend -y --use-local
+        run: s deploy xenix-backend -y
 
       - name: Deployment summary
         run: |
