@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   LAYER_NAME: xenix-backend-nodejs-deps
@@ -81,12 +81,41 @@ jobs:
         id: check-layer
         run: bash ../../.github/scripts/check-layer-hash-backend.sh
 
-      - name: Build and deploy backend layer (conditional)
+      - name: Build and publish backend layer (conditional)
         if: steps.check-layer.outputs.LAYER_CHANGED == 'true'
+        id: publish-layer
         run: |
-          echo "Deploying backend layer..."
-          s build xenix-backend-nodejs-deps-layer
-          s deploy xenix-backend-nodejs-deps-layer -y --use-local
+          echo "Building backend layer..."
+          bash build-layer.sh
+          echo "Publishing layer..."
+          LAYER_OUTPUT=$(s layer publish --layer-name "$LAYER_NAME" --code ./opt --compatible-runtime nodejs22,custom.debian12 2>&1)
+          echo "$LAYER_OUTPUT"
+          # Extract version number from output
+          NEW_VERSION=$(echo "$LAYER_OUTPUT" | grep -oP 'version:\s*\K[0-9]+' | tail -1)
+          if [ -z "$NEW_VERSION" ]; then
+            # Try alternative pattern
+            NEW_VERSION=$(echo "$LAYER_OUTPUT" | grep -oE 'versions/[0-9]+' | tail -1 | cut -d'/' -f2)
+          fi
+          echo "New layer version: $NEW_VERSION"
+          echo "LAYER_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update layer version in s.yaml
+        if: steps.check-layer.outputs.LAYER_CHANGED == 'true' && steps.publish-layer.outputs.LAYER_VERSION != ''
+        run: |
+          NEW_VERSION=${{ steps.publish-layer.outputs.LAYER_VERSION }}
+          echo "Updating s.yaml with layer version: $NEW_VERSION"
+          # Update the layer ARN in s.yaml
+          sed -i "s|layers/xenix-backend-nodejs-deps/versions/[0-9]*|layers/xenix-backend-nodejs-deps/versions/$NEW_VERSION|g" s.yaml
+          # Show the change
+          grep "nodejsDepsLayerArn" s.yaml
+
+      - name: Commit layer version update
+        if: steps.check-layer.outputs.LAYER_CHANGED == 'true' && steps.publish-layer.outputs.LAYER_VERSION != ''
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add s.yaml
+          git diff --cached --quiet || (git commit -m "chore: update backend layer version to ${{ steps.publish-layer.outputs.LAYER_VERSION }}" && git push)
 
       - name: Prune old layer versions
         if: steps.check-layer.outputs.LAYER_CHANGED == 'true'
