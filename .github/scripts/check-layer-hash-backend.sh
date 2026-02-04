@@ -2,8 +2,9 @@
 # Calculate MD5 hash of dependency definitions for backend layer
 set -e
 
-HASH_FILE=".layer-hash-backend"
-PACKAGE_JSON="package.json"
+BACKEND_DIR="packages/backend"
+HASH_FILE="$BACKEND_DIR/.layer-hash-backend"
+PACKAGE_JSON="$BACKEND_DIR/package.json"
 
 # Calculate hash of package.json
 CURRENT_HASH=$(md5sum "$PACKAGE_JSON" | cut -d' ' -f1)
