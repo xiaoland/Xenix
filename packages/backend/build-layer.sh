@@ -6,6 +6,10 @@ echo "Building backend layer with pnpm..."
 # Set CI mode to avoid TTY issues
 export CI=true
 
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 # Create layer directory structure
 mkdir -p opt/nodejs
 
