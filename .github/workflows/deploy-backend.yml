@@ -113,12 +113,12 @@ jobs:
             NEW_VERSION=$(echo "$LAYER_OUTPUT" | grep -oE 'versions/[0-9]+' | tail -1 | cut -d'/' -f2)
           fi
           echo "New layer version: $NEW_VERSION"
-          echo "LAYER_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "NEW_LAYER_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
 
       - name: Update layer version in packages/backend/s.yaml
-        if: steps.check-layer.outputs.LAYER_CHANGED == 'true' && steps.publish-layer.outputs.LAYER_VERSION != ''
+        if: steps.publish-layer.outputs.NEW_LAYER_VERSION != ''
         run: |
-          NEW_VERSION=${{ steps.publish-layer.outputs.LAYER_VERSION }}
+          NEW_VERSION=${{ steps.publish-layer.outputs.NEW_LAYER_VERSION }}
           echo "Updating packages/backend/s.yaml with layer version: $NEW_VERSION"
           # Update the layer ARN in packages/backend/s.yaml
           sed -i "s|layers/xenix-backend-nodejs-deps/versions/[0-9]*|layers/xenix-backend-nodejs-deps/versions/$NEW_VERSION|g" packages/backend/s.yaml
@@ -126,15 +126,15 @@ jobs:
           grep "nodejsDepsLayerArn" packages/backend/s.yaml
 
       - name: Commit layer version update
-        if: steps.check-layer.outputs.LAYER_CHANGED == 'true' && steps.publish-layer.outputs.LAYER_VERSION != ''
+        if: steps.publish-layer.outputs.NEW_LAYER_VERSION != ''
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add packages/backend/s.yaml
-          git diff --cached --quiet || (git commit -m "chore: update backend layer version to ${{ steps.publish-layer.outputs.LAYER_VERSION }}" && git push)
+          git diff --cached --quiet || (git commit -m "chore: update backend layer version to ${{ steps.publish-layer.outputs.NEW_LAYER_VERSION }}" && git push)
 
       - name: Prune old layer versions
-        if: steps.check-layer.outputs.LAYER_CHANGED == 'true'
+        if: steps.publish-layer.outputs.NEW_LAYER_VERSION != ''
         run: bash .github/scripts/prune-layer-versions.sh "$LAYER_NAME" 3
 
       - name: Build backend
@@ -148,7 +148,7 @@ jobs:
 
       - name: Deployment summary
         run: |
-          if [ "${{ steps.check-layer.outputs.LAYER_CHANGED }}" = "true" ]; then
+          if [ "${{ steps.publish-layer.outputs.NEW_LAYER_VERSION }}" != "" ]; then
             echo "✅ Backend layer and function deployed successfully!"
           else
             echo "✅ Backend function deployed successfully (layer unchanged)!"
