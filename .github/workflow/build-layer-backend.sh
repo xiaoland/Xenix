@@ -22,8 +22,8 @@ if ! command -v pnpm >/dev/null 2>&1; then
   exit 1
 fi
 
-# Use pnpm deploy to materialize production deps for @xenix/backend
-pnpm deploy --filter @xenix/backend --prod --ignore-scripts --no-optional --dir "$BUILD_DIR"
+# Use pnpm deploy to materialize production deps for @xenix/backend into temp dir
+pnpm deploy "$BUILD_DIR" --filter @xenix/backend --prod --ignore-scripts --no-optional
 
 # Prepare layer output structure /opt/nodejs/node_modules
 OUTPUT_DIR="$ROOT_DIR/opt"
