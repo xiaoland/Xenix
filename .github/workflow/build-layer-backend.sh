@@ -18,6 +18,21 @@ trap "rm -rf \"$BUILD_DIR\"" EXIT
 
 echo "Building in isolated directory: $BUILD_DIR"
 
+WORK_DIR="$BUILD_DIR/workspace"
+mkdir -p "$WORK_DIR"
+
+# Copy only what pnpm needs for a workspace install to avoid mutating the repo
+FILES=(
+  package.json
+  pnpm-lock.yaml
+  pnpm-workspace.yaml
+  packages
+)
+if [ -f "$ROOT_DIR/.npmrc" ]; then
+  FILES+=(".npmrc")
+fi
+tar -C "$ROOT_DIR" -cf - "${FILES[@]}" | tar -C "$WORK_DIR" -xf -
+
 # Ensure pnpm is available (workflow installed it)
 if ! command -v pnpm >/dev/null 2>&1; then
   if command -v corepack >/dev/null 2>&1; then
@@ -43,7 +58,7 @@ if ! command -v pnpm >/dev/null 2>&1; then
 fi
 
 # Install production deps for @xenix/backend (pnpm deploy has lockfile issues in CI)
-pnpm install --filter @xenix/backend... --prod --ignore-scripts
+pnpm install --filter @xenix/backend... --prod --ignore-scripts --dir "$WORK_DIR"
 
 # Prepare layer output structure /opt/nodejs/node_modules
 OUTPUT_DIR="$ROOT_DIR/packages/backend/opt"
@@ -51,8 +66,8 @@ rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR/nodejs"
 
 # Copy only node_modules into the expected path
-if [ -d "$ROOT_DIR/packages/backend/node_modules" ]; then
-  cp -R "$ROOT_DIR/packages/backend/node_modules" "$OUTPUT_DIR/nodejs/"
+if [ -d "$WORK_DIR/packages/backend/node_modules" ]; then
+  cp -R "$WORK_DIR/packages/backend/node_modules" "$OUTPUT_DIR/nodejs/"
 else
   echo "node_modules not found after pnpm install"
   exit 1
