@@ -12,15 +12,6 @@ on:
       - ".github/scripts/check-layer-hash-backend.sh"
       - ".github/scripts/prune-layer-versions.sh"
   workflow_dispatch:
-    inputs:
-      force_layer_publish:
-        description: "Force rebuild & publish backend layer"
-        required: false
-        default: "false"
-        type: choice
-        options:
-          - "false"
-          - "true"
 
 permissions:
   contents: write
@@ -76,20 +67,7 @@ jobs:
             --AccessKeySecret "$ALIYUN_ACCESS_KEY_SECRET" \
             -a default -f
 
-      - name: Restore layer hash cache
-        uses: actions/cache@v4
-        with:
-          path: packages/backend/.layer-hash-backend
-          key: layer-hash-backend-${{ hashFiles('packages/backend/package.json') }}
-          restore-keys: |
-            layer-hash-backend-
-
-      - name: Check if layer dependencies changed
-        id: check-layer
-        run: bash .github/scripts/check-layer-hash-backend.sh
-
-      - name: Build and publish backend layer (conditional)
-        if: steps.check-layer.outputs.LAYER_CHANGED == 'true' || inputs.force_layer_publish == 'true'
+      - name: Build and publish backend layer
         id: publish-layer
         run: |
           echo "Building backend layer..."
@@ -105,7 +83,7 @@ jobs:
             echo "ERROR: Layer code directory not found: $CODE_PATH"
             exit 1
           fi
-          LAYER_OUTPUT=$(s layer publish --layer-name "$LAYER_NAME" --code "$CODE_PATH" --compatible-runtime nodejs22,custom.debian12 --region "$OSS_REGION" 2>&1)
+          LAYER_OUTPUT=$(s layer publish --layer-name "$LAYER_NAME" --code "$CODE_PATH" --compatible-runtime nodejs22,custom.debian12 --region "$OSS_REGION" --output json 2>&1)
           popd >/dev/null
           LAYER_EXIT_CODE=$?
           set -e
@@ -115,11 +93,20 @@ jobs:
             echo "ERROR: Layer publish failed with exit code $LAYER_EXIT_CODE"
             exit $LAYER_EXIT_CODE
           fi
-          # Extract version number from output
-          NEW_VERSION=$(echo "$LAYER_OUTPUT" | grep -oP 'version:\s*\K[0-9]+' | tail -1)
+          # Extract version number from output (prefer JSON, fallback to text)
+          NEW_VERSION=""
+          if echo "$LAYER_OUTPUT" | jq -e . >/dev/null 2>&1; then
+            NEW_VERSION=$(echo "$LAYER_OUTPUT" | jq -r '.. | .version? // empty' | tail -1)
+          fi
           if [ -z "$NEW_VERSION" ]; then
-            # Try alternative pattern
+            NEW_VERSION=$(echo "$LAYER_OUTPUT" | grep -oP 'version:\s*\K[0-9]+' | tail -1)
+          fi
+          if [ -z "$NEW_VERSION" ]; then
             NEW_VERSION=$(echo "$LAYER_OUTPUT" | grep -oE 'versions/[0-9]+' | tail -1 | cut -d'/' -f2)
+          fi
+          if [ -z "$NEW_VERSION" ]; then
+            echo "ERROR: Unable to determine new layer version from publish output"
+            exit 1
           fi
           echo "New layer version: $NEW_VERSION"
           echo "NEW_LAYER_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
@@ -143,22 +130,33 @@ jobs:
           git diff --cached --quiet || (git commit -m "chore: update backend layer version to ${{ steps.publish-layer.outputs.NEW_LAYER_VERSION }}" && git push)
 
       - name: Prune old layer versions
-        if: steps.publish-layer.outputs.NEW_LAYER_VERSION != ''
         run: bash .github/scripts/prune-layer-versions.sh "$LAYER_NAME" 3
 
       - name: Build backend
         run: pnpm --filter @xenix/backend run build
 
+      - name: Prepare minimal backend deploy artifact
+        run: |
+          set -euo pipefail
+          DEPLOY_DIR="packages/backend/.fc-deploy"
+          rm -rf "$DEPLOY_DIR"
+          mkdir -p "$DEPLOY_DIR"
+
+          cp -R packages/backend/dist "$DEPLOY_DIR/dist"
+          cp packages/backend/fc-start.sh "$DEPLOY_DIR/fc-start.sh"
+          cp packages/backend/s.yaml "$DEPLOY_DIR/s.yaml"
+
+          echo "Deploy artifact contents:"
+          find "$DEPLOY_DIR" -maxdepth 3 -type f | sort
+
       - name: Make fc-start.sh executable
-        run: chmod +x packages/backend/fc-start.sh
+        run: chmod +x packages/backend/.fc-deploy/fc-start.sh
 
       - name: Deploy backend function
-        run: s deploy xenix-backend -y -t packages/backend/s.yaml --use-local
+        run: |
+          pushd packages/backend/.fc-deploy >/dev/null
+          s deploy xenix-backend -y -t s.yaml --use-local
+          popd >/dev/null
 
       - name: Deployment summary
-        run: |
-          if [ "${{ steps.publish-layer.outputs.NEW_LAYER_VERSION }}" != "" ]; then
-            echo "✅ Backend layer and function deployed successfully!"
-          else
-            echo "✅ Backend function deployed successfully (layer unchanged)!"
-          fi
+        run: echo "✅ Backend layer and function deployed successfully!"

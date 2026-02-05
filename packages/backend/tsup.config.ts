@@ -12,5 +12,5 @@ export default defineConfig({
   minify: false,
   dts: false,
   // Bundle only @xenix/shared (source dependencies pattern)
-  noExternal: ['@xenix/shared'],
+  noExternal: ["@xenix/shared"],
 });
