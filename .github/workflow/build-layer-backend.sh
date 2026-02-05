@@ -29,8 +29,15 @@ if ! command -v pnpm >/dev/null 2>&1; then
       echo "pnpm not found; installing via npm..."
       npm install -g pnpm@10.28.1
     else
-      echo "pnpm not found and corepack/npm are unavailable"
-      exit 1
+      echo "pnpm not found and corepack/npm are unavailable; installing nodejs/npm via apt..."
+      if command -v apt-get >/dev/null 2>&1; then
+        apt-get update -y
+        apt-get install -y nodejs npm
+        npm install -g pnpm@10.28.1
+      else
+        echo "apt-get unavailable; cannot install nodejs/npm"
+        exit 1
+      fi
     fi
   fi
 fi
