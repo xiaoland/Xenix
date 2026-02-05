@@ -131,6 +131,9 @@ jobs:
       - name: Build backend
         run: pnpm --filter @xenix/backend run build
 
+      - name: Make fc-start.sh executable
+        run: chmod +x packages/backend/fc-start.sh
+
       - name: Deploy backend function
         run: s deploy xenix-backend -y -t packages/backend/s.yaml --use-local
 
