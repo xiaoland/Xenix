@@ -3,10 +3,11 @@
 ## Infrastructure
 
 - [ ] CD
-  - 仅在特定包变化时
-  - 自动构建层并部署
-  - 自动运行数据库迁移
-  - 自动构建应用并部署
+  - [ ] 自动运行数据库迁移
+  - [ ] 自动构建层（仅在必要时）
+  - [ ] 自动构建应用并部署到 Aliyun FC
+  - Fix 20260205
+    - ml-backend 的打包结果过大
 - [ ] 应用 RFC 7807 Problem Details for HTTP APIs
 - [ ] 增加更多的数据库约束（比如 work_items.dataset_id -> datasets.id），配置正确的默认值
 - [ ] 把所有的 schema 都移动到 shared 中

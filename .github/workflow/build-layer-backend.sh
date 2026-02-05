@@ -43,7 +43,7 @@ if ! command -v pnpm >/dev/null 2>&1; then
 fi
 
 # Install production deps for @xenix/backend (pnpm deploy has lockfile issues in CI)
-pnpm install --filter @xenix/backend... --prod --ignore-scripts --no-optional
+pnpm install --filter @xenix/backend... --prod --ignore-scripts
 
 # Prepare layer output structure /opt/nodejs/node_modules
 OUTPUT_DIR="$ROOT_DIR/packages/backend/opt"
