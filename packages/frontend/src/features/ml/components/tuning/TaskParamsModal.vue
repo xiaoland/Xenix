@@ -8,9 +8,9 @@
   >
     <div v-if="task" class="params-display">
       <div class="mb-4">
-        <h4 class="text-sm font-medium mb-2">
+        <h4 v-if="showModel" class="text-sm font-medium mb-2">
           {{ $t("ml.tuning.model") }}:
-          {{ formatModelName(task.parameter?.model) }}
+          {{ modelName }}
         </h4>
         <a-tag :color="getStatusColor(task.status)">
           {{ task.status }}
@@ -68,6 +68,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import type { Task } from "@xenix/shared";
 
 import { useTaskFormatting } from "@/hooks";
@@ -77,7 +78,7 @@ interface Props {
   task: Task | null;
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
 const emit = defineEmits<{
   "update:open": [value: boolean];
@@ -90,4 +91,15 @@ const {
   formatParamValue,
   getStatusColor,
 } = useTaskFormatting();
+
+const showModel = computed(() => {
+  return !!props.task && props.task.type !== "code-execution";
+});
+
+const modelName = computed(() => {
+  if (!props.task || props.task.type === "code-execution") {
+    return "";
+  }
+  return formatModelName(props.task.parameter.model);
+});
 </script>
