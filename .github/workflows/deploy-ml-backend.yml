@@ -70,11 +70,9 @@ jobs:
         if: steps.check-layer.outputs.LAYER_CHANGED == 'true'
         id: publish-layer
         run: |
-          echo "Building ML backend layer..."
-          s layer build --use-docker -t packages/ml-backend/ml-backend.s.yaml --layer-name "$LAYER_NAME"
-          echo "Publishing layer..."
+          echo "Building and publishing ML backend layer (fc3 build)..."
           set +e
-          LAYER_OUTPUT=$(s layer publish --layer-name "$LAYER_NAME" -t packages/ml-backend/ml-backend.s.yaml --code ./opt --compatible-runtime custom.debian11,python3.12 2>&1)
+          LAYER_OUTPUT=$(s build --publish-layer -t packages/ml-backend/ml-backend.s.yaml --layer-name "$LAYER_NAME" 2>&1)
           LAYER_EXIT_CODE=$?
           set -e
           echo "Exit code: $LAYER_EXIT_CODE"
