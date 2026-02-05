@@ -68,6 +68,13 @@ mkdir -p "$OUTPUT_DIR/nodejs"
 # Copy only node_modules into the expected path
 if [ -d "$WORK_DIR/node_modules" ]; then
   cp -R "$WORK_DIR/node_modules" "$OUTPUT_DIR/nodejs/"
+  # Include manifest files at the layer root to match FC guidance
+  if [ -f "$WORK_DIR/package.json" ]; then
+    cp "$WORK_DIR/package.json" "$OUTPUT_DIR/nodejs/package.json"
+  fi
+  if [ -f "$WORK_DIR/package-lock.json" ]; then
+    cp "$WORK_DIR/package-lock.json" "$OUTPUT_DIR/nodejs/package-lock.json"
+  fi
   echo "Layer node_modules size:"
   du -sh "$OUTPUT_DIR/nodejs/node_modules" || true
   echo "Top-level node_modules (sample):"
