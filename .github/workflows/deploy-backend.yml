@@ -158,11 +158,28 @@ jobs:
       - name: Build backend
         run: pnpm --filter @xenix/backend run build
 
+      - name: Prepare minimal backend deploy artifact
+        run: |
+          set -euo pipefail
+          DEPLOY_DIR="packages/backend/.fc-deploy"
+          rm -rf "$DEPLOY_DIR"
+          mkdir -p "$DEPLOY_DIR"
+
+          cp -R packages/backend/dist "$DEPLOY_DIR/dist"
+          cp packages/backend/fc-start.sh "$DEPLOY_DIR/fc-start.sh"
+          cp packages/backend/s.yaml "$DEPLOY_DIR/s.yaml"
+
+          echo "Deploy artifact contents:"
+          find "$DEPLOY_DIR" -maxdepth 3 -type f | sort
+
       - name: Make fc-start.sh executable
-        run: chmod +x packages/backend/fc-start.sh
+        run: chmod +x packages/backend/.fc-deploy/fc-start.sh
 
       - name: Deploy backend function
-        run: s deploy xenix-backend -y -t packages/backend/s.yaml --use-local
+        run: |
+          pushd packages/backend/.fc-deploy >/dev/null
+          s deploy xenix-backend -y -t s.yaml --use-local
+          popd >/dev/null
 
       - name: Deployment summary
         run: |
