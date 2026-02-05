@@ -84,8 +84,8 @@ jobs:
         id: publish-layer
         run: |
           echo "Building backend layer in docker..."
-          docker pull aliyunfc/runtime-custom.debian12:build-3.1.0
-          docker run --rm -v "$PWD":/workspace -w /workspace aliyunfc/runtime-custom.debian12:build-3.1.0 bash .github/workflow/build-layer-backend.sh
+          docker pull node:20-bookworm
+          docker run --rm -v "$PWD":/workspace -w /workspace node:20-bookworm bash .github/workflow/build-layer-backend.sh
           echo "Publishing layer..."
           set +e
           LAYER_OUTPUT=$(s layer publish --layer-name "$LAYER_NAME" -t packages/backend/s.yaml --code ./opt --compatible-runtime nodejs22,custom.debian12 2>&1)
