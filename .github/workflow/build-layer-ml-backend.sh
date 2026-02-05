@@ -27,7 +27,7 @@ pdm export --prod --format requirements --without-hashes --output requirements.t
 mkdir -p "$BUILD_DIR/project/opt/python"
 python3 -m pip install --no-cache-dir -r requirements.txt -t "$BUILD_DIR/project/opt/python"
 
-OUTPUT_DIR="$ROOT_DIR/opt"
+OUTPUT_DIR="$ROOT_DIR/packages/ml-backend/opt"
 rm -rf "$OUTPUT_DIR"
 mv "$BUILD_DIR/project/opt" "$OUTPUT_DIR"
 

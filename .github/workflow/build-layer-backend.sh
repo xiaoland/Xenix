@@ -46,7 +46,7 @@ fi
 pnpm deploy "$BUILD_DIR" --filter @xenix/backend --prod --ignore-scripts --no-optional
 
 # Prepare layer output structure /opt/nodejs/node_modules
-OUTPUT_DIR="$ROOT_DIR/opt"
+OUTPUT_DIR="$ROOT_DIR/packages/backend/opt"
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR/nodejs"
 
