@@ -5,9 +5,16 @@ set -e
 BACKEND_DIR="packages/backend"
 HASH_FILE="$BACKEND_DIR/.layer-hash-backend"
 PACKAGE_JSON="$BACKEND_DIR/package.json"
+BUILD_SCRIPT=".github/workflow/build-layer-backend.sh"
+WORKFLOW_FILE=".github/workflows/deploy-backend.yml"
 
-# Calculate hash of package.json
-CURRENT_HASH=$(md5sum "$PACKAGE_JSON" | cut -d' ' -f1)
+if [ ! -f "$PACKAGE_JSON" ]; then
+  echo "ERROR: Missing $PACKAGE_JSON"
+  exit 1
+fi
+
+# Hash package dependencies and layer-build pipeline inputs.
+CURRENT_HASH=$(cat "$PACKAGE_JSON" "$BUILD_SCRIPT" "$WORKFLOW_FILE" | md5sum | cut -d' ' -f1)
 
 # Check if hash file exists and compare
 if [ -f "$HASH_FILE" ]; then

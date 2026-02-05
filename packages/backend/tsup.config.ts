@@ -2,11 +2,9 @@ import { defineConfig } from "tsup";
 
 export default defineConfig({
   entry: ["src/index.ts"],
-  format: ["cjs"],
-  target: "node22",
-  platform: "node",
+  format: ["esm"],
+  target: "es2022",
   outDir: "dist",
-  outExtension: () => ({ js: ".cjs" }),
   clean: true,
   sourcemap: true,
   splitting: false,

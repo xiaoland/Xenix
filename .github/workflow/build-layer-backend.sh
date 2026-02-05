@@ -33,8 +33,9 @@ fi
 
 node -e '
 const fs = require("fs");
-const path = process.argv[1];
-const pkg = JSON.parse(fs.readFileSync(path, "utf8"));
+const backendPkgPath = process.argv[1];
+const outputPkgPath = process.argv[2];
+const pkg = JSON.parse(fs.readFileSync(backendPkgPath, "utf8"));
 const deps = pkg.dependencies || {};
 const filtered = {};
 for (const [name, version] of Object.entries(deps)) {
@@ -48,13 +49,11 @@ const out = {
   type: "module",
   dependencies: filtered
 };
-fs.writeFileSync("package.json", JSON.stringify(out, null, 2));
-' "$BACKEND_PKG"
+fs.writeFileSync(outputPkgPath, JSON.stringify(out, null, 2));
+' "$BACKEND_PKG" "$WORK_DIR/package.json"
 
 echo "Generated layer package.json (dependencies only):"
-cat package.json
-
-mv package.json "$WORK_DIR/package.json"
+cat "$WORK_DIR/package.json"
 
 # Install production deps with npm (no dev dependencies, no scripts)
 cd "$WORK_DIR"
@@ -88,6 +87,7 @@ if [ -d "$WORK_DIR/node_modules" ]; then
     fi
   else
     echo "Missing @hono/node-server in layer"
+    exit 1
   fi
 else
   echo "node_modules not found after npm install"
