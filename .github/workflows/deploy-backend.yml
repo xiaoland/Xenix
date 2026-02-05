@@ -43,27 +43,20 @@ env:
   JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
 jobs:
-  deploy:
+  layer:
     runs-on: ubuntu-latest
+    outputs:
+      layer_version: ${{ steps.publish-layer.outputs.NEW_LAYER_VERSION }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 10.28.1
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "pnpm"
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
 
       - name: Install Serverless Devs CLI
         run: npm install -g @serverless-devs/s
@@ -92,9 +85,8 @@ jobs:
         if: steps.check-layer.outputs.LAYER_CHANGED == 'true' || inputs.force_layer_publish == 'true'
         id: publish-layer
         run: |
-          echo "Building backend layer in docker..."
-          docker pull node:20-bookworm
-          docker run --rm -v "$PWD":/workspace -w /workspace node:20-bookworm bash .github/workflow/build-layer-backend.sh
+          echo "Building backend layer..."
+          bash .github/workflow/build-layer-backend.sh
           echo "Publishing layer..."
           set +e
           LAYER_OUTPUT=$(s layer publish --layer-name "$LAYER_NAME" -t packages/backend/s.yaml --code opt --compatible-runtime nodejs22,custom.debian12 2>&1)
@@ -137,6 +129,43 @@ jobs:
         if: steps.publish-layer.outputs.NEW_LAYER_VERSION != ''
         run: bash .github/scripts/prune-layer-versions.sh "$LAYER_NAME" 3
 
+  deploy:
+    needs: layer
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Pull latest (if layer job pushed)
+        run: git pull --ff-only origin ${{ github.ref_name }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.28.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Serverless Devs CLI
+        run: npm install -g @serverless-devs/s
+
+      - name: Configure Serverless Devs credentials
+        run: |
+          s config add \
+            --AccountID "$ALIYUN_ACCOUNT_ID" \
+            --AccessKeyID "$ALIYUN_ACCESS_KEY_ID" \
+            --AccessKeySecret "$ALIYUN_ACCESS_KEY_SECRET" \
+            -a default -f
+
       - name: Build backend
         run: pnpm --filter @xenix/backend run build
 
@@ -148,7 +177,7 @@ jobs:
 
       - name: Deployment summary
         run: |
-          if [ "${{ steps.publish-layer.outputs.NEW_LAYER_VERSION }}" != "" ]; then
+          if [ "${{ needs.layer.outputs.layer_version }}" != "" ]; then
             echo "✅ Backend layer and function deployed successfully!"
           else
             echo "✅ Backend function deployed successfully (layer unchanged)!"
