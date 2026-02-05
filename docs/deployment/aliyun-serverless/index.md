@@ -1,25 +1,27 @@
 # Deploy to Aliyun Serverless
 
-充分利用阿里云 Serverless 服务的能力来部署：
+充分利用阿里云 Serverless 服务能力来部署 Xenix：
 
-- ESA（边缘安全加速）：使用 Pages 部署前端
-- FC（函数计算）：使用自定义运行时部署后端
-- OSS（对象存储）：存储用户上传的、计算得到的数据文件
+- ESA（边缘安全加速）：部署前端
+- FC（函数计算）：部署后端
+- OSS（对象存储）：存储上传与产出文件
 - RDS PostgreSQL：数据库
 
-## Backend
+## Backend（Aliyun FC）
 
-> 基于 Aliyun FC
+当前后端部署策略：
 
-- 自定义层
-- 运行时：自定义运行时 (Debian 12 Node.js 22)
-- 配置
-  - 启动命令：`./fc-start.sh`
-    - 在该 shell 脚本中执行了 node_modules 软链接，因为 ESMJS 不支持 NODE_PATH 环境变量
-  - 数据库 (Aliyun RDS)
-  - 层
-    - 公共层
-- 配置触发器
+- 运行时：`custom.debian12`（叠加官方 Node.js 22 层）
+- 启动命令：`./fc-start.sh`
+- 依赖来源：自定义 Node.js 依赖层 `xenix-backend-nodejs-deps`
+- 函数代码包：仅最小产物（`dist/` + `fc-start.sh` + `s.yaml`）
+
+说明：
+
+- `fc-start.sh` 会在运行时执行 `ln -sf /opt/nodejs/node_modules ./node_modules`，用于让 ESM 入口从当前目录解析 layer 中依赖。
+- CI 工作流会构建并发布 layer，再部署最小函数产物，避免将工作区多余文件（特别是 `node_modules`）打进函数代码。
+
+详细流程见：[aliyun-fc.md](./aliyun-fc.md)。
 
 ## ML Backend
 
@@ -30,14 +32,12 @@
 运行来获得获得依赖层：
 
 - `pdm export -f requirements --without-hashes -o tmp/requirements.txt`
-- `pip install -r tmp/requirements.txt --target ./python --platform manylinux2014_x86_64 --only-binary=:all:` （注意因为 FC 环境是 Debian，在 Windows/MacOS 上构建时要加上平台参数）
+- `pip install -r tmp/requirements.txt --target ./python --platform manylinux2014_x86_64 --only-binary=:all:`（注意因为 FC 环境是 Debian，在 Windows/MacOS 上构建时要加平台参数）
 - `pnpm s cli fc layer publish --code ./my-layer-code --compatible-runtime java8,Java11,custom  --region cn-guangzhou --layer-name xenix-python-dep`
 
 ### 挂载 OSS
 
-## Frontend
-
-> 基于 Aliyun ESA
+## Frontend（Aliyun ESA）
 
 1. 添加：
 
@@ -65,4 +65,4 @@
 
 ### 配置 OSS
 
-需要在 OSS 的 CORS 策略中添加前端的域名，不然就会遭遇 `403 Forbidden`
+需要在 OSS 的 CORS 策略中添加前端域名，否则会遭遇 `403 Forbidden`。

@@ -12,15 +12,6 @@ on:
       - ".github/scripts/check-layer-hash-backend.sh"
       - ".github/scripts/prune-layer-versions.sh"
   workflow_dispatch:
-    inputs:
-      force_layer_publish:
-        description: "Force rebuild & publish backend layer"
-        required: false
-        default: "false"
-        type: choice
-        options:
-          - "false"
-          - "true"
 
 permissions:
   contents: write
@@ -76,20 +67,7 @@ jobs:
             --AccessKeySecret "$ALIYUN_ACCESS_KEY_SECRET" \
             -a default -f
 
-      - name: Restore layer hash cache
-        uses: actions/cache@v4
-        with:
-          path: packages/backend/.layer-hash-backend
-          key: layer-hash-backend-${{ hashFiles('packages/backend/package.json') }}
-          restore-keys: |
-            layer-hash-backend-
-
-      - name: Check if layer dependencies changed
-        id: check-layer
-        run: bash .github/scripts/check-layer-hash-backend.sh
-
-      - name: Build and publish backend layer (conditional)
-        if: steps.check-layer.outputs.LAYER_CHANGED == 'true' || inputs.force_layer_publish == 'true'
+      - name: Build and publish backend layer
         id: publish-layer
         run: |
           echo "Building backend layer..."
@@ -152,7 +130,6 @@ jobs:
           git diff --cached --quiet || (git commit -m "chore: update backend layer version to ${{ steps.publish-layer.outputs.NEW_LAYER_VERSION }}" && git push)
 
       - name: Prune old layer versions
-        if: steps.publish-layer.outputs.NEW_LAYER_VERSION != ''
         run: bash .github/scripts/prune-layer-versions.sh "$LAYER_NAME" 3
 
       - name: Build backend
@@ -182,9 +159,4 @@ jobs:
           popd >/dev/null
 
       - name: Deployment summary
-        run: |
-          if [ "${{ steps.publish-layer.outputs.NEW_LAYER_VERSION }}" != "" ]; then
-            echo "✅ Backend layer and function deployed successfully!"
-          else
-            echo "✅ Backend function deployed successfully (layer unchanged)!"
-          fi
+        run: echo "✅ Backend layer and function deployed successfully!"
