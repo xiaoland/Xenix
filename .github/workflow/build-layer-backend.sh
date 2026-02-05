@@ -60,8 +60,8 @@ mv package.json "$WORK_DIR/package.json"
 cd "$WORK_DIR"
 npm install --omit=dev --ignore-scripts --no-audit --no-fund
 
-# Prepare layer output structure /opt/nodejs/node_modules
-OUTPUT_DIR="$ROOT_DIR/packages/backend/opt"
+# Prepare layer output structure: ZIP root must be nodejs/
+OUTPUT_DIR="$ROOT_DIR/packages/backend/layer"
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR/nodejs"
 
