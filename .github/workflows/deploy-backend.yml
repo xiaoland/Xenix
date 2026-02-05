@@ -96,7 +96,9 @@ jobs:
           bash .github/workflow/build-layer-backend.sh
           echo "Publishing layer..."
           set +e
-          LAYER_OUTPUT=$(s layer publish --layer-name "$LAYER_NAME" --code packages/backend/layer --compatible-runtime nodejs22,custom.debian12 --region "$OSS_REGION" 2>&1)
+          pushd packages/backend >/dev/null
+          LAYER_OUTPUT=$(s layer publish --layer-name "$LAYER_NAME" --code layer --compatible-runtime nodejs22,custom.debian12 --region "$OSS_REGION" 2>&1)
+          popd >/dev/null
           LAYER_EXIT_CODE=$?
           set -e
           echo "Exit code: $LAYER_EXIT_CODE"
