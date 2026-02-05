@@ -20,8 +20,14 @@ echo "Building in isolated directory: $BUILD_DIR"
 
 # Ensure pnpm is available (workflow installed it)
 if ! command -v pnpm >/dev/null 2>&1; then
-  echo "pnpm not found on PATH"
-  exit 1
+  if command -v corepack >/dev/null 2>&1; then
+    echo "pnpm not found; enabling via corepack..."
+    corepack enable
+    corepack prepare pnpm@10.28.1 --activate
+  else
+    echo "pnpm not found and corepack is unavailable"
+    exit 1
+  fi
 fi
 
 # Use pnpm deploy to materialize production deps for @xenix/backend into temp dir

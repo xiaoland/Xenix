@@ -17,10 +17,15 @@ cp "$ML_BACKEND_DIR/pyproject.toml" "$BUILD_DIR/project/"
 cp "$ML_BACKEND_DIR/pdm.lock" "$BUILD_DIR/project/"
 
 cd "$BUILD_DIR/project"
-pip install --no-cache-dir pdm
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "python3 not found on PATH"
+  exit 1
+fi
+python3 -m pip install --no-cache-dir --upgrade pip
+python3 -m pip install --no-cache-dir pdm
 pdm export --prod --format requirements --without-hashes --output requirements.txt
 mkdir -p "$BUILD_DIR/project/opt/python"
-pip install --no-cache-dir -r requirements.txt -t "$BUILD_DIR/project/opt/python"
+python3 -m pip install --no-cache-dir -r requirements.txt -t "$BUILD_DIR/project/opt/python"
 
 OUTPUT_DIR="$ROOT_DIR/opt"
 rm -rf "$OUTPUT_DIR"
