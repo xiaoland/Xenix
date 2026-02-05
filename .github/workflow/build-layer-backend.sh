@@ -42,19 +42,19 @@ if ! command -v pnpm >/dev/null 2>&1; then
   fi
 fi
 
-# Use pnpm deploy to materialize production deps for @xenix/backend into temp dir
-pnpm deploy "$BUILD_DIR" --filter @xenix/backend --prod --ignore-scripts --no-optional
+# Install production deps for @xenix/backend (pnpm deploy has lockfile issues in CI)
+pnpm install --filter @xenix/backend... --prod --ignore-scripts --no-optional
 
 # Prepare layer output structure /opt/nodejs/node_modules
 OUTPUT_DIR="$ROOT_DIR/packages/backend/opt"
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR/nodejs"
 
-# Move only node_modules into the expected path
-if [ -d "$BUILD_DIR/node_modules" ]; then
-  mv "$BUILD_DIR/node_modules" "$OUTPUT_DIR/nodejs/"
+# Copy only node_modules into the expected path
+if [ -d "$ROOT_DIR/packages/backend/node_modules" ]; then
+  cp -R "$ROOT_DIR/packages/backend/node_modules" "$OUTPUT_DIR/nodejs/"
 else
-  echo "node_modules not found after pnpm deploy"
+  echo "node_modules not found after pnpm install"
   exit 1
 fi
 
