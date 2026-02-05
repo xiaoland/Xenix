@@ -12,6 +12,15 @@ on:
       - ".github/scripts/check-layer-hash-backend.sh"
       - ".github/scripts/prune-layer-versions.sh"
   workflow_dispatch:
+    inputs:
+      force_layer_publish:
+        description: "Force rebuild & publish backend layer"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 permissions:
   contents: write
@@ -80,7 +89,7 @@ jobs:
         run: bash .github/scripts/check-layer-hash-backend.sh
 
       - name: Build and publish backend layer (conditional)
-        if: steps.check-layer.outputs.LAYER_CHANGED == 'true'
+        if: steps.check-layer.outputs.LAYER_CHANGED == 'true' || inputs.force_layer_publish == 'true'
         id: publish-layer
         run: |
           echo "Building backend layer in docker..."
@@ -88,7 +97,7 @@ jobs:
           docker run --rm -v "$PWD":/workspace -w /workspace node:20-bookworm bash .github/workflow/build-layer-backend.sh
           echo "Publishing layer..."
           set +e
-          LAYER_OUTPUT=$(s layer publish --layer-name "$LAYER_NAME" -t packages/backend/s.yaml --code ./opt --compatible-runtime nodejs22,custom.debian12 2>&1)
+          LAYER_OUTPUT=$(s layer publish --layer-name "$LAYER_NAME" -t packages/backend/s.yaml --code packages/backend/opt --compatible-runtime nodejs22,custom.debian12 2>&1)
           LAYER_EXIT_CODE=$?
           set -e
           echo "Exit code: $LAYER_EXIT_CODE"
