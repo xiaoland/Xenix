@@ -6,6 +6,11 @@ echo "Building backend layer..."
 # Set CI mode to avoid TTY issues
 export CI=true
 
+echo "Node version:"
+node -v || true
+echo "NPM version:"
+npm -v || true
+
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -46,6 +51,9 @@ const out = {
 fs.writeFileSync("package.json", JSON.stringify(out, null, 2));
 ' "$BACKEND_PKG"
 
+echo "Generated layer package.json (dependencies only):"
+cat package.json
+
 mv package.json "$WORK_DIR/package.json"
 
 # Install production deps with npm (no dev dependencies, no scripts)
@@ -62,6 +70,18 @@ if [ -d "$WORK_DIR/node_modules" ]; then
   cp -R "$WORK_DIR/node_modules" "$OUTPUT_DIR/nodejs/"
   echo "Layer node_modules size:"
   du -sh "$OUTPUT_DIR/nodejs/node_modules" || true
+  echo "Top-level node_modules (sample):"
+  ls -la "$OUTPUT_DIR/nodejs/node_modules" | head -n 40 || true
+  echo "Check @hono/node-server:"
+  if [ -d "$OUTPUT_DIR/nodejs/node_modules/@hono/node-server" ]; then
+    echo "Found @hono/node-server"
+    ls -la "$OUTPUT_DIR/nodejs/node_modules/@hono/node-server" || true
+    if [ -f "$OUTPUT_DIR/nodejs/node_modules/@hono/node-server/package.json" ]; then
+      cat "$OUTPUT_DIR/nodejs/node_modules/@hono/node-server/package.json" | head -n 60 || true
+    fi
+  else
+    echo "Missing @hono/node-server in layer"
+  fi
 else
   echo "node_modules not found after npm install"
   exit 1
