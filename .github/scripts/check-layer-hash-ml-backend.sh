@@ -2,9 +2,10 @@
 # Calculate MD5 hash of dependency definitions for ml-backend layer
 set -e
 
-HASH_FILE=".layer-hash-ml-backend"
-PYPROJECT_TOML="packages/ml-backend/pyproject.toml"
-PDM_LOCK="packages/ml-backend/pdm.lock"
+ML_BACKEND_DIR="packages/ml-backend"
+HASH_FILE="$ML_BACKEND_DIR/.layer-hash-ml-backend"
+PYPROJECT_TOML="$ML_BACKEND_DIR/pyproject.toml"
+PDM_LOCK="$ML_BACKEND_DIR/pdm.lock"
 
 # Check if required files exist
 if [ ! -f "$PYPROJECT_TOML" ]; then
