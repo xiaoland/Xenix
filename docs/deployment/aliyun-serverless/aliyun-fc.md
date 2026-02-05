@@ -1,442 +1,160 @@
-# Xenix Backend Deployment Guide for Aliyun Function Compute
+# Xenix Backend Deployment to Aliyun FC (Current Workflow)
 
-This guide provides detailed instructions for deploying the Xenix backend to Aliyun Function Compute (FC) HTTP Server Mode.
+This document describes the **actual backend deployment path used in this repository**.
 
-## Table of Contents
+> Scope: `packages/backend` Node.js API on Aliyun Function Compute (custom runtime), with Node.js dependencies delivered by a custom FC layer.
 
-1. [Prerequisites](#prerequisites)
-2. [Architecture Overview](#architecture-overview)
-3. [One-Time Setup](#one-time-setup)
-4. [Build Process](#build-process)
-5. [Python Layer Creation](#python-layer-creation)
-6. [FC Function Configuration](#fc-function-configuration)
-7. [Deployment](#deployment)
-8. [Post-Deployment Verification](#post-deployment-verification)
-9. [BullMQ Worker Setup](#bullmq-worker-setup)
-10. [References](#references)
+## Overview
 
----
+Current deployment model:
 
-## Prerequisites
+- Runtime: `custom.debian12` (Node.js 22 available via official layer)
+- Function startup command: `./fc-start.sh`
+- Application artifact deployed to function code (`/code`):
+  - `dist/`
+  - `fc-start.sh`
+  - `s.yaml` (deployment template)
+- Node.js dependencies (`@hono/node-server`, etc.) are published separately to custom layer `xenix-backend-nodejs-deps` and mounted to `/opt/nodejs/node_modules`.
 
-- Node.js 22+ and pnpm installed locally
-- Aliyun account with Function Compute service enabled
-- Aliyun Serverless Devs installed
-- Access to Aliyun RDS PostgreSQL and Redis instances
+This keeps function code minimal and avoids shipping workspace files.
 
 ---
 
-## Architecture Overview
+## Source of Truth Files
 
-### Deployment Package Structure
-
-```
-dist/
-├── index.js              # Bundled Node.js HTTP server with @xenix/shared inlined
-├── index.js.map          # Source map
-└── package.json          # Minimal package.json (created by FC)
-```
-
-### Key Design Decisions
-
-1. **Simple Node.js HTTP Server**: Backend is a standalone HTTP server (Hono-based)
-2. **Source Dependencies**: `@xenix/shared` bundled directly from TypeScript source
-3. **External Dependencies**: Other Node.js packages loaded from `node_modules` (via layer)
-4. **ML Backend Separated**: Python ML scripts are in separate `packages/ml-backend` package
-5. **Managed Services**: Connects to external Aliyun RDS (PostgreSQL) and Redis
+- Workflow: `.github/workflows/deploy-backend.yml`
+- Layer builder: `.github/workflow/build-layer-backend.sh`
+- FC template: `packages/backend/s.yaml`
+- Startup script: `packages/backend/fc-start.sh`
+- Backend build config: `packages/backend/tsup.config.ts`
 
 ---
 
-## One-Time Setup
+## Runtime Behavior
 
-### 1. Create Aliyun Services
+`fc-start.sh` does three key things:
 
-#### RDS PostgreSQL Instance
+1. Prepends `/opt/nodejs/bin` to `PATH`
+2. Creates symlink: `./node_modules -> /opt/nodejs/node_modules`
+3. Starts backend with `node dist/index.js`
 
-```bash
-# Create RDS instance via Aliyun Console or CLI
-# Note the connection string:
-# postgresql://username:password@your-rds.aliyuncs.com:5432/xenix
-```
+Why symlink is needed:
 
-#### Redis Instance
-
-```bash
-# Create Redis instance via Aliyun Console or CLI
-# Note the connection string:
-# redis://r-xxxxx.redis.rds.aliyuncs.com:6379
-```
-
-### 2. Run Database Migrations
-
-```bash
-cd packages/backend
-
-# Set DATABASE_URL to your RDS instance
-export DATABASE_URL="postgresql://user:pass@your-rds.aliyuncs.com:5432/xenix"
-
-# Run migrations
-pnpm run db:migrate
-```
-
-### 3. Configure Environment Variables
-
-Copy [.env.fc.example](.env.fc.example) and update with your values:
-
-```bash
-cp .env.fc.example .env.fc
-# Edit .env.fc with your actual values
-```
+- Backend output is ESM (`dist/index.js`), and ESM does not use `NODE_PATH` fallback for package resolution.
+- Therefore, `node_modules` must exist in the function working directory.
 
 ---
 
-## Build Process
+## Layer Build and Publish
 
-### Quick Start
+Layer is built in isolated temporary workspace by `.github/workflow/build-layer-backend.sh`:
 
-```bash
-# From packages/backend directory
+- Reads `packages/backend/package.json`
+- Filters out `workspace:*` deps
+- Installs prod deps only (`npm install --omit=dev --ignore-scripts`)
+- Produces layer directory at `packages/backend/layer/nodejs/node_modules`
+- Fails fast if `@hono/node-server` is missing
 
-# Build backend (bundles @xenix/shared from source)
-pnpm run build
-
-# Deploy to Aliyun FC
-pnpm run deploy
-```
-
-### Detailed Build Steps
-
-#### Build with tsup
-
-The tsup configuration ([tsup.config.ts](tsup.config.ts)) bundles the application:
+Workflow then publishes with Serverless Devs:
 
 ```bash
-pnpm run build
+s layer publish \
+  --layer-name xenix-backend-nodejs-deps \
+  --code packages/backend/layer \
+  --compatible-runtime nodejs22,custom.debian12 \
+  --region <region>
 ```
 
-This creates `dist/index.js`:
-
-- Bundled HTTP server with `@xenix/shared` inlined
-- Other dependencies remain external (loaded from `node_modules`)
-
-Key configuration:
-
-- `noExternal: ['@xenix/shared']` - Bundles only the shared package from TypeScript source
-- Other Node.js dependencies: external (must be in layer or dependencies)
-- `external: [...]` - Excludes Node.js built-ins
-
-**Note**: `@xenix/shared` uses source dependencies pattern - bundled directly from TypeScript source, no pre-compilation needed.
-
-#### Deploy to FC
-
-```bash
-pnpm run deploy
-```
-
-This runs `s deploy` which:
-
-- Uploads `dist/` directory to FC
-- Applies configuration from [s.yaml](s.yaml)
-- Creates/updates the FC function
+After publish, workflow parses new layer version and updates `packages/backend/s.yaml` layer ARN.
 
 ---
 
-## Python Layer Creation
+## Function Artifact Preparation (Minimal)
 
-FC requires Python packages to be pre-installed. Two options:
+Before function deploy, workflow creates a minimal directory:
 
-### Option A: Custom Layer (Recommended)
+`packages/backend/.fc-deploy`
 
-#### Create Layer Package
+Containing only:
 
-```bash
-# Create layer directory structure
-mkdir -p layer/python/lib/python3.10/site-packages
+- `dist/`
+- `fc-start.sh`
+- `s.yaml`
 
-# Install Python packages
-pip3 install -r requirements.txt -t layer/python/lib/python3.10/site-packages
-
-# Create layer zip
-cd layer
-zip -r python-layer.zip python/
-```
-
-#### Upload to Aliyun FC
-
-Via Console:
-
-1. Navigate to **Function Compute** > **Layers**
-2. Click **Create Layer**
-3. Upload `python-layer.zip`
-4. Select **Python 3.10** runtime
-5. Note the Layer ARN
-
-Via CLI:
-
-```bash
-fcli layer publish \
-  --layer-name xenix-python-deps \
-  --code-zip-file python-layer.zip \
-  --compatible-runtime python3.10
-```
-
-### Option B: Bootstrap Installation (Alternative)
-
-Create a bootstrap script that installs packages on cold start:
-
-**bootstrap.sh:**
-
-```bash
-#!/bin/bash
-set -e
-
-if [ ! -d "/tmp/python-packages" ]; then
-    echo "Installing Python dependencies..."
-    pip3 install -r requirements.txt -t /tmp/python-packages --no-cache-dir
-fi
-
-export PYTHONPATH="/tmp/python-packages:$PYTHONPATH"
-exec node index.js
-```
-
-Upload bootstrap script and set as function initialization handler.
-
-**Note**: This increases cold start time significantly (~30-60 seconds).
+Then deploy is executed from `.fc-deploy` so `code: .` in `s.yaml` points to this minimal artifact.
 
 ---
 
-## FC Function Configuration
+## CI/CD Flow (deploy-backend)
 
-### Create Function
+On each run, workflow does:
 
-Via Aliyun Console:
-
-1. Navigate to **Function Compute** > **Services** > Create Service
-2. Service Name: `xenix`
-3. Create Function within service:
-   - Function Name: `xenix-backend`
-   - Runtime: **Node.js 22**
-   - Memory: **2048 MB** (minimum for ML tasks)
-   - Timeout: **600 seconds** (10 minutes)
-   - Handler: Leave default (we use HTTP trigger)
-
-### Configure HTTP Trigger
-
-1. Click **Create Trigger**
-2. Trigger Type: **HTTP Trigger**
-3. Auth Type: Choose based on your security requirements
-4. Methods: **GET, POST, PUT, DELETE**
-5. Note the trigger URL
-
-### Attach Python Layer
-
-1. In function configuration, scroll to **Layers**
-2. Click **Add Layer**
-3. Select the Python layer created earlier
-4. Save changes
-
-### Set Environment Variables
-
-In Function Configuration > Environment Variables, add all variables from [.env.fc.example](.env.fc.example):
-
-```bash
-NODE_ENV=production
-BACKEND_PORT=9000
-FRONTEND_URL=https://your-frontend-domain.com
-DATABASE_URL=postgresql://user:pass@your-rds.aliyuncs.com:5432/xenix
-REDIS_URL=redis://r-xxxxx.redis.rds.aliyuncs.com:6379
-JWT_SECRET=your-secure-secret-at-least-32-characters-long
-UPLOAD_DIR=/tmp/uploads
-PYTHON_PATH=/usr/bin/python3
-ML_TIMEOUT=300000
-```
-
-### VPC Configuration (if RDS/Redis in VPC)
-
-1. Navigate to **Network Configuration**
-2. Enable VPC
-3. Select VPC, vSwitch, and Security Group
-4. Ensure Security Group allows:
-   - Outbound to RDS (port 5432)
-   - Outbound to Redis (port 6379)
+1. `pnpm install --frozen-lockfile`
+2. Install/configure Serverless Devs credentials
+3. Build backend layer (`build-layer-backend.sh`)
+4. Publish layer
+5. Update `packages/backend/s.yaml` with new layer version
+6. Commit layer version update (if changed)
+7. Prune old layer versions
+8. Build backend (`pnpm --filter @xenix/backend run build`)
+9. Prepare minimal function artifact (`.fc-deploy`)
+10. Deploy function from `.fc-deploy`
 
 ---
 
-## Deployment
+## Required Aliyun Configuration
 
-### Via Aliyun Console
+In `packages/backend/s.yaml`, ensure:
 
-1. Navigate to your function
-2. Click **Code** tab
-3. Click **Upload** > **Upload .zip file**
-4. Select `fc-deploy.zip`
-5. Click **Deploy**
-6. Wait for deployment to complete
-
-### Via Aliyun CLI
-
-```bash
-# Configure Aliyun CLI first
-aliyun configure
-
-# Deploy function
-fcli function update \
-  --service-name xenix \
-  --function-name xenix-backend \
-  --code-zip-file fc-deploy.zip \
-  --region cn-hangzhou
-```
-
-### Via fcli (Function Compute CLI)
-
-```bash
-# Install fcli
-npm install -g @alicloud/fcli
-
-# Configure credentials
-fcli config
-
-# Deploy
-fcli function update \
-  -s xenix \
-  -f xenix-backend \
-  -r cn-hangzhou \
-  --code-zip-file fc-deploy.zip
-```
+- `runtime: custom.debian12`
+- `customRuntimeConfig.command: ["./fc-start.sh"]`
+- Layers include:
+  - official Node.js 22 layer
+  - custom `xenix-backend-nodejs-deps` layer version
+- Environment variables are set (`DATABASE_URL`, `JWT_SECRET`, OSS settings, etc.)
 
 ---
 
-## Post-Deployment Verification
+## Troubleshooting
 
-### 1. Health Check
+### `ERR_MODULE_NOT_FOUND: Cannot find package '@hono/node-server'`
 
-```bash
-curl https://<function-url>/health
-```
+Check in order:
 
-Expected response:
+1. Layer contains package under `nodejs/node_modules/@hono/node-server`
+2. Function has latest custom layer version attached
+3. Function code package does **not** include unexpected workspace payload that interferes with symlink behavior
+4. `fc-start.sh` is executable and startup command is `./fc-start.sh`
 
-```json
-{
-  "status": "ok",
-  "timestamp": "2024-01-14T12:00:00.000Z",
-  "environment": "production",
-  "version": "1"
-}
-```
+### `operation not permitted` at startup
 
-### 2. Authentication Test
+Usually indicates runtime filesystem operation issue.
 
-```bash
-# Create test user first, then:
-curl -X POST https://<function-url>/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"password"}'
-```
+- Verify startup script path and permissions
+- Verify function code package layout is minimal and expected
+- Verify FC runtime has permissions/paths exactly as configured
 
-### 3. Check Logs
+### Layer version not updated
 
-Via Console:
-
-1. Navigate to function
-2. Click **Logs** tab
-3. Check for errors or warnings
-
-Via CLI:
-
-```bash
-fcli logs tail -s xenix -f xenix-backend
-```
-
-Look for:
-
-- ✅ "Starting server" message
-- ✅ Database connection success
-- ✅ Redis connection success
-- ❌ No error stack traces
-
-### 4. Test ML Functionality
-
-Submit a test ML task:
-
-```bash
-TOKEN="<your-jwt-token>"
-
-curl -X POST https://<function-url>/tune \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "inputFile": "/path/to/dataset.csv",
-    "model": "regression.linear_regression_hyperparameter_tuning",
-    "featureColumns": ["feature1", "feature2"],
-    "targetColumn": "target"
-  }'
-```
-
-Check logs for Python script execution.
+Workflow expects publish output to include version metadata; if parsing fails, deployment should fail fast.
 
 ---
 
-## BullMQ Worker Setup
+## Manual Local Verification Pattern
 
-The backend uses BullMQ for async ML task processing. In FC, you have options:
+From repo root:
 
-### Option A: Separate Worker Function (Recommended)
-
-Create a second FC function dedicated to processing jobs:
-
-#### 1. Create Worker Function
-
-Same code package, but different entry point:
-
-**worker.js:**
-
-```javascript
-import './dist-fc/index.js';
-// Import and start worker only
-import { startWorker } from './jobs/mlTaskWorker.js';
-startWorker();
+```bash
+pnpm --filter @xenix/backend run build
+bash .github/workflow/build-layer-backend.sh
 ```
 
-#### 2. Configure Worker Function
-
-- Runtime: Node.js 22
-- Memory: 2048 MB
-- Timeout: 900 seconds (15 minutes for long tasks)
-- Trigger: **Timer Trigger** (every 1-5 minutes)
-
-#### 3. Deploy Worker
-
-Upload same `fc-deploy.zip` but configure to run worker code.
-
-### Option B: Use FC Async Invoke
-
-Replace BullMQ with FC async invocation:
-
-1. Modify ML task submission to use FC async API
-2. Remove Redis dependency
-3. Use FC's built-in async processing
-
-**Pros**: No separate Redis needed
-**Cons**: Less control over job retry/failure handling
-
-### Option C: Combined Function (Not Recommended)
-
-Run worker alongside HTTP server in same function.
-
-**Cons**:
-
-- Cold start issues
-- Worker may not process jobs during idle periods
-- Resource contention
+Then simulate FC runtime by placing layer deps under `/opt/nodejs/node_modules` and running `fc-start.sh` from a minimal directory containing only `dist/` and `fc-start.sh`.
 
 ---
 
-## References
+## Notes
 
-- [Aliyun Function Compute Documentation](https://www.alibabacloud.com/help/fc)
-- [FC Custom Runtime Documentation](https://help.aliyun.com/zh/functioncompute/fc/user-guide/principles-1)
-- [FC Node.js Runtime Reference](https://help.aliyun.com/zh/functioncompute/fc/user-guide/node-js/)
-- [HTTP Trigger Configuration](https://www.alibabacloud.com/help/fc/user-guide/http-triggers)
-- [FC Custom Layer Documentation](https://help.aliyun.com/zh/functioncompute/fc/user-guide/create-a-custom-layer-1)
-- [Aliyun Serverless Devs Documentation](https://docs.serverless-devs.com/)
+- Keep backend output ESM unless runtime strategy changes holistically.
+- Keep `@xenix/shared` bundled via tsup (`noExternal: ["@xenix/shared"]`).
+- Avoid adding workspace artifacts into function code package.
