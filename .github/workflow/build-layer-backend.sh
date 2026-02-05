@@ -5,6 +5,8 @@ echo "Building backend layer..."
 
 # Set CI mode to avoid TTY issues
 export CI=true
+# Ensure pnpm deploy allows workspace package injection in CI
+export PNPM_CONFIG_INJECT_WORKSPACE_PACKAGES=true
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
