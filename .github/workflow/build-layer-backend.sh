@@ -12,29 +12,30 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Build in a temporary directory to completely isolate from workspace
 BUILD_DIR=$(mktemp -d)
-trap "rm -rf $BUILD_DIR" EXIT
+trap "rm -rf \"$BUILD_DIR\"" EXIT
 
 echo "Building in isolated directory: $BUILD_DIR"
 
-# Create layer directory structure
-mkdir -p "$BUILD_DIR/nodejs"
+# Ensure pnpm is available (workflow installed it)
+if ! command -v pnpm >/dev/null 2>&1; then
+  echo "pnpm not found on PATH"
+  exit 1
+fi
 
-PACKAGE_JSON="$ROOT_DIR/packages/backend/package.json"
+# Use pnpm deploy to materialize production deps for @xenix/backend
+pnpm deploy --filter @xenix/backend --prod --ignore-scripts --no-optional --dir "$BUILD_DIR"
 
-# Copy only package.json (no workspace files!)
-cp "$PACKAGE_JSON" "$BUILD_DIR/nodejs/"
-
-# Install dependencies for the layer build
-cd "$BUILD_DIR/nodejs"
-npm install --omit=dev --ignore-scripts --no-optional --no-audit --no-fund
-
-# Clean up package files, keep only node_modules
-rm -f package.json package-lock.json
-
-# Move the built layer to the expected location
+# Prepare layer output structure /opt/nodejs/node_modules
 OUTPUT_DIR="$ROOT_DIR/opt"
 rm -rf "$OUTPUT_DIR"
-mkdir -p "$OUTPUT_DIR"
-mv "$BUILD_DIR/nodejs" "$OUTPUT_DIR/"
+mkdir -p "$OUTPUT_DIR/nodejs"
+
+# Move only node_modules into the expected path
+if [ -d "$BUILD_DIR/node_modules" ]; then
+  mv "$BUILD_DIR/node_modules" "$OUTPUT_DIR/nodejs/"
+else
+  echo "node_modules not found after pnpm deploy"
+  exit 1
+fi
 
 echo "Backend layer built successfully!"
