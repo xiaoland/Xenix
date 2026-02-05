@@ -25,8 +25,13 @@ if ! command -v pnpm >/dev/null 2>&1; then
     corepack enable
     corepack prepare pnpm@10.28.1 --activate
   else
-    echo "pnpm not found and corepack is unavailable"
-    exit 1
+    if command -v npm >/dev/null 2>&1; then
+      echo "pnpm not found; installing via npm..."
+      npm install -g pnpm@10.28.1
+    else
+      echo "pnpm not found and corepack/npm are unavailable"
+      exit 1
+    fi
   fi
 fi
 
