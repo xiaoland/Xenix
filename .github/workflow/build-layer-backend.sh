@@ -66,8 +66,18 @@ rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR/nodejs"
 
 # Copy only node_modules into the expected path
-if [ -d "$WORK_DIR/packages/backend/node_modules" ]; then
-  cp -R "$WORK_DIR/packages/backend/node_modules" "$OUTPUT_DIR/nodejs/"
+SOURCE_NODE_MODULES="$WORK_DIR/packages/backend/node_modules"
+if [ -L "$SOURCE_NODE_MODULES" ]; then
+  # pnpm hoisted linker may make this a symlink to the workspace root
+  SOURCE_NODE_MODULES="$(readlink -f "$SOURCE_NODE_MODULES")"
+fi
+if [ ! -d "$SOURCE_NODE_MODULES" ]; then
+  # Fallback to root node_modules (hoisted linker)
+  SOURCE_NODE_MODULES="$WORK_DIR/node_modules"
+fi
+if [ -d "$SOURCE_NODE_MODULES" ]; then
+  # -L to dereference symlinks so the layer contains real files
+  cp -R -L "$SOURCE_NODE_MODULES" "$OUTPUT_DIR/nodejs/"
 else
   echo "node_modules not found after pnpm install"
   exit 1
