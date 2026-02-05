@@ -149,6 +149,41 @@ jobs:
       - name: Build backend
         run: pnpm --filter @xenix/backend run build
 
+      - name: Prepare backend runtime dependencies
+        run: |
+          set -euo pipefail
+          BACKEND_DIR="packages/backend"
+          BUILD_DIR=$(mktemp -d)
+          trap 'rm -rf "$BUILD_DIR"' EXIT
+
+          node -e '
+          const fs = require("fs");
+          const path = process.argv[1];
+          const pkg = JSON.parse(fs.readFileSync(path, "utf8"));
+          const deps = pkg.dependencies || {};
+          const filtered = {};
+          for (const [name, version] of Object.entries(deps)) {
+            if (typeof version === "string" && version.startsWith("workspace:")) continue;
+            filtered[name] = version;
+          }
+          fs.writeFileSync(process.argv[2], JSON.stringify({
+            name: "@xenix/backend-runtime",
+            private: true,
+            version: "0.0.0",
+            type: "module",
+            dependencies: filtered
+          }, null, 2));
+          ' "$BACKEND_DIR/package.json" "$BUILD_DIR/package.json"
+
+          pushd "$BUILD_DIR" >/dev/null
+          npm install --omit=dev --ignore-scripts --no-audit --no-fund
+          popd >/dev/null
+
+          rm -rf "$BACKEND_DIR/node_modules"
+          cp -R "$BUILD_DIR/node_modules" "$BACKEND_DIR/node_modules"
+          cp "$BUILD_DIR/package.json" "$BACKEND_DIR/package.runtime.json"
+          cp "$BUILD_DIR/package-lock.json" "$BACKEND_DIR/package-lock.runtime.json"
+
       - name: Make fc-start.sh executable
         run: chmod +x packages/backend/fc-start.sh
 
