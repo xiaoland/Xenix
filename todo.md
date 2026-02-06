@@ -3,11 +3,12 @@
 ## Infrastructure
 
 - [ ] CD
-  - [ ] 自动运行数据库迁移
-  - [ ] 自动构建层（仅在必要时）
-  - [ ] 自动构建应用并部署到 Aliyun FC
-  - Fix 20260205
-    - ml-backend 的打包结果过大
+  - [ ] 自动运行数据库迁移（支持回滚，要备份）
+  - [x] 自动构建层（仅在必要时）
+  - [x] 自动构建应用并部署到 Aliyun FC
+  - Fix
+    - [ ] ml-backend 的打包结果过大
+    - [ ] 层清理不工作
 - [ ] 应用 RFC 7807 Problem Details for HTTP APIs
 - [ ] 增加更多的数据库约束（比如 work_items.dataset_id -> datasets.id），配置正确的默认值
 - [ ] 把所有的 schema 都移动到 shared 中
@@ -19,7 +20,9 @@
 
 ### Tasks
 
-- [ ] 任务日志查看
+- [ ] 流式任务日志
+  - 可以的话不要再给 PostgreSQl 数据库负担了，考虑到成本问题？
+  不过也还需要进一步确认 SLS 之类服务的价格。
 
 ### ML Operations
 
@@ -37,3 +40,8 @@
 ## Others
 
 - [ ] 橙色为主题色
+- [ ] 一键反馈
+
+## FIXMEs
+
+- [ ] 翻译缺漏和错误
