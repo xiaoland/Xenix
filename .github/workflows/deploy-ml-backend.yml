@@ -63,7 +63,7 @@ jobs:
         run: |
           echo "Publishing ML backend layer..."
           set +e
-          LAYER_OUTPUT=$(s layer publish -t packages/ml-backend/ml-backend.s.yaml --layer-name "$LAYER_NAME" --code .layer-build/ml-backend/opt --compatible-runtime custom.debian11,python3.12 --region "$OSS_REGION" --output json 2>&1)
+          LAYER_OUTPUT=$(s layer publish -t packages/ml-backend/ml-backend.s.yaml --layer-name "$LAYER_NAME" --code "$GITHUB_WORKSPACE/.layer-build/ml-backend/opt" --compatible-runtime custom.debian11,python3.12 --region "$OSS_REGION" --output json 2>&1)
           LAYER_EXIT_CODE=$?
           set -e
           echo "Exit code: $LAYER_EXIT_CODE"
