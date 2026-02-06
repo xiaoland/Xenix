@@ -66,29 +66,47 @@ jobs:
         id: check-layer
         run: bash .github/scripts/check-layer-hash-ml-backend.sh
 
+      - name: Prepare dependencies for Serverless Devs build
+        run: bash .github/workflow/build-layer-ml-backend.sh
+
       - name: Build and publish ML backend layer
         id: publish-layer
+        if: steps.check-layer.outputs.LAYER_CHANGED == 'true'
         run: |
-          echo "Building ML backend layer in docker..."
-          docker pull python:3.12-bookworm
-          docker run --rm -v "$PWD":/workspace -w /workspace python:3.12-bookworm bash .github/workflow/build-layer-ml-backend.sh
-          echo "Publishing layer..."
+          cd packages/ml-backend
+          echo "Building and publishing ML backend layer using Serverless Devs..."
           set +e
-          LAYER_OUTPUT=$(s layer publish --layer-name "$LAYER_NAME" -t .layer-build/ml-backend/ml-backend.s.yaml --code .layer-build/ml-backend/opt --compatible-runtime custom.debian11,python3.12 2>&1)
+          LAYER_OUTPUT=$(s build --publish-layer --layer-name "$LAYER_NAME" --compatible-runtime python3.12 --region "$OSS_REGION" --output json 2>&1)
           LAYER_EXIT_CODE=$?
           set -e
           echo "Exit code: $LAYER_EXIT_CODE"
           echo "$LAYER_OUTPUT"
           if [ $LAYER_EXIT_CODE -ne 0 ]; then
-            echo "ERROR: Layer publish failed with exit code $LAYER_EXIT_CODE"
+            echo "ERROR: Layer build and publish failed with exit code $LAYER_EXIT_CODE"
             exit $LAYER_EXIT_CODE
           fi
-          NEW_VERSION=$(echo "$LAYER_OUTPUT" | grep -oP 'version:\s*\K[0-9]+' | tail -1)
+          # Extract version number from JSON output
+          NEW_VERSION=""
+          if echo "$LAYER_OUTPUT" | jq -e . >/dev/null 2>&1; then
+            NEW_VERSION=$(echo "$LAYER_OUTPUT" | jq -r '.. | .version? // empty' | tail -1)
+          fi
+          if [ -z "$NEW_VERSION" ]; then
+            NEW_VERSION=$(echo "$LAYER_OUTPUT" | grep -oP 'version:\s*\K[0-9]+' | tail -1)
+          fi
           if [ -z "$NEW_VERSION" ]; then
             NEW_VERSION=$(echo "$LAYER_OUTPUT" | grep -oE 'versions/[0-9]+' | tail -1 | cut -d'/' -f2)
           fi
+          if [ -z "$NEW_VERSION" ]; then
+            echo "ERROR: Unable to determine new layer version from build output"
+            exit 1
+          fi
           echo "New layer version: $NEW_VERSION"
           echo "LAYER_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Cleanup generated files after layer build
+        run: |
+          cd packages/ml-backend
+          rm -f requirements.txt
 
       - name: Update layer version in packages/ml-backend/ml-backend.s.yaml
         if: steps.publish-layer.outputs.LAYER_VERSION != ''
@@ -107,10 +125,13 @@ jobs:
           git diff --cached --quiet || (git commit -m "chore: update ml-backend layer version to ${{ steps.publish-layer.outputs.LAYER_VERSION }}" && git push)
 
       - name: Prune old layer versions
+        if: steps.check-layer.outputs.LAYER_CHANGED == 'true'
         run: bash .github/scripts/prune-layer-versions.sh "$LAYER_NAME" 3 "$OSS_REGION"
 
       - name: Deploy ML backend function
-        run: s deploy xenix-ml-backend -y -t packages/ml-backend/ml-backend.s.yaml --use-local
+        run: |
+          cd packages/ml-backend
+          s deploy xenix-ml-backend -y --use-local
 
       - name: Deployment summary
         run: |
