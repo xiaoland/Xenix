@@ -74,10 +74,18 @@ jobs:
       - name: Build and publish backend layer
         id: publish-layer
         run: |
-          cd packages/backend
-          echo "Building and publishing backend layer using Serverless Devs..."
+          echo "Building backend layer..."
+          bash .github/workflow/build-layer-backend.sh
+          echo "Publishing backend layer..."
           set +e
-          LAYER_OUTPUT=$(s build --publish-layer --layer-name "$LAYER_NAME" --region "$OSS_REGION" --output json 2>&1)
+          pushd packages/backend >/dev/null
+          CODE_PATH="$PWD/layer"
+          if [ ! -d "$CODE_PATH" ]; then
+            echo "ERROR: Layer code directory not found: $CODE_PATH"
+            exit 1
+          fi
+          LAYER_OUTPUT=$(s layer publish --layer-name "$LAYER_NAME" --code "$CODE_PATH" --compatible-runtime nodejs22,custom.debian12 --region "$OSS_REGION" --output json 2>&1)
+          popd >/dev/null
           LAYER_EXIT_CODE=$?
           set -e
           echo "Exit code: $LAYER_EXIT_CODE"
@@ -103,14 +111,6 @@ jobs:
           fi
           echo "New layer version: $NEW_VERSION"
           echo "NEW_LAYER_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
-
-      - name: Restore original package.json after layer build
-        run: |
-          cd packages/backend
-          if [ -f package.json.original ]; then
-            mv package.json.original package.json
-            rm -f package.json.build
-          fi
 
       - name: Update layer version in packages/backend/s.yaml
         if: steps.publish-layer.outputs.NEW_LAYER_VERSION != ''
