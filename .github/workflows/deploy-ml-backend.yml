@@ -105,10 +105,15 @@ jobs:
       - name: Commit layer version update
         if: steps.publish-layer.outputs.LAYER_VERSION != ''
         run: |
+          set +e
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add packages/ml-backend/ml-backend.s.yaml
-          git diff --cached --quiet || (git commit -m "chore: update ml-backend layer version to ${{ steps.publish-layer.outputs.LAYER_VERSION }}" && git push)
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: update ml-backend layer version to ${{ steps.publish-layer.outputs.LAYER_VERSION }}"
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push || echo "WARNING: Failed to push layer version update; continuing deploy."
+          set -e
 
       - name: Prune old layer versions
         run: bash .github/scripts/prune-layer-versions.sh "$LAYER_NAME" 3 "$OSS_REGION"
