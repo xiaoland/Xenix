@@ -75,7 +75,7 @@ jobs:
           docker run --rm -v "$PWD":/workspace -w /workspace python:3.12-bookworm bash .github/workflow/build-layer-ml-backend.sh
           echo "Publishing layer..."
           set +e
-          LAYER_OUTPUT=$(s layer publish --layer-name "$LAYER_NAME" -t packages/ml-backend/ml-backend.s.yaml --code ./opt --compatible-runtime custom.debian11,python3.12 2>&1)
+          LAYER_OUTPUT=$(s layer publish --layer-name "$LAYER_NAME" -t .layer-build/ml-backend/ml-backend.s.yaml --code .layer-build/ml-backend/opt --compatible-runtime custom.debian11,python3.12 2>&1)
           LAYER_EXIT_CODE=$?
           set -e
           echo "Exit code: $LAYER_EXIT_CODE"
