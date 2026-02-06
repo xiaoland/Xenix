@@ -17,6 +17,7 @@ permissions:
 
 env:
   LAYER_NAME: xenix-ml-backend
+  FC_DOCKER_VERSION: "3.0.0"
   # Aliyun credentials
   ALIYUN_ACCOUNT_ID: ${{ secrets.ALIYUN_ACCOUNT_ID }}
   ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
@@ -68,6 +69,7 @@ jobs:
 
       - name: Prepare dependencies for Serverless Devs build
         run: bash .github/workflow/build-layer-ml-backend.sh
+        # TODO rename to prepare-ml-backend-layer.sh
 
       - name: Build and publish ML backend layer
         id: publish-layer
@@ -76,7 +78,7 @@ jobs:
           cd packages/ml-backend
           echo "Building and publishing ML backend layer using Serverless Devs..."
           set +e
-          LAYER_OUTPUT=$(s build --publish-layer --layer-name "$LAYER_NAME" --region "$OSS_REGION" --output json 2>&1)
+          LAYER_OUTPUT=$(s build --publish-layer -t ml-backend.s.yaml --layer-name "$LAYER_NAME" --region "$OSS_REGION" --output json 2>&1)
           LAYER_EXIT_CODE=$?
           set -e
           echo "Exit code: $LAYER_EXIT_CODE"
@@ -131,7 +133,7 @@ jobs:
       - name: Deploy ML backend function
         run: |
           cd packages/ml-backend
-          s deploy xenix-ml-backend -y --use-local
+          s deploy xenix-ml-backend -y -t ml-backend.s.yaml --use-local
 
       - name: Deployment summary
         run: |

@@ -18,6 +18,7 @@ permissions:
 
 env:
   LAYER_NAME: xenix-backend-nodejs-deps
+  FC_DOCKER_VERSION: "3.0.0"
   NODE_ENV: development
   NPM_CONFIG_PRODUCTION: "false"
   # Aliyun credentials
