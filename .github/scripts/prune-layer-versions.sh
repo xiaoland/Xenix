@@ -26,16 +26,23 @@ if [ -n "$TEMPLATE_PATH" ]; then
     LAYER_ARGS+=(-t "$TEMPLATE_PATH")
 fi
 
-# List all versions sorted by version number (descending)
-LAYER_OUTPUT=$(s layer versions "${LAYER_ARGS[@]}" --output json 2>&1) || {
+# List all versions
+LAYER_OUTPUT=$(s layer versions "${LAYER_ARGS[@]}" -o json --silent 2>&1) || {
     echo "Warning: Failed to list layer versions: $LAYER_OUTPUT"
     echo "Skipping pruning step."
     exit 0
 }
 
-# Validate JSON output (disable set -e temporarily for this check)
+# Serverless Devs may include human-readable logs before JSON.
+JSON_PAYLOAD=$(echo "$LAYER_OUTPUT" | awk '
+  BEGIN { capture = 0 }
+  /^[[:space:]]*[\[{]/ { capture = 1 }
+  capture { print }
+')
+
+# Validate JSON payload (disable set -e temporarily for this check)
 set +e
-JSON_VALID=$(echo "$LAYER_OUTPUT" | jq -e . > /dev/null 2>&1; echo $?)
+JSON_VALID=$(echo "$JSON_PAYLOAD" | jq -e . > /dev/null 2>&1; echo $?)
 set -e
 
 if [ "$JSON_VALID" -ne 0 ]; then
@@ -46,7 +53,7 @@ fi
 
 # Support multiple JSON response shapes from Serverless Devs.
 VERSIONS=$(
-    echo "$LAYER_OUTPUT" \
+    echo "$JSON_PAYLOAD" \
         | jq -r '.. | .version? // .versionId? // empty' \
         | grep -E '^[0-9]+$' \
         | sort -rn \
