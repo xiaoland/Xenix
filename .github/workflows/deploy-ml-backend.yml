@@ -76,7 +76,7 @@ jobs:
           cd packages/ml-backend
           echo "Building and publishing ML backend layer using Serverless Devs..."
           set +e
-          LAYER_OUTPUT=$(s build --publish-layer --layer-name "$LAYER_NAME" --compatible-runtime python3.12 --region "$OSS_REGION" --output json 2>&1)
+          LAYER_OUTPUT=$(s build --publish-layer --layer-name "$LAYER_NAME" --region "$OSS_REGION" --output json 2>&1)
           LAYER_EXIT_CODE=$?
           set -e
           echo "Exit code: $LAYER_EXIT_CODE"
