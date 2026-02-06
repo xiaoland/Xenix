@@ -61,10 +61,9 @@ jobs:
       - name: Build and publish ML backend layer
         id: publish-layer
         run: |
-          cd packages/ml-backend
-          echo "Building and publishing ML backend layer using Serverless Devs..."
+          echo "Publishing ML backend layer..."
           set +e
-          LAYER_OUTPUT=$(s build --publish-layer -t ml-backend.s.yaml --layer-name "$LAYER_NAME" --region "$OSS_REGION" --output json 2>&1)
+          LAYER_OUTPUT=$(s layer publish --layer-name "$LAYER_NAME" --code .layer-build/ml-backend/opt --compatible-runtime custom.debian11,python3.12 --region "$OSS_REGION" --output json 2>&1)
           LAYER_EXIT_CODE=$?
           set -e
           echo "Exit code: $LAYER_EXIT_CODE"
@@ -93,8 +92,7 @@ jobs:
 
       - name: Cleanup generated files after layer build
         run: |
-          cd packages/ml-backend
-          rm -f requirements.txt
+          rm -rf .layer-build/ml-backend
 
       - name: Update layer version in packages/ml-backend/ml-backend.s.yaml
         if: steps.publish-layer.outputs.LAYER_VERSION != ''
