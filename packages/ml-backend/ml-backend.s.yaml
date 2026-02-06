@@ -14,7 +14,7 @@ resources:
       diskSize: 512
       internetAccess: false
       layers:
-        - acs:fc:cn-hangzhou:1565423279464166:layers/xenix-ml-backend/versions/3
+        - acs:fc:cn-hangzhou:1565423279464166:layers/xenix-ml-backend/versions/4
       ossMountConfig:
         mountPoints:
           - bucketName: xenix
