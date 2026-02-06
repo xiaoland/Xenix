@@ -66,8 +66,7 @@ jobs:
         id: check-layer
         run: bash .github/scripts/check-layer-hash-ml-backend.sh
 
-      - name: Build and publish ML backend layer (conditional)
-        if: steps.check-layer.outputs.LAYER_CHANGED == 'true'
+      - name: Build and publish ML backend layer
         id: publish-layer
         run: |
           echo "Building ML backend layer in docker..."
@@ -92,7 +91,7 @@ jobs:
           echo "LAYER_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
 
       - name: Update layer version in packages/ml-backend/ml-backend.s.yaml
-        if: steps.check-layer.outputs.LAYER_CHANGED == 'true' && steps.publish-layer.outputs.LAYER_VERSION != ''
+        if: steps.publish-layer.outputs.LAYER_VERSION != ''
         run: |
           NEW_VERSION=${{ steps.publish-layer.outputs.LAYER_VERSION }}
           echo "Updating packages/ml-backend/ml-backend.s.yaml with layer version: $NEW_VERSION"
@@ -100,7 +99,7 @@ jobs:
           grep "xenix-ml-backend" packages/ml-backend/ml-backend.s.yaml
 
       - name: Commit layer version update
-        if: steps.check-layer.outputs.LAYER_CHANGED == 'true' && steps.publish-layer.outputs.LAYER_VERSION != ''
+        if: steps.publish-layer.outputs.LAYER_VERSION != ''
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
@@ -108,8 +107,7 @@ jobs:
           git diff --cached --quiet || (git commit -m "chore: update ml-backend layer version to ${{ steps.publish-layer.outputs.LAYER_VERSION }}" && git push)
 
       - name: Prune old layer versions
-        if: steps.check-layer.outputs.LAYER_CHANGED == 'true'
-        run: bash .github/scripts/prune-layer-versions.sh "$LAYER_NAME" 3
+        run: bash .github/scripts/prune-layer-versions.sh "$LAYER_NAME" 3 "$OSS_REGION"
 
       - name: Deploy ML backend function
         run: s deploy xenix-ml-backend -y -t packages/ml-backend/ml-backend.s.yaml --use-local

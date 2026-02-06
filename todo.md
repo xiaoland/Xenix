@@ -7,7 +7,7 @@
   - [x] 自动构建层（仅在必要时）
   - [x] 自动构建应用并部署到 Aliyun FC
   - Fix
-    - [ ] ml-backend 的打包结果过大
+    - [x] ml-backend 的打包结果过大
     - [ ] 层清理不工作
 - [ ] 应用 RFC 7807 Problem Details for HTTP APIs
 - [ ] 增加更多的数据库约束（比如 work_items.dataset_id -> datasets.id），配置正确的默认值

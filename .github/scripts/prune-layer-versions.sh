@@ -4,9 +4,10 @@ set -e
 
 LAYER_NAME=$1
 KEEP_VERSIONS=${2:-5}  # Default to keeping 5 versions
+REGION=$3              # Aliyun region (required)
 
-if [ -z "$LAYER_NAME" ]; then
-    echo "Usage: $0 <layer-name> [keep-versions]"
+if [ -z "$LAYER_NAME" ] || [ -z "$REGION" ]; then
+    echo "Usage: $0 <layer-name> <keep-versions> <region>"
     exit 1
 fi
 
@@ -19,7 +20,7 @@ fi
 echo "Pruning old versions of layer: $LAYER_NAME (keeping latest $KEEP_VERSIONS)"
 
 # List all versions sorted by version number (descending)
-LAYER_OUTPUT=$(s layer versions list --layer-name "$LAYER_NAME" --output json 2>&1) || {
+LAYER_OUTPUT=$(s layer versions list --layer-name "$LAYER_NAME" --region "$REGION" --output json 2>&1) || {
     echo "Warning: Failed to list layer versions: $LAYER_OUTPUT"
     echo "Skipping pruning step."
     exit 0
@@ -56,7 +57,7 @@ VERSIONS_TO_DELETE=$(echo "$VERSIONS" | tail -n "$DELETE_COUNT")
 # Delete old versions
 for VERSION in $VERSIONS_TO_DELETE; do
     echo "Deleting version $VERSION..."
-    s layer version delete --layer-name "$LAYER_NAME" --version-id "$VERSION" -y || echo "Failed to delete version $VERSION"
+    s layer version delete --layer-name "$LAYER_NAME" --version-id "$VERSION" --region "$REGION" -y || echo "Failed to delete version $VERSION"
 done
 
 echo "Layer pruning completed!"
