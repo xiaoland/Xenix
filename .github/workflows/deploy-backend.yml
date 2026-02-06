@@ -131,7 +131,7 @@ jobs:
           git diff --cached --quiet || (git commit -m "chore: update backend layer version to ${{ steps.publish-layer.outputs.NEW_LAYER_VERSION }}" && git push)
 
       - name: Prune old layer versions
-        run: bash .github/scripts/prune-layer-versions.sh "$LAYER_NAME" 3 "$OSS_REGION"
+        run: bash .github/scripts/prune-layer-versions.sh "$LAYER_NAME" 3 "$OSS_REGION" "packages/backend/s.yaml"
 
       - name: Build backend
         run: pnpm --filter @xenix/backend run build
@@ -160,3 +160,4 @@ jobs:
 
       - name: Deployment summary
         run: echo "✅ Backend layer and function deployed successfully!"
+

@@ -1,13 +1,14 @@
 #!/bin/bash
 # Prune old layer versions, keeping only the latest N versions
-set -e
+set -euo pipefail
 
-LAYER_NAME=$1
-KEEP_VERSIONS=${2:-5}  # Default to keeping 5 versions
-REGION=$3              # Aliyun region (required)
+LAYER_NAME="${1:-}"
+KEEP_VERSIONS="${2:-5}" # Default to keeping 5 versions
+REGION="${3:-}"         # Aliyun region (required)
+TEMPLATE_PATH="${4:-}"  # Optional s.yaml path, recommended in CI
 
 if [ -z "$LAYER_NAME" ] || [ -z "$REGION" ]; then
-    echo "Usage: $0 <layer-name> <keep-versions> <region>"
+    echo "Usage: $0 <layer-name> <keep-versions> <region> [template-path]"
     exit 1
 fi
 
@@ -19,8 +20,14 @@ fi
 
 echo "Pruning old versions of layer: $LAYER_NAME (keeping latest $KEEP_VERSIONS)"
 
+# Build shared CLI args for layer operations.
+LAYER_ARGS=(--layer-name "$LAYER_NAME" --region "$REGION")
+if [ -n "$TEMPLATE_PATH" ]; then
+    LAYER_ARGS+=(-t "$TEMPLATE_PATH")
+fi
+
 # List all versions sorted by version number (descending)
-LAYER_OUTPUT=$(s layer versions list --layer-name "$LAYER_NAME" --region "$REGION" --output json 2>&1) || {
+LAYER_OUTPUT=$(s layer versions "${LAYER_ARGS[@]}" --output json 2>&1) || {
     echo "Warning: Failed to list layer versions: $LAYER_OUTPUT"
     echo "Skipping pruning step."
     exit 0
@@ -37,10 +44,18 @@ if [ "$JSON_VALID" -ne 0 ]; then
     exit 0
 fi
 
-VERSIONS=$(echo "$LAYER_OUTPUT" | jq -r '.[].version' | sort -rn)
+# Support multiple JSON response shapes from Serverless Devs.
+VERSIONS=$(
+    echo "$LAYER_OUTPUT" \
+        | jq -r '.. | .version? // .versionId? // empty' \
+        | grep -E '^[0-9]+$' \
+        | sort -rn \
+        | uniq \
+        || true
+)
 
 # Count total versions (handle empty case)
-TOTAL_VERSIONS=$(echo "$VERSIONS" | grep -c '^' || echo "0")
+TOTAL_VERSIONS=$(echo "$VERSIONS" | sed '/^$/d' | wc -l | tr -d ' ')
 
 if [ -z "$VERSIONS" ] || [ "$TOTAL_VERSIONS" -le "$KEEP_VERSIONS" ]; then
     echo "Total versions ($TOTAL_VERSIONS) <= keep versions ($KEEP_VERSIONS), no pruning needed"
@@ -57,7 +72,7 @@ VERSIONS_TO_DELETE=$(echo "$VERSIONS" | tail -n "$DELETE_COUNT")
 # Delete old versions
 for VERSION in $VERSIONS_TO_DELETE; do
     echo "Deleting version $VERSION..."
-    s layer version delete --layer-name "$LAYER_NAME" --version-id "$VERSION" --region "$REGION" -y || echo "Failed to delete version $VERSION"
+    s layer remove "${LAYER_ARGS[@]}" --version-id "$VERSION" -y || echo "Failed to delete version $VERSION"
 done
 
 echo "Layer pruning completed!"

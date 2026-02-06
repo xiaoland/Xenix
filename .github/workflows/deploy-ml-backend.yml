@@ -116,7 +116,7 @@ jobs:
           set -e
 
       - name: Prune old layer versions
-        run: bash .github/scripts/prune-layer-versions.sh "$LAYER_NAME" 3 "$OSS_REGION"
+        run: bash .github/scripts/prune-layer-versions.sh "$LAYER_NAME" 3 "$OSS_REGION" "packages/ml-backend/ml-backend.s.yaml"
 
       - name: Deploy ML backend function
         run: |
@@ -125,3 +125,4 @@ jobs:
 
       - name: Deployment summary
         run: echo "ML backend layer and function deployed successfully!"
+
