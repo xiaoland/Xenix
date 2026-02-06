@@ -8,7 +8,6 @@ on:
     paths:
       - "packages/ml-backend/**"
       - ".github/workflows/deploy-ml-backend.yml"
-      - ".github/scripts/check-layer-hash-ml-backend.sh"
       - ".github/scripts/prune-layer-versions.sh"
   workflow_dispatch:
 
@@ -55,25 +54,12 @@ jobs:
             --AccessKeySecret "$ALIYUN_ACCESS_KEY_SECRET" \
             -a default -f
 
-      - name: Restore layer hash cache
-        uses: actions/cache@v4
-        with:
-          path: packages/ml-backend/.layer-hash-ml-backend
-          key: layer-hash-ml-backend-${{ hashFiles('packages/ml-backend/pyproject.toml', 'packages/ml-backend/pdm.lock') }}
-          restore-keys: |
-            layer-hash-ml-backend-
-
-      - name: Check if layer dependencies changed
-        id: check-layer
-        run: bash .github/scripts/check-layer-hash-ml-backend.sh
-
       - name: Prepare dependencies for Serverless Devs build
         run: bash .github/workflow/build-layer-ml-backend.sh
         # TODO rename to prepare-ml-backend-layer.sh
 
       - name: Build and publish ML backend layer
         id: publish-layer
-        if: steps.check-layer.outputs.LAYER_CHANGED == 'true'
         run: |
           cd packages/ml-backend
           echo "Building and publishing ML backend layer using Serverless Devs..."
@@ -127,7 +113,6 @@ jobs:
           git diff --cached --quiet || (git commit -m "chore: update ml-backend layer version to ${{ steps.publish-layer.outputs.LAYER_VERSION }}" && git push)
 
       - name: Prune old layer versions
-        if: steps.check-layer.outputs.LAYER_CHANGED == 'true'
         run: bash .github/scripts/prune-layer-versions.sh "$LAYER_NAME" 3 "$OSS_REGION"
 
       - name: Deploy ML backend function
@@ -136,9 +121,4 @@ jobs:
           s deploy xenix-ml-backend -y -t ml-backend.s.yaml --use-local
 
       - name: Deployment summary
-        run: |
-          if [ "${{ steps.check-layer.outputs.LAYER_CHANGED }}" = "true" ]; then
-            echo "✅ ML backend layer and function deployed successfully!"
-          else
-            echo "✅ ML backend function deployed successfully (layer unchanged)!"
-          fi
+        run: echo "ML backend layer and function deployed successfully!"
