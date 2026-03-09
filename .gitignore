@@ -1,95 +1,40 @@
-# dev/build outputs
-.output
-.data
-.nuxt
-.nitro
-.cache
-dist
-build/
-*.zip
-tsconfig.tsbuildinfo
-
-# Serverless build artifacts
-opt/
-node-v*.tar.xz
-node-v*-linux-x64/
-.layer-hash-*
-
-# Node dependencies
-node_modules
-
-# Logs
-logs/
-*.log
-
-# Misc
-.DS_Store
-.fleet
-.idea
-
-# Local env files
-.env
-.env.*
-!.env.example
-
-# IDE files
-.vscode/*
-!.vscode/*.example.jsonc
-
-# Local Data
-.browser-profile
-data/*
-*.pdf
-
-
-# PDM
-.pdm-python
-__pypackages__/
-
-# Python
+# Python caches
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
-*.so
-*.egg
-*.egg-info/
-venv/
+
+# Virtual environments and PDM state
 .venv/
-python/
-requirements.txt
+venv/
+__pypackages__/
+.pdm-python
+.pytest_cache/
+
+# Build artifacts
+build/
+dist/
+*.spec.tmp
+
+# Logs and local runtime data
+logs/
+*.log
+tmp/
+temp/
+data/
+uploads/
+datasets/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/*.example.jsonc
 nul
 
-# Uploads
-uploads/
-/datasets/
-*.xlsx
-*.xls
-
-# Model outputs
-*.json
-!package.json
-!tsconfig*.json
-!drizzle.config.ts
-!i18n/locales/*.json
-!packages/frontend/src/locales/*.json
-!packages/frontend/public/locales/*.json
-*_Params.json
-Model_Comparison_*.xlsx
-output.xlsx
-
-# SQLite database files
+# Databases
 *.db
 *.db-journal
 *.db-wal
 *.db-shm
-
-# Temporary files
-tmp/
-temp/
-
-# Test coverage
-coverage/
-.nyc_output/
-*.lcov
