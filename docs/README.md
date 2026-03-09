@@ -1,4 +1,15 @@
 # Native Docs
 
-- `runbooks/development.md` explains how to run and verify the desktop shell locally.
-- `runbooks/branch-governance.md` records the `native` branch role and the planned `master -> web` cutover steps.
+This branch uses a minimal documentation model:
+
+- `contracts/`: integration semantics, guarantees, and architecture boundaries
+- `adr/`: decision records for core technical choices
+- `runbooks/`: operational guidance for local development and recovery
+- `migrations/`: persistence and risky evolution rules
+
+Start here:
+
+- `contracts/README.md`
+- `adr/README.md`
+- `runbooks/README.md`
+- `migrations/README.md`

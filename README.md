@@ -25,8 +25,16 @@ Use Python `3.12` to `3.14`. The initial toolchain is pinned below `3.15` becaus
 - `tests` contains unit tests for config, logging, and resource resolution.
 - `scripts` contains developer helpers used by `pdm run`.
 - `ml` keeps the existing Python model scripts that will be integrated into the native workflow later.
-- `docs` stores native runbooks and governance notes.
+- `docs` stores contracts, ADRs, runbooks, and migration guidance for the native app.
 - `xenix.spec` is the initial PyInstaller spec for desktop packaging work.
+
+## Documentation Model
+
+- Contracts: [docs/contracts/README.md](docs/contracts/README.md)
+- ADRs: [docs/adr/README.md](docs/adr/README.md)
+- Runbooks: [docs/runbooks/README.md](docs/runbooks/README.md)
+- Migrations: [docs/migrations/README.md](docs/migrations/README.md)
+- Contributor workflow: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Runtime Conventions
 

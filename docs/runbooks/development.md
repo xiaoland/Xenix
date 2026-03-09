@@ -23,6 +23,12 @@ pdm run test
 pdm run check
 ```
 
+## VS Code
+
+- Launch `Xenix Native: Debug App` to start the desktop shell under the debugger.
+- Launch `Xenix Native: Debug App (Workspace Home)` to keep runtime data inside `${workspaceFolder}/.runtime`.
+- Run the `PyInstaller: package` task to build the desktop bundle from `xenix.spec`.
+
 ## App Directories
 
 - `XENIX_APP_HOME` overrides the base application directory.

@@ -1,0 +1,76 @@
+# Runtime Boundaries
+
+## Purpose
+
+Define the allowed call graph and integration rules for the native application so feature work does not create accidental coupling.
+
+## Layer Model
+
+The native app uses a one-process layered model:
+
+- UI layer: `src/xenix/ui/`
+- Service layer: `src/xenix/services/` when introduced
+- ML adapters: native wrappers around scripts under `ml/`
+- Persistence adapters: SQLite metadata access and filesystem access
+
+Allowed dependency direction:
+
+`UI -> services -> adapters -> SQLite/filesystem/ML`
+
+Forbidden dependency direction:
+
+- UI -> `ml/`
+- UI -> SQLite
+- UI -> raw filesystem writes outside user-selected paths and app runtime paths
+- ML -> Qt objects
+- ML -> SQLite access that bypasses services
+
+## UI Contract
+
+The UI is responsible for:
+
+- Collecting user intent from Qt Widgets
+- Rendering task status, validation errors, and result locations
+- Invoking services with plain Python inputs
+- Opening files or directories after a service reports a successful output
+
+The UI must not:
+
+- Parse datasets directly for training logic
+- Select models by reading arbitrary files on disk without service mediation
+- Maintain hidden business state beyond view state
+
+## Service Contract
+
+Services are responsible for:
+
+- Validating user requests before long-running work starts
+- Translating UI actions into task executions
+- Persisting task metadata and status transitions
+- Resolving runtime paths
+- Coordinating ML adapters and export paths
+
+Service APIs should be designed around explicit request/result objects or narrow methods. They should return structured outcomes rather than leaving the UI to infer success from side effects.
+
+## ML Adapter Contract
+
+ML adapters are responsible for:
+
+- Running existing scripts in `ml/` or future native wrappers
+- Returning typed metadata about produced artifacts
+- Emitting progress or log events through service-owned callbacks or loggers
+
+ML adapters must assume:
+
+- They run in a single local user session
+- They do not own application navigation, dialogs, or persistence policy
+- They may be replaced later without changing UI entry points
+
+## Boundary Tests Required
+
+Add contract tests when any of the following change:
+
+- UI-to-service request shape
+- Task state transitions
+- Service-to-ML adapter invocation shape
+- Storage location rules for logs, models, datasets, or results
