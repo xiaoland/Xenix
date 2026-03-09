@@ -18,10 +18,11 @@ from ..config import APP_NAME, AppPaths
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, paths: AppPaths, log_path: Path) -> None:
+    def __init__(self, paths: AppPaths, log_path: Path, db_path: Path) -> None:
         super().__init__()
         self._paths = paths
         self._log_path = log_path
+        self._db_path = db_path
 
         self.setWindowTitle(f"{APP_NAME} Native")
         self.resize(920, 560)
@@ -49,6 +50,10 @@ class MainWindow(QMainWindow):
         card_layout.addRow("Config", QLabel(str(self._paths.config)))
         card_layout.addRow("Logs", QLabel(str(self._paths.logs)))
         card_layout.addRow("Cache", QLabel(str(self._paths.cache)))
+        card_layout.addRow("State", QLabel(str(self._paths.state)))
+        card_layout.addRow("Temp", QLabel(str(self._paths.temp)))
+        card_layout.addRow("Artifacts", QLabel(str(self._paths.artifacts)))
+        card_layout.addRow("Database", QLabel(str(self._db_path)))
         card_layout.addRow("Current log file", QLabel(str(self._log_path)))
 
         open_logs_button = QPushButton("Open log directory")

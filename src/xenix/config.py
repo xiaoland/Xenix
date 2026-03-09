@@ -15,6 +15,9 @@ class AppPaths:
     config: Path
     logs: Path
     cache: Path
+    state: Path
+    temp: Path
+    artifacts: Path
     resources: Path
 
 
@@ -42,6 +45,9 @@ def get_app_paths() -> AppPaths:
         config=home / "config",
         logs=home / "logs",
         cache=home / "cache",
+        state=home / "state",
+        temp=home / "temp",
+        artifacts=home / "artifacts",
         resources=package_root / "resources",
     )
 
@@ -53,6 +59,9 @@ def ensure_app_dirs(paths: AppPaths | None = None) -> AppPaths:
         resolved_paths.config,
         resolved_paths.logs,
         resolved_paths.cache,
+        resolved_paths.state,
+        resolved_paths.temp,
+        resolved_paths.artifacts,
     ):
         directory.mkdir(parents=True, exist_ok=True)
 

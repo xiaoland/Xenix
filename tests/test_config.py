@@ -13,3 +13,6 @@ def test_env_override_controls_app_home(monkeypatch, tmp_path: Path) -> None:
     assert paths.config.is_dir()
     assert paths.logs.is_dir()
     assert paths.cache.is_dir()
+    assert paths.state.is_dir()
+    assert paths.temp.is_dir()
+    assert paths.artifacts.is_dir()

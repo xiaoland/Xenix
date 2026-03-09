@@ -2,7 +2,7 @@
 
 PySide6 desktop bootstrap for the `native` branch of Xenix.
 
-This branch is intentionally focused on the Windows desktop application line. The web monorepo remains on `master` for now and is planned to become `web` during the branch-governance cutover described in [docs/runbooks/branch-governance.md](docs/runbooks/branch-governance.md).
+This branch is intentionally focused on the Native desktop application line. The web monorepo remains on `web` (previous `master`, read [docs/runbooks/branch-governance.md](docs/runbooks/branch-governance.md) for more information)
 
 ## Quick Start
 
@@ -21,8 +21,8 @@ Use Python `3.12` to `3.14`. The initial toolchain is pinned below `3.15` becaus
 
 ## Layout
 
-- `src/xenix` contains the application package, bootstrap code, UI, runtime config, logging, and exception handling.
-- `tests` contains unit tests for config, logging, and resource resolution.
+- `src/xenix` contains the application package, bootstrap code, UI, runtime config, storage services, logging, and exception handling.
+- `tests` contains unit tests for config, storage bootstrap, repositories, services, logging, and resource resolution.
 - `scripts` contains developer helpers used by `pdm run`.
 - `ml` keeps the existing Python model scripts that will be integrated into the native workflow later.
 - `docs` stores contracts, ADRs, runbooks, and migration guidance for the native app.
@@ -41,5 +41,8 @@ Use Python `3.12` to `3.14`. The initial toolchain is pinned below `3.15` becaus
 - App state defaults to `%LOCALAPPDATA%/Xenix` on Windows.
 - Override the base directory with `XENIX_APP_HOME` during development or testing.
 - Logs are written to `logs/xenix.log` under the resolved app home.
+- SQLite metadata is stored in `state/xenix.db`.
+- Temporary dataset copies live under `temp/datasets/`.
+- App-managed artifacts and ML task working directories live under `artifacts/`.
 
 See [docs/runbooks/development.md](docs/runbooks/development.md) for local workflow details.

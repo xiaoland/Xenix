@@ -9,7 +9,7 @@ Define the minimum contract for background work such as dataset inspection, trai
 Each service-managed task must have:
 
 - A stable task id
-- A task type such as `inspect_dataset`, `train_model`, or `run_inference`
+- An ML task type such as `inspect_dataset`, `fit`, `hyperparameter_tuning`, or `inference`
 - A created timestamp
 - A current status
 
@@ -47,6 +47,8 @@ Minimum guarantees:
 
 Detailed per-task logs may later use separate files, but the canonical location stays under the runtime `logs/` directory.
 
+When ML task subprocess execution exists, each task may also write detailed process logs under `artifacts/ml-tasks/<ml-task-id>/`. Those per-task logs are supplementary. The canonical application log remains under `paths.logs`.
+
 ## Result File Contract
 
 Tasks that produce artifacts must return result metadata that includes:
@@ -59,6 +61,7 @@ Result ownership rules:
 
 - Datasets selected by the user stay in user-managed locations.
 - Generated models, exports, and reports live in service-managed directories on the local filesystem.
+- ML task working directories live under `artifacts/ml-tasks/<ml-task-id>/`.
 - A task is not `succeeded` until every declared output path exists.
 
 ## Failure Contract

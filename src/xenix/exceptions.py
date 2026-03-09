@@ -10,6 +10,30 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 LOGGER = logging.getLogger("xenix.runtime")
 
 
+class XenixError(Exception):
+    """Base class for domain-facing Xenix errors."""
+
+
+class NotFoundError(XenixError):
+    """Raised when a requested entity does not exist."""
+
+
+class ValidationError(XenixError):
+    """Raised when user-provided input is invalid."""
+
+
+class InvalidStateTransitionError(XenixError):
+    """Raised when an entity transition violates the state contract."""
+
+
+class DatasetSourceMissingError(XenixError):
+    """Raised when a registered dataset source file is no longer available."""
+
+
+class StorageBootstrapError(XenixError):
+    """Raised when local storage bootstrap cannot complete."""
+
+
 def install_exception_hooks() -> None:
     def handle_exception(exc_type: type[BaseException], exc_value: BaseException, exc_traceback: object) -> None:
         if issubclass(exc_type, KeyboardInterrupt):

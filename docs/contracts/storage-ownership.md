@@ -8,9 +8,8 @@ Define which local state belongs in SQLite and which belongs on the filesystem.
 
 SQLite is reserved for small, queryable application metadata:
 
-- Task records and status history
+- ML task records and status history
 - Dataset registration metadata
-- Model catalog metadata
 - User selections and lightweight preferences
 - References to files owned by the application
 
@@ -26,7 +25,7 @@ SQLite must not store:
 
 The filesystem is the source of truth for large or user-openable artifacts:
 
-- Imported or selected dataset files
+- User-selected external dataset files
 - Trained model artifacts
 - Inference outputs and exported reports
 - Application logs
@@ -34,15 +33,24 @@ The filesystem is the source of truth for large or user-openable artifacts:
 
 App-managed runtime directories live under `XENIX_APP_HOME` or the platform default returned by `xenix.config`.
 
+Current app-managed runtime layout includes:
+
+- `state/`
+- `temp/`
+- `artifacts/`
+
 ## Ownership Rules
 
 - SQLite stores references, summaries, and state.
 - The filesystem stores bytes, artifacts, and user-openable outputs.
 - Services coordinate both stores and keep references consistent.
 - UI code consumes resolved paths from services instead of constructing storage layouts itself.
+- Dataset registration stores the external source path and stable naming metadata only.
+- Temporary dataset copies are execution-scoped service artifacts, not canonical dataset storage.
 
 ## Deletion Rules
 
 - Deleting a SQLite row must not silently delete user-managed dataset files.
 - Deleting an app-managed artifact should update SQLite metadata in the same service operation.
 - Cache cleanup may remove reproducible files, but not canonical datasets, models, or exports.
+- Deleting a temporary dataset copy must not affect the external dataset source file.

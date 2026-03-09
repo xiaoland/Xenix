@@ -160,11 +160,91 @@ Draft L1 around these assumptions unless explicitly rejected:
 - Separate user-managed dataset source paths from app-managed artifact paths.
 - Introduce `src/xenix/services/` and a persistence subpackage rather than attaching storage code to the UI.
 
-## Approval Gate to Enter L1
+## Review Round 1 Decisions and Adjustments
 
-Before L1, one product-level interpretation should be confirmed because it affects the entire storage design:
+The following direction was provided after L0 review and is now treated as the working assumption for L1 unless revised again:
 
-- Preferred direction: datasets selected by the user remain external by default, while the schema leaves room for an optional app-managed imported copy later.
-- Alternative direction: importing a dataset always creates an app-managed canonical copy inside the Xenix runtime tree.
+### Dataset lifecycle
 
-The preferred direction is easier to keep maintainable because it matches the current storage contract and avoids surprising deletion/backup behavior.
+- Creating a dataset keeps the original file external.
+- When a service needs to read the dataset, it requests a temporary app-managed copy.
+- That temporary copy is destroyed after the read finishes.
+
+Implication:
+
+- The canonical dataset record should describe the external source file and user-facing storage metadata only.
+- Any transient read copy belongs to service execution, not to the canonical dataset model.
+
+### Refined stance on issue slicing
+
+- Agree: this task should stay foundational and avoid over-modeling.
+- Practical interpretation for L1:
+  - keep the schema small
+  - avoid encoding rich dataset profiling
+  - avoid introducing a full model catalog if artifact-instance persistence is not yet required by this issue
+  - leave room for follow-up issues rather than baking speculative fields into the first schema
+
+### Refined stance on dependencies
+
+- `pydantic` is reasonable for request/result objects or future ML parameter schemas.
+- `SQLModel` is less convincing at this stage.
+
+Reason:
+
+- The codebase currently has no service layer, no repository layer, and no persistence code.
+- The first schema is expected to be small and migration rules are already explicitly documented.
+- Introducing an ORM here would add another abstraction boundary before the repository and service boundaries even exist.
+
+L1 should therefore evaluate:
+
+- option A: stdlib `sqlite3` plus explicit row mapping
+- option B: `pydantic` for service DTOs while keeping persistence on stdlib `sqlite3`
+
+Using `SQLModel` is still possible, but it should clear a higher bar than “it is convenient.”
+
+### Refined stance on dataset metadata
+
+Agree:
+
+- Persist only file/storage metadata for datasets in the foundational schema.
+- Compute file-level or structural metadata such as modified time, column names, row counts, inferred types, or profiling summaries at runtime inside services.
+
+This keeps the first schema narrower and avoids stale derived metadata.
+
+### Refined stance on ML task execution isolation
+
+Agree with the process boundary:
+
+- the ML task runner should be a separate process
+- the runner should not own database writes or business-state transitions
+- the main process service should persist task lifecycle changes and interpret runner outputs
+
+This is the cleanest way to avoid unsafe shared SQLite access across background execution.
+
+### Refined stance on model metadata persistence
+
+This needs one clarification because two different concepts are being mixed:
+
+- static model-definition metadata
+  - example: model kind, editable parameter schema, registry membership
+  - this can reasonably come from runtime registration and code-owned metadata
+- persisted artifact-instance metadata
+  - example: a trained model artifact path, which task produced it, whether it is reusable later
+  - this is different and may still need persistence once cross-session reuse exists
+
+So the likely correct position is:
+
+- do not persist static model-definition metadata in SQLite
+- do persist artifact-instance references once the product needs cross-session model reuse
+
+That distinction keeps the design clean and avoids forcing code-owned model definitions into the database.
+
+## Updated Approval Gate to Enter L1
+
+L1 can now proceed if the following interpretation is accepted:
+
+- dataset records persist only stable file/storage metadata for external source files
+- temporary app-managed dataset copies are execution-scoped and deleted after use
+- derived dataset metadata stays runtime-computed, not canonical in SQLite
+- static model-definition metadata stays code-owned, not persisted in SQLite
+- if trained artifact reuse needs to exist across sessions, artifact-instance references remain eligible for persistence later even without a full `model catalog` now

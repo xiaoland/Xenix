@@ -6,6 +6,7 @@ Record which product concepts remain in the native edition and which are intenti
 
 ## Retained Concepts
 
+- Simple and easy to use for teachers, students.
 - Single local operator
 - Local dataset selection and drag-and-drop import
 - Training task creation and model selection
