@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - master
+      - web
     paths:
       - "packages/backend/**"
       - "packages/shared/**"

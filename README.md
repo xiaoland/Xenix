@@ -60,6 +60,18 @@ packages/
 - Database: PostgreSQL 17 (Docker)
 - Cache: Redis 7 (Docker, ready for job queue)
 
+## Native Desktop Bootstrap
+
+The first native desktop bootstrap for issue `#68` now lives under `native/`. It uses `pdm` plus `PySide6` and can be started with:
+
+```bash
+cd native
+pdm install
+pdm run dev
+```
+
+The branch split plan for `master -> web` and the future `native` branch is tracked in [docs/native-branch-governance.md](docs/native-branch-governance.md).
+
 ## Quick Start
 
 ### Prerequisites

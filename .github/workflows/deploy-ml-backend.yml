@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - master
+      - web
     paths:
       - "packages/ml-backend/**"
       - ".github/workflows/deploy-ml-backend.yml"

@@ -2,7 +2,7 @@ name: Quality Gates
 
 on:
   push:
-    branches: [main, develop]
+    branches: [web, master, main, develop]
     paths:
       - "packages/frontend/**"
       - "packages/shared/**"
@@ -10,7 +10,7 @@ on:
       - "scripts/**"
       - ".github/workflows/quality-gates.yml"
   pull_request:
-    branches: [main, develop]
+    branches: [web, master, main, develop]
     paths:
       - "packages/frontend/**"
       - "packages/shared/**"
