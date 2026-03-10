@@ -19,6 +19,9 @@ Ephemeral objects:
 - `DatasetColumnMetadata`
 - `ManualTrainRequest`
 - `HyperparameterTuningRequest`
+- `EvaluateModelRequest`
+- `EvaluationSnapshot`
+- `TaskContinuationPlan`
 - `MLWorkerTaskRequest`
 - `MLWorkerTaskResult`
 
@@ -49,36 +52,29 @@ Add table `trained_model` with these columns:
 
 - `id: str` primary key
 - `work_item_id: str` foreign key to `work_item.id`, indexed
-- `dataset_id: str | None` foreign key to `dataset.id`, indexed
-- `ml_task_id: str` foreign key to `ml_task.id`, indexed
+- `ml_task_id: str` foreign key to `ml_task.id`, indexed, unique
 - `model_key: str`, indexed
-- `problem_kind: str`, indexed
-- `training_mode: str`, indexed
-- `feature_columns: JSON`
-- `target_columns: JSON`
-- `params_payload: JSON`
-- `evaluation_policy_key: str`, indexed
-- `primary_metric_name: str`
-- `primary_metric_value: float`
-- `metrics_payload: JSON`
 - `artifact_path: str`
 - `created_at: datetime`
 - `updated_at: datetime`
 
 Field intent:
 
-- `problem_kind` is the comparable class for evaluation policy selection
-- `training_mode` is `manual` or `hyperparameter_tuning`
-- `feature_columns` and `target_columns` are persisted so later inference work has a stable training snapshot
+- `trained_model` is the durable pointer to one canonical fitted-model artifact
+- `model_key` stays on the row so trained-model listings and best-model references have a stable model identity without decoding task JSON each time
+- model family, params, feature columns, target columns, evaluation policy, and metrics are read from the linked `MLTask` payloads rather than duplicated here
 - `artifact_path` points to the canonical persisted model artifact under `artifacts/models/`
+
+Rationale:
+
+- `problem_kind` belongs to model metadata and evaluation policy, not to a duplicated row column
+- training mode can be derived from `MLTask.task_type`
+- feature columns, target columns, params, and metrics already have a better ownership boundary in task request/result payloads
 
 ## Row Models
 
 Concrete SQLModel additions in `src/xenix/services/storage/models.py`:
 
-- new enum `TrainingMode(StrEnum)`:
-  - `MANUAL = "manual"`
-  - `HYPERPARAMETER_TUNING = "hyperparameter_tuning"`
 - new enum `ProblemKind(StrEnum)`:
   - `REGRESSION = "regression"`
   - `CLASSIFICATION = "classification"`
@@ -90,8 +86,9 @@ Concrete SQLModel additions in `src/xenix/services/storage/models.py`:
 
 - `FIT`
 - `HYPERPARAMETER_TUNING`
+- `EVALUATE`
 
-Evaluation remains a distinct atomic ML operation in the worker contract, but it does not require a separate persisted `MLTaskType` in v1.
+Evaluation is a distinct atomic ML operation and should be represented by a persisted `MLTaskType` in v1.
 
 ## Repository Additions
 
@@ -100,7 +97,7 @@ Add `src/xenix/services/storage/repositories/trained_models.py` with methods:
 - `create(session, row) -> TrainedModelRow`
 - `get(session, trained_model_id) -> TrainedModelRow | None`
 - `list_by_work_item(session, work_item_id) -> list[TrainedModelRow]`
-- `list_by_ml_task(session, ml_task_id) -> list[TrainedModelRow]`
+- `get_by_ml_task(session, ml_task_id) -> TrainedModelRow | None`
 
 Extend `WorkItemRepository` with:
 
@@ -156,7 +153,7 @@ Remove the shared app-managed dataset-copy area from the ML workflow.
 
 Implications:
 
-- `DatasetService.materialize_read_copy()` should be removed from the training path
+- `DatasetService.materialize_read_copy()` should be removed
 - task execution gets a dedicated helper:
   - `copy_dataset_to_task_input(paths, ml_task_id, dataset_row) -> Path`
 
@@ -192,3 +189,4 @@ Migration guarantees:
 - no dataset, task, or artifact rows are lost
 - existing work items start with `best_trained_model_id = NULL`
 - no dataset inspection metadata is introduced into SQLite
+- trained-model metadata duplication is intentionally avoided

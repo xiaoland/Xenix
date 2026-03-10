@@ -2,12 +2,12 @@
 
 ## UI Module Layout
 
-The native UI additions should use these files:
+The UI additions should use these files:
 
 - `src/xenix/ui/main_window.py`
-  - switch from placeholder shell to host the ML workspace
+  - extend the current shell to host both dataset and training workspaces
 - `src/xenix/ui/ml_workspace.py`
-  - project, work item, dataset, mode, and model selection
+  - project, work item, mode, and model selection
 - `src/xenix/ui/widgets/json_schema_form.py`
   - reusable generic form renderer for JSON Schema
 - `src/xenix/ui/widgets/task_log_view.py`
@@ -21,8 +21,8 @@ The ML workspace should contain:
 
 - project selector
 - work item selector scoped by project
-- dataset selector scoped by project
-- column inspection panel
+- work-item dataset summary panel
+- work-item column-selection summary panel
 - model selection panel
 - generic schema form panel
 - submit controls
@@ -62,37 +62,45 @@ For nullable fields:
 
 ## UI Interaction Flow
 
-1. user selects project, work item, and dataset
-2. UI requests `inspect_dataset()`
-3. UI requests `list_models()`
-4. user selects mode and model(s)
-5. UI loads model schema into `JsonSchemaFormWidget`
-6. user selects columns and parameters
-7. UI submits typed request through `MLService`
-8. UI refreshes task list from `MLService`
-9. UI shows recent logs by reading parsed task details
+1. user selects project and work item
+2. UI loads the work item's linked dataset and stored column selections
+3. UI requests `DatasetService.inspect_source_file()` through the existing dataset domain service
+4. UI requests `list_models()`
+5. user selects mode and model(s)
+6. UI loads model schema into `JsonSchemaFormWidget`
+7. user confirms parameters
+8. UI submits the workflow request through `MLService`
+9. UI refreshes task list from `MLService`
+10. UI shows recent logs by reading parsed task details
+
+Bulk tuning behavior:
+
+- the UI may let the user select multiple models
+- submission creates one tuning task per selected model
+- task list ordering should match submission order
 
 ## Testing Layout
 
 Add or update tests:
 
 - `tests/test_migrations.py`
-  - v1 to v2 migration
+  - `v2 -> v3` migration
 - `tests/test_ml_registry.py`
   - catalog entries
   - JSON schema export
-- `tests/test_dataset_inspection.py`
-  - csv/xlsx inspection
-  - no persistence side effects
 - `tests/test_ml_service.py`
   - manual training validation
   - tuning validation
+  - bulk tuning fan-out
+  - explicit workflow chaining through `fit_with_evaluate()` and `tune_with_evaluate()`
   - best-model update behavior
   - incompatible-policy behavior
 - `tests/test_ml_execution.py`
   - queue order
-  - worker result ingestion
+  - worker-process result ingestion
   - canonical model copy
+  - task-executor artifact finalization
+  - explicit evaluation-task chaining
   - failure handling
 - `tests/test_json_schema_form.py`
   - basic field rendering
@@ -117,6 +125,7 @@ Its scope should document:
 
 - the public ML service boundary
 - the rule that dataset inspection metadata is ephemeral
+- the rule that dataset inspection belongs to the dataset domain, not the ML domain
 - the rule that the registry is Pydantic-declared and JSON-Schema-exportable
 - the rule that worker code must not mutate SQLite directly
 - the supported JSON-Schema envelope for the reusable form widget
@@ -125,9 +134,9 @@ Its scope should document:
 
 When L3 starts, the work should be staged in this order:
 
-1. storage v2 and repository changes
+1. storage v3 and repository changes
 2. Pydantic contracts and registry declarations
 3. ML service and execution manager
-4. worker module and model services
+4. worker-process module and model services
 5. UI workspace and generic JSON-Schema form widget
 6. tests and documentation
