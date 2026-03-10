@@ -44,6 +44,8 @@ Current runtime files and subdirectories:
 
 Do not store canonical datasets inside the runtime directory. Dataset registration keeps source files external. Services may create temporary dataset copies under `temp/datasets/` during execution and remove them after use.
 
+Dataset import and dataset inspection do not use `temp/datasets/`. Import reads the user-managed source file directly and persists only dataset registration metadata plus work-item dataset-selection state in SQLite.
+
 ## Backup Guidance
 
 - Back up `state/xenix.db` together with any app-managed model, inference, or ML task working directories you need to preserve.

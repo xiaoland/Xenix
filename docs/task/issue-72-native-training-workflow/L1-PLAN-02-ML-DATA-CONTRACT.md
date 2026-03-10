@@ -9,6 +9,7 @@ High-level rule:
 - inspection reads the registered dataset source file directly
 - inspection returns lightweight metadata only
 - inspection does not create execution copies
+- inspection metadata is not persisted in the dataset repository or other database tables
 
 Minimum inspection output for L2:
 
@@ -21,6 +22,11 @@ This keeps inspection lightweight and avoids conflating it with task execution.
 ## Registry And Boundary Strategy
 
 Expand `src/xenix/services/ml/` into a real native registry, but keep it explicit and code-owned.
+
+Preferred declaration style:
+
+- use Pydantic models as the primary declaration form for model definitions and related metadata
+- let the model-definition objects expose both typed Python access and JSON Schema export
 
 Each model definition should provide at least:
 
@@ -53,6 +59,11 @@ The source of truth is the Pydantic schema model, not ad hoc Qt form code.
 L1 expectation:
 
 - the UI uses JSON Schema to decide which editors to render
+- the dynamic form renderer is a generic component, not a training-only special case
+- examples:
+  - `bool` -> switch or checkbox
+  - `number` or `integer` -> numeric input
+  - `string` with `enum` -> selector
 - the service validates the submitted values again through the same Pydantic models
 - unsupported schema shapes may be intentionally limited in v1 if that keeps the form system maintainable
 

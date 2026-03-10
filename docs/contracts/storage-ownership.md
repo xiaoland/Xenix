@@ -46,6 +46,8 @@ Current app-managed runtime layout includes:
 - Services coordinate both stores and keep references consistent.
 - UI code consumes resolved paths from services instead of constructing storage layouts itself.
 - Dataset registration stores the external source path and stable naming metadata only.
+- Dataset inspection metadata such as row counts, inferred column kinds, and previews is runtime-derived and should not be persisted by default.
+- Work-item dataset selection state such as attached dataset id, feature columns, and target columns belongs on the work item rather than on the dataset record.
 - Temporary dataset copies are execution-scoped service artifacts, not canonical dataset storage.
 
 ## Deletion Rules

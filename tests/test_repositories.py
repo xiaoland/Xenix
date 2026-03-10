@@ -66,7 +66,49 @@ def test_work_item_repository_round_trip(monkeypatch, tmp_path: Path) -> None:
 
     assert loaded is not None
     assert loaded.name == "Churn"
+    assert loaded.dataset_id is None
+    assert loaded.feature_columns == []
+    assert loaded.target_columns == []
     assert [row.id for row in listed] == [work_item.id]
+
+
+def test_work_item_repository_persists_dataset_selection(monkeypatch, tmp_path: Path) -> None:
+    projects = ProjectRepository()
+    work_items = WorkItemRepository()
+    datasets = DatasetRepository()
+    dataset_file = tmp_path / "customers.csv"
+    dataset_file.write_text("age,label\n30,1\n", encoding="utf-8")
+
+    with _build_session(monkeypatch, tmp_path) as session:
+        project = ProjectRow(name="Retail")
+        projects.create(session, project)
+        dataset = DatasetRow(
+            project_id=project.id,
+            name="Customers",
+            source_path=str(dataset_file.resolve()),
+            source_format=DatasetSourceFormat.CSV,
+        )
+        datasets.create(session, dataset)
+        work_item = WorkItemRow(project_id=project.id, name="Churn")
+        work_items.create(session, work_item)
+
+        updated = work_items.set_dataset_selection(
+            session,
+            work_item.id,
+            dataset.id,
+            ["age"],
+            ["label"],
+            _utc_now(),
+        )
+        session.commit()
+
+        loaded = work_items.get(session, work_item.id)
+
+    assert updated is not None
+    assert loaded is not None
+    assert loaded.dataset_id == dataset.id
+    assert loaded.feature_columns == ["age"]
+    assert loaded.target_columns == ["label"]
 
 
 def test_dataset_repository_round_trip(monkeypatch, tmp_path: Path) -> None:

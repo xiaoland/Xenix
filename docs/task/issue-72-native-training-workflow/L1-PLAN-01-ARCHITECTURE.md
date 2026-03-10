@@ -7,7 +7,7 @@ Issue `#72` should deliver the first usable native ML training capability, not t
 In scope:
 
 - dataset selection from registered datasets
-- dataset column inspection needed for training setup
+- consumption of dataset inspection capability for training setup
 - manual training with single-model parameter editing
 - hyperparameter tuning with multi-model selection and editable param grids
 - evaluation as a distinct atomic ML operation chained after `fit`
@@ -16,6 +16,9 @@ In scope:
 
 Out of scope:
 
+- dataset drag-and-drop import
+- dataset file-picker import
+- first-class dataset-analysis workflow UX owned by issue `#75`
 - inference execution
 - prediction export flows
 - generic workflow engine infrastructure
@@ -26,7 +29,7 @@ Out of scope:
 The intended native business flow is:
 
 1. user selects a registered dataset
-2. app reads dataset columns from the dataset source file
+2. app loads dataset-analysis results through the capability delivered by issue `#75`
 3. user selects an ML mode:
    - manual training
    - hyperparameter tuning
@@ -127,3 +130,5 @@ Two different dataset interactions should be kept separate:
   - uses that task-local copy for the ML operation
 
 For issue `#72`, ML execution should not rely on a shared app-managed dataset-copy directory. Task-local copies are simpler to reason about and avoid name-collision and mapping problems.
+
+The current shared dataset-copy directory should be removed rather than preserved as a second path convention.

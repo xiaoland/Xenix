@@ -15,7 +15,7 @@ The screen should include:
 - model selector:
   - single-select for manual training
   - multi-select for tuning
-- schema-generated parameter editors
+- a generic schema-driven form component used to render parameter editors
 - task list
 - task detail area with:
   - status
@@ -38,6 +38,7 @@ The UI should:
 The UI should not:
 
 - hardcode parameter forms model by model
+- build training-only schema rendering logic that cannot be reused elsewhere
 - infer business rules from model-key string parsing
 - compare evaluation metrics on its own
 - decide best-model updates on its own
@@ -74,6 +75,8 @@ Expected updates:
   - delivered scope
   - deferred items
   - verification results
+- module-local `AGENTS.md` where complexity justifies it
+  - for example `src/xenix/services/ml/AGENTS.md`
 
 ## Testing Strategy
 

@@ -11,8 +11,11 @@ from .config import APP_NAME, APP_ORGANIZATION, ensure_app_dirs, get_app_paths
 from .exceptions import install_exception_hooks
 from .logging import setup_logging
 from .resources import package_resource_path
+from .services.dataset_service import DatasetService
+from .services.project_service import ProjectService
 from .services.storage import StorageBootstrapService
 from .services.storage.layout import database_path
+from .services.work_item_service import WorkItemService
 from .ui.main_window import MainWindow
 
 LOGGER = logging.getLogger("xenix.bootstrap")
@@ -36,10 +39,21 @@ def run() -> int:
     paths = ensure_app_dirs(get_app_paths())
     log_path = setup_logging(paths)
     install_exception_hooks()
-    StorageBootstrapService().initialize(paths)
+    context = StorageBootstrapService().initialize(paths)
+
+    project_service = ProjectService(context.session_factory)
+    work_item_service = WorkItemService(context.session_factory)
+    dataset_service = DatasetService(context.session_factory, paths)
 
     app = create_application()
-    window = MainWindow(paths=paths, log_path=log_path, db_path=database_path(paths))
+    window = MainWindow(
+        paths=paths,
+        log_path=log_path,
+        db_path=database_path(paths),
+        project_service=project_service,
+        work_item_service=work_item_service,
+        dataset_service=dataset_service,
+    )
     window.show()
 
     LOGGER.info("Xenix native shell started")

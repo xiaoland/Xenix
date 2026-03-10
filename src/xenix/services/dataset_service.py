@@ -11,6 +11,12 @@ from sqlmodel import SQLModel
 
 from ..config import AppPaths
 from ..exceptions import DatasetSourceMissingError, NotFoundError, ValidationError
+from .dataset_inspection import (
+    DatasetInspection,
+    InspectDatasetInput,
+    detect_source_format,
+    inspect_dataset_file,
+)
 from .storage.layout import dataset_temp_dir
 from .storage.models import DatasetRow, DatasetSourceFormat
 from .storage.repositories import DatasetRepository, ProjectRepository
@@ -18,17 +24,6 @@ from .storage.repositories import DatasetRepository, ProjectRepository
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def _detect_source_format(path: Path) -> DatasetSourceFormat:
-    suffix = path.suffix.lower()
-    if suffix == ".csv":
-        return DatasetSourceFormat.CSV
-    if suffix == ".xlsx":
-        return DatasetSourceFormat.XLSX
-    if suffix == ".xls":
-        return DatasetSourceFormat.XLS
-    return DatasetSourceFormat.UNKNOWN
 
 
 class RegisterDatasetInput(SQLModel):
@@ -86,7 +81,7 @@ class DatasetService:
         if not source_path.exists() or not source_path.is_file():
             raise ValidationError("Dataset source path must point to an existing file.")
 
-        source_format = _detect_source_format(source_path)
+        source_format = detect_source_format(source_path)
         if source_format is DatasetSourceFormat.UNKNOWN:
             raise ValidationError("Only .csv, .xlsx, and .xls dataset files are supported.")
 
@@ -110,6 +105,19 @@ class DatasetService:
             self._datasets.create(session, row)
             session.commit()
             return row
+
+    def inspect_source_file(self, input_data: InspectDatasetInput) -> DatasetInspection:
+        source_path = Path(input_data.source_path).expanduser()
+        if not source_path.is_absolute():
+            raise ValidationError("Dataset source path must be absolute.")
+        if not source_path.exists() or not source_path.is_file():
+            raise ValidationError("Dataset source path must point to an existing file.")
+        try:
+            return inspect_dataset_file(source_path)
+        except ValidationError:
+            raise
+        except Exception as exc:  # pragma: no cover - exercised by failure surface
+            raise ValidationError("Unable to read dataset file.") from exc
 
     def rename_dataset(self, input_data: RenameDatasetInput) -> DatasetRow:
         new_name = input_data.new_name.strip()

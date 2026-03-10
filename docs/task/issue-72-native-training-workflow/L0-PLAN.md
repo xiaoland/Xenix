@@ -54,7 +54,7 @@ Acceptance criteria stated by the issue:
 
 - desktop bootstrap, runtime directory setup, logging, and Qt shell window exist
 - SQLite bootstrap exists with schema versioning through `PRAGMA user_version`
-- schema version is still `1`
+- schema version is now `2` after issue `#75`
 - runtime storage foundations already exist for:
   - `project`
   - `work_item`
@@ -67,6 +67,11 @@ Acceptance criteria stated by the issue:
   - datasets
   - ML tasks
 - dataset registration stores the external source path and supports execution-scoped temp copies
+- dataset inspection and dataset-analysis UI now exist through issue `#75`
+- `work_item` now owns:
+  - `dataset_id`
+  - `feature_columns`
+  - `target_columns`
 - ML task lifecycle transitions are already enforced in `MLTaskService`
 - runtime layout already reserves:
   - `temp/datasets/`
@@ -80,7 +85,6 @@ Acceptance criteria stated by the issue:
 
 - no native training workflow service exists
 - no training execution runner exists
-- no dataset inspection or column-selection service exists
 - no trained-model persistence table exists
 - `work_item` has no best-model field or relationship
 - no evaluation-summary persistence model exists beyond generic task payload JSON
@@ -224,7 +228,7 @@ The issue does not explicitly say "dataset inspection", but the requested UX imp
 - tuning requires model-specific parameter editing against an actual dataset shape
 - evaluation needs a repeatable understanding of which columns were used
 
-Because the current branch has dataset registration only, issue `#72` likely needs at least a minimal dataset introspection path for columns and basic type metadata.
+Because issue `#75` now delivers dataset inspection and work-item dataset-selection state, issue `#72` should consume that capability rather than rebuilding it.
 
 This is a real dependency for L1, not an optional convenience.
 
@@ -245,7 +249,7 @@ To satisfy the issue without violating existing contracts, the next planning sta
 
 1. schema changes for trained-model metadata and work-item best-model tracking
 2. a concrete training execution boundary that keeps the UI responsive and the service layer authoritative
-3. minimal dataset introspection for column selection
+3. consumption of the dataset introspection and work-item dataset-selection state already delivered by issue `#75`
 4. a real model registry with typed training/tuning schemas for the supported model set
 5. a native adapter contract that reuses current ML capability without exposing script-style modules directly
 6. task-log and result-summary handling that matches the current task lifecycle contract
@@ -272,4 +276,4 @@ L1 should proceed only if the following L0 interpretation is accepted:
 - existing L1 assumptions around worker process, model subset, and backend-package influence should be treated as open questions, not locked decisions
 - model definitions and parameter schemas should stay code-owned in the native app
 - task metadata transitions should remain service-owned
-- dataset column inspection is a real dependency for the training UX even though the current branch does not implement it yet
+- dataset column inspection and work-item dataset-selection state are prerequisites that should now be treated as existing upstream capability from issue `#75`

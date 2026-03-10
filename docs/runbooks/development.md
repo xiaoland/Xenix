@@ -8,13 +8,15 @@ pdm install
 
 Use Python `3.12` to `3.14` for now.
 
+Runtime dependencies now include `pandas`, `openpyxl`, and `pydantic` for local dataset import and inspection.
+
 ## Run
 
 ```bash
 pdm run dev
 ```
 
-Expected result: a minimal `Xenix Native` window opens and shows the resolved app directories plus the current log file location.
+Expected result: the app opens the native dataset import workspace with project/work-item selection, file-picker and drag-and-drop import, dataset summary, and column selection.
 
 ## Verify
 

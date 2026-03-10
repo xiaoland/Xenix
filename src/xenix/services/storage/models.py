@@ -64,6 +64,15 @@ class WorkItemRow(SQLModel, table=True):
     project_id: str = Field(foreign_key="project.id", index=True)
     name: str = Field(index=True)
     description: str | None = None
+    dataset_id: str | None = Field(default=None, foreign_key="dataset.id", index=True)
+    feature_columns: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    target_columns: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
