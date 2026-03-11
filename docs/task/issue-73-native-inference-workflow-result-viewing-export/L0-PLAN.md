@@ -82,6 +82,9 @@ Acceptance criteria stated by the issue:
 - `MLTaskService` cannot execute `MLTaskType.INFERENCE`
 - no inference worker entrypoint exists
 - no inference-result persistence model exists beyond generic `ml_task` JSON and artifacts
+- no immutable work-item creation flow exists yet:
+  - work items can currently be created without a dataset
+  - attached dataset and selected columns remain mutable
 - no UI for:
   - model selection for inference
   - manual prediction-row entry
@@ -180,23 +183,98 @@ Issue `#73` should own:
 
 This prevents inference from duplicating training orchestration or dataset setup.
 
+## Decisions From L0 Review Feedback
+
+The review feedback on commit `fa0d7adbdaba182b2689c141e37e3554aa670bd1` resolved several L0 questions that were previously left open.
+
+### 1. Work-item dataset and feature binding should become immutable
+
+Chosen direction:
+
+- creating a work item should require a dataset plus feature-column selection
+- once created, that dataset/feature binding is locked
+- app-managed dataset copying should move earlier, when the dataset is attached to the work item, not later during ML task dispatch
+
+Reasoning:
+
+- this solves the model-lineage instability that would otherwise appear when a work item's selected columns change after a model has already been trained
+- it keeps inference correctness simple because the work item itself becomes the durable feature contract
+
+Design consequence:
+
+- issue `#73` now depends on adjusting both `WorkItemService` and the related dataset/work-item UI flow, even though the immediate user-facing feature is inference
+
+### 2. Manual entry and batch inference will share one file-array service contract
+
+Chosen direction:
+
+- the inference service should accept an input-files array
+- manual entry should be serialized into a temporary CSV file before task submission
+- the inference task runner/worker should only need to support file-based inputs
+
+Reasoning:
+
+- this keeps the worker boundary simple
+- it avoids maintaining separate manual-row and batch-file execution code paths
+- it matches the earlier L0 goal that both entry modes converge before execution
+
+### 3. Persisted inference outputs should prefer dataset reuse over a new inference-result table
+
+Chosen direction:
+
+- evaluate dataset reuse as the preferred persistence strategy for app-managed inference result files
+- keep model lineage and inference-specific metadata on the inference task
+- add nullable `dataset.ml_task_id` so generated tabular outputs can point back to the producing task
+
+Reasoning:
+
+- this keeps generated tabular prediction outputs in the same reusable tabular asset model as other datasets
+- it may simplify later chaining where inference output becomes the input to another local workflow
+- it avoids creating a second catalog concept just to represent tabular output files
+
+Important contract impact:
+
+- this expands the meaning of `dataset` beyond purely user-selected source files
+- L1 must make that domain shift explicit and keep the ownership rules readable
+
+### 4. Manual inference must use a dedicated row-entry widget
+
+Chosen direction:
+
+- do not stretch `JsonSchemaFormWidget` into record-array editing
+- introduce a dedicated inference row-entry widget, most likely table-editor based
+
+Reasoning:
+
+- row-oriented data entry is a different UX problem than scalar parameter editing
+- the review feedback explicitly chose the dedicated-widget route
+
+### 5. Export means copy, not expose the canonical artifact for editing
+
+Chosen direction:
+
+- canonical prediction artifacts stay app-managed
+- `Open` operates on the canonical artifact
+- `Export` means copying that canonical result artifact to a user-chosen destination
+
+Reasoning:
+
+- users are non-technical
+- copying for export better matches user expectation
+- it reduces accidental mutation of the app-owned canonical result file
+
 ## Key Architectural Tensions Identified
 
-### 1. Default model selection is easy; stable model-input contracts are not
+### 1. Default model selection is easy; stable model-input contracts are solved by changing work-item ownership
 
 The issue requirement to default to the best model maps cleanly onto `work_item.best_trained_model_id`.
 
-The harder problem is that the current branch does not persist the training-time feature contract on `trained_model`. Today that contract only exists indirectly through:
+The review decision is to solve that risk by changing ownership instead of adding trained-model-side feature snapshots:
 
-- mutable work-item feature selection state
-- training/evaluation task payload JSON
+- work items should be created with dataset and feature columns already attached
+- that binding becomes immutable
 
-That creates a correctness risk:
-
-- if a work item's selected feature columns change after training, an old trained model may no longer match the current work-item state
-- inference could then silently target the wrong feature set unless the service reconstructs the original training contract from durable metadata
-
-This is the main L0 risk.
+This converts the work item itself into the durable model-input contract and removes the need for inference to chase mutable column state.
 
 ### 2. Manual entry and batch-file inference should not become two separate engines
 
@@ -209,30 +287,30 @@ If the branch implements:
 
 then the feature typing, missing-value rules, and error messages will drift quickly.
 
-### 3. Result persistence scope is required, but the minimum durable shape is still open
+### 3. Result persistence scope is required, and the preferred direction is dataset reuse
 
 The issue explicitly requires saving inference results and metadata locally.
 
-Two broad approaches remain possible at L0:
+The review feedback rejected both of the earlier fallback options as the preferred design. The current preferred direction is:
 
-- lean on `ml_task.result_payload` plus `ml_task_artifact` for the first delivery
-- add a small dedicated inference-result row to make history, model linkage, and open/export references first-class
+- keep inference lineage metadata on the inference task
+- reuse `dataset` for persisted tabular inference outputs
+- add `dataset.ml_task_id` for reverse linkage
 
-The current branch does not yet justify which option is cleaner long term, but it does justify that generic task JSON alone may become hard to query and hard to present once multiple inference runs accumulate.
+The remaining L1 work is not to choose between catalogs anymore. It is to validate the exact ownership and query model for that reuse.
 
-### 4. Manual multi-row entry needs a UI primitive that does not exist yet
+### 4. Manual multi-row entry needs a dedicated UI primitive that does not exist yet
 
 The current `JsonSchemaFormWidget` is field-form oriented. It works well for model hyperparameters, but issue `#73` needs row-oriented data entry:
 
 - one row
 - or several rows with the same feature schema
 
-That means L1 must decide whether to:
+That decision is now made:
 
-- extend the generic schema form enough to represent record arrays, or
 - introduce a dedicated row-entry widget for inference input
 
-Locking that too early in L0 would be premature, but ignoring it would underestimate the UI work.
+L1 still needs to decide the concrete widget API and integration point, but not the overall direction.
 
 ### 5. Batch-file inference should reuse file parsing, but not dataset registration semantics
 
@@ -246,7 +324,7 @@ But an inference input file is not the same thing as a registered project datase
 
 So `#73` should reuse parsing capability and UX patterns from `#75`, while keeping batch inference files outside dataset-registration ownership.
 
-### 6. Open versus export needs a clear ownership rule
+### 6. Open versus export now has a clear ownership rule
 
 The issue asks for local open/export of results.
 
@@ -255,19 +333,23 @@ That leaves an important design question for L1:
 - is the app-managed artifact under `artifacts/inference/` already the canonical export file, with "Open" meaning reveal/open that file
 - or does "Export" mean copy a canonical result artifact to a user-chosen destination
 
-Both are viable. They have different consequences for simplicity, duplicate files, and service API shape.
+The review feedback selected the second option:
+
+- export copies the canonical result artifact to a user-selected destination
+
+So L1 only needs to define the service boundary and file-copy behavior.
 
 ## Minimum Capability Gaps That L1 Must Address
 
 To satisfy the issue without violating current contracts, the next stage must define a strategy for at least:
 
 1. selecting the inference model default from `best_trained_model_id` while still supporting manual model switching
-2. reconstructing or persisting a stable feature contract for each trained model
+2. changing work-item creation and attachment flow so dataset and feature selection become immutable work-item state
 3. introducing explicit inference request/result contracts and a worker entrypoint
-4. validating both manual rows and batch files against one normalized prediction-input shape
-5. deciding the minimum durable persistence model for inference summaries and result-file references
-6. defining how result files under `artifacts/inference/` are opened and exported
-7. adding a Qt inference UX that fits the existing `Datasets` and `Training` workspaces cleanly
+4. normalizing both manual rows and batch files into a service-owned input-files array
+5. defining how `dataset` reuse works for inference outputs, including nullable `dataset.ml_task_id`
+6. defining how canonical result files under `artifacts/inference/` are opened and exported
+7. adding a dedicated row-entry widget and a Qt inference UX that fits the existing `Datasets` and `Training` workspaces cleanly
 
 ## L1 Guardrails
 
@@ -275,10 +357,12 @@ The next stage should proceed with these guardrails:
 
 - do not allow arbitrary external model-file picking for inference
 - reuse the existing `MLService` / `MLTaskService` workflow boundary rather than creating a second inference execution stack
-- keep manual and batch inference on one normalized service contract
+- keep manual and batch inference on one normalized file-array service contract
 - reuse issue `#75` file-inspection patterns, but do not register transient batch-inference files as project datasets by default
 - treat result viewing/opening/export as service-owned artifact policy, not UI path guessing
-- assume the current trained-model metadata is insufficiently explicit for stable inference until L1 proves otherwise
+- treat immutable work-item dataset/feature binding as the chosen answer to feature-contract stability
+- treat dataset reuse with `dataset.ml_task_id` as the preferred persistence direction for tabular inference outputs
+- use a dedicated row-entry widget for manual inference input
 - avoid forcing a broad analytics/reporting subsystem when the issue only requires status, summary, open, and export
 
 ## Approval Gate to Enter L1
@@ -286,13 +370,14 @@ The next stage should proceed with these guardrails:
 L1 should proceed only if the following L0 interpretation is accepted:
 
 - issue `#73` should be built on the current task queue, artifact pipeline, and trained-model persistence from `#72`
-- issue `#73` should reuse file-inspection patterns from `#75`, but batch inference files should not automatically become registered datasets
+- work items should become dataset-bound and feature-bound at creation time, and that binding should be locked afterward
+- dataset app-managed copying should move from ML-task dispatch time to work-item attachment time
+- issue `#73` should reuse file-inspection patterns from `#75`, but transient input files should still stay outside durable project-dataset registration by default
 - inference should load only locally registered trained models, not arbitrary external model files
-- manual and batch prediction should converge on one service-owned validation/execution contract
-- the branch should treat stable trained-model input metadata as a first-class concern, because relying only on mutable work-item column state would weaken correctness and maintainability
-- a storage-shape decision is still open for L1:
-  - either keep first-pass inference history inside generic task metadata and artifacts
-  - or introduce a minimal dedicated inference-result row if that proves materially clearer
+- manual and batch prediction should converge on one service-owned input-files-array contract, with manual entry serialized to temporary CSV first
+- persisted tabular inference outputs should preferentially reuse `dataset`, with inference lineage metadata kept on the inference task and reverse linkage added through nullable `dataset.ml_task_id`
+- manual inference input should use a dedicated row-entry widget
+- export should copy the canonical result artifact to a user-chosen destination rather than exposing the canonical file for editing
 
 ## Sources
 
