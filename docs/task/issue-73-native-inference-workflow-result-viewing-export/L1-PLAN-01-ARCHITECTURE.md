@@ -26,20 +26,21 @@ Out of scope:
 The intended native business flow is:
 
 1. user imports and inspects a source dataset
-2. user creates a work item from that dataset and selected feature columns
-3. app locks that dataset/feature binding on the work item
-4. user trains one or more models under that stable work item contract
-5. inference workspace opens the work item
-6. app resolves the default model:
+2. app creates a managed copy dataset row from that source dataset for one work item
+3. user creates a work item from that managed dataset copy and selected feature columns
+4. app locks that dataset/feature binding on the work item
+5. user trains one or more models under that stable work item contract
+6. inference workspace opens the work item
+7. app resolves the default model:
    - `best_trained_model_id` first
    - otherwise one of the other trained models on the same work item
-7. user chooses an inference input mode:
+8. user chooses an inference input mode:
    - manual row entry
    - batch file input
-8. app normalizes the chosen input into one or more files and submits one atomic `INFERENCE` task
-9. task execution loads the chosen trained model, runs prediction against the normalized input file set, and writes canonical outputs
-10. main process persists task metadata, generated dataset metadata, and result references
-11. UI renders result summary and supports open/export of the canonical output
+9. app normalizes the chosen input into one or more files and submits one atomic `INFERENCE` task
+10. task execution loads the chosen trained model, runs prediction against the normalized input file set, and writes canonical outputs
+11. main process persists task metadata, generated dataset metadata, and result references
+12. UI renders result summary and supports open/export of the canonical output
 
 Important interpretation:
 
@@ -136,17 +137,11 @@ High-level L1 direction:
 - new work-item creation should require:
   - project id
   - work-item name
-  - dataset id
+  - source dataset id
   - selected feature columns
   - selected target columns when relevant to the dataset setup flow
+- work-item creation materializes a copied dataset row under app-managed storage
+- `work_item.dataset_id` points at that copied dataset row, not the original external-source dataset row
 - after creation, the dataset and selected columns on that work item are immutable
 
-This does not require L1 to make the SQLite columns non-null for historical data.
-
-Preferred compatibility rule:
-
-- preserve database compatibility for existing rows created before issue `#73`
-- enforce the stricter rule through new service methods and updated UI flows
-- treat old incomplete work items as legacy records that can be listed but are not the target flow going forward
-
-That keeps migration pressure low while still making the forward path correct.
+Because backward compatibility is not required for the MVP branch, L2 may tighten the schema to match this invariant directly instead of preserving the old nullable workflow.

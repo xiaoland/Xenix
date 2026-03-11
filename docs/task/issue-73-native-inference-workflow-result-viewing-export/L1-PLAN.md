@@ -37,12 +37,14 @@ The revised L1 locks these high-level decisions:
   - manual entry is serialized into a service-owned temporary CSV before task submission
 - the app should default inference model selection from `work_item.best_trained_model_id`, but still allow switching to any other trained model on the same work item
 - work items should become dataset-bound and feature-bound at creation time, and that binding should be immutable after creation
-- app-managed dataset copying should move from ML-task dispatch time to work-item attachment time
+- app-managed dataset copying should move from ML-task dispatch time to work-item creation, and the managed copy should be represented by a dedicated `dataset` row
+- that copied dataset row should point back to its source dataset through `copied_from` and `copied_at`, and `work_item.dataset_id` should point to the copied row
 - inference should reuse `dataset` for persisted tabular prediction outputs, with reverse linkage through nullable `dataset.ml_task_id`
 - inference-specific lineage and execution metadata remain task-owned in `ml_task.request_payload`, `ml_task.result_payload`, and task artifacts
 - manual inference input requires a dedicated row-entry widget rather than stretching the generic JSON-schema form
 - canonical inference result artifacts remain app-owned; `Export` copies them to a user-chosen destination
 - arbitrary external model-file loading stays out of scope; inference loads only locally registered trained models
+- MVP delivery does not require backward-compatible schema compromises; resetting the local database is acceptable during development
 
 ## Approval Gate To Enter L2
 
@@ -50,6 +52,7 @@ L2 should proceed only if this L1 direction is accepted:
 
 - keep inference on the current native ML service and task-execution stack
 - make work-item dataset/feature binding immutable through the work-item creation flow
+- represent the work-item-managed dataset copy as a first-class `dataset` row via `copied_from` / `copied_at`
 - normalize both manual and batch inference into one file-based execution contract
 - reuse `dataset` for persisted tabular inference outputs instead of creating a separate inference-result catalog
 - keep inference lineage metadata task-owned rather than duplicating it across new persistence tables
