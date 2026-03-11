@@ -23,6 +23,10 @@ distribution = false
 
 [tool.pdm.scripts]
 dev = "python scripts/run_dev.py"
+package = "python scripts/package_app.py"
+smoke = "python scripts/run_dev.py --smoke-test"
+smoke-package = "python scripts/verify_packaged_smoke.py"
+dist = "python scripts/build_distribution_zip.py"
 test = "pytest"
 check = "python -m compileall src tests scripts"
 

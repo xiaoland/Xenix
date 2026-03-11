@@ -31,13 +31,13 @@ def create_application() -> QApplication:
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(APP_ORGANIZATION)
 
-    icon_path = package_resource_path("app-icon.svg")
+    icon_path = package_resource_path("logo.png")
     app.setWindowIcon(QIcon(str(icon_path)))
 
     return app
 
 
-def run() -> int:
+def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
     paths = ensure_app_dirs(get_app_paths())
     log_path = setup_logging(paths)
     install_exception_hooks()
@@ -65,7 +65,19 @@ def run() -> int:
         dataset_service=dataset_service,
         ml_service=ml_service,
     )
-    window.show()
+    if show:
+        window.show()
 
     LOGGER.info("Xenix native shell started")
+    return app, window
+
+
+def run(*, smoke_test: bool = False) -> int:
+    app, window = build_main_window(show=not smoke_test)
+    if smoke_test:
+        window.show()
+        app.processEvents()
+        window.close()
+        LOGGER.info("Xenix smoke test completed")
+        return 0
     return app.exec()

@@ -21,6 +21,14 @@ class AppPaths:
     resources: Path
 
 
+def package_root() -> Path:
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            return Path(meipass) / "xenix"
+    return Path(__file__).resolve().parent
+
+
 def _default_app_home() -> Path:
     override = os.getenv("XENIX_APP_HOME")
     if override:
@@ -37,8 +45,8 @@ def _default_app_home() -> Path:
 
 
 def get_app_paths() -> AppPaths:
-    package_root = Path(__file__).resolve().parent
     home = _default_app_home()
+    resolved_package_root = package_root()
 
     return AppPaths(
         home=home,
@@ -48,7 +56,7 @@ def get_app_paths() -> AppPaths:
         state=home / "state",
         temp=home / "temp",
         artifacts=home / "artifacts",
-        resources=package_root / "resources",
+        resources=resolved_package_root / "resources",
     )
 
 

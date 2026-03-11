@@ -22,27 +22,53 @@ Runtime dependencies now include:
 pdm run dev
 ```
 
-Expected result: the app opens the native dataset import workspace with project/work-item selection, file-picker and drag-and-drop import, dataset summary, and column selection.
+Expected result: the app opens the native desktop shell with `Datasets`, `Training`, and `Inference` workspaces.
 
-Issue `#72` extends that shell with a dedicated training tab for:
+The delivered workflow includes:
 
-- manual fit with schema-driven parameter editing
-- multi-model tuning with schema-driven grid editing
-- background task status, logs, and failure summary
-- trained-model listing and best-model marker
+- dataset import by file picker or drag-and-drop
+- immutable work-item creation with feature/target column selection
+- manual fit and multi-model tuning
+- background ML task execution with logs and failure details
+- trained-model persistence and best-model tracking
+- manual and batch-file inference
+- result viewing and export
 
 ## Verify
 
 ```bash
 pdm run test
 pdm run check
+pdm run smoke
+```
+
+`pdm run smoke` uses the same native entrypoint as the real app, but exits after validating startup, storage bootstrap, logging, and window creation.
+
+## Package
+
+```bash
+pdm run package
+```
+
+Expected result:
+
+- Windows `onedir` bundle is created under `dist/xenix/`
+- packaged executable path is `dist/xenix/xenix.exe`
+- package resources are available under the bundled `xenix/resources/` path
+
+## Packaged Smoke Verification
+
+```bash
+pdm run smoke-package
 ```
 
 ## VS Code
 
 - Launch `Xenix Native: Debug App` to start the desktop shell under the debugger.
 - Launch `Xenix Native: Debug App (Workspace Home)` to keep runtime data inside `${workspaceFolder}/.runtime`.
+- Launch `Xenix Native: Debug Smoke Test` to validate startup without entering the full event loop.
 - Run the `PyInstaller: package` task to build the desktop bundle from `xenix.spec`.
+- Run the `PyInstaller: packaged smoke test` task to launch the packaged EXE with `--smoke-test` against a temporary runtime home.
 
 ## App Directories
 
@@ -59,3 +85,14 @@ Runtime directories created on startup:
 - `state/`
 - `temp/`
 - `artifacts/`
+
+Smoke verification should confirm that these directories are created in a fresh runtime home and that:
+
+- `state/xenix.db` is created
+- `logs/xenix.log` is created
+
+## Troubleshooting
+
+- If packaging succeeds but the EXE does not start, rerun `pdm run smoke-package` first. It validates the packaged startup path without requiring manual UI interaction.
+- If resources fail to load in the packaged app, verify that `xenix.spec` still copies `src/xenix/resources` into `xenix/resources`.
+- If you need an isolated local run, set `XENIX_APP_HOME` to an empty directory or use the VSCode workspace-home launch profile.

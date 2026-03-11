@@ -12,7 +12,7 @@ def main() -> int:
 
     from xenix.main import main as application_main
 
-    return application_main()
+    return application_main(sys.argv[1:])
 
 
 if __name__ == "__main__":

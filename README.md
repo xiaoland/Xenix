@@ -16,6 +16,9 @@ Use Python `3.12` to `3.14`. The initial toolchain is pinned below `3.15` becaus
 ## Commands
 
 - `pdm run dev` starts the desktop shell.
+- `pdm run smoke` initializes the app with a fresh startup path and exits after bootstrap validation.
+- `pdm run package` builds the Windows `onedir` PyInstaller bundle from `xenix.spec`.
+- `pdm run smoke-package` launches the packaged executable with `--smoke-test` and verifies runtime artifacts in a temporary app home.
 - `pdm run test` runs the Python tests.
 - `pdm run check` compiles the source tree to catch syntax errors.
 
@@ -26,7 +29,7 @@ Use Python `3.12` to `3.14`. The initial toolchain is pinned below `3.15` becaus
 - `scripts` contains developer helpers used by `pdm run`.
 - `ml` keeps the existing Python model scripts that will be integrated into the native workflow later.
 - `docs` stores contracts, ADRs, runbooks, and migration guidance for the native app.
-- `xenix.spec` is the initial PyInstaller spec for desktop packaging work.
+- `xenix.spec` is the canonical Windows PyInstaller `onedir` spec.
 
 ## Documentation Model
 
@@ -44,5 +47,11 @@ Use Python `3.12` to `3.14`. The initial toolchain is pinned below `3.15` becaus
 - SQLite metadata is stored in `state/xenix.db`.
 - Temporary dataset copies live under `temp/datasets/`.
 - App-managed artifacts and ML task working directories live under `artifacts/`.
+
+## Packaging
+
+- The packaged executable is built at `dist/xenix/xenix.exe`.
+- Startup smoke validation is available in both source and packaged forms through the shared `--smoke-test` CLI.
+- VSCode launch/task entries are provided for debugger startup, smoke startup, packaging, and packaged smoke verification.
 
 See [docs/runbooks/development.md](docs/runbooks/development.md) for local workflow details.
