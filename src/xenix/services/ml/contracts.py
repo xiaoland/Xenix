@@ -82,6 +82,29 @@ class EvaluateTaskRequest(TaskRequestBase):
     evaluate_model: EvaluateModelPayload
 
 
+class InferenceInputFile(BaseModel):
+    absolute_path: str
+    file_name: str
+    source_kind: str
+
+
+class InferenceModelPayload(BaseModel):
+    trained_model_id: str
+    model_key: str
+    trained_model_artifact_path: str
+
+
+class InferenceTaskRequest(BaseModel):
+    task_id: str
+    project_id: str
+    work_item_id: str
+    dataset_id: str
+    dataset_source_path: str
+    feature_columns: list[str]
+    inference_model: InferenceModelPayload
+    input_files: list[InferenceInputFile]
+
+
 class CandidateMetrics(BaseModel):
     primary_metric_name: str
     primary_metric_value: float
@@ -119,6 +142,21 @@ class EvaluateTaskResult(TaskResultBase):
     trained_model_id: str
     model_key: str
     evaluation: CandidateMetrics
+
+
+class InferenceSummary(BaseModel):
+    row_count: int
+    input_file_count: int
+    prediction_column_name: str = "prediction"
+
+
+class InferenceTaskResult(BaseModel):
+    task_id: str
+    trained_model_id: str
+    model_key: str
+    output_file_path: str
+    summary: InferenceSummary
+    error_summary: str | None = None
 
 
 class TaskLogEntry(BaseModel):

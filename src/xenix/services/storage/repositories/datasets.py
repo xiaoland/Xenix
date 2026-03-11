@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from sqlalchemy import and_
 from sqlmodel import Session, select
 
 from ..models import DatasetRow
@@ -24,6 +25,45 @@ class DatasetRepository:
             .order_by(DatasetRow.created_at)
         )
         return list(session.exec(statement))
+
+    def list_source_by_project(self, session: Session, project_id: str) -> list[DatasetRow]:
+        statement = (
+            select(DatasetRow)
+            .where(
+                and_(
+                    DatasetRow.project_id == project_id,
+                    DatasetRow.copied_from.is_(None),
+                    DatasetRow.ml_task_id.is_(None),
+                )
+            )
+            .order_by(DatasetRow.created_at)
+        )
+        return list(session.exec(statement))
+
+    def list_generated_by_project(self, session: Session, project_id: str) -> list[DatasetRow]:
+        statement = (
+            select(DatasetRow)
+            .where(
+                and_(
+                    DatasetRow.project_id == project_id,
+                    DatasetRow.ml_task_id.is_not(None),
+                )
+            )
+            .order_by(DatasetRow.created_at)
+        )
+        return list(session.exec(statement))
+
+    def list_copies_by_source(self, session: Session, source_dataset_id: str) -> list[DatasetRow]:
+        statement = (
+            select(DatasetRow)
+            .where(DatasetRow.copied_from == source_dataset_id)
+            .order_by(DatasetRow.created_at)
+        )
+        return list(session.exec(statement))
+
+    def get_by_ml_task(self, session: Session, ml_task_id: str) -> DatasetRow | None:
+        statement = select(DatasetRow).where(DatasetRow.ml_task_id == ml_task_id)
+        return session.exec(statement).first()
 
     def rename(self, session: Session, dataset_id: str, new_name: str, now: datetime) -> DatasetRow | None:
         row = self.get(session, dataset_id)

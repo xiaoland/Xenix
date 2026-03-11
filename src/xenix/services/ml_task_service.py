@@ -15,18 +15,23 @@ from sqlmodel import Field, SQLModel
 from ..config import AppPaths
 from ..exceptions import InvalidStateTransitionError, NotFoundError, ValidationError
 from .ml.contracts import EvaluateTaskResult, FitTaskResult, HyperparameterTuningTaskResult, TaskLogEntry
+from .ml.contracts import InferenceTaskResult
 from .ml.execution import MLWorkerRunner
-from .ml.operations import run_evaluate_task, run_fit_task, run_hyperparameter_tuning_task
+from .ml.operations import run_evaluate_task, run_fit_task, run_hyperparameter_tuning_task, run_inference_task
 from .storage.layout import (
+    canonical_inference_dir,
     canonical_model_dir,
     ml_task_root,
     task_input_dir,
     task_logs_path,
+    task_output_dir,
     task_models_dir,
     task_request_path,
     task_result_path,
 )
 from .storage.models import (
+    DatasetRow,
+    DatasetSourceFormat,
     MLTaskArtifactKind,
     MLTaskArtifactRow,
     MLTaskRow,
@@ -162,6 +167,7 @@ class MLTaskService:
         root = ml_task_root(self._paths, ml_task_id)
         root.mkdir(parents=True, exist_ok=True)
         task_input_dir(self._paths, ml_task_id).mkdir(parents=True, exist_ok=True)
+        task_output_dir(self._paths, ml_task_id).mkdir(parents=True, exist_ok=True)
         task_models_dir(self._paths, ml_task_id).mkdir(parents=True, exist_ok=True)
         task_request_path(self._paths, ml_task_id).write_text(
             json.dumps(task.request_payload, indent=2, ensure_ascii=True),
@@ -308,6 +314,8 @@ class MLTaskService:
             return run_hyperparameter_tuning_task
         if task_type is MLTaskType.EVALUATE:
             return run_evaluate_task
+        if task_type is MLTaskType.INFERENCE:
+            return run_inference_task
         raise ValidationError(f"ML task type '{task_type.value}' is not executable in this workflow.")
 
     def _finalize_success(self, ml_task_id: str) -> MLTaskRow:
@@ -321,6 +329,8 @@ class MLTaskService:
                 result_payload, artifacts = self._finalize_tuning_task(session, row)
             elif row.task_type is MLTaskType.EVALUATE:
                 result_payload, artifacts = self._finalize_evaluate_task(row)
+            elif row.task_type is MLTaskType.INFERENCE:
+                result_payload, artifacts = self._finalize_inference_task(session, row)
             else:
                 raise ValidationError(f"ML task type '{row.task_type.value}' cannot be finalized.")
 
@@ -410,6 +420,48 @@ class MLTaskService:
             raise ValidationError(result.error_summary)
         return result.model_dump(mode="json"), []
 
+    def _finalize_inference_task(
+        self,
+        session: Any,
+        row: MLTaskRow,
+    ) -> tuple[dict[str, Any], list[MLTaskArtifactInput]]:
+        result = InferenceTaskResult.model_validate_json(
+            task_result_path(self._paths, row.id).read_text(encoding="utf-8")
+        )
+        if result.error_summary:
+            raise ValidationError(result.error_summary)
+
+        output_path = Path(result.output_file_path)
+        self._require_existing_path(output_path)
+        canonical_path = self._copy_canonical_inference_output(row.work_item_id, row.id, output_path)
+        work_item = self._work_items.get(session, row.work_item_id)
+        if work_item is None:
+            raise NotFoundError(f"Work item '{row.work_item_id}' was not found.")
+        dataset_row = DatasetRow(
+            project_id=row.project_id,
+            name=f"{work_item.name} predictions",
+            source_path=str(canonical_path),
+            source_format=DatasetSourceFormat.CSV,
+            copied_from=None,
+            copied_at=None,
+            ml_task_id=row.id,
+        )
+        self._datasets.create(session, dataset_row)
+        payload = result.model_dump(mode="json")
+        payload["canonical_output_path"] = str(canonical_path)
+        payload["result_dataset_id"] = dataset_row.id
+        payload["row_count"] = result.summary.row_count
+        payload["input_file_count"] = result.summary.input_file_count
+        payload["prediction_column_name"] = result.summary.prediction_column_name
+        artifacts = [
+            MLTaskArtifactInput(
+                artifact_kind=MLTaskArtifactKind.INFERENCE_RESULT,
+                absolute_path=str(canonical_path),
+                ready_to_open=True,
+            )
+        ]
+        return payload, artifacts
+
     def _finalize_failure(self, ml_task_id: str, return_code: int) -> MLTaskRow:
         result_path = task_result_path(self._paths, ml_task_id)
         error_summary = f"Worker process exited with code {return_code}."
@@ -461,6 +513,18 @@ class MLTaskService:
         destination_dir = canonical_model_dir(self._paths, work_item_id)
         destination_dir.mkdir(parents=True, exist_ok=True)
         destination_path = destination_dir / f"{ml_task_id}-{model_key.replace('.', '_')}.joblib"
+        shutil.copy2(source_path, destination_path)
+        return destination_path
+
+    def _copy_canonical_inference_output(
+        self,
+        work_item_id: str,
+        ml_task_id: str,
+        source_path: Path,
+    ) -> Path:
+        destination_dir = canonical_inference_dir(self._paths, work_item_id)
+        destination_dir.mkdir(parents=True, exist_ok=True)
+        destination_path = destination_dir / f"{ml_task_id}-predictions.csv"
         shutil.copy2(source_path, destination_path)
         return destination_path
 

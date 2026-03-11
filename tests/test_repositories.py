@@ -38,6 +38,28 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _create_project(session: Session) -> ProjectRow:
+    project = ProjectRow(name="Retail")
+    ProjectRepository().create(session, project)
+    return project
+
+
+def _create_source_dataset(session: Session, project: ProjectRow, tmp_path: Path) -> DatasetRow:
+    dataset_file = tmp_path / "customers.csv"
+    dataset_file.write_text("age,income,label\n30,9000,1\n41,12000,0\n", encoding="utf-8")
+    dataset = DatasetRow(
+        project_id=project.id,
+        name="Customers",
+        source_path=str(dataset_file.resolve()),
+        source_format=DatasetSourceFormat.CSV,
+        copied_from=None,
+        copied_at=None,
+        ml_task_id=None,
+    )
+    DatasetRepository().create(session, dataset)
+    return dataset
+
+
 def test_project_repository_round_trip(monkeypatch, tmp_path: Path) -> None:
     repo = ProjectRepository()
     with _build_session(monkeypatch, tmp_path) as session:
@@ -55,12 +77,32 @@ def test_project_repository_round_trip(monkeypatch, tmp_path: Path) -> None:
 
 def test_work_item_repository_round_trip(monkeypatch, tmp_path: Path) -> None:
     projects = ProjectRepository()
+    datasets = DatasetRepository()
     work_items = WorkItemRepository()
 
     with _build_session(monkeypatch, tmp_path) as session:
         project = ProjectRow(name="Retail")
         projects.create(session, project)
-        work_item = WorkItemRow(project_id=project.id, name="Churn")
+        source_dataset = _create_source_dataset(session, project, tmp_path)
+        dataset_file = tmp_path / "customers-copy.csv"
+        dataset_file.write_text("age,income,label\n30,9000,1\n", encoding="utf-8")
+        copied_dataset = DatasetRow(
+            project_id=project.id,
+            name="Customers",
+            source_path=str(dataset_file.resolve()),
+            source_format=DatasetSourceFormat.CSV,
+            copied_from=source_dataset.id,
+            copied_at=_utc_now(),
+            ml_task_id=None,
+        )
+        datasets.create(session, copied_dataset)
+        work_item = WorkItemRow(
+            project_id=project.id,
+            name="Churn",
+            dataset_id=copied_dataset.id,
+            feature_columns=["age", "income"],
+            target_columns=["label"],
+        )
         work_items.create(session, work_item)
         session.commit()
 
@@ -69,54 +111,14 @@ def test_work_item_repository_round_trip(monkeypatch, tmp_path: Path) -> None:
 
     assert loaded is not None
     assert loaded.name == "Churn"
-    assert loaded.dataset_id is None
+    assert loaded.dataset_id == copied_dataset.id
     assert loaded.best_trained_model_id is None
-    assert loaded.feature_columns == []
-    assert loaded.target_columns == []
+    assert loaded.feature_columns == ["age", "income"]
+    assert loaded.target_columns == ["label"]
     assert [row.id for row in listed] == [work_item.id]
 
 
-def test_work_item_repository_persists_dataset_selection(monkeypatch, tmp_path: Path) -> None:
-    projects = ProjectRepository()
-    work_items = WorkItemRepository()
-    datasets = DatasetRepository()
-    dataset_file = tmp_path / "customers.csv"
-    dataset_file.write_text("age,label\n30,1\n", encoding="utf-8")
-
-    with _build_session(monkeypatch, tmp_path) as session:
-        project = ProjectRow(name="Retail")
-        projects.create(session, project)
-        dataset = DatasetRow(
-            project_id=project.id,
-            name="Customers",
-            source_path=str(dataset_file.resolve()),
-            source_format=DatasetSourceFormat.CSV,
-        )
-        datasets.create(session, dataset)
-        work_item = WorkItemRow(project_id=project.id, name="Churn")
-        work_items.create(session, work_item)
-
-        updated = work_items.set_dataset_selection(
-            session,
-            work_item.id,
-            dataset.id,
-            ["age"],
-            ["label"],
-            _utc_now(),
-        )
-        session.commit()
-
-        loaded = work_items.get(session, work_item.id)
-
-    assert updated is not None
-    assert loaded is not None
-    assert loaded.dataset_id == dataset.id
-    assert loaded.feature_columns == ["age"]
-    assert loaded.target_columns == ["label"]
-
-
 def test_work_item_repository_sets_best_trained_model(monkeypatch, tmp_path: Path) -> None:
-    projects = ProjectRepository()
     work_items = WorkItemRepository()
     ml_tasks = MLTaskRepository()
     trained_models = TrainedModelRepository()
@@ -124,13 +126,20 @@ def test_work_item_repository_sets_best_trained_model(monkeypatch, tmp_path: Pat
     artifact_path.write_text("binary-placeholder", encoding="utf-8")
 
     with _build_session(monkeypatch, tmp_path) as session:
-        project = ProjectRow(name="Retail")
-        projects.create(session, project)
-        work_item = WorkItemRow(project_id=project.id, name="Churn")
+        project = _create_project(session)
+        copied_dataset = _create_source_dataset(session, project, tmp_path)
+        work_item = WorkItemRow(
+            project_id=project.id,
+            name="Churn",
+            dataset_id=copied_dataset.id,
+            feature_columns=["age", "income"],
+            target_columns=["label"],
+        )
         work_items.create(session, work_item)
         task = MLTaskRow(
             project_id=project.id,
             work_item_id=work_item.id,
+            dataset_id=copied_dataset.id,
             task_type=MLTaskType.FIT,
             status=MLTaskStatus.SUCCEEDED,
         )
@@ -154,45 +163,82 @@ def test_work_item_repository_sets_best_trained_model(monkeypatch, tmp_path: Pat
     assert loaded.best_trained_model_id == trained_model.id
 
 
-def test_dataset_repository_round_trip(monkeypatch, tmp_path: Path) -> None:
-    projects = ProjectRepository()
+def test_dataset_repository_provenance_queries(monkeypatch, tmp_path: Path) -> None:
     datasets = DatasetRepository()
-    dataset_file = tmp_path / "customers.csv"
-    dataset_file.write_text("id,name\n1,Alice\n", encoding="utf-8")
+    output_file = tmp_path / "predictions.csv"
+    output_file.write_text("feature,prediction\n1,0\n", encoding="utf-8")
 
     with _build_session(monkeypatch, tmp_path) as session:
-        project = ProjectRow(name="Retail")
-        projects.create(session, project)
-        dataset = DatasetRow(
+        project = _create_project(session)
+        source_dataset = _create_source_dataset(session, project, tmp_path)
+        work_item = WorkItemRow(
             project_id=project.id,
-            name="Customers",
-            source_path=str(dataset_file.resolve()),
-            source_format=DatasetSourceFormat.CSV,
+            name="Inference",
+            dataset_id=source_dataset.id,
+            feature_columns=["age"],
+            target_columns=["label"],
         )
-        datasets.create(session, dataset)
-        session.commit()
-
-        loaded = datasets.get(session, dataset.id)
-        listed = datasets.list_by_project(session, project.id)
-
-    assert loaded is not None
-    assert loaded.source_format is DatasetSourceFormat.CSV
-    assert [row.id for row in listed] == [dataset.id]
-
-
-def test_ml_task_repository_round_trip(monkeypatch, tmp_path: Path) -> None:
-    projects = ProjectRepository()
-    work_items = WorkItemRepository()
-    ml_tasks = MLTaskRepository()
-
-    with _build_session(monkeypatch, tmp_path) as session:
-        project = ProjectRow(name="Retail")
-        projects.create(session, project)
-        work_item = WorkItemRow(project_id=project.id, name="Churn")
-        work_items.create(session, work_item)
+        WorkItemRepository().create(session, work_item)
         task = MLTaskRow(
             project_id=project.id,
             work_item_id=work_item.id,
+            dataset_id=source_dataset.id,
+            task_type=MLTaskType.INFERENCE,
+            status=MLTaskStatus.SUCCEEDED,
+        )
+        MLTaskRepository().create(session, task)
+        copied_dataset = DatasetRow(
+            project_id=project.id,
+            name="Customers copy",
+            source_path=str((tmp_path / "copy.csv").resolve()),
+            source_format=DatasetSourceFormat.CSV,
+            copied_from=source_dataset.id,
+            copied_at=_utc_now(),
+            ml_task_id=None,
+        )
+        generated_dataset = DatasetRow(
+            project_id=project.id,
+            name="Predictions",
+            source_path=str(output_file.resolve()),
+            source_format=DatasetSourceFormat.CSV,
+            copied_from=None,
+            copied_at=None,
+            ml_task_id=task.id,
+        )
+        datasets.create(session, copied_dataset)
+        datasets.create(session, generated_dataset)
+        session.commit()
+
+        sources = datasets.list_source_by_project(session, project.id)
+        generated = datasets.list_generated_by_project(session, project.id)
+        copies = datasets.list_copies_by_source(session, source_dataset.id)
+        by_task = datasets.get_by_ml_task(session, task.id)
+
+    assert [row.id for row in sources] == [source_dataset.id]
+    assert [row.id for row in generated] == [generated_dataset.id]
+    assert [row.id for row in copies] == [copied_dataset.id]
+    assert by_task is not None
+    assert by_task.id == generated_dataset.id
+
+
+def test_ml_task_repository_round_trip(monkeypatch, tmp_path: Path) -> None:
+    ml_tasks = MLTaskRepository()
+
+    with _build_session(monkeypatch, tmp_path) as session:
+        project = _create_project(session)
+        copied_dataset = _create_source_dataset(session, project, tmp_path)
+        work_item = WorkItemRow(
+            project_id=project.id,
+            name="Churn",
+            dataset_id=copied_dataset.id,
+            feature_columns=["age", "income"],
+            target_columns=["label"],
+        )
+        WorkItemRepository().create(session, work_item)
+        task = MLTaskRow(
+            project_id=project.id,
+            work_item_id=work_item.id,
+            dataset_id=copied_dataset.id,
             task_type=MLTaskType.FIT,
             status=MLTaskStatus.PENDING,
             request_payload={"model": "regression.ridge"},
@@ -209,20 +255,25 @@ def test_ml_task_repository_round_trip(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_ml_task_completion_persists_artifacts(monkeypatch, tmp_path: Path) -> None:
-    projects = ProjectRepository()
-    work_items = WorkItemRepository()
     ml_tasks = MLTaskRepository()
     artifact_path = tmp_path / "model.pkl"
     artifact_path.write_text("binary-placeholder", encoding="utf-8")
 
     with _build_session(monkeypatch, tmp_path) as session:
-        project = ProjectRow(name="Retail")
-        projects.create(session, project)
-        work_item = WorkItemRow(project_id=project.id, name="Churn")
-        work_items.create(session, work_item)
+        project = _create_project(session)
+        copied_dataset = _create_source_dataset(session, project, tmp_path)
+        work_item = WorkItemRow(
+            project_id=project.id,
+            name="Churn",
+            dataset_id=copied_dataset.id,
+            feature_columns=["age", "income"],
+            target_columns=["label"],
+        )
+        WorkItemRepository().create(session, work_item)
         task = MLTaskRow(
             project_id=project.id,
             work_item_id=work_item.id,
+            dataset_id=copied_dataset.id,
             task_type=MLTaskType.FIT,
             status=MLTaskStatus.RUNNING,
         )
@@ -254,25 +305,29 @@ def test_ml_task_completion_persists_artifacts(monkeypatch, tmp_path: Path) -> N
 
 
 def test_trained_model_repository_round_trip(monkeypatch, tmp_path: Path) -> None:
-    projects = ProjectRepository()
-    work_items = WorkItemRepository()
-    ml_tasks = MLTaskRepository()
     trained_models = TrainedModelRepository()
     artifact_path = tmp_path / "canonical-model.joblib"
     artifact_path.write_text("binary-placeholder", encoding="utf-8")
 
     with _build_session(monkeypatch, tmp_path) as session:
-        project = ProjectRow(name="Retail")
-        projects.create(session, project)
-        work_item = WorkItemRow(project_id=project.id, name="Churn")
-        work_items.create(session, work_item)
+        project = _create_project(session)
+        copied_dataset = _create_source_dataset(session, project, tmp_path)
+        work_item = WorkItemRow(
+            project_id=project.id,
+            name="Churn",
+            dataset_id=copied_dataset.id,
+            feature_columns=["age", "income"],
+            target_columns=["label"],
+        )
+        WorkItemRepository().create(session, work_item)
         task = MLTaskRow(
             project_id=project.id,
             work_item_id=work_item.id,
+            dataset_id=copied_dataset.id,
             task_type=MLTaskType.FIT,
             status=MLTaskStatus.SUCCEEDED,
         )
-        ml_tasks.create(session, task)
+        MLTaskRepository().create(session, task)
         trained_model = TrainedModelRow(
             work_item_id=work_item.id,
             ml_task_id=task.id,

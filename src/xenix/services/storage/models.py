@@ -72,7 +72,7 @@ class WorkItemRow(SQLModel, table=True):
     project_id: str = Field(foreign_key="project.id", index=True)
     name: str = Field(index=True)
     description: str | None = None
-    dataset_id: str | None = Field(default=None, foreign_key="dataset.id", index=True)
+    dataset_id: str = Field(foreign_key="dataset.id", index=True)
     best_trained_model_id: str | None = Field(
         default=None,
         foreign_key="trained_model.id",
@@ -98,6 +98,9 @@ class DatasetRow(SQLModel, table=True):
     name: str = Field(index=True)
     source_path: str
     source_format: DatasetSourceFormat = Field(default=DatasetSourceFormat.UNKNOWN, index=True)
+    copied_from: str | None = Field(default=None, foreign_key="dataset.id", index=True)
+    copied_at: datetime | None = None
+    ml_task_id: str | None = Field(default=None, foreign_key="ml_task.id", index=True, unique=True)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 

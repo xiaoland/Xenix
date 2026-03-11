@@ -15,6 +15,10 @@ def artifact_models_root(paths: AppPaths) -> Path:
     return paths.artifacts / "models"
 
 
+def artifact_datasets_root(paths: AppPaths) -> Path:
+    return paths.artifacts / "datasets"
+
+
 def artifact_training_root(paths: AppPaths) -> Path:
     return paths.artifacts / "training"
 
@@ -31,8 +35,20 @@ def ml_task_root(paths: AppPaths, ml_task_id: str) -> Path:
     return ml_task_parent_root(paths) / ml_task_id
 
 
+def work_item_dataset_dir(paths: AppPaths, work_item_id: str) -> Path:
+    return artifact_datasets_root(paths) / "work-items" / work_item_id
+
+
+def canonical_inference_dir(paths: AppPaths, work_item_id: str) -> Path:
+    return artifact_inference_root(paths) / work_item_id
+
+
 def task_input_dir(paths: AppPaths, ml_task_id: str) -> Path:
     return ml_task_root(paths, ml_task_id) / "input"
+
+
+def task_output_dir(paths: AppPaths, ml_task_id: str) -> Path:
+    return ml_task_root(paths, ml_task_id) / "output"
 
 
 def task_models_dir(paths: AppPaths, ml_task_id: str) -> Path:
@@ -57,6 +73,7 @@ def canonical_model_dir(paths: AppPaths, work_item_id: str) -> Path:
 
 def ensure_storage_layout(paths: AppPaths) -> None:
     for directory in (
+        artifact_datasets_root(paths),
         artifact_models_root(paths),
         artifact_training_root(paths),
         artifact_inference_root(paths),

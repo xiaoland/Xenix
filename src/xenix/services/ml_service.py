@@ -8,6 +8,7 @@ from pydantic import Field
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
 
+from ..config import AppPaths
 from ..exceptions import DatasetSourceMissingError, ValidationError
 from .dataset_inspection import InspectDatasetInput
 from .dataset_service import DatasetService
@@ -20,6 +21,9 @@ from .ml.contracts import (
     FitTaskRequest,
     HyperparameterTuningTaskRequest,
     HyperparameterTuningPayload,
+    InferenceInputFile,
+    InferenceModelPayload,
+    InferenceTaskRequest,
     ManualTrainingPayload,
     TaskContinuationPlan,
     TaskLogEntry,
@@ -54,6 +58,12 @@ class BulkTuneWithEvaluateInput(SQLModel):
     selections: list[BulkTuningSelection] = Field(default_factory=list)
 
 
+class InferWithFilesInput(SQLModel):
+    work_item_id: str
+    trained_model_id: str | None = None
+    input_files: list[str] = Field(default_factory=list)
+
+
 @dataclass(frozen=True)
 class MLTaskDetails:
     task: MLTaskRow
@@ -64,11 +74,13 @@ class MLTaskDetails:
 class MLService:
     def __init__(
         self,
+        paths: AppPaths,
         session_factory: sessionmaker,
         dataset_service: DatasetService,
         work_item_service: WorkItemService,
         ml_task_service: MLTaskService,
     ) -> None:
+        self._paths = paths
         self._session_factory = session_factory
         self._dataset_service = dataset_service
         self._work_item_service = work_item_service
@@ -160,6 +172,33 @@ class MLService:
     def list_trained_models(self, work_item_id: str) -> list[TrainedModelRow]:
         with self._session_factory() as session:
             return self._trained_models.list_by_work_item(session, work_item_id)
+
+    def infer(self, input_data: InferWithFilesInput) -> MLTaskRow:
+        work_item = self._work_item_service.get_work_item(input_data.work_item_id)
+        if not work_item.feature_columns:
+            raise ValidationError("The selected work item does not have feature columns.")
+
+        dataset = self._dataset_service.get_dataset(work_item.dataset_id)
+        if not Path(dataset.source_path).exists():
+            raise DatasetSourceMissingError("Dataset source file is missing.")
+
+        trained_model = self._resolve_inference_model(work_item, input_data.trained_model_id)
+        input_files = self._build_inference_input_files(work_item.feature_columns, input_data.input_files)
+        request = InferenceTaskRequest(
+            task_id="",
+            project_id=work_item.project_id,
+            work_item_id=work_item.id,
+            dataset_id=dataset.id,
+            dataset_source_path=dataset.source_path,
+            feature_columns=work_item.feature_columns,
+            inference_model=InferenceModelPayload(
+                trained_model_id=trained_model.id,
+                model_key=trained_model.model_key,
+                trained_model_artifact_path=trained_model.artifact_path,
+            ),
+            input_files=input_files,
+        )
+        return self._create_task_from_request(MLTaskType.INFERENCE, request, auto_submit=True)
 
     def _handle_task_completion(self, task: MLTaskRow) -> None:
         if task.status is not MLTaskStatus.SUCCEEDED:
@@ -295,7 +334,9 @@ class MLService:
     def _create_task_from_request(
         self,
         task_type: MLTaskType,
-        request: FitTaskRequest | HyperparameterTuningTaskRequest | EvaluateTaskRequest,
+        request: FitTaskRequest | HyperparameterTuningTaskRequest | EvaluateTaskRequest | InferenceTaskRequest,
+        *,
+        auto_submit: bool = False,
     ) -> MLTaskRow:
         created = self._ml_task_service.create_ml_task(
             CreateMLTaskInput(
@@ -315,7 +356,48 @@ class MLService:
             session.add(row)
             session.commit()
             session.refresh(row)
+            if auto_submit:
+                self._ml_task_service.submit_ml_task(created.id)
             return row
+
+    def _resolve_inference_model(self, work_item: Any, trained_model_id: str | None) -> TrainedModelRow:
+        with self._session_factory() as session:
+            model_id = trained_model_id or work_item.best_trained_model_id
+            if model_id is None:
+                raise ValidationError("The selected work item does not have a best model yet. Select a trained model first.")
+            trained_model = self._trained_models.get(session, model_id)
+            if trained_model is None or trained_model.work_item_id != work_item.id:
+                raise ValidationError("The selected trained model is invalid for the current work item.")
+            if not Path(trained_model.artifact_path).exists():
+                raise ValidationError("The selected trained model artifact is missing.")
+            return trained_model
+
+    def _build_inference_input_files(
+        self,
+        feature_columns: list[str],
+        input_paths: list[str],
+    ) -> list[InferenceInputFile]:
+        if not input_paths:
+            raise ValidationError("Select at least one inference input file.")
+        manual_root = (self._paths.temp / "manual-inference").resolve()
+        files: list[InferenceInputFile] = []
+        for raw_path in input_paths:
+            inspection = self._dataset_service.inspect_source_file(
+                InspectDatasetInput(source_path=str(Path(raw_path).resolve()))
+            )
+            available = {column.name for column in inspection.columns}
+            if not set(feature_columns).issubset(available):
+                raise ValidationError("Inference input file does not contain the required feature columns.")
+            absolute_path = Path(inspection.source_path).resolve()
+            source_kind = "manual_csv" if manual_root in absolute_path.parents else "user_file"
+            files.append(
+                InferenceInputFile(
+                    absolute_path=str(absolute_path),
+                    file_name=absolute_path.name,
+                    source_kind=source_kind,
+                )
+            )
+        return files
 
 
 @dataclass(frozen=True)

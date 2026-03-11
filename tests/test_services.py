@@ -5,16 +5,17 @@ import pytest
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import InvalidStateTransitionError, ValidationError
 from xenix.services.dataset_inspection import InspectDatasetInput
-from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
+from xenix.services.dataset_service import (
+    DatasetService,
+    ExportDatasetCopyInput,
+    MaterializeManualInferenceCsvInput,
+    RegisterDatasetInput,
+)
 from xenix.services.ml_task_service import CompleteMLTaskInput, CreateMLTaskInput, MLTaskService
 from xenix.services.project_service import CreateProjectInput, ProjectService
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import MLTaskType
-from xenix.services.work_item_service import (
-    AttachDatasetSelectionInput,
-    CreateWorkItemInput,
-    WorkItemService,
-)
+from xenix.services.work_item_service import CreateWorkItemInput, WorkItemService
 
 
 def _build_services(monkeypatch, tmp_path: Path) -> tuple[ProjectService, WorkItemService, DatasetService, MLTaskService]:
@@ -22,10 +23,26 @@ def _build_services(monkeypatch, tmp_path: Path) -> tuple[ProjectService, WorkIt
     paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
     project_service = ProjectService(context.session_factory)
-    work_item_service = WorkItemService(context.session_factory)
-    dataset_service = DatasetService(context.session_factory)
+    work_item_service = WorkItemService(context.session_factory, paths)
+    dataset_service = DatasetService(context.session_factory, paths)
     ml_task_service = MLTaskService(context.session_factory, paths)
     return project_service, work_item_service, dataset_service, ml_task_service
+
+
+def _register_dataset(
+    dataset_service: DatasetService,
+    project_id: str,
+    dataset_path: Path,
+    *,
+    name: str = "Customers",
+) -> object:
+    return dataset_service.register_dataset(
+        RegisterDatasetInput(
+            project_id=project_id,
+            source_path=str(dataset_path.resolve()),
+            name=name,
+        )
+    )
 
 
 def test_dataset_service_inspects_csv_summary_and_column_kinds(monkeypatch, tmp_path: Path) -> None:
@@ -56,75 +73,99 @@ def test_dataset_service_rejects_empty_dataset_file(monkeypatch, tmp_path: Path)
         dataset_service.inspect_source_file(InspectDatasetInput(source_path=str(dataset_file.resolve())))
 
 
-def test_work_item_service_persists_dataset_feature_and_target_selection(monkeypatch, tmp_path: Path) -> None:
+def test_work_item_service_creates_dataset_bound_copy_with_locked_columns(monkeypatch, tmp_path: Path) -> None:
     project_service, work_item_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
     project = project_service.create_project(CreateProjectInput(name="Retail"))
-    work_item = work_item_service.create_work_item(
-        CreateWorkItemInput(project_id=project.id, name="Churn")
-    )
-
     dataset_file = tmp_path / "customers.csv"
     dataset_file.write_text("age,income,label\n30,9000,1\n41,12000,0\n", encoding="utf-8")
-    dataset = dataset_service.register_dataset(
-        RegisterDatasetInput(
-            project_id=project.id,
-            source_path=str(dataset_file.resolve()),
-            name="Customers",
-        )
-    )
+    source_dataset = _register_dataset(dataset_service, project.id, dataset_file)
 
-    updated = work_item_service.attach_dataset_selection(
-        AttachDatasetSelectionInput(
-            work_item_id=work_item.id,
-            dataset_id=dataset.id,
+    work_item = work_item_service.create_work_item(
+        CreateWorkItemInput(
+            project_id=project.id,
+            name="Churn",
+            source_dataset_id=source_dataset.id,
             feature_columns=["age", "income"],
             target_columns=["label"],
         )
     )
+    copied_dataset = dataset_service.get_dataset(work_item.dataset_id)
 
-    assert updated.dataset_id == dataset.id
-    assert updated.feature_columns == ["age", "income"]
-    assert updated.target_columns == ["label"]
+    assert work_item.dataset_id != source_dataset.id
+    assert work_item.feature_columns == ["age", "income"]
+    assert work_item.target_columns == ["label"]
+    assert copied_dataset.project_id == project.id
+    assert copied_dataset.copied_from == source_dataset.id
+    assert copied_dataset.copied_at is not None
+    assert Path(copied_dataset.source_path).exists()
+    assert Path(copied_dataset.source_path).read_text(encoding="utf-8") == dataset_file.read_text(encoding="utf-8")
 
 
 def test_work_item_service_rejects_overlapping_feature_and_target_columns(monkeypatch, tmp_path: Path) -> None:
     project_service, work_item_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
     project = project_service.create_project(CreateProjectInput(name="Retail"))
-    work_item = work_item_service.create_work_item(
-        CreateWorkItemInput(project_id=project.id, name="Churn")
-    )
-
     dataset_file = tmp_path / "customers.csv"
     dataset_file.write_text("age,income,label\n30,9000,1\n41,12000,0\n", encoding="utf-8")
-    dataset = dataset_service.register_dataset(
-        RegisterDatasetInput(
-            project_id=project.id,
-            source_path=str(dataset_file.resolve()),
-            name="Customers",
-        )
-    )
+    source_dataset = _register_dataset(dataset_service, project.id, dataset_file)
 
     with pytest.raises(ValidationError):
-        work_item_service.attach_dataset_selection(
-            AttachDatasetSelectionInput(
-                work_item_id=work_item.id,
-                dataset_id=dataset.id,
+        work_item_service.create_work_item(
+            CreateWorkItemInput(
+                project_id=project.id,
+                name="Churn",
+                source_dataset_id=source_dataset.id,
                 feature_columns=["age", "label"],
                 target_columns=["label"],
             )
         )
 
 
-def test_ml_task_service_rejects_invalid_state_transition(monkeypatch, tmp_path: Path) -> None:
-    project_service, work_item_service, _dataset_service, ml_task_service = _build_services(monkeypatch, tmp_path)
+def test_dataset_service_materializes_manual_inference_csv_and_exports_copy(monkeypatch, tmp_path: Path) -> None:
+    project_service, _work_item_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
     project = project_service.create_project(CreateProjectInput(name="Retail"))
+    dataset_file = tmp_path / "predictions.csv"
+    dataset_file.write_text("age,prediction\n30,1\n", encoding="utf-8")
+    dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Predictions")
+
+    materialized = dataset_service.materialize_manual_inference_csv(
+        MaterializeManualInferenceCsvInput(
+            feature_columns=["age", "income"],
+            rows=[{"age": "30", "income": "9000"}],
+        )
+    )
+    exported = dataset_service.export_dataset_copy(
+        ExportDatasetCopyInput(
+            dataset_id=dataset.id,
+            destination_path=str((tmp_path / "exports" / "predictions-copy.csv").resolve()),
+        )
+    )
+
+    assert materialized.exists()
+    assert materialized.read_text(encoding="utf-8").splitlines() == ["age,income", "30,9000"]
+    assert exported.exists()
+    assert exported.read_text(encoding="utf-8") == dataset_file.read_text(encoding="utf-8")
+
+
+def test_ml_task_service_rejects_invalid_state_transition(monkeypatch, tmp_path: Path) -> None:
+    project_service, work_item_service, dataset_service, ml_task_service = _build_services(monkeypatch, tmp_path)
+    project = project_service.create_project(CreateProjectInput(name="Retail"))
+    dataset_file = tmp_path / "customers.csv"
+    dataset_file.write_text("age,income,label\n30,9000,1\n41,12000,0\n", encoding="utf-8")
+    source_dataset = _register_dataset(dataset_service, project.id, dataset_file)
     work_item = work_item_service.create_work_item(
-        CreateWorkItemInput(project_id=project.id, name="Churn")
+        CreateWorkItemInput(
+            project_id=project.id,
+            name="Churn",
+            source_dataset_id=source_dataset.id,
+            feature_columns=["age", "income"],
+            target_columns=["label"],
+        )
     )
     task = ml_task_service.create_ml_task(
         CreateMLTaskInput(
             project_id=project.id,
             work_item_id=work_item.id,
+            dataset_id=work_item.dataset_id,
             task_type=MLTaskType.FIT,
             request_payload={"model": "regression.ridge"},
         )

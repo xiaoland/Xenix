@@ -22,6 +22,9 @@ from ..contracts import (
     FitTaskResult,
     HyperparameterTuningTaskRequest,
     HyperparameterTuningTaskResult,
+    InferenceSummary,
+    InferenceTaskRequest,
+    InferenceTaskResult,
     TuningSummary,
 )
 from ..dataset_loader import load_dataset, load_holdout_frame
@@ -113,6 +116,41 @@ class NumericAndCategoricalModelService(ModelServiceBase):
             trained_model_id=request.evaluate_model.trained_model_id,
             model_key=cls.key,
             evaluation=metrics,
+        )
+
+    @classmethod
+    def infer(cls, request: InferenceTaskRequest, task_dir: Path) -> InferenceTaskResult:
+        estimator = joblib.load(request.inference_model.trained_model_artifact_path)
+        result_frames: list[pd.DataFrame] = []
+        for input_file in request.input_files:
+            dataframe = load_dataset(Path(input_file.absolute_path))
+            missing = [column for column in request.feature_columns if column not in dataframe.columns]
+            if missing:
+                raise ValidationError(
+                    f"Inference input '{input_file.file_name}' is missing required columns: {', '.join(missing)}."
+                )
+            X_infer = dataframe.loc[:, request.feature_columns].copy()
+            predictions = estimator.predict(X_infer)
+            result_frame = dataframe.copy()
+            result_frame["prediction"] = predictions
+            if len(request.input_files) > 1:
+                result_frame["source_file"] = input_file.file_name
+            result_frames.append(result_frame)
+
+        output_dir = task_dir / "output"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / "predictions.csv"
+        pd.concat(result_frames, ignore_index=True).to_csv(output_path, index=False)
+        return InferenceTaskResult(
+            task_id=request.task_id,
+            trained_model_id=request.inference_model.trained_model_id,
+            model_key=cls.key,
+            output_file_path=str(output_path),
+            summary=InferenceSummary(
+                row_count=int(sum(len(frame.index) for frame in result_frames)),
+                input_file_count=len(request.input_files),
+                prediction_column_name="prediction",
+            ),
         )
 
     @classmethod

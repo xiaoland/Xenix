@@ -8,6 +8,7 @@ from ..contracts import (
     EvaluateTaskRequest,
     FitTaskRequest,
     HyperparameterTuningTaskRequest,
+    InferenceTaskRequest,
     TaskLogEntry,
 )
 from ..registry import get_model_service
@@ -85,6 +86,33 @@ def run_evaluate_task(task_dir_str: str) -> None:
                 "task_id": request.task_id,
                 "problem_kind": request.problem_kind.value,
                 "evaluation_policy": request.evaluation_policy.model_dump(mode="json"),
+                "error_summary": str(exc),
+                "traceback": traceback.format_exc(),
+            },
+        )
+        raise
+
+
+def run_inference_task(task_dir_str: str) -> None:
+    task_dir = Path(task_dir_str)
+    request = InferenceTaskRequest.model_validate_json(
+        task_request_path_from_dir(task_dir).read_text(encoding="utf-8")
+    )
+    logger = TaskFileLogger(task_dir)
+    logger.info(f"Starting inference for model '{request.inference_model.model_key}'.")
+    service = get_model_service(request.inference_model.model_key)
+    try:
+        result = service.infer(request, task_dir)
+        write_result(task_dir, result.model_dump(mode="json"))
+        logger.info("Inference completed successfully.")
+    except Exception as exc:  # pragma: no cover - subprocess safety
+        logger.error(f"Inference failed: {exc}")
+        write_result(
+            task_dir,
+            {
+                "task_id": request.task_id,
+                "trained_model_id": request.inference_model.trained_model_id,
+                "model_key": request.inference_model.model_key,
                 "error_summary": str(exc),
                 "traceback": traceback.format_exc(),
             },

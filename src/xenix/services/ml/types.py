@@ -14,6 +14,8 @@ from .contracts import (
     FitTaskResult,
     HyperparameterTuningTaskRequest,
     HyperparameterTuningTaskResult,
+    InferenceTaskRequest,
+    InferenceTaskResult,
 )
 
 
@@ -78,4 +80,9 @@ class ModelServiceBase(ABC):
     @classmethod
     @abstractmethod
     def evaluate(cls, request: EvaluateTaskRequest, task_dir: Path) -> EvaluateTaskResult:
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def infer(cls, request: InferenceTaskRequest, task_dir: Path) -> InferenceTaskResult:
         raise NotImplementedError

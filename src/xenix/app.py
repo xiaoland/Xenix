@@ -44,10 +44,11 @@ def run() -> int:
     context = StorageBootstrapService().initialize(paths)
 
     project_service = ProjectService(context.session_factory)
-    work_item_service = WorkItemService(context.session_factory)
-    dataset_service = DatasetService(context.session_factory)
+    work_item_service = WorkItemService(context.session_factory, paths)
+    dataset_service = DatasetService(context.session_factory, paths)
     ml_task_service = MLTaskService(context.session_factory, paths)
     ml_service = MLService(
+        paths,
         context.session_factory,
         dataset_service,
         work_item_service,

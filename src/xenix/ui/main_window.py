@@ -21,6 +21,7 @@ from ..services.ml_service import MLService
 from ..services.project_service import ProjectService
 from ..services.work_item_service import WorkItemService
 from .dataset_workspace import DatasetWorkspace
+from .inference_workspace import InferenceWorkspace
 from .ml_workspace import MLWorkspace
 
 
@@ -58,8 +59,8 @@ class MainWindow(QMainWindow):
         title.setStyleSheet("font-size: 24px; font-weight: 600;")
 
         summary = QLabel(
-            "Import datasets, persist feature and target selections onto work items,"
-            " then run background fit and tuning workflows with automatic evaluation."
+            "Create immutable work items from datasets, train models in the background,"
+            " then run local inference with result viewing and export."
         )
         summary.setWordWrap(True)
 
@@ -87,11 +88,25 @@ class MainWindow(QMainWindow):
             ml_service=self._ml_service,
             parent=self,
         )
+        inference_workspace = InferenceWorkspace(
+            project_service=self._project_service,
+            work_item_service=self._work_item_service,
+            dataset_service=self._dataset_service,
+            ml_service=self._ml_service,
+            parent=self,
+        )
         workspace_tabs = QTabWidget(self)
         workspace_tabs.addTab(dataset_workspace, "Datasets")
         workspace_tabs.addTab(ml_workspace, "Training")
+        workspace_tabs.addTab(inference_workspace, "Inference")
         workspace_tabs.currentChanged.connect(
-            lambda index: ml_workspace.reload_state() if workspace_tabs.widget(index) is ml_workspace else None
+            lambda index: (
+                ml_workspace.reload_state()
+                if workspace_tabs.widget(index) is ml_workspace
+                else inference_workspace.reload_state()
+                if workspace_tabs.widget(index) is inference_workspace
+                else None
+            )
         )
 
         layout.addWidget(title)
