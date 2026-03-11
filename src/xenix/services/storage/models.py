@@ -21,6 +21,7 @@ class MLTaskType(StrEnum):
     INSPECT_DATASET = "inspect_dataset"
     FIT = "fit"
     HYPERPARAMETER_TUNING = "hyperparameter_tuning"
+    EVALUATE = "evaluate"
     INFERENCE = "inference"
 
 
@@ -39,9 +40,16 @@ class DatasetSourceFormat(StrEnum):
     UNKNOWN = "unknown"
 
 
+class ProblemKind(StrEnum):
+    REGRESSION = "regression"
+    CLASSIFICATION = "classification"
+
+
 class MLTaskArtifactKind(StrEnum):
     MODEL = "model"
+    HOLDOUT_DATA = "holdout_data"
     TRAINING_REPORT = "training_report"
+    EVALUATION_REPORT = "evaluation_report"
     INFERENCE_RESULT = "inference_result"
     EXPORT_FILE = "export_file"
     OTHER = "other"
@@ -65,6 +73,11 @@ class WorkItemRow(SQLModel, table=True):
     name: str = Field(index=True)
     description: str | None = None
     dataset_id: str | None = Field(default=None, foreign_key="dataset.id", index=True)
+    best_trained_model_id: str | None = Field(
+        default=None,
+        foreign_key="trained_model.id",
+        index=True,
+    )
     feature_columns: list[str] = Field(
         default_factory=list,
         sa_column=Column(JSON, nullable=False),
@@ -122,3 +135,16 @@ class MLTaskArtifactRow(SQLModel, table=True):
     absolute_path: str
     ready_to_open: bool = True
     created_at: datetime = Field(default_factory=utc_now)
+
+
+class TrainedModelRow(SQLModel, table=True):
+    __tablename__ = "trained_model"
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    work_item_id: str = Field(foreign_key="work_item.id", index=True)
+    ml_task_id: str = Field(foreign_key="ml_task.id", index=True, unique=True)
+    model_key: str = Field(index=True)
+    problem_kind: ProblemKind = Field(index=True)
+    artifact_path: str
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)

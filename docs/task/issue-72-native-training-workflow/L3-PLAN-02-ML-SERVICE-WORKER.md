@@ -15,8 +15,8 @@ Boundary rule:
 - `MLService` is the UI-facing training workflow boundary
 - `DatasetService` keeps raw dataset inspection ownership
 - `WorkItemService` keeps ownership of work-item dataset-selection state
-- `MLTaskService` keeps lifecycle transitions and task-artifact registration
-- `MLTaskExecutor` owns atomic task execution finalization: worker output validation, artifact registration, canonical model persistence, and execution-side continuation handling
+- `MLTaskService` owns atomic task queueing, dispatch, lifecycle transitions, and task-artifact registration
+- `MLWorkerRunner` is a pure process helper with no ML task or workflow semantics
 
 That split avoids duplicating issue `#75` logic while keeping execution concerns out of the UI-facing service.
 
@@ -29,7 +29,6 @@ That split avoids duplicating issue `#75` logic while keeping execution concerns
 - `DatasetService`
 - `WorkItemService`
 - `MLTaskService`
-- `MLExecutionManager`
 - model registry
 
 Public methods:
@@ -87,44 +86,48 @@ Implementation note:
 Files:
 
 - `src/xenix/services/ml/execution.py`
-- `src/xenix/services/ml/worker_main.py`
+- `src/xenix/services/ml/operations/`
 
-`MLExecutionManager` responsibilities:
+`MLTaskService` responsibilities:
 
 - keep an in-memory FIFO queue of `ml_task_id`
 - start one dispatcher thread lazily on first submit
 - launch at most one worker process at a time
-- delegate one task at a time to `MLTaskExecutor`
+- invoke `MLWorkerRunner`
+- validate worker outputs by task type
+- complete or fail atomic tasks
+- register task-scoped artifacts
+- persist atomic-task products such as `TrainedModelRow` when required
 
-`MLTaskExecutor` responsibilities:
+`MLWorkerRunner` responsibilities:
 
-- mark tasks `RUNNING` before worker execution
-- validate worker outputs after exit
-- register task-owned artifacts
-- canonicalize produced model artifacts when required
-- persist `TrainedModelRow` when required
-- ask `MLService` to materialize explicit continuation tasks when required
-- fail tasks cleanly on missing files, invalid schema, or worker failure
+- spawn the worker process
+- target the already-resolved operation entrypoint
+- point it at the task directory
+- wait for exit code
+- return process outcome only
 
 Pseudo-code:
 
 ```python
-class MLExecutionManager:
+class MLTaskService:
     def submit(self, ml_task_id: str) -> None:
         self._queue.put(ml_task_id)
         self._ensure_dispatcher()
 
     def _dispatch_loop(self) -> None:
         while True:
-            ml_task_id = self._queue.get()
-            self._executor.execute(ml_task_id)
+            task = self._load_next_task()
+            returncode = self._worker_runner.run(task)
+            self._finalize_task(task, returncode)
 ```
 
 Implementation rule:
 
 - use `multiprocessing.get_context("spawn")`
-- keep the worker target as a top-level importable function so it works in both dev runs and PyInstaller builds
+- keep each operation entrypoint as a top-level importable function so it works in both dev runs and PyInstaller builds
 - initialize `freeze_support()` in the packaged bootstrap path if needed
+- avoid an extra route/dispatch layer inside the worker process once `MLTaskType` is already known in the parent process
 
 ## Step 4: Keep Evaluation Atomic And Workflow-Chained
 
@@ -138,7 +141,7 @@ Implementation rule:
 
 Worker algorithm for manual training:
 
-1. load `request.json`
+1. operation entrypoint loads `request.json`
 2. copy dataset source into `input/`
 3. load normalized dataframe from the copied file
 4. build estimator
@@ -150,7 +153,7 @@ Worker algorithm for manual training:
 
 Worker algorithm for tuning:
 
-1. load `request.json`
+1. operation entrypoint loads `request.json`
 2. copy dataset source into `input/`
 3. split once into training and holdout partitions
 4. run tuning search on the training partition only
@@ -161,21 +164,21 @@ Worker algorithm for tuning:
 
 Explicit workflow continuation algorithm after successful fit or tuning finalization:
 
-1. persist the canonical model artifact
-2. create one `TrainedModelRow`
-3. materialize one `EVALUATE` task referencing that trained model and the predecessor task's holdout artifact
-4. write its `request.json`
-5. enqueue it
+1. `MLTaskService` persists the canonical model artifact
+2. `MLTaskService` creates one `TrainedModelRow`
+3. `MLService` observes the successful atomic task and materializes one `EVALUATE` task referencing that trained model and the predecessor task's holdout artifact
+4. `MLService` writes its `request.json`
+5. `MLTaskService` enqueues it
 
 Worker algorithm for evaluation:
 
-1. load `request.json`
+1. operation entrypoint loads `request.json`
 2. load the persisted model artifact referenced by `trained_model_id`
 3. load the holdout artifact referenced from the predecessor task
 4. evaluate on the held-out partition only
 5. write `result.json`
 
-## Step 5: Execution Finalization
+## Step 5: Atomic Task Finalization
 
 Files:
 
@@ -183,17 +186,30 @@ Files:
 - `src/xenix/services/storage/repositories/trained_models.py`
 - `src/xenix/services/storage/layout.py`
 
-Execution finalization algorithm:
+`FIT` task finalization algorithm in `MLTaskService`:
 
-1. read and validate `result.json`
-2. verify declared task-owned artifacts exist under the task directory
-3. prepare finalized task-artifact inputs
-4. if the task is `FIT` or `HYPERPARAMETER_TUNING`, canonicalize the model artifact and create one `TrainedModelRow`
-5. if the task is `FIT` or `HYPERPARAMETER_TUNING` and its continuation plan requests evaluation, ask `MLService` to create the follow-up `EVALUATE` task
-6. if the task is `EVALUATE`, compare the evaluated trained model against `work_item.best_trained_model_id`
-7. if the task is `EVALUATE`, update `best_trained_model_id` only when the policies are comparable and the new candidate is better
-8. write a concise result snapshot to `MLTaskRow.result_payload`
-9. call `complete_ml_task(...)` once with the finalized artifact list and result payload
+1. read and validate `FitTaskResult`
+2. verify fit-task-owned artifacts
+3. canonicalize the produced model artifact
+4. create one `TrainedModelRow`
+5. call `complete_ml_task(...)` once with finalized artifact inputs and result payload
+6. notify `MLService` so the workflow layer can decide whether to request `EVALUATE`
+
+`HYPERPARAMETER_TUNING` task finalization algorithm in `MLTaskService`:
+
+1. read and validate `HyperparameterTuningTaskResult`
+2. verify tuning-task-owned artifacts
+3. canonicalize the produced model artifact
+4. create one `TrainedModelRow`
+5. call `complete_ml_task(...)` once with finalized artifact inputs and result payload
+6. notify `MLService` so the workflow layer can decide whether to request `EVALUATE`
+
+`EVALUATE` task finalization algorithm in `MLTaskService`:
+
+1. read and validate `EvaluateTaskResult`
+2. verify evaluation-task-owned artifacts
+3. call `complete_ml_task(...)` once with finalized artifact inputs and result payload
+4. notify `MLService` so the workflow layer can decide whether to update `work_item.best_trained_model_id`
 
 Failure path:
 

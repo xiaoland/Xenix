@@ -1,23 +1,18 @@
 from __future__ import annotations
 
-import shutil
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from uuid import uuid4
 
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
 
-from ..config import AppPaths
-from ..exceptions import DatasetSourceMissingError, NotFoundError, ValidationError
+from ..exceptions import NotFoundError, ValidationError
 from .dataset_inspection import (
     DatasetInspection,
     InspectDatasetInput,
     detect_source_format,
     inspect_dataset_file,
 )
-from .storage.layout import dataset_temp_dir
 from .storage.models import DatasetRow, DatasetSourceFormat
 from .storage.repositories import DatasetRepository, ProjectRepository
 
@@ -37,40 +32,9 @@ class RenameDatasetInput(SQLModel):
     new_name: str
 
 
-class MaterializeDatasetCopyInput(SQLModel):
-    dataset_id: str
-    owner_id: str | None = None
-
-
-@dataclass
-class MaterializedDatasetCopy:
-    dataset_id: str
-    owner_id: str
-    source_path: Path
-    copied_path: Path
-
-    def cleanup(self) -> None:
-        if self.copied_path.exists():
-            self.copied_path.unlink()
-
-        owner_dir = self.copied_path.parent
-        if owner_dir.exists():
-            try:
-                next(owner_dir.iterdir())
-            except StopIteration:
-                owner_dir.rmdir()
-
-    def __enter__(self) -> "MaterializedDatasetCopy":
-        return self
-
-    def __exit__(self, _exc_type: object, _exc_value: object, _traceback: object) -> None:
-        self.cleanup()
-
-
 class DatasetService:
-    def __init__(self, session_factory: sessionmaker, paths: AppPaths) -> None:
+    def __init__(self, session_factory: sessionmaker) -> None:
         self._session_factory = session_factory
-        self._paths = paths
         self._projects = ProjectRepository()
         self._datasets = DatasetRepository()
 
@@ -141,22 +105,3 @@ class DatasetService:
             if row is None:
                 raise NotFoundError(f"Dataset '{dataset_id}' was not found.")
             return row
-
-    def materialize_read_copy(self, input_data: MaterializeDatasetCopyInput) -> MaterializedDatasetCopy:
-        dataset = self.get_dataset(input_data.dataset_id)
-        source_path = Path(dataset.source_path)
-        if not source_path.exists() or not source_path.is_file():
-            raise DatasetSourceMissingError("Dataset source file is missing.")
-
-        owner_id = input_data.owner_id or uuid4().hex
-        owner_dir = dataset_temp_dir(self._paths, owner_id)
-        owner_dir.mkdir(parents=True, exist_ok=True)
-        copied_path = owner_dir / source_path.name
-        shutil.copy2(source_path, copied_path)
-
-        return MaterializedDatasetCopy(
-            dataset_id=dataset.id,
-            owner_id=owner_id,
-            source_path=source_path,
-            copied_path=copied_path,
-        )

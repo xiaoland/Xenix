@@ -78,9 +78,14 @@ def test_storage_bootstrap_migrates_v1_work_item_schema(monkeypatch, tmp_path: P
 
     with context.session_factory() as session:
         row = session.connection().exec_driver_sql(
-            "SELECT dataset_id, feature_columns, target_columns FROM work_item WHERE id = 'work-item-1'"
+            """
+            SELECT dataset_id, best_trained_model_id, feature_columns, target_columns
+            FROM work_item
+            WHERE id = 'work-item-1'
+            """
         ).one()
 
     assert row[0] is None
-    assert row[1] == "[]"
+    assert row[1] is None
     assert row[2] == "[]"
+    assert row[3] == "[]"

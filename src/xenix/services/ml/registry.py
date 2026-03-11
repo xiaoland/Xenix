@@ -1,26 +1,43 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from ...exceptions import NotFoundError
+from .models.classification import (
+    LogisticRegressionService,
+    RandomForestClassificationService,
+)
+from .models.regression import (
+    LinearRegressionService,
+    RandomForestRegressionService,
+    RidgeRegressionService,
+)
+from .types import ModelCatalogEntry, ModelServiceBase
 
-from .types import ModelDefinition
+_MODEL_SERVICES: dict[str, type[ModelServiceBase]] = {
+    service.key: service
+    for service in (
+        LinearRegressionService,
+        RidgeRegressionService,
+        RandomForestRegressionService,
+        LogisticRegressionService,
+        RandomForestClassificationService,
+    )
+}
 
 
-class EmptyParams(BaseModel):
-    pass
-
-
-_MODEL_DEFINITIONS: dict[str, ModelDefinition] = {}
+def get_model_service(model_key: str) -> type[ModelServiceBase]:
+    try:
+        return _MODEL_SERVICES[model_key]
+    except KeyError as exc:
+        raise NotFoundError(f"Model '{model_key}' was not found.") from exc
 
 
 def list_model_keys() -> list[str]:
-    return list(_MODEL_DEFINITIONS.keys())
+    return sorted(_MODEL_SERVICES)
 
 
-def get_model_definition(model_key: str) -> ModelDefinition:
-    if model_key not in _MODEL_DEFINITIONS:
-        raise ValueError(f"Unknown model definition: {model_key}")
-    return _MODEL_DEFINITIONS[model_key]
+def list_model_catalog() -> list[ModelCatalogEntry]:
+    return [get_model_service(model_key).catalog_entry() for model_key in list_model_keys()]
 
 
-def list_model_definitions() -> list[ModelDefinition]:
-    return list(_MODEL_DEFINITIONS.values())
+def get_model_catalog_entry(model_key: str) -> ModelCatalogEntry:
+    return get_model_service(model_key).catalog_entry()

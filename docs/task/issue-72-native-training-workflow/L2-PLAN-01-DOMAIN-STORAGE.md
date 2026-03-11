@@ -22,8 +22,14 @@ Ephemeral objects:
 - `EvaluateModelRequest`
 - `EvaluationSnapshot`
 - `TaskContinuationPlan`
-- `MLWorkerTaskRequest`
-- `MLWorkerTaskResult`
+- `TaskRequestBase`
+- `FitTaskRequest`
+- `HyperparameterTuningTaskRequest`
+- `EvaluateTaskRequest`
+- `TaskResultBase`
+- `FitTaskResult`
+- `HyperparameterTuningTaskResult`
+- `EvaluateTaskResult`
 
 ## Schema Version 3
 

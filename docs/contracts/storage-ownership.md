@@ -48,11 +48,13 @@ Current app-managed runtime layout includes:
 - Dataset registration stores the external source path and stable naming metadata only.
 - Dataset inspection metadata such as row counts, inferred column kinds, and previews is runtime-derived and should not be persisted by default.
 - Work-item dataset selection state such as attached dataset id, feature columns, and target columns belongs on the work item rather than on the dataset record.
-- Temporary dataset copies are execution-scoped service artifacts, not canonical dataset storage.
+- Work-item best-model state belongs on the work item as `best_trained_model_id`.
+- Trained-model registration rows are durable metadata pointers to canonical model artifacts, not a duplication of task-owned training payloads.
+- Task working files such as `request.json`, `result.json`, `logs.jsonl`, and holdout artifacts are execution-scoped ML task files, not canonical storage.
 
 ## Deletion Rules
 
 - Deleting a SQLite row must not silently delete user-managed dataset files.
 - Deleting an app-managed artifact should update SQLite metadata in the same service operation.
 - Cache cleanup may remove reproducible files, but not canonical datasets, models, or exports.
-- Deleting a temporary dataset copy must not affect the external dataset source file.
+- Deleting ML task working files must not affect canonical trained-model artifacts or external dataset source files.

@@ -18,6 +18,8 @@ Target:
 - registry entries are project-owned declarations under `src/xenix/services/ml/`
 - schemas are exported from Pydantic models
 - the UI only receives serializable catalog entries
+- task contracts stay per-operation, not as one large optional union
+- worker-side model services remain the code actually executed inside the ML process
 
 ## Registry Shape
 
@@ -50,6 +52,7 @@ Files:
 - `src/xenix/services/ml/models/classification.py`
 - `src/xenix/services/ml/dataset_loader.py`
 - `src/xenix/services/ml/evaluation.py`
+- `src/xenix/services/ml/operations/`
 
 Initial model set:
 
@@ -63,6 +66,7 @@ Ownership rule:
 
 - use `ml/` as behavior reference only
 - model services should instantiate and evaluate estimators in `src/xenix/services/ml/...`
+- worker processes should call the already-resolved operation entrypoint directly, not route again inside the child process
 - do not import or mutate the legacy `ml/` scripts directly
 
 ## Parameter And Grid Models
@@ -107,7 +111,7 @@ Metric rules:
 
 The comparison helper should be reused by:
 
-- worker result evaluation
+- worker-side evaluation operation
 - `best_trained_model_id` replacement logic
 
 ## Step 4: Standardize Dataset Loading And Splits
@@ -143,4 +147,4 @@ Coverage:
 - parameter validation surfaces Pydantic errors cleanly
 - regression and classification helpers emit metrics in the expected shape
 - predecessor-task holdout artifacts avoid fit/evaluate partition drift
-- the worker evaluation snapshot uses the same policy helper as best-model updates
+- the evaluation executor uses the same policy helper as best-model updates

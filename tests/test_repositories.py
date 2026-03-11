@@ -14,12 +14,15 @@ from xenix.services.storage.models import (
     MLTaskStatus,
     MLTaskType,
     ProjectRow,
+    ProblemKind,
+    TrainedModelRow,
     WorkItemRow,
 )
 from xenix.services.storage.repositories import (
     DatasetRepository,
     MLTaskRepository,
     ProjectRepository,
+    TrainedModelRepository,
     WorkItemRepository,
 )
 
@@ -67,6 +70,7 @@ def test_work_item_repository_round_trip(monkeypatch, tmp_path: Path) -> None:
     assert loaded is not None
     assert loaded.name == "Churn"
     assert loaded.dataset_id is None
+    assert loaded.best_trained_model_id is None
     assert loaded.feature_columns == []
     assert loaded.target_columns == []
     assert [row.id for row in listed] == [work_item.id]
@@ -109,6 +113,45 @@ def test_work_item_repository_persists_dataset_selection(monkeypatch, tmp_path: 
     assert loaded.dataset_id == dataset.id
     assert loaded.feature_columns == ["age"]
     assert loaded.target_columns == ["label"]
+
+
+def test_work_item_repository_sets_best_trained_model(monkeypatch, tmp_path: Path) -> None:
+    projects = ProjectRepository()
+    work_items = WorkItemRepository()
+    ml_tasks = MLTaskRepository()
+    trained_models = TrainedModelRepository()
+    artifact_path = tmp_path / "canonical-model.joblib"
+    artifact_path.write_text("binary-placeholder", encoding="utf-8")
+
+    with _build_session(monkeypatch, tmp_path) as session:
+        project = ProjectRow(name="Retail")
+        projects.create(session, project)
+        work_item = WorkItemRow(project_id=project.id, name="Churn")
+        work_items.create(session, work_item)
+        task = MLTaskRow(
+            project_id=project.id,
+            work_item_id=work_item.id,
+            task_type=MLTaskType.FIT,
+            status=MLTaskStatus.SUCCEEDED,
+        )
+        ml_tasks.create(session, task)
+        trained_model = TrainedModelRow(
+            work_item_id=work_item.id,
+            ml_task_id=task.id,
+            model_key="regression.ridge",
+            problem_kind=ProblemKind.REGRESSION,
+            artifact_path=str(artifact_path),
+        )
+        trained_models.create(session, trained_model)
+
+        updated = work_items.set_best_trained_model(session, work_item.id, trained_model.id, _utc_now())
+        session.commit()
+
+        loaded = work_items.get(session, work_item.id)
+
+    assert updated is not None
+    assert loaded is not None
+    assert loaded.best_trained_model_id == trained_model.id
 
 
 def test_dataset_repository_round_trip(monkeypatch, tmp_path: Path) -> None:
@@ -208,3 +251,44 @@ def test_ml_task_completion_persists_artifacts(monkeypatch, tmp_path: Path) -> N
     assert loaded.status is MLTaskStatus.SUCCEEDED
     assert loaded.result_payload == {"score": 0.91}
     assert [row.absolute_path for row in artifacts] == [str(artifact_path)]
+
+
+def test_trained_model_repository_round_trip(monkeypatch, tmp_path: Path) -> None:
+    projects = ProjectRepository()
+    work_items = WorkItemRepository()
+    ml_tasks = MLTaskRepository()
+    trained_models = TrainedModelRepository()
+    artifact_path = tmp_path / "canonical-model.joblib"
+    artifact_path.write_text("binary-placeholder", encoding="utf-8")
+
+    with _build_session(monkeypatch, tmp_path) as session:
+        project = ProjectRow(name="Retail")
+        projects.create(session, project)
+        work_item = WorkItemRow(project_id=project.id, name="Churn")
+        work_items.create(session, work_item)
+        task = MLTaskRow(
+            project_id=project.id,
+            work_item_id=work_item.id,
+            task_type=MLTaskType.FIT,
+            status=MLTaskStatus.SUCCEEDED,
+        )
+        ml_tasks.create(session, task)
+        trained_model = TrainedModelRow(
+            work_item_id=work_item.id,
+            ml_task_id=task.id,
+            model_key="regression.ridge",
+            problem_kind=ProblemKind.REGRESSION,
+            artifact_path=str(artifact_path),
+        )
+        trained_models.create(session, trained_model)
+        session.commit()
+
+        loaded = trained_models.get(session, trained_model.id)
+        by_task = trained_models.get_by_ml_task(session, task.id)
+        listed = trained_models.list_by_work_item(session, work_item.id)
+
+    assert loaded is not None
+    assert loaded.artifact_path == str(artifact_path)
+    assert by_task is not None
+    assert by_task.id == trained_model.id
+    assert [row.id for row in listed] == [trained_model.id]

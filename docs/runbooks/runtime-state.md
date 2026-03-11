@@ -23,7 +23,6 @@ Current runtime directories:
 Current runtime files and subdirectories:
 
 - `state/xenix.db`
-- `temp/datasets/`
 - `artifacts/models/`
 - `artifacts/training/`
 - `artifacts/inference/`
@@ -34,7 +33,7 @@ Current runtime files and subdirectories:
 1. Start the app with `pdm run dev`.
 2. Read the resolved paths from the main window.
 3. Open the log directory from the UI or inspect files directly on disk.
-4. Inspect `state/xenix.db` for metadata and `artifacts/ml-tasks/` for per-task working directories once ML task execution exists.
+4. Inspect `state/xenix.db` for metadata, `artifacts/ml-tasks/` for per-task working directories, and `artifacts/models/<work-item-id>/` for canonical trained-model files.
 
 ## Reset
 
@@ -42,9 +41,21 @@ Current runtime files and subdirectories:
 2. Delete only the runtime directory you intend to reset under `XENIX_APP_HOME`.
 3. Restart the app so bootstrap recreates `config/`, `logs/`, `cache/`, `state/`, `temp/`, and `artifacts/`.
 
-Do not store canonical datasets inside the runtime directory. Dataset registration keeps source files external. Services may create temporary dataset copies under `temp/datasets/` during execution and remove them after use.
+Do not store canonical datasets inside the runtime directory. Dataset registration keeps source files external.
 
-Dataset import and dataset inspection do not use `temp/datasets/`. Import reads the user-managed source file directly and persists only dataset registration metadata plus work-item dataset-selection state in SQLite.
+Dataset import and dataset inspection do not use app-managed temp dataset copies. Import reads the user-managed source file directly and persists only dataset registration metadata plus work-item dataset-selection state in SQLite.
+
+Issue `#72` adds ML task working directories with this shape:
+
+- `artifacts/ml-tasks/<ml-task-id>/request.json`
+- `artifacts/ml-tasks/<ml-task-id>/result.json`
+- `artifacts/ml-tasks/<ml-task-id>/logs.jsonl`
+- `artifacts/ml-tasks/<ml-task-id>/input/`
+- `artifacts/ml-tasks/<ml-task-id>/models/`
+
+Canonical trained models are copied out of task-local working directories into:
+
+- `artifacts/models/<work-item-id>/`
 
 ## Backup Guidance
 

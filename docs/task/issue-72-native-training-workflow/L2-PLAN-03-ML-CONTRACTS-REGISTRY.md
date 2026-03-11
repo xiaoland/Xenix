@@ -4,6 +4,11 @@
 
 Add `src/xenix/services/ml/contracts.py` with the core Pydantic models.
 
+The maintainability rule for this layer is:
+
+- keep a small shared base for common task metadata
+- use per-operation request/result models instead of one large optional-field union
+
 ### Evaluation policy models
 
 - `ProblemKind(str, Enum)`
@@ -31,6 +36,15 @@ Add `src/xenix/services/ml/contracts.py` with the core Pydantic models.
 - `ColumnSelection(BaseModel)`
   - `feature_columns: list[str]`
   - `target_columns: list[str]`
+- `TaskRequestBase(BaseModel)`
+  - `task_id: str`
+  - `project_id: str`
+  - `work_item_id: str`
+  - `dataset_id: str`
+  - `dataset_source_path: str`
+  - `problem_kind: ProblemKind`
+  - `column_selection: ColumnSelection`
+  - `evaluation_policy: EvaluationPolicySnapshot`
 - `ManualTrainingPayload(BaseModel)`
   - `model_key: str`
   - `params: dict[str, Any]`
@@ -42,23 +56,21 @@ Add `src/xenix/services/ml/contracts.py` with the core Pydantic models.
   - `model_key: str`
   - `source_ml_task_id: str`
   - `holdout_artifact_relpath: str`
-- `MLWorkerTaskRequest(BaseModel)`
-  - `task_id: str`
-  - `project_id: str`
-  - `work_item_id: str`
-  - `dataset_id: str`
-  - `dataset_source_path: str`
-  - `task_type: str`
-  - `problem_kind: ProblemKind`
-  - `column_selection: ColumnSelection`
-  - `evaluation_policy: EvaluationPolicySnapshot`
+- `FitTaskRequest(TaskRequestBase)`
   - `continuation_plan: TaskContinuationPlan | None`
   - `manual_training: ManualTrainingPayload | None`
+- `HyperparameterTuningTaskRequest(TaskRequestBase)`
+  - `continuation_plan: TaskContinuationPlan | None`
   - `hyperparameter_tuning: HyperparameterTuningPayload | None`
+- `EvaluateTaskRequest(TaskRequestBase)`
   - `evaluate_model: EvaluateModelPayload | None`
 
 ### Worker result models
 
+- `TaskResultBase(BaseModel)`
+  - `task_id: str`
+  - `evaluation_policy: EvaluationPolicySnapshot`
+  - `error_summary: str | None`
 - `CandidateMetrics(BaseModel)`
   - `primary_metric_name: str`
   - `primary_metric_value: float`
@@ -73,13 +85,12 @@ Add `src/xenix/services/ml/contracts.py` with the core Pydantic models.
   - `artifact_relpath: str`
   - `holdout_artifact_relpath: str | None`
   - `tuning_summary: TuningSummary | None`
-- `MLWorkerTaskResult(BaseModel)`
-  - `task_id: str`
-  - `task_type: str`
-  - `evaluation_policy: EvaluationPolicySnapshot`
-  - `candidate: CandidateResult | None`
-  - `evaluation: CandidateMetrics | None`
-  - `error_summary: str | None`
+- `FitTaskResult(TaskResultBase)`
+  - `candidate: CandidateResult`
+- `HyperparameterTuningTaskResult(TaskResultBase)`
+  - `candidate: CandidateResult`
+- `EvaluateTaskResult(TaskResultBase)`
+  - `evaluation: CandidateMetrics`
 
 ## Registry Declaration Style
 

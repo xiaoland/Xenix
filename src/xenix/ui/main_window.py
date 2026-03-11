@@ -10,15 +10,18 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QPushButton,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from ..config import APP_NAME, AppPaths
 from ..services.dataset_service import DatasetService
+from ..services.ml_service import MLService
 from ..services.project_service import ProjectService
 from ..services.work_item_service import WorkItemService
 from .dataset_workspace import DatasetWorkspace
+from .ml_workspace import MLWorkspace
 
 
 class MainWindow(QMainWindow):
@@ -30,6 +33,7 @@ class MainWindow(QMainWindow):
         project_service: ProjectService,
         work_item_service: WorkItemService,
         dataset_service: DatasetService,
+        ml_service: MLService,
     ) -> None:
         super().__init__()
         self._paths = paths
@@ -38,6 +42,7 @@ class MainWindow(QMainWindow):
         self._project_service = project_service
         self._work_item_service = work_item_service
         self._dataset_service = dataset_service
+        self._ml_service = ml_service
 
         self.setWindowTitle(f"{APP_NAME} Native")
         self.resize(1080, 760)
@@ -49,13 +54,12 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        title = QLabel("Xenix dataset import workspace")
+        title = QLabel("Xenix native ML workspace")
         title.setStyleSheet("font-size: 24px; font-weight: 600;")
 
         summary = QLabel(
-            "Import a local dataset, inspect its columns, and save feature and target"
-            " selections onto a work item. Training will consume this state in later"
-            " native issues."
+            "Import datasets, persist feature and target selections onto work items,"
+            " then run background fit and tuning workflows with automatic evaluation."
         )
         summary.setWordWrap(True)
 
@@ -71,18 +75,30 @@ class MainWindow(QMainWindow):
         open_logs_button = QPushButton("Open log directory")
         open_logs_button.clicked.connect(self._open_logs_dir)
 
-        workspace = DatasetWorkspace(
+        dataset_workspace = DatasetWorkspace(
             project_service=self._project_service,
             work_item_service=self._work_item_service,
             dataset_service=self._dataset_service,
             parent=self,
+        )
+        ml_workspace = MLWorkspace(
+            project_service=self._project_service,
+            work_item_service=self._work_item_service,
+            ml_service=self._ml_service,
+            parent=self,
+        )
+        workspace_tabs = QTabWidget(self)
+        workspace_tabs.addTab(dataset_workspace, "Datasets")
+        workspace_tabs.addTab(ml_workspace, "Training")
+        workspace_tabs.currentChanged.connect(
+            lambda index: ml_workspace.reload_state() if workspace_tabs.widget(index) is ml_workspace else None
         )
 
         layout.addWidget(title)
         layout.addWidget(summary)
         layout.addWidget(runtime_card)
         layout.addWidget(open_logs_button)
-        layout.addWidget(workspace, 1)
+        layout.addWidget(workspace_tabs, 1)
 
         self.setCentralWidget(root)
 

@@ -50,7 +50,8 @@ This L3 draft locks the following execution choices:
 - `MLService` becomes the UI-facing training boundary, but dataset inspection remains implemented in `DatasetService`
 - each ML task is atomic for one model and one operation, including `EVALUATE`
 - `MLService` exposes explicit workflow methods such as `fit_with_evaluate()` and `tune_with_evaluate()`
-- execution-side artifact finalization is owned by a separate executor component, not by `MLService`
+- `MLTaskService` owns atomic task queueing, dispatch, completion, and artifact registration
+- `MLWorkerRunner` is a pure process helper and does not know ML task semantics
 - the first UI delivery extends the existing native shell with a dedicated training workspace instead of replacing the dataset workspace
 - worker execution remains sequential in v1, with one service-owned `multiprocessing` process at a time
 - tuning stays atomic per model, while the UI may bulk-dispatch several tuning tasks
@@ -64,5 +65,6 @@ Implementation should start only if this L3 direction is accepted:
 - minimal `TrainedModel` persistence is added before any worker logic lands
 - training orchestration composes existing dataset/work-item services rather than re-owning their storage rules
 - evaluation is implemented as a distinct persisted `MLTask`, chained only by explicit workflow methods such as `fit_with_evaluate()` and `tune_with_evaluate()`
+- `MLTaskService` owns atomic task runtime, while `MLService` owns workflow reactions to completed tasks
 - tuning is implemented as one task per model, even when the UI submits several together
 - training UI is delivered as a new workspace beside the existing dataset workflow

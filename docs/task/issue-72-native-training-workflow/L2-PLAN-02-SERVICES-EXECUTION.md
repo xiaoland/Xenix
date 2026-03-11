@@ -12,7 +12,7 @@ Issue `#72` should introduce `src/xenix/services/ml_service.py` as the main UI-f
 - cross-task orchestration
 - follow-up evaluation task creation for workflow-driven training
 
-Add a separate execution-side component, for example `MLTaskExecutor`, to own:
+`MLTaskService` should own atomic task runtime:
 
 - task queue management
 - worker process dispatch
@@ -22,9 +22,24 @@ Add a separate execution-side component, for example `MLTaskExecutor`, to own:
 - trained-model creation
 - evaluation-result finalization and best-model updates
 
+Add `MLWorkerRunner` as a pure infrastructure helper for:
+
+- spawning the worker process
+- targeting the already-resolved operation entrypoint
+- passing the task working directory / request file
+- waiting for exit code
+
+`MLWorkerRunner` should not know:
+
+- `MLTask` lifecycle
+- SQLite
+- trained-model persistence
+- workflow chaining
+- operation routing tables inside the worker process
+
 `DatasetService` remains the owner of dataset inspection.
 
-`MLTaskService` remains the lifecycle and artifact persistence helper, not the main feature entry point.
+`MLTaskService` remains the atomic-task boundary, not the main workflow entry point.
 
 ## `MLService` API
 
@@ -80,13 +95,16 @@ V1 execution should use a single service-owned queue with one active worker proc
 
 Components:
 
-- `MLExecutionManager`
+- `MLTaskService`
   - holds an in-memory queue of `ml_task_id`
   - runs one dispatcher thread
-  - delegates one task at a time to `MLTaskExecutor`
-- `MLTaskExecutor`
-  - runs one atomic task end-to-end
-  - finalizes its artifacts and result payload
+  - starts tasks
+  - invokes `MLWorkerRunner`
+  - validates worker output contracts
+  - finalizes atomic task results
+- `MLWorkerRunner`
+  - launches the worker process
+  - returns process exit status only
 
 Why sequential in v1:
 
@@ -139,39 +157,55 @@ Why sequential in v1:
 
 ## Worker Launch Contract
 
-The executor launches one worker process through `multiprocessing`, not `python -m`.
+`MLTaskService` launches one worker process through `MLWorkerRunner`, using `multiprocessing`, not `python -m`.
 
 Why:
 
 - PyInstaller packaging cannot assume a user-managed Python runtime
 - `multiprocessing` can spawn the packaged executable and keeps one implementation path for dev and packaged runs
-- the worker entrypoint stays importable and testable without shelling out to `python -m`
+- the operation entrypoint stays importable and testable without shelling out to `python -m`
+- task type is already known before spawn, so a second dispatch layer inside the worker process is unnecessary
 
 Worker launch steps:
 
-1. load `request.json`
-2. transition task to `RUNNING`
-3. copy the dataset into `input/`
-4. invoke the appropriate model service
-5. write `logs.jsonl`
-6. write `result.json`
-7. exit with code `0` or non-zero
+1. `MLTaskService` resolves the operation entrypoint from `MLTaskType`
+2. `MLTaskService` transitions the task to `RUNNING`
+3. `MLWorkerRunner` spawns that operation entrypoint in a worker process
+4. the operation code loads `request.json`
+5. the operation code writes `logs.jsonl`
+6. the operation code writes `result.json`
+7. the process exits with code `0` or non-zero
 
 The worker does not write SQLite.
 
 ## Execution Finalization Algorithm
 
-After worker exit, `MLTaskExecutor`:
+After worker exit, `MLTaskService` finalizes the atomic task.
 
-1. reads `result.json`
-2. validates it with `MLWorkerTaskResult`
-3. validates the declared task-owned artifacts
-4. prepares artifact inputs for final task completion
-5. if the task is `FIT` or `HYPERPARAMETER_TUNING`, canonicalizes the model artifact and creates one `TrainedModelRow`
-6. if the task carries an explicit continuation plan for `EVALUATE`, asks `MLService` to materialize the follow-up evaluation task
-7. if the task is `EVALUATE`, computes whether `work_item.best_trained_model_id` should be updated
-8. writes a concise execution-owned `result_payload` snapshot into `MLTaskRow`
-9. calls `complete_ml_task(...)` once with the finalized artifact list and result payload, or fails the task
+`FIT` task finalization:
+
+1. read and validate `FitTaskResult`
+2. validate fit-task-owned artifacts
+3. canonicalize the produced model artifact
+4. create one `TrainedModelRow`
+5. call `complete_ml_task(...)` once with finalized artifact inputs and result payload
+6. notify `MLService` that a workflow-owned continuation may be needed
+
+`HYPERPARAMETER_TUNING` task finalization:
+
+1. read and validate `HyperparameterTuningTaskResult`
+2. validate tuning-task-owned artifacts
+3. canonicalize the produced model artifact
+4. create one `TrainedModelRow`
+5. call `complete_ml_task(...)` once with finalized artifact inputs and result payload
+6. notify `MLService` that a workflow-owned continuation may be needed
+
+`EVALUATE` task finalization:
+
+1. read and validate `EvaluateTaskResult`
+2. validate evaluation-task-owned artifacts
+3. call `complete_ml_task(...)` once with finalized artifact inputs and result payload
+4. notify `MLService` so the workflow layer can decide whether to update `work_item.best_trained_model_id`
 
 Failure conditions:
 
@@ -202,14 +236,14 @@ Bulk tuning in the UI is just repeated single-model tuning submission, so the pe
 
 When an `EVALUATE` task succeeds:
 
-1. load the evaluated trained model reference from `request_payload`
-2. load the new task's evaluation snapshot from `result_payload`
-3. load the current work-item best model if one exists
+1. `MLService` loads the evaluated trained model reference from `request_payload`
+2. `MLService` loads the new task's evaluation snapshot from `result_payload`
+3. `MLService` loads the current work-item best model if one exists
 4. if no current best exists, set the evaluated trained model
 5. if a current best exists, load its linked evaluation-task result payload
 6. if the policies are comparable, compare the evaluation snapshots
 7. if the new trained model is better, update `best_trained_model_id`
-8. if the policies are not comparable, leave the current best unchanged and record that decision in `result_payload`
+8. if the policies are not comparable, leave the current best unchanged and record that decision in workflow-owned state
 
 ## Service Detail Model
 

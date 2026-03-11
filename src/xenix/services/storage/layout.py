@@ -11,14 +11,6 @@ def database_path(paths: AppPaths) -> Path:
     return paths.state / DATABASE_FILE_NAME
 
 
-def dataset_temp_root(paths: AppPaths) -> Path:
-    return paths.temp / "datasets"
-
-
-def dataset_temp_dir(paths: AppPaths, owner_id: str) -> Path:
-    return dataset_temp_root(paths) / owner_id
-
-
 def artifact_models_root(paths: AppPaths) -> Path:
     return paths.artifacts / "models"
 
@@ -39,13 +31,32 @@ def ml_task_root(paths: AppPaths, ml_task_id: str) -> Path:
     return ml_task_parent_root(paths) / ml_task_id
 
 
-def task_artifact_dir(paths: AppPaths, ml_task_id: str, family: str) -> Path:
-    return ml_task_root(paths, ml_task_id) / family
+def task_input_dir(paths: AppPaths, ml_task_id: str) -> Path:
+    return ml_task_root(paths, ml_task_id) / "input"
+
+
+def task_models_dir(paths: AppPaths, ml_task_id: str) -> Path:
+    return ml_task_root(paths, ml_task_id) / "models"
+
+
+def task_request_path(paths: AppPaths, ml_task_id: str) -> Path:
+    return ml_task_root(paths, ml_task_id) / "request.json"
+
+
+def task_result_path(paths: AppPaths, ml_task_id: str) -> Path:
+    return ml_task_root(paths, ml_task_id) / "result.json"
+
+
+def task_logs_path(paths: AppPaths, ml_task_id: str) -> Path:
+    return ml_task_root(paths, ml_task_id) / "logs.jsonl"
+
+
+def canonical_model_dir(paths: AppPaths, work_item_id: str) -> Path:
+    return artifact_models_root(paths) / work_item_id
 
 
 def ensure_storage_layout(paths: AppPaths) -> None:
     for directory in (
-        dataset_temp_root(paths),
         artifact_models_root(paths),
         artifact_training_root(paths),
         artifact_inference_root(paths),

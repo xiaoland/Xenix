@@ -8,7 +8,13 @@ pdm install
 
 Use Python `3.12` to `3.14` for now.
 
-Runtime dependencies now include `pandas`, `openpyxl`, and `pydantic` for local dataset import and inspection.
+Runtime dependencies now include:
+
+- `pandas`
+- `openpyxl`
+- `pydantic`
+- `joblib`
+- `scikit-learn`
 
 ## Run
 
@@ -17,6 +23,13 @@ pdm run dev
 ```
 
 Expected result: the app opens the native dataset import workspace with project/work-item selection, file-picker and drag-and-drop import, dataset summary, and column selection.
+
+Issue `#72` extends that shell with a dedicated training tab for:
+
+- manual fit with schema-driven parameter editing
+- multi-model tuning with schema-driven grid editing
+- background task status, logs, and failure summary
+- trained-model listing and best-model marker
 
 ## Verify
 
@@ -43,3 +56,6 @@ Runtime directories created on startup:
 - `config/`
 - `logs/`
 - `cache/`
+- `state/`
+- `temp/`
+- `artifacts/`

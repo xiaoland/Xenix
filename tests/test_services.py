@@ -23,7 +23,7 @@ def _build_services(monkeypatch, tmp_path: Path) -> tuple[ProjectService, WorkIt
     context = StorageBootstrapService().initialize(paths)
     project_service = ProjectService(context.session_factory)
     work_item_service = WorkItemService(context.session_factory)
-    dataset_service = DatasetService(context.session_factory, paths)
+    dataset_service = DatasetService(context.session_factory)
     ml_task_service = MLTaskService(context.session_factory, paths)
     return project_service, work_item_service, dataset_service, ml_task_service
 

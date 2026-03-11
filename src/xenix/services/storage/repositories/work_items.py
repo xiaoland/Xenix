@@ -46,3 +46,21 @@ class WorkItemRepository:
         session.flush()
         session.refresh(row)
         return row
+
+    def set_best_trained_model(
+        self,
+        session: Session,
+        work_item_id: str,
+        trained_model_id: str | None,
+        now: datetime,
+    ) -> WorkItemRow | None:
+        row = self.get(session, work_item_id)
+        if row is None:
+            return None
+
+        row.best_trained_model_id = trained_model_id
+        row.updated_at = now
+        session.add(row)
+        session.flush()
+        session.refresh(row)
+        return row

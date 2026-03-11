@@ -12,6 +12,8 @@ from .exceptions import install_exception_hooks
 from .logging import setup_logging
 from .resources import package_resource_path
 from .services.dataset_service import DatasetService
+from .services.ml_service import MLService
+from .services.ml_task_service import MLTaskService
 from .services.project_service import ProjectService
 from .services.storage import StorageBootstrapService
 from .services.storage.layout import database_path
@@ -43,7 +45,14 @@ def run() -> int:
 
     project_service = ProjectService(context.session_factory)
     work_item_service = WorkItemService(context.session_factory)
-    dataset_service = DatasetService(context.session_factory, paths)
+    dataset_service = DatasetService(context.session_factory)
+    ml_task_service = MLTaskService(context.session_factory, paths)
+    ml_service = MLService(
+        context.session_factory,
+        dataset_service,
+        work_item_service,
+        ml_task_service,
+    )
 
     app = create_application()
     window = MainWindow(
@@ -53,6 +62,7 @@ def run() -> int:
         project_service=project_service,
         work_item_service=work_item_service,
         dataset_service=dataset_service,
+        ml_service=ml_service,
     )
     window.show()
 
