@@ -69,6 +69,42 @@
       "problemMatcher": []
     },
     {
+      "label": "PDM: i18n extract",
+      "type": "shell",
+      "command": "pdm",
+      "args": [
+        "run",
+        "i18n-extract"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "PDM: i18n compile",
+      "type": "shell",
+      "command": "pdm",
+      "args": [
+        "run",
+        "i18n-compile"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "PDM: smoke",
       "type": "shell",
       "command": "pdm",
