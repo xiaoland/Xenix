@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from xenix.config import ensure_app_dirs, get_app_paths
@@ -120,11 +121,11 @@ def test_work_item_service_rejects_overlapping_feature_and_target_columns(monkey
         )
 
 
-def test_dataset_service_materializes_manual_inference_csv_and_exports_copy(monkeypatch, tmp_path: Path) -> None:
+def test_dataset_service_materializes_manual_inference_csv_and_exports_utf8_by_default(monkeypatch, tmp_path: Path) -> None:
     project_service, _work_item_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
     project = project_service.create_project(CreateProjectInput(name="Retail"))
     dataset_file = tmp_path / "predictions.csv"
-    dataset_file.write_text("age,prediction\n30,1\n", encoding="utf-8")
+    dataset_file.write_text("城市,prediction\n上海,1\n", encoding="utf-8")
     dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Predictions")
 
     materialized = dataset_service.materialize_manual_inference_csv(
@@ -144,6 +145,41 @@ def test_dataset_service_materializes_manual_inference_csv_and_exports_copy(monk
     assert materialized.read_text(encoding="utf-8").splitlines() == ["age,income", "30,9000"]
     assert exported.exists()
     assert exported.read_text(encoding="utf-8") == dataset_file.read_text(encoding="utf-8")
+    assert not exported.read_bytes().startswith(b"\xef\xbb\xbf")
+
+
+def test_dataset_service_exports_csv_with_selected_encoding_and_xlsx(monkeypatch, tmp_path: Path) -> None:
+    project_service, _work_item_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
+    project = project_service.create_project(CreateProjectInput(name="Retail"))
+    dataset_file = tmp_path / "predictions.csv"
+    dataset_file.write_text("城市,prediction\n上海,1\n苏州,0\n", encoding="utf-8")
+    dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Predictions")
+
+    bom_export = dataset_service.export_dataset_copy(
+        ExportDatasetCopyInput(
+            dataset_id=dataset.id,
+            destination_path=str((tmp_path / "exports" / "predictions-bom.csv").resolve()),
+            csv_encoding="utf-8-sig",
+        )
+    )
+    xlsx_export = dataset_service.export_dataset_copy(
+        ExportDatasetCopyInput(
+            dataset_id=dataset.id,
+            destination_path=str((tmp_path / "exports" / "predictions.xlsx").resolve()),
+        )
+    )
+
+    assert bom_export.read_bytes().startswith(b"\xef\xbb\xbf")
+    assert bom_export.read_text(encoding="utf-8-sig").splitlines() == [
+        "城市,prediction",
+        "上海,1",
+        "苏州,0",
+    ]
+    exported_frame = pd.read_excel(xlsx_export)
+    assert exported_frame.to_dict(orient="records") == [
+        {"城市": "上海", "prediction": 1},
+        {"城市": "苏州", "prediction": 0},
+    ]
 
 
 def test_ml_task_service_rejects_invalid_state_transition(monkeypatch, tmp_path: Path) -> None:

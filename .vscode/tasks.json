@@ -102,8 +102,7 @@
         "PDM: check"
       ],
       "group": {
-        "kind": "build",
-        "isDefault": true
+        "kind": "build"
       },
       "presentation": {
         "reveal": "always",

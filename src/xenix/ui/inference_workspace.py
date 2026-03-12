@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QListWidget,
     QListWidgetItem,
@@ -466,19 +467,28 @@ class InferenceWorkspace(QWidget):
     def _export_result(self) -> None:
         if self._current_result_dataset_id is None:
             return
-        destination_path, _selected_filter = QFileDialog.getSaveFileName(
+        destination_path, selected_filter = QFileDialog.getSaveFileName(
             self,
             self.tr("Export Prediction Result"),
             "",
-            self.tr("CSV Files (*.csv)"),
+            self.tr("CSV Files (*.csv);;Excel Files (*.xlsx)"),
         )
         if not destination_path:
             return
+        destination = Path(destination_path).resolve()
+        destination = self._normalize_export_destination(destination, selected_filter)
+        csv_encoding = "utf-8"
+        if destination.suffix.lower() == ".csv":
+            selected_encoding = self._choose_csv_encoding()
+            if selected_encoding is None:
+                return
+            csv_encoding = selected_encoding
         try:
             exported_path = self._dataset_service.export_dataset_copy(
                 ExportDatasetCopyInput(
                     dataset_id=self._current_result_dataset_id,
-                    destination_path=str(Path(destination_path).resolve()),
+                    destination_path=str(destination),
+                    csv_encoding=csv_encoding,
                 )
             )
         except XenixError as exc:
@@ -490,6 +500,36 @@ class InferenceWorkspace(QWidget):
             path=exported_path,
         )
         QMessageBox.information(self, self.tr("Exported"), self.tr("Prediction result exported successfully."))
+
+    def _normalize_export_destination(self, destination_path: Path, selected_filter: str) -> Path:
+        if destination_path.suffix.lower() in {".csv", ".xlsx"}:
+            return destination_path
+        if "*.xlsx" in selected_filter:
+            return destination_path.with_suffix(".xlsx")
+        return destination_path.with_suffix(".csv")
+
+    def _choose_csv_encoding(self) -> str | None:
+        labels = [
+            self.tr("UTF-8"),
+            self.tr("UTF-8 with BOM"),
+            self.tr("GBK"),
+        ]
+        selected_label, accepted = QInputDialog.getItem(
+            self,
+            self.tr("CSV Encoding"),
+            self.tr("Choose CSV encoding"),
+            labels,
+            0,
+            False,
+        )
+        if not accepted:
+            return None
+        mapping = {
+            labels[0]: "utf-8",
+            labels[1]: "utf-8-sig",
+            labels[2]: "gbk",
+        }
+        return mapping[selected_label]
 
     def _translate_task_status(self, status: MLTaskStatus) -> str:
         labels = {

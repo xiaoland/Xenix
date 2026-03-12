@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import csv
+import codecs
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
+import pandas as pd
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
 
@@ -15,8 +17,8 @@ from .dataset_inspection import (
     InspectDatasetInput,
     detect_source_format,
     inspect_dataset_file,
+    load_dataframe,
 )
-from .storage.layout import artifact_datasets_root
 from .storage.models import DatasetRow, DatasetSourceFormat
 from .storage.repositories import DatasetRepository, ProjectRepository
 
@@ -44,6 +46,7 @@ class MaterializeManualInferenceCsvInput(SQLModel):
 class ExportDatasetCopyInput(SQLModel):
     dataset_id: str
     destination_path: str
+    csv_encoding: str = "utf-8"
 
 
 class DatasetService:
@@ -175,5 +178,38 @@ class DatasetService:
             raise ValidationError("Dataset source file is missing.")
 
         destination_path.parent.mkdir(parents=True, exist_ok=True)
-        destination_path.write_bytes(source_path.read_bytes())
+        destination_suffix = destination_path.suffix.lower()
+        if destination_suffix not in {".csv", ".xlsx"}:
+            raise ValidationError("Export destination must end with .csv or .xlsx.")
+
+        source_format = self._resolve_export_source_format(source_path, dataset.source_format)
+        dataframe = self._load_export_dataframe(source_path, source_format)
+        if destination_suffix == ".csv":
+            csv_encoding = self._normalize_csv_encoding(input_data.csv_encoding)
+            dataframe.to_csv(destination_path, index=False, encoding=csv_encoding)
+        else:
+            dataframe.to_excel(destination_path, index=False)
         return destination_path
+
+    def _resolve_export_source_format(self, source_path: Path, dataset_format: DatasetSourceFormat) -> DatasetSourceFormat:
+        detected_format = detect_source_format(source_path)
+        if detected_format is not DatasetSourceFormat.UNKNOWN:
+            return detected_format
+        if dataset_format is DatasetSourceFormat.UNKNOWN:
+            raise ValidationError("Dataset source file format is not supported for export.")
+        return dataset_format
+
+    def _load_export_dataframe(self, source_path: Path, source_format: DatasetSourceFormat) -> pd.DataFrame:
+        try:
+            return load_dataframe(source_path, source_format)
+        except Exception as exc:  # pragma: no cover - exercised by failure surface
+            raise ValidationError("Unable to read dataset file for export.") from exc
+
+    def _normalize_csv_encoding(self, encoding_name: str) -> str:
+        normalized = encoding_name.strip()
+        if not normalized:
+            raise ValidationError("CSV export encoding cannot be empty.")
+        try:
+            return codecs.lookup(normalized).name
+        except LookupError as exc:
+            raise ValidationError(f"CSV export encoding '{encoding_name}' is not supported.") from exc

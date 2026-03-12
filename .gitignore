@@ -21,6 +21,7 @@ dist/
 logs/
 *.log
 tmp/
+.tmp/
 temp/
 data/
 uploads/
