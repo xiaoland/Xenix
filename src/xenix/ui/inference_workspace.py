@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import QEvent, QT_TRANSLATE_NOOP, Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -32,7 +32,7 @@ from ..services.dataset_service import (
 )
 from ..services.ml_service import InferWithFilesInput, MLService
 from ..services.project_service import ProjectService
-from ..services.storage.models import MLTaskType
+from ..services.storage.models import MLTaskStatus, MLTaskType
 from ..services.work_item_service import WorkItemService
 from .widgets.inference_row_editor import InferenceRowEditorWidget
 from .widgets.task_log_view import TaskLogView
@@ -52,34 +52,45 @@ class InferenceWorkspace(QWidget):
         self._work_item_service = work_item_service
         self._dataset_service = dataset_service
         self._ml_service = ml_service
+        self._message_template: str | None = None
+        self._message_kwargs: dict[str, str] = {}
+        self._raw_message: str | None = None
 
+        self._project_label = QLabel()
+        self._work_item_label = QLabel()
+        self._model_label = QLabel()
         self._project_selector = QComboBox()
         self._work_item_selector = QComboBox()
         self._model_selector = QComboBox()
-        self._context_label = QLabel("Select a work item with at least one trained model.")
+        self._context_label = QLabel()
         self._context_label.setWordWrap(True)
-        self._message_label = QLabel("")
+        self._message_label = QLabel()
         self._message_label.setWordWrap(True)
 
         self._input_tabs = QTabWidget()
+        self._manual_tab = QWidget()
+        self._batch_tab = QWidget()
         self._row_editor = InferenceRowEditorWidget()
-        self._manual_submit_button = QPushButton("Run Manual Inference")
+        self._manual_submit_button = QPushButton()
         self._batch_file_list = QListWidget()
-        self._choose_batch_button = QPushButton("Choose Files")
-        self._batch_submit_button = QPushButton("Run Batch Inference")
+        self._choose_batch_button = QPushButton()
+        self._batch_submit_button = QPushButton()
 
         self._task_table = QTableWidget(0, 4)
-        self._task_details_label = QLabel("Select an inference task to inspect its details.")
+        self._task_details_label = QLabel()
         self._task_details_label.setWordWrap(True)
         self._task_log_view = TaskLogView()
-        self._open_result_button = QPushButton("Open Result")
-        self._export_result_button = QPushButton("Export Result")
+        self._open_result_button = QPushButton()
+        self._export_result_button = QPushButton()
+        self._task_group = QGroupBox()
+        self._detail_group = QGroupBox()
         self._current_result_dataset_id: str | None = None
         self._current_result_path: str | None = None
 
         self._build_ui()
         self._wire_events()
         self._reload_projects()
+        self.retranslate_ui()
 
     def reload_state(self) -> None:
         self._reload_projects()
@@ -93,17 +104,19 @@ class InferenceWorkspace(QWidget):
         header = QGridLayout()
         header.setHorizontalSpacing(12)
         header.setVerticalSpacing(8)
-        header.addWidget(QLabel("Project"), 0, 0)
+        header.addWidget(self._project_label, 0, 0)
         header.addWidget(self._project_selector, 0, 1)
-        header.addWidget(QLabel("Work Item"), 1, 0)
+        header.addWidget(self._work_item_label, 1, 0)
         header.addWidget(self._work_item_selector, 1, 1)
-        header.addWidget(QLabel("Model"), 2, 0)
+        header.addWidget(self._model_label, 2, 0)
         header.addWidget(self._model_selector, 2, 1)
         root_layout.addLayout(header)
         root_layout.addWidget(self._context_label)
 
-        self._input_tabs.addTab(self._build_manual_tab(), "Manual")
-        self._input_tabs.addTab(self._build_batch_tab(), "Batch File")
+        self._build_manual_tab()
+        self._build_batch_tab()
+        self._input_tabs.addTab(self._manual_tab, "")
+        self._input_tabs.addTab(self._batch_tab, "")
         root_layout.addWidget(self._input_tabs)
 
         runtime_splitter = QSplitter(Qt.Horizontal)
@@ -114,18 +127,15 @@ class InferenceWorkspace(QWidget):
         root_layout.addWidget(runtime_splitter, 1)
         root_layout.addWidget(self._message_label)
 
-    def _build_manual_tab(self) -> QWidget:
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
+    def _build_manual_tab(self) -> None:
+        layout = QVBoxLayout(self._manual_tab)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
         layout.addWidget(self._row_editor, 1)
         layout.addWidget(self._manual_submit_button)
-        return widget
 
-    def _build_batch_tab(self) -> QWidget:
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
+    def _build_batch_tab(self) -> None:
+        layout = QVBoxLayout(self._batch_tab)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
         layout.addWidget(self._batch_file_list, 1)
@@ -134,18 +144,15 @@ class InferenceWorkspace(QWidget):
         actions.addStretch(1)
         layout.addLayout(actions)
         layout.addWidget(self._batch_submit_button)
-        return widget
 
     def _build_task_panel(self) -> QWidget:
-        widget = QGroupBox("Inference Tasks")
-        layout = QVBoxLayout(widget)
-        self._task_table.setHorizontalHeaderLabels(["Status", "Model", "Rows", "Failure"])
+        layout = QVBoxLayout(self._task_group)
         self._task_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self._task_table.setSelectionMode(QAbstractItemView.SingleSelection)
         self._task_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self._task_table.verticalHeader().setVisible(False)
         layout.addWidget(self._task_table)
-        return widget
+        return self._task_group
 
     def _build_detail_panel(self) -> QWidget:
         widget = QWidget()
@@ -153,8 +160,7 @@ class InferenceWorkspace(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
 
-        detail_group = QGroupBox("Task Details")
-        detail_layout = QVBoxLayout(detail_group)
+        detail_layout = QVBoxLayout(self._detail_group)
         detail_layout.addWidget(self._task_details_label)
         detail_layout.addWidget(self._task_log_view, 1)
 
@@ -164,7 +170,7 @@ class InferenceWorkspace(QWidget):
         actions.addStretch(1)
         detail_layout.addLayout(actions)
 
-        layout.addWidget(detail_group, 1)
+        layout.addWidget(self._detail_group, 1)
         return widget
 
     def _wire_events(self) -> None:
@@ -176,6 +182,36 @@ class InferenceWorkspace(QWidget):
         self._task_table.itemSelectionChanged.connect(self._load_selected_task_details)
         self._open_result_button.clicked.connect(self._open_result)
         self._export_result_button.clicked.connect(self._export_result)
+
+    def retranslate_ui(self) -> None:
+        self._project_label.setText(self.tr("Project"))
+        self._work_item_label.setText(self.tr("Work Item"))
+        self._model_label.setText(self.tr("Model"))
+        self._manual_submit_button.setText(self.tr("Run Manual Inference"))
+        self._choose_batch_button.setText(self.tr("Choose Files"))
+        self._batch_submit_button.setText(self.tr("Run Batch Inference"))
+        self._open_result_button.setText(self.tr("Open Result"))
+        self._export_result_button.setText(self.tr("Export Result"))
+        self._input_tabs.setTabText(0, self.tr("Manual"))
+        self._input_tabs.setTabText(1, self.tr("Batch File"))
+        self._task_group.setTitle(self.tr("Inference Tasks"))
+        self._detail_group.setTitle(self.tr("Task Details"))
+        self._task_table.setHorizontalHeaderLabels(
+            [
+                self.tr("Status"),
+                self.tr("Model"),
+                self.tr("Rows"),
+                self.tr("Failure"),
+            ]
+        )
+        self._reload_message_label()
+        self.refresh_runtime()
+        self._load_selected_task_details()
+
+    def changeEvent(self, event: QEvent) -> None:
+        if event.type() == QEvent.LanguageChange:
+            self.retranslate_ui()
+        super().changeEvent(event)
 
     def _reload_projects(self) -> None:
         current_project_id = self.current_project_id()
@@ -212,7 +248,7 @@ class InferenceWorkspace(QWidget):
         if work_item_id is not None:
             work_item = self._work_item_service.get_work_item(work_item_id)
             for model in self._ml_service.list_trained_models(work_item.id):
-                prefix = "[Best] " if work_item.best_trained_model_id == model.id else ""
+                prefix = f"{self.tr('[Best]')} " if work_item.best_trained_model_id == model.id else ""
                 self._model_selector.addItem(f"{prefix}{model.model_key}", model.id)
         self._model_selector.blockSignals(False)
         if current_model_id is not None:
@@ -244,9 +280,9 @@ class InferenceWorkspace(QWidget):
         self._open_result_button.setEnabled(False)
         self._export_result_button.setEnabled(False)
         if work_item_id is None:
-            self._context_label.setText("Select a project and work item to run inference.")
+            self._context_label.setText(self.tr("Select a project and work item to run inference."))
             self._task_table.setRowCount(0)
-            self._task_details_label.setText("Select an inference task to inspect its details.")
+            self._task_details_label.setText(self.tr("Select an inference task to inspect its details."))
             self._task_log_view.clear()
             self._row_editor.clear()
             return
@@ -256,14 +292,17 @@ class InferenceWorkspace(QWidget):
             dataset = self._dataset_service.get_dataset(work_item.dataset_id)
             trained_models = self._ml_service.list_trained_models(work_item.id)
         except XenixError as exc:
-            self._set_message(str(exc), is_error=True)
+            self._set_raw_message(str(exc), is_error=True)
             return
 
         if not trained_models:
-            self._context_label.setText("This work item does not have a trained model yet.")
+            self._context_label.setText(self.tr("This work item does not have a trained model yet."))
         else:
             self._context_label.setText(
-                f"Managed dataset: {Path(dataset.source_path).name}. Features: {', '.join(work_item.feature_columns)}."
+                self.tr("Managed dataset: {dataset_name}. Features: {features}.").format(
+                    dataset_name=Path(dataset.source_path).name,
+                    features=", ".join(work_item.feature_columns),
+                )
             )
         self._row_editor.set_columns(work_item.feature_columns)
         self._refresh_task_table(work_item.id)
@@ -279,7 +318,7 @@ class InferenceWorkspace(QWidget):
         for row_index, task in enumerate(tasks):
             result_payload = task.result_payload or {}
             values = [
-                task.status.value,
+                self._translate_task_status(task.status),
                 str(result_payload.get("model_key", "")),
                 str(result_payload.get("row_count", "")),
                 task.error_summary or "",
@@ -300,7 +339,13 @@ class InferenceWorkspace(QWidget):
         work_item_id = self.current_work_item_id()
         model_id = self.current_model_id()
         if work_item_id is None or model_id is None:
-            self._set_message("Select a work item and trained model before submitting inference.", is_error=True)
+            self._set_ui_message(
+                QT_TRANSLATE_NOOP(
+                    "InferenceWorkspace",
+                    "Select a work item and trained model before submitting inference.",
+                ),
+                is_error=True,
+            )
             return
         try:
             work_item = self._work_item_service.get_work_item(work_item_id)
@@ -318,19 +363,22 @@ class InferenceWorkspace(QWidget):
                 )
             )
         except Exception as exc:
-            self._set_message(str(exc), is_error=True)
+            self._set_raw_message(str(exc), is_error=True)
             return
 
-        self._set_message(f"Inference task '{task.id}' queued.")
-        QMessageBox.information(self, "Queued", "Manual inference queued successfully.")
+        self._set_ui_message(
+            QT_TRANSLATE_NOOP("InferenceWorkspace", "Inference task '{task_id}' queued."),
+            task_id=task.id,
+        )
+        QMessageBox.information(self, self.tr("Queued"), self.tr("Manual inference queued successfully."))
         self.refresh_runtime()
 
     def _choose_batch_files(self) -> None:
         file_paths, _selected_filter = QFileDialog.getOpenFileNames(
             self,
-            "Choose Inference Files",
+            self.tr("Choose Inference Files"),
             "",
-            "Supported Data Files (*.csv *.xlsx *.xls);;CSV Files (*.csv);;Excel Files (*.xlsx *.xls)",
+            self.tr("Supported Data Files (*.csv *.xlsx *.xls);;CSV Files (*.csv);;Excel Files (*.xlsx *.xls)"),
         )
         if not file_paths:
             return
@@ -342,7 +390,13 @@ class InferenceWorkspace(QWidget):
         work_item_id = self.current_work_item_id()
         model_id = self.current_model_id()
         if work_item_id is None or model_id is None:
-            self._set_message("Select a work item and trained model before submitting inference.", is_error=True)
+            self._set_ui_message(
+                QT_TRANSLATE_NOOP(
+                    "InferenceWorkspace",
+                    "Select a work item and trained model before submitting inference.",
+                ),
+                is_error=True,
+            )
             return
         input_files = [self._batch_file_list.item(index).text() for index in range(self._batch_file_list.count())]
         try:
@@ -354,11 +408,14 @@ class InferenceWorkspace(QWidget):
                 )
             )
         except Exception as exc:
-            self._set_message(str(exc), is_error=True)
+            self._set_raw_message(str(exc), is_error=True)
             return
 
-        self._set_message(f"Inference task '{task.id}' queued.")
-        QMessageBox.information(self, "Queued", "Batch inference queued successfully.")
+        self._set_ui_message(
+            QT_TRANSLATE_NOOP("InferenceWorkspace", "Inference task '{task_id}' queued."),
+            task_id=task.id,
+        )
+        QMessageBox.information(self, self.tr("Queued"), self.tr("Batch inference queued successfully."))
         self.refresh_runtime()
 
     def _selected_task_id(self) -> str | None:
@@ -374,20 +431,20 @@ class InferenceWorkspace(QWidget):
         self._open_result_button.setEnabled(False)
         self._export_result_button.setEnabled(False)
         if task_id is None:
-            self._task_details_label.setText("Select an inference task to inspect its details.")
+            self._task_details_label.setText(self.tr("Select an inference task to inspect its details."))
             self._task_log_view.clear()
             return
         try:
             details = self._ml_service.get_task_details(task_id)
         except XenixError as exc:
-            self._set_message(str(exc), is_error=True)
+            self._set_raw_message(str(exc), is_error=True)
             return
 
         summary_lines = [
-            f"Task: {details.task.id}",
-            f"Status: {details.task.status.value}",
-            f"Model: {(details.task.result_payload or {}).get('model_key', '')}",
-            f"Rows: {(details.task.result_payload or {}).get('row_count', '')}",
+            self.tr("Task: {task_id}").format(task_id=details.task.id),
+            self.tr("Status: {status}").format(status=self._translate_task_status(details.task.status)),
+            self.tr("Model: {model_key}").format(model_key=(details.task.result_payload or {}).get("model_key", "")),
+            self.tr("Rows: {row_count}").format(row_count=(details.task.result_payload or {}).get("row_count", "")),
         ]
         if details.task.result_payload:
             result_dataset_id = details.task.result_payload.get("result_dataset_id")
@@ -397,7 +454,7 @@ class InferenceWorkspace(QWidget):
                 self._current_result_path = canonical_output_path
                 self._open_result_button.setEnabled(True)
                 self._export_result_button.setEnabled(True)
-                summary_lines.append(f"Result: {canonical_output_path}")
+                summary_lines.append(self.tr("Result: {path}").format(path=canonical_output_path))
         self._task_details_label.setText("\n".join(summary_lines))
         self._task_log_view.set_logs(details.logs)
 
@@ -411,9 +468,9 @@ class InferenceWorkspace(QWidget):
             return
         destination_path, _selected_filter = QFileDialog.getSaveFileName(
             self,
-            "Export Prediction Result",
+            self.tr("Export Prediction Result"),
             "",
-            "CSV Files (*.csv)",
+            self.tr("CSV Files (*.csv)"),
         )
         if not destination_path:
             return
@@ -425,12 +482,41 @@ class InferenceWorkspace(QWidget):
                 )
             )
         except XenixError as exc:
-            self._set_message(str(exc), is_error=True)
+            self._set_raw_message(str(exc), is_error=True)
             return
 
-        self._set_message(f"Result exported to '{exported_path}'.")
-        QMessageBox.information(self, "Exported", "Prediction result exported successfully.")
+        self._set_ui_message(
+            QT_TRANSLATE_NOOP("InferenceWorkspace", "Result exported to '{path}'."),
+            path=exported_path,
+        )
+        QMessageBox.information(self, self.tr("Exported"), self.tr("Prediction result exported successfully."))
 
-    def _set_message(self, message: str, *, is_error: bool = False) -> None:
+    def _translate_task_status(self, status: MLTaskStatus) -> str:
+        labels = {
+            MLTaskStatus.PENDING: self.tr("Pending"),
+            MLTaskStatus.RUNNING: self.tr("Running"),
+            MLTaskStatus.SUCCEEDED: self.tr("Succeeded"),
+            MLTaskStatus.FAILED: self.tr("Failed"),
+            MLTaskStatus.CANCELLED: self.tr("Cancelled"),
+        }
+        return labels.get(status, str(status))
+
+    def _set_ui_message(self, template: str, *, is_error: bool = False, **kwargs: str) -> None:
+        self._message_template = template
+        self._message_kwargs = {key: str(value) for key, value in kwargs.items()}
+        self._raw_message = None
+        self._message_label.setText(self.tr(template).format(**self._message_kwargs))
+        self._message_label.setStyleSheet("color: #b42318;" if is_error else "color: #17643a;")
+
+    def _set_raw_message(self, message: str, *, is_error: bool = False) -> None:
+        self._message_template = None
+        self._message_kwargs = {}
+        self._raw_message = message
         self._message_label.setText(message)
         self._message_label.setStyleSheet("color: #b42318;" if is_error else "color: #17643a;")
+
+    def _reload_message_label(self) -> None:
+        if self._message_template is not None:
+            self._message_label.setText(self.tr(self._message_template).format(**self._message_kwargs))
+        elif self._raw_message is not None:
+            self._message_label.setText(self._raw_message)

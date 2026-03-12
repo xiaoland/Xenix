@@ -5,6 +5,7 @@ import sys
 import threading
 import traceback
 
+from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 LOGGER = logging.getLogger("xenix.runtime")
@@ -53,8 +54,13 @@ def install_exception_hooks() -> None:
 
         message_box = QMessageBox()
         message_box.setIcon(QMessageBox.Critical)
-        message_box.setWindowTitle("Xenix")
-        message_box.setText("An unexpected error occurred. Check the log file for details.")
+        message_box.setWindowTitle(QCoreApplication.translate("Exceptions", "Xenix"))
+        message_box.setText(
+            QCoreApplication.translate(
+                "Exceptions",
+                "An unexpected error occurred. Check the log file for details.",
+            )
+        )
         message_box.setDetailedText(summary)
         message_box.exec()
 

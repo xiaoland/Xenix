@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -112,7 +112,7 @@ class JsonSchemaFormWidget(QFrame):
             default = field_schema.get("default", [])
             if isinstance(default, list):
                 widget.setText(", ".join(str(item) for item in default))
-            widget.setPlaceholderText("Comma-separated values")
+            widget.setPlaceholderText(self.tr("Comma-separated values"))
             item_schema, _ = self._unwrap_nullable(field_schema.get("items", {}))
             return _FieldBinding(
                 name=name,
@@ -197,6 +197,18 @@ class JsonSchemaFormWidget(QFrame):
 
     def _show_empty_label(self) -> None:
         if self._empty_label is None:
-            self._empty_label = QLabel("No parameters to configure.")
+            self._empty_label = QLabel(self.tr("No parameters to configure."))
             self._empty_label.setAlignment(Qt.AlignCenter)
         self._layout.addRow(self._empty_label)
+
+    def retranslate_ui(self) -> None:
+        if self._empty_label is not None:
+            self._empty_label.setText(self.tr("No parameters to configure."))
+        for binding in self._bindings.values():
+            if binding.field_type == "array":
+                binding.widget.setPlaceholderText(self.tr("Comma-separated values"))  # type: ignore[union-attr]
+
+    def changeEvent(self, event: QEvent) -> None:
+        if event.type() == QEvent.LanguageChange:
+            self.retranslate_ui()
+        super().changeEvent(event)

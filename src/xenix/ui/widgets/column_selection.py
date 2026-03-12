@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QFrame,
@@ -19,34 +19,48 @@ class ColumnSelectionWidget(QFrame):
         super().__init__(parent)
         self.setFrameShape(QFrame.StyledPanel)
 
+        self._hint_label = QLabel()
+        self._feature_title_label = QLabel()
+        self._target_title_label = QLabel()
+        self._feature_list = QListWidget()
+        self._target_list = QListWidget()
+
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(12, 12, 12, 12)
         root_layout.setSpacing(10)
 
-        hint = QLabel("Select feature columns and target columns for the current work item.")
-        hint.setWordWrap(True)
-        root_layout.addWidget(hint)
+        self._hint_label.setWordWrap(True)
+        root_layout.addWidget(self._hint_label)
 
         columns_layout = QHBoxLayout()
         columns_layout.setSpacing(12)
 
-        self._feature_list = QListWidget()
         self._feature_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self._target_list = QListWidget()
         self._target_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
 
-        columns_layout.addLayout(self._build_column_group("Feature Columns", self._feature_list))
-        columns_layout.addLayout(self._build_column_group("Target Columns", self._target_list))
+        columns_layout.addLayout(self._build_column_group(self._feature_title_label, self._feature_list))
+        columns_layout.addLayout(self._build_column_group(self._target_title_label, self._target_list))
         root_layout.addLayout(columns_layout)
 
-    def _build_column_group(self, title: str, widget: QListWidget) -> QVBoxLayout:
+        self.retranslate_ui()
+
+    def _build_column_group(self, label: QLabel, widget: QListWidget) -> QVBoxLayout:
         layout = QVBoxLayout()
-        label = QLabel(title)
         label.setAlignment(Qt.AlignLeft)
         label.setStyleSheet("font-weight: 600;")
         layout.addWidget(label)
         layout.addWidget(widget)
         return layout
+
+    def retranslate_ui(self) -> None:
+        self._hint_label.setText(self.tr("Select feature columns and target columns for the current work item."))
+        self._feature_title_label.setText(self.tr("Feature Columns"))
+        self._target_title_label.setText(self.tr("Target Columns"))
+
+    def changeEvent(self, event: QEvent) -> None:
+        if event.type() == QEvent.LanguageChange:
+            self.retranslate_ui()
+        super().changeEvent(event)
 
     def clear(self) -> None:
         self._feature_list.clear()

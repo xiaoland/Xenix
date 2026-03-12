@@ -11,7 +11,10 @@ a = Analysis(
     [str(scripts_root / "run_dev.py")],
     pathex=[str(src_root)],
     binaries=[],
-    datas=[(str(src_root / "xenix" / "resources"), "xenix/resources")],
+    datas=[
+        (str(src_root / "xenix" / "resources"), "xenix/resources"),
+        (str(src_root / "xenix" / "translations"), "xenix/translations"),
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication
 
 from .config import APP_NAME, APP_ORGANIZATION, ensure_app_dirs, get_app_paths
 from .exceptions import install_exception_hooks
+from .i18n import TranslationManager
 from .logging import setup_logging
 from .resources import package_resource_path
 from .services.dataset_service import DatasetService
@@ -56,10 +57,13 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
     )
 
     app = create_application()
+    translation_manager = TranslationManager(app, paths)
+    translation_manager.initialize()
     window = MainWindow(
         paths=paths,
         log_path=log_path,
         db_path=database_path(paths),
+        translation_manager=translation_manager,
         project_service=project_service,
         work_item_service=work_item_service,
         dataset_service=dataset_service,

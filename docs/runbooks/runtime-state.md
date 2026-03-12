@@ -22,6 +22,7 @@ Current runtime directories:
 
 Current runtime files and subdirectories:
 
+- `config/locale.json`
 - `state/xenix.db`
 - `artifacts/models/`
 - `artifacts/training/`
@@ -33,7 +34,8 @@ Current runtime files and subdirectories:
 1. Start the app with `pdm run dev`.
 2. Read the resolved paths from the main window.
 3. Open the log directory from the UI or inspect files directly on disk.
-4. Inspect `state/xenix.db` for metadata, `artifacts/ml-tasks/` for per-task working directories, and `artifacts/models/<work-item-id>/` for canonical trained-model files.
+4. Inspect `config/locale.json` for the persisted UI language preference when debugging localization behavior.
+5. Inspect `state/xenix.db` for metadata, `artifacts/ml-tasks/` for per-task working directories, and `artifacts/models/<work-item-id>/` for canonical trained-model files.
 
 ## Reset
 

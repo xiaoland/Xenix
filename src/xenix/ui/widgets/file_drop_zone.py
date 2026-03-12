@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QEvent, Qt, Signal
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 
 
@@ -13,20 +13,32 @@ class FileDropZone(QFrame):
         self.setFrameShape(QFrame.StyledPanel)
         self.setObjectName("fileDropZone")
 
+        self._title_label = QLabel()
+        self._subtitle_label = QLabel()
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(6)
 
-        title = QLabel("Drop a dataset file here")
-        title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("font-size: 16px; font-weight: 600;")
+        self._title_label.setAlignment(Qt.AlignCenter)
+        self._title_label.setStyleSheet("font-size: 16px; font-weight: 600;")
 
-        subtitle = QLabel("Supports .csv, .xlsx, and .xls")
-        subtitle.setAlignment(Qt.AlignCenter)
-        subtitle.setWordWrap(True)
+        self._subtitle_label.setAlignment(Qt.AlignCenter)
+        self._subtitle_label.setWordWrap(True)
 
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
+        layout.addWidget(self._title_label)
+        layout.addWidget(self._subtitle_label)
+
+        self.retranslate_ui()
+
+    def retranslate_ui(self) -> None:
+        self._title_label.setText(self.tr("Drop a dataset file here"))
+        self._subtitle_label.setText(self.tr("Supports .csv, .xlsx, and .xls"))
+
+    def changeEvent(self, event: QEvent) -> None:
+        if event.type() == QEvent.LanguageChange:
+            self.retranslate_ui()
+        super().changeEvent(event)
 
     def dragEnterEvent(self, event) -> None:  # type: ignore[override]
         mime_data = event.mimeData()

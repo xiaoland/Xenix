@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from PySide6.QtCore import QEvent
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QFrame,
@@ -17,27 +18,41 @@ class InferenceRowEditorWidget(QFrame):
         super().__init__(parent)
         self.setFrameShape(QFrame.StyledPanel)
         self._columns: list[str] = []
+        self._add_button = QPushButton()
+        self._remove_button = QPushButton()
+        self._table = QTableWidget(0, 0, self)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
 
         controls = QHBoxLayout()
-        self._add_button = QPushButton("Add Row")
-        self._remove_button = QPushButton("Remove Row")
         self._add_button.clicked.connect(self._add_row)
         self._remove_button.clicked.connect(self._remove_selected_rows)
         controls.addWidget(self._add_button)
         controls.addWidget(self._remove_button)
         controls.addStretch(1)
 
-        self._table = QTableWidget(0, 0, self)
         self._table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self._table.setSelectionMode(QAbstractItemView.SingleSelection)
 
         layout.addLayout(controls)
         layout.addWidget(self._table)
 
+        self.retranslate_ui()
+
+    def retranslate_ui(self) -> None:
+        self._add_button.setText(self.tr("Add Row"))
+        self._remove_button.setText(self.tr("Remove Row"))
+
+    def changeEvent(self, event: QEvent) -> None:
+        if event.type() == QEvent.LanguageChange:
+            self.retranslate_ui()
+        super().changeEvent(event)
+
     def set_columns(self, columns: list[str]) -> None:
+        if list(columns) == self._columns:
+            return
         self._columns = list(columns)
         self._table.setColumnCount(len(self._columns))
         self._table.setHorizontalHeaderLabels(self._columns)

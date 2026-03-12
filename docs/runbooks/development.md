@@ -44,6 +44,16 @@ pdm run smoke
 
 `pdm run smoke` uses the same native entrypoint as the real app, but exits after validating startup, storage bootstrap, logging, and window creation.
 
+## Translations
+
+```bash
+pdm run i18n-extract
+pdm run i18n-compile
+```
+
+- `pdm run i18n-extract` refreshes the Qt Linguist `.ts` catalogs from the current Python widget source.
+- `pdm run i18n-compile` compiles `.ts` catalogs into `.qm` files used by `QTranslator` at runtime.
+
 ## Package
 
 ```bash
@@ -55,6 +65,7 @@ Expected result:
 - Windows `onedir` bundle is created under `dist/xenix/`
 - packaged executable path is `dist/xenix/xenix.exe`
 - package resources are available under the bundled `xenix/resources/` path
+- compiled translations are available under the bundled `xenix/translations/` path
 
 ## Packaged Smoke Verification
 
@@ -95,4 +106,5 @@ Smoke verification should confirm that these directories are created in a fresh 
 
 - If packaging succeeds but the EXE does not start, rerun `pdm run smoke-package` first. It validates the packaged startup path without requiring manual UI interaction.
 - If resources fail to load in the packaged app, verify that `xenix.spec` still copies `src/xenix/resources` into `xenix/resources`.
+- If language switching fails in a packaged app, verify that `src/xenix/translations/*.qm` were rebuilt and copied into `xenix/translations`.
 - If you need an isolated local run, set `XENIX_APP_HOME` to an empty directory or use the VSCode workspace-home launch profile.

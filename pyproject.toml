@@ -23,6 +23,8 @@ distribution = false
 
 [tool.pdm.scripts]
 dev = "python scripts/run_dev.py"
+i18n-extract = "python scripts/update_translations.py"
+i18n-compile = "python scripts/compile_translations.py"
 package = "python scripts/package_app.py"
 smoke = "python scripts/run_dev.py --smoke-test"
 smoke-package = "python scripts/verify_packaged_smoke.py"
