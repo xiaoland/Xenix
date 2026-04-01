@@ -1,15 +1,17 @@
 # Native Docs
 
-This branch uses a minimal documentation model:
+This repository uses SVC v9.1 canonical durable layers.
 
-- `contracts/`: integration semantics, guarantees, and architecture boundaries
-- `adr/`: decision records for core technical choices
-- `runbooks/`: operational guidance for local development and recovery
-- `migrations/`: persistence and risky evolution rules
+Canonical durable layers:
 
-Start here:
+- `10-prd/`
+- `15-alignment/`
+- `20-product-tdd/`
+- `30-unit-tdd/`
+- `40-deployment/`
 
-- `contracts/README.md`
-- `adr/README.md`
-- `runbooks/README.md`
-- `migrations/README.md`
+Layer mapping:
+
+- `SVC-LAYER-MAP.md`
+
+Volatile planning and execution records live in top-level `tasks/`.

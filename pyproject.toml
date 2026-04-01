@@ -31,6 +31,7 @@ smoke-package = "python scripts/verify_packaged_smoke.py"
 dist = "python scripts/build_distribution_zip.py"
 test = "pytest"
 check = "python -m compileall src tests scripts"
+check-svc-docs = "python scripts/check_svc_docs.py"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

@@ -2,7 +2,7 @@
 
 PySide6 desktop bootstrap for the `native` branch of Xenix.
 
-This branch is intentionally focused on the Native desktop application line. The web monorepo remains on `web` (previous `master`, read [docs/runbooks/branch-governance.md](docs/runbooks/branch-governance.md) for more information)
+This branch is intentionally focused on the Native desktop application line. The web monorepo remains on `web` (previous `master`, read [docs/40-deployment/branch-governance.md](docs/40-deployment/branch-governance.md) for more information)
 
 ## Quick Start
 
@@ -21,6 +21,7 @@ Use Python `3.12` to `3.14`. The initial toolchain is pinned below `3.15` becaus
 - `pdm run smoke-package` launches the packaged executable with `--smoke-test` and verifies runtime artifacts in a temporary app home.
 - `pdm run test` runs the Python tests.
 - `pdm run check` compiles the source tree to catch syntax errors.
+- `pdm run check-svc-docs` validates SVC layer and task-path policies.
 
 ## Layout
 
@@ -28,15 +29,18 @@ Use Python `3.12` to `3.14`. The initial toolchain is pinned below `3.15` becaus
 - `tests` contains unit tests for config, storage bootstrap, repositories, services, logging, and resource resolution.
 - `scripts` contains developer helpers used by `pdm run`.
 - `ml` keeps the existing Python model scripts that will be integrated into the native workflow later.
-- `docs` stores contracts, ADRs, runbooks, and migration guidance for the native app.
+- `docs` stores canonical durable documentation layers.
+- `tasks` stores volatile planning and execution records.
 - `xenix.spec` is the canonical Windows PyInstaller `onedir` spec.
 
 ## Documentation Model
 
-- Contracts: [docs/contracts/README.md](docs/contracts/README.md)
-- ADRs: [docs/adr/README.md](docs/adr/README.md)
-- Runbooks: [docs/runbooks/README.md](docs/runbooks/README.md)
-- Migrations: [docs/migrations/README.md](docs/migrations/README.md)
+- PRD: [docs/10-prd/README.md](docs/10-prd/README.md)
+- Alignment: [docs/15-alignment/README.md](docs/15-alignment/README.md)
+- Product TDD: [docs/20-product-tdd/README.md](docs/20-product-tdd/README.md)
+- Unit TDD: [docs/30-unit-tdd/README.md](docs/30-unit-tdd/README.md)
+- Deployment: [docs/40-deployment/README.md](docs/40-deployment/README.md)
+- Task layer: [tasks/README.md](tasks/README.md)
 - Contributor workflow: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Runtime Conventions
@@ -54,4 +58,4 @@ Use Python `3.12` to `3.14`. The initial toolchain is pinned below `3.15` becaus
 - Startup smoke validation is available in both source and packaged forms through the shared `--smoke-test` CLI.
 - VSCode launch/task entries are provided for debugger startup, smoke startup, packaging, and packaged smoke verification.
 
-See [docs/runbooks/development.md](docs/runbooks/development.md) for local workflow details.
+See [docs/40-deployment/development.md](docs/40-deployment/development.md) for local workflow details.
