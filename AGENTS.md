@@ -1,16 +1,26 @@
 # Xenix Native
 
 Respond and think in English.
-Stop and ask the user about trade-offs if a decision would hurt maintainability or readability.
+Keep this file as a lightweight dispatcher, not a constitutional rulebook.
 
-## Primary areas
+## Dispatch
 
-- `src/xenix` contains the desktop application package, bootstrap code, runtime services, and Qt Widgets UI.
-- `tests` contains Python unit tests for the native shell.
-- `scripts` contains local developer helpers.
-- `ml` keeps the existing Python model scripts that will be integrated into the native flow later.
-- `docs` stores canonical durable documentation layers.
-- `tasks` stores volatile planning and execution records.
+- Mode A, exploration: vague request, unknown causality, or unstable requirements. Load `docs/00-meta/mode-a-explore.md` and work only in `tasks/`.
+- Mode B, solidification: requirements are stabilizing but not yet confirmed. Load `docs/00-meta/mode-b-solidify.md`, restate scope, and wait for confirmation before durable-doc updates or code.
+- Mode C, execution: bounded implementation work with known causality. Load `docs/00-meta/mode-c-execute.md`, check local `AGENTS.md` files near the target, then restate and edit tests or code.
+- Mode D, diagnosis: crashes, anomalies, or data corruption. Load `docs/00-meta/mode-d-diagnose.md`, stay read-only, gather telemetry, and write diagnostics in `tasks/` before fixing anything.
+
+## Pacing Layers
+
+- `docs/30-unit-tdd/` holds slow-moving logical structure.
+- `src/**/AGENTS.md` holds fast-moving local hazards close to the code they protect.
+- `docs/15-alignment/` is optional and only for repeated coordination drift.
+
+## Guardrails
+
+- Do not create or update durable docs outside the canonical layers.
+- Do not create new planning records outside `tasks/active/`.
+- Preserve `ml/` as-is unless the task explicitly requires migrating or deleting legacy model scripts.
 
 ## Quick commands
 
@@ -18,48 +28,3 @@ Stop and ask the user about trade-offs if a decision would hurt maintainability 
 - `pdm run dev`
 - `pdm run test`
 - `pdm run check`
-
-## Execution protocol (SVC v9.1)
-
-- Select execution mode from request ambiguity:
-  - Mode A (exploration): high ambiguity or fuzzy requests. Work only in `tasks/`. Do not edit durable docs or production code.
-  - Mode B (solidification): requirements are becoming stable. Classify truths by durable layer, restate scope, and wait for confirmation before durable-doc updates and coding.
-  - Mode C (execution): specific and bounded implementation work. Read relevant docs, restate execution scope, then implement tests and code.
-
-### Pre-execution restatement
-
-For reference-sensitive or logic-altering work, restate before editing:
-
-- target path or anchor
-- current state and context
-- intended operation
-- scope included
-- scope excluded
-- invariants that must hold
-- likely affected files
-- uncertainty or assumptions
-
-### Documentation layers
-
-- Durable docs:
-  - `docs/10-prd/`
-  - `docs/15-alignment/`
-  - `docs/20-product-tdd/`
-  - `docs/30-unit-tdd/`
-  - `docs/40-deployment/`
-- Volatile planning:
- 	- `tasks/active/`
- 	- `tasks/archive/`
-
-### L2 hard rule
-
-- Do not create or update durable docs outside canonical layers.
-- Do not create new planning records outside `tasks/active/`.
-
-## Native rules
-
-- Use PySide6 with Qt Widgets. Do not introduce QML unless the user asks for that direction explicitly.
-- Keep bootstrap code small and explicit: `main.py`, `app.py`, and `ui/`.
-- Keep application path conventions stable. `XENIX_APP_HOME` is the local override for runtime directories.
-- Prefer simple Python standard library solutions before adding new dependencies.
-- Preserve `ml/` as-is unless the task explicitly requires migrating or deleting legacy model scripts.

@@ -1,6 +1,6 @@
 # 40 Deployment
 
-This layer captures runtime and operational truths.
+This layer captures runtime, operational truths, and runbook-level mitigation guidance.
 
 Current deployment documents:
 

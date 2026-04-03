@@ -1,6 +1,8 @@
 # 30 Unit TDD
 
-This layer is for hard local units where code and tests alone are not enough to preserve design intent.
+This layer preserves slow-moving logical structure for a complex unit.
+
+Use it for cross-submodule constraints, architectural boundaries, and technology choices that should survive physical refactors.
 
 Add a unit TDD only when:
 
