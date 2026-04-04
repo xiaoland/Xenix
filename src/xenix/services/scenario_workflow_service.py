@@ -1,0 +1,211 @@
+from __future__ import annotations
+
+from enum import StrEnum
+
+from pydantic import Field
+from sqlmodel import SQLModel
+
+from .ml_service import FitWithEvaluateInput, MLService, TuneWithEvaluateInput
+from .project_service import CreateProjectInput, ProjectService
+from .scenario_template_service import (
+    ScenarioTemplateService,
+    ScenarioTrainingOperation,
+    ScenarioTrainingPlanStep,
+)
+from .storage.models import MLTaskRow, MLTaskStatus, MLTaskType, ProjectRow
+from .work_item_service import WorkItemService
+
+SCENARIO_PROJECT_NAME = "Xenix Scenarios"
+SCENARIO_PROJECT_DESCRIPTION = "Application-managed hidden project for scenario mode."
+
+
+class ScenarioTrainingStepStatus(StrEnum):
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
+class StartScenarioTrainingRunInput(SQLModel):
+    template_key: str
+    work_item_id: str
+
+
+class ScenarioTrainingRun(SQLModel):
+    template_key: str
+    work_item_id: str
+    root_task_ids: list[str] = Field(default_factory=list)
+
+
+class ScenarioTrainingStepSnapshot(SQLModel):
+    step_key: str
+    operation: ScenarioTrainingOperation
+    model_key: str
+    root_task_id: str
+    root_status: MLTaskStatus
+    evaluate_task_id: str | None = None
+    evaluate_status: MLTaskStatus | None = None
+    status: ScenarioTrainingStepStatus
+    failure_summary: str | None = None
+
+
+class ScenarioTrainingRunSnapshot(SQLModel):
+    template_key: str
+    work_item_id: str
+    step_snapshots: list[ScenarioTrainingStepSnapshot] = Field(default_factory=list)
+    best_trained_model_id: str | None = None
+    is_terminal: bool
+    can_proceed_to_inference: bool
+
+
+class ScenarioWorkflowService:
+    def __init__(
+        self,
+        project_service: ProjectService,
+        work_item_service: WorkItemService,
+        ml_service: MLService,
+        template_service: ScenarioTemplateService,
+    ) -> None:
+        self._project_service = project_service
+        self._work_item_service = work_item_service
+        self._ml_service = ml_service
+        self._template_service = template_service
+
+    def ensure_scenario_project(self) -> ProjectRow:
+        for project in self._project_service.list_projects():
+            if project.name == SCENARIO_PROJECT_NAME:
+                return project
+        return self._project_service.create_project(
+            CreateProjectInput(
+                name=SCENARIO_PROJECT_NAME,
+                description=SCENARIO_PROJECT_DESCRIPTION,
+            )
+        )
+
+    def start_training_run(self, input_data: StartScenarioTrainingRunInput) -> ScenarioTrainingRun:
+        self._work_item_service.get_work_item(input_data.work_item_id)
+        template = self._template_service.get_template(input_data.template_key)
+
+        root_task_ids: list[str] = []
+        for step in template.training_plan:
+            created = self._submit_plan_step(input_data.work_item_id, step)
+            root_task_ids.append(created.id)
+
+        return ScenarioTrainingRun(
+            template_key=template.key,
+            work_item_id=input_data.work_item_id,
+            root_task_ids=root_task_ids,
+        )
+
+    def get_training_run_snapshot(self, run: ScenarioTrainingRun) -> ScenarioTrainingRunSnapshot:
+        template = self._template_service.get_template(run.template_key)
+        work_item = self._work_item_service.get_work_item(run.work_item_id)
+        tasks_by_id = {task.id: task for task in self._ml_service.list_work_item_tasks(run.work_item_id)}
+
+        step_snapshots: list[ScenarioTrainingStepSnapshot] = []
+        for step, root_task_id in zip(template.training_plan, run.root_task_ids, strict=True):
+            root_task = tasks_by_id[root_task_id]
+            evaluate_task = self._find_follow_up_evaluate(run.work_item_id, root_task_id)
+            step_snapshots.append(self._build_step_snapshot(step, root_task, evaluate_task))
+
+        is_terminal = all(
+            snapshot.status in {ScenarioTrainingStepStatus.SUCCEEDED, ScenarioTrainingStepStatus.FAILED}
+            for snapshot in step_snapshots
+        )
+        can_proceed = is_terminal and work_item.best_trained_model_id is not None
+        return ScenarioTrainingRunSnapshot(
+            template_key=run.template_key,
+            work_item_id=run.work_item_id,
+            step_snapshots=step_snapshots,
+            best_trained_model_id=work_item.best_trained_model_id,
+            is_terminal=is_terminal,
+            can_proceed_to_inference=can_proceed,
+        )
+
+    def _submit_plan_step(self, work_item_id: str, step: ScenarioTrainingPlanStep) -> MLTaskRow:
+        if step.operation is ScenarioTrainingOperation.FIT:
+            return self._ml_service.fit_with_evaluate(
+                FitWithEvaluateInput(
+                    work_item_id=work_item_id,
+                    model_key=step.model_key,
+                    params=step.params,
+                )
+            )
+        return self._ml_service.tune_with_evaluate(
+            TuneWithEvaluateInput(
+                work_item_id=work_item_id,
+                model_key=step.model_key,
+                param_grid=step.param_grid,
+            )
+        )
+
+    def _find_follow_up_evaluate(self, work_item_id: str, root_task_id: str) -> MLTaskRow | None:
+        for task in self._ml_service.list_work_item_tasks(work_item_id):
+            if task.task_type is not MLTaskType.EVALUATE:
+                continue
+            evaluate_model = (task.request_payload or {}).get("evaluate_model", {})
+            if evaluate_model.get("source_ml_task_id") == root_task_id:
+                return task
+        return None
+
+    def _build_step_snapshot(
+        self,
+        step: ScenarioTrainingPlanStep,
+        root_task: MLTaskRow,
+        evaluate_task: MLTaskRow | None,
+    ) -> ScenarioTrainingStepSnapshot:
+        if root_task.status in {MLTaskStatus.FAILED, MLTaskStatus.CANCELLED}:
+            return ScenarioTrainingStepSnapshot(
+                step_key=step.step_key,
+                operation=step.operation,
+                model_key=step.model_key,
+                root_task_id=root_task.id,
+                root_status=root_task.status,
+                status=ScenarioTrainingStepStatus.FAILED,
+                failure_summary=root_task.error_summary,
+            )
+
+        if root_task.status in {MLTaskStatus.PENDING, MLTaskStatus.RUNNING} or evaluate_task is None:
+            return ScenarioTrainingStepSnapshot(
+                step_key=step.step_key,
+                operation=step.operation,
+                model_key=step.model_key,
+                root_task_id=root_task.id,
+                root_status=root_task.status,
+                status=ScenarioTrainingStepStatus.RUNNING,
+            )
+
+        if evaluate_task.status in {MLTaskStatus.PENDING, MLTaskStatus.RUNNING}:
+            return ScenarioTrainingStepSnapshot(
+                step_key=step.step_key,
+                operation=step.operation,
+                model_key=step.model_key,
+                root_task_id=root_task.id,
+                root_status=root_task.status,
+                evaluate_task_id=evaluate_task.id,
+                evaluate_status=evaluate_task.status,
+                status=ScenarioTrainingStepStatus.RUNNING,
+            )
+
+        if evaluate_task.status is MLTaskStatus.SUCCEEDED:
+            return ScenarioTrainingStepSnapshot(
+                step_key=step.step_key,
+                operation=step.operation,
+                model_key=step.model_key,
+                root_task_id=root_task.id,
+                root_status=root_task.status,
+                evaluate_task_id=evaluate_task.id,
+                evaluate_status=evaluate_task.status,
+                status=ScenarioTrainingStepStatus.SUCCEEDED,
+            )
+
+        return ScenarioTrainingStepSnapshot(
+            step_key=step.step_key,
+            operation=step.operation,
+            model_key=step.model_key,
+            root_task_id=root_task.id,
+            root_status=root_task.status,
+            evaluate_task_id=evaluate_task.id,
+            evaluate_status=evaluate_task.status,
+            status=ScenarioTrainingStepStatus.FAILED,
+            failure_summary=evaluate_task.error_summary,
+        )
