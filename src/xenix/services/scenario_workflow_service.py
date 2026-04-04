@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from pathlib import Path
 
 from pydantic import Field
 from sqlmodel import SQLModel
 
+from ..exceptions import ValidationError
+from .dataset_inspection import InspectDatasetInput
+from .dataset_service import DatasetService, RegisterDatasetInput
 from .ml_service import FitWithEvaluateInput, MLService, TuneWithEvaluateInput
 from .project_service import CreateProjectInput, ProjectService
 from .scenario_template_service import (
@@ -13,7 +17,7 @@ from .scenario_template_service import (
     ScenarioTrainingPlanStep,
 )
 from .storage.models import MLTaskRow, MLTaskStatus, MLTaskType, ProjectRow
-from .work_item_service import WorkItemService
+from .work_item_service import CreateWorkItemInput, WorkItemService
 
 SCENARIO_PROJECT_NAME = "Xenix Scenarios"
 SCENARIO_PROJECT_DESCRIPTION = "Application-managed hidden project for scenario mode."
@@ -28,6 +32,24 @@ class ScenarioTrainingStepStatus(StrEnum):
 class StartScenarioTrainingRunInput(SQLModel):
     template_key: str
     work_item_id: str
+
+
+class PrepareScenarioWorkItemInput(SQLModel):
+    template_key: str
+    source_path: str
+    feature_columns: list[str] = Field(default_factory=list)
+    target_columns: list[str] = Field(default_factory=list)
+    dataset_name: str | None = None
+    work_item_name: str | None = None
+
+
+class ScenarioWorkItemPreparationResult(SQLModel):
+    template_key: str
+    project_id: str
+    work_item_id: str
+    dataset_id: str
+    feature_columns: list[str] = Field(default_factory=list)
+    target_columns: list[str] = Field(default_factory=list)
 
 
 class ScenarioTrainingRun(SQLModel):
@@ -62,11 +84,13 @@ class ScenarioWorkflowService:
         self,
         project_service: ProjectService,
         work_item_service: WorkItemService,
+        dataset_service: DatasetService,
         ml_service: MLService,
         template_service: ScenarioTemplateService,
     ) -> None:
         self._project_service = project_service
         self._work_item_service = work_item_service
+        self._dataset_service = dataset_service
         self._ml_service = ml_service
         self._template_service = template_service
 
@@ -79,6 +103,62 @@ class ScenarioWorkflowService:
                 name=SCENARIO_PROJECT_NAME,
                 description=SCENARIO_PROJECT_DESCRIPTION,
             )
+        )
+
+    def prepare_work_item(self, input_data: PrepareScenarioWorkItemInput) -> ScenarioWorkItemPreparationResult:
+        template = self._template_service.get_template(input_data.template_key)
+        scenario_project = self.ensure_scenario_project()
+        source_path = Path(input_data.source_path).expanduser()
+        if not source_path.is_absolute():
+            raise ValidationError("Dataset source path must be absolute.")
+
+        inspection = self._dataset_service.inspect_source_file(
+            InspectDatasetInput(source_path=str(source_path.resolve()))
+        )
+        feature_columns = [column.strip() for column in input_data.feature_columns if column.strip()]
+        target_columns = [column.strip() for column in input_data.target_columns if column.strip()]
+        if len(feature_columns) < template.min_feature_columns:
+            raise ValidationError(
+                f"Select at least {template.min_feature_columns} input columns for '{template.display_name}'."
+            )
+        if len(target_columns) != template.required_target_count:
+            raise ValidationError(
+                f"Select exactly {template.required_target_count} prediction target column for '{template.display_name}'."
+            )
+        if set(feature_columns) & set(target_columns):
+            raise ValidationError("Input columns and prediction target cannot overlap.")
+
+        available_columns = {column.name for column in inspection.columns}
+        if not set(feature_columns).issubset(available_columns):
+            raise ValidationError("Selected input columns are invalid for the dataset file.")
+        if not set(target_columns).issubset(available_columns):
+            raise ValidationError("Selected prediction target is invalid for the dataset file.")
+
+        dataset_name = input_data.dataset_name.strip() if input_data.dataset_name else source_path.stem
+        work_item_name = input_data.work_item_name.strip() if input_data.work_item_name else source_path.stem
+        source_dataset = self._dataset_service.register_dataset(
+            RegisterDatasetInput(
+                project_id=scenario_project.id,
+                source_path=str(source_path.resolve()),
+                name=dataset_name,
+            )
+        )
+        work_item = self._work_item_service.create_work_item(
+            CreateWorkItemInput(
+                project_id=scenario_project.id,
+                name=work_item_name,
+                source_dataset_id=source_dataset.id,
+                feature_columns=feature_columns,
+                target_columns=target_columns,
+            )
+        )
+        return ScenarioWorkItemPreparationResult(
+            template_key=template.key,
+            project_id=scenario_project.id,
+            work_item_id=work_item.id,
+            dataset_id=work_item.dataset_id,
+            feature_columns=feature_columns,
+            target_columns=target_columns,
         )
 
     def start_training_run(self, input_data: StartScenarioTrainingRunInput) -> ScenarioTrainingRun:

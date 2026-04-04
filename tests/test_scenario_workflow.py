@@ -10,6 +10,7 @@ from xenix.services.scenario_template_service import ScenarioTemplateService
 from xenix.services.scenario_workflow_service import (
     SCENARIO_PROJECT_DESCRIPTION,
     SCENARIO_PROJECT_NAME,
+    PrepareScenarioWorkItemInput,
     ScenarioTrainingStepStatus,
     ScenarioWorkflowService,
     StartScenarioTrainingRunInput,
@@ -40,6 +41,7 @@ def _build_services(
     workflow_service = ScenarioWorkflowService(
         project_service=project_service,
         work_item_service=work_item_service,
+        dataset_service=dataset_service,
         ml_service=ml_service,
         template_service=ScenarioTemplateService(),
     )
@@ -169,3 +171,45 @@ def test_start_training_run_submits_root_tasks_in_template_order_and_enables_pro
         step.status is ScenarioTrainingStepStatus.SUCCEEDED for step in terminal_snapshot.step_snapshots
     )
     assert work_item_after.best_trained_model_id == terminal_snapshot.best_trained_model_id
+
+
+def test_prepare_work_item_creates_dataset_and_managed_work_item_in_hidden_scenario_project(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    (
+        project_service,
+        work_item_service,
+        _dataset_service,
+        _ml_task_service,
+        _ml_service,
+        workflow_service,
+    ) = _build_services(monkeypatch, tmp_path)
+
+    dataset_file = tmp_path / "demand.csv"
+    dataset_file.write_text(
+        "feature_a,feature_b,target\n"
+        "1,2,5\n"
+        "2,1,5\n"
+        "3,5,11\n"
+        "4,2,10\n",
+        encoding="utf-8",
+    )
+
+    prepared = workflow_service.prepare_work_item(
+        PrepareScenarioWorkItemInput(
+            template_key="sales_demand_forecast.v1",
+            source_path=str(dataset_file.resolve()),
+            feature_columns=["feature_a", "feature_b"],
+            target_columns=["target"],
+        )
+    )
+    scenario_project = project_service.list_projects()[0]
+    work_item = work_item_service.get_work_item(prepared.work_item_id)
+
+    assert scenario_project.name == SCENARIO_PROJECT_NAME
+    assert prepared.project_id == scenario_project.id
+    assert work_item.project_id == scenario_project.id
+    assert work_item.dataset_id == prepared.dataset_id
+    assert prepared.feature_columns == ["feature_a", "feature_b"]
+    assert prepared.target_columns == ["target"]

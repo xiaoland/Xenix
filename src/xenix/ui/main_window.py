@@ -11,10 +11,12 @@ from ..services.dataset_service import DatasetService
 from ..services.ml_service import MLService
 from ..services.project_service import ProjectService
 from ..services.scenario_template_service import ScenarioTemplateService
+from ..services.scenario_workflow_service import ScenarioWorkflowService
 from ..services.work_item_service import WorkItemService
 from .dataset_workspace import DatasetWorkspace
 from .inference_workspace import InferenceWorkspace
 from .ml_workspace import MLWorkspace
+from .scenario_data_preparation_dialog import ScenarioDataPreparationDialog
 from .scenario_home_view import ScenarioHomeView
 from .settings_dialog import SettingsDialog
 
@@ -31,6 +33,7 @@ class MainWindow(QMainWindow):
         dataset_service: DatasetService,
         ml_service: MLService,
         scenario_template_service: ScenarioTemplateService,
+        scenario_workflow_service: ScenarioWorkflowService,
     ) -> None:
         super().__init__()
         self._paths = paths
@@ -42,7 +45,9 @@ class MainWindow(QMainWindow):
         self._dataset_service = dataset_service
         self._ml_service = ml_service
         self._scenario_template_service = scenario_template_service
+        self._scenario_workflow_service = scenario_workflow_service
         self._settings_dialog: SettingsDialog | None = None
+        self._scenario_data_preparation_dialog: ScenarioDataPreparationDialog | None = None
 
         self._dataset_workspace = DatasetWorkspace(
             project_service=self._project_service,
@@ -113,10 +118,12 @@ class MainWindow(QMainWindow):
 
     def _show_scenario_placeholder(self, template_key: str) -> None:
         template = self._scenario_template_service.get_template(template_key)
-        QMessageBox.information(
-            self,
-            self.tr("Scenario"),
-            self.tr("The guided flow for '{scenario_name}' is not wired yet.").format(
-                scenario_name=template.display_name
-            ),
+        self._scenario_data_preparation_dialog = ScenarioDataPreparationDialog(
+            template=template,
+            dataset_service=self._dataset_service,
+            workflow_service=self._scenario_workflow_service,
+            parent=self,
         )
+        self._scenario_data_preparation_dialog.show()
+        self._scenario_data_preparation_dialog.raise_()
+        self._scenario_data_preparation_dialog.activateWindow()
