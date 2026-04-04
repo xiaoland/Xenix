@@ -62,33 +62,36 @@ def test_main_window_language_switch_updates_ui_without_losing_form_state(
     try:
         window._dataset_workspace._dataset_name_input.setText("customer-data")
         window._dataset_workspace._work_item_name_input.setText("baseline-run")
+        window._open_settings()
+        settings = window._settings_dialog
+        assert settings is not None
 
         assert window.windowTitle() == "Xenix Native"
-        assert window._open_logs_button.text() == "Open log directory"
-        assert window._workspace_tabs.tabText(0) == "Datasets"
+        assert settings._open_logs_button.text() == "Open log directory"
+        assert window._home_view._title_label.text() == "Xenix native ML workspace"
 
-        zh_index = window._language_selector.findData("zh_CN")
-        window._language_selector.setCurrentIndex(zh_index)
+        zh_index = settings._language_selector.findData("zh_CN")
+        settings._language_selector.setCurrentIndex(zh_index)
         app.processEvents()
 
         assert window.windowTitle() == "Xenix 原生版"
-        assert window._open_logs_button.text() == "打开日志目录"
-        assert window._workspace_tabs.tabText(0) == "数据集"
+        assert settings._open_logs_button.text() == "打开日志目录"
         assert window._dataset_workspace._create_button.text() == "创建工作项"
         assert window._dataset_workspace._dataset_name_input.text() == "customer-data"
         assert window._dataset_workspace._work_item_name_input.text() == "baseline-run"
         assert read_saved_locale(paths) == "zh_CN"
 
-        en_index = window._language_selector.findData("en_US")
-        window._language_selector.setCurrentIndex(en_index)
+        en_index = settings._language_selector.findData("en_US")
+        settings._language_selector.setCurrentIndex(en_index)
         app.processEvents()
 
         assert window.windowTitle() == "Xenix Native"
-        assert window._open_logs_button.text() == "Open log directory"
-        assert window._workspace_tabs.tabText(0) == "Datasets"
+        assert settings._open_logs_button.text() == "Open log directory"
         assert window._dataset_workspace._dataset_name_input.text() == "customer-data"
         assert window._dataset_workspace._work_item_name_input.text() == "baseline-run"
         assert read_saved_locale(paths) == "en_US"
     finally:
+        if window._settings_dialog is not None:
+            window._settings_dialog.close()
         window._ml_workspace._timer.stop()
         window.close()

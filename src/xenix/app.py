@@ -16,6 +16,7 @@ from .services.dataset_service import DatasetService
 from .services.ml_service import MLService
 from .services.ml_task_service import MLTaskService
 from .services.project_service import ProjectService
+from .services.scenario_template_service import ScenarioTemplateService
 from .services.storage import StorageBootstrapService
 from .services.storage.layout import database_path
 from .services.work_item_service import WorkItemService
@@ -55,6 +56,7 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
         work_item_service,
         ml_task_service,
     )
+    scenario_template_service = ScenarioTemplateService()
 
     app = create_application()
     translation_manager = TranslationManager(app, paths)
@@ -68,6 +70,7 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
         work_item_service=work_item_service,
         dataset_service=dataset_service,
         ml_service=ml_service,
+        scenario_template_service=scenario_template_service,
     )
     if show:
         window.show()
