@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QApplication
 
 from xenix.app import build_main_window
 from xenix.config import ensure_app_dirs, get_app_paths
+from xenix.services.dataset_inspection import DatasetColumnKind, DatasetColumnMetadata
 from xenix.services.dataset_service import DatasetService
 from xenix.services.ml_service import FitWithEvaluateInput, MLService
 from xenix.services.ml_task_service import MLTaskService
@@ -24,8 +25,10 @@ from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import MLTaskStatus, MLTaskType
 from xenix.services.work_item_service import WorkItemService
 from xenix.ui.scenario_data_preparation_dialog import ScenarioDataPreparationDialog
+from xenix.ui.inference_history_dialog import InferenceHistoryDialog
 from xenix.ui.scenario_inference_dialog import ScenarioInferenceDialog
 from xenix.ui.scenario_training_dialog import ScenarioTrainingDialog
+from xenix.ui.widgets.column_selection import ColumnSelectionWidget
 
 
 @pytest.fixture()
@@ -59,6 +62,71 @@ def test_scenario_home_card_opens_data_preparation_dialog(
             window._scenario_data_preparation_dialog.close()
         window._ml_workspace._timer.stop()
         window.close()
+
+
+def test_history_button_opens_history_dialog(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    _app, window = build_main_window(show=False)
+    try:
+        window._home_view._history_button.click()
+        app.processEvents()
+
+        assert isinstance(window._inference_history_dialog, InferenceHistoryDialog)
+        assert window._inference_history_dialog.isVisible()
+        assert window._inference_history_dialog.windowTitle() == "History"
+    finally:
+        if window._inference_history_dialog is not None:
+            window._inference_history_dialog.close()
+        window._ml_workspace._timer.stop()
+        window.close()
+
+
+def test_column_selection_widget_uses_combo_driven_target_and_feature_selection(
+    app: QApplication,
+) -> None:
+    widget = ColumnSelectionWidget()
+    widget.set_columns(
+        [
+            DatasetColumnMetadata(name="feature_a", kind=DatasetColumnKind.NUMERIC, nullable=False),
+            DatasetColumnMetadata(name="feature_b", kind=DatasetColumnKind.NUMERIC, nullable=False),
+            DatasetColumnMetadata(name="target", kind=DatasetColumnKind.NUMERIC, nullable=False),
+        ]
+    )
+    try:
+        widget.show()
+        app.processEvents()
+
+        widget._target_selector.setCurrentIndex(widget._target_selector.findData("target"))
+        widget._feature_picker.setCurrentIndex(widget._feature_picker.findData("feature_a"))
+        widget._add_selected_feature()
+        widget._feature_picker.setCurrentIndex(widget._feature_picker.findData("feature_b"))
+        widget._add_selected_feature()
+        app.processEvents()
+
+        assert widget.selected_target_columns() == ["target"]
+        assert widget.selected_feature_columns() == ["feature_a", "feature_b"]
+
+        widget._target_selector.setCurrentIndex(widget._target_selector.findData("feature_a"))
+        app.processEvents()
+
+        assert widget.selected_target_columns() == ["feature_a"]
+        assert widget.selected_feature_columns() == ["feature_b"]
+        assert widget._feature_picker.findData("feature_a") == -1
+
+        widget._selected_feature_list.setCurrentRow(0)
+        widget._remove_selected_feature()
+        app.processEvents()
+
+        assert widget.selected_feature_columns() == []
+    finally:
+        widget.close()
 
 
 def test_scenario_training_dialog_starts_a_run_for_prepared_work_item(

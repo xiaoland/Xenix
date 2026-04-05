@@ -14,6 +14,7 @@ from xenix.i18n import (
     write_saved_locale,
 )
 from xenix.services.scenario_workflow_service import PrepareScenarioWorkItemInput
+from xenix.ui.inference_history_dialog import InferenceHistoryDialog
 from xenix.ui.scenario_inference_dialog import ScenarioInferenceDialog
 from xenix.ui.scenario_training_dialog import ScenarioTrainingDialog
 
@@ -94,6 +95,11 @@ def test_main_window_language_switch_updates_ui_without_losing_form_state(
         assert window._scenario_data_preparation_dialog is not None
         assert window._scenario_data_preparation_dialog.windowTitle() == "准备场景数据"
         assert window._scenario_data_preparation_dialog._title_label.text() == "销售需求预测"
+        assert (
+            window._scenario_data_preparation_dialog._column_selection._hint_label.text()
+            == "先选择一个预测目标，再加入一个或多个输入列。"
+        )
+        assert window._scenario_data_preparation_dialog._column_selection._add_feature_button.text() == "添加"
         window._scenario_data_preparation_dialog.close()
 
         dataset_file = tmp_path / "demand.csv"
@@ -146,6 +152,20 @@ def test_main_window_language_switch_updates_ui_without_losing_form_state(
         assert inference_dialog._manual_submit_button.text() == "开始预测"
         assert inference_dialog._input_tabs.tabText(0) == "单条预测"
         inference_dialog.close()
+
+        history_dialog = InferenceHistoryDialog(
+            history_service=window._inference_history_service,
+            dataset_service=window._dataset_service,
+            ml_service=window._ml_service,
+            parent=window,
+        )
+        history_dialog.show()
+        app.processEvents()
+
+        assert history_dialog.windowTitle() == "历史"
+        assert history_dialog._refresh_button.text() == "刷新"
+        assert history_dialog._task_group.title() == "推理结果"
+        history_dialog.close()
 
         en_index = settings._language_selector.findData("en_US")
         settings._language_selector.setCurrentIndex(en_index)
