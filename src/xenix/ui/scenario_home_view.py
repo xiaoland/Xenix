@@ -6,6 +6,7 @@ from PySide6.QtCore import QEvent, Signal
 from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from ..services.scenario_template_service import ScenarioTemplate
+from .scenario_template_text import localized_template_description, localized_template_display_name
 
 
 class ScenarioHomeView(QWidget):
@@ -49,10 +50,10 @@ class ScenarioHomeView(QWidget):
             card_layout.setContentsMargins(16, 16, 16, 16)
             card_layout.setSpacing(10)
 
-            button = QPushButton(template.display_name)
+            button = QPushButton()
             button.setMinimumHeight(44)
             button.clicked.connect(partial(self.scenario_selected.emit, template.key))
-            description = QLabel(template.description)
+            description = QLabel()
             description.setWordWrap(True)
 
             card_layout.addWidget(button)
@@ -83,6 +84,9 @@ class ScenarioHomeView(QWidget):
         self._cards_label.setText(self.tr("Scenario Templates"))
         self._history_button.setText(self.tr("History"))
         self._settings_button.setText(self.tr("Settings"))
+        for template in self._templates:
+            self._scenario_buttons[template.key].setText(localized_template_display_name(template))
+            self._scenario_descriptions[template.key].setText(localized_template_description(template))
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == QEvent.LanguageChange:

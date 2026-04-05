@@ -18,6 +18,7 @@ from .inference_workspace import InferenceWorkspace
 from .ml_workspace import MLWorkspace
 from .scenario_data_preparation_dialog import ScenarioDataPreparationDialog
 from .scenario_home_view import ScenarioHomeView
+from .scenario_training_dialog import ScenarioTrainingDialog
 from .settings_dialog import SettingsDialog
 
 
@@ -48,6 +49,7 @@ class MainWindow(QMainWindow):
         self._scenario_workflow_service = scenario_workflow_service
         self._settings_dialog: SettingsDialog | None = None
         self._scenario_data_preparation_dialog: ScenarioDataPreparationDialog | None = None
+        self._scenario_training_dialog: ScenarioTrainingDialog | None = None
 
         self._dataset_workspace = DatasetWorkspace(
             project_service=self._project_service,
@@ -124,6 +126,25 @@ class MainWindow(QMainWindow):
             workflow_service=self._scenario_workflow_service,
             parent=self,
         )
+        self._scenario_data_preparation_dialog.accepted.connect(self._open_training_after_preparation)
         self._scenario_data_preparation_dialog.show()
         self._scenario_data_preparation_dialog.raise_()
         self._scenario_data_preparation_dialog.activateWindow()
+
+    def _open_training_after_preparation(self) -> None:
+        if self._scenario_data_preparation_dialog is None:
+            return
+        result = self._scenario_data_preparation_dialog.preparation_result()
+        if result is None:
+            return
+        template = self._scenario_template_service.get_template(result.template_key)
+        self._scenario_training_dialog = ScenarioTrainingDialog(
+            template=template,
+            preparation_result=result,
+            workflow_service=self._scenario_workflow_service,
+            ml_service=self._ml_service,
+            parent=self,
+        )
+        self._scenario_training_dialog.show()
+        self._scenario_training_dialog.raise_()
+        self._scenario_training_dialog.activateWindow()

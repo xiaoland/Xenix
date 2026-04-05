@@ -14,6 +14,7 @@ from ..services.scenario_workflow_service import (
     ScenarioWorkItemPreparationResult,
     ScenarioWorkflowService,
 )
+from .scenario_template_text import localized_template_display_name
 from .widgets.column_selection import ColumnSelectionWidget
 from .widgets.dataset_summary import DatasetSummaryWidget
 from .widgets.file_drop_zone import FileDropZone
@@ -81,7 +82,7 @@ class ScenarioDataPreparationDialog(QDialog):
 
     def retranslate_ui(self) -> None:
         self.setWindowTitle(self.tr("Prepare Scenario Data"))
-        self._title_label.setText(self._template.display_name)
+        self._title_label.setText(localized_template_display_name(self._template))
         self._summary_label.setText(
             self.tr("Upload one dataset, choose the prediction target and input columns, then continue to training.")
         )

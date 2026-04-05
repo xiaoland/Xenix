@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QCoreApplication, QEvent, QUrl
+from PySide6.QtCore import QEvent, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QComboBox, QDialog, QFormLayout, QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton, QVBoxLayout
 
@@ -88,13 +88,13 @@ class SettingsDialog(QDialog):
 
     def retranslate_ui(self) -> None:
         self.setWindowTitle(self.tr("Settings"))
-        self._language_label.setText(self._translate_main_window("Language"))
-        self._app_home_label.setText(self._translate_main_window("App home"))
-        self._state_label.setText(self._translate_main_window("State"))
-        self._artifacts_label.setText(self._translate_main_window("Artifacts"))
-        self._database_label.setText(self._translate_main_window("Database"))
-        self._current_log_file_label.setText(self._translate_main_window("Current log file"))
-        self._open_logs_button.setText(self._translate_main_window("Open log directory"))
+        self._language_label.setText(self.tr("Language"))
+        self._app_home_label.setText(self.tr("App home"))
+        self._state_label.setText(self.tr("State"))
+        self._artifacts_label.setText(self.tr("Artifacts"))
+        self._database_label.setText(self.tr("Database"))
+        self._current_log_file_label.setText(self.tr("Current log file"))
+        self._open_logs_button.setText(self.tr("Open log directory"))
         self._reload_language_options()
 
     def changeEvent(self, event: QEvent) -> None:
@@ -105,8 +105,8 @@ class SettingsDialog(QDialog):
     def _reload_language_options(self) -> None:
         current_locale = self._translation_manager.current_locale()
         labels = {
-            "en_US": self._translate_main_window("English"),
-            "zh_CN": self._translate_main_window("Simplified Chinese"),
+            "en_US": self.tr("English"),
+            "zh_CN": self.tr("Simplified Chinese"),
         }
         self._language_selector.blockSignals(True)
         self._language_selector.clear()
@@ -134,6 +134,3 @@ class SettingsDialog(QDialog):
 
     def _open_logs_dir(self) -> None:
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._paths.logs)))
-
-    def _translate_main_window(self, text: str) -> str:
-        return QCoreApplication.translate("MainWindow", text)
