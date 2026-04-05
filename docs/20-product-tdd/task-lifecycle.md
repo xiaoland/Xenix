@@ -12,6 +12,7 @@ Each service-managed task must have:
 - An ML task type such as `inspect_dataset`, `fit`, `hyperparameter_tuning`, or `inference`
 - A created timestamp
 - A current status
+- A finished timestamp once the task reaches a terminal state
 
 SQLite is the default store for task metadata once task persistence is implemented.
 
@@ -56,6 +57,8 @@ Tasks that produce artifacts must return result metadata that includes:
 - Result kind
 - Absolute filesystem path
 - Whether the file or directory is ready to open
+
+Tasks surfaced after the original dialog closes, such as inference results shown in history, must preserve enough terminal metadata for later review and export.
 
 Result ownership rules:
 

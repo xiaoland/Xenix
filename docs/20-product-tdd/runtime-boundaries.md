@@ -30,6 +30,7 @@ Forbidden dependency direction:
 The UI is responsible for:
 
 - Collecting user intent from Qt Widgets
+- Rendering guided scenario surfaces that may hide project or work-item selectors
 - Rendering task status, validation errors, and result locations
 - Invoking services with plain Python inputs
 - Opening files or directories after a service reports a successful output
@@ -37,6 +38,7 @@ The UI is responsible for:
 The UI must not:
 
 - Parse datasets directly for training logic
+- Invent hidden project ids, work-item ids, or result paths outside service mediation
 - Select models by reading arbitrary files on disk without service mediation
 - Maintain hidden business state beyond view state
 
@@ -46,6 +48,7 @@ Services are responsible for:
 
 - Validating user requests before long-running work starts
 - Translating UI actions into task executions
+- Owning application-managed scenario containers when the UI hides project management details
 - Persisting task metadata and status transitions
 - Resolving runtime paths
 - Coordinating ML adapters and export paths

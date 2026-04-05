@@ -22,17 +22,17 @@ Runtime dependencies now include:
 pdm run dev
 ```
 
-Expected result: the app opens the native desktop shell with `Datasets`, `Training`, and `Inference` workspaces.
+Expected result: the app opens the native desktop shell on a scenario-first home surface with guided templates, `History`, and `Settings`.
 
 The delivered workflow includes:
 
-- dataset import by file picker or drag-and-drop
-- immutable work-item creation with feature/target column selection
-- manual fit and multi-model tuning
-- background ML task execution with logs and failure details
-- trained-model persistence and best-model tracking
-- manual and batch-file inference
-- result viewing and export
+- scenario data import by file picker or drag-and-drop
+- guided checkbox-group selection of one prediction target and one or more input columns
+- application-managed scenario work-item preparation
+- fixed template-driven background training with logs and best-model tracking
+- manual and batch-file prediction against the best trained model
+- prediction history browsing with reopen and export
+- technical dataset, training, and inference workspaces still available in code for direct control
 
 ## Verify
 

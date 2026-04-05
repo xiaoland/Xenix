@@ -8,9 +8,13 @@ Record which product concepts remain in the native edition and which are intenti
 
 - Simple and easy to use for teachers, students.
 - Single local operator
+- Guided scenario-first home shell with localized scenario templates
 - Local dataset selection and drag-and-drop import
-- Training task creation and model selection
+- Scenario data preparation with checkbox-group input and target selection
+- Fixed template-driven training plans with best-model tracking
+- Technical training and inference workspaces for direct control when needed
 - Inference against local data or manually entered values
+- Prediction history review with reopen and export
 - Local result viewing and export
 - Local runtime logs and metadata
 
@@ -27,4 +31,7 @@ Record which product concepts remain in the native edition and which are intenti
 - The native app can optimize for one desktop session instead of concurrent users.
 - Authentication and authorization are out of scope unless a future issue reintroduces them with an ADR.
 - "Backend" logic in the native app means local services, not a network service.
+- The default operator path can hide project management details behind guided scenario surfaces.
+- Scenario mode may use application-managed local containers while continuing to rely on the shared service and storage layers.
+- Prediction outputs must remain reopenable and exportable after the original prediction dialog closes.
 - Operations guidance focuses on local runtime recovery and packaging, not cloud deployment.
