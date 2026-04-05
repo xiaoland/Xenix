@@ -4,19 +4,51 @@
 <context>
     <name>ColumnSelectionWidget</name>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="56"/>
         <source>Select feature columns and target columns for the current work item.</source>
-        <translation>为当前工作项选择特征列和目标列。</translation>
+        <translation type="vanished">为当前工作项选择特征列和目标列。</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="57"/>
         <source>Feature Columns</source>
-        <translation>特征列</translation>
+        <translation type="vanished">特征列</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="58"/>
         <source>Target Columns</source>
-        <translation>目标列</translation>
+        <translation type="vanished">目标列</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="85"/>
+        <source>Choose one prediction target, then add one or more input columns.</source>
+        <translation>先选择一个预测目标，再加入一个或多个输入列。</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="86"/>
+        <source>Input Columns</source>
+        <translation>输入列</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="87"/>
+        <source>Prediction Target</source>
+        <translation>预测目标</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="88"/>
+        <source>Add</source>
+        <translation>添加</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="89"/>
+        <source>Remove</source>
+        <translation>移除</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="134"/>
+        <source>Choose target column</source>
+        <translation>选择目标列</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="147"/>
+        <source>Choose input column</source>
+        <translation>选择输入列</translation>
     </message>
 </context>
 <context>
@@ -170,6 +202,222 @@
         <location filename="../ui/widgets/file_drop_zone.py" line="36"/>
         <source>Supports .csv, .xlsx, and .xls</source>
         <translation>支持 .csv、.xlsx 和 .xls</translation>
+    </message>
+</context>
+<context>
+    <name>InferenceHistoryDialog</name>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="155"/>
+        <source>History</source>
+        <translation>历史</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="156"/>
+        <source>Sort</source>
+        <translation>排序</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="157"/>
+        <source>Start time</source>
+        <translation>开始时间</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="158"/>
+        <source>End time</source>
+        <translation>结束时间</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="159"/>
+        <source>Refresh</source>
+        <translation>刷新</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="160"/>
+        <source>Open Result</source>
+        <translation>打开结果</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="161"/>
+        <source>Export Result</source>
+        <translation>导出结果</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="162"/>
+        <source>Inference Results</source>
+        <translation>推理结果</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="163"/>
+        <source>Task Details</source>
+        <translation>任务详情</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="166"/>
+        <source>Finished</source>
+        <translation>完成时间</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="167"/>
+        <source>Work Item</source>
+        <translation>工作项</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="168"/>
+        <source>Model</source>
+        <translation>模型</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="169"/>
+        <source>Rows</source>
+        <translation>行数</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="175"/>
+        <source>Refresh to load prediction history.</source>
+        <translation>点击刷新以加载预测历史。</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="177"/>
+        <location filename="../ui/inference_history_dialog.py" line="197"/>
+        <location filename="../ui/inference_history_dialog.py" line="225"/>
+        <location filename="../ui/inference_history_dialog.py" line="292"/>
+        <source>Select a history row to inspect its details.</source>
+        <translation>请选择一条历史记录查看详情。</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="230"/>
+        <source>Loaded {count} prediction result(s).</source>
+        <translation>已加载 {count} 条预测结果。</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="234"/>
+        <source>No prediction results match the current filter.</source>
+        <translation>当前筛选条件下没有匹配的预测结果。</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="242"/>
+        <source>Newest first</source>
+        <translation>最新优先</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="246"/>
+        <source>Oldest first</source>
+        <translation>最早优先</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="313"/>
+        <source>Task: {task_id}</source>
+        <translation>任务：{task_id}</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="314"/>
+        <source>Finished: {finished_at}</source>
+        <translation>完成时间：{finished_at}</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="315"/>
+        <source>Work item: {work_item_name}</source>
+        <translation>工作项：{work_item_name}</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="316"/>
+        <source>Model: {model_key}</source>
+        <translation>模型：{model_key}</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="317"/>
+        <source>Rows: {row_count}</source>
+        <translation>行数：{row_count}</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="318"/>
+        <source>Result: {path}</source>
+        <translation>结果：{path}</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="319"/>
+        <source>Status: {status}</source>
+        <translation>状态：{status}</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="323"/>
+        <source>Scenario: {scenario_name}</source>
+        <translation>场景：{scenario_name}</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="338"/>
+        <source>Export Prediction Result</source>
+        <translation>导出预测结果</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="340"/>
+        <source>CSV Files (*.csv);;Excel Files (*.xlsx)</source>
+        <translation>CSV 文件 (*.csv);;Excel 文件 (*.xlsx)</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="369"/>
+        <source>Prediction result exported to &apos;{path}&apos;.</source>
+        <translation>预测结果已导出到 &apos;{path}&apos;。</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="372"/>
+        <source>Exported</source>
+        <translation>已导出</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="372"/>
+        <source>Prediction result exported successfully.</source>
+        <translation>预测结果已成功导出。</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="376"/>
+        <source>UTF-8</source>
+        <translation>UTF-8</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="377"/>
+        <source>UTF-8 with BOM</source>
+        <translation>UTF-8 with BOM</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="378"/>
+        <source>GBK</source>
+        <translation>GBK</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="382"/>
+        <source>CSV Encoding</source>
+        <translation>CSV 编码</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="383"/>
+        <source>Choose CSV encoding</source>
+        <translation>选择 CSV 编码</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="404"/>
+        <source>Pending</source>
+        <translation>待处理</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="405"/>
+        <source>Running</source>
+        <translation>运行中</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="406"/>
+        <source>Succeeded</source>
+        <translation>成功</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="407"/>
+        <source>Failed</source>
+        <translation>失败</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="408"/>
+        <source>Cancelled</source>
+        <translation>已取消</translation>
     </message>
 </context>
 <context>
@@ -355,7 +603,7 @@
     <message>
         <location filename="../ui/inference_workspace.py" line="474"/>
         <source>CSV Files (*.csv);;Excel Files (*.xlsx)</source>
-        <translation type="unfinished"></translation>
+        <translation>CSV 文件 (*.csv);;Excel 文件 (*.xlsx)</translation>
     </message>
     <message>
         <source>CSV Files (*.csv)</source>
@@ -379,17 +627,17 @@
     <message>
         <location filename="../ui/inference_workspace.py" line="513"/>
         <source>UTF-8</source>
-        <translation type="unfinished"></translation>
+        <translation>UTF-8</translation>
     </message>
     <message>
         <location filename="../ui/inference_workspace.py" line="514"/>
         <source>UTF-8 with BOM</source>
-        <translation type="unfinished"></translation>
+        <translation>UTF-8 with BOM</translation>
     </message>
     <message>
         <location filename="../ui/inference_workspace.py" line="515"/>
         <source>GBK</source>
-        <translation type="unfinished"></translation>
+        <translation>GBK</translation>
     </message>
     <message>
         <location filename="../ui/inference_workspace.py" line="519"/>
@@ -722,19 +970,17 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../ui/main_window.py" line="94"/>
+        <location filename="../ui/main_window.py" line="99"/>
         <source>Xenix Native</source>
         <translation>Xenix 原生版</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="119"/>
         <source>History</source>
-        <translation>历史</translation>
+        <translation type="vanished">历史</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="120"/>
         <source>Inference history is the next scenario-mode surface to wire.</source>
-        <translation>推理历史是场景模式下一步要接入的界面。</translation>
+        <translation type="vanished">推理历史是场景模式下一步要接入的界面。</translation>
     </message>
     <message>
         <source>Xenix native ML workspace</source>

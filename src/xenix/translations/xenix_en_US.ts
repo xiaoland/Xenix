@@ -4,19 +4,51 @@
 <context>
     <name>ColumnSelectionWidget</name>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="56"/>
         <source>Select feature columns and target columns for the current work item.</source>
-        <translation>Select feature columns and target columns for the current work item.</translation>
+        <translation type="vanished">Select feature columns and target columns for the current work item.</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="57"/>
         <source>Feature Columns</source>
-        <translation>Feature Columns</translation>
+        <translation type="vanished">Feature Columns</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="58"/>
         <source>Target Columns</source>
-        <translation>Target Columns</translation>
+        <translation type="vanished">Target Columns</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="85"/>
+        <source>Choose one prediction target, then add one or more input columns.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="86"/>
+        <source>Input Columns</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="87"/>
+        <source>Prediction Target</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="88"/>
+        <source>Add</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="89"/>
+        <source>Remove</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="134"/>
+        <source>Choose target column</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="147"/>
+        <source>Choose input column</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -170,6 +202,222 @@
         <location filename="../ui/widgets/file_drop_zone.py" line="36"/>
         <source>Supports .csv, .xlsx, and .xls</source>
         <translation>Supports .csv, .xlsx, and .xls</translation>
+    </message>
+</context>
+<context>
+    <name>InferenceHistoryDialog</name>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="155"/>
+        <source>History</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="156"/>
+        <source>Sort</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="157"/>
+        <source>Start time</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="158"/>
+        <source>End time</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="159"/>
+        <source>Refresh</source>
+        <translation type="unfinished">Refresh</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="160"/>
+        <source>Open Result</source>
+        <translation type="unfinished">Open Result</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="161"/>
+        <source>Export Result</source>
+        <translation type="unfinished">Export Result</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="162"/>
+        <source>Inference Results</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="163"/>
+        <source>Task Details</source>
+        <translation type="unfinished">Task Details</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="166"/>
+        <source>Finished</source>
+        <translation type="unfinished">Finished</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="167"/>
+        <source>Work Item</source>
+        <translation type="unfinished">Work Item</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="168"/>
+        <source>Model</source>
+        <translation type="unfinished">Model</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="169"/>
+        <source>Rows</source>
+        <translation type="unfinished">Rows</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="175"/>
+        <source>Refresh to load prediction history.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="177"/>
+        <location filename="../ui/inference_history_dialog.py" line="197"/>
+        <location filename="../ui/inference_history_dialog.py" line="225"/>
+        <location filename="../ui/inference_history_dialog.py" line="292"/>
+        <source>Select a history row to inspect its details.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="230"/>
+        <source>Loaded {count} prediction result(s).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="234"/>
+        <source>No prediction results match the current filter.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="242"/>
+        <source>Newest first</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="246"/>
+        <source>Oldest first</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="313"/>
+        <source>Task: {task_id}</source>
+        <translation type="unfinished">Task: {task_id}</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="314"/>
+        <source>Finished: {finished_at}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="315"/>
+        <source>Work item: {work_item_name}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="316"/>
+        <source>Model: {model_key}</source>
+        <translation type="unfinished">Model: {model_key}</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="317"/>
+        <source>Rows: {row_count}</source>
+        <translation type="unfinished">Rows: {row_count}</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="318"/>
+        <source>Result: {path}</source>
+        <translation type="unfinished">Result: {path}</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="319"/>
+        <source>Status: {status}</source>
+        <translation type="unfinished">Status: {status}</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="323"/>
+        <source>Scenario: {scenario_name}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="338"/>
+        <source>Export Prediction Result</source>
+        <translation type="unfinished">Export Prediction Result</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="340"/>
+        <source>CSV Files (*.csv);;Excel Files (*.xlsx)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="369"/>
+        <source>Prediction result exported to &apos;{path}&apos;.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="372"/>
+        <source>Exported</source>
+        <translation type="unfinished">Exported</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="372"/>
+        <source>Prediction result exported successfully.</source>
+        <translation type="unfinished">Prediction result exported successfully.</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="376"/>
+        <source>UTF-8</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="377"/>
+        <source>UTF-8 with BOM</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="378"/>
+        <source>GBK</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="382"/>
+        <source>CSV Encoding</source>
+        <translation type="unfinished">CSV Encoding</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="383"/>
+        <source>Choose CSV encoding</source>
+        <translation type="unfinished">Choose CSV encoding</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="404"/>
+        <source>Pending</source>
+        <translation type="unfinished">Pending</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="405"/>
+        <source>Running</source>
+        <translation type="unfinished">Running</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="406"/>
+        <source>Succeeded</source>
+        <translation type="unfinished">Succeeded</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="407"/>
+        <source>Failed</source>
+        <translation type="unfinished">Failed</translation>
+    </message>
+    <message>
+        <location filename="../ui/inference_history_dialog.py" line="408"/>
+        <source>Cancelled</source>
+        <translation type="unfinished">Cancelled</translation>
     </message>
 </context>
 <context>
@@ -722,19 +970,9 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../ui/main_window.py" line="94"/>
+        <location filename="../ui/main_window.py" line="99"/>
         <source>Xenix Native</source>
         <translation>Xenix Native</translation>
-    </message>
-    <message>
-        <location filename="../ui/main_window.py" line="119"/>
-        <source>History</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/main_window.py" line="120"/>
-        <source>Inference history is the next scenario-mode surface to wire.</source>
-        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Xenix native ML workspace</source>
