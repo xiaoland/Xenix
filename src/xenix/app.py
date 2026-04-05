@@ -13,6 +13,7 @@ from .i18n import TranslationManager
 from .logging import setup_logging
 from .resources import package_resource_path
 from .services.dataset_service import DatasetService
+from .services.inference_history_service import InferenceHistoryService
 from .services.ml_service import MLService
 from .services.ml_task_service import MLTaskService
 from .services.project_service import ProjectService
@@ -65,6 +66,7 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
         ml_service=ml_service,
         template_service=scenario_template_service,
     )
+    inference_history_service = InferenceHistoryService(context.session_factory)
 
     app = create_application()
     translation_manager = TranslationManager(app, paths)
@@ -78,6 +80,7 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
         work_item_service=work_item_service,
         dataset_service=dataset_service,
         ml_service=ml_service,
+        inference_history_service=inference_history_service,
         scenario_template_service=scenario_template_service,
         scenario_workflow_service=scenario_workflow_service,
     )

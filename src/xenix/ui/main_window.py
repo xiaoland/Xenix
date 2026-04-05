@@ -3,17 +3,19 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QEvent
-from PySide6.QtWidgets import QMainWindow, QMessageBox, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QMainWindow, QVBoxLayout, QWidget
 
 from ..config import AppPaths
 from ..i18n import TranslationManager
 from ..services.dataset_service import DatasetService
+from ..services.inference_history_service import InferenceHistoryService
 from ..services.ml_service import MLService
 from ..services.project_service import ProjectService
 from ..services.scenario_template_service import ScenarioTemplateService
 from ..services.scenario_workflow_service import ScenarioWorkflowService
 from ..services.work_item_service import WorkItemService
 from .dataset_workspace import DatasetWorkspace
+from .inference_history_dialog import InferenceHistoryDialog
 from .inference_workspace import InferenceWorkspace
 from .ml_workspace import MLWorkspace
 from .scenario_data_preparation_dialog import ScenarioDataPreparationDialog
@@ -34,6 +36,7 @@ class MainWindow(QMainWindow):
         work_item_service: WorkItemService,
         dataset_service: DatasetService,
         ml_service: MLService,
+        inference_history_service: InferenceHistoryService,
         scenario_template_service: ScenarioTemplateService,
         scenario_workflow_service: ScenarioWorkflowService,
     ) -> None:
@@ -46,12 +49,14 @@ class MainWindow(QMainWindow):
         self._work_item_service = work_item_service
         self._dataset_service = dataset_service
         self._ml_service = ml_service
+        self._inference_history_service = inference_history_service
         self._scenario_template_service = scenario_template_service
         self._scenario_workflow_service = scenario_workflow_service
         self._settings_dialog: SettingsDialog | None = None
         self._scenario_data_preparation_dialog: ScenarioDataPreparationDialog | None = None
         self._scenario_training_dialog: ScenarioTrainingDialog | None = None
         self._scenario_inference_dialog: ScenarioInferenceDialog | None = None
+        self._inference_history_dialog: InferenceHistoryDialog | None = None
 
         self._dataset_workspace = DatasetWorkspace(
             project_service=self._project_service,
@@ -84,7 +89,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
         self._home_view.open_settings_requested.connect(self._open_settings)
-        self._home_view.open_history_requested.connect(self._show_history_placeholder)
+        self._home_view.open_history_requested.connect(self._open_history)
         self._home_view.scenario_selected.connect(self._show_scenario_placeholder)
         layout.addWidget(self._home_view, 1)
 
@@ -113,12 +118,19 @@ class MainWindow(QMainWindow):
         self._settings_dialog.raise_()
         self._settings_dialog.activateWindow()
 
-    def _show_history_placeholder(self) -> None:
-        QMessageBox.information(
-            self,
-            self.tr("History"),
-            self.tr("Inference history is the next scenario-mode surface to wire."),
-        )
+    def _open_history(self) -> None:
+        if self._inference_history_dialog is None:
+            self._inference_history_dialog = InferenceHistoryDialog(
+                history_service=self._inference_history_service,
+                dataset_service=self._dataset_service,
+                ml_service=self._ml_service,
+                parent=self,
+            )
+        else:
+            self._inference_history_dialog.refresh_history()
+        self._inference_history_dialog.show()
+        self._inference_history_dialog.raise_()
+        self._inference_history_dialog.activateWindow()
 
     def _show_scenario_placeholder(self, template_key: str) -> None:
         template = self._scenario_template_service.get_template(template_key)
