@@ -1,3 +1,5 @@
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -117,4 +119,91 @@ def test_scenario_training_dialog_starts_a_run_for_prepared_work_item(
         assert dialog._step_table.rowCount() == 3
         assert dialog._continue_button.isEnabled() is False
     finally:
+        dialog.close()
+
+
+def test_scenario_data_preparation_dialog_shows_busy_state_while_inspecting_dataset(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    project_service = ProjectService(context.session_factory)
+    work_item_service = WorkItemService(context.session_factory, paths)
+    dataset_service = DatasetService(context.session_factory, paths)
+    ml_task_service = MLTaskService(context.session_factory, paths)
+    ml_service = MLService(
+        paths,
+        context.session_factory,
+        dataset_service,
+        work_item_service,
+        ml_task_service,
+    )
+    template_service = ScenarioTemplateService()
+    workflow_service = ScenarioWorkflowService(
+        project_service=project_service,
+        work_item_service=work_item_service,
+        dataset_service=dataset_service,
+        ml_service=ml_service,
+        template_service=template_service,
+    )
+
+    dataset_file = tmp_path / "slow-demand.csv"
+    dataset_file.write_text(
+        "feature_a,feature_b,target\n"
+        "1,2,5\n"
+        "2,1,5\n"
+        "3,5,11\n",
+        encoding="utf-8",
+    )
+
+    started = threading.Event()
+    release = threading.Event()
+    original_inspect = dataset_service.inspect_source_file
+
+    def slow_inspect(input_data):
+        started.set()
+        if not release.wait(timeout=5):
+            raise AssertionError("Timed out waiting to release the slow inspection stub.")
+        return original_inspect(input_data)
+
+    monkeypatch.setattr(dataset_service, "inspect_source_file", slow_inspect)
+    dialog = ScenarioDataPreparationDialog(
+        template=template_service.get_template("sales_demand_forecast.v1"),
+        dataset_service=dataset_service,
+        workflow_service=workflow_service,
+    )
+    try:
+        dialog.show()
+        dialog._inspect_path(str(dataset_file.resolve()))
+
+        deadline = time.time() + 5
+        while not started.is_set() and time.time() < deadline:
+            app.processEvents()
+            time.sleep(0.01)
+
+        assert started.is_set()
+        app.processEvents()
+        assert dialog._busy_indicator.isVisible()
+        assert dialog._busy_label.isVisible()
+        assert dialog._busy_label.text() == "Inspecting dataset..."
+        assert dialog._choose_file_button.isEnabled() is False
+        assert dialog._continue_button.isEnabled() is False
+
+        release.set()
+        deadline = time.time() + 5
+        while dialog._busy_indicator.isVisible() and time.time() < deadline:
+            app.processEvents()
+            time.sleep(0.01)
+
+        assert dialog._busy_indicator.isVisible() is False
+        assert dialog._current_inspection is not None
+        assert dialog._continue_button.isEnabled() is True
+    finally:
+        release.set()
         dialog.close()

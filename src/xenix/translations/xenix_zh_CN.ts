@@ -814,62 +814,72 @@
 <context>
     <name>ScenarioDataPreparationDialog</name>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="84"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="124"/>
         <source>Prepare Scenario Data</source>
         <translation>准备场景数据</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="87"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="127"/>
         <source>Upload one dataset, choose the prediction target and input columns, then continue to training.</source>
         <translation>上传一个数据集，选择预测目标和输入列，然后继续训练。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="89"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="129"/>
         <source>Choose File</source>
         <translation>选择文件</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="90"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="130"/>
         <source>Continue to Training</source>
         <translation>继续训练</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="92"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="133"/>
         <source>Choose a dataset file to begin.</source>
         <translation>请选择一个数据集文件开始。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="102"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="143"/>
         <source>Choose Dataset File</source>
         <translation>选择数据集文件</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="104"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="145"/>
         <source>Supported Data Files (*.csv *.xlsx *.xls);;CSV Files (*.csv);;Excel Files (*.xlsx *.xls)</source>
         <translation>支持的数据文件 (*.csv *.xlsx *.xls);;CSV 文件 (*.csv);;Excel 文件 (*.xlsx *.xls)</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="126"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="212"/>
         <source>Dataset inspected. Choose columns, then continue.</source>
         <translation>数据集已分析。请选择列，然后继续。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="130"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="264"/>
+        <source>Inspecting dataset...</source>
+        <translation>正在解析数据集...</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="266"/>
+        <source>Preparing scenario work item...</source>
+        <translation>正在准备场景工作项...</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="166"/>
         <source>Choose and inspect a dataset before continuing.</source>
         <translation>继续前请先选择并分析数据集。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="146"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="229"/>
         <source>Data preparation finished. Training can start next.</source>
         <translation>数据准备已完成。接下来可以开始训练。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="149"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="232"/>
         <source>Prepared</source>
         <translation>已准备就绪</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="150"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="233"/>
         <source>The scenario work item is ready for training.</source>
         <translation>场景工作项已准备好进行训练。</translation>
     </message>

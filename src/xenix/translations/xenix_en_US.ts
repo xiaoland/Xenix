@@ -806,62 +806,72 @@
 <context>
     <name>ScenarioDataPreparationDialog</name>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="84"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="124"/>
         <source>Prepare Scenario Data</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="87"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="127"/>
         <source>Upload one dataset, choose the prediction target and input columns, then continue to training.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="89"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="129"/>
         <source>Choose File</source>
         <translation type="unfinished">Choose File</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="90"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="130"/>
         <source>Continue to Training</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="92"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="133"/>
         <source>Choose a dataset file to begin.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="102"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="143"/>
         <source>Choose Dataset File</source>
         <translation type="unfinished">Choose Dataset File</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="104"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="145"/>
         <source>Supported Data Files (*.csv *.xlsx *.xls);;CSV Files (*.csv);;Excel Files (*.xlsx *.xls)</source>
         <translation type="unfinished">Supported Data Files (*.csv *.xlsx *.xls);;CSV Files (*.csv);;Excel Files (*.xlsx *.xls)</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="126"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="212"/>
         <source>Dataset inspected. Choose columns, then continue.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="130"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="264"/>
+        <source>Inspecting dataset...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="266"/>
+        <source>Preparing scenario work item...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="166"/>
         <source>Choose and inspect a dataset before continuing.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="146"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="229"/>
         <source>Data preparation finished. Training can start next.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="149"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="232"/>
         <source>Prepared</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="150"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="233"/>
         <source>The scenario work item is ready for training.</source>
         <translation type="unfinished"></translation>
     </message>
