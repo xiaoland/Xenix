@@ -8,14 +8,23 @@ from PySide6.QtWidgets import QApplication
 from xenix.app import build_main_window
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.dataset_service import DatasetService
-from xenix.services.ml_service import MLService
+from xenix.services.ml_service import FitWithEvaluateInput, MLService
 from xenix.services.ml_task_service import MLTaskService
 from xenix.services.project_service import ProjectService
 from xenix.services.scenario_template_service import ScenarioTemplateService
-from xenix.services.scenario_workflow_service import PrepareScenarioWorkItemInput, ScenarioWorkflowService
+from xenix.services.scenario_workflow_service import (
+    PrepareScenarioWorkItemInput,
+    ScenarioTrainingRun,
+    ScenarioTrainingRunSnapshot,
+    ScenarioTrainingStepSnapshot,
+    ScenarioTrainingStepStatus,
+    ScenarioWorkflowService,
+)
 from xenix.services.storage import StorageBootstrapService
+from xenix.services.storage.models import MLTaskStatus, MLTaskType
 from xenix.services.work_item_service import WorkItemService
 from xenix.ui.scenario_data_preparation_dialog import ScenarioDataPreparationDialog
+from xenix.ui.scenario_inference_dialog import ScenarioInferenceDialog
 from xenix.ui.scenario_training_dialog import ScenarioTrainingDialog
 
 
@@ -100,6 +109,37 @@ def test_scenario_training_dialog_starts_a_run_for_prepared_work_item(
         )
     )
     template = template_service.get_template(prepared.template_key)
+    fake_run = ScenarioTrainingRun(
+        template_key=template.key,
+        work_item_id=prepared.work_item_id,
+        root_task_ids=["root-1", "root-2", "root-3"],
+    )
+
+    def fake_start_training_run(_input):
+        return fake_run
+
+    def fake_get_training_run_snapshot(_run):
+        return ScenarioTrainingRunSnapshot(
+            template_key=template.key,
+            work_item_id=prepared.work_item_id,
+            step_snapshots=[
+                ScenarioTrainingStepSnapshot(
+                    step_key=step.step_key,
+                    operation=step.operation,
+                    model_key=step.model_key,
+                    root_task_id=fake_run.root_task_ids[index],
+                    root_status=MLTaskStatus.PENDING,
+                    status=ScenarioTrainingStepStatus.RUNNING,
+                )
+                for index, step in enumerate(template.training_plan)
+            ],
+            best_trained_model_id=None,
+            is_terminal=False,
+            can_proceed_to_inference=False,
+        )
+
+    monkeypatch.setattr(workflow_service, "start_training_run", fake_start_training_run)
+    monkeypatch.setattr(workflow_service, "get_training_run_snapshot", fake_get_training_run_snapshot)
 
     dialog = ScenarioTrainingDialog(
         template=template,
@@ -206,4 +246,123 @@ def test_scenario_data_preparation_dialog_shows_busy_state_while_inspecting_data
         assert dialog._continue_button.isEnabled() is True
     finally:
         release.set()
+        dialog.close()
+
+
+def test_scenario_inference_dialog_queues_manual_prediction_with_best_model(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    project_service = ProjectService(context.session_factory)
+    work_item_service = WorkItemService(context.session_factory, paths)
+    dataset_service = DatasetService(context.session_factory, paths)
+    ml_task_service = MLTaskService(context.session_factory, paths)
+    ml_service = MLService(
+        paths,
+        context.session_factory,
+        dataset_service,
+        work_item_service,
+        ml_task_service,
+    )
+    template_service = ScenarioTemplateService()
+    workflow_service = ScenarioWorkflowService(
+        project_service=project_service,
+        work_item_service=work_item_service,
+        dataset_service=dataset_service,
+        ml_service=ml_service,
+        template_service=template_service,
+    )
+
+    dataset_file = tmp_path / "predict-demand.csv"
+    dataset_file.write_text(
+        "feature_a,feature_b,target\n"
+        "1,2,5\n"
+        "2,1,5\n"
+        "3,5,11\n"
+        "4,2,10\n"
+        "5,3,13\n"
+        "6,6,18\n"
+        "7,5,19\n"
+        "8,4,20\n"
+        "9,7,25\n"
+        "10,8,28\n",
+        encoding="utf-8",
+    )
+    prepared = workflow_service.prepare_work_item(
+        PrepareScenarioWorkItemInput(
+            template_key="sales_demand_forecast.v1",
+            source_path=str(dataset_file.resolve()),
+            feature_columns=["feature_a", "feature_b"],
+            target_columns=["target"],
+        )
+    )
+    template = template_service.get_template(prepared.template_key)
+    ml_service.fit_with_evaluate(
+        FitWithEvaluateInput(
+            work_item_id=prepared.work_item_id,
+            model_key="regression.linear",
+            params={"fit_intercept": True},
+        )
+    )
+
+    deadline = time.time() + 60
+    while time.time() < deadline:
+        work_item = work_item_service.get_work_item(prepared.work_item_id)
+        if work_item.best_trained_model_id is not None:
+            break
+        time.sleep(0.1)
+    else:
+        raise AssertionError("Timed out waiting for the scenario work item to get a best model.")
+
+    monkeypatch.setattr("xenix.ui.scenario_inference_dialog.QMessageBox.information", lambda *args, **kwargs: None)
+    dialog = ScenarioInferenceDialog(
+        template=template,
+        preparation_result=prepared,
+        work_item_service=work_item_service,
+        dataset_service=dataset_service,
+        ml_service=ml_service,
+    )
+    try:
+        dialog.show()
+        app.processEvents()
+
+        assert dialog.windowTitle() == "Prediction"
+        assert dialog._title_label.text() == "Sales Demand Forecast"
+        assert dialog._best_model_label.text().startswith("Using best model:")
+        assert dialog._manual_submit_button.isEnabled() is True
+
+        dialog._row_editor._table.item(0, 0).setText("11")
+        dialog._row_editor._table.item(0, 1).setText("9")
+        dialog._submit_manual_inference()
+        app.processEvents()
+
+        inference_tasks = [
+            task
+            for task in ml_service.list_work_item_tasks(prepared.work_item_id)
+            if task.task_type is MLTaskType.INFERENCE
+        ]
+        assert len(inference_tasks) == 1
+        assert dialog._task_table.rowCount() == 1
+
+        inference_task_id = inference_tasks[0].id
+        deadline = time.time() + 60
+        while time.time() < deadline:
+            inference_task = next(
+                task
+                for task in ml_service.list_work_item_tasks(prepared.work_item_id)
+                if task.id == inference_task_id
+            )
+            if inference_task.status in {MLTaskStatus.SUCCEEDED, MLTaskStatus.FAILED, MLTaskStatus.CANCELLED}:
+                break
+            time.sleep(0.1)
+        else:
+            raise AssertionError("Timed out waiting for the scenario prediction task to finish.")
+    finally:
         dialog.close()

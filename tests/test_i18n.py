@@ -14,6 +14,7 @@ from xenix.i18n import (
     write_saved_locale,
 )
 from xenix.services.scenario_workflow_service import PrepareScenarioWorkItemInput
+from xenix.ui.scenario_inference_dialog import ScenarioInferenceDialog
 from xenix.ui.scenario_training_dialog import ScenarioTrainingDialog
 
 
@@ -128,6 +129,23 @@ def test_main_window_language_switch_updates_ui_without_losing_form_state(
         assert training_dialog._run_again_button.text() == "重新完整运行计划"
         assert training_dialog._continue_button.text() == "继续到预测"
         training_dialog.close()
+
+        inference_dialog = ScenarioInferenceDialog(
+            template=window._scenario_template_service.get_template(prepared.template_key),
+            preparation_result=prepared,
+            work_item_service=window._work_item_service,
+            dataset_service=window._dataset_service,
+            ml_service=window._ml_service,
+            parent=window,
+        )
+        inference_dialog.show()
+        app.processEvents()
+
+        assert inference_dialog.windowTitle() == "预测"
+        assert inference_dialog._title_label.text() == "销售需求预测"
+        assert inference_dialog._manual_submit_button.text() == "开始预测"
+        assert inference_dialog._input_tabs.tabText(0) == "单条预测"
+        inference_dialog.close()
 
         en_index = settings._language_selector.findData("en_US")
         settings._language_selector.setCurrentIndex(en_index)

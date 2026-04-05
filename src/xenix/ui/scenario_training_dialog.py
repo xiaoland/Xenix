@@ -2,14 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import QEvent, QTimer, Qt
+from PySide6.QtCore import QEvent, QTimer, Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QDialog,
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QMessageBox,
     QPushButton,
     QSplitter,
     QTableWidget,
@@ -35,6 +34,8 @@ from .widgets.task_log_view import TaskLogView
 
 
 class ScenarioTrainingDialog(QDialog):
+    continue_to_prediction_requested = Signal(object)
+
     def __init__(
         self,
         template: ScenarioTemplate,
@@ -129,7 +130,7 @@ class ScenarioTrainingDialog(QDialog):
 
     def _wire_events(self) -> None:
         self._run_again_button.clicked.connect(self._start_training_run)
-        self._continue_button.clicked.connect(self._show_prediction_placeholder)
+        self._continue_button.clicked.connect(self._continue_to_prediction)
         self._step_table.itemSelectionChanged.connect(self._load_selected_step_details)
 
     def retranslate_ui(self) -> None:
@@ -332,9 +333,8 @@ class ScenarioTrainingDialog(QDialog):
             return self.tr("Params: {params}").format(params=result_payload["params"])
         return str(result_payload)
 
-    def _show_prediction_placeholder(self) -> None:
-        QMessageBox.information(
-            self,
-            self.tr("Prediction"),
-            self.tr("Window C is the next implementation slice."),
-        )
+    def _continue_to_prediction(self) -> None:
+        if self._current_snapshot is None or not self._current_snapshot.can_proceed_to_inference:
+            return
+        self.continue_to_prediction_requested.emit(self._preparation_result)
+        self.close()

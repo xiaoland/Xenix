@@ -722,17 +722,17 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../ui/main_window.py" line="92"/>
+        <location filename="../ui/main_window.py" line="94"/>
         <source>Xenix Native</source>
         <translation>Xenix Native</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="117"/>
+        <location filename="../ui/main_window.py" line="119"/>
         <source>History</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="118"/>
+        <location filename="../ui/main_window.py" line="120"/>
         <source>Inference history is the next scenario-mode surface to wire.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -905,6 +905,252 @@
     </message>
 </context>
 <context>
+    <name>ScenarioInferenceDialog</name>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="192"/>
+        <source>Prediction</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="195"/>
+        <source>Use the best trained model to predict one row or a batch file.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="198"/>
+        <source>Enter one or more rows below. The current best model is used automatically.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="201"/>
+        <source>Choose one or more files with the required input columns.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="203"/>
+        <source>Start Prediction</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="204"/>
+        <source>Choose Files</source>
+        <translation type="unfinished">Choose Files</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="205"/>
+        <source>Start Batch Prediction</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="206"/>
+        <source>Open Result</source>
+        <translation type="unfinished">Open Result</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="207"/>
+        <source>Export Result</source>
+        <translation type="unfinished">Export Result</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="208"/>
+        <source>Single Prediction</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="209"/>
+        <source>Batch File</source>
+        <translation type="unfinished">Batch File</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="210"/>
+        <source>Prediction Tasks</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="211"/>
+        <source>Task Details</source>
+        <translation type="unfinished">Task Details</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="214"/>
+        <source>Status</source>
+        <translation type="unfinished">Status</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="215"/>
+        <source>Model</source>
+        <translation type="unfinished">Model</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="216"/>
+        <source>Rows</source>
+        <translation type="unfinished">Rows</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="217"/>
+        <source>Failure</source>
+        <translation type="unfinished">Failure</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="248"/>
+        <source>Managed dataset: {dataset_name}. Prediction fields: {features}.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="264"/>
+        <source>Using best model: {model_key}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="267"/>
+        <source>Best model is not available yet.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="307"/>
+        <location filename="../ui/scenario_inference_dialog.py" line="351"/>
+        <source>Training must finish before prediction can start.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="330"/>
+        <location filename="../ui/scenario_inference_dialog.py" line="367"/>
+        <source>Prediction task &apos;{task_id}&apos; queued.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="333"/>
+        <location filename="../ui/scenario_inference_dialog.py" line="370"/>
+        <source>Queued</source>
+        <translation type="unfinished">Queued</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="333"/>
+        <source>Prediction queued successfully.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="339"/>
+        <source>Choose Prediction Files</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="341"/>
+        <source>Supported Data Files (*.csv *.xlsx *.xls);;CSV Files (*.csv);;Excel Files (*.xlsx *.xls)</source>
+        <translation type="unfinished">Supported Data Files (*.csv *.xlsx *.xls);;CSV Files (*.csv);;Excel Files (*.xlsx *.xls)</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="370"/>
+        <source>Batch prediction queued successfully.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="386"/>
+        <source>Select a prediction task to inspect its details.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="397"/>
+        <source>Task: {task_id}</source>
+        <translation type="unfinished">Task: {task_id}</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="398"/>
+        <source>Status: {status}</source>
+        <translation type="unfinished">Status: {status}</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="399"/>
+        <source>Model: {model_key}</source>
+        <translation type="unfinished">Model: {model_key}</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="400"/>
+        <source>Rows: {row_count}</source>
+        <translation type="unfinished">Rows: {row_count}</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="410"/>
+        <source>Result: {path}</source>
+        <translation type="unfinished">Result: {path}</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="424"/>
+        <source>Export Prediction Result</source>
+        <translation type="unfinished">Export Prediction Result</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="426"/>
+        <source>CSV Files (*.csv);;Excel Files (*.xlsx)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="451"/>
+        <source>Prediction result exported to &apos;{path}&apos;.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="454"/>
+        <source>Exported</source>
+        <translation type="unfinished">Exported</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="454"/>
+        <source>Prediction result exported successfully.</source>
+        <translation type="unfinished">Prediction result exported successfully.</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="465"/>
+        <source>UTF-8</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="466"/>
+        <source>UTF-8 with BOM</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="467"/>
+        <source>GBK</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="471"/>
+        <source>CSV Encoding</source>
+        <translation type="unfinished">CSV Encoding</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="472"/>
+        <source>Choose CSV encoding</source>
+        <translation type="unfinished">Choose CSV encoding</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="488"/>
+        <source>Pending</source>
+        <translation type="unfinished">Pending</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="489"/>
+        <source>Running</source>
+        <translation type="unfinished">Running</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="490"/>
+        <source>Succeeded</source>
+        <translation type="unfinished">Succeeded</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="491"/>
+        <source>Failed</source>
+        <translation type="unfinished">Failed</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_inference_dialog.py" line="492"/>
+        <source>Cancelled</source>
+        <translation type="unfinished">Cancelled</translation>
+    </message>
+</context>
+<context>
     <name>ScenarioTemplateText</name>
     <message>
         <location filename="../ui/scenario_template_text.py" line="10"/>
@@ -930,189 +1176,179 @@
 <context>
     <name>ScenarioTrainingDialog</name>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="136"/>
+        <location filename="../ui/scenario_training_dialog.py" line="137"/>
         <source>Training Dashboard</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="139"/>
+        <location filename="../ui/scenario_training_dialog.py" line="140"/>
         <source>The fixed training plan is running in the background. Review the result and continue when a best model is ready.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="141"/>
+        <location filename="../ui/scenario_training_dialog.py" line="142"/>
         <source>Run Full Plan Again</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="142"/>
+        <location filename="../ui/scenario_training_dialog.py" line="143"/>
         <source>Continue to Prediction</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="143"/>
+        <location filename="../ui/scenario_training_dialog.py" line="144"/>
         <source>Training Plan</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="144"/>
+        <location filename="../ui/scenario_training_dialog.py" line="145"/>
         <source>Task Details</source>
         <translation type="unfinished">Task Details</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="147"/>
+        <location filename="../ui/scenario_training_dialog.py" line="148"/>
         <source>Step</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="148"/>
+        <location filename="../ui/scenario_training_dialog.py" line="149"/>
         <source>Model</source>
         <translation type="unfinished">Model</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="149"/>
+        <location filename="../ui/scenario_training_dialog.py" line="150"/>
         <source>Training</source>
         <translation type="unfinished">Training</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="150"/>
+        <location filename="../ui/scenario_training_dialog.py" line="151"/>
         <source>Evaluate</source>
         <translation type="unfinished">Evaluate</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="151"/>
+        <location filename="../ui/scenario_training_dialog.py" line="152"/>
         <source>Status</source>
         <translation type="unfinished">Status</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="155"/>
+        <location filename="../ui/scenario_training_dialog.py" line="156"/>
         <source>Preparing the training plan...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="156"/>
-        <location filename="../ui/scenario_training_dialog.py" line="217"/>
+        <location filename="../ui/scenario_training_dialog.py" line="157"/>
+        <location filename="../ui/scenario_training_dialog.py" line="218"/>
         <source>Best model: waiting for evaluation.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="157"/>
-        <location filename="../ui/scenario_training_dialog.py" line="282"/>
+        <location filename="../ui/scenario_training_dialog.py" line="158"/>
+        <location filename="../ui/scenario_training_dialog.py" line="283"/>
         <source>Select a plan step to inspect task details.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="194"/>
+        <location filename="../ui/scenario_training_dialog.py" line="195"/>
         <source>Training finished. {succeeded_count} plan step(s) succeeded and the best model is ready.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="201"/>
+        <location filename="../ui/scenario_training_dialog.py" line="202"/>
         <source>Training finished with partial failure. {succeeded_count} step(s) succeeded and {failed_count} step(s) failed.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="209"/>
+        <location filename="../ui/scenario_training_dialog.py" line="210"/>
         <source>Training is running. {succeeded_count} completed step(s) so far.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="237"/>
+        <location filename="../ui/scenario_training_dialog.py" line="238"/>
         <source>Best model: {model_key} ({metric_name}={metric_value})</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="242"/>
+        <location filename="../ui/scenario_training_dialog.py" line="243"/>
         <source>Best model: {model_key}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="249"/>
+        <location filename="../ui/scenario_training_dialog.py" line="250"/>
         <source>Step {number}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="252"/>
+        <location filename="../ui/scenario_training_dialog.py" line="253"/>
         <source>Waiting</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="293"/>
+        <location filename="../ui/scenario_training_dialog.py" line="294"/>
         <source>Task: {task_id}</source>
         <translation type="unfinished">Task: {task_id}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="294"/>
+        <location filename="../ui/scenario_training_dialog.py" line="295"/>
         <source>Model: {model_key}</source>
         <translation type="unfinished">Model: {model_key}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="295"/>
+        <location filename="../ui/scenario_training_dialog.py" line="296"/>
         <source>Status: {status}</source>
         <translation type="unfinished">Status: {status}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="298"/>
+        <location filename="../ui/scenario_training_dialog.py" line="299"/>
         <source>Result: {summary}</source>
         <translation type="unfinished">Result: {summary}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="300"/>
+        <location filename="../ui/scenario_training_dialog.py" line="301"/>
         <source>Failure: {summary}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="306"/>
+        <location filename="../ui/scenario_training_dialog.py" line="307"/>
         <source>Pending</source>
         <translation type="unfinished">Pending</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="307"/>
-        <location filename="../ui/scenario_training_dialog.py" line="317"/>
+        <location filename="../ui/scenario_training_dialog.py" line="308"/>
+        <location filename="../ui/scenario_training_dialog.py" line="318"/>
         <source>Running</source>
         <translation type="unfinished">Running</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="308"/>
-        <location filename="../ui/scenario_training_dialog.py" line="318"/>
+        <location filename="../ui/scenario_training_dialog.py" line="309"/>
+        <location filename="../ui/scenario_training_dialog.py" line="319"/>
         <source>Succeeded</source>
         <translation type="unfinished">Succeeded</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="309"/>
-        <location filename="../ui/scenario_training_dialog.py" line="319"/>
+        <location filename="../ui/scenario_training_dialog.py" line="310"/>
+        <location filename="../ui/scenario_training_dialog.py" line="320"/>
         <source>Failed</source>
         <translation type="unfinished">Failed</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="310"/>
+        <location filename="../ui/scenario_training_dialog.py" line="311"/>
         <source>Cancelled</source>
         <translation type="unfinished">Cancelled</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="326"/>
+        <location filename="../ui/scenario_training_dialog.py" line="327"/>
         <source>metric</source>
         <translation type="unfinished">metric</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="330"/>
+        <location filename="../ui/scenario_training_dialog.py" line="331"/>
         <source>Best params: {params}</source>
         <translation type="unfinished">Best params: {params}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="332"/>
+        <location filename="../ui/scenario_training_dialog.py" line="333"/>
         <source>Params: {params}</source>
         <translation type="unfinished">Params: {params}</translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="338"/>
-        <source>Prediction</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="339"/>
-        <source>Window C is the next implementation slice.</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>

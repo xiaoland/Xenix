@@ -18,6 +18,7 @@ from .inference_workspace import InferenceWorkspace
 from .ml_workspace import MLWorkspace
 from .scenario_data_preparation_dialog import ScenarioDataPreparationDialog
 from .scenario_home_view import ScenarioHomeView
+from .scenario_inference_dialog import ScenarioInferenceDialog
 from .scenario_training_dialog import ScenarioTrainingDialog
 from .settings_dialog import SettingsDialog
 
@@ -50,6 +51,7 @@ class MainWindow(QMainWindow):
         self._settings_dialog: SettingsDialog | None = None
         self._scenario_data_preparation_dialog: ScenarioDataPreparationDialog | None = None
         self._scenario_training_dialog: ScenarioTrainingDialog | None = None
+        self._scenario_inference_dialog: ScenarioInferenceDialog | None = None
 
         self._dataset_workspace = DatasetWorkspace(
             project_service=self._project_service,
@@ -145,6 +147,21 @@ class MainWindow(QMainWindow):
             ml_service=self._ml_service,
             parent=self,
         )
+        self._scenario_training_dialog.continue_to_prediction_requested.connect(self._open_inference_after_training)
         self._scenario_training_dialog.show()
         self._scenario_training_dialog.raise_()
         self._scenario_training_dialog.activateWindow()
+
+    def _open_inference_after_training(self, preparation_result) -> None:
+        template = self._scenario_template_service.get_template(preparation_result.template_key)
+        self._scenario_inference_dialog = ScenarioInferenceDialog(
+            template=template,
+            preparation_result=preparation_result,
+            work_item_service=self._work_item_service,
+            dataset_service=self._dataset_service,
+            ml_service=self._ml_service,
+            parent=self,
+        )
+        self._scenario_inference_dialog.show()
+        self._scenario_inference_dialog.raise_()
+        self._scenario_inference_dialog.activateWindow()
