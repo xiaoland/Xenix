@@ -12,43 +12,49 @@
         <translation type="vanished">特征列</translation>
     </message>
     <message>
+        <location filename="../ui/widgets/column_selection.py" line="76"/>
+        <source>Choose one prediction target, then select one or more input columns.</source>
+        <translation>先选择一个预测目标，再选择一个或多个输入列。</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="80"/>
+        <source>Select target columns and one or more input columns.</source>
+        <translation>选择目标列和一个或多个输入列。</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="81"/>
         <source>Target Columns</source>
-        <translation type="vanished">目标列</translation>
+        <translation>目标列</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="85"/>
         <source>Choose one prediction target, then add one or more input columns.</source>
-        <translation>先选择一个预测目标，再加入一个或多个输入列。</translation>
+        <translation type="vanished">先选择一个预测目标，再加入一个或多个输入列。</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="86"/>
+        <location filename="../ui/widgets/column_selection.py" line="82"/>
         <source>Input Columns</source>
         <translation>输入列</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="87"/>
+        <location filename="../ui/widgets/column_selection.py" line="78"/>
         <source>Prediction Target</source>
         <translation>预测目标</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="88"/>
         <source>Add</source>
-        <translation>添加</translation>
+        <translation type="vanished">添加</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="89"/>
         <source>Remove</source>
-        <translation>移除</translation>
+        <translation type="vanished">移除</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="134"/>
         <source>Choose target column</source>
-        <translation>选择目标列</translation>
+        <translation type="vanished">选择目标列</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="147"/>
         <source>Choose input column</source>
-        <translation>选择输入列</translation>
+        <translation type="vanished">选择输入列</translation>
     </message>
 </context>
 <context>

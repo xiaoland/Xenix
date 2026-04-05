@@ -88,10 +88,10 @@ def test_history_button_opens_history_dialog(
         window.close()
 
 
-def test_column_selection_widget_uses_combo_driven_target_and_feature_selection(
+def test_column_selection_widget_uses_checkbox_groups_for_single_target_selection(
     app: QApplication,
 ) -> None:
-    widget = ColumnSelectionWidget()
+    widget = ColumnSelectionWidget(single_target_selection=True)
     widget.set_columns(
         [
             DatasetColumnMetadata(name="feature_a", kind=DatasetColumnKind.NUMERIC, nullable=False),
@@ -103,25 +103,22 @@ def test_column_selection_widget_uses_combo_driven_target_and_feature_selection(
         widget.show()
         app.processEvents()
 
-        widget._target_selector.setCurrentIndex(widget._target_selector.findData("target"))
-        widget._feature_picker.setCurrentIndex(widget._feature_picker.findData("feature_a"))
-        widget._add_selected_feature()
-        widget._feature_picker.setCurrentIndex(widget._feature_picker.findData("feature_b"))
-        widget._add_selected_feature()
+        widget._target_checkboxes["target"].setChecked(True)
+        widget._feature_checkboxes["feature_a"].setChecked(True)
+        widget._feature_checkboxes["feature_b"].setChecked(True)
         app.processEvents()
 
         assert widget.selected_target_columns() == ["target"]
         assert widget.selected_feature_columns() == ["feature_a", "feature_b"]
 
-        widget._target_selector.setCurrentIndex(widget._target_selector.findData("feature_a"))
+        widget._target_checkboxes["feature_a"].setChecked(True)
         app.processEvents()
 
         assert widget.selected_target_columns() == ["feature_a"]
         assert widget.selected_feature_columns() == ["feature_b"]
-        assert widget._feature_picker.findData("feature_a") == -1
+        assert widget._feature_checkboxes["feature_a"].isChecked() is False
 
-        widget._selected_feature_list.setCurrentRow(0)
-        widget._remove_selected_feature()
+        widget._feature_checkboxes["feature_b"].setChecked(False)
         app.processEvents()
 
         assert widget.selected_feature_columns() == []

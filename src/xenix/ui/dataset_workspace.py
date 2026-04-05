@@ -57,7 +57,7 @@ class DatasetWorkspace(QWidget):
         self._create_button = QPushButton()
         self._drop_zone = FileDropZone()
         self._summary_widget = DatasetSummaryWidget()
-        self._column_selection = ColumnSelectionWidget()
+        self._column_selection = ColumnSelectionWidget(single_target_selection=False)
         self._message_label = QLabel()
         self._message_label.setWordWrap(True)
 

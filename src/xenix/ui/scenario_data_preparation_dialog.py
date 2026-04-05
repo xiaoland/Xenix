@@ -62,7 +62,7 @@ class ScenarioDataPreparationDialog(QDialog):
         self._drop_zone = FileDropZone()
         self._choose_file_button = QPushButton()
         self._summary_widget = DatasetSummaryWidget()
-        self._column_selection = ColumnSelectionWidget()
+        self._column_selection = ColumnSelectionWidget(single_target_selection=True)
         self._busy_label = QLabel()
         self._busy_indicator = QProgressBar()
         self._message_label = QLabel()

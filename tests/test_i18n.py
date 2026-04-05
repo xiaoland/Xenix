@@ -97,9 +97,9 @@ def test_main_window_language_switch_updates_ui_without_losing_form_state(
         assert window._scenario_data_preparation_dialog._title_label.text() == "销售需求预测"
         assert (
             window._scenario_data_preparation_dialog._column_selection._hint_label.text()
-            == "先选择一个预测目标，再加入一个或多个输入列。"
+            == "先选择一个预测目标，再选择一个或多个输入列。"
         )
-        assert window._scenario_data_preparation_dialog._column_selection._add_feature_button.text() == "添加"
+        assert window._scenario_data_preparation_dialog._column_selection._target_title_label.text() == "预测目标"
         window._scenario_data_preparation_dialog.close()
 
         dataset_file = tmp_path / "demand.csv"

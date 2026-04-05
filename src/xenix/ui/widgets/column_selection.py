@@ -2,33 +2,40 @@ from __future__ import annotations
 
 from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import (
-    QComboBox,
+    QCheckBox,
     QFrame,
     QHBoxLayout,
     QLabel,
-    QListWidget,
-    QListWidgetItem,
-    QPushButton,
+    QScrollArea,
     QVBoxLayout,
+    QWidget,
 )
 
 from ...services.dataset_inspection import DatasetColumnMetadata
 
 
 class ColumnSelectionWidget(QFrame):
-    def __init__(self, parent: QFrame | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        single_target_selection: bool = False,
+        parent: QFrame | None = None,
+    ) -> None:
         super().__init__(parent)
         self.setFrameShape(QFrame.StyledPanel)
+        self._single_target_selection = single_target_selection
         self._columns: list[DatasetColumnMetadata] = []
+        self._feature_checkboxes: dict[str, QCheckBox] = {}
+        self._target_checkboxes: dict[str, QCheckBox] = {}
+        self._syncing_selection = False
 
         self._hint_label = QLabel()
         self._feature_title_label = QLabel()
         self._target_title_label = QLabel()
-        self._feature_picker = QComboBox()
-        self._add_feature_button = QPushButton()
-        self._selected_feature_list = QListWidget()
-        self._remove_feature_button = QPushButton()
-        self._target_selector = QComboBox()
+        self._feature_panel = QWidget()
+        self._feature_layout = QVBoxLayout(self._feature_panel)
+        self._target_panel = QWidget()
+        self._target_layout = QVBoxLayout(self._target_panel)
 
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(12, 12, 12, 12)
@@ -39,58 +46,40 @@ class ColumnSelectionWidget(QFrame):
 
         columns_layout = QHBoxLayout()
         columns_layout.setSpacing(12)
-
-        self._selected_feature_list.setSelectionMode(QListWidget.SingleSelection)
-
-        columns_layout.addLayout(self._build_feature_group())
-        columns_layout.addLayout(self._build_target_group())
+        columns_layout.addLayout(self._build_checkbox_group(self._feature_title_label, self._feature_panel))
+        columns_layout.addLayout(self._build_checkbox_group(self._target_title_label, self._target_panel))
         root_layout.addLayout(columns_layout)
 
-        self._wire_events()
+        self._feature_layout.setContentsMargins(0, 0, 0, 0)
+        self._feature_layout.setSpacing(6)
+        self._target_layout.setContentsMargins(0, 0, 0, 0)
+        self._target_layout.setSpacing(6)
+
         self.retranslate_ui()
-        self._refresh_action_state()
 
-    def _build_feature_group(self) -> QVBoxLayout:
+    def _build_checkbox_group(self, title_label: QLabel, panel: QWidget) -> QVBoxLayout:
         layout = QVBoxLayout()
-        self._feature_title_label.setAlignment(Qt.AlignLeft)
-        self._feature_title_label.setStyleSheet("font-weight: 600;")
-        layout.addWidget(self._feature_title_label)
+        title_label.setAlignment(Qt.AlignLeft)
+        title_label.setStyleSheet("font-weight: 600;")
+        layout.addWidget(title_label)
 
-        picker_row = QHBoxLayout()
-        picker_row.setSpacing(8)
-        picker_row.addWidget(self._feature_picker, 1)
-        picker_row.addWidget(self._add_feature_button, 0)
-        layout.addLayout(picker_row)
-        layout.addWidget(self._selected_feature_list, 1)
-        layout.addWidget(self._remove_feature_button, 0, alignment=Qt.AlignLeft)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setWidget(panel)
+        layout.addWidget(scroll, 1)
         return layout
-
-    def _build_target_group(self) -> QVBoxLayout:
-        layout = QVBoxLayout()
-        self._target_title_label.setAlignment(Qt.AlignLeft)
-        self._target_title_label.setStyleSheet("font-weight: 600;")
-        layout.addWidget(self._target_title_label)
-        layout.addWidget(self._target_selector)
-        layout.addStretch(1)
-        return layout
-
-    def _wire_events(self) -> None:
-        self._add_feature_button.clicked.connect(self._add_selected_feature)
-        self._remove_feature_button.clicked.connect(self._remove_selected_feature)
-        self._feature_picker.currentIndexChanged.connect(self._refresh_action_state)
-        self._selected_feature_list.itemSelectionChanged.connect(self._refresh_action_state)
-        self._target_selector.currentIndexChanged.connect(self._on_target_changed)
 
     def retranslate_ui(self) -> None:
-        self._hint_label.setText(self.tr("Choose one prediction target, then add one or more input columns."))
+        if self._single_target_selection:
+            self._hint_label.setText(
+                self.tr("Choose one prediction target, then select one or more input columns.")
+            )
+            self._target_title_label.setText(self.tr("Prediction Target"))
+        else:
+            self._hint_label.setText(self.tr("Select target columns and one or more input columns."))
+            self._target_title_label.setText(self.tr("Target Columns"))
         self._feature_title_label.setText(self.tr("Input Columns"))
-        self._target_title_label.setText(self.tr("Prediction Target"))
-        self._add_feature_button.setText(self.tr("Add"))
-        self._remove_feature_button.setText(self.tr("Remove"))
-        self._reload_target_selector()
-        self._reload_feature_picker()
-        self._refresh_selected_feature_list()
-        self._refresh_action_state()
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == QEvent.LanguageChange:
@@ -99,10 +88,10 @@ class ColumnSelectionWidget(QFrame):
 
     def clear(self) -> None:
         self._columns = []
-        self._selected_feature_list.clear()
-        self._feature_picker.clear()
-        self._target_selector.clear()
-        self._refresh_action_state()
+        self._feature_checkboxes = {}
+        self._target_checkboxes = {}
+        self._clear_checkbox_layout(self._feature_layout)
+        self._clear_checkbox_layout(self._target_layout)
 
     def set_columns(
         self,
@@ -112,93 +101,87 @@ class ColumnSelectionWidget(QFrame):
     ) -> None:
         self.clear()
         self._columns = list(columns)
-        selected_target = next(iter(target_columns or []), None)
-        selected_features = [name for name in (feature_columns or []) if name != selected_target]
-        self._reload_target_selector(selected_target=selected_target)
-        self._refresh_selected_feature_list(selected_features=selected_features)
-        self._reload_feature_picker()
-        self._refresh_action_state()
+        available_names = {column.name for column in self._columns}
+
+        target_names = [name for name in (target_columns or []) if name in available_names]
+        if self._single_target_selection and len(target_names) > 1:
+            target_names = target_names[:1]
+        target_name_set = set(target_names)
+        feature_name_set = {
+            name
+            for name in (feature_columns or [])
+            if name in available_names and name not in target_name_set
+        }
+
+        for column in self._columns:
+            feature_checkbox = QCheckBox(self._column_label(column))
+            feature_checkbox.setChecked(column.name in feature_name_set)
+            feature_checkbox.toggled.connect(
+                lambda checked, column_name=column.name: self._on_feature_toggled(column_name, checked)
+            )
+            self._feature_layout.addWidget(feature_checkbox)
+            self._feature_checkboxes[column.name] = feature_checkbox
+
+            target_checkbox = QCheckBox(self._column_label(column))
+            target_checkbox.setChecked(column.name in target_name_set)
+            target_checkbox.toggled.connect(
+                lambda checked, column_name=column.name: self._on_target_toggled(column_name, checked)
+            )
+            self._target_layout.addWidget(target_checkbox)
+            self._target_checkboxes[column.name] = target_checkbox
+
+        self._feature_layout.addStretch(1)
+        self._target_layout.addStretch(1)
 
     def selected_feature_columns(self) -> list[str]:
-        return [str(self._selected_feature_list.item(index).data(Qt.UserRole)) for index in range(self._selected_feature_list.count())]
+        return [
+            column.name
+            for column in self._columns
+            if self._feature_checkboxes.get(column.name) is not None
+            and self._feature_checkboxes[column.name].isChecked()
+        ]
 
     def selected_target_columns(self) -> list[str]:
-        target = self._selected_target_name()
-        return [target] if target is not None else []
+        return [
+            column.name
+            for column in self._columns
+            if self._target_checkboxes.get(column.name) is not None
+            and self._target_checkboxes[column.name].isChecked()
+        ]
 
-    def _reload_target_selector(self, *, selected_target: str | None = None) -> None:
-        if selected_target is None:
-            selected_target = self._selected_target_name()
-        self._target_selector.blockSignals(True)
-        self._target_selector.clear()
-        self._target_selector.addItem(self.tr("Choose target column"), None)
-        for column in self._columns:
-            self._target_selector.addItem(self._column_label(column), column.name)
-        index = self._target_selector.findData(selected_target)
-        self._target_selector.setCurrentIndex(index if index >= 0 else 0)
-        self._target_selector.blockSignals(False)
-
-    def _reload_feature_picker(self) -> None:
-        selected_features = set(self.selected_feature_columns())
-        selected_target = self._selected_target_name()
-        current_value = self._feature_picker.currentData()
-        self._feature_picker.blockSignals(True)
-        self._feature_picker.clear()
-        self._feature_picker.addItem(self.tr("Choose input column"), None)
-        for column in self._columns:
-            if column.name == selected_target or column.name in selected_features:
-                continue
-            self._feature_picker.addItem(self._column_label(column), column.name)
-        index = self._feature_picker.findData(current_value)
-        self._feature_picker.setCurrentIndex(index if index >= 0 else 0)
-        self._feature_picker.blockSignals(False)
-
-    def _refresh_selected_feature_list(self, *, selected_features: list[str] | None = None) -> None:
-        if selected_features is None:
-            selected_features = self.selected_feature_columns()
-        selected_target = self._selected_target_name()
-        feature_names = [name for name in selected_features if name != selected_target]
-        self._selected_feature_list.clear()
-        for feature_name in feature_names:
-            column = next((item for item in self._columns if item.name == feature_name), None)
-            if column is None:
-                continue
-            feature_item = QListWidgetItem(self._column_label(column))
-            feature_item.setData(Qt.UserRole, column.name)
-            self._selected_feature_list.addItem(feature_item)
-
-    def _add_selected_feature(self) -> None:
-        feature_name = self._feature_picker.currentData()
-        if feature_name is None:
+    def _on_feature_toggled(self, column_name: str, checked: bool) -> None:
+        if self._syncing_selection or not checked:
             return
-        selected_features = self.selected_feature_columns()
-        selected_features.append(str(feature_name))
-        self._refresh_selected_feature_list(selected_features=selected_features)
-        self._reload_feature_picker()
-        self._refresh_action_state()
-
-    def _remove_selected_feature(self) -> None:
-        selected_item = self._selected_feature_list.currentItem()
-        if selected_item is None:
+        target_checkbox = self._target_checkboxes.get(column_name)
+        if target_checkbox is None or not target_checkbox.isChecked():
             return
-        feature_name = str(selected_item.data(Qt.UserRole))
-        selected_features = [name for name in self.selected_feature_columns() if name != feature_name]
-        self._refresh_selected_feature_list(selected_features=selected_features)
-        self._reload_feature_picker()
-        self._refresh_action_state()
+        self._syncing_selection = True
+        target_checkbox.setChecked(False)
+        self._syncing_selection = False
 
-    def _on_target_changed(self) -> None:
-        self._refresh_selected_feature_list()
-        self._reload_feature_picker()
-        self._refresh_action_state()
+    def _on_target_toggled(self, column_name: str, checked: bool) -> None:
+        if self._syncing_selection or not checked:
+            return
 
-    def _selected_target_name(self) -> str | None:
-        current_value = self._target_selector.currentData()
-        return str(current_value) if current_value is not None else None
+        self._syncing_selection = True
+        try:
+            if self._single_target_selection:
+                for other_name, checkbox in self._target_checkboxes.items():
+                    if other_name != column_name and checkbox.isChecked():
+                        checkbox.setChecked(False)
 
-    def _refresh_action_state(self) -> None:
-        self._add_feature_button.setEnabled(self._feature_picker.currentData() is not None)
-        self._remove_feature_button.setEnabled(self._selected_feature_list.currentItem() is not None)
+            feature_checkbox = self._feature_checkboxes.get(column_name)
+            if feature_checkbox is not None and feature_checkbox.isChecked():
+                feature_checkbox.setChecked(False)
+        finally:
+            self._syncing_selection = False
+
+    def _clear_checkbox_layout(self, layout: QVBoxLayout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
 
     def _column_label(self, column: DatasetColumnMetadata) -> str:
         return f"{column.name} ({column.kind.value})"

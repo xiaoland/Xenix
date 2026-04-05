@@ -12,42 +12,28 @@
         <translation type="vanished">Feature Columns</translation>
     </message>
     <message>
-        <source>Target Columns</source>
-        <translation type="vanished">Target Columns</translation>
-    </message>
-    <message>
-        <location filename="../ui/widgets/column_selection.py" line="85"/>
-        <source>Choose one prediction target, then add one or more input columns.</source>
+        <location filename="../ui/widgets/column_selection.py" line="76"/>
+        <source>Choose one prediction target, then select one or more input columns.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="86"/>
+        <location filename="../ui/widgets/column_selection.py" line="80"/>
+        <source>Select target columns and one or more input columns.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="81"/>
+        <source>Target Columns</source>
+        <translation>Target Columns</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="82"/>
         <source>Input Columns</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="87"/>
+        <location filename="../ui/widgets/column_selection.py" line="78"/>
         <source>Prediction Target</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/widgets/column_selection.py" line="88"/>
-        <source>Add</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/widgets/column_selection.py" line="89"/>
-        <source>Remove</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/widgets/column_selection.py" line="134"/>
-        <source>Choose target column</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/widgets/column_selection.py" line="147"/>
-        <source>Choose input column</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
