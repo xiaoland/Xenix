@@ -2,6 +2,69 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="zh_CN">
 <context>
+    <name>AnalysisScenarioText</name>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="10"/>
+        <source>Prediction</source>
+        <translation>预测</translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="12"/>
+        <source>Classification</source>
+        <translation>分类</translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="14"/>
+        <source>Clustering</source>
+        <translation>聚类</translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="16"/>
+        <source>Anomaly Detection</source>
+        <translation>异常检测</translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="18"/>
+        <source>Key Driver Analysis</source>
+        <translation>关键因素分析</translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="24"/>
+        <source>Prepare a historical dataset, train forecasting models, and predict numeric business outcomes.</source>
+        <translation>准备历史数据集，训练预测模型，并预测数值型业务结果。</translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="29"/>
+        <source>Prepare labeled data, train classification models, and predict discrete business outcomes.</source>
+        <translation>准备带标签的数据，训练分类模型，并预测离散型业务结果。</translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="34"/>
+        <source>Group similar entities into segments and compare segment-level characteristics.</source>
+        <translation>将相似对象分组为不同区段，并比较各区段特征。</translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="39"/>
+        <source>Detect unusual records, rank anomaly severity, and inspect abnormal patterns.</source>
+        <translation>检测异常记录，对异常严重程度排序，并查看异常模式。</translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="44"/>
+        <source>Rank business drivers, inspect impact direction, and explain influential factors.</source>
+        <translation>对业务驱动因素进行排序，查看影响方向，并解释关键影响因素。</translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="53"/>
+        <source>Available Now</source>
+        <translation>当前可用</translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="54"/>
+        <source>Planned</source>
+        <translation>规划中</translation>
+    </message>
+</context>
+<context>
     <name>ColumnSelectionWidget</name>
     <message>
         <source>Select feature columns and target columns for the current work item.</source>
@@ -976,7 +1039,7 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../ui/main_window.py" line="99"/>
+        <location filename="../ui/main_window.py" line="105"/>
         <source>Xenix Native</source>
         <translation>Xenix 原生版</translation>
     </message>
@@ -1064,6 +1127,48 @@
     </message>
 </context>
 <context>
+    <name>PreviousModelFlowDialog</name>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="52"/>
+        <location filename="../ui/previous_model_flow_dialog.py" line="53"/>
+        <source>Choose Previous Model</source>
+        <translation>选择过往模型</translation>
+    </message>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="55"/>
+        <source>This 2.0 entry reserves the saved-model workflow for the selected analysis scenario.</source>
+        <translation>这个 2.0 入口为所选分析场景预留了过往模型工作流。</translation>
+    </message>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="58"/>
+        <source>Selected scenario: {scenario_name}</source>
+        <translation>已选场景：{scenario_name}</translation>
+    </message>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="65"/>
+        <source>Saved-model browsing for this scenario will be connected in the next work package.
+
+Current scenario description: {description}</source>
+        <translation>这个场景的过往模型浏览能力会在下一个工作包接入。
+
+当前场景说明：{description}</translation>
+    </message>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="73"/>
+        <source>This analysis scenario stays in the planned set for the current build.
+
+Current scenario description: {description}</source>
+        <translation>这个分析场景在当前版本中仍属于规划项。
+
+当前场景说明：{description}</translation>
+    </message>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="78"/>
+        <source>Close</source>
+        <translation>关闭</translation>
+    </message>
+</context>
+<context>
     <name>ScenarioDataPreparationDialog</name>
     <message>
         <location filename="../ui/scenario_data_preparation_dialog.py" line="124"/>
@@ -1139,27 +1244,71 @@
 <context>
     <name>ScenarioHomeView</name>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="78"/>
+        <location filename="../ui/scenario_home_view.py" line="141"/>
         <source>Xenix native ML workspace</source>
         <translation>Xenix 原生机器学习工作台</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="81"/>
+        <location filename="../ui/scenario_home_view.py" line="144"/>
         <source>Choose a guided scenario to prepare data, train models, and run local prediction without technical tabs.</source>
         <translation>选择一个引导式场景来准备数据、训练模型并执行本地预测，无需进入技术标签页。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="84"/>
-        <source>Scenario Templates</source>
-        <translation>场景模板</translation>
+        <location filename="../ui/scenario_home_view.py" line="147"/>
+        <source>Start</source>
+        <translation>开始</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="85"/>
+        <location filename="../ui/scenario_home_view.py" line="148"/>
+        <source>Analysis Scenarios</source>
+        <translation>分析场景</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_home_view.py" line="152"/>
+        <source>New Task</source>
+        <translation>新任务</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_home_view.py" line="153"/>
+        <source>Choose Previous Model</source>
+        <translation>选择过往模型</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_home_view.py" line="155"/>
+        <source>Prepare data, train a fresh model set, and continue through the guided workflow.</source>
+        <translation>准备数据，训练一组新的模型，并继续完成引导式流程。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_home_view.py" line="158"/>
+        <source>Start from a saved-model route and keep the interaction focused on model reuse.</source>
+        <translation>从过往模型路径开始，并让交互聚焦在模型复用上。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_home_view.py" line="192"/>
+        <source>Choose an analysis scenario for a new guided task.</source>
+        <translation>选择一个分析场景来创建新的引导式任务。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_home_view.py" line="196"/>
+        <source>Choose an analysis scenario for the saved-model route.</source>
+        <translation>选择一个分析场景来进入过往模型路径。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_home_view.py" line="200"/>
+        <source>Start by choosing a new task or the saved-model route.</source>
+        <translation>请先选择新任务或过往模型路径。</translation>
+    </message>
+    <message>
+        <source>Scenario Templates</source>
+        <translation type="vanished">场景模板</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_home_view.py" line="149"/>
         <source>History</source>
         <translation>历史</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="86"/>
+        <location filename="../ui/scenario_home_view.py" line="150"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>

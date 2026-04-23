@@ -1,4 +1,6 @@
+import shutil
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from PySide6.QtWidgets import QApplication
@@ -26,6 +28,22 @@ def app(monkeypatch) -> QApplication:
     if instance is not None:
         return instance
     return QApplication([])
+
+
+@pytest.fixture()
+def tmp_path() -> Path:
+    root = Path.cwd() / ".codex-test-tmp"
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / uuid4().hex
+    path.mkdir()
+    try:
+        yield path
+    finally:
+        shutil.rmtree(path, ignore_errors=True)
+        try:
+            root.rmdir()
+        except OSError:
+            pass
 
 
 def test_locale_preference_round_trips_and_falls_back_to_supported_system_locale(
@@ -73,6 +91,7 @@ def test_main_window_language_switch_updates_ui_without_losing_form_state(
         assert window.windowTitle() == "Xenix Native"
         assert settings._open_logs_button.text() == "Open log directory"
         assert window._home_view._title_label.text() == "Xenix native ML workspace"
+        assert window._home_view._cards_label.text() == "Analysis Scenarios"
         assert window._home_view._settings_button.text() == "Settings"
         assert window._home_view._history_button.text() == "History"
 
@@ -82,15 +101,17 @@ def test_main_window_language_switch_updates_ui_without_losing_form_state(
 
         assert window.windowTitle() == "Xenix 原生版"
         assert settings._open_logs_button.text() == "打开日志目录"
+        assert window._home_view._title_label.text() == "Xenix 原生机器学习工作台"
+        assert window._home_view._cards_label.text() == "分析场景"
         assert window._home_view._settings_button.text() == "设置"
         assert window._home_view._history_button.text() == "历史"
-        assert window._home_view._scenario_buttons["sales_demand_forecast.v1"].text() == "销售需求预测"
+        assert window._home_view._analysis_buttons["prediction"].text() == "预测"
         assert window._dataset_workspace._create_button.text() == "创建工作项"
         assert window._dataset_workspace._dataset_name_input.text() == "customer-data"
         assert window._dataset_workspace._work_item_name_input.text() == "baseline-run"
         assert read_saved_locale(paths) == "zh_CN"
 
-        window._home_view._scenario_buttons["sales_demand_forecast.v1"].click()
+        window._home_view._analysis_buttons["prediction"].click()
         app.processEvents()
         assert window._scenario_data_preparation_dialog is not None
         assert window._scenario_data_preparation_dialog.windowTitle() == "准备场景数据"

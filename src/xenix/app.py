@@ -12,6 +12,7 @@ from .exceptions import install_exception_hooks
 from .i18n import TranslationManager
 from .logging import setup_logging
 from .resources import package_resource_path
+from .services.analysis_scenario_service import AnalysisScenarioService
 from .services.dataset_service import DatasetService
 from .services.inference_history_service import InferenceHistoryService
 from .services.ml_service import MLService
@@ -59,6 +60,7 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
         ml_task_service,
     )
     scenario_template_service = ScenarioTemplateService()
+    analysis_scenario_service = AnalysisScenarioService()
     scenario_workflow_service = ScenarioWorkflowService(
         project_service=project_service,
         work_item_service=work_item_service,
@@ -81,6 +83,7 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
         dataset_service=dataset_service,
         ml_service=ml_service,
         inference_history_service=inference_history_service,
+        analysis_scenario_service=analysis_scenario_service,
         scenario_template_service=scenario_template_service,
         scenario_workflow_service=scenario_workflow_service,
     )

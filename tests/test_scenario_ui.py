@@ -1,6 +1,8 @@
+import shutil
 import threading
 import time
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from PySide6.QtWidgets import QApplication
@@ -40,7 +42,23 @@ def app(monkeypatch) -> QApplication:
     return QApplication([])
 
 
-def test_scenario_home_card_opens_data_preparation_dialog(
+@pytest.fixture()
+def tmp_path() -> Path:
+    root = Path.cwd() / ".codex-test-tmp"
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / uuid4().hex
+    path.mkdir()
+    try:
+        yield path
+    finally:
+        shutil.rmtree(path, ignore_errors=True)
+        try:
+            root.rmdir()
+        except OSError:
+            pass
+
+
+def test_prediction_scenario_card_opens_data_preparation_dialog(
     monkeypatch,
     tmp_path: Path,
     app: QApplication,
@@ -51,7 +69,11 @@ def test_scenario_home_card_opens_data_preparation_dialog(
 
     _app, window = build_main_window(show=False)
     try:
-        window._home_view._scenario_buttons["sales_demand_forecast.v1"].click()
+        assert window._home_view._analysis_buttons["prediction"].isEnabled() is True
+        assert window._home_view._analysis_buttons["classification"].isEnabled() is True
+        assert window._home_view._analysis_buttons["clustering"].isEnabled() is False
+
+        window._home_view._analysis_buttons["prediction"].click()
         app.processEvents()
 
         assert isinstance(window._scenario_data_preparation_dialog, ScenarioDataPreparationDialog)

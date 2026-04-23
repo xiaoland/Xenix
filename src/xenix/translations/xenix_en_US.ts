@@ -2,6 +2,69 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="en_US">
 <context>
+    <name>AnalysisScenarioText</name>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="10"/>
+        <source>Prediction</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="12"/>
+        <source>Classification</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="14"/>
+        <source>Clustering</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="16"/>
+        <source>Anomaly Detection</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="18"/>
+        <source>Key Driver Analysis</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="24"/>
+        <source>Prepare a historical dataset, train forecasting models, and predict numeric business outcomes.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="29"/>
+        <source>Prepare labeled data, train classification models, and predict discrete business outcomes.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="34"/>
+        <source>Group similar entities into segments and compare segment-level characteristics.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="39"/>
+        <source>Detect unusual records, rank anomaly severity, and inspect abnormal patterns.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="44"/>
+        <source>Rank business drivers, inspect impact direction, and explain influential factors.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="53"/>
+        <source>Available Now</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/analysis_scenario_text.py" line="54"/>
+        <source>Planned</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>ColumnSelectionWidget</name>
     <message>
         <source>Select feature columns and target columns for the current work item.</source>
@@ -956,7 +1019,7 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../ui/main_window.py" line="99"/>
+        <location filename="../ui/main_window.py" line="105"/>
         <source>Xenix Native</source>
         <translation>Xenix Native</translation>
     </message>
@@ -1025,6 +1088,44 @@
 {details}</source>
         <translation type="vanished">Unable to switch the application language.
 {details}</translation>
+    </message>
+</context>
+<context>
+    <name>PreviousModelFlowDialog</name>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="52"/>
+        <location filename="../ui/previous_model_flow_dialog.py" line="53"/>
+        <source>Choose Previous Model</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="55"/>
+        <source>This 2.0 entry reserves the saved-model workflow for the selected analysis scenario.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="58"/>
+        <source>Selected scenario: {scenario_name}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="65"/>
+        <source>Saved-model browsing for this scenario will be connected in the next work package.
+
+Current scenario description: {description}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="73"/>
+        <source>This analysis scenario stays in the planned set for the current build.
+
+Current scenario description: {description}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="78"/>
+        <source>Close</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -1103,27 +1204,67 @@
 <context>
     <name>ScenarioHomeView</name>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="78"/>
+        <location filename="../ui/scenario_home_view.py" line="141"/>
         <source>Xenix native ML workspace</source>
         <translation type="unfinished">Xenix native ML workspace</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="81"/>
+        <location filename="../ui/scenario_home_view.py" line="144"/>
         <source>Choose a guided scenario to prepare data, train models, and run local prediction without technical tabs.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="84"/>
-        <source>Scenario Templates</source>
+        <location filename="../ui/scenario_home_view.py" line="147"/>
+        <source>Start</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="85"/>
+        <location filename="../ui/scenario_home_view.py" line="148"/>
+        <source>Analysis Scenarios</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_home_view.py" line="152"/>
+        <source>New Task</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_home_view.py" line="153"/>
+        <source>Choose Previous Model</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_home_view.py" line="155"/>
+        <source>Prepare data, train a fresh model set, and continue through the guided workflow.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_home_view.py" line="158"/>
+        <source>Start from a saved-model route and keep the interaction focused on model reuse.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_home_view.py" line="192"/>
+        <source>Choose an analysis scenario for a new guided task.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_home_view.py" line="196"/>
+        <source>Choose an analysis scenario for the saved-model route.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_home_view.py" line="200"/>
+        <source>Start by choosing a new task or the saved-model route.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_home_view.py" line="149"/>
         <source>History</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="86"/>
+        <location filename="../ui/scenario_home_view.py" line="150"/>
         <source>Settings</source>
         <translation type="unfinished"></translation>
     </message>

@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QMainWindow, QVBoxLayout, QWidget
 
 from ..config import AppPaths
 from ..i18n import TranslationManager
+from ..services.analysis_scenario_service import AnalysisScenarioService
 from ..services.dataset_service import DatasetService
 from ..services.inference_history_service import InferenceHistoryService
 from ..services.ml_service import MLService
@@ -37,6 +38,7 @@ class MainWindow(QMainWindow):
         dataset_service: DatasetService,
         ml_service: MLService,
         inference_history_service: InferenceHistoryService,
+        analysis_scenario_service: AnalysisScenarioService,
         scenario_template_service: ScenarioTemplateService,
         scenario_workflow_service: ScenarioWorkflowService,
     ) -> None:
@@ -50,6 +52,7 @@ class MainWindow(QMainWindow):
         self._dataset_service = dataset_service
         self._ml_service = ml_service
         self._inference_history_service = inference_history_service
+        self._analysis_scenario_service = analysis_scenario_service
         self._scenario_template_service = scenario_template_service
         self._scenario_workflow_service = scenario_workflow_service
         self._settings_dialog: SettingsDialog | None = None
@@ -77,7 +80,7 @@ class MainWindow(QMainWindow):
             ml_service=self._ml_service,
             parent=self,
         )
-        self._home_view = ScenarioHomeView(self._scenario_template_service.list_templates(), parent=self)
+        self._home_view = ScenarioHomeView(self._analysis_scenario_service.list_scenarios(), parent=self)
 
         self.resize(1080, 760)
         self._setup_ui()
@@ -90,7 +93,7 @@ class MainWindow(QMainWindow):
         layout.setSpacing(16)
         self._home_view.open_settings_requested.connect(self._open_settings)
         self._home_view.open_history_requested.connect(self._open_history)
-        self._home_view.scenario_selected.connect(self._show_scenario_placeholder)
+        self._home_view.scenario_selected.connect(self._open_scenario)
         layout.addWidget(self._home_view, 1)
 
         self.setCentralWidget(root)
@@ -132,7 +135,11 @@ class MainWindow(QMainWindow):
         self._inference_history_dialog.raise_()
         self._inference_history_dialog.activateWindow()
 
-    def _show_scenario_placeholder(self, template_key: str) -> None:
+    def _open_scenario(self, analysis_scenario_key: str) -> None:
+        analysis_scenario = self._analysis_scenario_service.get_scenario(analysis_scenario_key)
+        if len(analysis_scenario.linked_template_keys) != 1:
+            return
+        template_key = analysis_scenario.linked_template_keys[0]
         template = self._scenario_template_service.get_template(template_key)
         self._scenario_data_preparation_dialog = ScenarioDataPreparationDialog(
             template=template,
