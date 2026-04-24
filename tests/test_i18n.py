@@ -153,7 +153,7 @@ def test_main_window_language_switch_updates_ui_without_losing_form_state(
 
         assert training_dialog.windowTitle() == "训练看板"
         assert training_dialog._title_label.text() == "销售需求预测"
-        assert training_dialog._run_again_button.text() == "重新完整运行计划"
+        assert training_dialog._run_again_button.text() == "重新运行所选方案"
         assert training_dialog._continue_button.text() == "继续到预测"
         training_dialog.close()
 

@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QInputDialog,
 )
 
+from ..datetime_utils import format_datetime_for_display
 from ..exceptions import XenixError
 from ..services.dataset_service import DatasetService, ExportDatasetCopyInput
 from ..services.inference_history_service import (
@@ -395,9 +396,7 @@ class InferenceHistoryDialog(QDialog):
         return mapping[selected_label]
 
     def _format_finished_at(self, finished_at: datetime) -> str:
-        if finished_at.tzinfo is None:
-            return finished_at.strftime("%Y-%m-%d %H:%M:%S")
-        return finished_at.astimezone().strftime("%Y-%m-%d %H:%M:%S")
+        return format_datetime_for_display(finished_at, format_string="%Y-%m-%d %H:%M:%S")
 
     def _translate_task_status(self, status: MLTaskStatus) -> str:
         labels = {

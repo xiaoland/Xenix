@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QLabel,
     QLineEdit,
+    QPlainTextEdit,
     QSpinBox,
     QWidget,
 )
@@ -108,11 +109,12 @@ class JsonSchemaFormWidget(QFrame):
             widget.setValue(float(field_schema.get("default", 0.0)))
             return _FieldBinding(name=name, label=label, widget=widget, field_type="number", nullable=False)
         if field_type == "array":
-            widget = QLineEdit()
+            widget = QPlainTextEdit()
+            widget.setFixedHeight(92)
             default = field_schema.get("default", [])
             if isinstance(default, list):
-                widget.setText(", ".join(str(item) for item in default))
-            widget.setPlaceholderText(self.tr("Comma-separated values"))
+                widget.setPlainText("\n".join(str(item) for item in default))
+            widget.setPlaceholderText(self.tr("One value per line"))
             item_schema, _ = self._unwrap_nullable(field_schema.get("items", {}))
             return _FieldBinding(
                 name=name,
@@ -139,10 +141,19 @@ class JsonSchemaFormWidget(QFrame):
         if binding.field_type == "enum":
             return widget.currentData()  # type: ignore[union-attr]
         if binding.field_type == "array":
-            raw = widget.text().strip()  # type: ignore[union-attr]
+            raw = widget.toPlainText().strip()  # type: ignore[union-attr]
             if not raw:
                 return []
-            return [self._parse_scalar(binding.array_item_type or "string", item.strip()) for item in raw.split(",") if item.strip()]
+            normalized_items = [
+                part.strip()
+                for line in raw.splitlines()
+                for part in line.split(",")
+                if part.strip()
+            ]
+            return [
+                self._parse_scalar(binding.array_item_type or "string", item)
+                for item in normalized_items
+            ]
 
         raw = widget.text().strip()  # type: ignore[union-attr]
         if binding.nullable and raw == "":
@@ -166,7 +177,7 @@ class JsonSchemaFormWidget(QFrame):
                 widget.setCurrentIndex(index)  # type: ignore[union-attr]
             return
         if binding.field_type == "array":
-            widget.setText(", ".join(str(item) for item in value))  # type: ignore[union-attr]
+            widget.setPlainText("\n".join(str(item) for item in value))  # type: ignore[union-attr]
             return
         widget.setText("" if value is None else str(value))  # type: ignore[union-attr]
 
@@ -206,7 +217,7 @@ class JsonSchemaFormWidget(QFrame):
             self._empty_label.setText(self.tr("No parameters to configure."))
         for binding in self._bindings.values():
             if binding.field_type == "array":
-                binding.widget.setPlaceholderText(self.tr("Comma-separated values"))  # type: ignore[union-attr]
+                binding.widget.setPlaceholderText(self.tr("One value per line"))  # type: ignore[union-attr]
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == QEvent.LanguageChange:

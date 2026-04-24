@@ -539,6 +539,90 @@ SVG 的推論頁重心是輸入資料與結果。現況推論頁以任務表、�
 - 建立默認模型組合持久化
 - 加入模型刪除操作
 
+實作狀態：
+
+- 已完成第一輪落地，日期為 `2026-04-24`
+
+本輪已完成：
+
+- 新增 `ScenarioTrainingSelectionDialog`，作為 `選擇模型並訓練` 分支的訓練前配置頁
+- 第二步的 `TRAIN_NEW` 分支已改為：
+  - 先進入模型選擇與訓練模式
+  - 再承接既有 `ScenarioTrainingDialog`
+- 已支援按場景模板載入可用模型清單，並依模板既有訓練計畫排序
+- 已支援模型多選
+- 已支援每個模型在以下兩種訓練模式中擇一：
+  - `Fit`
+  - `Hyperparameter Tuning`
+- 已支援依模型能力切換參數表單：
+  - `param_schema`
+  - `param_grid_schema`
+- 已新增 `ScenarioTrainingPresetService`
+- 已支援按模板保存與回載默認模型組合，持久化位置為 `paths.config/scenario_training_defaults.json`
+- `ScenarioWorkflowService` 已支援接收使用者選定的訓練步驟集合
+- `ScenarioTrainingDialog` 已從固定模板訓練計畫，擴充為可監控使用者選定的模型方案
+- `ScenarioTrainingDialog` 已補上 task details 安全降級，測試替身與異常 task id 不會再把 UI 拉進全域例外對話框
+
+本輪聚焦範圍：
+
+- 先完成模型選擇、參數調整、默認保存與訓練承接
+- 模型刪除保留到後續工作包
+
+涉及檔案：
+
+- `src/xenix/services/scenario_template_service.py`
+- `src/xenix/services/scenario_training_preset_service.py`
+- `src/xenix/services/scenario_workflow_service.py`
+- `src/xenix/ui/scenario_training_selection_dialog.py`
+- `src/xenix/ui/scenario_training_dialog.py`
+- `src/xenix/ui/main_window.py`
+- `src/xenix/app.py`
+- `src/xenix/translations/xenix_en_US.ts`
+- `src/xenix/translations/xenix_zh_CN.ts`
+- `tests/test_scenario_ui.py`
+- `tests/test_scenario_workflow.py`
+- `tests/test_i18n.py`
+
+驗證結果：
+
+- `python -m compileall src tests scripts` 已通過
+- 與工作包 3 直接相關的目標用例已通過，包括：
+  - 模型選擇頁的默認組合保存與回載
+  - 主視窗在 `TRAIN_NEW` 分支打開模型選擇頁，並將選定步驟送入訓練流程
+  - `ScenarioWorkflowService` 對自訂訓練步驟集合的承接
+  - `zh_CN` 下既有主流程與新增訓練頁文案切換
+
+驗收回修：
+
+- 日期：`2026-04-24`
+
+本輪修復：
+
+- 已訓練模型列表中的建立時間顯示已修正
+  - 診斷結果：SQLite round-trip 後，`created_at` 在部分查詢路徑中會回到 naive datetime
+  - 原先 `ScenarioModelSourceDialog` 直接 `strftime`，因此 UTC 時間會被當作本地時間直接顯示
+  - 目前修正為：
+    - 在 `ScenarioModelSourceService` 先將 `created_at` 正規化為 UTC-aware datetime
+    - 在 UI 顯示階段統一轉換為本地時區後格式化
+    - 相同格式化規則也同步套用到 `PreviousModelFlowDialog` 與 `InferenceHistoryDialog`
+- `Hyperparameter Tuning` 的表單切換已修正
+  - 診斷結果：`QComboBox.currentData()` 對 `StrEnum` 取回的是 plain `str`
+  - 原先 `ScenarioTrainingSelectionDialog.current_operation()` 只接受 enum instance，導致操作模式會回退到 `FIT`
+  - 目前修正為：
+    - 將 combobox 回傳的 `str` 顯式轉回 `ScenarioTrainingOperation`
+    - tuning 模式現在會正確套用 `param_grid_schema`
+- `param_grid_schema` 的多值輸入形態已加強
+  - `JsonSchemaFormWidget` 的 array 欄位已從單行逗號輸入，升級成多行值輸入
+  - 每個候選值以一行呈現，更接近參數矩陣的互動語義
+  - 舊的逗號分隔輸入仍可被解析，避免破壞既有使用習慣
+
+本輪補充驗證：
+
+- `tests/test_json_schema_form.py`
+- `tests/test_scenario_ui.py`
+  - 已覆蓋相容已訓練模型時間正規化
+  - 已覆蓋 tuning 模式切換到多值輸入並輸出 list 型 `param_grid`
+
 ### 工作包 4：訓練結果視圖重寫
 
 目標：

@@ -20,6 +20,7 @@ from .services.ml_task_service import MLTaskService
 from .services.project_service import ProjectService
 from .services.scenario_model_source_service import ScenarioModelSourceService
 from .services.scenario_template_service import ScenarioTemplateService
+from .services.scenario_training_preset_service import ScenarioTrainingPresetService
 from .services.scenario_workflow_service import ScenarioWorkflowService
 from .services.storage import StorageBootstrapService
 from .services.storage.layout import database_path
@@ -66,6 +67,10 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
         context.session_factory,
         scenario_template_service,
     )
+    scenario_training_preset_service = ScenarioTrainingPresetService(
+        paths,
+        scenario_template_service,
+    )
     scenario_workflow_service = ScenarioWorkflowService(
         project_service=project_service,
         work_item_service=work_item_service,
@@ -91,6 +96,7 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
         analysis_scenario_service=analysis_scenario_service,
         scenario_model_source_service=scenario_model_source_service,
         scenario_template_service=scenario_template_service,
+        scenario_training_preset_service=scenario_training_preset_service,
         scenario_workflow_service=scenario_workflow_service,
     )
     if show:

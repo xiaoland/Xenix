@@ -211,3 +211,64 @@ def test_prepare_work_item_creates_dataset_and_managed_work_item_in_hidden_scena
     assert work_item.dataset_id == prepared.dataset_id
     assert prepared.feature_columns == ["feature_a", "feature_b"]
     assert prepared.target_columns == ["target"]
+
+
+def test_start_training_run_uses_selected_steps_when_provided(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    (
+        _project_service,
+        work_item_service,
+        dataset_service,
+        _ml_task_service,
+        ml_service,
+        workflow_service,
+    ) = _build_services(monkeypatch, tmp_path)
+    template_service = ScenarioTemplateService()
+    template = template_service.get_template("sales_demand_forecast.v1")
+    scenario_project = workflow_service.ensure_scenario_project()
+
+    dataset_file = tmp_path / "selected-demand.csv"
+    dataset_file.write_text(
+        "feature_a,feature_b,target\n"
+        "1,2,5\n"
+        "2,1,5\n"
+        "3,5,11\n"
+        "4,2,10\n"
+        "5,3,13\n"
+        "6,6,18\n"
+        "7,5,19\n"
+        "8,4,20\n"
+        "9,7,25\n"
+        "10,8,28\n",
+        encoding="utf-8",
+    )
+    dataset = _register_dataset(dataset_service, scenario_project.id, dataset_file, name="Selected Demand")
+    work_item = work_item_service.create_work_item(
+        CreateWorkItemInput(
+            project_id=scenario_project.id,
+            name="Selected Model Run",
+            source_dataset_id=dataset.id,
+            feature_columns=["feature_a", "feature_b"],
+            target_columns=["target"],
+        )
+    )
+
+    selected_steps = [template.training_plan[0]]
+    run = workflow_service.start_training_run(
+        StartScenarioTrainingRunInput(
+            template_key=template.key,
+            work_item_id=work_item.id,
+            selected_steps=selected_steps,
+        )
+    )
+    terminal_snapshot = _wait_for_terminal_run(workflow_service, run)
+    root_tasks = [ml_service.get_task_details(task_id).task for task_id in run.root_task_ids]
+
+    assert len(run.root_task_ids) == 1
+    assert len(run.steps) == 1
+    assert root_tasks[0].task_type is MLTaskType.FIT
+    assert _extract_model_key(root_tasks[0]) == "regression.linear"
+    assert len(terminal_snapshot.step_snapshots) == 1
+    assert terminal_snapshot.step_snapshots[0].model_key == "regression.linear"

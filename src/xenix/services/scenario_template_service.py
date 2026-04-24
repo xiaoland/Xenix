@@ -22,6 +22,11 @@ class ScenarioTrainingPlanStep(SQLModel):
     param_grid: dict[str, list[Any]] = Field(default_factory=dict)
 
 
+def build_scenario_training_step_key(model_key: str, operation: ScenarioTrainingOperation) -> str:
+    normalized_model_key = model_key.replace(".", "_")
+    return f"{operation.value}_{normalized_model_key}"
+
+
 class ScenarioTemplate(SQLModel):
     key: str
     display_name: str

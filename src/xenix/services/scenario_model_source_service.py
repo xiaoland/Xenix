@@ -6,6 +6,7 @@ from pydantic import Field
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
 
+from ..datetime_utils import normalize_datetime_to_utc
 from .ml.registry import get_model_catalog_entry
 from .scenario_template_service import ScenarioTemplateService
 from .scenario_workflow_service import SCENARIO_PROJECT_NAME
@@ -78,7 +79,7 @@ class ScenarioModelSourceService:
                             work_item_name=work_item.name,
                             model_key=trained_model.model_key,
                             model_display_name=catalog.display_name,
-                            created_at=trained_model.created_at,
+                            created_at=normalize_datetime_to_utc(trained_model.created_at),
                             is_best_for_work_item=work_item.best_trained_model_id == trained_model.id,
                             feature_columns=list(work_item.feature_columns),
                             target_columns=list(work_item.target_columns),

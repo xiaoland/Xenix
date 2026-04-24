@@ -3,6 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import QEvent
 from PySide6.QtWidgets import QDialog, QLabel, QPushButton, QVBoxLayout, QWidget
 
+from ..datetime_utils import format_datetime_for_display
 from ..services.scenario_model_source_service import CompatibleTrainedModelOption
 from ..services.scenario_template_service import ScenarioTemplate
 from .scenario_template_text import localized_template_display_name
@@ -73,7 +74,10 @@ class PreviousModelFlowDialog(QDialog):
                     "The compatible trained model route is now connected to the second step.\n\nDetailed direct-to-inference reuse will be completed in the next work package.\n\nSource work item: {work_item_name}\nCreated at: {created_at}"
                 ).format(
                     work_item_name=self._selected_model.work_item_name,
-                    created_at=self._selected_model.created_at.strftime("%Y-%m-%d %H:%M"),
+                    created_at=format_datetime_for_display(
+                        self._selected_model.created_at,
+                        format_string="%Y-%m-%d %H:%M",
+                    ),
                 )
             )
         else:

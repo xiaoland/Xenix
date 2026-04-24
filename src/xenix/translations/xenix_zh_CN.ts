@@ -281,215 +281,215 @@
 <context>
     <name>InferenceHistoryDialog</name>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="155"/>
+        <location filename="../ui/inference_history_dialog.py" line="156"/>
         <source>History</source>
         <translation>历史</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="156"/>
+        <location filename="../ui/inference_history_dialog.py" line="157"/>
         <source>Sort</source>
         <translation>排序</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="157"/>
+        <location filename="../ui/inference_history_dialog.py" line="158"/>
         <source>Start time</source>
         <translation>开始时间</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="158"/>
+        <location filename="../ui/inference_history_dialog.py" line="159"/>
         <source>End time</source>
         <translation>结束时间</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="159"/>
+        <location filename="../ui/inference_history_dialog.py" line="160"/>
         <source>Refresh</source>
         <translation>刷新</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="160"/>
+        <location filename="../ui/inference_history_dialog.py" line="161"/>
         <source>Open Result</source>
         <translation>打开结果</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="161"/>
+        <location filename="../ui/inference_history_dialog.py" line="162"/>
         <source>Export Result</source>
         <translation>导出结果</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="162"/>
+        <location filename="../ui/inference_history_dialog.py" line="163"/>
         <source>Inference Results</source>
         <translation>推理结果</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="163"/>
+        <location filename="../ui/inference_history_dialog.py" line="164"/>
         <source>Task Details</source>
         <translation>任务详情</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="166"/>
+        <location filename="../ui/inference_history_dialog.py" line="167"/>
         <source>Finished</source>
         <translation>完成时间</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="167"/>
+        <location filename="../ui/inference_history_dialog.py" line="168"/>
         <source>Work Item</source>
         <translation>工作项</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="168"/>
+        <location filename="../ui/inference_history_dialog.py" line="169"/>
         <source>Model</source>
         <translation>模型</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="169"/>
+        <location filename="../ui/inference_history_dialog.py" line="170"/>
         <source>Rows</source>
         <translation>行数</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="175"/>
+        <location filename="../ui/inference_history_dialog.py" line="176"/>
         <source>Refresh to load prediction history.</source>
         <translation>点击刷新以加载预测历史。</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="177"/>
-        <location filename="../ui/inference_history_dialog.py" line="197"/>
-        <location filename="../ui/inference_history_dialog.py" line="225"/>
-        <location filename="../ui/inference_history_dialog.py" line="292"/>
+        <location filename="../ui/inference_history_dialog.py" line="178"/>
+        <location filename="../ui/inference_history_dialog.py" line="198"/>
+        <location filename="../ui/inference_history_dialog.py" line="226"/>
+        <location filename="../ui/inference_history_dialog.py" line="293"/>
         <source>Select a history row to inspect its details.</source>
         <translation>请选择一条历史记录查看详情。</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="230"/>
+        <location filename="../ui/inference_history_dialog.py" line="231"/>
         <source>Loaded {count} prediction result(s).</source>
         <translation>已加载 {count} 条预测结果。</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="234"/>
+        <location filename="../ui/inference_history_dialog.py" line="235"/>
         <source>No prediction results match the current filter.</source>
         <translation>当前筛选条件下没有匹配的预测结果。</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="242"/>
+        <location filename="../ui/inference_history_dialog.py" line="243"/>
         <source>Newest first</source>
         <translation>最新优先</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="246"/>
+        <location filename="../ui/inference_history_dialog.py" line="247"/>
         <source>Oldest first</source>
         <translation>最早优先</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="313"/>
+        <location filename="../ui/inference_history_dialog.py" line="314"/>
         <source>Task: {task_id}</source>
         <translation>任务：{task_id}</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="314"/>
+        <location filename="../ui/inference_history_dialog.py" line="315"/>
         <source>Finished: {finished_at}</source>
         <translation>完成时间：{finished_at}</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="315"/>
+        <location filename="../ui/inference_history_dialog.py" line="316"/>
         <source>Work item: {work_item_name}</source>
         <translation>工作项：{work_item_name}</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="316"/>
+        <location filename="../ui/inference_history_dialog.py" line="317"/>
         <source>Model: {model_key}</source>
         <translation>模型：{model_key}</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="317"/>
+        <location filename="../ui/inference_history_dialog.py" line="318"/>
         <source>Rows: {row_count}</source>
         <translation>行数：{row_count}</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="318"/>
+        <location filename="../ui/inference_history_dialog.py" line="319"/>
         <source>Result: {path}</source>
         <translation>结果：{path}</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="319"/>
+        <location filename="../ui/inference_history_dialog.py" line="320"/>
         <source>Status: {status}</source>
         <translation>状态：{status}</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="323"/>
+        <location filename="../ui/inference_history_dialog.py" line="324"/>
         <source>Scenario: {scenario_name}</source>
         <translation>场景：{scenario_name}</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="338"/>
+        <location filename="../ui/inference_history_dialog.py" line="339"/>
         <source>Export Prediction Result</source>
         <translation>导出预测结果</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="340"/>
+        <location filename="../ui/inference_history_dialog.py" line="341"/>
         <source>CSV Files (*.csv);;Excel Files (*.xlsx)</source>
         <translation>CSV 文件 (*.csv);;Excel 文件 (*.xlsx)</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="369"/>
+        <location filename="../ui/inference_history_dialog.py" line="370"/>
         <source>Prediction result exported to &apos;{path}&apos;.</source>
         <translation>预测结果已导出到 &apos;{path}&apos;。</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="372"/>
+        <location filename="../ui/inference_history_dialog.py" line="373"/>
         <source>Exported</source>
         <translation>已导出</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="372"/>
+        <location filename="../ui/inference_history_dialog.py" line="373"/>
         <source>Prediction result exported successfully.</source>
         <translation>预测结果已成功导出。</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="376"/>
+        <location filename="../ui/inference_history_dialog.py" line="377"/>
         <source>UTF-8</source>
         <translation>UTF-8</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="377"/>
+        <location filename="../ui/inference_history_dialog.py" line="378"/>
         <source>UTF-8 with BOM</source>
         <translation>UTF-8 with BOM</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="378"/>
+        <location filename="../ui/inference_history_dialog.py" line="379"/>
         <source>GBK</source>
         <translation>GBK</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="382"/>
+        <location filename="../ui/inference_history_dialog.py" line="383"/>
         <source>CSV Encoding</source>
         <translation>CSV 编码</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="383"/>
+        <location filename="../ui/inference_history_dialog.py" line="384"/>
         <source>Choose CSV encoding</source>
         <translation>选择 CSV 编码</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="404"/>
+        <location filename="../ui/inference_history_dialog.py" line="403"/>
         <source>Pending</source>
         <translation>待处理</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="405"/>
+        <location filename="../ui/inference_history_dialog.py" line="404"/>
         <source>Running</source>
         <translation>运行中</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="406"/>
+        <location filename="../ui/inference_history_dialog.py" line="405"/>
         <source>Succeeded</source>
         <translation>成功</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="407"/>
+        <location filename="../ui/inference_history_dialog.py" line="406"/>
         <source>Failed</source>
         <translation>失败</translation>
     </message>
     <message>
-        <location filename="../ui/inference_history_dialog.py" line="408"/>
+        <location filename="../ui/inference_history_dialog.py" line="407"/>
         <source>Cancelled</source>
         <translation>已取消</translation>
     </message>
@@ -752,14 +752,18 @@
 <context>
     <name>JsonSchemaFormWidget</name>
     <message>
-        <location filename="../ui/widgets/json_schema_form.py" line="115"/>
-        <location filename="../ui/widgets/json_schema_form.py" line="209"/>
         <source>Comma-separated values</source>
-        <translation>逗号分隔值</translation>
+        <translation type="vanished">逗号分隔值</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/json_schema_form.py" line="200"/>
-        <location filename="../ui/widgets/json_schema_form.py" line="206"/>
+        <location filename="../ui/widgets/json_schema_form.py" line="117"/>
+        <location filename="../ui/widgets/json_schema_form.py" line="220"/>
+        <source>One value per line</source>
+        <translation>每行一个值</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/json_schema_form.py" line="211"/>
+        <location filename="../ui/widgets/json_schema_form.py" line="217"/>
         <source>No parameters to configure.</source>
         <translation>没有可配置的参数。</translation>
     </message>
@@ -1044,7 +1048,7 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../ui/main_window.py" line="109"/>
+        <location filename="../ui/main_window.py" line="114"/>
         <source>Xenix Native</source>
         <translation>Xenix 原生版</translation>
     </message>
@@ -1162,28 +1166,28 @@ Current scenario description: {description}</source>
 当前场景说明：{description}</translation>
     </message>
     <message>
-        <location filename="../ui/previous_model_flow_dialog.py" line="55"/>
         <location filename="../ui/previous_model_flow_dialog.py" line="56"/>
+        <location filename="../ui/previous_model_flow_dialog.py" line="57"/>
         <source>Choose Trained Model</source>
         <translation>选择已训练模型</translation>
     </message>
     <message>
-        <location filename="../ui/previous_model_flow_dialog.py" line="58"/>
+        <location filename="../ui/previous_model_flow_dialog.py" line="59"/>
         <source>This 2.0 step reserves the trained-model reuse flow after data preparation.</source>
         <translation>这个 2.0 步骤为数据准备之后的已训练模型复用流程预留了入口。</translation>
     </message>
     <message>
-        <location filename="../ui/previous_model_flow_dialog.py" line="61"/>
+        <location filename="../ui/previous_model_flow_dialog.py" line="62"/>
         <source>Selected template: {template_name}</source>
         <translation>已选模板：{template_name}</translation>
     </message>
     <message>
-        <location filename="../ui/previous_model_flow_dialog.py" line="67"/>
+        <location filename="../ui/previous_model_flow_dialog.py" line="68"/>
         <source>Selected trained model: {model_name}</source>
         <translation>已选模型：{model_name}</translation>
     </message>
     <message>
-        <location filename="../ui/previous_model_flow_dialog.py" line="73"/>
+        <location filename="../ui/previous_model_flow_dialog.py" line="74"/>
         <source>The compatible trained model route is now connected to the second step.
 
 Detailed direct-to-inference reuse will be completed in the next work package.
@@ -1198,12 +1202,12 @@ Created at: {created_at}</source>
 创建时间：{created_at}</translation>
     </message>
     <message>
-        <location filename="../ui/previous_model_flow_dialog.py" line="80"/>
+        <location filename="../ui/previous_model_flow_dialog.py" line="84"/>
         <source>Selected trained model: None</source>
         <translation>已选模型：无</translation>
     </message>
     <message>
-        <location filename="../ui/previous_model_flow_dialog.py" line="83"/>
+        <location filename="../ui/previous_model_flow_dialog.py" line="87"/>
         <source>No compatible trained model is currently selected.
 
 This route will stay available after model selection is connected.</source>
@@ -1212,7 +1216,7 @@ This route will stay available after model selection is connected.</source>
 模型选择接入后，这条路径会持续可用。</translation>
     </message>
     <message>
-        <location filename="../ui/previous_model_flow_dialog.py" line="86"/>
+        <location filename="../ui/previous_model_flow_dialog.py" line="90"/>
         <source>Close</source>
         <translation>关闭</translation>
     </message>
@@ -1608,89 +1612,89 @@ This route will stay available after model selection is connected.</source>
 <context>
     <name>ScenarioModelSourceDialog</name>
     <message>
-        <location filename="../ui/scenario_model_source_dialog.py" line="133"/>
+        <location filename="../ui/scenario_model_source_dialog.py" line="134"/>
         <source>Choose Model Source</source>
         <translation>选择模型来源</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_model_source_dialog.py" line="136"/>
+        <location filename="../ui/scenario_model_source_dialog.py" line="137"/>
         <source>The dataset is ready. Choose whether to train a new model set or continue from a compatible trained model.</source>
         <translation>数据已准备完成。请选择训练一组新模型，或从相容的已训练模型继续。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_model_source_dialog.py" line="139"/>
+        <location filename="../ui/scenario_model_source_dialog.py" line="140"/>
         <source>Input columns: {features}
 Prediction target: {targets}</source>
         <translation>输入列：{features}
 预测目标：{targets}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_model_source_dialog.py" line="144"/>
+        <location filename="../ui/scenario_model_source_dialog.py" line="145"/>
         <source>Choose Models and Train</source>
         <translation>选择模型并训练</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_model_source_dialog.py" line="146"/>
+        <location filename="../ui/scenario_model_source_dialog.py" line="147"/>
         <source>Continue to model selection and training with the prepared dataset.</source>
         <translation>使用当前已准备的数据集，继续进入模型选择与训练。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_model_source_dialog.py" line="148"/>
+        <location filename="../ui/scenario_model_source_dialog.py" line="149"/>
         <source>Choose Trained Model</source>
         <translation>选择已训练模型</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_model_source_dialog.py" line="150"/>
+        <location filename="../ui/scenario_model_source_dialog.py" line="151"/>
         <source>Compatible trained models with the same scenario and column selection appear below.</source>
         <translation>下方会显示与当前场景和列选择相容的已训练模型。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_model_source_dialog.py" line="154"/>
+        <location filename="../ui/scenario_model_source_dialog.py" line="155"/>
         <source>{count} compatible trained models found.</source>
         <translation>找到 {count} 个相容的已训练模型。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_model_source_dialog.py" line="160"/>
+        <location filename="../ui/scenario_model_source_dialog.py" line="161"/>
         <source>No compatible trained models are available yet for the current selection.</source>
         <translation>当前选择下还没有可用的相容已训练模型。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_model_source_dialog.py" line="162"/>
+        <location filename="../ui/scenario_model_source_dialog.py" line="163"/>
         <source>Continue to Training</source>
         <translation>继续训练</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_model_source_dialog.py" line="163"/>
+        <location filename="../ui/scenario_model_source_dialog.py" line="164"/>
         <source>Continue with Trained Model</source>
         <translation>继续使用已训练模型</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_model_source_dialog.py" line="164"/>
+        <location filename="../ui/scenario_model_source_dialog.py" line="165"/>
         <source>Close</source>
         <translation>关闭</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_model_source_dialog.py" line="181"/>
+        <location filename="../ui/scenario_model_source_dialog.py" line="182"/>
         <source> [Best]</source>
         <translation> [最佳]</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_model_source_dialog.py" line="183"/>
+        <location filename="../ui/scenario_model_source_dialog.py" line="184"/>
         <source>{model_name} | {work_item_name} | {created_at}{suffix}</source>
         <translation>{model_name} | {work_item_name} | {created_at}{suffix}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_model_source_dialog.py" line="201"/>
+        <location filename="../ui/scenario_model_source_dialog.py" line="202"/>
         <source>Select one compatible trained model to continue.</source>
         <translation>请选择一个相容的已训练模型再继续。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_model_source_dialog.py" line="205"/>
+        <location filename="../ui/scenario_model_source_dialog.py" line="206"/>
         <source>Training a new model set is available immediately.</source>
         <translation>现在可以直接训练一组新模型。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_model_source_dialog.py" line="211"/>
+        <location filename="../ui/scenario_model_source_dialog.py" line="212"/>
         <source>Selected model: {model_name}
 Source work item: {work_item_name}
 Created at: {created_at}</source>
@@ -1725,177 +1729,194 @@ Created at: {created_at}</source>
 <context>
     <name>ScenarioTrainingDialog</name>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="137"/>
+        <location filename="../ui/scenario_training_dialog.py" line="141"/>
         <source>Training Dashboard</source>
         <translation>训练看板</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="140"/>
         <source>The fixed training plan is running in the background. Review the result and continue when a best model is ready.</source>
-        <translation>固定训练计划正在后台运行。查看结果，并在最佳模型就绪后继续。</translation>
+        <translation type="vanished">固定训练计划正在后台运行。查看结果，并在最佳模型就绪后继续。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="142"/>
         <source>Run Full Plan Again</source>
-        <translation>重新完整运行计划</translation>
+        <translation type="vanished">重新完整运行计划</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="143"/>
+        <location filename="../ui/scenario_training_dialog.py" line="147"/>
         <source>Continue to Prediction</source>
         <translation>继续到预测</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="144"/>
         <source>Training Plan</source>
-        <translation>训练计划</translation>
+        <translation type="vanished">训练计划</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="145"/>
+        <location filename="../ui/scenario_training_dialog.py" line="144"/>
+        <source>The selected model plan is running in the background. Review the result and continue when a best model is ready.</source>
+        <translation>当前选定的模型方案正在后台运行。最佳模型准备完成后，可查看结果并继续。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="146"/>
+        <source>Run Selected Plan Again</source>
+        <translation>重新运行所选方案</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="148"/>
+        <source>Training Steps</source>
+        <translation>训练步骤</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="149"/>
         <source>Task Details</source>
         <translation>任务详情</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="148"/>
+        <location filename="../ui/scenario_training_dialog.py" line="152"/>
         <source>Step</source>
         <translation>步骤</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="149"/>
+        <location filename="../ui/scenario_training_dialog.py" line="153"/>
         <source>Model</source>
         <translation>模型</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="150"/>
+        <location filename="../ui/scenario_training_dialog.py" line="154"/>
         <source>Training</source>
         <translation>训练</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="151"/>
+        <location filename="../ui/scenario_training_dialog.py" line="155"/>
         <source>Evaluate</source>
         <translation>评估</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="152"/>
+        <location filename="../ui/scenario_training_dialog.py" line="156"/>
         <source>Status</source>
         <translation>状态</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="156"/>
+        <location filename="../ui/scenario_training_dialog.py" line="160"/>
         <source>Preparing the training plan...</source>
         <translation>正在准备训练计划...</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="157"/>
-        <location filename="../ui/scenario_training_dialog.py" line="218"/>
+        <location filename="../ui/scenario_training_dialog.py" line="161"/>
+        <location filename="../ui/scenario_training_dialog.py" line="223"/>
         <source>Best model: waiting for evaluation.</source>
         <translation>最佳模型：等待评估中。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="158"/>
-        <location filename="../ui/scenario_training_dialog.py" line="283"/>
+        <location filename="../ui/scenario_training_dialog.py" line="162"/>
+        <location filename="../ui/scenario_training_dialog.py" line="288"/>
         <source>Select a plan step to inspect task details.</source>
         <translation>请选择一个计划步骤查看任务详情。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="195"/>
+        <location filename="../ui/scenario_training_dialog.py" line="200"/>
         <source>Training finished. {succeeded_count} plan step(s) succeeded and the best model is ready.</source>
         <translation>训练已完成。{succeeded_count} 个计划步骤已成功，最佳模型已就绪。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="202"/>
+        <location filename="../ui/scenario_training_dialog.py" line="207"/>
         <source>Training finished with partial failure. {succeeded_count} step(s) succeeded and {failed_count} step(s) failed.</source>
         <translation>训练已完成，但存在部分失败。{succeeded_count} 个步骤成功，{failed_count} 个步骤失败。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="210"/>
+        <location filename="../ui/scenario_training_dialog.py" line="215"/>
         <source>Training is running. {succeeded_count} completed step(s) so far.</source>
         <translation>训练正在运行。目前已完成 {succeeded_count} 个步骤。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="238"/>
+        <location filename="../ui/scenario_training_dialog.py" line="243"/>
         <source>Best model: {model_key} ({metric_name}={metric_value})</source>
         <translation>最佳模型：{model_key}（{metric_name}={metric_value}）</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="243"/>
+        <location filename="../ui/scenario_training_dialog.py" line="248"/>
         <source>Best model: {model_key}</source>
         <translation>最佳模型：{model_key}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="250"/>
+        <location filename="../ui/scenario_training_dialog.py" line="255"/>
         <source>Step {number}</source>
         <translation>步骤 {number}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="253"/>
+        <location filename="../ui/scenario_training_dialog.py" line="258"/>
         <source>Waiting</source>
         <translation>等待中</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="294"/>
+        <location filename="../ui/scenario_training_dialog.py" line="301"/>
+        <source>Task details are temporarily unavailable for the selected step.</source>
+        <translation>当前所选步骤的任务详情暂时不可用。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="306"/>
         <source>Task: {task_id}</source>
         <translation>任务：{task_id}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="295"/>
+        <location filename="../ui/scenario_training_dialog.py" line="307"/>
         <source>Model: {model_key}</source>
         <translation>模型：{model_key}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="296"/>
+        <location filename="../ui/scenario_training_dialog.py" line="308"/>
         <source>Status: {status}</source>
         <translation>状态：{status}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="299"/>
+        <location filename="../ui/scenario_training_dialog.py" line="311"/>
         <source>Result: {summary}</source>
         <translation>结果：{summary}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="301"/>
+        <location filename="../ui/scenario_training_dialog.py" line="313"/>
         <source>Failure: {summary}</source>
         <translation>失败：{summary}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="307"/>
+        <location filename="../ui/scenario_training_dialog.py" line="319"/>
         <source>Pending</source>
         <translation>待处理</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="308"/>
-        <location filename="../ui/scenario_training_dialog.py" line="318"/>
+        <location filename="../ui/scenario_training_dialog.py" line="320"/>
+        <location filename="../ui/scenario_training_dialog.py" line="330"/>
         <source>Running</source>
         <translation>运行中</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="309"/>
-        <location filename="../ui/scenario_training_dialog.py" line="319"/>
+        <location filename="../ui/scenario_training_dialog.py" line="321"/>
+        <location filename="../ui/scenario_training_dialog.py" line="331"/>
         <source>Succeeded</source>
         <translation>成功</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="310"/>
-        <location filename="../ui/scenario_training_dialog.py" line="320"/>
+        <location filename="../ui/scenario_training_dialog.py" line="322"/>
+        <location filename="../ui/scenario_training_dialog.py" line="332"/>
         <source>Failed</source>
         <translation>失败</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="311"/>
+        <location filename="../ui/scenario_training_dialog.py" line="323"/>
         <source>Cancelled</source>
         <translation>已取消</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="327"/>
+        <location filename="../ui/scenario_training_dialog.py" line="339"/>
         <source>metric</source>
         <translation>指标</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="331"/>
+        <location filename="../ui/scenario_training_dialog.py" line="343"/>
         <source>Best params: {params}</source>
         <translation>最佳参数：{params}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="333"/>
+        <location filename="../ui/scenario_training_dialog.py" line="345"/>
         <source>Params: {params}</source>
         <translation>参数：{params}</translation>
     </message>
@@ -1906,6 +1927,64 @@ Created at: {created_at}</source>
     <message>
         <source>Window C is the next implementation slice.</source>
         <translation type="vanished">窗口 C 是下一步实现内容。</translation>
+    </message>
+</context>
+<context>
+    <name>ScenarioTrainingSelectionDialog</name>
+    <message>
+        <location filename="../ui/scenario_training_selection_dialog.py" line="264"/>
+        <source>Choose Models and Train</source>
+        <translation>选择模型并训练</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_selection_dialog.py" line="268"/>
+        <source>Choose one or more models for this scenario, adjust their parameters, and save the current combination as the default when needed.</source>
+        <translation>为当前场景选择一个或多个模型，调整参数，并在需要时将当前组合保存为默认方案。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_selection_dialog.py" line="272"/>
+        <source>Input columns: {features}
+Prediction target: {targets}</source>
+        <translation>输入列：{features}
+预测目标：{targets}</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_selection_dialog.py" line="277"/>
+        <source>Save as Default</source>
+        <translation>保存为默认方案</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_selection_dialog.py" line="278"/>
+        <source>Start Training</source>
+        <translation>开始训练</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_selection_dialog.py" line="279"/>
+        <source>Close</source>
+        <translation>关闭</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_selection_dialog.py" line="281"/>
+        <location filename="../ui/scenario_training_selection_dialog.py" line="352"/>
+        <source>No compatible models are available for this scenario template yet.</source>
+        <translation>当前场景模板暂时还没有可用的兼容模型。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_selection_dialog.py" line="283"/>
+        <location filename="../ui/scenario_training_selection_dialog.py" line="360"/>
+        <location filename="../ui/scenario_training_selection_dialog.py" line="372"/>
+        <source>Select at least one model to continue.</source>
+        <translation>请至少选择一个模型后继续。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_selection_dialog.py" line="356"/>
+        <source>Ready to train {count} model selection(s).</source>
+        <translation>已准备训练 {count} 个模型选择项。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_selection_dialog.py" line="368"/>
+        <source>Saved the current model selection as the default.</source>
+        <translation>当前模型选择已保存为默认方案。</translation>
     </message>
 </context>
 <context>
@@ -1981,6 +2060,39 @@ Created at: {created_at}</source>
         <location filename="../ui/widgets/task_log_view.py" line="21"/>
         <source>Task logs will appear here.</source>
         <translation>任务日志会显示在这里。</translation>
+    </message>
+</context>
+<context>
+    <name>_ScenarioTrainingOptionCard</name>
+    <message>
+        <location filename="../ui/scenario_training_selection_dialog.py" line="101"/>
+        <source>Include this model</source>
+        <translation>纳入这个模型</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_selection_dialog.py" line="102"/>
+        <source>Training mode</source>
+        <translation>训练模式</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_selection_dialog.py" line="204"/>
+        <source>Train this model once with a concrete parameter set.</source>
+        <translation>使用一组确定参数执行一次训练。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_selection_dialog.py" line="208"/>
+        <source>Search across a parameter grid and keep the best result.</source>
+        <translation>在参数网格中搜索，并保留最佳结果。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_selection_dialog.py" line="213"/>
+        <source>Fit</source>
+        <translation>训练</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_selection_dialog.py" line="214"/>
+        <source>Hyperparameter Tuning</source>
+        <translation>超参数调优</translation>
     </message>
 </context>
 </TS>

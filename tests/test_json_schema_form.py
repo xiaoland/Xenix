@@ -41,7 +41,7 @@ def test_json_schema_form_round_trips_supported_field_shapes(app: QApplication) 
     bindings["count"].widget.setValue(7)  # type: ignore[union-attr]
     bindings["weight"].widget.setValue(2.75)  # type: ignore[union-attr]
     bindings["mode"].widget.setCurrentIndex(0)  # type: ignore[union-attr]
-    bindings["features"].widget.setText("tenure, segment")  # type: ignore[union-attr]
+    bindings["features"].widget.setPlainText("tenure\nsegment")  # type: ignore[union-attr]
     bindings["max_depth"].widget.setText("5")  # type: ignore[union-attr]
 
     assert widget.values() == {

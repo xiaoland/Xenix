@@ -32,6 +32,7 @@ class ScenarioTrainingStepStatus(StrEnum):
 class StartScenarioTrainingRunInput(SQLModel):
     template_key: str
     work_item_id: str
+    selected_steps: list[ScenarioTrainingPlanStep] = Field(default_factory=list)
 
 
 class PrepareScenarioWorkItemInput(SQLModel):
@@ -55,6 +56,7 @@ class ScenarioWorkItemPreparationResult(SQLModel):
 class ScenarioTrainingRun(SQLModel):
     template_key: str
     work_item_id: str
+    steps: list[ScenarioTrainingPlanStep] = Field(default_factory=list)
     root_task_ids: list[str] = Field(default_factory=list)
 
 
@@ -164,15 +166,17 @@ class ScenarioWorkflowService:
     def start_training_run(self, input_data: StartScenarioTrainingRunInput) -> ScenarioTrainingRun:
         self._work_item_service.get_work_item(input_data.work_item_id)
         template = self._template_service.get_template(input_data.template_key)
+        steps = input_data.selected_steps or template.training_plan
 
         root_task_ids: list[str] = []
-        for step in template.training_plan:
+        for step in steps:
             created = self._submit_plan_step(input_data.work_item_id, step)
             root_task_ids.append(created.id)
 
         return ScenarioTrainingRun(
             template_key=template.key,
             work_item_id=input_data.work_item_id,
+            steps=steps,
             root_task_ids=root_task_ids,
         )
 
@@ -180,9 +184,10 @@ class ScenarioWorkflowService:
         template = self._template_service.get_template(run.template_key)
         work_item = self._work_item_service.get_work_item(run.work_item_id)
         tasks_by_id = {task.id: task for task in self._ml_service.list_work_item_tasks(run.work_item_id)}
+        run_steps = run.steps or template.training_plan
 
         step_snapshots: list[ScenarioTrainingStepSnapshot] = []
-        for step, root_task_id in zip(template.training_plan, run.root_task_ids, strict=True):
+        for step, root_task_id in zip(run_steps, run.root_task_ids, strict=True):
             root_task = tasks_by_id[root_task_id]
             evaluate_task = self._find_follow_up_evaluate(run.work_item_id, root_task_id)
             step_snapshots.append(self._build_step_snapshot(step, root_task, evaluate_task))

@@ -14,6 +14,7 @@ from ..services.ml_service import MLService
 from ..services.project_service import ProjectService
 from ..services.scenario_model_source_service import ScenarioModelSourceService
 from ..services.scenario_template_service import ScenarioTemplateService
+from ..services.scenario_training_preset_service import ScenarioTrainingPresetService
 from ..services.scenario_workflow_service import ScenarioWorkflowService
 from ..services.work_item_service import WorkItemService
 from .dataset_workspace import DatasetWorkspace
@@ -26,6 +27,7 @@ from .scenario_home_view import ScenarioHomeView
 from .scenario_inference_dialog import ScenarioInferenceDialog
 from .scenario_model_source_dialog import ScenarioModelSourceDialog, ScenarioModelSourceKind
 from .scenario_training_dialog import ScenarioTrainingDialog
+from .scenario_training_selection_dialog import ScenarioTrainingSelectionDialog
 from .settings_dialog import SettingsDialog
 
 
@@ -44,6 +46,7 @@ class MainWindow(QMainWindow):
         analysis_scenario_service: AnalysisScenarioService,
         scenario_model_source_service: ScenarioModelSourceService,
         scenario_template_service: ScenarioTemplateService,
+        scenario_training_preset_service: ScenarioTrainingPresetService,
         scenario_workflow_service: ScenarioWorkflowService,
     ) -> None:
         super().__init__()
@@ -59,10 +62,12 @@ class MainWindow(QMainWindow):
         self._analysis_scenario_service = analysis_scenario_service
         self._scenario_model_source_service = scenario_model_source_service
         self._scenario_template_service = scenario_template_service
+        self._scenario_training_preset_service = scenario_training_preset_service
         self._scenario_workflow_service = scenario_workflow_service
         self._settings_dialog: SettingsDialog | None = None
         self._scenario_data_preparation_dialog: ScenarioDataPreparationDialog | None = None
         self._scenario_model_source_dialog: ScenarioModelSourceDialog | None = None
+        self._scenario_training_selection_dialog: ScenarioTrainingSelectionDialog | None = None
         self._scenario_training_dialog: ScenarioTrainingDialog | None = None
         self._scenario_inference_dialog: ScenarioInferenceDialog | None = None
         self._inference_history_dialog: InferenceHistoryDialog | None = None
@@ -186,7 +191,16 @@ class MainWindow(QMainWindow):
         template = self._scenario_template_service.get_template(result.template_key)
         selection_kind = self._scenario_model_source_dialog.selected_source_kind()
         if selection_kind is ScenarioModelSourceKind.TRAIN_NEW:
-            self._open_training_for_preparation(template, result)
+            self._scenario_training_selection_dialog = ScenarioTrainingSelectionDialog(
+                template=template,
+                preparation_result=result,
+                training_preset_service=self._scenario_training_preset_service,
+                parent=self,
+            )
+            self._scenario_training_selection_dialog.accepted.connect(self._continue_after_training_selection)
+            self._scenario_training_selection_dialog.show()
+            self._scenario_training_selection_dialog.raise_()
+            self._scenario_training_selection_dialog.activateWindow()
             return
         if selection_kind is ScenarioModelSourceKind.TRAINED_MODEL:
             self._previous_model_flow_dialog = PreviousModelFlowDialog(
@@ -198,12 +212,26 @@ class MainWindow(QMainWindow):
             self._previous_model_flow_dialog.raise_()
             self._previous_model_flow_dialog.activateWindow()
 
-    def _open_training_for_preparation(self, template, preparation_result) -> None:
+    def _continue_after_training_selection(self) -> None:
+        if self._scenario_data_preparation_dialog is None or self._scenario_training_selection_dialog is None:
+            return
+        result = self._scenario_data_preparation_dialog.preparation_result()
+        if result is None:
+            return
+        template = self._scenario_template_service.get_template(result.template_key)
+        self._open_training_for_preparation(
+            template=template,
+            preparation_result=result,
+            selected_steps=self._scenario_training_selection_dialog.selected_steps(),
+        )
+
+    def _open_training_for_preparation(self, template, preparation_result, *, selected_steps=None) -> None:
         self._scenario_training_dialog = ScenarioTrainingDialog(
             template=template,
             preparation_result=preparation_result,
             workflow_service=self._scenario_workflow_service,
             ml_service=self._ml_service,
+            training_steps=selected_steps,
             parent=self,
         )
         self._scenario_training_dialog.continue_to_prediction_requested.connect(self._open_inference_after_training)

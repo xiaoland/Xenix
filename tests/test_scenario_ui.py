@@ -5,7 +5,9 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QPlainTextEdit
+
+from xenix.datetime_utils import format_datetime_for_display
 
 from xenix.app import build_main_window
 from xenix.config import ensure_app_dirs, get_app_paths
@@ -18,7 +20,8 @@ from xenix.services.scenario_model_source_service import (
     ListCompatibleTrainedModelsInput,
     ScenarioModelSourceService,
 )
-from xenix.services.scenario_template_service import ScenarioTemplateService
+from xenix.services.scenario_template_service import ScenarioTemplateService, ScenarioTrainingOperation
+from xenix.services.scenario_training_preset_service import ScenarioTrainingPresetService
 from xenix.services.scenario_workflow_service import (
     PrepareScenarioWorkItemInput,
     ScenarioTrainingRun,
@@ -26,6 +29,7 @@ from xenix.services.scenario_workflow_service import (
     ScenarioTrainingStepSnapshot,
     ScenarioTrainingStepStatus,
     ScenarioWorkflowService,
+    StartScenarioTrainingRunInput,
 )
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import MLTaskStatus, MLTaskType
@@ -35,6 +39,7 @@ from xenix.ui.inference_history_dialog import InferenceHistoryDialog
 from xenix.ui.scenario_inference_dialog import ScenarioInferenceDialog
 from xenix.ui.scenario_model_source_dialog import ScenarioModelSourceDialog, ScenarioModelSourceKind
 from xenix.ui.scenario_training_dialog import ScenarioTrainingDialog
+from xenix.ui.scenario_training_selection_dialog import ScenarioTrainingSelectionDialog
 from xenix.ui.widgets.column_selection import ColumnSelectionWidget
 
 
@@ -456,10 +461,187 @@ def test_scenario_model_source_dialog_lists_compatible_trained_models_for_matchi
         dialog._model_list.setCurrentRow(0)
         app.processEvents()
 
+        selected_option = dialog.selected_trained_model()
+        assert selected_option is not None
+        assert selected_option.created_at.tzinfo is not None
         assert dialog._use_trained_button.isEnabled() is True
+        assert format_datetime_for_display(
+            selected_option.created_at,
+            format_string="%Y-%m-%d %H:%M",
+        ) in dialog._selected_model_label.text()
         dialog._choose_trained_model_branch()
         assert dialog.selected_source_kind() is ScenarioModelSourceKind.TRAINED_MODEL
         assert dialog.selected_trained_model() is not None
+    finally:
+        dialog.close()
+
+
+def test_scenario_training_selection_dialog_persists_default_model_selection(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    project_service = ProjectService(context.session_factory)
+    work_item_service = WorkItemService(context.session_factory, paths)
+    dataset_service = DatasetService(context.session_factory, paths)
+    ml_task_service = MLTaskService(context.session_factory, paths)
+    ml_service = MLService(
+        paths,
+        context.session_factory,
+        dataset_service,
+        work_item_service,
+        ml_task_service,
+    )
+    template_service = ScenarioTemplateService()
+    preset_service = ScenarioTrainingPresetService(paths, template_service)
+    workflow_service = ScenarioWorkflowService(
+        project_service=project_service,
+        work_item_service=work_item_service,
+        dataset_service=dataset_service,
+        ml_service=ml_service,
+        template_service=template_service,
+    )
+
+    dataset_file = tmp_path / "selection-demand.csv"
+    dataset_file.write_text(
+        "feature_a,feature_b,target\n"
+        "1,2,5\n"
+        "2,1,5\n"
+        "3,5,11\n"
+        "4,2,10\n",
+        encoding="utf-8",
+    )
+    prepared = workflow_service.prepare_work_item(
+        PrepareScenarioWorkItemInput(
+            template_key="sales_demand_forecast.v1",
+            source_path=str(dataset_file.resolve()),
+            feature_columns=["feature_a", "feature_b"],
+            target_columns=["target"],
+        )
+    )
+    template = template_service.get_template(prepared.template_key)
+
+    dialog = ScenarioTrainingSelectionDialog(
+        template=template,
+        preparation_result=prepared,
+        training_preset_service=preset_service,
+    )
+    try:
+        dialog.show()
+        app.processEvents()
+
+        assert dialog.isVisible()
+        assert dialog.windowTitle() == "Choose Models and Train"
+        assert [step.model_key for step in dialog.selected_steps()] == [
+            "regression.linear",
+            "regression.ridge",
+            "regression.random_forest",
+        ]
+
+        dialog._model_cards["regression.ridge"]._selected_checkbox.setChecked(False)
+        dialog._model_cards["regression.random_forest"]._selected_checkbox.setChecked(False)
+        app.processEvents()
+        dialog._save_defaults_button.click()
+        app.processEvents()
+
+        assert [step.model_key for step in dialog.selected_steps()] == ["regression.linear"]
+        assert dialog._message_label.text() == "Saved the current model selection as the default."
+    finally:
+        dialog.close()
+
+    second_dialog = ScenarioTrainingSelectionDialog(
+        template=template,
+        preparation_result=prepared,
+        training_preset_service=preset_service,
+    )
+    try:
+        second_dialog.show()
+        app.processEvents()
+
+        assert [step.model_key for step in second_dialog.selected_steps()] == ["regression.linear"]
+    finally:
+        second_dialog.close()
+
+
+def test_scenario_training_selection_dialog_switches_to_multivalue_param_grid_inputs(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    project_service = ProjectService(context.session_factory)
+    work_item_service = WorkItemService(context.session_factory, paths)
+    dataset_service = DatasetService(context.session_factory, paths)
+    ml_task_service = MLTaskService(context.session_factory, paths)
+    ml_service = MLService(
+        paths,
+        context.session_factory,
+        dataset_service,
+        work_item_service,
+        ml_task_service,
+    )
+    template_service = ScenarioTemplateService()
+    preset_service = ScenarioTrainingPresetService(paths, template_service)
+    workflow_service = ScenarioWorkflowService(
+        project_service=project_service,
+        work_item_service=work_item_service,
+        dataset_service=dataset_service,
+        ml_service=ml_service,
+        template_service=template_service,
+    )
+
+    dataset_file = tmp_path / "linear-demand.csv"
+    dataset_file.write_text(
+        "feature_a,feature_b,target\n"
+        "1,2,5\n"
+        "2,1,5\n"
+        "3,5,11\n"
+        "4,2,10\n",
+        encoding="utf-8",
+    )
+    prepared = workflow_service.prepare_work_item(
+        PrepareScenarioWorkItemInput(
+            template_key="sales_demand_forecast.v1",
+            source_path=str(dataset_file.resolve()),
+            feature_columns=["feature_a", "feature_b"],
+            target_columns=["target"],
+        )
+    )
+    template = template_service.get_template(prepared.template_key)
+
+    dialog = ScenarioTrainingSelectionDialog(
+        template=template,
+        preparation_result=prepared,
+        training_preset_service=preset_service,
+    )
+    try:
+        dialog.show()
+        app.processEvents()
+
+        linear_card = dialog._model_cards["regression.linear"]
+        tuning_index = linear_card._operation_selector.findData(ScenarioTrainingOperation.HYPERPARAMETER_TUNING)
+        linear_card._operation_selector.setCurrentIndex(tuning_index)
+        app.processEvents()
+
+        binding = linear_card._config_form._bindings["fit_intercept"]
+        assert isinstance(binding.widget, QPlainTextEdit)
+        binding.widget.setPlainText("true\nfalse")  # type: ignore[union-attr]
+
+        selected_step = linear_card.selected_step()
+        assert selected_step is not None
+        assert selected_step.operation.value == "hyperparameter_tuning"
+        assert selected_step.param_grid == {"fit_intercept": [True, False]}
     finally:
         dialog.close()
 
@@ -507,6 +689,106 @@ def test_main_window_opens_model_source_dialog_after_preparation(
     finally:
         if window._scenario_model_source_dialog is not None:
             window._scenario_model_source_dialog.close()
+        window._ml_workspace._timer.stop()
+        window.close()
+
+
+def test_main_window_train_new_flow_opens_training_selection_and_starts_selected_steps(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    dataset_file = tmp_path / "train-new-demand.csv"
+    dataset_file.write_text(
+        "feature_a,feature_b,target\n"
+        "1,2,5\n"
+        "2,1,5\n"
+        "3,5,11\n"
+        "4,2,10\n",
+        encoding="utf-8",
+    )
+    _app, window = build_main_window(show=False)
+    captured_inputs: list[StartScenarioTrainingRunInput] = []
+
+    def fake_start_training_run(input_data: StartScenarioTrainingRunInput) -> ScenarioTrainingRun:
+        captured_inputs.append(input_data)
+        return ScenarioTrainingRun(
+            template_key=input_data.template_key,
+            work_item_id=input_data.work_item_id,
+            steps=input_data.selected_steps,
+            root_task_ids=[f"root-{index + 1}" for index, _step in enumerate(input_data.selected_steps)],
+        )
+
+    def fake_get_training_run_snapshot(run: ScenarioTrainingRun) -> ScenarioTrainingRunSnapshot:
+        return ScenarioTrainingRunSnapshot(
+            template_key=run.template_key,
+            work_item_id=run.work_item_id,
+            step_snapshots=[
+                ScenarioTrainingStepSnapshot(
+                    step_key=step.step_key,
+                    operation=step.operation,
+                    model_key=step.model_key,
+                    root_task_id=run.root_task_ids[index],
+                    root_status=MLTaskStatus.PENDING,
+                    status=ScenarioTrainingStepStatus.RUNNING,
+                )
+                for index, step in enumerate(run.steps)
+            ],
+            best_trained_model_id=None,
+            is_terminal=False,
+            can_proceed_to_inference=False,
+        )
+
+    monkeypatch.setattr(window._scenario_workflow_service, "start_training_run", fake_start_training_run)
+    monkeypatch.setattr(window._scenario_workflow_service, "get_training_run_snapshot", fake_get_training_run_snapshot)
+
+    try:
+        prepared = window._scenario_workflow_service.prepare_work_item(
+            PrepareScenarioWorkItemInput(
+                template_key="sales_demand_forecast.v1",
+                source_path=str(dataset_file.resolve()),
+                feature_columns=["feature_a", "feature_b"],
+                target_columns=["target"],
+            )
+        )
+
+        class _PreparedDialogStub:
+            def preparation_result(self_nonlocal):
+                return prepared
+
+        class _ModelSourceDialogStub:
+            def selected_source_kind(self_nonlocal):
+                return ScenarioModelSourceKind.TRAIN_NEW
+
+        window._scenario_data_preparation_dialog = _PreparedDialogStub()
+        window._scenario_model_source_dialog = _ModelSourceDialogStub()
+
+        window._continue_after_model_source_selection()
+        app.processEvents()
+
+        assert isinstance(window._scenario_training_selection_dialog, ScenarioTrainingSelectionDialog)
+        assert window._scenario_training_selection_dialog.isVisible()
+
+        window._scenario_training_selection_dialog._model_cards["regression.ridge"]._selected_checkbox.setChecked(False)
+        window._scenario_training_selection_dialog._model_cards["regression.random_forest"]._selected_checkbox.setChecked(False)
+        app.processEvents()
+        window._scenario_training_selection_dialog._start_training_button.click()
+        app.processEvents()
+
+        assert len(captured_inputs) == 1
+        assert [step.model_key for step in captured_inputs[0].selected_steps] == ["regression.linear"]
+        assert isinstance(window._scenario_training_dialog, ScenarioTrainingDialog)
+        assert window._scenario_training_dialog.isVisible()
+        assert window._scenario_training_dialog._step_table.rowCount() == 1
+    finally:
+        if window._scenario_training_selection_dialog is not None:
+            window._scenario_training_selection_dialog.close()
+        if window._scenario_training_dialog is not None:
+            window._scenario_training_dialog.close()
         window._ml_workspace._timer.stop()
         window.close()
 

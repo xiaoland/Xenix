@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..datetime_utils import format_datetime_for_display
 from ..services.scenario_model_source_service import (
     CompatibleTrainedModelOption,
     ListCompatibleTrainedModelsInput,
@@ -183,7 +184,7 @@ class ScenarioModelSourceDialog(QDialog):
                 self.tr("{model_name} | {work_item_name} | {created_at}{suffix}").format(
                     model_name=option.model_display_name,
                     work_item_name=option.work_item_name,
-                    created_at=option.created_at.strftime("%Y-%m-%d %H:%M"),
+                    created_at=self._format_created_at(option),
                     suffix=suffix,
                 )
             )
@@ -212,9 +213,12 @@ class ScenarioModelSourceDialog(QDialog):
             ).format(
                 model_name=option.model_display_name,
                 work_item_name=option.work_item_name,
-                created_at=option.created_at.strftime("%Y-%m-%d %H:%M"),
+                created_at=self._format_created_at(option),
             )
         )
+
+    def _format_created_at(self, option: CompatibleTrainedModelOption) -> str:
+        return format_datetime_for_display(option.created_at, format_string="%Y-%m-%d %H:%M")
 
     def _choose_training_branch(self) -> None:
         self._selected_source_kind = ScenarioModelSourceKind.TRAIN_NEW

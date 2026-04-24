@@ -17,8 +17,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..exceptions import XenixError
 from ..services.ml_service import MLService
 from ..services.scenario_template_service import ScenarioTemplate
+from ..services.scenario_template_service import ScenarioTrainingPlanStep
 from ..services.scenario_workflow_service import (
     ScenarioTrainingRun,
     ScenarioTrainingRunSnapshot,
@@ -42,6 +44,7 @@ class ScenarioTrainingDialog(QDialog):
         preparation_result: ScenarioWorkItemPreparationResult,
         workflow_service: ScenarioWorkflowService,
         ml_service: MLService,
+        training_steps: list[ScenarioTrainingPlanStep] | None = None,
         *,
         start_immediately: bool = True,
         parent: QWidget | None = None,
@@ -51,6 +54,7 @@ class ScenarioTrainingDialog(QDialog):
         self._preparation_result = preparation_result
         self._workflow_service = workflow_service
         self._ml_service = ml_service
+        self._training_steps = list(training_steps or [])
         self._current_run: ScenarioTrainingRun | None = None
         self._current_snapshot: ScenarioTrainingRunSnapshot | None = None
 
@@ -137,11 +141,11 @@ class ScenarioTrainingDialog(QDialog):
         self.setWindowTitle(self.tr("Training Dashboard"))
         self._title_label.setText(localized_template_display_name(self._template))
         self._summary_label.setText(
-            self.tr("The fixed training plan is running in the background. Review the result and continue when a best model is ready.")
+            self.tr("The selected model plan is running in the background. Review the result and continue when a best model is ready.")
         )
-        self._run_again_button.setText(self.tr("Run Full Plan Again"))
+        self._run_again_button.setText(self.tr("Run Selected Plan Again"))
         self._continue_button.setText(self.tr("Continue to Prediction"))
-        self._step_group.setTitle(self.tr("Training Plan"))
+        self._step_group.setTitle(self.tr("Training Steps"))
         self._detail_group.setTitle(self.tr("Task Details"))
         self._step_table.setHorizontalHeaderLabels(
             [
@@ -172,6 +176,7 @@ class ScenarioTrainingDialog(QDialog):
             StartScenarioTrainingRunInput(
                 template_key=self._template.key,
                 work_item_id=self._preparation_result.work_item_id,
+                selected_steps=self._training_steps,
             )
         )
         self.refresh_runtime()
@@ -289,7 +294,14 @@ class ScenarioTrainingDialog(QDialog):
             return
 
         task_id = selected_snapshot.evaluate_task_id or selected_snapshot.root_task_id
-        details = self._ml_service.get_task_details(task_id)
+        try:
+            details = self._ml_service.get_task_details(task_id)
+        except XenixError:
+            self._task_details_label.setText(
+                self.tr("Task details are temporarily unavailable for the selected step.")
+            )
+            self._task_log_view.clear()
+            return
         lines = [
             self.tr("Task: {task_id}").format(task_id=details.task.id),
             self.tr("Model: {model_key}").format(model_key=selected_snapshot.model_key),
