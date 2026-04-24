@@ -3,25 +3,26 @@ from __future__ import annotations
 from PySide6.QtCore import QEvent
 from PySide6.QtWidgets import QDialog, QLabel, QPushButton, QVBoxLayout, QWidget
 
-from ..services.analysis_scenario_service import AnalysisScenario, AnalysisScenarioAvailability
-from .analysis_scenario_text import (
-    localized_analysis_scenario_description,
-    localized_analysis_scenario_display_name,
-)
+from ..services.scenario_model_source_service import CompatibleTrainedModelOption
+from ..services.scenario_template_service import ScenarioTemplate
+from .scenario_template_text import localized_template_display_name
 
 
 class PreviousModelFlowDialog(QDialog):
     def __init__(
         self,
-        scenario: AnalysisScenario,
+        template: ScenarioTemplate,
+        selected_model: CompatibleTrainedModelOption | None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self._scenario = scenario
+        self._template = template
+        self._selected_model = selected_model
 
         self._title_label = QLabel()
         self._summary_label = QLabel()
-        self._scenario_label = QLabel()
+        self._template_label = QLabel()
+        self._model_label = QLabel()
         self._detail_label = QLabel()
         self._close_button = QPushButton()
 
@@ -36,43 +37,50 @@ class PreviousModelFlowDialog(QDialog):
 
         self._title_label.setStyleSheet("font-size: 20px; font-weight: 600;")
         self._summary_label.setWordWrap(True)
-        self._scenario_label.setWordWrap(True)
+        self._template_label.setWordWrap(True)
+        self._model_label.setWordWrap(True)
         self._detail_label.setWordWrap(True)
 
         self._close_button.clicked.connect(self.close)
 
         layout.addWidget(self._title_label)
         layout.addWidget(self._summary_label)
-        layout.addWidget(self._scenario_label)
+        layout.addWidget(self._template_label)
+        layout.addWidget(self._model_label)
         layout.addWidget(self._detail_label)
         layout.addStretch(1)
         layout.addWidget(self._close_button)
 
     def retranslate_ui(self) -> None:
-        self.setWindowTitle(self.tr("Choose Previous Model"))
-        self._title_label.setText(self.tr("Choose Previous Model"))
+        self.setWindowTitle(self.tr("Choose Trained Model"))
+        self._title_label.setText(self.tr("Choose Trained Model"))
         self._summary_label.setText(
-            self.tr("This 2.0 entry reserves the saved-model workflow for the selected analysis scenario.")
+            self.tr("This 2.0 step reserves the trained-model reuse flow after data preparation.")
         )
-        self._scenario_label.setText(
-            self.tr("Selected scenario: {scenario_name}").format(
-                scenario_name=localized_analysis_scenario_display_name(self._scenario)
+        self._template_label.setText(
+            self.tr("Selected template: {template_name}").format(
+                template_name=localized_template_display_name(self._template)
             )
         )
-        if self._scenario.availability is AnalysisScenarioAvailability.AVAILABLE:
+        if self._selected_model is not None:
+            self._model_label.setText(
+                self.tr("Selected trained model: {model_name}").format(
+                    model_name=self._selected_model.model_display_name
+                )
+            )
             self._detail_label.setText(
                 self.tr(
-                    "Saved-model browsing for this scenario will be connected in the next work package.\n\nCurrent scenario description: {description}"
+                    "The compatible trained model route is now connected to the second step.\n\nDetailed direct-to-inference reuse will be completed in the next work package.\n\nSource work item: {work_item_name}\nCreated at: {created_at}"
                 ).format(
-                    description=localized_analysis_scenario_description(self._scenario)
+                    work_item_name=self._selected_model.work_item_name,
+                    created_at=self._selected_model.created_at.strftime("%Y-%m-%d %H:%M"),
                 )
             )
         else:
+            self._model_label.setText(self.tr("Selected trained model: None"))
             self._detail_label.setText(
                 self.tr(
-                    "This analysis scenario stays in the planned set for the current build.\n\nCurrent scenario description: {description}"
-                ).format(
-                    description=localized_analysis_scenario_description(self._scenario)
+                    "No compatible trained model is currently selected.\n\nThis route will stay available after model selection is connected."
                 )
             )
         self._close_button.setText(self.tr("Close"))

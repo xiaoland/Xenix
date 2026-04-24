@@ -18,6 +18,7 @@ from .services.inference_history_service import InferenceHistoryService
 from .services.ml_service import MLService
 from .services.ml_task_service import MLTaskService
 from .services.project_service import ProjectService
+from .services.scenario_model_source_service import ScenarioModelSourceService
 from .services.scenario_template_service import ScenarioTemplateService
 from .services.scenario_workflow_service import ScenarioWorkflowService
 from .services.storage import StorageBootstrapService
@@ -61,6 +62,10 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
     )
     scenario_template_service = ScenarioTemplateService()
     analysis_scenario_service = AnalysisScenarioService()
+    scenario_model_source_service = ScenarioModelSourceService(
+        context.session_factory,
+        scenario_template_service,
+    )
     scenario_workflow_service = ScenarioWorkflowService(
         project_service=project_service,
         work_item_service=work_item_service,
@@ -84,6 +89,7 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
         ml_service=ml_service,
         inference_history_service=inference_history_service,
         analysis_scenario_service=analysis_scenario_service,
+        scenario_model_source_service=scenario_model_source_service,
         scenario_template_service=scenario_template_service,
         scenario_workflow_service=scenario_workflow_service,
     )

@@ -75,27 +75,27 @@
         <translation type="vanished">Feature Columns</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="76"/>
+        <location filename="../ui/widgets/column_selection.py" line="78"/>
         <source>Choose one prediction target, then select one or more input columns.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="80"/>
+        <location filename="../ui/widgets/column_selection.py" line="82"/>
         <source>Select target columns and one or more input columns.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="81"/>
+        <location filename="../ui/widgets/column_selection.py" line="83"/>
         <source>Target Columns</source>
         <translation>Target Columns</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="82"/>
+        <location filename="../ui/widgets/column_selection.py" line="84"/>
         <source>Input Columns</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="78"/>
+        <location filename="../ui/widgets/column_selection.py" line="80"/>
         <source>Prediction Target</source>
         <translation type="unfinished"></translation>
     </message>
@@ -103,29 +103,34 @@
 <context>
     <name>DatasetSummaryWidget</name>
     <message>
-        <location filename="../ui/widgets/dataset_summary.py" line="38"/>
+        <location filename="../ui/widgets/dataset_summary.py" line="54"/>
         <source>File</source>
         <translation>File</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/dataset_summary.py" line="39"/>
+        <location filename="../ui/widgets/dataset_summary.py" line="55"/>
         <source>Path</source>
         <translation>Path</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/dataset_summary.py" line="40"/>
+        <location filename="../ui/widgets/dataset_summary.py" line="56"/>
         <source>Format</source>
         <translation>Format</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/dataset_summary.py" line="41"/>
+        <location filename="../ui/widgets/dataset_summary.py" line="57"/>
         <source>Rows</source>
         <translation>Rows</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/dataset_summary.py" line="42"/>
+        <location filename="../ui/widgets/dataset_summary.py" line="58"/>
         <source>Columns</source>
         <translation>Columns</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/dataset_summary.py" line="59"/>
+        <source>Preview</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -1019,7 +1024,7 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../ui/main_window.py" line="105"/>
+        <location filename="../ui/main_window.py" line="109"/>
         <source>Xenix Native</source>
         <translation>Xenix Native</translation>
     </message>
@@ -1093,37 +1098,50 @@
 <context>
     <name>PreviousModelFlowDialog</name>
     <message>
-        <location filename="../ui/previous_model_flow_dialog.py" line="52"/>
-        <location filename="../ui/previous_model_flow_dialog.py" line="53"/>
-        <source>Choose Previous Model</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../ui/previous_model_flow_dialog.py" line="55"/>
-        <source>This 2.0 entry reserves the saved-model workflow for the selected analysis scenario.</source>
+        <location filename="../ui/previous_model_flow_dialog.py" line="56"/>
+        <source>Choose Trained Model</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../ui/previous_model_flow_dialog.py" line="58"/>
-        <source>Selected scenario: {scenario_name}</source>
+        <source>This 2.0 step reserves the trained-model reuse flow after data preparation.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/previous_model_flow_dialog.py" line="65"/>
-        <source>Saved-model browsing for this scenario will be connected in the next work package.
-
-Current scenario description: {description}</source>
+        <location filename="../ui/previous_model_flow_dialog.py" line="61"/>
+        <source>Selected template: {template_name}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="67"/>
+        <source>Selected trained model: {model_name}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../ui/previous_model_flow_dialog.py" line="73"/>
-        <source>This analysis scenario stays in the planned set for the current build.
+        <source>The compatible trained model route is now connected to the second step.
 
-Current scenario description: {description}</source>
+Detailed direct-to-inference reuse will be completed in the next work package.
+
+Source work item: {work_item_name}
+Created at: {created_at}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/previous_model_flow_dialog.py" line="78"/>
+        <location filename="../ui/previous_model_flow_dialog.py" line="80"/>
+        <source>Selected trained model: None</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="83"/>
+        <source>No compatible trained model is currently selected.
+
+This route will stay available after model selection is connected.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="86"/>
         <source>Close</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1131,72 +1149,77 @@ Current scenario description: {description}</source>
 <context>
     <name>ScenarioDataPreparationDialog</name>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="124"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="125"/>
         <source>Prepare Scenario Data</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="127"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="128"/>
         <source>Upload one dataset, choose the prediction target and input columns, then continue to training.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="129"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="130"/>
         <source>Choose File</source>
         <translation type="unfinished">Choose File</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="130"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="131"/>
         <source>Continue to Training</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="133"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="134"/>
         <source>Choose a dataset file to begin.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="143"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="144"/>
         <source>Choose Dataset File</source>
         <translation type="unfinished">Choose Dataset File</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="145"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="146"/>
         <source>Supported Data Files (*.csv *.xlsx *.xls);;CSV Files (*.csv);;Excel Files (*.xlsx *.xls)</source>
         <translation type="unfinished">Supported Data Files (*.csv *.xlsx *.xls);;CSV Files (*.csv);;Excel Files (*.xlsx *.xls)</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="212"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="170"/>
+        <source>Choose valid input columns and a prediction target before continuing.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="216"/>
         <source>Dataset inspected. Choose columns, then continue.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="264"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="268"/>
         <source>Inspecting dataset...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="266"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="270"/>
         <source>Preparing scenario work item...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="166"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="167"/>
         <source>Choose and inspect a dataset before continuing.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="229"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="233"/>
         <source>Data preparation finished. Training can start next.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="232"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="236"/>
         <source>Prepared</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="233"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="237"/>
         <source>The scenario work item is ready for training.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1204,67 +1227,27 @@ Current scenario description: {description}</source>
 <context>
     <name>ScenarioHomeView</name>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="141"/>
+        <location filename="../ui/scenario_home_view.py" line="97"/>
         <source>Xenix native ML workspace</source>
         <translation type="unfinished">Xenix native ML workspace</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="144"/>
+        <location filename="../ui/scenario_home_view.py" line="100"/>
         <source>Choose a guided scenario to prepare data, train models, and run local prediction without technical tabs.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="147"/>
-        <source>Start</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_home_view.py" line="148"/>
+        <location filename="../ui/scenario_home_view.py" line="103"/>
         <source>Analysis Scenarios</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="152"/>
-        <source>New Task</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_home_view.py" line="153"/>
-        <source>Choose Previous Model</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_home_view.py" line="155"/>
-        <source>Prepare data, train a fresh model set, and continue through the guided workflow.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_home_view.py" line="158"/>
-        <source>Start from a saved-model route and keep the interaction focused on model reuse.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_home_view.py" line="192"/>
-        <source>Choose an analysis scenario for a new guided task.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_home_view.py" line="196"/>
-        <source>Choose an analysis scenario for the saved-model route.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_home_view.py" line="200"/>
-        <source>Start by choosing a new task or the saved-model route.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_home_view.py" line="149"/>
+        <location filename="../ui/scenario_home_view.py" line="104"/>
         <source>History</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="150"/>
+        <location filename="../ui/scenario_home_view.py" line="105"/>
         <source>Settings</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1513,6 +1496,97 @@ Current scenario description: {description}</source>
         <location filename="../ui/scenario_inference_dialog.py" line="492"/>
         <source>Cancelled</source>
         <translation type="unfinished">Cancelled</translation>
+    </message>
+</context>
+<context>
+    <name>ScenarioModelSourceDialog</name>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="133"/>
+        <source>Choose Model Source</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="136"/>
+        <source>The dataset is ready. Choose whether to train a new model set or continue from a compatible trained model.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="139"/>
+        <source>Input columns: {features}
+Prediction target: {targets}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="144"/>
+        <source>Choose Models and Train</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="146"/>
+        <source>Continue to model selection and training with the prepared dataset.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="148"/>
+        <source>Choose Trained Model</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="150"/>
+        <source>Compatible trained models with the same scenario and column selection appear below.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="154"/>
+        <source>{count} compatible trained models found.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="160"/>
+        <source>No compatible trained models are available yet for the current selection.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="162"/>
+        <source>Continue to Training</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="163"/>
+        <source>Continue with Trained Model</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="164"/>
+        <source>Close</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="181"/>
+        <source> [Best]</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="183"/>
+        <source>{model_name} | {work_item_name} | {created_at}{suffix}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="201"/>
+        <source>Select one compatible trained model to continue.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="205"/>
+        <source>Training a new model set is available immediately.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="211"/>
+        <source>Selected model: {model_name}
+Source work item: {work_item_name}
+Created at: {created_at}</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>

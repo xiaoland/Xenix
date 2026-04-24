@@ -75,17 +75,17 @@
         <translation type="vanished">特征列</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="76"/>
+        <location filename="../ui/widgets/column_selection.py" line="78"/>
         <source>Choose one prediction target, then select one or more input columns.</source>
         <translation>先选择一个预测目标，再选择一个或多个输入列。</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="80"/>
+        <location filename="../ui/widgets/column_selection.py" line="82"/>
         <source>Select target columns and one or more input columns.</source>
         <translation>选择目标列和一个或多个输入列。</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="81"/>
+        <location filename="../ui/widgets/column_selection.py" line="83"/>
         <source>Target Columns</source>
         <translation>目标列</translation>
     </message>
@@ -94,12 +94,12 @@
         <translation type="vanished">先选择一个预测目标，再加入一个或多个输入列。</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="82"/>
+        <location filename="../ui/widgets/column_selection.py" line="84"/>
         <source>Input Columns</source>
         <translation>输入列</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/column_selection.py" line="78"/>
+        <location filename="../ui/widgets/column_selection.py" line="80"/>
         <source>Prediction Target</source>
         <translation>预测目标</translation>
     </message>
@@ -123,29 +123,34 @@
 <context>
     <name>DatasetSummaryWidget</name>
     <message>
-        <location filename="../ui/widgets/dataset_summary.py" line="38"/>
+        <location filename="../ui/widgets/dataset_summary.py" line="54"/>
         <source>File</source>
         <translation>文件</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/dataset_summary.py" line="39"/>
+        <location filename="../ui/widgets/dataset_summary.py" line="55"/>
         <source>Path</source>
         <translation>路径</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/dataset_summary.py" line="40"/>
+        <location filename="../ui/widgets/dataset_summary.py" line="56"/>
         <source>Format</source>
         <translation>格式</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/dataset_summary.py" line="41"/>
+        <location filename="../ui/widgets/dataset_summary.py" line="57"/>
         <source>Rows</source>
         <translation>行数</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/dataset_summary.py" line="42"/>
+        <location filename="../ui/widgets/dataset_summary.py" line="58"/>
         <source>Columns</source>
         <translation>列数</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/dataset_summary.py" line="59"/>
+        <source>Preview</source>
+        <translation>预览</translation>
     </message>
 </context>
 <context>
@@ -1039,7 +1044,7 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../ui/main_window.py" line="105"/>
+        <location filename="../ui/main_window.py" line="109"/>
         <source>Xenix Native</source>
         <translation>Xenix 原生版</translation>
     </message>
@@ -1129,41 +1134,85 @@
 <context>
     <name>PreviousModelFlowDialog</name>
     <message>
-        <location filename="../ui/previous_model_flow_dialog.py" line="52"/>
-        <location filename="../ui/previous_model_flow_dialog.py" line="53"/>
         <source>Choose Previous Model</source>
-        <translation>选择过往模型</translation>
+        <translation type="vanished">选择过往模型</translation>
     </message>
     <message>
-        <location filename="../ui/previous_model_flow_dialog.py" line="55"/>
         <source>This 2.0 entry reserves the saved-model workflow for the selected analysis scenario.</source>
-        <translation>这个 2.0 入口为所选分析场景预留了过往模型工作流。</translation>
+        <translation type="vanished">这个 2.0 入口为所选分析场景预留了过往模型工作流。</translation>
     </message>
     <message>
-        <location filename="../ui/previous_model_flow_dialog.py" line="58"/>
         <source>Selected scenario: {scenario_name}</source>
-        <translation>已选场景：{scenario_name}</translation>
+        <translation type="vanished">已选场景：{scenario_name}</translation>
     </message>
     <message>
-        <location filename="../ui/previous_model_flow_dialog.py" line="65"/>
         <source>Saved-model browsing for this scenario will be connected in the next work package.
 
 Current scenario description: {description}</source>
-        <translation>这个场景的过往模型浏览能力会在下一个工作包接入。
+        <translation type="vanished">这个场景的过往模型浏览能力会在下一个工作包接入。
 
 当前场景说明：{description}</translation>
     </message>
     <message>
-        <location filename="../ui/previous_model_flow_dialog.py" line="73"/>
         <source>This analysis scenario stays in the planned set for the current build.
 
 Current scenario description: {description}</source>
-        <translation>这个分析场景在当前版本中仍属于规划项。
+        <translation type="vanished">这个分析场景在当前版本中仍属于规划项。
 
 当前场景说明：{description}</translation>
     </message>
     <message>
-        <location filename="../ui/previous_model_flow_dialog.py" line="78"/>
+        <location filename="../ui/previous_model_flow_dialog.py" line="55"/>
+        <location filename="../ui/previous_model_flow_dialog.py" line="56"/>
+        <source>Choose Trained Model</source>
+        <translation>选择已训练模型</translation>
+    </message>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="58"/>
+        <source>This 2.0 step reserves the trained-model reuse flow after data preparation.</source>
+        <translation>这个 2.0 步骤为数据准备之后的已训练模型复用流程预留了入口。</translation>
+    </message>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="61"/>
+        <source>Selected template: {template_name}</source>
+        <translation>已选模板：{template_name}</translation>
+    </message>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="67"/>
+        <source>Selected trained model: {model_name}</source>
+        <translation>已选模型：{model_name}</translation>
+    </message>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="73"/>
+        <source>The compatible trained model route is now connected to the second step.
+
+Detailed direct-to-inference reuse will be completed in the next work package.
+
+Source work item: {work_item_name}
+Created at: {created_at}</source>
+        <translation>相容的已训练模型路径已经接入第二步。
+
+直接承接到预测的完整复用流程会在下一个工作包完成。
+
+来源工作项：{work_item_name}
+创建时间：{created_at}</translation>
+    </message>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="80"/>
+        <source>Selected trained model: None</source>
+        <translation>已选模型：无</translation>
+    </message>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="83"/>
+        <source>No compatible trained model is currently selected.
+
+This route will stay available after model selection is connected.</source>
+        <translation>当前尚未选择相容的已训练模型。
+
+模型选择接入后，这条路径会持续可用。</translation>
+    </message>
+    <message>
+        <location filename="../ui/previous_model_flow_dialog.py" line="86"/>
         <source>Close</source>
         <translation>关闭</translation>
     </message>
@@ -1171,72 +1220,77 @@ Current scenario description: {description}</source>
 <context>
     <name>ScenarioDataPreparationDialog</name>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="124"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="125"/>
         <source>Prepare Scenario Data</source>
         <translation>准备场景数据</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="127"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="128"/>
         <source>Upload one dataset, choose the prediction target and input columns, then continue to training.</source>
         <translation>上传一个数据集，选择预测目标和输入列，然后继续训练。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="129"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="130"/>
         <source>Choose File</source>
         <translation>选择文件</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="130"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="131"/>
         <source>Continue to Training</source>
         <translation>继续训练</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="133"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="134"/>
         <source>Choose a dataset file to begin.</source>
         <translation>请选择一个数据集文件开始。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="143"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="144"/>
         <source>Choose Dataset File</source>
         <translation>选择数据集文件</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="145"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="146"/>
         <source>Supported Data Files (*.csv *.xlsx *.xls);;CSV Files (*.csv);;Excel Files (*.xlsx *.xls)</source>
         <translation>支持的数据文件 (*.csv *.xlsx *.xls);;CSV 文件 (*.csv);;Excel 文件 (*.xlsx *.xls)</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="212"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="170"/>
+        <source>Choose valid input columns and a prediction target before continuing.</source>
+        <translation>继续前请选择有效的输入列和预测目标。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="216"/>
         <source>Dataset inspected. Choose columns, then continue.</source>
         <translation>数据集已分析。请选择列，然后继续。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="264"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="268"/>
         <source>Inspecting dataset...</source>
         <translation>正在解析数据集...</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="266"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="270"/>
         <source>Preparing scenario work item...</source>
         <translation>正在准备场景工作项...</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="166"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="167"/>
         <source>Choose and inspect a dataset before continuing.</source>
         <translation>继续前请先选择并分析数据集。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="229"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="233"/>
         <source>Data preparation finished. Training can start next.</source>
         <translation>数据准备已完成。接下来可以开始训练。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="232"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="236"/>
         <source>Prepared</source>
         <translation>已准备就绪</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_data_preparation_dialog.py" line="233"/>
+        <location filename="../ui/scenario_data_preparation_dialog.py" line="237"/>
         <source>The scenario work item is ready for training.</source>
         <translation>场景工作项已准备好进行训练。</translation>
     </message>
@@ -1244,71 +1298,63 @@ Current scenario description: {description}</source>
 <context>
     <name>ScenarioHomeView</name>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="141"/>
+        <location filename="../ui/scenario_home_view.py" line="97"/>
         <source>Xenix native ML workspace</source>
         <translation>Xenix 原生机器学习工作台</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="144"/>
+        <location filename="../ui/scenario_home_view.py" line="100"/>
         <source>Choose a guided scenario to prepare data, train models, and run local prediction without technical tabs.</source>
         <translation>选择一个引导式场景来准备数据、训练模型并执行本地预测，无需进入技术标签页。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="147"/>
         <source>Start</source>
-        <translation>开始</translation>
+        <translation type="vanished">开始</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="148"/>
+        <location filename="../ui/scenario_home_view.py" line="103"/>
         <source>Analysis Scenarios</source>
         <translation>分析场景</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="152"/>
         <source>New Task</source>
-        <translation>新任务</translation>
+        <translation type="vanished">新任务</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="153"/>
         <source>Choose Previous Model</source>
-        <translation>选择过往模型</translation>
+        <translation type="vanished">选择过往模型</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="155"/>
         <source>Prepare data, train a fresh model set, and continue through the guided workflow.</source>
-        <translation>准备数据，训练一组新的模型，并继续完成引导式流程。</translation>
+        <translation type="vanished">准备数据，训练一组新的模型，并继续完成引导式流程。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="158"/>
         <source>Start from a saved-model route and keep the interaction focused on model reuse.</source>
-        <translation>从过往模型路径开始，并让交互聚焦在模型复用上。</translation>
+        <translation type="vanished">从过往模型路径开始，并让交互聚焦在模型复用上。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="192"/>
         <source>Choose an analysis scenario for a new guided task.</source>
-        <translation>选择一个分析场景来创建新的引导式任务。</translation>
+        <translation type="vanished">选择一个分析场景来创建新的引导式任务。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="196"/>
         <source>Choose an analysis scenario for the saved-model route.</source>
-        <translation>选择一个分析场景来进入过往模型路径。</translation>
+        <translation type="vanished">选择一个分析场景来进入过往模型路径。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="200"/>
         <source>Start by choosing a new task or the saved-model route.</source>
-        <translation>请先选择新任务或过往模型路径。</translation>
+        <translation type="vanished">请先选择新任务或过往模型路径。</translation>
     </message>
     <message>
         <source>Scenario Templates</source>
         <translation type="vanished">场景模板</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="149"/>
+        <location filename="../ui/scenario_home_view.py" line="104"/>
         <source>History</source>
         <translation>历史</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_home_view.py" line="150"/>
+        <location filename="../ui/scenario_home_view.py" line="105"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>
@@ -1557,6 +1603,100 @@ Current scenario description: {description}</source>
         <location filename="../ui/scenario_inference_dialog.py" line="492"/>
         <source>Cancelled</source>
         <translation>已取消</translation>
+    </message>
+</context>
+<context>
+    <name>ScenarioModelSourceDialog</name>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="133"/>
+        <source>Choose Model Source</source>
+        <translation>选择模型来源</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="136"/>
+        <source>The dataset is ready. Choose whether to train a new model set or continue from a compatible trained model.</source>
+        <translation>数据已准备完成。请选择训练一组新模型，或从相容的已训练模型继续。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="139"/>
+        <source>Input columns: {features}
+Prediction target: {targets}</source>
+        <translation>输入列：{features}
+预测目标：{targets}</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="144"/>
+        <source>Choose Models and Train</source>
+        <translation>选择模型并训练</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="146"/>
+        <source>Continue to model selection and training with the prepared dataset.</source>
+        <translation>使用当前已准备的数据集，继续进入模型选择与训练。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="148"/>
+        <source>Choose Trained Model</source>
+        <translation>选择已训练模型</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="150"/>
+        <source>Compatible trained models with the same scenario and column selection appear below.</source>
+        <translation>下方会显示与当前场景和列选择相容的已训练模型。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="154"/>
+        <source>{count} compatible trained models found.</source>
+        <translation>找到 {count} 个相容的已训练模型。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="160"/>
+        <source>No compatible trained models are available yet for the current selection.</source>
+        <translation>当前选择下还没有可用的相容已训练模型。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="162"/>
+        <source>Continue to Training</source>
+        <translation>继续训练</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="163"/>
+        <source>Continue with Trained Model</source>
+        <translation>继续使用已训练模型</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="164"/>
+        <source>Close</source>
+        <translation>关闭</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="181"/>
+        <source> [Best]</source>
+        <translation> [最佳]</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="183"/>
+        <source>{model_name} | {work_item_name} | {created_at}{suffix}</source>
+        <translation>{model_name} | {work_item_name} | {created_at}{suffix}</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="201"/>
+        <source>Select one compatible trained model to continue.</source>
+        <translation>请选择一个相容的已训练模型再继续。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="205"/>
+        <source>Training a new model set is available immediately.</source>
+        <translation>现在可以直接训练一组新模型。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_model_source_dialog.py" line="211"/>
+        <source>Selected model: {model_name}
+Source work item: {work_item_name}
+Created at: {created_at}</source>
+        <translation>已选模型：{model_name}
+来源工作项：{work_item_name}
+创建时间：{created_at}</translation>
     </message>
 </context>
 <context>

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, Qt
+from PySide6.QtCore import QEvent, Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
@@ -15,6 +15,8 @@ from ...services.dataset_inspection import DatasetColumnMetadata
 
 
 class ColumnSelectionWidget(QFrame):
+    selection_changed = Signal()
+
     def __init__(
         self,
         *,
@@ -92,6 +94,7 @@ class ColumnSelectionWidget(QFrame):
         self._target_checkboxes = {}
         self._clear_checkbox_layout(self._feature_layout)
         self._clear_checkbox_layout(self._target_layout)
+        self.selection_changed.emit()
 
     def set_columns(
         self,
@@ -132,6 +135,7 @@ class ColumnSelectionWidget(QFrame):
 
         self._feature_layout.addStretch(1)
         self._target_layout.addStretch(1)
+        self.selection_changed.emit()
 
     def selected_feature_columns(self) -> list[str]:
         return [
@@ -151,16 +155,20 @@ class ColumnSelectionWidget(QFrame):
 
     def _on_feature_toggled(self, column_name: str, checked: bool) -> None:
         if self._syncing_selection or not checked:
+            self.selection_changed.emit()
             return
         target_checkbox = self._target_checkboxes.get(column_name)
         if target_checkbox is None or not target_checkbox.isChecked():
+            self.selection_changed.emit()
             return
         self._syncing_selection = True
         target_checkbox.setChecked(False)
         self._syncing_selection = False
+        self.selection_changed.emit()
 
     def _on_target_toggled(self, column_name: str, checked: bool) -> None:
         if self._syncing_selection or not checked:
+            self.selection_changed.emit()
             return
 
         self._syncing_selection = True
@@ -175,6 +183,7 @@ class ColumnSelectionWidget(QFrame):
                 feature_checkbox.setChecked(False)
         finally:
             self._syncing_selection = False
+        self.selection_changed.emit()
 
     def _clear_checkbox_layout(self, layout: QVBoxLayout) -> None:
         while layout.count():

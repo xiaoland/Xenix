@@ -11,7 +11,7 @@ from pandas.api.types import (
     is_object_dtype,
     is_string_dtype,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..exceptions import ValidationError
 from .storage.models import DatasetSourceFormat
@@ -43,6 +43,8 @@ class DatasetInspection(BaseModel):
     row_count: int
     column_count: int
     columns: list[DatasetColumnMetadata]
+    preview_columns: list[str] = Field(default_factory=list)
+    preview_rows: list[list[str]] = Field(default_factory=list)
 
 
 def detect_source_format(path: Path) -> DatasetSourceFormat:
@@ -103,6 +105,11 @@ def inspect_dataset_file(source_path: Path) -> DatasetInspection:
         )
         for column_name in dataframe.columns
     ]
+    preview_columns = [str(column_name) for column_name in dataframe.columns]
+    preview_rows = [
+        [_format_preview_value(value) for value in row]
+        for row in dataframe.head(5).itertuples(index=False, name=None)
+    ]
     return DatasetInspection(
         source_path=str(source_path),
         source_format=source_format,
@@ -110,4 +117,12 @@ def inspect_dataset_file(source_path: Path) -> DatasetInspection:
         row_count=int(len(dataframe.index)),
         column_count=int(len(dataframe.columns)),
         columns=columns,
+        preview_columns=preview_columns,
+        preview_rows=preview_rows,
     )
+
+
+def _format_preview_value(value: object) -> str:
+    if pd.isna(value):
+        return ""
+    return str(value)

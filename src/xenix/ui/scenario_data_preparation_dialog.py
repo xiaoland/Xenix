@@ -115,6 +115,7 @@ class ScenarioDataPreparationDialog(QDialog):
         self._drop_zone.file_dropped.connect(self._inspect_path)
         self._choose_file_button.clicked.connect(self._choose_file)
         self._continue_button.clicked.connect(self._prepare_work_item)
+        self._column_selection.selection_changed.connect(self._refresh_interaction_state)
         self._signals.inspection_succeeded.connect(self._on_inspection_succeeded)
         self._signals.inspection_failed.connect(self._on_inspection_failed)
         self._signals.preparation_succeeded.connect(self._on_preparation_succeeded)
@@ -164,6 +165,9 @@ class ScenarioDataPreparationDialog(QDialog):
     def _prepare_work_item(self) -> None:
         if self._current_inspection is None or self._current_source_path is None:
             self._set_message(self.tr("Choose and inspect a dataset before continuing."), is_error=True)
+            return
+        if not self._has_valid_column_selection():
+            self._set_message(self.tr("Choose valid input columns and a prediction target before continuing."), is_error=True)
             return
 
         operation_id = self._start_busy_operation("preparation")
@@ -270,8 +274,20 @@ class ScenarioDataPreparationDialog(QDialog):
     def _refresh_interaction_state(self) -> None:
         is_busy = self._active_operation_kind is not None
         has_inspection = self._current_inspection is not None
+        has_valid_column_selection = has_inspection and self._has_valid_column_selection()
         self._drop_zone.setEnabled(not is_busy)
         self._choose_file_button.setEnabled(not is_busy)
         self._summary_widget.setEnabled(not is_busy)
         self._column_selection.setEnabled(not is_busy and has_inspection)
-        self._continue_button.setEnabled(not is_busy and has_inspection)
+        self._continue_button.setEnabled(not is_busy and has_valid_column_selection)
+
+    def _has_valid_column_selection(self) -> bool:
+        feature_columns = self._column_selection.selected_feature_columns()
+        target_columns = self._column_selection.selected_target_columns()
+        if len(feature_columns) < self._template.min_feature_columns:
+            return False
+        if len(target_columns) != self._template.required_target_count:
+            return False
+        if set(feature_columns) & set(target_columns):
+            return False
+        return True

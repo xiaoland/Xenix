@@ -481,6 +481,52 @@ SVG 的推論頁重心是輸入資料與結果。現況推論頁以任務表、�
 - 新增資料準備後的模型來源選擇頁
 - 建立已訓練模型分支的相容性查詢契約
 
+實作狀態：
+
+- 已完成第一輪落地，日期為 `2026-04-23`
+
+本輪已完成：
+
+- `DatasetInspection` 已補上前 5 筆預覽資料
+- `DatasetSummaryWidget` 已補上資料預覽表格
+- `ScenarioDataPreparationDialog` 已把欄位有效性前移到 UI
+- 只有在輸入列與預測目標配置有效後，才可繼續到下一步
+- 資料準備完成後，主流程已不再直接跳到訓練頁
+- 新增 `ScenarioModelSourceDialog` 作為第二步
+- 第二步已提供：
+  - `選擇模型並訓練`
+  - `選擇已訓練模型`
+- 已新增 `ScenarioModelSourceService`，目前以場景隱藏專案中的既有工作項為來源，按：
+  - 模板問題型別
+  - 輸入列完整匹配
+  - 預測目標完整匹配
+  來查詢相容的已訓練模型
+- 已訓練模型分支目前會承接到占位頁，完整直接復用到推論仍留在工作包 6
+
+涉及檔案：
+
+- `src/xenix/services/dataset_inspection.py`
+- `src/xenix/services/scenario_model_source_service.py`
+- `src/xenix/ui/scenario_data_preparation_dialog.py`
+- `src/xenix/ui/scenario_model_source_dialog.py`
+- `src/xenix/ui/previous_model_flow_dialog.py`
+- `src/xenix/ui/main_window.py`
+- `src/xenix/ui/widgets/column_selection.py`
+- `src/xenix/ui/widgets/dataset_summary.py`
+- `src/xenix/app.py`
+- `src/xenix/translations/xenix_en_US.ts`
+- `src/xenix/translations/xenix_zh_CN.ts`
+- `tests/test_scenario_ui.py`
+
+驗證結果：
+
+- `python -m compileall src tests scripts` 已通過
+- 與工作包 2 直接相關的目標用例已通過，包括：
+  - 資料預覽與欄位有效性
+  - 相容已訓練模型查詢
+  - 主視窗從資料準備頁承接到第二步
+  - `zh_CN` 下的既有首頁與主流程切換
+
 ### 工作包 3：新模型選擇與訓練模式
 
 目標：
