@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent
+from PySide6.QtCore import QEvent, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QFrame,
@@ -14,6 +14,8 @@ from PySide6.QtWidgets import (
 
 
 class InferenceRowEditorWidget(QFrame):
+    rows_changed = Signal()
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setFrameShape(QFrame.StyledPanel)
@@ -35,6 +37,7 @@ class InferenceRowEditorWidget(QFrame):
 
         self._table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self._table.setSelectionMode(QAbstractItemView.SingleSelection)
+        self._table.itemChanged.connect(lambda _item: self.rows_changed.emit())
 
         layout.addLayout(controls)
         layout.addWidget(self._table)
@@ -79,6 +82,29 @@ class InferenceRowEditorWidget(QFrame):
         self._columns = []
         self._table.setColumnCount(0)
         self._table.setRowCount(0)
+        self.rows_changed.emit()
+
+    def complete_rows(self) -> list[dict[str, str]]:
+        rows: list[dict[str, str]] = []
+        for row_index in range(self._table.rowCount()):
+            values = self._row_values(row_index)
+            if not any(values.values()):
+                continue
+            if not all(values.values()):
+                continue
+            rows.append(values)
+        return rows
+
+    def has_complete_rows(self) -> bool:
+        return bool(self.complete_rows())
+
+    def has_partial_rows(self) -> bool:
+        for row_index in range(self._table.rowCount()):
+            values = self._row_values(row_index)
+            populated = [value for value in values.values() if value]
+            if populated and len(populated) < len(self._columns):
+                return True
+        return False
 
     def _add_row(self) -> None:
         if not self._columns:
@@ -87,6 +113,7 @@ class InferenceRowEditorWidget(QFrame):
         self._table.insertRow(row_index)
         for column_index in range(len(self._columns)):
             self._table.setItem(row_index, column_index, QTableWidgetItem(""))
+        self.rows_changed.emit()
 
     def _remove_selected_rows(self) -> None:
         selected_rows = sorted({index.row() for index in self._table.selectedIndexes()}, reverse=True)
@@ -94,3 +121,12 @@ class InferenceRowEditorWidget(QFrame):
             self._table.removeRow(row_index)
         if self._columns and self._table.rowCount() == 0:
             self._add_row()
+            return
+        self.rows_changed.emit()
+
+    def _row_values(self, row_index: int) -> dict[str, str]:
+        values: dict[str, str] = {}
+        for column_index, column_name in enumerate(self._columns):
+            item = self._table.item(row_index, column_index)
+            values[column_name] = item.text().strip() if item is not None else ""
+        return values

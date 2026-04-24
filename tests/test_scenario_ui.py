@@ -990,11 +990,15 @@ def test_scenario_inference_dialog_queues_manual_prediction_with_best_model(
 
         assert dialog.windowTitle() == "Prediction"
         assert dialog._title_label.text() == "Sales Demand Forecast"
-        assert dialog._best_model_label.text().startswith("Using best model:")
-        assert dialog._manual_submit_button.isEnabled() is True
+        assert dialog._best_model_label.text().startswith("Best model selected:")
+        assert dialog._manual_submit_button.isEnabled() is False
 
         dialog._row_editor._table.item(0, 0).setText("11")
+        app.processEvents()
+        assert dialog._manual_submit_button.isEnabled() is False
         dialog._row_editor._table.item(0, 1).setText("9")
+        app.processEvents()
+        assert dialog._manual_submit_button.isEnabled() is True
         dialog._submit_manual_inference()
         app.processEvents()
 
@@ -1019,5 +1023,153 @@ def test_scenario_inference_dialog_queues_manual_prediction_with_best_model(
             time.sleep(0.1)
         else:
             raise AssertionError("Timed out waiting for the scenario prediction task to finish.")
+
+        dialog.refresh_runtime()
+        app.processEvents()
+
+        assert dialog._result_group.title() == "Prediction Result"
+        assert dialog._result_table.columnCount() >= 3
+        assert "prediction" in [
+            dialog._result_table.horizontalHeaderItem(index).text()
+            for index in range(dialog._result_table.columnCount())
+        ]
+        assert "Output column: prediction" in dialog._result_summary_label.text()
+    finally:
+        dialog.close()
+
+
+def test_scenario_inference_dialog_uses_selected_model_and_previews_batch_input(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    project_service = ProjectService(context.session_factory)
+    work_item_service = WorkItemService(context.session_factory, paths)
+    dataset_service = DatasetService(context.session_factory, paths)
+    ml_task_service = MLTaskService(context.session_factory, paths)
+    ml_service = MLService(
+        paths,
+        context.session_factory,
+        dataset_service,
+        work_item_service,
+        ml_task_service,
+    )
+    template_service = ScenarioTemplateService()
+    workflow_service = ScenarioWorkflowService(
+        project_service=project_service,
+        work_item_service=work_item_service,
+        dataset_service=dataset_service,
+        ml_service=ml_service,
+        template_service=template_service,
+    )
+
+    dataset_file = tmp_path / "predict-selected-model.csv"
+    dataset_file.write_text(
+        "feature_a,feature_b,target\n"
+        "1,2,5\n"
+        "2,1,5\n"
+        "3,5,11\n"
+        "4,2,10\n"
+        "5,3,13\n"
+        "6,6,18\n"
+        "7,5,19\n"
+        "8,4,20\n"
+        "9,7,25\n"
+        "10,8,28\n",
+        encoding="utf-8",
+    )
+    prepared = workflow_service.prepare_work_item(
+        PrepareScenarioWorkItemInput(
+            template_key="sales_demand_forecast.v1",
+            source_path=str(dataset_file.resolve()),
+            feature_columns=["feature_a", "feature_b"],
+            target_columns=["target"],
+        )
+    )
+    template = template_service.get_template(prepared.template_key)
+
+    ml_service.fit_with_evaluate(
+        FitWithEvaluateInput(
+            work_item_id=prepared.work_item_id,
+            model_key="regression.linear",
+            params={"fit_intercept": True},
+        )
+    )
+    ml_service.fit_with_evaluate(
+        FitWithEvaluateInput(
+            work_item_id=prepared.work_item_id,
+            model_key="regression.ridge",
+            params={"alpha": 1.0},
+        )
+    )
+
+    deadline = time.time() + 60
+    while time.time() < deadline:
+        trained_models = ml_service.list_trained_models(prepared.work_item_id)
+        if len(trained_models) >= 2:
+            break
+        time.sleep(0.1)
+    else:
+        raise AssertionError("Timed out waiting for two trained models.")
+
+    batch_file = tmp_path / "batch-preview.csv"
+    batch_file.write_text(
+        "feature_a,feature_b\n"
+        "11,9\n"
+        "12,10\n"
+        "13,11\n"
+        "14,12\n"
+        "15,13\n"
+        "16,14\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr("xenix.ui.scenario_inference_dialog.QMessageBox.information", lambda *args, **kwargs: None)
+    dialog = ScenarioInferenceDialog(
+        template=template,
+        preparation_result=prepared,
+        work_item_service=work_item_service,
+        dataset_service=dataset_service,
+        ml_service=ml_service,
+    )
+    try:
+        dialog.show()
+        app.processEvents()
+
+        assert dialog._model_selector.count() >= 2
+        dialog._load_batch_files([str(batch_file.resolve())])
+        app.processEvents()
+
+        assert dialog._batch_submit_button.isEnabled() is True
+        assert dialog._batch_preview_table.rowCount() == 5
+        assert "batch-preview.csv" in dialog._batch_preview_summary_label.text()
+
+        selected_index = dialog._model_selector.findText("Ridge Regression")
+        if selected_index < 0:
+            selected_index = dialog._model_selector.findText("[Best] Ridge Regression")
+        assert selected_index >= 0
+        dialog._model_selector.setCurrentIndex(selected_index)
+        app.processEvents()
+
+        selected_model_id = dialog._current_model_id()
+        assert selected_model_id is not None
+
+        dialog._submit_batch_inference()
+        app.processEvents()
+
+        inference_tasks = [
+            task
+            for task in ml_service.list_work_item_tasks(prepared.work_item_id)
+            if task.task_type is MLTaskType.INFERENCE
+        ]
+        assert len(inference_tasks) >= 1
+        latest_task = inference_tasks[-1]
+        assert latest_task.request_payload["inference_model"]["trained_model_id"] == selected_model_id
     finally:
         dialog.close()
