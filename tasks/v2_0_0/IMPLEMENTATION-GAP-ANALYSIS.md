@@ -635,6 +635,65 @@ SVG 的推論頁重心是輸入資料與結果。現況推論頁以任務表、�
 - 顯示 `MSE`、`R平方` 與提示說明
 - 補上保存模型與保存狀態
 
+實作狀態：
+
+- 已完成第一輪落地，日期為 `2026-04-24`
+
+本輪已完成：
+
+- `ScenarioTrainingDialog` 的主視圖已由任務步驟表重寫為模型結果卡片列表
+- 每張卡片已展示：
+  - 模型名稱
+  - 訓練模式
+  - `R平方`
+  - `MSE`
+  - 其他可用評估指標
+  - 參數摘要
+  - 保存狀態
+- 最佳模型卡片已補上顯式標記
+- 模型結果卡片可切換右側的 task details 檢視
+- 原本的 task details 區已保留為進階資訊區
+- `ScenarioWorkflowService` 已擴充訓練步驟快照，現在會帶出：
+  - 模型展示名稱
+  - 訓練參數
+  - 最佳參數
+  - 評估指標
+  - 主指標
+  - 候選數量
+  - 已保存模型 id
+- 訓練結束摘要文案已調整為面向模型結果的語義
+- 中英文翻譯資產已補齊新的模型結果視圖文案
+
+本輪保留：
+
+- SVG 中的顯式「保存該模型」按鈕與二次點擊鎖定規則，仍由後續模型資產工作包補齊
+
+涉及檔案：
+
+- `src/xenix/services/scenario_workflow_service.py`
+- `src/xenix/ui/scenario_training_dialog.py`
+- `src/xenix/translations/xenix_en_US.ts`
+- `src/xenix/translations/xenix_zh_CN.ts`
+- `tests/test_scenario_ui.py`
+
+驗證結果：
+
+- `python -m compileall src tests scripts` 已於前序工作包通過
+- 與工作包 4 直接相關的目標用例已通過，包括：
+  - 訓練頁從資料準備項啟動訓練
+  - 主視窗在 `TRAIN_NEW` 分支承接訓練流程
+  - 模型結果卡片顯示 `R平方`、`MSE` 與保存狀態
+
+驗收回修：
+
+- 日期：`2026-04-24`
+
+本輪修正：
+
+- 模型結果卡片的視覺語言已與現有 scenario UI 對齊
+- 卡片外層樣式已限制在卡片容器本身，內容列不再呈現輸入框式邊框
+- 狀態 badge、指標摘要、保存狀態與選中態已收斂成與既有 `StyledPanel` 相容的表達方式
+
 ### 工作包 5：推論頁靠攏
 
 目標：

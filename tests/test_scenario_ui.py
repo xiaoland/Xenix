@@ -224,6 +224,7 @@ def test_scenario_training_dialog_starts_a_run_for_prepared_work_item(
                     step_key=step.step_key,
                     operation=step.operation,
                     model_key=step.model_key,
+                    model_display_name=step.model_key,
                     root_task_id=fake_run.root_task_ids[index],
                     root_status=MLTaskStatus.PENDING,
                     status=ScenarioTrainingStepStatus.RUNNING,
@@ -253,7 +254,7 @@ def test_scenario_training_dialog_starts_a_run_for_prepared_work_item(
         assert len(dialog._current_run.root_task_ids) == 3
         assert dialog.windowTitle() == "Training Dashboard"
         assert dialog._title_label.text() == "Sales Demand Forecast"
-        assert dialog._step_table.rowCount() == 3
+        assert len(dialog._result_cards) == 3
         assert dialog._continue_button.isEnabled() is False
     finally:
         dialog.close()
@@ -732,6 +733,7 @@ def test_main_window_train_new_flow_opens_training_selection_and_starts_selected
                     step_key=step.step_key,
                     operation=step.operation,
                     model_key=step.model_key,
+                    model_display_name=step.model_key,
                     root_task_id=run.root_task_ids[index],
                     root_status=MLTaskStatus.PENDING,
                     status=ScenarioTrainingStepStatus.RUNNING,
@@ -783,7 +785,7 @@ def test_main_window_train_new_flow_opens_training_selection_and_starts_selected
         assert [step.model_key for step in captured_inputs[0].selected_steps] == ["regression.linear"]
         assert isinstance(window._scenario_training_dialog, ScenarioTrainingDialog)
         assert window._scenario_training_dialog.isVisible()
-        assert window._scenario_training_dialog._step_table.rowCount() == 1
+        assert len(window._scenario_training_dialog._result_cards) == 1
     finally:
         if window._scenario_training_selection_dialog is not None:
             window._scenario_training_selection_dialog.close()
@@ -791,6 +793,115 @@ def test_main_window_train_new_flow_opens_training_selection_and_starts_selected
             window._scenario_training_dialog.close()
         window._ml_workspace._timer.stop()
         window.close()
+
+
+def test_scenario_training_dialog_shows_regression_result_cards_with_metrics_and_save_state(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    project_service = ProjectService(context.session_factory)
+    work_item_service = WorkItemService(context.session_factory, paths)
+    dataset_service = DatasetService(context.session_factory, paths)
+    ml_task_service = MLTaskService(context.session_factory, paths)
+    ml_service = MLService(
+        paths,
+        context.session_factory,
+        dataset_service,
+        work_item_service,
+        ml_task_service,
+    )
+    template_service = ScenarioTemplateService()
+    workflow_service = ScenarioWorkflowService(
+        project_service=project_service,
+        work_item_service=work_item_service,
+        dataset_service=dataset_service,
+        ml_service=ml_service,
+        template_service=template_service,
+    )
+    dataset_file = tmp_path / "metrics-demand.csv"
+    dataset_file.write_text(
+        "feature_a,feature_b,target\n"
+        "1,2,5\n"
+        "2,1,5\n"
+        "3,5,11\n"
+        "4,2,10\n",
+        encoding="utf-8",
+    )
+    prepared = workflow_service.prepare_work_item(
+        PrepareScenarioWorkItemInput(
+            template_key="sales_demand_forecast.v1",
+            source_path=str(dataset_file.resolve()),
+            feature_columns=["feature_a", "feature_b"],
+            target_columns=["target"],
+        )
+    )
+    template = template_service.get_template(prepared.template_key)
+    fake_run = ScenarioTrainingRun(
+        template_key=template.key,
+        work_item_id=prepared.work_item_id,
+        steps=template.training_plan[:1],
+        root_task_ids=["root-1"],
+    )
+
+    def fake_start_training_run(_input):
+        return fake_run
+
+    def fake_get_training_run_snapshot(_run):
+        return ScenarioTrainingRunSnapshot(
+            template_key=template.key,
+            work_item_id=prepared.work_item_id,
+            step_snapshots=[
+                ScenarioTrainingStepSnapshot(
+                    step_key="fit_linear",
+                    operation=template.training_plan[0].operation,
+                    model_key="regression.linear",
+                    model_display_name="Linear Regression",
+                    root_task_id="root-1",
+                    root_status=MLTaskStatus.SUCCEEDED,
+                    evaluate_task_id="eval-1",
+                    evaluate_status=MLTaskStatus.SUCCEEDED,
+                    trained_model_id="trained-1",
+                    training_params={"fit_intercept": True},
+                    evaluation_metrics={"r2": 0.9123, "rmse": 1.5, "mae": 1.0},
+                    primary_metric_name="r2",
+                    primary_metric_value=0.9123,
+                    status=ScenarioTrainingStepStatus.SUCCEEDED,
+                )
+            ],
+            best_trained_model_id="trained-1",
+            is_terminal=True,
+            can_proceed_to_inference=True,
+        )
+
+    monkeypatch.setattr(workflow_service, "start_training_run", fake_start_training_run)
+    monkeypatch.setattr(workflow_service, "get_training_run_snapshot", fake_get_training_run_snapshot)
+
+    dialog = ScenarioTrainingDialog(
+        template=template,
+        preparation_result=prepared,
+        workflow_service=workflow_service,
+        ml_service=ml_service,
+    )
+    try:
+        dialog.show()
+        app.processEvents()
+
+        assert len(dialog._result_cards) == 1
+        card = dialog._result_cards["fit_linear"]
+        assert "R²" in card._metrics_label.text()
+        assert "MSE" in card._metrics_label.text()
+        assert "saved automatically" in card._save_state_label.text().lower()
+        assert "Best Model" in card._title_label.text()
+        assert dialog._continue_button.isEnabled() is True
+    finally:
+        dialog.close()
 
 
 def test_scenario_inference_dialog_queues_manual_prediction_with_best_model(

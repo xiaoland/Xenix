@@ -3,24 +3,27 @@ from __future__ import annotations
 from typing import Any
 
 from PySide6.QtCore import QEvent, QTimer, Qt, Signal
+from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import (
-    QAbstractItemView,
     QDialog,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QScrollArea,
     QSplitter,
-    QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
 from ..exceptions import XenixError
 from ..services.ml_service import MLService
-from ..services.scenario_template_service import ScenarioTemplate
-from ..services.scenario_template_service import ScenarioTrainingPlanStep
+from ..services.scenario_template_service import (
+    ScenarioTemplate,
+    ScenarioTrainingOperation,
+    ScenarioTrainingPlanStep,
+)
 from ..services.scenario_workflow_service import (
     ScenarioTrainingRun,
     ScenarioTrainingRunSnapshot,
@@ -33,6 +36,160 @@ from ..services.scenario_workflow_service import (
 from ..services.storage.models import MLTaskType
 from .scenario_template_text import localized_template_display_name
 from .widgets.task_log_view import TaskLogView
+
+
+class _ScenarioTrainingResultCard(QWidget):
+    clicked = Signal(str)
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._step_key: str | None = None
+        self._frame = QFrame(self)
+        self._title_label = QLabel()
+        self._status_label = QLabel()
+        self._mode_label = QLabel()
+        self._metrics_label = QLabel()
+        self._params_label = QLabel()
+        self._save_state_label = QLabel()
+        self._hint_label = QLabel()
+
+        self._build_ui()
+
+    def set_snapshot(
+        self,
+        snapshot: ScenarioTrainingStepSnapshot,
+        *,
+        is_selected: bool,
+        is_best_model: bool,
+        metrics_text: str,
+        params_text: str,
+        save_state_text: str,
+        hint_text: str,
+        mode_text: str,
+        status_text: str,
+    ) -> None:
+        self._step_key = snapshot.step_key
+        title = snapshot.model_display_name
+        if is_best_model:
+            title = self.tr("{model_name} · Best Model").format(model_name=title)
+        self._title_label.setText(title)
+        self._status_label.setText(status_text)
+        self._mode_label.setText(mode_text)
+        self._metrics_label.setText(metrics_text)
+        self._params_label.setText(params_text)
+        self._save_state_label.setText(save_state_text)
+        self._hint_label.setText(hint_text)
+        self._refresh_style(snapshot.status, is_selected, is_best_model)
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
+        if event.button() == Qt.LeftButton and self._step_key is not None:
+            self.clicked.emit(self._step_key)
+        super().mousePressEvent(event)
+
+    def _build_ui(self) -> None:
+        root_layout = QVBoxLayout(self)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.setCursor(Qt.PointingHandCursor)
+        self._frame.setObjectName("resultCardFrame")
+        self._frame.setFrameShape(QFrame.StyledPanel)
+        self._frame.setCursor(Qt.PointingHandCursor)
+        self._title_label.setObjectName("resultCardTitle")
+        self._status_label.setObjectName("resultCardStatus")
+        self._mode_label.setObjectName("resultCardMode")
+        self._metrics_label.setObjectName("resultCardMetrics")
+        self._params_label.setObjectName("resultCardParams")
+        self._save_state_label.setObjectName("resultCardSaveState")
+        self._hint_label.setObjectName("resultCardHint")
+
+        card_layout = QVBoxLayout(self._frame)
+        card_layout.setContentsMargins(16, 16, 16, 16)
+        card_layout.setSpacing(6)
+
+        self._metrics_label.setWordWrap(True)
+        self._params_label.setWordWrap(True)
+        self._save_state_label.setWordWrap(True)
+        self._hint_label.setWordWrap(True)
+
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(10)
+        header_layout.addWidget(self._title_label, 1)
+        header_layout.addWidget(self._status_label, 0)
+
+        card_layout.addLayout(header_layout)
+        card_layout.addWidget(self._mode_label)
+        card_layout.addWidget(self._metrics_label)
+        card_layout.addWidget(self._params_label)
+        card_layout.addWidget(self._save_state_label)
+        card_layout.addWidget(self._hint_label)
+        root_layout.addWidget(self._frame)
+
+    def _refresh_style(
+        self,
+        status: ScenarioTrainingStepStatus,
+        is_selected: bool,
+        is_best_model: bool,
+    ) -> None:
+        status_palette = {
+            ScenarioTrainingStepStatus.RUNNING: ("#9a6700", "#fff7e6", "#f4c86a"),
+            ScenarioTrainingStepStatus.SUCCEEDED: ("#17643a", "#ecfdf3", "#8fd3a8"),
+            ScenarioTrainingStepStatus.FAILED: ("#b42318", "#fef3f2", "#f3a7a0"),
+        }
+        status_color, status_background, status_border = status_palette[status]
+        border_color = "#7aa2f7" if is_selected else "#d0d5dd"
+        background = "#f5f8ff" if is_selected else "#ffffff"
+        title_color = "#17643a" if is_best_model else "#101828"
+        save_state_color = "#17643a" if is_best_model else "#344054"
+        self._frame.setStyleSheet(
+            f"""
+            QFrame#resultCardFrame {{
+                background-color: {background};
+                border: 1px solid {border_color};
+                border-radius: 10px;
+            }}
+            QLabel {{
+                background: transparent;
+                border: none;
+            }}
+            QLabel#resultCardTitle {{
+                color: {title_color};
+                font-size: 16px;
+                font-weight: 600;
+            }}
+            QLabel#resultCardStatus {{
+                color: {status_color};
+                background-color: {status_background};
+                border: 1px solid {status_border};
+                border-radius: 10px;
+                font-size: 12px;
+                font-weight: 600;
+                padding: 2px 8px;
+            }}
+            QLabel#resultCardMode {{
+                color: #475467;
+                font-size: 12px;
+                font-weight: 500;
+            }}
+            QLabel#resultCardMetrics {{
+                color: #101828;
+                font-size: 14px;
+                font-weight: 600;
+            }}
+            QLabel#resultCardParams {{
+                color: #344054;
+                font-size: 12px;
+            }}
+            QLabel#resultCardSaveState {{
+                color: {save_state_color};
+                font-size: 12px;
+                font-weight: 600;
+            }}
+            QLabel#resultCardHint {{
+                color: #667085;
+                font-size: 12px;
+            }}
+            """
+        )
 
 
 class ScenarioTrainingDialog(QDialog):
@@ -65,7 +222,11 @@ class ScenarioTrainingDialog(QDialog):
         self._run_again_button = QPushButton()
         self._continue_button = QPushButton()
 
-        self._step_table = QTableWidget(0, 5)
+        self._selected_step_key: str | None = None
+        self._result_cards: dict[str, _ScenarioTrainingResultCard] = {}
+        self._results_scroll_area = QScrollArea()
+        self._results_container = QWidget()
+        self._results_layout = QVBoxLayout(self._results_container)
         self._task_details_label = QLabel()
         self._task_details_label.setWordWrap(True)
         self._task_log_view = TaskLogView()
@@ -92,17 +253,17 @@ class ScenarioTrainingDialog(QDialog):
         self._summary_label.setWordWrap(True)
         self._status_summary_label.setWordWrap(True)
         self._best_model_label.setWordWrap(True)
+        self._results_layout.setContentsMargins(0, 0, 0, 0)
+        self._results_layout.setSpacing(12)
+        self._results_scroll_area.setWidgetResizable(True)
+        self._results_scroll_area.setFrameShape(QScrollArea.NoFrame)
+        self._results_scroll_area.setWidget(self._results_container)
 
         actions = QHBoxLayout()
         actions.setSpacing(12)
         actions.addWidget(self._run_again_button)
         actions.addWidget(self._continue_button)
         actions.addStretch(1)
-
-        self._step_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self._step_table.setSelectionMode(QAbstractItemView.SingleSelection)
-        self._step_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self._step_table.verticalHeader().setVisible(False)
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.addWidget(self._build_step_panel())
@@ -119,7 +280,7 @@ class ScenarioTrainingDialog(QDialog):
 
     def _build_step_panel(self) -> QWidget:
         layout = QVBoxLayout(self._step_group)
-        layout.addWidget(self._step_table)
+        layout.addWidget(self._results_scroll_area)
         return self._step_group
 
     def _build_detail_panel(self) -> QWidget:
@@ -135,7 +296,6 @@ class ScenarioTrainingDialog(QDialog):
     def _wire_events(self) -> None:
         self._run_again_button.clicked.connect(self._start_training_run)
         self._continue_button.clicked.connect(self._continue_to_prediction)
-        self._step_table.itemSelectionChanged.connect(self._load_selected_step_details)
 
     def retranslate_ui(self) -> None:
         self.setWindowTitle(self.tr("Training Dashboard"))
@@ -145,21 +305,12 @@ class ScenarioTrainingDialog(QDialog):
         )
         self._run_again_button.setText(self.tr("Run Selected Plan Again"))
         self._continue_button.setText(self.tr("Continue to Prediction"))
-        self._step_group.setTitle(self.tr("Training Steps"))
-        self._detail_group.setTitle(self.tr("Task Details"))
-        self._step_table.setHorizontalHeaderLabels(
-            [
-                self.tr("Step"),
-                self.tr("Model"),
-                self.tr("Training"),
-                self.tr("Evaluate"),
-                self.tr("Status"),
-            ]
-        )
+        self._step_group.setTitle(self.tr("Model Results"))
+        self._detail_group.setTitle(self.tr("Advanced Task Details"))
         if self._current_snapshot is None:
             self._status_summary_label.setText(self.tr("Preparing the training plan..."))
             self._best_model_label.setText(self.tr("Best model: waiting for evaluation."))
-            self._task_details_label.setText(self.tr("Select a plan step to inspect task details."))
+            self._task_details_label.setText(self.tr("Select a model result card to inspect task details."))
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == QEvent.LanguageChange:
@@ -187,7 +338,7 @@ class ScenarioTrainingDialog(QDialog):
             return
         self._current_snapshot = self._workflow_service.get_training_run_snapshot(self._current_run)
         self._refresh_summary(self._current_snapshot)
-        self._refresh_step_table(self._current_snapshot)
+        self._refresh_result_cards(self._current_snapshot)
         self._continue_button.setEnabled(self._current_snapshot.can_proceed_to_inference)
         if self._current_snapshot.is_terminal:
             self._timer.stop()
@@ -197,14 +348,14 @@ class ScenarioTrainingDialog(QDialog):
         failed_count = sum(1 for step in snapshot.step_snapshots if step.status is ScenarioTrainingStepStatus.FAILED)
         if snapshot.can_proceed_to_inference:
             self._status_summary_label.setText(
-                self.tr("Training finished. {succeeded_count} plan step(s) succeeded and the best model is ready.").format(
+                self.tr("Training finished. {succeeded_count} model result(s) succeeded and the best model is ready.").format(
                     succeeded_count=str(succeeded_count)
                 )
             )
         elif failed_count > 0 and snapshot.is_terminal:
             self._status_summary_label.setText(
                 self.tr(
-                    "Training finished with partial failure. {succeeded_count} step(s) succeeded and {failed_count} step(s) failed."
+                    "Training finished with partial failure. {succeeded_count} model result(s) succeeded and {failed_count} model result(s) failed."
                 ).format(
                     succeeded_count=str(succeeded_count),
                     failed_count=str(failed_count),
@@ -212,7 +363,7 @@ class ScenarioTrainingDialog(QDialog):
             )
         else:
             self._status_summary_label.setText(
-                self.tr("Training is running. {succeeded_count} completed step(s) so far.").format(
+                self.tr("Training is running. {succeeded_count} model result(s) completed so far.").format(
                     succeeded_count=str(succeeded_count)
                 )
             )
@@ -228,6 +379,11 @@ class ScenarioTrainingDialog(QDialog):
             if model.id == snapshot.best_trained_model_id:
                 best_model_key = model.model_key
                 break
+        best_model_display_name = str(best_model_key)
+        try:
+            best_model_display_name = self._ml_service.get_model(str(best_model_key)).display_name
+        except Exception:
+            best_model_display_name = str(best_model_key)
 
         tasks = self._ml_service.list_work_item_tasks(snapshot.work_item_id)
         for task in tasks:
@@ -241,51 +397,69 @@ class ScenarioTrainingDialog(QDialog):
             metric_value = evaluation.get("primary_metric_value")
             if isinstance(metric_name, str) and metric_value is not None:
                 return self.tr("Best model: {model_key} ({metric_name}={metric_value})").format(
-                    model_key=str(best_model_key),
+                    model_key=best_model_display_name,
                     metric_name=metric_name,
                     metric_value=str(metric_value),
                 )
-        return self.tr("Best model: {model_key}").format(model_key=str(best_model_key))
+        return self.tr("Best model: {model_key}").format(model_key=best_model_display_name)
 
-    def _refresh_step_table(self, snapshot: ScenarioTrainingRunSnapshot) -> None:
-        selected_step_key = self._selected_step_key()
-        self._step_table.setRowCount(len(snapshot.step_snapshots))
-        for row_index, step in enumerate(snapshot.step_snapshots):
-            values = [
-                self.tr("Step {number}").format(number=str(row_index + 1)),
-                step.model_key,
-                self._translate_task_status(step.root_status),
-                self._translate_task_status(step.evaluate_status) if step.evaluate_status is not None else self.tr("Waiting"),
-                self._translate_step_status(step.status),
-            ]
-            for column_index, value in enumerate(values):
-                item = QTableWidgetItem(value)
-                if column_index == 0:
-                    item.setData(Qt.UserRole, step.step_key)
-                self._step_table.setItem(row_index, column_index, item)
+    def _refresh_result_cards(self, snapshot: ScenarioTrainingRunSnapshot) -> None:
+        valid_step_keys = {step.step_key for step in snapshot.step_snapshots}
+        for step_key in list(self._result_cards):
+            if step_key in valid_step_keys:
+                continue
+            card = self._result_cards.pop(step_key)
+            self._results_layout.removeWidget(card)
+            card.deleteLater()
 
-        if selected_step_key is not None:
-            for row in range(self._step_table.rowCount()):
-                item = self._step_table.item(row, 0)
-                if item is not None and item.data(Qt.UserRole) == selected_step_key:
-                    self._step_table.selectRow(row)
-                    break
-        elif self._step_table.rowCount() > 0:
-            self._step_table.selectRow(0)
+        for step in snapshot.step_snapshots:
+            card = self._result_cards.get(step.step_key)
+            if card is None:
+                card = _ScenarioTrainingResultCard(self._results_container)
+                card.clicked.connect(self._select_step_key)
+                self._results_layout.addWidget(card)
+                self._result_cards[step.step_key] = card
+            is_best_model = step.trained_model_id is not None and step.trained_model_id == snapshot.best_trained_model_id
+            card.set_snapshot(
+                step,
+                is_selected=self._selected_step_key == step.step_key,
+                is_best_model=is_best_model,
+                metrics_text=self._build_metrics_text(step),
+                params_text=self._build_params_text(step),
+                save_state_text=self._build_save_state_text(step, is_best_model=is_best_model),
+                hint_text=self._build_hint_text(step, is_best_model=is_best_model),
+                mode_text=self._build_mode_text(step),
+                status_text=self._translate_step_status(step.status),
+            )
 
-    def _selected_step_key(self) -> str | None:
-        selected_items = self._step_table.selectedItems()
-        if not selected_items:
-            return None
-        return str(selected_items[0].data(Qt.UserRole))
+        if snapshot.step_snapshots and self._selected_step_key not in valid_step_keys:
+            self._selected_step_key = snapshot.step_snapshots[0].step_key
+            self._load_selected_step_details()
+            self._refresh_result_cards(snapshot)
+            return
+        if not snapshot.step_snapshots:
+            self._selected_step_key = None
+            self._task_details_label.setText(self.tr("Select a model result card to inspect task details."))
+            self._task_log_view.clear()
+            return
+        if self._selected_step_key is None:
+            self._selected_step_key = snapshot.step_snapshots[0].step_key
+            self._load_selected_step_details()
+            self._refresh_result_cards(snapshot)
+
+    def _select_step_key(self, step_key: str) -> None:
+        self._selected_step_key = step_key
+        self._load_selected_step_details()
+        if self._current_snapshot is not None:
+            self._refresh_result_cards(self._current_snapshot)
 
     def _load_selected_step_details(self) -> None:
         snapshot = self._current_snapshot
         if snapshot is None:
             return
-        step_key = self._selected_step_key()
+        step_key = self._selected_step_key
         if step_key is None:
-            self._task_details_label.setText(self.tr("Select a plan step to inspect task details."))
+            self._task_details_label.setText(self.tr("Select a model result card to inspect task details."))
             self._task_log_view.clear()
             return
 
@@ -298,7 +472,7 @@ class ScenarioTrainingDialog(QDialog):
             details = self._ml_service.get_task_details(task_id)
         except XenixError:
             self._task_details_label.setText(
-                self.tr("Task details are temporarily unavailable for the selected step.")
+                self.tr("Task details are temporarily unavailable for the selected model result.")
             )
             self._task_log_view.clear()
             return
@@ -313,6 +487,92 @@ class ScenarioTrainingDialog(QDialog):
             lines.append(self.tr("Failure: {summary}").format(summary=selected_snapshot.failure_summary))
         self._task_details_label.setText("\n".join(lines))
         self._task_log_view.set_logs(details.logs)
+
+    def _build_mode_text(self, step: ScenarioTrainingStepSnapshot) -> str:
+        if step.operation is ScenarioTrainingOperation.FIT:
+            return self.tr("Mode: Fit training")
+        candidate_suffix = ""
+        if step.candidate_count is not None:
+            candidate_suffix = self.tr(" · {count} candidates").format(count=str(step.candidate_count))
+        return self.tr("Mode: Hyperparameter tuning{candidate_suffix}").format(candidate_suffix=candidate_suffix)
+
+    def _build_metrics_text(self, step: ScenarioTrainingStepSnapshot) -> str:
+        if not step.evaluation_metrics:
+            if step.status is ScenarioTrainingStepStatus.FAILED:
+                return self.tr("Metrics: evaluation did not complete.")
+            if step.evaluate_status is not None:
+                return self.tr("Metrics: evaluation is in progress.")
+            return self.tr("Metrics: waiting for evaluation.")
+
+        metrics = step.evaluation_metrics
+        if "r2" in metrics:
+            mse_value = metrics.get("mse")
+            if mse_value is None and "rmse" in metrics:
+                mse_value = metrics["rmse"] ** 2
+            metric_parts = [self.tr("R² {value}").format(value=self._format_metric_value(metrics["r2"]))]
+            if mse_value is not None:
+                metric_parts.append(self.tr("MSE {value}").format(value=self._format_metric_value(mse_value)))
+            if "mae" in metrics:
+                metric_parts.append(self.tr("MAE {value}").format(value=self._format_metric_value(metrics["mae"])))
+            return " · ".join(metric_parts)
+
+        metric_parts: list[str] = []
+        for metric_name in ("f1_weighted", "accuracy", "precision_weighted", "recall_weighted"):
+            if metric_name not in metrics:
+                continue
+            metric_parts.append(
+                self.tr("{label} {value}").format(
+                    label=self._translate_metric_name(metric_name),
+                    value=self._format_metric_value(metrics[metric_name]),
+                )
+            )
+        return " · ".join(metric_parts) if metric_parts else self.tr("Metrics: available in task details.")
+
+    def _build_params_text(self, step: ScenarioTrainingStepSnapshot) -> str:
+        if step.best_params:
+            return self.tr("Best params: {params}").format(params=self._format_mapping(step.best_params))
+        if step.training_params:
+            return self.tr("Parameters: {params}").format(params=self._format_mapping(step.training_params))
+        return self.tr("Parameters: default model configuration")
+
+    def _build_save_state_text(self, step: ScenarioTrainingStepSnapshot, *, is_best_model: bool) -> str:
+        if step.trained_model_id is None:
+            return self.tr("Save state: waiting for persisted model")
+        if is_best_model:
+            return self.tr("Save state: saved automatically and leading this run")
+        return self.tr("Save state: saved automatically")
+
+    def _build_hint_text(self, step: ScenarioTrainingStepSnapshot, *, is_best_model: bool) -> str:
+        if step.status is ScenarioTrainingStepStatus.RUNNING:
+            return self.tr("Hint: training and evaluation are progressing in the background.")
+        if step.status is ScenarioTrainingStepStatus.FAILED:
+            return self.tr("Hint: open the advanced task details to inspect the failure summary and logs.")
+        if is_best_model:
+            return self.tr("Hint: this model currently gives the strongest result for the prepared dataset.")
+        return self.tr("Hint: this saved model remains available for comparison and later reuse.")
+
+    def _format_mapping(self, payload: dict[str, Any]) -> str:
+        if not payload:
+            return self.tr("(empty)")
+        segments: list[str] = []
+        for index, (key, value) in enumerate(payload.items()):
+            if index >= 3:
+                segments.append("...")
+                break
+            segments.append(f"{key}={value}")
+        return ", ".join(segments)
+
+    def _format_metric_value(self, value: float) -> str:
+        return f"{value:.4f}"
+
+    def _translate_metric_name(self, metric_name: str) -> str:
+        labels = {
+            "f1_weighted": self.tr("F1"),
+            "accuracy": self.tr("Accuracy"),
+            "precision_weighted": self.tr("Precision"),
+            "recall_weighted": self.tr("Recall"),
+        }
+        return labels.get(metric_name, metric_name)
 
     def _translate_task_status(self, status: Any) -> str:
         labels = {

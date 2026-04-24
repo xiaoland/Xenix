@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 from pathlib import Path
+from typing import Any
 
 from pydantic import Field
 from sqlmodel import SQLModel
@@ -16,6 +17,7 @@ from .scenario_template_service import (
     ScenarioTrainingOperation,
     ScenarioTrainingPlanStep,
 )
+from .ml.registry import get_model_catalog_entry
 from .storage.models import MLTaskRow, MLTaskStatus, MLTaskType, ProjectRow
 from .work_item_service import CreateWorkItemInput, WorkItemService
 
@@ -64,10 +66,18 @@ class ScenarioTrainingStepSnapshot(SQLModel):
     step_key: str
     operation: ScenarioTrainingOperation
     model_key: str
+    model_display_name: str
     root_task_id: str
     root_status: MLTaskStatus
     evaluate_task_id: str | None = None
     evaluate_status: MLTaskStatus | None = None
+    trained_model_id: str | None = None
+    training_params: dict[str, Any] = Field(default_factory=dict)
+    best_params: dict[str, Any] = Field(default_factory=dict)
+    evaluation_metrics: dict[str, float] = Field(default_factory=dict)
+    primary_metric_name: str | None = None
+    primary_metric_value: float | None = None
+    candidate_count: int | None = None
     status: ScenarioTrainingStepStatus
     failure_summary: str | None = None
 
@@ -243,8 +253,13 @@ class ScenarioWorkflowService:
                 step_key=step.step_key,
                 operation=step.operation,
                 model_key=step.model_key,
+                model_display_name=get_model_catalog_entry(step.model_key).display_name,
                 root_task_id=root_task.id,
                 root_status=root_task.status,
+                trained_model_id=_extract_trained_model_id(root_task),
+                training_params=_extract_training_params(root_task),
+                best_params=_extract_best_params(root_task),
+                candidate_count=_extract_candidate_count(root_task),
                 status=ScenarioTrainingStepStatus.FAILED,
                 failure_summary=root_task.error_summary,
             )
@@ -254,8 +269,13 @@ class ScenarioWorkflowService:
                 step_key=step.step_key,
                 operation=step.operation,
                 model_key=step.model_key,
+                model_display_name=get_model_catalog_entry(step.model_key).display_name,
                 root_task_id=root_task.id,
                 root_status=root_task.status,
+                trained_model_id=_extract_trained_model_id(root_task),
+                training_params=_extract_training_params(root_task),
+                best_params=_extract_best_params(root_task),
+                candidate_count=_extract_candidate_count(root_task),
                 status=ScenarioTrainingStepStatus.RUNNING,
             )
 
@@ -264,33 +284,112 @@ class ScenarioWorkflowService:
                 step_key=step.step_key,
                 operation=step.operation,
                 model_key=step.model_key,
+                model_display_name=get_model_catalog_entry(step.model_key).display_name,
                 root_task_id=root_task.id,
                 root_status=root_task.status,
                 evaluate_task_id=evaluate_task.id,
                 evaluate_status=evaluate_task.status,
+                trained_model_id=_extract_trained_model_id(root_task),
+                training_params=_extract_training_params(root_task),
+                best_params=_extract_best_params(root_task),
+                candidate_count=_extract_candidate_count(root_task),
                 status=ScenarioTrainingStepStatus.RUNNING,
             )
 
         if evaluate_task.status is MLTaskStatus.SUCCEEDED:
+            primary_metric_name, primary_metric_value, evaluation_metrics = _extract_evaluation_metrics(evaluate_task)
             return ScenarioTrainingStepSnapshot(
                 step_key=step.step_key,
                 operation=step.operation,
                 model_key=step.model_key,
+                model_display_name=get_model_catalog_entry(step.model_key).display_name,
                 root_task_id=root_task.id,
                 root_status=root_task.status,
                 evaluate_task_id=evaluate_task.id,
                 evaluate_status=evaluate_task.status,
+                trained_model_id=_extract_trained_model_id(root_task),
+                training_params=_extract_training_params(root_task),
+                best_params=_extract_best_params(root_task),
+                evaluation_metrics=evaluation_metrics,
+                primary_metric_name=primary_metric_name,
+                primary_metric_value=primary_metric_value,
+                candidate_count=_extract_candidate_count(root_task),
                 status=ScenarioTrainingStepStatus.SUCCEEDED,
             )
 
+        primary_metric_name, primary_metric_value, evaluation_metrics = _extract_evaluation_metrics(evaluate_task)
         return ScenarioTrainingStepSnapshot(
             step_key=step.step_key,
             operation=step.operation,
             model_key=step.model_key,
+            model_display_name=get_model_catalog_entry(step.model_key).display_name,
             root_task_id=root_task.id,
             root_status=root_task.status,
             evaluate_task_id=evaluate_task.id,
             evaluate_status=evaluate_task.status,
+            trained_model_id=_extract_trained_model_id(root_task),
+            training_params=_extract_training_params(root_task),
+            best_params=_extract_best_params(root_task),
+            evaluation_metrics=evaluation_metrics,
+            primary_metric_name=primary_metric_name,
+            primary_metric_value=primary_metric_value,
+            candidate_count=_extract_candidate_count(root_task),
             status=ScenarioTrainingStepStatus.FAILED,
             failure_summary=evaluate_task.error_summary,
         )
+
+
+def _extract_trained_model_id(task: MLTaskRow) -> str | None:
+    result_payload = task.result_payload or {}
+    trained_model_id = result_payload.get("trained_model_id")
+    return str(trained_model_id) if isinstance(trained_model_id, str) and trained_model_id else None
+
+
+def _extract_training_params(task: MLTaskRow) -> dict[str, Any]:
+    result_payload = task.result_payload or {}
+    params = result_payload.get("params")
+    if isinstance(params, dict):
+        return dict(params)
+    return {}
+
+
+def _extract_best_params(task: MLTaskRow) -> dict[str, Any]:
+    result_payload = task.result_payload or {}
+    best_params = result_payload.get("best_params")
+    if isinstance(best_params, dict):
+        return dict(best_params)
+    return {}
+
+
+def _extract_candidate_count(task: MLTaskRow) -> int | None:
+    result_payload = task.result_payload or {}
+    tuning_summary = result_payload.get("tuning_summary")
+    if not isinstance(tuning_summary, dict):
+        return None
+    cv_summary = tuning_summary.get("cv_summary")
+    if not isinstance(cv_summary, dict):
+        return None
+    candidate_count = cv_summary.get("candidate_count")
+    return int(candidate_count) if isinstance(candidate_count, int) else None
+
+
+def _extract_evaluation_metrics(task: MLTaskRow) -> tuple[str | None, float | None, dict[str, float]]:
+    result_payload = task.result_payload or {}
+    evaluation = result_payload.get("evaluation")
+    if not isinstance(evaluation, dict):
+        return None, None, {}
+
+    primary_metric_name = evaluation.get("primary_metric_name")
+    primary_metric_value = evaluation.get("primary_metric_value")
+    metrics = evaluation.get("metrics")
+    if not isinstance(metrics, dict):
+        metrics = {}
+
+    normalized_metrics: dict[str, float] = {}
+    for key, value in metrics.items():
+        if isinstance(key, str) and isinstance(value, (int, float)):
+            normalized_metrics[key] = float(value)
+
+    resolved_primary_name = str(primary_metric_name) if isinstance(primary_metric_name, str) else None
+    resolved_primary_value = float(primary_metric_value) if isinstance(primary_metric_value, (int, float)) else None
+    return resolved_primary_name, resolved_primary_value, normalized_metrics

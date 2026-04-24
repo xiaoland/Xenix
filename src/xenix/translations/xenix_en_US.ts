@@ -1619,182 +1619,294 @@ Created at: {created_at}</source>
 <context>
     <name>ScenarioTrainingDialog</name>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="141"/>
+        <location filename="../ui/scenario_training_dialog.py" line="250"/>
         <source>Training Dashboard</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="147"/>
+        <location filename="../ui/scenario_training_dialog.py" line="256"/>
         <source>Continue to Prediction</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="144"/>
+        <location filename="../ui/scenario_training_dialog.py" line="253"/>
         <source>The selected model plan is running in the background. Review the result and continue when a best model is ready.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="146"/>
+        <location filename="../ui/scenario_training_dialog.py" line="255"/>
         <source>Run Selected Plan Again</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="148"/>
-        <source>Training Steps</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="149"/>
         <source>Task Details</source>
-        <translation type="unfinished">Task Details</translation>
+        <translation type="obsolete">Task Details</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="152"/>
-        <source>Step</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="153"/>
         <source>Model</source>
-        <translation type="unfinished">Model</translation>
+        <translation type="obsolete">Model</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="154"/>
         <source>Training</source>
-        <translation type="unfinished">Training</translation>
+        <translation type="obsolete">Training</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="155"/>
         <source>Evaluate</source>
-        <translation type="unfinished">Evaluate</translation>
+        <translation type="obsolete">Evaluate</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="156"/>
         <source>Status</source>
-        <translation type="unfinished">Status</translation>
+        <translation type="obsolete">Status</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="160"/>
+        <location filename="../ui/scenario_training_dialog.py" line="260"/>
         <source>Preparing the training plan...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="161"/>
-        <location filename="../ui/scenario_training_dialog.py" line="223"/>
+        <location filename="../ui/scenario_training_dialog.py" line="261"/>
+        <location filename="../ui/scenario_training_dialog.py" line="323"/>
         <source>Best model: waiting for evaluation.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="162"/>
-        <location filename="../ui/scenario_training_dialog.py" line="288"/>
-        <source>Select a plan step to inspect task details.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="200"/>
-        <source>Training finished. {succeeded_count} plan step(s) succeeded and the best model is ready.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="207"/>
-        <source>Training finished with partial failure. {succeeded_count} step(s) succeeded and {failed_count} step(s) failed.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="215"/>
-        <source>Training is running. {succeeded_count} completed step(s) so far.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="243"/>
+        <location filename="../ui/scenario_training_dialog.py" line="348"/>
         <source>Best model: {model_key} ({metric_name}={metric_value})</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="248"/>
+        <location filename="../ui/scenario_training_dialog.py" line="353"/>
         <source>Best model: {model_key}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="255"/>
-        <source>Step {number}</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="258"/>
-        <source>Waiting</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="301"/>
-        <source>Task details are temporarily unavailable for the selected step.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="306"/>
+        <location filename="../ui/scenario_training_dialog.py" line="429"/>
         <source>Task: {task_id}</source>
         <translation type="unfinished">Task: {task_id}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="307"/>
+        <location filename="../ui/scenario_training_dialog.py" line="430"/>
         <source>Model: {model_key}</source>
         <translation type="unfinished">Model: {model_key}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="308"/>
+        <location filename="../ui/scenario_training_dialog.py" line="431"/>
         <source>Status: {status}</source>
         <translation type="unfinished">Status: {status}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="311"/>
+        <location filename="../ui/scenario_training_dialog.py" line="434"/>
         <source>Result: {summary}</source>
         <translation type="unfinished">Result: {summary}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="313"/>
+        <location filename="../ui/scenario_training_dialog.py" line="436"/>
         <source>Failure: {summary}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="319"/>
+        <location filename="../ui/scenario_training_dialog.py" line="442"/>
+        <source>Mode: Fit training</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="445"/>
+        <source> · {count} candidates</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="446"/>
+        <source>Mode: Hyperparameter tuning{candidate_suffix}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="451"/>
+        <source>Metrics: evaluation did not complete.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="453"/>
+        <source>Metrics: evaluation is in progress.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="454"/>
+        <source>Metrics: waiting for evaluation.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="461"/>
+        <source>R² {value}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="463"/>
+        <source>MSE {value}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="465"/>
+        <source>MAE {value}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="473"/>
+        <source>{label} {value}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="478"/>
+        <source>Metrics: available in task details.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="484"/>
+        <source>Parameters: {params}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="485"/>
+        <source>Parameters: default model configuration</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="489"/>
+        <source>Save state: waiting for persisted model</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="491"/>
+        <source>Save state: saved automatically and leading this run</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="492"/>
+        <source>Save state: saved automatically</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="496"/>
+        <source>Hint: training and evaluation are progressing in the background.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="498"/>
+        <source>Hint: open the advanced task details to inspect the failure summary and logs.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="500"/>
+        <source>Hint: this model currently gives the strongest result for the prepared dataset.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="501"/>
+        <source>Hint: this saved model remains available for comparison and later reuse.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="505"/>
+        <source>(empty)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="519"/>
+        <source>F1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="520"/>
+        <source>Accuracy</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="521"/>
+        <source>Precision</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="522"/>
+        <source>Recall</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="528"/>
         <source>Pending</source>
         <translation type="unfinished">Pending</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="320"/>
-        <location filename="../ui/scenario_training_dialog.py" line="330"/>
+        <location filename="../ui/scenario_training_dialog.py" line="529"/>
+        <location filename="../ui/scenario_training_dialog.py" line="539"/>
         <source>Running</source>
         <translation type="unfinished">Running</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="321"/>
-        <location filename="../ui/scenario_training_dialog.py" line="331"/>
+        <location filename="../ui/scenario_training_dialog.py" line="530"/>
+        <location filename="../ui/scenario_training_dialog.py" line="540"/>
         <source>Succeeded</source>
         <translation type="unfinished">Succeeded</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="322"/>
-        <location filename="../ui/scenario_training_dialog.py" line="332"/>
+        <location filename="../ui/scenario_training_dialog.py" line="531"/>
+        <location filename="../ui/scenario_training_dialog.py" line="541"/>
         <source>Failed</source>
         <translation type="unfinished">Failed</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="323"/>
+        <location filename="../ui/scenario_training_dialog.py" line="532"/>
         <source>Cancelled</source>
         <translation type="unfinished">Cancelled</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="339"/>
+        <location filename="../ui/scenario_training_dialog.py" line="548"/>
         <source>metric</source>
         <translation type="unfinished">metric</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="343"/>
+        <location filename="../ui/scenario_training_dialog.py" line="482"/>
+        <location filename="../ui/scenario_training_dialog.py" line="552"/>
         <source>Best params: {params}</source>
         <translation type="unfinished">Best params: {params}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="345"/>
+        <location filename="../ui/scenario_training_dialog.py" line="257"/>
+        <source>Model Results</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="258"/>
+        <source>Advanced Task Details</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="262"/>
+        <location filename="../ui/scenario_training_dialog.py" line="391"/>
+        <location filename="../ui/scenario_training_dialog.py" line="411"/>
+        <source>Select a model result card to inspect task details.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="300"/>
+        <source>Training finished. {succeeded_count} model result(s) succeeded and the best model is ready.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="307"/>
+        <source>Training finished with partial failure. {succeeded_count} model result(s) succeeded and {failed_count} model result(s) failed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="315"/>
+        <source>Training is running. {succeeded_count} model result(s) completed so far.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="424"/>
+        <source>Task details are temporarily unavailable for the selected model result.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="554"/>
         <source>Params: {params}</source>
         <translation type="unfinished">Params: {params}</translation>
     </message>
@@ -1960,6 +2072,14 @@ Prediction target: {targets}</source>
         <location filename="../ui/scenario_training_selection_dialog.py" line="214"/>
         <source>Hyperparameter Tuning</source>
         <translation type="unfinished">Hyperparameter Tuning</translation>
+    </message>
+</context>
+<context>
+    <name>_ScenarioTrainingResultCard</name>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="73"/>
+        <source>{model_name} · Best Model</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 </TS>

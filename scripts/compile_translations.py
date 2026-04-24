@@ -5,11 +5,26 @@ import subprocess
 from pathlib import Path
 
 
+def _resolve_lrelease(project_root: Path) -> str | None:
+    command = shutil.which("pyside6-lrelease")
+    if command is not None:
+        return command
+
+    candidates = (
+        project_root / ".venv" / "Scripts" / "pyside6-lrelease.exe",
+        project_root / ".venv" / "Lib" / "site-packages" / "PySide6" / "lrelease.exe",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
 def main() -> int:
     project_root = Path(__file__).resolve().parents[1]
     translations_root = project_root / "src" / "xenix" / "translations"
 
-    command = shutil.which("pyside6-lrelease")
+    command = _resolve_lrelease(project_root)
     if command is None:
         raise SystemExit("pyside6-lrelease is not available in the active environment.")
 
