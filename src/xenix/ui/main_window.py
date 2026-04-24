@@ -21,7 +21,6 @@ from .dataset_workspace import DatasetWorkspace
 from .inference_history_dialog import InferenceHistoryDialog
 from .inference_workspace import InferenceWorkspace
 from .ml_workspace import MLWorkspace
-from .previous_model_flow_dialog import PreviousModelFlowDialog
 from .scenario_data_preparation_dialog import ScenarioDataPreparationDialog
 from .scenario_home_view import ScenarioHomeView
 from .scenario_inference_dialog import ScenarioInferenceDialog
@@ -71,7 +70,6 @@ class MainWindow(QMainWindow):
         self._scenario_training_dialog: ScenarioTrainingDialog | None = None
         self._scenario_inference_dialog: ScenarioInferenceDialog | None = None
         self._inference_history_dialog: InferenceHistoryDialog | None = None
-        self._previous_model_flow_dialog: PreviousModelFlowDialog | None = None
 
         self._dataset_workspace = DatasetWorkspace(
             project_service=self._project_service,
@@ -203,14 +201,15 @@ class MainWindow(QMainWindow):
             self._scenario_training_selection_dialog.activateWindow()
             return
         if selection_kind is ScenarioModelSourceKind.TRAINED_MODEL:
-            self._previous_model_flow_dialog = PreviousModelFlowDialog(
-                template=template,
-                selected_model=self._scenario_model_source_dialog.selected_trained_model(),
-                parent=self,
+            selected_model = self._scenario_model_source_dialog.selected_trained_model()
+            if selected_model is None:
+                return
+            self._open_inference_for_preparation(
+                preparation_result=result,
+                available_trained_models=self._scenario_model_source_dialog.compatible_models(),
+                preferred_trained_model_id=selected_model.trained_model_id,
             )
-            self._previous_model_flow_dialog.show()
-            self._previous_model_flow_dialog.raise_()
-            self._previous_model_flow_dialog.activateWindow()
+            return
 
     def _continue_after_training_selection(self) -> None:
         if self._scenario_data_preparation_dialog is None or self._scenario_training_selection_dialog is None:
@@ -240,6 +239,15 @@ class MainWindow(QMainWindow):
         self._scenario_training_dialog.activateWindow()
 
     def _open_inference_after_training(self, preparation_result) -> None:
+        self._open_inference_for_preparation(preparation_result=preparation_result)
+
+    def _open_inference_for_preparation(
+        self,
+        *,
+        preparation_result,
+        available_trained_models=None,
+        preferred_trained_model_id=None,
+    ) -> None:
         template = self._scenario_template_service.get_template(preparation_result.template_key)
         self._scenario_inference_dialog = ScenarioInferenceDialog(
             template=template,
@@ -247,6 +255,8 @@ class MainWindow(QMainWindow):
             work_item_service=self._work_item_service,
             dataset_service=self._dataset_service,
             ml_service=self._ml_service,
+            available_trained_models=available_trained_models,
+            preferred_trained_model_id=preferred_trained_model_id,
             parent=self,
         )
         self._scenario_inference_dialog.show()

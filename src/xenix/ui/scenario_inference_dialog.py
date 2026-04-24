@@ -33,6 +33,7 @@ from ..services.dataset_service import (
     MaterializeManualInferenceCsvInput,
 )
 from ..services.ml_service import InferWithFilesInput, MLService
+from ..services.scenario_model_source_service import CompatibleTrainedModelOption
 from ..services.scenario_template_service import ScenarioTemplate
 from ..services.scenario_workflow_service import ScenarioWorkItemPreparationResult
 from ..services.storage.models import MLTaskStatus, MLTaskType, TrainedModelRow, WorkItemRow
@@ -50,6 +51,8 @@ class ScenarioInferenceDialog(QDialog):
         work_item_service: WorkItemService,
         dataset_service: DatasetService,
         ml_service: MLService,
+        available_trained_models: list[CompatibleTrainedModelOption] | None = None,
+        preferred_trained_model_id: str | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -58,6 +61,12 @@ class ScenarioInferenceDialog(QDialog):
         self._work_item_service = work_item_service
         self._dataset_service = dataset_service
         self._ml_service = ml_service
+        self._available_trained_models = (
+            list(available_trained_models)
+            if available_trained_models is not None
+            else None
+        )
+        self._preferred_trained_model_id = preferred_trained_model_id
         self._best_model_id: str | None = None
         self._current_result_dataset_id: str | None = None
         self._current_result_path: str | None = None
@@ -298,7 +307,11 @@ class ScenarioInferenceDialog(QDialog):
     def _handle_model_selection_changed(self) -> None:
         try:
             work_item = self._work_item_service.get_work_item(self._preparation_result.work_item_id)
-            trained_models = self._ml_service.list_trained_models(work_item.id)
+            trained_models = (
+                []
+                if self._available_trained_models is not None
+                else self._ml_service.list_trained_models(work_item.id)
+            )
         except XenixError:
             self._refresh_action_state()
             return
@@ -309,13 +322,22 @@ class ScenarioInferenceDialog(QDialog):
         current_model_id = self._current_model_id()
         self._model_selector.blockSignals(True)
         self._model_selector.clear()
-        for model in trained_models:
-            prefix = f"{self.tr('[Best]')} " if work_item.best_trained_model_id == model.id else ""
-            self._model_selector.addItem(
-                f"{prefix}{self._model_display_name(model.model_key)}",
-                model.id,
-            )
-        preferred_model_id = current_model_id or work_item.best_trained_model_id
+        if self._available_trained_models is not None:
+            for option in self._available_trained_models:
+                prefix = f"{self.tr('[Best]')} " if option.is_best_for_work_item else ""
+                self._model_selector.addItem(
+                    f"{prefix}{option.model_display_name}",
+                    option.trained_model_id,
+                )
+            preferred_model_id = current_model_id or self._preferred_trained_model_id
+        else:
+            for model in trained_models:
+                prefix = f"{self.tr('[Best]')} " if work_item.best_trained_model_id == model.id else ""
+                self._model_selector.addItem(
+                    f"{prefix}{self._model_display_name(model.model_key)}",
+                    model.id,
+                )
+            preferred_model_id = current_model_id or work_item.best_trained_model_id
         if preferred_model_id is not None:
             index = self._model_selector.findData(preferred_model_id)
             if index >= 0:
@@ -325,6 +347,32 @@ class ScenarioInferenceDialog(QDialog):
         self._model_selector.blockSignals(False)
 
     def _refresh_best_model_label(self, work_item: WorkItemRow, trained_models: list[TrainedModelRow]) -> None:
+        if self._available_trained_models is not None:
+            if not self._available_trained_models:
+                self._best_model_label.setText(self.tr("No compatible trained models are available yet."))
+                return
+            selected_option = self._selected_compatible_model()
+            best_option = next(
+                (option for option in self._available_trained_models if option.is_best_for_work_item),
+                None,
+            )
+            if selected_option is None:
+                self._best_model_label.setText(self.tr("Choose one trained model to start prediction."))
+                return
+            if best_option is None or selected_option.trained_model_id == best_option.trained_model_id:
+                self._best_model_label.setText(
+                    self.tr("Compatible model selected: {model_name}.").format(
+                        model_name=selected_option.model_display_name
+                    )
+                )
+                return
+            self._best_model_label.setText(
+                self.tr("Current model: {selected_model}. Source best model: {best_model}.").format(
+                    selected_model=selected_option.model_display_name,
+                    best_model=best_option.model_display_name,
+                )
+            )
+            return
         if not trained_models:
             self._best_model_label.setText(self.tr("No trained models are available yet."))
             return
@@ -757,6 +805,21 @@ class ScenarioInferenceDialog(QDialog):
             return self._ml_service.get_model(model_key).display_name
         except Exception:
             return model_key
+
+    def _selected_compatible_model(self) -> CompatibleTrainedModelOption | None:
+        if self._available_trained_models is None:
+            return None
+        selected_model_id = self._current_model_id()
+        if selected_model_id is None:
+            return None
+        return next(
+            (
+                option
+                for option in self._available_trained_models
+                if option.trained_model_id == selected_model_id
+            ),
+            None,
+        )
 
     def _batch_file_path_at(self, index: int) -> str:
         item = self._batch_file_list.item(index)

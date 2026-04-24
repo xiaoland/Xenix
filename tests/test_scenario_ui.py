@@ -795,6 +795,101 @@ def test_main_window_train_new_flow_opens_training_selection_and_starts_selected
         window.close()
 
 
+def test_main_window_trained_model_flow_opens_inference_with_selected_compatible_model(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    dataset_file = tmp_path / "reuse-demand.csv"
+    dataset_file.write_text(
+        "feature_a,feature_b,target\n"
+        "1,2,5\n"
+        "2,1,5\n"
+        "3,5,11\n"
+        "4,2,10\n",
+        encoding="utf-8",
+    )
+    _app, window = build_main_window(show=False)
+    try:
+        source_prepared = window._scenario_workflow_service.prepare_work_item(
+            PrepareScenarioWorkItemInput(
+                template_key="sales_demand_forecast.v1",
+                source_path=str(dataset_file.resolve()),
+                feature_columns=["feature_a", "feature_b"],
+                target_columns=["target"],
+                work_item_name="source-model-run",
+            )
+        )
+        window._ml_service.fit_with_evaluate(
+            FitWithEvaluateInput(
+                work_item_id=source_prepared.work_item_id,
+                model_key="regression.linear",
+                params={"fit_intercept": True},
+            )
+        )
+
+        deadline = time.time() + 60
+        while time.time() < deadline:
+            source_work_item = window._work_item_service.get_work_item(source_prepared.work_item_id)
+            if source_work_item.best_trained_model_id is not None:
+                break
+            time.sleep(0.1)
+        else:
+            raise AssertionError("Timed out waiting for the source work item to get a best model.")
+
+        prepared = window._scenario_workflow_service.prepare_work_item(
+            PrepareScenarioWorkItemInput(
+                template_key="sales_demand_forecast.v1",
+                source_path=str(dataset_file.resolve()),
+                feature_columns=["feature_a", "feature_b"],
+                target_columns=["target"],
+                work_item_name="reuse-target-run",
+            )
+        )
+        compatible_models = window._scenario_model_source_service.list_compatible_trained_models(
+            ListCompatibleTrainedModelsInput(
+                template_key=prepared.template_key,
+                feature_columns=prepared.feature_columns,
+                target_columns=prepared.target_columns,
+            )
+        )
+        assert compatible_models
+        selected_model = compatible_models[0]
+
+        class _PreparedDialogStub:
+            def preparation_result(self_nonlocal):
+                return prepared
+
+        class _ModelSourceDialogStub:
+            def selected_source_kind(self_nonlocal):
+                return ScenarioModelSourceKind.TRAINED_MODEL
+
+            def selected_trained_model(self_nonlocal):
+                return selected_model
+
+            def compatible_models(self_nonlocal):
+                return compatible_models
+
+        window._scenario_data_preparation_dialog = _PreparedDialogStub()
+        window._scenario_model_source_dialog = _ModelSourceDialogStub()
+
+        window._continue_after_model_source_selection()
+        app.processEvents()
+
+        assert isinstance(window._scenario_inference_dialog, ScenarioInferenceDialog)
+        assert window._scenario_inference_dialog.isVisible()
+        assert window._scenario_inference_dialog._current_model_id() == selected_model.trained_model_id
+    finally:
+        if window._scenario_inference_dialog is not None:
+            window._scenario_inference_dialog.close()
+        window._ml_workspace._timer.stop()
+        window.close()
+
+
 def test_scenario_training_dialog_shows_regression_result_cards_with_metrics_and_save_state(
     monkeypatch,
     tmp_path: Path,
@@ -1171,5 +1266,134 @@ def test_scenario_inference_dialog_uses_selected_model_and_previews_batch_input(
         assert len(inference_tasks) >= 1
         latest_task = inference_tasks[-1]
         assert latest_task.request_payload["inference_model"]["trained_model_id"] == selected_model_id
+    finally:
+        dialog.close()
+
+
+def test_scenario_inference_dialog_reuses_compatible_model_from_previous_work_item(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    project_service = ProjectService(context.session_factory)
+    work_item_service = WorkItemService(context.session_factory, paths)
+    dataset_service = DatasetService(context.session_factory, paths)
+    ml_task_service = MLTaskService(context.session_factory, paths)
+    ml_service = MLService(
+        paths,
+        context.session_factory,
+        dataset_service,
+        work_item_service,
+        ml_task_service,
+    )
+    template_service = ScenarioTemplateService()
+    workflow_service = ScenarioWorkflowService(
+        project_service=project_service,
+        work_item_service=work_item_service,
+        dataset_service=dataset_service,
+        ml_service=ml_service,
+        template_service=template_service,
+    )
+    model_source_service = ScenarioModelSourceService(context.session_factory, template_service)
+
+    dataset_file = tmp_path / "reuse-model-demand.csv"
+    dataset_file.write_text(
+        "feature_a,feature_b,target\n"
+        "1,2,5\n"
+        "2,1,5\n"
+        "3,5,11\n"
+        "4,2,10\n"
+        "5,3,13\n"
+        "6,6,18\n"
+        "7,5,19\n"
+        "8,4,20\n"
+        "9,7,25\n"
+        "10,8,28\n",
+        encoding="utf-8",
+    )
+    source_prepared = workflow_service.prepare_work_item(
+        PrepareScenarioWorkItemInput(
+            template_key="sales_demand_forecast.v1",
+            source_path=str(dataset_file.resolve()),
+            feature_columns=["feature_a", "feature_b"],
+            target_columns=["target"],
+            work_item_name="source-trained-model",
+        )
+    )
+    ml_service.fit_with_evaluate(
+        FitWithEvaluateInput(
+            work_item_id=source_prepared.work_item_id,
+            model_key="regression.linear",
+            params={"fit_intercept": True},
+        )
+    )
+
+    deadline = time.time() + 60
+    while time.time() < deadline:
+        source_work_item = work_item_service.get_work_item(source_prepared.work_item_id)
+        if source_work_item.best_trained_model_id is not None:
+            break
+        time.sleep(0.1)
+    else:
+        raise AssertionError("Timed out waiting for the source work item to get a best model.")
+
+    prepared = workflow_service.prepare_work_item(
+        PrepareScenarioWorkItemInput(
+            template_key="sales_demand_forecast.v1",
+            source_path=str(dataset_file.resolve()),
+            feature_columns=["feature_a", "feature_b"],
+            target_columns=["target"],
+            work_item_name="reuse-target",
+        )
+    )
+    template = template_service.get_template(prepared.template_key)
+    compatible_models = model_source_service.list_compatible_trained_models(
+        ListCompatibleTrainedModelsInput(
+            template_key=prepared.template_key,
+            feature_columns=prepared.feature_columns,
+            target_columns=prepared.target_columns,
+        )
+    )
+    assert compatible_models
+    selected_model = compatible_models[0]
+
+    monkeypatch.setattr("xenix.ui.scenario_inference_dialog.QMessageBox.information", lambda *args, **kwargs: None)
+    dialog = ScenarioInferenceDialog(
+        template=template,
+        preparation_result=prepared,
+        work_item_service=work_item_service,
+        dataset_service=dataset_service,
+        ml_service=ml_service,
+        available_trained_models=compatible_models,
+        preferred_trained_model_id=selected_model.trained_model_id,
+    )
+    try:
+        dialog.show()
+        app.processEvents()
+
+        assert dialog._current_model_id() == selected_model.trained_model_id
+        assert dialog._best_model_label.text().startswith("Compatible model selected:")
+
+        dialog._row_editor._table.item(0, 0).setText("11")
+        dialog._row_editor._table.item(0, 1).setText("9")
+        app.processEvents()
+        assert dialog._manual_submit_button.isEnabled() is True
+
+        dialog._submit_manual_inference()
+        app.processEvents()
+
+        inference_tasks = [
+            task
+            for task in ml_service.list_work_item_tasks(prepared.work_item_id)
+            if task.task_type is MLTaskType.INFERENCE
+        ]
+        assert len(inference_tasks) == 1
+        assert inference_tasks[0].request_payload["inference_model"]["trained_model_id"] == selected_model.trained_model_id
     finally:
         dialog.close()

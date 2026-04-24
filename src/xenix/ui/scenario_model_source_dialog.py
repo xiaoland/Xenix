@@ -74,6 +74,9 @@ class ScenarioModelSourceDialog(QDialog):
     def selected_source_kind(self) -> ScenarioModelSourceKind | None:
         return self._selected_source_kind
 
+    def compatible_models(self) -> list[CompatibleTrainedModelOption]:
+        return list(self._compatible_models)
+
     def selected_trained_model(self) -> CompatibleTrainedModelOption | None:
         current_item = self._model_list.currentItem()
         if current_item is None:

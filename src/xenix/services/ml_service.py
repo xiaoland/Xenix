@@ -366,8 +366,18 @@ class MLService:
             if model_id is None:
                 raise ValidationError("The selected work item does not have a best model yet. Select a trained model first.")
             trained_model = self._trained_models.get(session, model_id)
-            if trained_model is None or trained_model.work_item_id != work_item.id:
+            if trained_model is None:
                 raise ValidationError("The selected trained model is invalid for the current work item.")
+            source_work_item = self._work_items.get(session, trained_model.work_item_id)
+            if source_work_item is None:
+                raise ValidationError("The selected trained model is invalid for the current work item.")
+            if (
+                list(source_work_item.feature_columns) != list(work_item.feature_columns)
+                or list(source_work_item.target_columns) != list(work_item.target_columns)
+            ):
+                raise ValidationError(
+                    "The selected trained model is incompatible with the current feature and target selection."
+                )
             if not Path(trained_model.artifact_path).exists():
                 raise ValidationError("The selected trained model artifact is missing.")
             return trained_model

@@ -755,6 +755,46 @@ SVG 的推論頁重心是輸入資料與結果。現況推論頁以任務表、�
 - 模型確認與刪除
 - 直接承接到推論
 
+實作狀態：
+
+- 已完成第一輪落地，日期為 `2026-04-24`
+
+本輪已完成：
+
+- 資料準備後選擇 `選擇已訓練模型`，現在會直接承接到 `ScenarioInferenceDialog`
+- 推論頁已支援承接第二步傳入的相容模型清單
+- 推論頁會預選第二步剛選中的已訓練模型
+- `MLService.infer()` 已放寬成可接受跨 work item 的已訓練模型
+- 跨 work item 推論目前要求：
+  - 輸入列完全一致
+  - 預測目標完全一致
+- 已訓練模型回用路徑現在已具備：
+  - 相容模型查詢
+  - 最新優先排序
+  - 模型資訊展示
+  - 模型確認後直接進推論
+
+本輪保留：
+
+- SVG 中的刪除模型操作與刪除後的最佳模型重選規則，仍保留在工作包 6 的下一輪
+
+涉及檔案：
+
+- `src/xenix/services/ml_service.py`
+- `src/xenix/services/scenario_model_source_service.py`
+- `src/xenix/ui/scenario_model_source_dialog.py`
+- `src/xenix/ui/scenario_inference_dialog.py`
+- `src/xenix/ui/main_window.py`
+- `src/xenix/translations/xenix_en_US.ts`
+- `src/xenix/translations/xenix_zh_CN.ts`
+- `tests/test_scenario_ui.py`
+
+驗證結果：
+
+- 與工作包 6 直接相關的目標用例已通過，包括：
+  - 主視窗從第二步的已訓練模型分支直接打開推論頁
+  - 跨 work item 已訓練模型在相容欄位配置下可直接推論
+
 ### 工作包 7：模型 metadata 與保存語義
 
 目標：
