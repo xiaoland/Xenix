@@ -34,6 +34,7 @@ from ..services.scenario_workflow_service import (
     StartScenarioTrainingRunInput,
 )
 from ..services.storage.models import MLTaskType
+from ..services.trained_model_metadata import parse_trained_model_metadata
 from .scenario_template_text import localized_template_display_name
 from .widgets.task_log_view import TaskLogView
 
@@ -374,16 +375,15 @@ class ScenarioTrainingDialog(QDialog):
             return self.tr("Best model: waiting for evaluation.")
 
         trained_models = self._ml_service.list_trained_models(snapshot.work_item_id)
-        best_model_key = snapshot.best_trained_model_id
+        best_model_display_name = str(snapshot.best_trained_model_id)
         for model in trained_models:
             if model.id == snapshot.best_trained_model_id:
-                best_model_key = model.model_key
+                metadata = parse_trained_model_metadata(model.metadata_payload)
+                if metadata is not None and metadata.saved_name:
+                    best_model_display_name = metadata.saved_name
+                    break
+                best_model_display_name = self._model_display_name(model.model_key)
                 break
-        best_model_display_name = str(best_model_key)
-        try:
-            best_model_display_name = self._ml_service.get_model(str(best_model_key)).display_name
-        except Exception:
-            best_model_display_name = str(best_model_key)
 
         tasks = self._ml_service.list_work_item_tasks(snapshot.work_item_id)
         for task in tasks:
@@ -538,6 +538,15 @@ class ScenarioTrainingDialog(QDialog):
     def _build_save_state_text(self, step: ScenarioTrainingStepSnapshot, *, is_best_model: bool) -> str:
         if step.trained_model_id is None:
             return self.tr("Save state: waiting for persisted model")
+        metadata = self._trained_model_metadata(step.trained_model_id)
+        if metadata is not None and metadata.artifact_file_name:
+            if is_best_model:
+                return self.tr("Save state: saved automatically as {file_name} and leading this run").format(
+                    file_name=metadata.artifact_file_name
+                )
+            return self.tr("Save state: saved automatically as {file_name}").format(
+                file_name=metadata.artifact_file_name
+            )
         if is_best_model:
             return self.tr("Save state: saved automatically and leading this run")
         return self.tr("Save state: saved automatically")
@@ -610,3 +619,18 @@ class ScenarioTrainingDialog(QDialog):
             return
         self.continue_to_prediction_requested.emit(self._preparation_result)
         self.close()
+
+    def _trained_model_metadata(self, trained_model_id: str) -> Any:
+        if self._current_snapshot is None:
+            return None
+        for model in self._ml_service.list_trained_models(self._current_snapshot.work_item_id):
+            if model.id != trained_model_id:
+                continue
+            return parse_trained_model_metadata(model.metadata_payload)
+        return None
+
+    def _model_display_name(self, model_key: str) -> str:
+        try:
+            return self._ml_service.get_model(model_key).display_name
+        except Exception:
+            return model_key

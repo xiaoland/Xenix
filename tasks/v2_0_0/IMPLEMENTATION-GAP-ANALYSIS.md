@@ -807,6 +807,75 @@ SVG 的推論頁重心是輸入資料與結果。現況推論頁以任務表、�
 - 增加命名規則
 - 增加訓練來源、欄位、樣例、評估值的持久化
 
+實作狀態：
+
+- 已完成第一輪落地，日期為 `2026-04-24`
+
+本輪已完成：
+
+- `trained_model` 已新增結構化 `metadata_payload`
+- 本地 storage schema 已升級到 `v5`
+- 已新增自動 migration，既有 `v4` 本地資料庫可直接升級到 `v5`
+- 已新增 `TrainedModelMetadata` 契約，保存以下語義：
+  - 模型展示名稱
+  - 保存名稱
+  - 保存檔名
+  - 保存說明
+  - 訓練操作型別
+  - 來源 work item
+  - 來源 dataset
+  - 輸入列與預測目標
+  - 資料列數、欄位數
+  - 前 5 筆樣本預覽
+  - 訓練參數
+  - tuning 搜尋網格
+  - 最佳參數
+  - primary metric 與完整評估值
+- 新訓練出的 canonical 模型檔案已改為規則化命名
+  - 目前採用：`<work-item>-<model>-<timestamp>-<taskid8>.joblib`
+- `MLService` 在建立訓練 task 時，已把資料來源摘要與樣本預覽寫入 request context
+- `MLTaskService` 在 `fit` / `hyperparameter_tuning` 完成時，已建立完整模型 metadata
+- `MLService` 在 `evaluate` 完成時，已把 primary metric 與完整 metrics 回填到對應模型 metadata
+- `ScenarioModelSourceDialog` 現在已展示：
+  - 保存名稱
+  - 模型家族
+  - 來源資料集
+  - 建立時間
+  - 輸入列與預測目標
+  - 樣本摘要
+  - 評估指標
+  - 保存檔名
+  - 保存說明
+- `ScenarioInferenceDialog`、`MLWorkspace`、`InferenceWorkspace` 已開始優先使用保存名稱，而不是裸 `model_key`
+
+涉及檔案：
+
+- `src/xenix/services/trained_model_metadata.py`
+- `src/xenix/services/ml/contracts.py`
+- `src/xenix/services/ml_service.py`
+- `src/xenix/services/ml_task_service.py`
+- `src/xenix/services/scenario_model_source_service.py`
+- `src/xenix/services/storage/models.py`
+- `src/xenix/services/storage/migrations.py`
+- `src/xenix/services/storage/repositories/trained_models.py`
+- `src/xenix/ui/scenario_model_source_dialog.py`
+- `src/xenix/ui/scenario_inference_dialog.py`
+- `src/xenix/ui/scenario_training_dialog.py`
+- `src/xenix/ui/ml_workspace.py`
+- `src/xenix/ui/inference_workspace.py`
+- `tests/test_repositories.py`
+- `tests/test_ml_execution.py`
+- `tests/test_scenario_ui.py`
+
+驗證結果：
+
+- `python -m compileall` 已通過
+- 與工作包 7 直接相關的目標用例已通過，包括：
+  - `trained_model` metadata round-trip 與更新
+  - `v4 -> v5` schema migration
+  - 訓練完成後的 metadata 建立與評估值回填
+  - 第二步已訓練模型列表展示保存語義與評估摘要
+
 ## 我們真正要做的事
 
 如果目標是讓軟體的用戶互動模式向這份 SVG 靠攏，核心工作可以濃縮成一句話：

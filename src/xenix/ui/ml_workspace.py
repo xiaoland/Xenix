@@ -32,6 +32,7 @@ from ..services.ml_service import (
 )
 from ..services.project_service import ProjectService
 from ..services.storage.models import MLTaskArtifactKind, MLTaskStatus, MLTaskType
+from ..services.trained_model_metadata import parse_trained_model_metadata
 from ..services.work_item_service import WorkItemService
 from .widgets.json_schema_form import JsonSchemaFormWidget
 from .widgets.task_log_view import TaskLogView
@@ -394,7 +395,14 @@ class MLWorkspace(QWidget):
         self._trained_model_list.clear()
         for model in trained_models:
             prefix = f"{self.tr('[Best]')} " if work_item.best_trained_model_id == model.id else ""
-            self._trained_model_list.addItem(f"{prefix}{model.model_key}")
+            metadata = parse_trained_model_metadata(model.metadata_payload)
+            label = metadata.saved_name if metadata is not None and metadata.saved_name else model.model_key
+            if metadata is not None and metadata.evaluation_primary_metric_name and metadata.evaluation_primary_metric_value is not None:
+                label = (
+                    f"{label} | "
+                    f"{metadata.evaluation_primary_metric_name}={metadata.evaluation_primary_metric_value:.4f}"
+                )
+            self._trained_model_list.addItem(f"{prefix}{label}")
 
     def _load_selected_task_details(self) -> None:
         task_id = self._selected_task_id()

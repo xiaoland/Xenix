@@ -149,5 +149,9 @@ class TrainedModelRow(SQLModel, table=True):
     model_key: str = Field(index=True)
     problem_kind: ProblemKind = Field(index=True)
     artifact_path: str
+    metadata_payload: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)

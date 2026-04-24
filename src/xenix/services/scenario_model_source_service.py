@@ -11,6 +11,7 @@ from .ml.registry import get_model_catalog_entry
 from .scenario_template_service import ScenarioTemplateService
 from .scenario_workflow_service import SCENARIO_PROJECT_NAME
 from .storage.repositories import ProjectRepository, TrainedModelRepository, WorkItemRepository
+from .trained_model_metadata import parse_trained_model_metadata
 
 
 class ListCompatibleTrainedModelsInput(SQLModel):
@@ -25,10 +26,22 @@ class CompatibleTrainedModelOption(SQLModel):
     work_item_name: str
     model_key: str
     model_display_name: str
+    saved_name: str | None = None
+    artifact_file_name: str | None = None
     created_at: datetime
     is_best_for_work_item: bool
     feature_columns: list[str] = Field(default_factory=list)
     target_columns: list[str] = Field(default_factory=list)
+    source_dataset_name: str | None = None
+    source_dataset_file_name: str | None = None
+    dataset_row_count: int | None = None
+    dataset_column_count: int | None = None
+    preview_columns: list[str] = Field(default_factory=list)
+    preview_rows: list[list[str]] = Field(default_factory=list)
+    save_note: str | None = None
+    evaluation_primary_metric_name: str | None = None
+    evaluation_primary_metric_value: float | None = None
+    evaluation_metrics: dict[str, float] = Field(default_factory=dict)
 
 
 class ScenarioModelSourceService:
@@ -72,17 +85,38 @@ class ScenarioModelSourceService:
                     if trained_model.problem_kind != expected_problem_kind:
                         continue
                     catalog = get_model_catalog_entry(trained_model.model_key)
+                    metadata = parse_trained_model_metadata(trained_model.metadata_payload)
                     options.append(
                         CompatibleTrainedModelOption(
                             trained_model_id=trained_model.id,
                             work_item_id=work_item.id,
                             work_item_name=work_item.name,
                             model_key=trained_model.model_key,
-                            model_display_name=catalog.display_name,
+                            model_display_name=(
+                                metadata.model_display_name if metadata is not None else catalog.display_name
+                            ),
+                            saved_name=metadata.saved_name if metadata is not None else None,
+                            artifact_file_name=metadata.artifact_file_name if metadata is not None else None,
                             created_at=normalize_datetime_to_utc(trained_model.created_at),
                             is_best_for_work_item=work_item.best_trained_model_id == trained_model.id,
                             feature_columns=list(work_item.feature_columns),
                             target_columns=list(work_item.target_columns),
+                            source_dataset_name=metadata.source_dataset_name if metadata is not None else None,
+                            source_dataset_file_name=(
+                                metadata.source_dataset_file_name if metadata is not None else None
+                            ),
+                            dataset_row_count=metadata.dataset_row_count if metadata is not None else None,
+                            dataset_column_count=metadata.dataset_column_count if metadata is not None else None,
+                            preview_columns=list(metadata.preview_columns) if metadata is not None else [],
+                            preview_rows=[list(row) for row in metadata.preview_rows] if metadata is not None else [],
+                            save_note=metadata.save_note if metadata is not None else None,
+                            evaluation_primary_metric_name=(
+                                metadata.evaluation_primary_metric_name if metadata is not None else None
+                            ),
+                            evaluation_primary_metric_value=(
+                                metadata.evaluation_primary_metric_value if metadata is not None else None
+                            ),
+                            evaluation_metrics=dict(metadata.evaluation_metrics) if metadata is not None else {},
                         )
                     )
 

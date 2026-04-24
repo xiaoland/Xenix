@@ -34,6 +34,7 @@ from ..services.dataset_service import (
 from ..services.ml_service import InferWithFilesInput, MLService
 from ..services.project_service import ProjectService
 from ..services.storage.models import MLTaskStatus, MLTaskType
+from ..services.trained_model_metadata import parse_trained_model_metadata
 from ..services.work_item_service import WorkItemService
 from .widgets.inference_row_editor import InferenceRowEditorWidget
 from .widgets.task_log_view import TaskLogView
@@ -250,7 +251,9 @@ class InferenceWorkspace(QWidget):
             work_item = self._work_item_service.get_work_item(work_item_id)
             for model in self._ml_service.list_trained_models(work_item.id):
                 prefix = f"{self.tr('[Best]')} " if work_item.best_trained_model_id == model.id else ""
-                self._model_selector.addItem(f"{prefix}{model.model_key}", model.id)
+                metadata = parse_trained_model_metadata(model.metadata_payload)
+                label = metadata.saved_name if metadata is not None and metadata.saved_name else model.model_key
+                self._model_selector.addItem(f"{prefix}{label}", model.id)
         self._model_selector.blockSignals(False)
         if current_model_id is not None:
             index = self._model_selector.findData(current_model_id)

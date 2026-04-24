@@ -27,10 +27,12 @@ from .ml.contracts import (
     ManualTrainingPayload,
     TaskContinuationPlan,
     TaskLogEntry,
+    TrainedModelContextPayload,
 )
 from .ml.evaluation import compare_metric_snapshots, get_default_policy
 from .ml.registry import get_model_catalog_entry, get_model_service, list_model_catalog
 from .ml_task_service import CreateMLTaskInput, MLTaskService
+from .trained_model_metadata import parse_trained_model_metadata, with_evaluation
 from .storage.models import MLTaskArtifactRow, MLTaskRow, MLTaskStatus, MLTaskType, TrainedModelRow
 from .storage.repositories import MLTaskRepository, TrainedModelRepository, WorkItemRepository
 from .work_item_service import WorkItemService
@@ -118,6 +120,7 @@ class MLService:
                 model_key=input_data.model_key,
                 params=params_model.model_dump(mode="json", by_alias=True),
             ),
+            trained_model_context=self._build_trained_model_context(context),
         )
         return self._create_and_submit_task(context, MLTaskType.FIT, request)
 
@@ -143,6 +146,7 @@ class MLService:
                 model_key=input_data.model_key,
                 param_grid=param_grid_model.model_dump(mode="json", by_alias=True),
             ),
+            trained_model_context=self._build_trained_model_context(context),
         )
         return self._create_and_submit_task(context, MLTaskType.HYPERPARAMETER_TUNING, request)
 
@@ -252,6 +256,7 @@ class MLService:
             if not isinstance(evaluated_model_id, str):
                 return
             new_metrics = EvaluateTaskResult.model_validate(result_payload).evaluation
+            self._update_trained_model_metadata_with_evaluation(session, evaluated_model_id, new_metrics)
             if work_item.best_trained_model_id is None:
                 self._work_items.set_best_trained_model(session, work_item.id, evaluated_model_id, _now())
                 session.commit()
@@ -319,6 +324,20 @@ class MLService:
                 target_columns=work_item.target_columns,
             ),
             evaluation_policy=get_default_policy(catalog.problem_kind),
+            inspection=inspection,
+        )
+
+    def _build_trained_model_context(self, context: "_TrainingContext") -> TrainedModelContextPayload:
+        return TrainedModelContextPayload(
+            work_item_name=context.work_item.name,
+            dataset_name=context.dataset.name,
+            dataset_file_name=context.inspection.file_name,
+            feature_columns=list(context.work_item.feature_columns),
+            target_columns=list(context.work_item.target_columns),
+            dataset_row_count=context.inspection.row_count,
+            dataset_column_count=context.inspection.column_count,
+            preview_columns=list(context.inspection.preview_columns),
+            preview_rows=[list(row) for row in context.inspection.preview_rows],
         )
 
     def _create_and_submit_task(
@@ -409,6 +428,25 @@ class MLService:
             )
         return files
 
+    def _update_trained_model_metadata_with_evaluation(
+        self,
+        session: Any,
+        trained_model_id: str,
+        evaluation: CandidateMetrics,
+    ) -> None:
+        trained_model = self._trained_models.get(session, trained_model_id)
+        if trained_model is None:
+            return
+        metadata = parse_trained_model_metadata(trained_model.metadata_payload)
+        if metadata is None:
+            return
+        self._trained_models.update_metadata(
+            session,
+            trained_model.id,
+            with_evaluation(metadata, evaluation).model_dump(mode="json"),
+            _now(),
+        )
+
 
 @dataclass(frozen=True)
 class _TrainingContext:
@@ -418,6 +456,7 @@ class _TrainingContext:
     catalog: Any
     column_selection: ColumnSelection
     evaluation_policy: Any
+    inspection: Any
 
 
 def _now() -> Any:

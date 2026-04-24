@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from ..storage.models import ProblemKind
+from ..trained_model_metadata import TrainedModelContextPayload
 
 
 def utc_now_iso() -> str:
@@ -71,11 +72,13 @@ class EvaluateModelPayload(BaseModel):
 class FitTaskRequest(TaskRequestBase):
     continuation_plan: TaskContinuationPlan | None = None
     manual_training: ManualTrainingPayload
+    trained_model_context: TrainedModelContextPayload | None = None
 
 
 class HyperparameterTuningTaskRequest(TaskRequestBase):
     continuation_plan: TaskContinuationPlan | None = None
     hyperparameter_tuning: HyperparameterTuningPayload
+    trained_model_context: TrainedModelContextPayload | None = None
 
 
 class EvaluateTaskRequest(TaskRequestBase):

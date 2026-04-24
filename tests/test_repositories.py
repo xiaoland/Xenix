@@ -5,6 +5,9 @@ from sqlmodel import Session
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.storage import StorageBootstrapService
+from xenix.services.storage.database import create_engine_for_path
+from xenix.services.storage.layout import database_path
+from xenix.services.storage.migrations import get_user_version, run_migrations
 from xenix.services.storage.models import (
     DatasetRow,
     DatasetSourceFormat,
@@ -334,6 +337,7 @@ def test_trained_model_repository_round_trip(monkeypatch, tmp_path: Path) -> Non
             model_key="regression.ridge",
             problem_kind=ProblemKind.REGRESSION,
             artifact_path=str(artifact_path),
+            metadata_payload={"saved_name": "Churn · Ridge Regression · 2026-04-24 09:30"},
         )
         trained_models.create(session, trained_model)
         session.commit()
@@ -341,9 +345,55 @@ def test_trained_model_repository_round_trip(monkeypatch, tmp_path: Path) -> Non
         loaded = trained_models.get(session, trained_model.id)
         by_task = trained_models.get_by_ml_task(session, task.id)
         listed = trained_models.list_by_work_item(session, work_item.id)
+        loaded_payload = dict(loaded.metadata_payload) if loaded is not None else {}
+        trained_models.update_metadata(
+            session,
+            trained_model.id,
+            {"saved_name": "Churn · Ridge Regression · 2026-04-24 09:35"},
+            _utc_now(),
+        )
+        session.commit()
+        refreshed = trained_models.get(session, trained_model.id)
 
     assert loaded is not None
     assert loaded.artifact_path == str(artifact_path)
+    assert loaded_payload["saved_name"] == "Churn · Ridge Regression · 2026-04-24 09:30"
     assert by_task is not None
     assert by_task.id == trained_model.id
     assert [row.id for row in listed] == [trained_model.id]
+    assert refreshed is not None
+    assert refreshed.metadata_payload["saved_name"] == "Churn · Ridge Regression · 2026-04-24 09:35"
+
+
+def test_run_migrations_upgrades_v4_trained_model_table_to_v5(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    engine = create_engine_for_path(database_path(paths))
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE trained_model (
+                id TEXT PRIMARY KEY,
+                work_item_id TEXT NOT NULL,
+                ml_task_id TEXT NOT NULL UNIQUE,
+                model_key TEXT NOT NULL,
+                problem_kind TEXT NOT NULL,
+                artifact_path TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.exec_driver_sql("PRAGMA user_version=4")
+
+    version = run_migrations(engine)
+
+    with engine.connect() as connection:
+        columns = {
+            str(row[1])
+            for row in connection.exec_driver_sql("PRAGMA table_info(trained_model)").all()
+        }
+
+    assert version == 5
+    assert get_user_version(engine) == 5
+    assert "metadata_payload" in columns

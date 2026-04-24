@@ -14,8 +14,17 @@ from sqlmodel import Field, SQLModel
 
 from ..config import AppPaths
 from ..exceptions import InvalidStateTransitionError, NotFoundError, ValidationError
-from .ml.contracts import EvaluateTaskResult, FitTaskResult, HyperparameterTuningTaskResult, TaskLogEntry
+from .ml.contracts import (
+    EvaluateTaskResult,
+    FitTaskRequest,
+    FitTaskResult,
+    HyperparameterTuningTaskRequest,
+    HyperparameterTuningTaskResult,
+    TaskLogEntry,
+    TrainedModelContextPayload,
+)
 from .ml.contracts import InferenceTaskResult
+from .ml.registry import get_model_catalog_entry
 from .ml.execution import MLWorkerRunner
 from .ml.operations import run_evaluate_task, run_fit_task, run_hyperparameter_tuning_task, run_inference_task
 from .storage.layout import (
@@ -28,6 +37,13 @@ from .storage.layout import (
     task_models_dir,
     task_request_path,
     task_result_path,
+)
+from .trained_model_metadata import (
+    TrainedModelMetadata,
+    artifact_file_name_from_path,
+    build_artifact_file_name,
+    build_save_note,
+    build_saved_name,
 )
 from .storage.models import (
     DatasetRow,
@@ -343,6 +359,8 @@ class MLTaskService:
         session: Any,
         row: MLTaskRow,
     ) -> tuple[dict[str, Any], list[MLTaskArtifactInput]]:
+        request = FitTaskRequest.model_validate(row.request_payload)
+        trained_model_context = self._resolve_trained_model_context(session, row, request.trained_model_context)
         result = FitTaskResult.model_validate_json(task_result_path(self._paths, row.id).read_text(encoding="utf-8"))
         if result.error_summary:
             raise ValidationError(result.error_summary)
@@ -350,7 +368,37 @@ class MLTaskService:
         holdout_path = Path(result.holdout_artifact_path)
         self._require_existing_path(model_path)
         self._require_existing_path(holdout_path)
-        canonical_path = self._copy_canonical_model(row.work_item_id, row.id, result.model_key, model_path)
+        model_display_name = get_model_catalog_entry(result.model_key).display_name
+        artifact_file_name = build_artifact_file_name(
+            trained_model_context.work_item_name,
+            model_display_name,
+            row.created_at,
+            row.id,
+        )
+        canonical_path = self._copy_canonical_model(row.work_item_id, artifact_file_name, model_path)
+        metadata = TrainedModelMetadata(
+            model_key=result.model_key,
+            model_display_name=model_display_name,
+            display_name=model_display_name,
+            saved_name=build_saved_name(
+                trained_model_context.work_item_name,
+                model_display_name,
+                row.created_at,
+            ),
+            artifact_file_name=artifact_file_name_from_path(str(canonical_path)),
+            save_note=build_save_note(model_display_name),
+            training_operation=row.task_type.value,
+            source_work_item_name=trained_model_context.work_item_name,
+            source_dataset_name=trained_model_context.dataset_name,
+            source_dataset_file_name=trained_model_context.dataset_file_name,
+            feature_columns=list(trained_model_context.feature_columns),
+            target_columns=list(trained_model_context.target_columns),
+            dataset_row_count=trained_model_context.dataset_row_count,
+            dataset_column_count=trained_model_context.dataset_column_count,
+            preview_columns=list(trained_model_context.preview_columns),
+            preview_rows=[list(row_values) for row_values in trained_model_context.preview_rows],
+            training_params=dict(result.params),
+        )
         trained_model = self._trained_models.create(
             session,
             TrainedModelRow(
@@ -359,6 +407,7 @@ class MLTaskService:
                 model_key=result.model_key,
                 problem_kind=result.problem_kind,
                 artifact_path=str(canonical_path),
+                metadata_payload=metadata.model_dump(mode="json"),
             ),
         )
         payload = result.model_dump(mode="json")
@@ -379,6 +428,8 @@ class MLTaskService:
         session: Any,
         row: MLTaskRow,
     ) -> tuple[dict[str, Any], list[MLTaskArtifactInput]]:
+        request = HyperparameterTuningTaskRequest.model_validate(row.request_payload)
+        trained_model_context = self._resolve_trained_model_context(session, row, request.trained_model_context)
         result = HyperparameterTuningTaskResult.model_validate_json(
             task_result_path(self._paths, row.id).read_text(encoding="utf-8")
         )
@@ -388,7 +439,41 @@ class MLTaskService:
         holdout_path = Path(result.holdout_artifact_path)
         self._require_existing_path(model_path)
         self._require_existing_path(holdout_path)
-        canonical_path = self._copy_canonical_model(row.work_item_id, row.id, result.model_key, model_path)
+        model_display_name = get_model_catalog_entry(result.model_key).display_name
+        artifact_file_name = build_artifact_file_name(
+            trained_model_context.work_item_name,
+            model_display_name,
+            row.created_at,
+            row.id,
+        )
+        canonical_path = self._copy_canonical_model(row.work_item_id, artifact_file_name, model_path)
+        metadata = TrainedModelMetadata(
+            model_key=result.model_key,
+            model_display_name=model_display_name,
+            display_name=model_display_name,
+            saved_name=build_saved_name(
+                trained_model_context.work_item_name,
+                model_display_name,
+                row.created_at,
+            ),
+            artifact_file_name=artifact_file_name_from_path(str(canonical_path)),
+            save_note=build_save_note(model_display_name),
+            training_operation=row.task_type.value,
+            source_work_item_name=trained_model_context.work_item_name,
+            source_dataset_name=trained_model_context.dataset_name,
+            source_dataset_file_name=trained_model_context.dataset_file_name,
+            feature_columns=list(trained_model_context.feature_columns),
+            target_columns=list(trained_model_context.target_columns),
+            dataset_row_count=trained_model_context.dataset_row_count,
+            dataset_column_count=trained_model_context.dataset_column_count,
+            preview_columns=list(trained_model_context.preview_columns),
+            preview_rows=[list(row_values) for row_values in trained_model_context.preview_rows],
+            best_params=dict(result.best_params),
+            tuning_grid={
+                str(key): list(values)
+                for key, values in request.hyperparameter_tuning.param_grid.items()
+            },
+        )
         trained_model = self._trained_models.create(
             session,
             TrainedModelRow(
@@ -397,6 +482,7 @@ class MLTaskService:
                 model_key=result.model_key,
                 problem_kind=result.problem_kind,
                 artifact_path=str(canonical_path),
+                metadata_payload=metadata.model_dump(mode="json"),
             ),
         )
         payload = result.model_dump(mode="json")
@@ -506,13 +592,12 @@ class MLTaskService:
     def _copy_canonical_model(
         self,
         work_item_id: str,
-        ml_task_id: str,
-        model_key: str,
+        artifact_file_name: str,
         source_path: Path,
     ) -> Path:
         destination_dir = canonical_model_dir(self._paths, work_item_id)
         destination_dir.mkdir(parents=True, exist_ok=True)
-        destination_path = destination_dir / f"{ml_task_id}-{model_key.replace('.', '_')}.joblib"
+        destination_path = destination_dir / artifact_file_name
         shutil.copy2(source_path, destination_path)
         return destination_path
 
@@ -527,6 +612,30 @@ class MLTaskService:
         destination_path = destination_dir / f"{ml_task_id}-predictions.csv"
         shutil.copy2(source_path, destination_path)
         return destination_path
+
+    def _resolve_trained_model_context(
+        self,
+        session: Any,
+        row: MLTaskRow,
+        request_context: TrainedModelContextPayload | None,
+    ) -> TrainedModelContextPayload:
+        if request_context is not None:
+            return request_context
+        work_item = self._work_items.get(session, row.work_item_id)
+        dataset = self._datasets.get(session, row.dataset_id) if row.dataset_id is not None else None
+        dataset_name = dataset.name if dataset is not None else ""
+        dataset_file_name = Path(dataset.source_path).name if dataset is not None else ""
+        return TrainedModelContextPayload(
+            work_item_name=work_item.name if work_item is not None else row.work_item_id,
+            dataset_name=dataset_name,
+            dataset_file_name=dataset_file_name,
+            feature_columns=list(work_item.feature_columns) if work_item is not None else [],
+            target_columns=list(work_item.target_columns) if work_item is not None else [],
+            dataset_row_count=0,
+            dataset_column_count=0,
+            preview_columns=[],
+            preview_rows=[],
+        )
 
     def _notify_callbacks(self, task: MLTaskRow) -> None:
         for callback in list(self._callbacks):

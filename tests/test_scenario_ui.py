@@ -465,11 +465,19 @@ def test_scenario_model_source_dialog_lists_compatible_trained_models_for_matchi
         selected_option = dialog.selected_trained_model()
         assert selected_option is not None
         assert selected_option.created_at.tzinfo is not None
+        assert selected_option.saved_name is not None
+        assert selected_option.source_dataset_name == "source-demand"
+        assert selected_option.evaluation_primary_metric_name == "r2"
+        assert selected_option.preview_columns == ["feature_a", "feature_b", "target"]
         assert dialog._use_trained_button.isEnabled() is True
         assert format_datetime_for_display(
             selected_option.created_at,
             format_string="%Y-%m-%d %H:%M",
-        ) in dialog._selected_model_label.text()
+        ) in dialog._selected_model_detail_label.text()
+        assert "Selected model:" in dialog._selected_model_label.text()
+        assert "Source dataset:" in dialog._selected_model_detail_label.text()
+        assert "Evaluation:" in dialog._selected_model_detail_label.text()
+        assert "Saved file:" in dialog._selected_model_detail_label.text()
         dialog._choose_trained_model_branch()
         assert dialog.selected_source_kind() is ScenarioModelSourceKind.TRAINED_MODEL
         assert dialog.selected_trained_model() is not None

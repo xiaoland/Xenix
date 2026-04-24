@@ -18,6 +18,7 @@ from xenix.services.ml_task_service import MLTaskService
 from xenix.services.project_service import CreateProjectInput, ProjectService
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import MLTaskArtifactKind, MLTaskStatus, MLTaskType
+from xenix.services.trained_model_metadata import parse_trained_model_metadata
 from xenix.services.work_item_service import CreateWorkItemInput, WorkItemService
 
 
@@ -142,6 +143,18 @@ def test_fit_with_evaluate_runs_in_background_and_persists_best_model(monkeypatc
     assert work_item_after.best_trained_model_id == trained_models[0].id
     assert len(fit_details.artifacts) == 2
     assert any(log.level == "INFO" for log in fit_details.logs)
+    metadata = parse_trained_model_metadata(trained_models[0].metadata_payload)
+    assert metadata is not None
+    assert metadata.source_work_item_name == "Demand"
+    assert metadata.source_dataset_name == "Demand"
+    assert metadata.feature_columns == ["feature_a", "feature_b"]
+    assert metadata.target_columns == ["target"]
+    assert metadata.preview_columns == ["feature_a", "feature_b", "target"]
+    assert metadata.preview_rows[0] == ["1", "2", "5"]
+    assert metadata.training_params == {"fit_intercept": True}
+    assert metadata.evaluation_primary_metric_name == "r2"
+    assert "r2" in metadata.evaluation_metrics
+    assert metadata.artifact_file_name.endswith(".joblib")
 
 
 def test_bulk_tuning_creates_one_tuning_task_per_model_and_follow_up_evaluations(

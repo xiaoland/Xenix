@@ -62,6 +62,7 @@ class ScenarioModelSourceDialog(QDialog):
         self._compatible_count_label = QLabel()
         self._model_list = QListWidget()
         self._selected_model_label = QLabel()
+        self._selected_model_detail_label = QLabel()
         self._use_trained_button = QPushButton()
         self._close_button = QPushButton()
 
@@ -102,6 +103,7 @@ class ScenarioModelSourceDialog(QDialog):
         self._trained_description_label.setWordWrap(True)
         self._compatible_count_label.setWordWrap(True)
         self._selected_model_label.setWordWrap(True)
+        self._selected_model_detail_label.setWordWrap(True)
 
         actions_layout = QHBoxLayout()
         actions_layout.setSpacing(12)
@@ -124,6 +126,7 @@ class ScenarioModelSourceDialog(QDialog):
         layout.addWidget(self._compatible_count_label)
         layout.addWidget(self._model_list, 1)
         layout.addWidget(self._selected_model_label)
+        layout.addWidget(self._selected_model_detail_label)
         layout.addLayout(actions_layout)
         layout.addLayout(footer_layout)
 
@@ -183,12 +186,14 @@ class ScenarioModelSourceDialog(QDialog):
         self._model_list.clear()
         for index, option in enumerate(self._compatible_models):
             suffix = self.tr(" [Best]") if option.is_best_for_work_item else ""
+            metric_text = self._format_metric_summary(option)
             item = QListWidgetItem(
-                self.tr("{model_name} | {work_item_name} | {created_at}{suffix}").format(
-                    model_name=option.model_display_name,
+                self.tr("{model_name} | {work_item_name} | {created_at}{suffix}{metric_text}").format(
+                    model_name=option.saved_name or option.model_display_name,
                     work_item_name=option.work_item_name,
                     created_at=self._format_created_at(option),
                     suffix=suffix,
+                    metric_text=f" | {metric_text}" if metric_text else "",
                 )
             )
             item.setData(Qt.UserRole, index)
@@ -204,21 +209,22 @@ class ScenarioModelSourceDialog(QDialog):
                 self._selected_model_label.setText(
                     self.tr("Select one compatible trained model to continue.")
                 )
+                self._selected_model_detail_label.setText(
+                    self.tr("The selected model summary appears here, including saved name, source dataset, metrics, and sample preview.")
+                )
             else:
                 self._selected_model_label.setText(
                     self.tr("Training a new model set is available immediately.")
                 )
+                self._selected_model_detail_label.setText("")
             return
 
         self._selected_model_label.setText(
-            self.tr(
-                "Selected model: {model_name}\nSource work item: {work_item_name}\nCreated at: {created_at}"
-            ).format(
-                model_name=option.model_display_name,
-                work_item_name=option.work_item_name,
-                created_at=self._format_created_at(option),
+            self.tr("Selected model: {model_name}").format(
+                model_name=option.saved_name or option.model_display_name
             )
         )
+        self._selected_model_detail_label.setText(self._build_selected_model_detail_text(option))
 
     def _format_created_at(self, option: CompatibleTrainedModelOption) -> str:
         return format_datetime_for_display(option.created_at, format_string="%Y-%m-%d %H:%M")
@@ -232,3 +238,59 @@ class ScenarioModelSourceDialog(QDialog):
             return
         self._selected_source_kind = ScenarioModelSourceKind.TRAINED_MODEL
         self.accept()
+
+    def _build_selected_model_detail_text(self, option: CompatibleTrainedModelOption) -> str:
+        lines = [
+            self.tr("Model family: {model_name}").format(model_name=option.model_display_name),
+            self.tr("Source work item: {work_item_name}").format(work_item_name=option.work_item_name),
+            self.tr("Created at: {created_at}").format(created_at=self._format_created_at(option)),
+        ]
+        if option.source_dataset_name:
+            dataset_text = option.source_dataset_name
+            if option.source_dataset_file_name:
+                dataset_text = self.tr("{dataset_name} ({file_name})").format(
+                    dataset_name=option.source_dataset_name,
+                    file_name=option.source_dataset_file_name,
+                )
+            lines.append(self.tr("Source dataset: {dataset_name}").format(dataset_name=dataset_text))
+        lines.append(
+            self.tr("Input columns: {features}\nPrediction target: {targets}").format(
+                features=", ".join(option.feature_columns),
+                targets=", ".join(option.target_columns),
+            )
+        )
+        if option.dataset_row_count is not None and option.dataset_column_count is not None:
+            lines.append(
+                self.tr("Captured sample context: {row_count} rows, {column_count} columns.").format(
+                    row_count=str(option.dataset_row_count),
+                    column_count=str(option.dataset_column_count),
+                )
+            )
+        if option.preview_columns and option.preview_rows:
+            lines.append(
+                self.tr("Preview columns: {columns}\nPreview first row: {first_row}").format(
+                    columns=", ".join(option.preview_columns),
+                    first_row=" | ".join(option.preview_rows[0]),
+                )
+            )
+        metric_text = self._format_metric_summary(option)
+        if metric_text:
+            lines.append(self.tr("Evaluation: {metrics}").format(metrics=metric_text))
+        if option.artifact_file_name:
+            lines.append(
+                self.tr("Saved file: {file_name}").format(file_name=option.artifact_file_name)
+            )
+        if option.save_note:
+            lines.append(self.tr("Note: {note}").format(note=option.save_note))
+        return "\n".join(lines)
+
+    def _format_metric_summary(self, option: CompatibleTrainedModelOption) -> str:
+        if option.evaluation_primary_metric_name and option.evaluation_primary_metric_value is not None:
+            return (
+                f"{option.evaluation_primary_metric_name}="
+                f"{option.evaluation_primary_metric_value:.4f}"
+            )
+        if option.evaluation_metrics:
+            first_metric_name = next(iter(option.evaluation_metrics))
+            return f"{first_metric_name}={option.evaluation_metrics[first_metric_name]:.4f}"
+        return ""

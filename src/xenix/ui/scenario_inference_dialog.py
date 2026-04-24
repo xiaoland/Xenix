@@ -37,6 +37,7 @@ from ..services.scenario_model_source_service import CompatibleTrainedModelOptio
 from ..services.scenario_template_service import ScenarioTemplate
 from ..services.scenario_workflow_service import ScenarioWorkItemPreparationResult
 from ..services.storage.models import MLTaskStatus, MLTaskType, TrainedModelRow, WorkItemRow
+from ..services.trained_model_metadata import parse_trained_model_metadata
 from ..services.work_item_service import WorkItemService
 from .scenario_template_text import localized_template_display_name
 from .widgets.inference_row_editor import InferenceRowEditorWidget
@@ -334,7 +335,7 @@ class ScenarioInferenceDialog(QDialog):
             for model in trained_models:
                 prefix = f"{self.tr('[Best]')} " if work_item.best_trained_model_id == model.id else ""
                 self._model_selector.addItem(
-                    f"{prefix}{self._model_display_name(model.model_key)}",
+                    f"{prefix}{self._trained_model_label(model)}",
                     model.id,
                 )
             preferred_model_id = current_model_id or work_item.best_trained_model_id
@@ -382,13 +383,13 @@ class ScenarioInferenceDialog(QDialog):
         if selected_model is None:
             self._best_model_label.setText(self.tr("Choose one trained model to start prediction."))
             return
-        selected_name = self._model_display_name(selected_model.model_key)
+        selected_name = self._trained_model_label(selected_model)
         if best_model is None:
             self._best_model_label.setText(
                 self.tr("Current model: {model_name}.").format(model_name=selected_name)
             )
             return
-        best_name = self._model_display_name(best_model.model_key)
+        best_name = self._trained_model_label(best_model)
         if selected_model.id == best_model.id:
             self._best_model_label.setText(
                 self.tr("Best model selected: {model_name}.").format(model_name=best_name)
@@ -805,6 +806,12 @@ class ScenarioInferenceDialog(QDialog):
             return self._ml_service.get_model(model_key).display_name
         except Exception:
             return model_key
+
+    def _trained_model_label(self, model: TrainedModelRow) -> str:
+        metadata = parse_trained_model_metadata(model.metadata_payload)
+        if metadata is not None and metadata.saved_name:
+            return metadata.saved_name
+        return self._model_display_name(model.model_key)
 
     def _selected_compatible_model(self) -> CompatibleTrainedModelOption | None:
         if self._available_trained_models is None:
