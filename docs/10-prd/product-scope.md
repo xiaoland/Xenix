@@ -12,9 +12,9 @@ Record which product concepts remain in the native edition and which are intenti
 - Local dataset selection and drag-and-drop import
 - Scenario data preparation with checkbox-group input and target selection
 - Fixed template-driven training plans with best-model tracking
-- Technical training and inference workspaces for direct control when needed
+- Scenario-first guided workflows as the primary operator path
 - Inference against local data or manually entered values
-- Prediction history review with reopen and export
+- Prediction history review with result-file opening and export
 - Local result viewing and export
 - Local runtime logs and metadata
 
@@ -32,6 +32,7 @@ Record which product concepts remain in the native edition and which are intenti
 - Authentication and authorization are out of scope unless a future issue reintroduces them with an ADR.
 - "Backend" logic in the native app means local services, not a network service.
 - The default operator path can hide project management details behind guided scenario surfaces.
+- Technical workspaces may remain in code as supporting or future surfaces, but they are not part of the current primary operator path unless explicitly exposed.
 - Scenario mode may use application-managed local containers while continuing to rely on the shared service and storage layers.
-- Prediction outputs must remain reopenable and exportable after the original prediction dialog closes.
+- Prediction outputs must remain reviewable, openable, and exportable after the original prediction dialog closes.
 - Operations guidance focuses on local runtime recovery and packaging, not cloud deployment.

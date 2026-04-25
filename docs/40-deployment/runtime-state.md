@@ -24,6 +24,7 @@ Current runtime files and subdirectories:
 
 - `config/locale.json`
 - `state/xenix.db`
+- `artifacts/datasets/work-items/`
 - `artifacts/models/`
 - `artifacts/training/`
 - `artifacts/inference/`
@@ -35,7 +36,7 @@ Current runtime files and subdirectories:
 2. Read the resolved paths from the main window.
 3. Open the log directory from the UI or inspect files directly on disk.
 4. Inspect `config/locale.json` for the persisted UI language preference when debugging localization behavior.
-5. Inspect `state/xenix.db` for metadata, `artifacts/ml-tasks/` for per-ML-task working directories, and `artifacts/models/<work-item-id>/` for canonical trained-model files.
+5. Inspect `state/xenix.db` for metadata, `artifacts/datasets/work-items/` for app-managed work-item dataset copies, `artifacts/ml-tasks/` for per-ML-task working directories, and `artifacts/models/<work-item-id>/` for canonical trained-model files.
 
 ## Reset
 
@@ -45,7 +46,7 @@ Current runtime files and subdirectories:
 
 Do not store canonical datasets inside the runtime directory. Dataset registration keeps source files external.
 
-Dataset import and dataset inspection do not use app-managed temp dataset copies. Import reads the user-managed source file directly and persists only dataset registration metadata plus work-item dataset-selection state in SQLite.
+Dataset import and dataset inspection read the user-managed source file directly. Work-item creation then materializes an app-managed dataset copy under `artifacts/datasets/work-items/<work-item-id>/` and persists a dataset row that points to that copied file.
 
 Issue `#72` adds ML task working directories with this shape:
 
@@ -61,5 +62,5 @@ Canonical trained models are copied out of task-local working directories into:
 
 ## Backup Guidance
 
-- Back up `state/xenix.db` together with any app-managed model, inference, or ML task working directories you need to preserve.
+- Back up `state/xenix.db` together with any app-managed work-item dataset copies, model artifacts, inference outputs, or ML task working directories you need to preserve.
 - User-managed source datasets should be backed up by normal user filesystem practices, not by app reset flows.

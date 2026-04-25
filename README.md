@@ -49,7 +49,7 @@ Use Python `3.12` to `3.14`. The initial toolchain is pinned below `3.15` becaus
 - Override the base directory with `XENIX_APP_HOME` during development or testing.
 - Logs are written to `logs/xenix.log` under the resolved app home.
 - SQLite metadata is stored in `state/xenix.db`.
-- Temporary dataset copies live under `temp/datasets/`.
+- Work-item dataset copies live under `artifacts/datasets/work-items/`.
 - App-managed artifacts and ML task working directories live under `artifacts/`.
 
 ## Packaging

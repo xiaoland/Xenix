@@ -10,7 +10,7 @@ The native app uses a one-process layered model:
 
 - UI layer: `src/xenix/ui/`
 - Service layer: `src/xenix/services/` when introduced
-- ML adapters: native wrappers around scripts under `ml/`
+- ML adapters: native execution pipeline under `src/xenix/services/ml/`
 - Persistence adapters: SQLite metadata access and filesystem access
 
 Allowed dependency direction:
@@ -59,7 +59,7 @@ Service APIs should be designed around explicit request/result objects or narrow
 
 ML adapters are responsible for:
 
-- Running existing scripts in `ml/` or future native wrappers
+- Running native model execution entrypoints under `src/xenix/services/ml/`
 - Returning typed metadata about produced artifacts
 - Emitting progress or log events through service-owned callbacks or loggers
 
@@ -67,7 +67,7 @@ ML adapters must assume:
 
 - They run in a single local user session
 - They do not own application navigation, dialogs, or persistence policy
-- They may be replaced later without changing UI entry points
+- They may evolve internally without changing UI entry points as long as service contracts stay stable
 
 ## Boundary Tests Required
 

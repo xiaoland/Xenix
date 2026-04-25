@@ -31,8 +31,8 @@ The delivered workflow includes:
 - application-managed scenario work-item preparation
 - fixed template-driven background training with logs and best-model tracking
 - manual and batch-file prediction against the best trained model
-- prediction history browsing with reopen and export
-- technical dataset, training, and inference workspaces still available in code for direct control
+- prediction history browsing with result-file opening and export
+- scenario-first surfaces exposed as the current operator path
 
 ## Verify
 

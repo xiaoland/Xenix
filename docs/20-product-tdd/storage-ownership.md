@@ -9,7 +9,7 @@ Define which local state belongs in SQLite and which belongs on the filesystem.
 SQLite is reserved for small, queryable application metadata:
 
 - ML task records and status history
-- Dataset registration metadata
+- Dataset registration metadata for both user-managed source datasets and app-managed dataset copies
 - User selections and lightweight preferences
 - References to files owned by the application
 
@@ -26,6 +26,7 @@ SQLite must not store:
 The filesystem is the source of truth for large or user-openable artifacts:
 
 - User-selected external dataset files
+- Work-item dataset copies under `artifacts/datasets/work-items/<work-item-id>/`
 - Trained model artifacts
 - Inference outputs and exported reports
 - Application logs
@@ -45,7 +46,8 @@ Current app-managed runtime layout includes:
 - The filesystem stores bytes, artifacts, and user-openable outputs.
 - Services coordinate both stores and keep references consistent.
 - UI code consumes resolved paths from services instead of constructing storage layouts itself.
-- Dataset registration stores the external source path and stable naming metadata only.
+- Source dataset registration stores the external source path and stable naming metadata.
+- Work-item creation materializes an app-managed dataset copy and persists a dataset row that points to that copied file.
 - Dataset inspection metadata such as row counts, inferred column kinds, and previews is runtime-derived and should not be persisted by default.
 - Work-item dataset selection state such as attached dataset id, feature columns, and target columns belongs on the work item rather than on the dataset record.
 - Work-item best-model state belongs on the work item as `best_trained_model_id`.
@@ -55,6 +57,7 @@ Current app-managed runtime layout includes:
 ## Deletion Rules
 
 - Deleting a SQLite row must not silently delete user-managed dataset files.
+- Deleting an app-managed work-item dataset copy must not affect the original external source file.
 - Deleting an app-managed artifact should update SQLite metadata in the same service operation.
 - Cache cleanup may remove reproducible files, but not canonical datasets, models, or exports.
 - Deleting ML task working files must not affect canonical trained-model artifacts or external dataset source files.
