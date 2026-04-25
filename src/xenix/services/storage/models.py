@@ -43,6 +43,7 @@ class DatasetSourceFormat(StrEnum):
 class ProblemKind(StrEnum):
     REGRESSION = "regression"
     CLASSIFICATION = "classification"
+    CLUSTERING = "clustering"
 
 
 class MLTaskArtifactKind(StrEnum):

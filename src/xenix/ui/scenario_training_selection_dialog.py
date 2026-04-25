@@ -268,12 +268,7 @@ class ScenarioTrainingSelectionDialog(QDialog):
                 "Choose one or more models for this scenario, adjust their parameters, and save the current combination as the default when needed."
             )
         )
-        self._selection_label.setText(
-            self.tr("Input columns: {features}\nPrediction target: {targets}").format(
-                features=", ".join(self._preparation_result.feature_columns),
-                targets=", ".join(self._preparation_result.target_columns),
-            )
-        )
+        self._selection_label.setText(self._build_selection_text())
         self._save_defaults_button.setText(self.tr("Save as Default"))
         self._start_training_button.setText(self.tr("Start Training"))
         self._close_button.setText(self.tr("Close"))
@@ -376,3 +371,13 @@ class ScenarioTrainingSelectionDialog(QDialog):
     def _set_message(self, message: str, *, is_error: bool) -> None:
         self._message_label.setText(message)
         self._message_label.setStyleSheet("color: #b42318;" if is_error else "color: #17643a;")
+
+    def _build_selection_text(self) -> str:
+        if self._template.required_target_count == 0:
+            return self.tr("Input columns: {features}\nPrediction target: not required").format(
+                features=", ".join(self._preparation_result.feature_columns)
+            )
+        return self.tr("Input columns: {features}\nPrediction target: {targets}").format(
+            features=", ".join(self._preparation_result.feature_columns),
+            targets=", ".join(self._preparation_result.target_columns),
+        )

@@ -21,11 +21,13 @@ class ColumnSelectionWidget(QFrame):
         self,
         *,
         single_target_selection: bool = False,
+        required_target_count: int = 1,
         parent: QFrame | None = None,
     ) -> None:
         super().__init__(parent)
         self.setFrameShape(QFrame.StyledPanel)
         self._single_target_selection = single_target_selection
+        self._required_target_count = required_target_count
         self._columns: list[DatasetColumnMetadata] = []
         self._feature_checkboxes: dict[str, QCheckBox] = {}
         self._target_checkboxes: dict[str, QCheckBox] = {}
@@ -36,8 +38,10 @@ class ColumnSelectionWidget(QFrame):
         self._target_title_label = QLabel()
         self._feature_panel = QWidget()
         self._feature_layout = QVBoxLayout(self._feature_panel)
+        self._feature_group = QWidget()
         self._target_panel = QWidget()
         self._target_layout = QVBoxLayout(self._target_panel)
+        self._target_group = QWidget()
 
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(12, 12, 12, 12)
@@ -48,8 +52,10 @@ class ColumnSelectionWidget(QFrame):
 
         columns_layout = QHBoxLayout()
         columns_layout.setSpacing(12)
-        columns_layout.addLayout(self._build_checkbox_group(self._feature_title_label, self._feature_panel))
-        columns_layout.addLayout(self._build_checkbox_group(self._target_title_label, self._target_panel))
+        self._build_checkbox_group(self._feature_group, self._feature_title_label, self._feature_panel)
+        self._build_checkbox_group(self._target_group, self._target_title_label, self._target_panel)
+        columns_layout.addWidget(self._feature_group, 1)
+        columns_layout.addWidget(self._target_group, 1)
         root_layout.addLayout(columns_layout)
 
         self._feature_layout.setContentsMargins(0, 0, 0, 0)
@@ -59,8 +65,9 @@ class ColumnSelectionWidget(QFrame):
 
         self.retranslate_ui()
 
-    def _build_checkbox_group(self, title_label: QLabel, panel: QWidget) -> QVBoxLayout:
-        layout = QVBoxLayout()
+    def _build_checkbox_group(self, container: QWidget, title_label: QLabel, panel: QWidget) -> None:
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
         title_label.setAlignment(Qt.AlignLeft)
         title_label.setStyleSheet("font-weight: 600;")
         layout.addWidget(title_label)
@@ -70,17 +77,22 @@ class ColumnSelectionWidget(QFrame):
         scroll.setFrameShape(QFrame.NoFrame)
         scroll.setWidget(panel)
         layout.addWidget(scroll, 1)
-        return layout
 
     def retranslate_ui(self) -> None:
-        if self._single_target_selection:
+        if self._required_target_count == 0:
+            self._hint_label.setText(self.tr("Select one or more input columns. No prediction target is required."))
+            self._target_title_label.setText(self.tr("Prediction Target"))
+            self._target_group.hide()
+        elif self._single_target_selection:
             self._hint_label.setText(
                 self.tr("Choose one prediction target, then select one or more input columns.")
             )
             self._target_title_label.setText(self.tr("Prediction Target"))
+            self._target_group.show()
         else:
             self._hint_label.setText(self.tr("Select target columns and one or more input columns."))
             self._target_title_label.setText(self.tr("Target Columns"))
+            self._target_group.show()
         self._feature_title_label.setText(self.tr("Input Columns"))
 
     def changeEvent(self, event: QEvent) -> None:
@@ -146,6 +158,8 @@ class ColumnSelectionWidget(QFrame):
         ]
 
     def selected_target_columns(self) -> list[str]:
+        if self._required_target_count == 0:
+            return []
         return [
             column.name
             for column in self._columns
@@ -167,6 +181,9 @@ class ColumnSelectionWidget(QFrame):
         self.selection_changed.emit()
 
     def _on_target_toggled(self, column_name: str, checked: bool) -> None:
+        if self._required_target_count == 0:
+            self.selection_changed.emit()
+            return
         if self._syncing_selection or not checked:
             self.selection_changed.emit()
             return

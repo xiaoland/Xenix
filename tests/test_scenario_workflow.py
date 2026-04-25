@@ -272,3 +272,69 @@ def test_start_training_run_uses_selected_steps_when_provided(
     assert _extract_model_key(root_tasks[0]) == "regression.linear"
     assert len(terminal_snapshot.step_snapshots) == 1
     assert terminal_snapshot.step_snapshots[0].model_key == "regression.linear"
+
+
+def test_clustering_training_run_finishes_without_inference_gate(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    (
+        _project_service,
+        work_item_service,
+        dataset_service,
+        _ml_task_service,
+        ml_service,
+        workflow_service,
+    ) = _build_services(monkeypatch, tmp_path)
+    scenario_project = workflow_service.ensure_scenario_project()
+
+    dataset_file = tmp_path / "segments.csv"
+    dataset_file.write_text(
+        "spend,visits,segment\n"
+        "100,1,A\n"
+        "110,1,A\n"
+        "120,2,A\n"
+        "420,9,C\n"
+        "430,8,C\n"
+        "440,9,C\n",
+        encoding="utf-8",
+    )
+    dataset = _register_dataset(dataset_service, scenario_project.id, dataset_file, name="Segments")
+    work_item = work_item_service.create_work_item(
+        CreateWorkItemInput(
+            project_id=scenario_project.id,
+            name="Segmentation Run",
+            source_dataset_id=dataset.id,
+            feature_columns=["spend", "visits", "segment"],
+            target_columns=[],
+        )
+    )
+
+    run = workflow_service.start_training_run(
+        StartScenarioTrainingRunInput(
+            template_key="customer_segmentation_clustering.v1",
+            work_item_id=work_item.id,
+        )
+    )
+    initial_snapshot = workflow_service.get_training_run_snapshot(run)
+    root_tasks = [ml_service.get_task_details(task_id).task for task_id in run.root_task_ids]
+    terminal_snapshot = _wait_for_terminal_run(workflow_service, run)
+    all_tasks = ml_service.list_work_item_tasks(work_item.id)
+
+    assert [task.task_type for task in root_tasks] == [
+        MLTaskType.FIT,
+        MLTaskType.FIT,
+    ]
+    assert [_extract_model_key(task) for task in root_tasks] == [
+        "clustering.kmeans",
+        "clustering.dbscan",
+    ]
+    assert initial_snapshot.can_proceed_to_inference is False
+    assert len(all_tasks) == 2
+    assert all(task.status is MLTaskStatus.SUCCEEDED for task in all_tasks)
+    assert terminal_snapshot.is_terminal is True
+    assert terminal_snapshot.can_proceed_to_inference is False
+    assert terminal_snapshot.best_trained_model_id is None
+    assert all(step.status is ScenarioTrainingStepStatus.SUCCEEDED for step in terminal_snapshot.step_snapshots)
+    assert all(step.evaluate_task_id is None for step in terminal_snapshot.step_snapshots)
+    assert all(isinstance(step.result_summary.get("cluster_count"), int) for step in terminal_snapshot.step_snapshots)

@@ -365,9 +365,13 @@ class MLTaskService:
         if result.error_summary:
             raise ValidationError(result.error_summary)
         model_path = Path(result.model_artifact_path)
-        holdout_path = Path(result.holdout_artifact_path)
+        holdout_path = Path(result.holdout_artifact_path) if result.holdout_artifact_path else None
+        export_path = Path(result.export_artifact_path) if result.export_artifact_path else None
         self._require_existing_path(model_path)
-        self._require_existing_path(holdout_path)
+        if holdout_path is not None:
+            self._require_existing_path(holdout_path)
+        if export_path is not None:
+            self._require_existing_path(export_path)
         model_display_name = get_model_catalog_entry(result.model_key).display_name
         artifact_file_name = build_artifact_file_name(
             trained_model_context.work_item_name,
@@ -415,12 +419,22 @@ class MLTaskService:
         payload["canonical_model_artifact_path"] = str(canonical_path)
         artifacts = [
             MLTaskArtifactInput(artifact_kind=MLTaskArtifactKind.MODEL, absolute_path=str(canonical_path)),
-            MLTaskArtifactInput(
-                artifact_kind=MLTaskArtifactKind.HOLDOUT_DATA,
-                absolute_path=str(holdout_path),
-                ready_to_open=False,
-            ),
         ]
+        if holdout_path is not None:
+            artifacts.append(
+                MLTaskArtifactInput(
+                    artifact_kind=MLTaskArtifactKind.HOLDOUT_DATA,
+                    absolute_path=str(holdout_path),
+                    ready_to_open=False,
+                )
+            )
+        if export_path is not None:
+            artifacts.append(
+                MLTaskArtifactInput(
+                    artifact_kind=MLTaskArtifactKind.EXPORT_FILE,
+                    absolute_path=str(export_path),
+                )
+            )
         return payload, artifacts
 
     def _finalize_tuning_task(
@@ -436,9 +450,13 @@ class MLTaskService:
         if result.error_summary:
             raise ValidationError(result.error_summary)
         model_path = Path(result.model_artifact_path)
-        holdout_path = Path(result.holdout_artifact_path)
+        holdout_path = Path(result.holdout_artifact_path) if result.holdout_artifact_path else None
+        export_path = Path(result.export_artifact_path) if result.export_artifact_path else None
         self._require_existing_path(model_path)
-        self._require_existing_path(holdout_path)
+        if holdout_path is not None:
+            self._require_existing_path(holdout_path)
+        if export_path is not None:
+            self._require_existing_path(export_path)
         model_display_name = get_model_catalog_entry(result.model_key).display_name
         artifact_file_name = build_artifact_file_name(
             trained_model_context.work_item_name,
@@ -490,12 +508,22 @@ class MLTaskService:
         payload["canonical_model_artifact_path"] = str(canonical_path)
         artifacts = [
             MLTaskArtifactInput(artifact_kind=MLTaskArtifactKind.MODEL, absolute_path=str(canonical_path)),
-            MLTaskArtifactInput(
-                artifact_kind=MLTaskArtifactKind.HOLDOUT_DATA,
-                absolute_path=str(holdout_path),
-                ready_to_open=False,
-            ),
         ]
+        if holdout_path is not None:
+            artifacts.append(
+                MLTaskArtifactInput(
+                    artifact_kind=MLTaskArtifactKind.HOLDOUT_DATA,
+                    absolute_path=str(holdout_path),
+                    ready_to_open=False,
+                )
+            )
+        if export_path is not None:
+            artifacts.append(
+                MLTaskArtifactInput(
+                    artifact_kind=MLTaskArtifactKind.EXPORT_FILE,
+                    absolute_path=str(export_path),
+                )
+            )
         return payload, artifacts
 
     def _finalize_evaluate_task(self, row: MLTaskRow) -> tuple[dict[str, Any], list[MLTaskArtifactInput]]:

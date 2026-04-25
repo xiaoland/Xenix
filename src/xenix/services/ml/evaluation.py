@@ -41,6 +41,17 @@ _POLICIES: dict[ProblemKind, EvaluationPolicySnapshot] = {
         cv_folds=5,
         random_state=42,
     ),
+    ProblemKind.CLUSTERING: EvaluationPolicySnapshot(
+        policy_key="clustering.default.v1",
+        problem_kind=ProblemKind.CLUSTERING,
+        primary_metric_name="cluster_count",
+        primary_metric_direction=MetricDirection.MAX,
+        tie_breaker_metrics=[],
+        split_strategy="none",
+        test_size=0.0,
+        cv_folds=None,
+        random_state=42,
+    ),
 }
 
 
@@ -131,7 +142,9 @@ def build_metric_snapshot(
 ) -> CandidateMetrics:
     if problem_kind is ProblemKind.REGRESSION:
         return build_regression_metrics(y_true, y_pred)
-    return build_classification_metrics(y_true, y_pred)
+    if problem_kind is ProblemKind.CLASSIFICATION:
+        return build_classification_metrics(y_true, y_pred)
+    raise ValueError(f"Metric snapshots are not supported for problem kind '{problem_kind.value}'.")
 
 
 def scoring_name_for_policy(policy: EvaluationPolicySnapshot) -> str:

@@ -8,15 +8,33 @@ from xenix.services.storage.models import ProblemKind
 def test_model_catalog_exposes_json_schema_and_problem_kinds() -> None:
     catalog = list_model_catalog()
 
-    assert len(catalog) == 5
+    assert len(catalog) == 12
     assert all(isinstance(entry, ModelCatalogEntry) for entry in catalog)
     ridge = get_model_catalog_entry("regression.ridge")
     assert ridge.problem_kind is ProblemKind.REGRESSION
     assert "properties" in ridge.param_schema
     assert ridge.param_grid_schema is not None
+    lasso = get_model_catalog_entry("regression.lasso")
+    assert lasso.param_schema["properties"]["alpha"]["default"] == 1.0
+    gradient_boosting = get_model_catalog_entry("classification.gradient_boosting")
+    assert gradient_boosting.param_grid_schema is not None
     random_forest = get_model_catalog_entry("classification.random_forest")
     assert random_forest.param_grid_schema is not None
     assert random_forest.param_grid_schema["properties"]["n_estimators"]["default"] == [100, 200, 300]
+    clustering = get_model_catalog_entry("clustering.kmeans")
+    assert clustering.problem_kind is ProblemKind.CLUSTERING
+    assert clustering.requires_target is False
+    assert clustering.supports_hyperparameter_tuning is False
+    assert clustering.param_grid_schema is None
+
+
+def test_clustering_policy_uses_non_split_metric_defaults() -> None:
+    policy = get_default_policy(ProblemKind.CLUSTERING)
+
+    assert policy.primary_metric_name == "cluster_count"
+    assert policy.split_strategy == "none"
+    assert policy.test_size == 0.0
+    assert policy.cv_folds is None
 
 
 def test_compare_metric_snapshots_prefers_higher_primary_metric_then_tie_breakers() -> None:

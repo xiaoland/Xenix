@@ -169,6 +169,18 @@ class MainWindow(QMainWindow):
         if result is None:
             return
         template = self._scenario_template_service.get_template(result.template_key)
+        if not template.supervised_required:
+            self._scenario_training_selection_dialog = ScenarioTrainingSelectionDialog(
+                template=template,
+                preparation_result=result,
+                training_preset_service=self._scenario_training_preset_service,
+                parent=self,
+            )
+            self._scenario_training_selection_dialog.accepted.connect(self._continue_after_training_selection)
+            self._scenario_training_selection_dialog.show()
+            self._scenario_training_selection_dialog.raise_()
+            self._scenario_training_selection_dialog.activateWindow()
+            return
         self._scenario_model_source_dialog = ScenarioModelSourceDialog(
             template=template,
             preparation_result=result,

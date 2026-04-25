@@ -31,8 +31,8 @@ _SCENARIOS: tuple[AnalysisScenario, ...] = (
     ),
     AnalysisScenario(
         key="clustering",
-        linked_template_keys=(),
-        availability=AnalysisScenarioAvailability.PLANNED,
+        linked_template_keys=("customer_segmentation_clustering.v1",),
+        availability=AnalysisScenarioAvailability.AVAILABLE,
     ),
     AnalysisScenario(
         key="anomaly_detection",

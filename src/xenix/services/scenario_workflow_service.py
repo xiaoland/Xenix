@@ -75,6 +75,7 @@ class ScenarioTrainingStepSnapshot(SQLModel):
     training_params: dict[str, Any] = Field(default_factory=dict)
     best_params: dict[str, Any] = Field(default_factory=dict)
     evaluation_metrics: dict[str, float] = Field(default_factory=dict)
+    result_summary: dict[str, Any] = Field(default_factory=dict)
     primary_metric_name: str | None = None
     primary_metric_value: float | None = None
     candidate_count: int | None = None
@@ -206,7 +207,7 @@ class ScenarioWorkflowService:
             snapshot.status in {ScenarioTrainingStepStatus.SUCCEEDED, ScenarioTrainingStepStatus.FAILED}
             for snapshot in step_snapshots
         )
-        can_proceed = is_terminal and work_item.best_trained_model_id is not None
+        can_proceed = template.supervised_required and is_terminal and work_item.best_trained_model_id is not None
         return ScenarioTrainingRunSnapshot(
             template_key=run.template_key,
             work_item_id=run.work_item_id,
@@ -248,20 +249,38 @@ class ScenarioWorkflowService:
         root_task: MLTaskRow,
         evaluate_task: MLTaskRow | None,
     ) -> ScenarioTrainingStepSnapshot:
+        catalog = get_model_catalog_entry(step.model_key)
         if root_task.status in {MLTaskStatus.FAILED, MLTaskStatus.CANCELLED}:
             return ScenarioTrainingStepSnapshot(
                 step_key=step.step_key,
                 operation=step.operation,
                 model_key=step.model_key,
-                model_display_name=get_model_catalog_entry(step.model_key).display_name,
+                model_display_name=catalog.display_name,
                 root_task_id=root_task.id,
                 root_status=root_task.status,
                 trained_model_id=_extract_trained_model_id(root_task),
                 training_params=_extract_training_params(root_task),
                 best_params=_extract_best_params(root_task),
+                result_summary=_extract_result_summary(root_task),
                 candidate_count=_extract_candidate_count(root_task),
                 status=ScenarioTrainingStepStatus.FAILED,
                 failure_summary=root_task.error_summary,
+            )
+
+        if root_task.status is MLTaskStatus.SUCCEEDED and evaluate_task is None and not catalog.requires_target:
+            return ScenarioTrainingStepSnapshot(
+                step_key=step.step_key,
+                operation=step.operation,
+                model_key=step.model_key,
+                model_display_name=catalog.display_name,
+                root_task_id=root_task.id,
+                root_status=root_task.status,
+                trained_model_id=_extract_trained_model_id(root_task),
+                training_params=_extract_training_params(root_task),
+                best_params=_extract_best_params(root_task),
+                result_summary=_extract_result_summary(root_task),
+                candidate_count=_extract_candidate_count(root_task),
+                status=ScenarioTrainingStepStatus.SUCCEEDED,
             )
 
         if root_task.status in {MLTaskStatus.PENDING, MLTaskStatus.RUNNING} or evaluate_task is None:
@@ -269,12 +288,13 @@ class ScenarioWorkflowService:
                 step_key=step.step_key,
                 operation=step.operation,
                 model_key=step.model_key,
-                model_display_name=get_model_catalog_entry(step.model_key).display_name,
+                model_display_name=catalog.display_name,
                 root_task_id=root_task.id,
                 root_status=root_task.status,
                 trained_model_id=_extract_trained_model_id(root_task),
                 training_params=_extract_training_params(root_task),
                 best_params=_extract_best_params(root_task),
+                result_summary=_extract_result_summary(root_task),
                 candidate_count=_extract_candidate_count(root_task),
                 status=ScenarioTrainingStepStatus.RUNNING,
             )
@@ -284,7 +304,7 @@ class ScenarioWorkflowService:
                 step_key=step.step_key,
                 operation=step.operation,
                 model_key=step.model_key,
-                model_display_name=get_model_catalog_entry(step.model_key).display_name,
+                model_display_name=catalog.display_name,
                 root_task_id=root_task.id,
                 root_status=root_task.status,
                 evaluate_task_id=evaluate_task.id,
@@ -292,6 +312,7 @@ class ScenarioWorkflowService:
                 trained_model_id=_extract_trained_model_id(root_task),
                 training_params=_extract_training_params(root_task),
                 best_params=_extract_best_params(root_task),
+                result_summary=_extract_result_summary(root_task),
                 candidate_count=_extract_candidate_count(root_task),
                 status=ScenarioTrainingStepStatus.RUNNING,
             )
@@ -302,7 +323,7 @@ class ScenarioWorkflowService:
                 step_key=step.step_key,
                 operation=step.operation,
                 model_key=step.model_key,
-                model_display_name=get_model_catalog_entry(step.model_key).display_name,
+                model_display_name=catalog.display_name,
                 root_task_id=root_task.id,
                 root_status=root_task.status,
                 evaluate_task_id=evaluate_task.id,
@@ -311,6 +332,7 @@ class ScenarioWorkflowService:
                 training_params=_extract_training_params(root_task),
                 best_params=_extract_best_params(root_task),
                 evaluation_metrics=evaluation_metrics,
+                result_summary=_extract_result_summary(root_task),
                 primary_metric_name=primary_metric_name,
                 primary_metric_value=primary_metric_value,
                 candidate_count=_extract_candidate_count(root_task),
@@ -322,7 +344,7 @@ class ScenarioWorkflowService:
             step_key=step.step_key,
             operation=step.operation,
             model_key=step.model_key,
-            model_display_name=get_model_catalog_entry(step.model_key).display_name,
+            model_display_name=catalog.display_name,
             root_task_id=root_task.id,
             root_status=root_task.status,
             evaluate_task_id=evaluate_task.id,
@@ -331,6 +353,7 @@ class ScenarioWorkflowService:
             training_params=_extract_training_params(root_task),
             best_params=_extract_best_params(root_task),
             evaluation_metrics=evaluation_metrics,
+            result_summary=_extract_result_summary(root_task),
             primary_metric_name=primary_metric_name,
             primary_metric_value=primary_metric_value,
             candidate_count=_extract_candidate_count(root_task),
@@ -371,6 +394,14 @@ def _extract_candidate_count(task: MLTaskRow) -> int | None:
         return None
     candidate_count = cv_summary.get("candidate_count")
     return int(candidate_count) if isinstance(candidate_count, int) else None
+
+
+def _extract_result_summary(task: MLTaskRow) -> dict[str, Any]:
+    result_payload = task.result_payload or {}
+    result_summary = result_payload.get("result_summary")
+    if isinstance(result_summary, dict):
+        return dict(result_summary)
+    return {}
 
 
 def _extract_evaluation_metrics(task: MLTaskRow) -> tuple[str | None, float | None, dict[str, float]]:

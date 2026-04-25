@@ -104,6 +104,35 @@ _TEMPLATES: tuple[ScenarioTemplate, ...] = (
             ),
         ],
     ),
+    ScenarioTemplate(
+        key="customer_segmentation_clustering.v1",
+        display_name="Customer Segmentation Clustering",
+        description="Group similar entities into segments from feature-only business data.",
+        supervised_required=False,
+        min_feature_columns=1,
+        required_target_count=0,
+        training_plan=[
+            ScenarioTrainingPlanStep(
+                step_key="fit_kmeans",
+                operation=ScenarioTrainingOperation.FIT,
+                model_key="clustering.kmeans",
+                params={
+                    "n_clusters": 4,
+                    "n_init": 10,
+                    "max_iter": 300,
+                },
+            ),
+            ScenarioTrainingPlanStep(
+                step_key="fit_dbscan",
+                operation=ScenarioTrainingOperation.FIT,
+                model_key="clustering.dbscan",
+                params={
+                    "eps": 0.5,
+                    "min_samples": 5,
+                },
+            ),
+        ],
+    ),
 )
 
 

@@ -28,6 +28,7 @@ from xenix.services.scenario_workflow_service import (
     ScenarioTrainingRunSnapshot,
     ScenarioTrainingStepSnapshot,
     ScenarioTrainingStepStatus,
+    ScenarioWorkItemPreparationResult,
     ScenarioWorkflowService,
     StartScenarioTrainingRunInput,
 )
@@ -81,7 +82,7 @@ def test_prediction_scenario_card_opens_data_preparation_dialog(
     try:
         assert window._home_view._analysis_buttons["prediction"].isEnabled() is True
         assert window._home_view._analysis_buttons["classification"].isEnabled() is True
-        assert window._home_view._analysis_buttons["clustering"].isEnabled() is False
+        assert window._home_view._analysis_buttons["clustering"].isEnabled() is True
 
         window._home_view._analysis_buttons["prediction"].click()
         app.processEvents()
@@ -154,6 +155,33 @@ def test_column_selection_widget_uses_checkbox_groups_for_single_target_selectio
         app.processEvents()
 
         assert widget.selected_feature_columns() == []
+    finally:
+        widget.close()
+
+
+def test_column_selection_widget_hides_target_group_for_feature_only_selection(
+    app: QApplication,
+) -> None:
+    widget = ColumnSelectionWidget(single_target_selection=False, required_target_count=0)
+    widget.set_columns(
+        [
+            DatasetColumnMetadata(name="feature_a", kind=DatasetColumnKind.NUMERIC, nullable=False),
+            DatasetColumnMetadata(name="feature_b", kind=DatasetColumnKind.NUMERIC, nullable=False),
+        ]
+    )
+    try:
+        widget.show()
+        app.processEvents()
+
+        assert widget._target_group.isHidden() is True
+        assert widget._hint_label.text() == "Select one or more input columns. No prediction target is required."
+        assert widget.selected_target_columns() == []
+
+        widget._feature_checkboxes["feature_a"].setChecked(True)
+        app.processEvents()
+
+        assert widget.selected_feature_columns() == ["feature_a"]
+        assert widget.selected_target_columns() == []
     finally:
         widget.close()
 
@@ -353,6 +381,45 @@ def test_scenario_data_preparation_dialog_shows_busy_state_while_inspecting_data
     finally:
         release.set()
         dialog.close()
+
+
+def test_clustering_preparation_routes_directly_to_training_selection_dialog(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    _app, window = build_main_window(show=False)
+    prepared = ScenarioWorkItemPreparationResult(
+        template_key="customer_segmentation_clustering.v1",
+        project_id="project-1",
+        work_item_id="work-item-1",
+        dataset_id="dataset-1",
+        feature_columns=["feature_a", "feature_b"],
+        target_columns=[],
+    )
+
+    class _PreparedDialog:
+        def preparation_result(self):
+            return prepared
+
+    try:
+        window._scenario_data_preparation_dialog = _PreparedDialog()
+
+        window._open_model_source_after_preparation()
+        app.processEvents()
+
+        assert window._scenario_model_source_dialog is None
+        assert isinstance(window._scenario_training_selection_dialog, ScenarioTrainingSelectionDialog)
+        assert "Prediction target: not required" in window._scenario_training_selection_dialog._selection_label.text()
+    finally:
+        if window._scenario_training_selection_dialog is not None:
+            window._scenario_training_selection_dialog.close()
+        window._ml_workspace._timer.stop()
+        window.close()
 
 
 def test_scenario_model_source_dialog_lists_compatible_trained_models_for_matching_columns(

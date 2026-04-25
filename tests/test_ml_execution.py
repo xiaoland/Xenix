@@ -93,6 +93,20 @@ def _wait_for_terminal_tasks(
     raise AssertionError("Timed out waiting for ML tasks to complete.")
 
 
+def _wait_for_best_trained_model_id(
+    work_item_service: WorkItemService,
+    work_item_id: str,
+    timeout_seconds: float = 30.0,
+) -> str:
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        work_item = work_item_service.get_work_item(work_item_id)
+        if work_item.best_trained_model_id is not None:
+            return work_item.best_trained_model_id
+        time.sleep(0.1)
+    raise AssertionError("Timed out waiting for the work item to receive a best trained model.")
+
+
 def test_fit_with_evaluate_runs_in_background_and_persists_best_model(monkeypatch, tmp_path: Path) -> None:
     project_service, work_item_service, dataset_service, _ml_task_service, ml_service = _build_services(
         monkeypatch, tmp_path
@@ -133,6 +147,7 @@ def test_fit_with_evaluate_runs_in_background_and_persists_best_model(monkeypatc
 
     tasks = _wait_for_terminal_tasks(ml_service, work_item.id, expected_count=2)
     trained_models = ml_service.list_trained_models(work_item.id)
+    best_model_id = _wait_for_best_trained_model_id(work_item_service, work_item.id)
     work_item_after = work_item_service.get_work_item(work_item.id)
     fit_details = ml_service.get_task_details(fit_task.id)
 
@@ -140,6 +155,7 @@ def test_fit_with_evaluate_runs_in_background_and_persists_best_model(monkeypatc
     assert {task.task_type for task in tasks} == {MLTaskType.FIT, MLTaskType.EVALUATE}
     assert all(task.status is MLTaskStatus.SUCCEEDED for task in tasks)
     assert len(trained_models) == 1
+    assert best_model_id == trained_models[0].id
     assert work_item_after.best_trained_model_id == trained_models[0].id
     assert len(fit_details.artifacts) == 2
     assert any(log.level == "INFO" for log in fit_details.logs)
@@ -155,6 +171,69 @@ def test_fit_with_evaluate_runs_in_background_and_persists_best_model(monkeypatc
     assert metadata.evaluation_primary_metric_name == "r2"
     assert "r2" in metadata.evaluation_metrics
     assert metadata.artifact_file_name.endswith(".joblib")
+
+
+def test_clustering_fit_runs_without_follow_up_evaluate_and_persists_export_artifact(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    project_service, work_item_service, dataset_service, _ml_task_service, ml_service = _build_services(
+        monkeypatch, tmp_path
+    )
+    project = project_service.create_project(CreateProjectInput(name="Retail"))
+    dataset_file = tmp_path / "segments.csv"
+    dataset_file.write_text(
+        "spend,visits,segment\n"
+        "100,1,A\n"
+        "110,1,A\n"
+        "120,2,A\n"
+        "420,9,C\n"
+        "430,8,C\n"
+        "440,9,C\n",
+        encoding="utf-8",
+    )
+    dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Segments")
+    work_item = _create_work_item(
+        work_item_service,
+        project.id,
+        dataset.id,
+        name="Segments",
+        feature_columns=["spend", "visits", "segment"],
+        target_columns=[],
+    )
+
+    fit_task = ml_service.fit_with_evaluate(
+        FitWithEvaluateInput(
+            work_item_id=work_item.id,
+            model_key="clustering.kmeans",
+            params={"n_clusters": 2, "n_init": 10, "max_iter": 200},
+        )
+    )
+
+    tasks = _wait_for_terminal_tasks(ml_service, work_item.id, expected_count=1)
+    trained_models = ml_service.list_trained_models(work_item.id)
+    work_item_after = work_item_service.get_work_item(work_item.id)
+    fit_details = ml_service.get_task_details(fit_task.id)
+
+    assert len(tasks) == 1
+    assert tasks[0].task_type is MLTaskType.FIT
+    assert tasks[0].status is MLTaskStatus.SUCCEEDED
+    assert len(trained_models) == 1
+    assert work_item_after.best_trained_model_id is None
+    assert len(fit_details.artifacts) == 2
+    assert any(artifact.artifact_kind is MLTaskArtifactKind.MODEL for artifact in fit_details.artifacts)
+    export_artifact = next(
+        artifact for artifact in fit_details.artifacts if artifact.artifact_kind is MLTaskArtifactKind.EXPORT_FILE
+    )
+    assert Path(export_artifact.absolute_path).exists()
+    assert export_artifact.absolute_path.endswith("cluster_assignments.csv")
+    assert fit_details.task.result_payload is not None
+    assert fit_details.task.result_payload["result_summary"]["cluster_count"] == 2
+    assert fit_details.task.result_payload["result_summary"]["row_count"] == 6
+    metadata = parse_trained_model_metadata(trained_models[0].metadata_payload)
+    assert metadata is not None
+    assert metadata.target_columns == []
+    assert metadata.feature_columns == ["spend", "visits", "segment"]
 
 
 def test_bulk_tuning_creates_one_tuning_task_per_model_and_follow_up_evaluations(

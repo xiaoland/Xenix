@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import joblib
+import numpy as np
 import pandas as pd
 from pydantic import BaseModel, Field
 from sklearn.compose import ColumnTransformer
@@ -277,3 +278,122 @@ class BooleanGridModel(BaseModel):
         min_length=1,
         description="Candidate values for fit_intercept.",
     )
+
+
+class UnsupervisedClusteringModelService(ModelServiceBase):
+    requires_target: bool = False
+    supports_hyperparameter_tuning: bool = False
+    scaler_for_numeric: bool = True
+    cluster_column_name: str = "cluster_id"
+
+    @classmethod
+    def fit(cls, request: FitTaskRequest, task_dir: Path) -> FitTaskResult:
+        dataframe = load_dataset(Path(request.dataset_source_path))
+        X = cls._select_features(dataframe, request.column_selection.feature_columns)
+
+        params_model = cls.validate_params(request.manual_training.params)
+        estimator = cls._build_pipeline(**cls._estimator_kwargs(params_model))
+        raw_labels = estimator.fit_predict(X)
+        display_labels, cluster_count, noise_count = cls._normalize_cluster_labels(raw_labels)
+
+        model_artifact_path = task_dir / "models" / f"{cls.key.replace('.', '_')}.joblib"
+        export_artifact_path = task_dir / "output" / "cluster_assignments.csv"
+        model_artifact_path.parent.mkdir(parents=True, exist_ok=True)
+        export_artifact_path.parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump(estimator, model_artifact_path)
+
+        result_frame = dataframe.copy()
+        result_frame[cls.cluster_column_name] = display_labels
+        result_frame.to_csv(export_artifact_path, index=False)
+
+        return FitTaskResult(
+            task_id=request.task_id,
+            problem_kind=request.problem_kind,
+            evaluation_policy=request.evaluation_policy,
+            model_key=cls.key,
+            params=params_model.model_dump(mode="json", by_alias=True),
+            model_artifact_path=str(model_artifact_path),
+            export_artifact_path=str(export_artifact_path),
+            result_summary={
+                "cluster_column_name": cls.cluster_column_name,
+                "cluster_count": cluster_count,
+                "noise_count": noise_count,
+                "row_count": int(len(result_frame.index)),
+            },
+        )
+
+    @classmethod
+    def tune(cls, request: HyperparameterTuningTaskRequest, task_dir: Path) -> HyperparameterTuningTaskResult:
+        raise ValidationError(f"Model '{cls.key}' does not support hyperparameter tuning.")
+
+    @classmethod
+    def evaluate(cls, request: EvaluateTaskRequest, task_dir: Path) -> EvaluateTaskResult:
+        raise ValidationError(f"Model '{cls.key}' does not support evaluation.")
+
+    @classmethod
+    def infer(cls, request: InferenceTaskRequest, task_dir: Path) -> InferenceTaskResult:
+        raise ValidationError(f"Model '{cls.key}' does not support inference.")
+
+    @classmethod
+    def _select_features(cls, dataframe: pd.DataFrame, feature_columns: list[str]) -> pd.DataFrame:
+        if not feature_columns:
+            raise ValidationError("Select at least one input column for clustering.")
+        return dataframe.loc[:, feature_columns].copy()
+
+    @classmethod
+    def _build_pipeline(cls, **estimator_kwargs: Any) -> Pipeline:
+        return Pipeline(
+            steps=[
+                ("preprocess", cls._build_preprocessor()),
+                ("model", cls._build_estimator(**estimator_kwargs)),
+            ]
+        )
+
+    @classmethod
+    def _build_preprocessor(cls) -> ColumnTransformer:
+        numeric_transformer = Pipeline(
+            steps=[
+                ("imputer", SimpleImputer(strategy="median")),
+                ("scaler", StandardScaler()),
+            ]
+        )
+        categorical_transformer = Pipeline(
+            steps=[
+                ("imputer", SimpleImputer(strategy="most_frequent")),
+                ("encoder", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+            ]
+        )
+        return ColumnTransformer(
+            transformers=[
+                ("numeric", numeric_transformer, NumericAndCategoricalModelService._numeric_selector),
+                ("categorical", categorical_transformer, NumericAndCategoricalModelService._categorical_selector),
+            ]
+        )
+
+    @classmethod
+    def _normalize_cluster_labels(cls, labels: Any) -> tuple[np.ndarray, int, int]:
+        raw = np.asarray(labels, dtype=int)
+        unique_labels = sorted(set(int(value) for value in raw.tolist()))
+        if -1 in unique_labels:
+            mapped = raw.copy()
+            current = 1
+            for label in unique_labels:
+                if label == -1:
+                    continue
+                mapped[raw == label] = current
+                current += 1
+            cluster_count = current - 1
+            noise_count = int(np.sum(raw == -1))
+            return mapped, cluster_count, noise_count
+        mapped = raw + 1
+        cluster_count = len(unique_labels)
+        return mapped, cluster_count, 0
+
+    @classmethod
+    def _estimator_kwargs(cls, params_model: BaseModel) -> dict[str, Any]:
+        return params_model.model_dump(exclude_none=True, by_alias=True)
+
+    @classmethod
+    @abstractmethod
+    def _build_estimator(cls, **estimator_kwargs: Any) -> Any:
+        raise NotImplementedError

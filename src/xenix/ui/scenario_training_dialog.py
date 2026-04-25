@@ -301,16 +301,25 @@ class ScenarioTrainingDialog(QDialog):
     def retranslate_ui(self) -> None:
         self.setWindowTitle(self.tr("Training Dashboard"))
         self._title_label.setText(localized_template_display_name(self._template))
-        self._summary_label.setText(
-            self.tr("The selected model plan is running in the background. Review the result and continue when a best model is ready.")
-        )
+        if self._template.supervised_required:
+            self._summary_label.setText(
+                self.tr("The selected model plan is running in the background. Review the result and continue when a best model is ready.")
+            )
+        else:
+            self._summary_label.setText(
+                self.tr("The selected clustering plan is running in the background. Review the saved clustering outputs when each result is ready.")
+            )
         self._run_again_button.setText(self.tr("Run Selected Plan Again"))
-        self._continue_button.setText(self.tr("Continue to Prediction"))
+        if self._template.supervised_required:
+            self._continue_button.setText(self.tr("Continue to Prediction"))
+        else:
+            self._continue_button.setText(self.tr("Close Results"))
         self._step_group.setTitle(self.tr("Model Results"))
         self._detail_group.setTitle(self.tr("Advanced Task Details"))
+        self._continue_button.setVisible(True)
         if self._current_snapshot is None:
             self._status_summary_label.setText(self.tr("Preparing the training plan..."))
-            self._best_model_label.setText(self.tr("Best model: waiting for evaluation."))
+            self._best_model_label.setText(self._build_empty_best_model_text())
             self._task_details_label.setText(self.tr("Select a model result card to inspect task details."))
 
     def changeEvent(self, event: QEvent) -> None:
@@ -340,7 +349,10 @@ class ScenarioTrainingDialog(QDialog):
         self._current_snapshot = self._workflow_service.get_training_run_snapshot(self._current_run)
         self._refresh_summary(self._current_snapshot)
         self._refresh_result_cards(self._current_snapshot)
-        self._continue_button.setEnabled(self._current_snapshot.can_proceed_to_inference)
+        if self._template.supervised_required:
+            self._continue_button.setEnabled(self._current_snapshot.can_proceed_to_inference)
+        else:
+            self._continue_button.setEnabled(self._current_snapshot.is_terminal)
         if self._current_snapshot.is_terminal:
             self._timer.stop()
 
@@ -350,6 +362,12 @@ class ScenarioTrainingDialog(QDialog):
         if snapshot.can_proceed_to_inference:
             self._status_summary_label.setText(
                 self.tr("Training finished. {succeeded_count} model result(s) succeeded and the best model is ready.").format(
+                    succeeded_count=str(succeeded_count)
+                )
+            )
+        elif not self._template.supervised_required and snapshot.is_terminal:
+            self._status_summary_label.setText(
+                self.tr("Clustering finished. {succeeded_count} model result(s) are ready for review.").format(
                     succeeded_count=str(succeeded_count)
                 )
             )
@@ -371,6 +389,15 @@ class ScenarioTrainingDialog(QDialog):
         self._best_model_label.setText(self._build_best_model_text(snapshot))
 
     def _build_best_model_text(self, snapshot: ScenarioTrainingRunSnapshot) -> str:
+        if not self._template.supervised_required:
+            succeeded_models = sum(
+                1 for step in snapshot.step_snapshots if step.status is ScenarioTrainingStepStatus.SUCCEEDED
+            )
+            if succeeded_models == 0:
+                return self.tr("Clustering outputs: waiting for successful model results.")
+            return self.tr("Clustering outputs: {count} saved model result(s) are ready.").format(
+                count=str(succeeded_models)
+            )
         if snapshot.best_trained_model_id is None:
             return self.tr("Best model: waiting for evaluation.")
 
@@ -497,6 +524,19 @@ class ScenarioTrainingDialog(QDialog):
         return self.tr("Mode: Hyperparameter tuning{candidate_suffix}").format(candidate_suffix=candidate_suffix)
 
     def _build_metrics_text(self, step: ScenarioTrainingStepSnapshot) -> str:
+        if step.result_summary:
+            cluster_count = step.result_summary.get("cluster_count")
+            noise_count = step.result_summary.get("noise_count")
+            row_count = step.result_summary.get("row_count")
+            parts: list[str] = []
+            if isinstance(cluster_count, int):
+                parts.append(self.tr("Clusters {value}").format(value=str(cluster_count)))
+            if isinstance(noise_count, int):
+                parts.append(self.tr("Noise {value}").format(value=str(noise_count)))
+            if isinstance(row_count, int):
+                parts.append(self.tr("Rows {value}").format(value=str(row_count)))
+            if parts:
+                return " · ".join(parts)
         if not step.evaluation_metrics:
             if step.status is ScenarioTrainingStepStatus.FAILED:
                 return self.tr("Metrics: evaluation did not complete.")
@@ -553,9 +593,15 @@ class ScenarioTrainingDialog(QDialog):
 
     def _build_hint_text(self, step: ScenarioTrainingStepSnapshot, *, is_best_model: bool) -> str:
         if step.status is ScenarioTrainingStepStatus.RUNNING:
+            if step.result_summary:
+                return self.tr("Hint: clustering output is being finalized in the background.")
+            if not self._template.supervised_required:
+                return self.tr("Hint: clustering is progressing in the background.")
             return self.tr("Hint: training and evaluation are progressing in the background.")
         if step.status is ScenarioTrainingStepStatus.FAILED:
             return self.tr("Hint: open the advanced task details to inspect the failure summary and logs.")
+        if step.result_summary:
+            return self.tr("Hint: review the saved clustering output file from the task artifacts or advanced details.")
         if is_best_model:
             return self.tr("Hint: this model currently gives the strongest result for the prepared dataset.")
         return self.tr("Hint: this saved model remains available for comparison and later reuse.")
@@ -603,6 +649,14 @@ class ScenarioTrainingDialog(QDialog):
         return labels[status]
 
     def _summarize_result(self, result_payload: dict[str, Any]) -> str:
+        if isinstance(result_payload.get("result_summary"), dict):
+            summary = result_payload["result_summary"]
+            cluster_count = summary.get("cluster_count")
+            noise_count = summary.get("noise_count")
+            return self.tr("clusters={cluster_count}, noise={noise_count}").format(
+                cluster_count=str(cluster_count if cluster_count is not None else ""),
+                noise_count=str(noise_count if noise_count is not None else ""),
+            )
         if isinstance(result_payload.get("evaluation"), dict):
             evaluation = result_payload["evaluation"]
             metric_name = evaluation.get("primary_metric_name", self.tr("metric"))
@@ -615,10 +669,21 @@ class ScenarioTrainingDialog(QDialog):
         return str(result_payload)
 
     def _continue_to_prediction(self) -> None:
-        if self._current_snapshot is None or not self._current_snapshot.can_proceed_to_inference:
+        if self._current_snapshot is None:
+            return
+        if not self._template.supervised_required:
+            if self._current_snapshot.is_terminal:
+                self.close()
+            return
+        if not self._current_snapshot.can_proceed_to_inference:
             return
         self.continue_to_prediction_requested.emit(self._preparation_result)
         self.close()
+
+    def _build_empty_best_model_text(self) -> str:
+        if self._template.supervised_required:
+            return self.tr("Best model: waiting for evaluation.")
+        return self.tr("Clustering outputs: waiting for successful model results.")
 
     def _trained_model_metadata(self, trained_model_id: str) -> Any:
         if self._current_snapshot is None:

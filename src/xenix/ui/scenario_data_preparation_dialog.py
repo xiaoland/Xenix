@@ -62,7 +62,10 @@ class ScenarioDataPreparationDialog(QDialog):
         self._drop_zone = FileDropZone()
         self._choose_file_button = QPushButton()
         self._summary_widget = DatasetSummaryWidget()
-        self._column_selection = ColumnSelectionWidget(single_target_selection=True)
+        self._column_selection = ColumnSelectionWidget(
+            single_target_selection=self._template.required_target_count == 1,
+            required_target_count=self._template.required_target_count,
+        )
         self._busy_label = QLabel()
         self._busy_indicator = QProgressBar()
         self._message_label = QLabel()
@@ -124,9 +127,14 @@ class ScenarioDataPreparationDialog(QDialog):
     def retranslate_ui(self) -> None:
         self.setWindowTitle(self.tr("Prepare Scenario Data"))
         self._title_label.setText(localized_template_display_name(self._template))
-        self._summary_label.setText(
-            self.tr("Upload one dataset, choose the prediction target and input columns, then continue to training.")
-        )
+        if self._template.required_target_count == 0:
+            self._summary_label.setText(
+                self.tr("Upload one dataset, choose one or more input columns, then continue to training.")
+            )
+        else:
+            self._summary_label.setText(
+                self.tr("Upload one dataset, choose the prediction target and input columns, then continue to training.")
+            )
         self._choose_file_button.setText(self.tr("Choose File"))
         self._continue_button.setText(self.tr("Continue to Training"))
         self._reload_busy_text()
@@ -167,7 +175,7 @@ class ScenarioDataPreparationDialog(QDialog):
             self._set_message(self.tr("Choose and inspect a dataset before continuing."), is_error=True)
             return
         if not self._has_valid_column_selection():
-            self._set_message(self.tr("Choose valid input columns and a prediction target before continuing."), is_error=True)
+            self._set_message(self._invalid_selection_message(), is_error=True)
             return
 
         operation_id = self._start_busy_operation("preparation")
@@ -291,3 +299,8 @@ class ScenarioDataPreparationDialog(QDialog):
         if set(feature_columns) & set(target_columns):
             return False
         return True
+
+    def _invalid_selection_message(self) -> str:
+        if self._template.required_target_count == 0:
+            return self.tr("Choose valid input columns before continuing.")
+        return self.tr("Choose valid input columns and a prediction target before continuing.")

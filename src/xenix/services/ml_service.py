@@ -115,7 +115,11 @@ class MLService:
             problem_kind=context.catalog.problem_kind,
             column_selection=context.column_selection,
             evaluation_policy=context.evaluation_policy,
-            continuation_plan=TaskContinuationPlan(next_operation=MLTaskType.EVALUATE.value),
+            continuation_plan=(
+                TaskContinuationPlan(next_operation=MLTaskType.EVALUATE.value)
+                if context.catalog.requires_target
+                else None
+            ),
             manual_training=ManualTrainingPayload(
                 model_key=input_data.model_key,
                 params=params_model.model_dump(mode="json", by_alias=True),
@@ -141,7 +145,11 @@ class MLService:
             problem_kind=context.catalog.problem_kind,
             column_selection=context.column_selection,
             evaluation_policy=context.evaluation_policy,
-            continuation_plan=TaskContinuationPlan(next_operation=MLTaskType.EVALUATE.value),
+            continuation_plan=(
+                TaskContinuationPlan(next_operation=MLTaskType.EVALUATE.value)
+                if context.catalog.requires_target
+                else None
+            ),
             hyperparameter_tuning=HyperparameterTuningPayload(
                 model_key=input_data.model_key,
                 param_grid=param_grid_model.model_dump(mode="json", by_alias=True),
