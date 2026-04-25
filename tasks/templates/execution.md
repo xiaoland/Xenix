@@ -1,15 +1,25 @@
 # Execution Task
 
+## Objective & Hypothesis
+
+- Objective:
+- Hypothesis:
+
 ## Pre-Execution Restatement
 
 - Target:
-- State and context:
+- Current state and context:
 - Operation:
 - Scope included:
 - Scope excluded:
 - Invariants:
 - Likely affected files:
 - Uncertainty:
+
+## Guardrails Touched
+
+- Guardrail 1
+- Guardrail 2
 
 ## Plan
 

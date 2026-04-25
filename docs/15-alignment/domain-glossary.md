@@ -1,23 +1,19 @@
 # Domain Glossary
 
-## Product Terms
+This glossary is reserved for coordination language that helps humans and agents route work consistently across layers.
 
-- Native app: the desktop application running as a single local process.
-- Work item: a persisted unit of user ML work and selection state.
-- Dataset registration: metadata pointer to a user-managed source dataset.
-- Trained model: canonical model artifact tracked by metadata and stored on filesystem.
+It does not own product vocabulary, cross-unit architecture truth, or framework text.
 
-## Architecture Terms
+## Coordination Terms
 
-- UI layer: Qt Widgets views under `src/xenix/ui/`.
-- Service layer: orchestration and validation layer under `src/xenix/services/`.
-- ML adapter: service-owned bridge to model execution logic.
-- Persistence adapters: SQLite repositories and filesystem ownership logic.
+- Durable owner: the local layer that should hold a stable truth once it is ready to be promoted.
+- Task packet: the active workspace under `tasks/<task-slug>/` that holds volatile reasoning, evidence, plans, and temporary artifacts.
+- Local seam guidance: the nearest local `AGENTS.md` that protects a fragile code boundary with fast-moving tripwires and editing constraints.
+- Promotion candidate: a task-level finding that may become durable only if it is stable, expensive to rediscover, and not better enforced mechanically.
 
-## Documentation Terms
+## Routing Notes
 
-- PRD: product what and why (`docs/10-prd/`).
-- Product TDD: cross-unit technical truths (`docs/20-product-tdd/`).
-- Unit TDD: hard local unit design memory (`docs/30-unit-tdd/`).
-- Deployment layer: runtime/ops truth (`docs/40-deployment/`).
-- Task layer: volatile planning and execution records (`tasks/`).
+- Product terms belong in `docs/10-prd/glossary.md`.
+- Cross-unit architecture and technical boundary terms belong in `docs/20-product-tdd/`.
+- Runtime and operational vocabulary belongs in `docs/40-deployment/`.
+- Repository-wide routing posture belongs in the root `AGENTS.md` and `docs/00-meta/`.

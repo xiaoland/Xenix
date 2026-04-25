@@ -3,6 +3,7 @@
 PySide6 desktop bootstrap for the `native` branch of Xenix.
 
 This branch is intentionally focused on the Native desktop application line. The web monorepo remains on `web` (previous `master`, read [docs/40-deployment/branch-governance.md](docs/40-deployment/branch-governance.md) for more information)
+Repository governance follows a local single-repo application of SVC v9.7.
 
 ## Quick Start
 
@@ -21,7 +22,6 @@ Use Python `3.12` to `3.14`. The initial toolchain is pinned below `3.15` becaus
 - `pdm run smoke-package` launches the packaged executable with `--smoke-test` and verifies runtime artifacts in a temporary app home.
 - `pdm run test` runs the Python tests.
 - `pdm run check` compiles the source tree to catch syntax errors.
-- `pdm run check-svc-docs` validates SVC layer and task-path policies.
 
 ## Layout
 
@@ -30,7 +30,7 @@ Use Python `3.12` to `3.14`. The initial toolchain is pinned below `3.15` becaus
 - `scripts` contains developer helpers used by `pdm run`.
 - `ml` keeps the existing Python model scripts that will be integrated into the native workflow later.
 - `docs` stores canonical durable documentation layers.
-- `tasks` stores volatile planning and execution records.
+- `tasks` stores active task packets, reusable templates, and archived records.
 - `xenix.spec` is the canonical Windows PyInstaller `onedir` spec.
 
 ## Documentation Model

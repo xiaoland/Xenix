@@ -5,3 +5,4 @@ This layer holds product truth: what the product is, why it exists, user-visible
 Current canonical documents:
 
 - `product-scope.md`
+- `glossary.md`

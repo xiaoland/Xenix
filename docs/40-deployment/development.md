@@ -39,7 +39,6 @@ The delivered workflow includes:
 ```bash
 pdm run test
 pdm run check
-pdm run check-svc-docs
 pdm run smoke
 ```
 

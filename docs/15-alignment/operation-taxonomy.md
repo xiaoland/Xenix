@@ -1,27 +1,23 @@
 # Operation Taxonomy
 
-Use these labels to classify requests before execution.
+Use this taxonomy to route work before execution.
 
-## Mode A Operations (Exploration)
+## Input Lens
 
-- fuzzy feature ideation
-- unresolved requirement discovery
-- multi-option design framing
+- `Intent`: desired product behavior, scope, or user-visible outcome
+- `Constraint`: technical rule, boundary, or implementation guardrail
+- `Reality`: evidence about a bug, anomaly, migration fact, or current repository state
+- `Artifact`: temporary notes, plans, inventories, or generated supporting material
 
-Output location: `tasks/active/`
+## Mode Overlays
 
-## Mode B Operations (Solidification)
+- `Explore`: use when causality or scope is unclear; keep output in `tasks/<task-slug>/`
+- `Solidify`: classify truths, restate scope, and settle durable destinations before edits
+- `Execute`: make bounded code or doc changes once owner and causality are clear
+- `Diagnose`: gather read-only evidence in `tasks/<task-slug>/` before fixing anything
 
-- truth classification to durable layers
-- scope locking through pre-execution restatement
-- doc-impact confirmation before implementation
+## Routing Notes
 
-Output location: `tasks/active/` plus approved durable docs
-
-## Mode C Operations (Execution)
-
-- bounded bug fix
-- bounded refactor
-- bounded feature implementation with stable requirements
-
-Output location: code/tests plus durable docs when required
+- Route by owner first, then pick the working mode.
+- Keep temporary reasoning and transition-state artifacts in `tasks/<task-slug>/`.
+- Promote only stable, reusable, expensive-to-rediscover truth into durable docs or local `AGENTS.md`.

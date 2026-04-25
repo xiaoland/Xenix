@@ -2,10 +2,20 @@
 
 This map helps select the right layer for common changes.
 
+## Meta Workflow and SOP Changes
+
+- Target: `docs/00-meta/`
+- Examples: reusable mode overlays, repository-local execution posture, agent operating loops
+
 ## Product-Semantics Changes
 
 - Target: `docs/10-prd/`
 - Examples: scope boundaries, user-visible guarantees, retained/removed concepts
+
+## Coordination Grammar Changes
+
+- Target: `docs/15-alignment/`
+- Examples: glossary, routing language, operation taxonomy, owner map
 
 ## Cross-Unit Technical Changes
 
@@ -22,12 +32,17 @@ This map helps select the right layer for common changes.
 - Target: `docs/40-deployment/`
 - Examples: packaging workflow, runtime state recovery, migration safety process
 
-## Volatile Planning and Iteration
+## Local Seam Hazards and Recurrence Notes
 
-- Target: `tasks/active/`
-- Examples: exploration, implementation plans, temporary decisions
+- Target: nearest `AGENTS.md`
+- Examples: fragile boundary reminders, local editing constraints, evidence-derived tripwires
+
+## Volatile Planning, Exploration, and Diagnosis
+
+- Target: `tasks/<task-slug>/`
+- Examples: exploration, solidification notes, execution packets, temporary decisions, diagnosis evidence
 
 ## Historical Task Records
 
-- Target: `tasks/archive/`
+- Target: `tasks/archive/<task-slug>/`
 - Examples: completed issue plans and results

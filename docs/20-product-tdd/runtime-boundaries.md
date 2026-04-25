@@ -31,7 +31,7 @@ The UI is responsible for:
 
 - Collecting user intent from Qt Widgets
 - Rendering guided scenario surfaces that may hide project or work-item selectors
-- Rendering task status, validation errors, and result locations
+- Rendering ML task status, validation errors, and result locations
 - Invoking services with plain Python inputs
 - Opening files or directories after a service reports a successful output
 
@@ -46,10 +46,10 @@ The UI must not:
 
 Services are responsible for:
 
-- Validating user requests before long-running work starts
-- Translating UI actions into task executions
+- Validating user requests before long-running ML work starts
+- Translating UI actions into ML task executions
 - Owning application-managed scenario containers when the UI hides project management details
-- Persisting task metadata and status transitions
+- Persisting ML task metadata and status transitions
 - Resolving runtime paths
 - Coordinating ML adapters and export paths
 
@@ -74,6 +74,6 @@ ML adapters must assume:
 Add contract tests when any of the following change:
 
 - UI-to-service request shape
-- Task state transitions
+- ML task state transitions
 - Service-to-ML adapter invocation shape
 - Storage location rules for logs, models, datasets, or results

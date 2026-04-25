@@ -1,8 +1,23 @@
 # Exploration Task
 
+## Objective & Hypothesis
+
+- Objective:
+- Hypothesis:
+
 ## Prompt
 
 - Describe the fuzzy idea or open question.
+
+## Guardrails Touched
+
+- Guardrail 1
+- Guardrail 2
+
+## Current Facts
+
+- Fact 1
+- Fact 2
 
 ## Unknowns
 
@@ -14,13 +29,18 @@
 - Constraint 1
 - Constraint 2
 
-## Options
+## Candidate Paths
 
 1. Option A
 2. Option B
 3. Option C
 
-## Questions for Confirmation
+## Verification Anchors
+
+- Anchor 1
+- Anchor 2
+
+## Smallest Confirmation Needed
 
 - Question 1
 - Question 2

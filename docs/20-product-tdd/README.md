@@ -5,6 +5,6 @@ This layer holds cross-unit technical truths that are costly to rediscover and u
 Current canonical documents:
 
 - `runtime-boundaries.md`
-- `task-lifecycle.md`
+- `ml-task-lifecycle.md`
 - `storage-ownership.md`
 - `adr/` decision records for product-level technical constraints
