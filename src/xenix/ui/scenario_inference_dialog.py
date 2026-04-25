@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
@@ -86,6 +87,9 @@ class ScenarioInferenceDialog(QDialog):
         self._model_selector = QComboBox()
         self._best_model_label = QLabel()
         self._message_label = QLabel()
+        self._overview_scroll_area = QScrollArea()
+        self._overview_container = QWidget()
+        self._overview_layout = QVBoxLayout(self._overview_container)
 
         self._input_tabs = QTabWidget()
         self._manual_tab = QWidget()
@@ -117,7 +121,7 @@ class ScenarioInferenceDialog(QDialog):
         self._timer.setInterval(1000)
         self._timer.timeout.connect(self.refresh_runtime)
 
-        self.resize(1080, 820)
+        self.resize(1080, 720)
         self._build_ui()
         self._wire_events()
         self.retranslate_ui()
@@ -143,6 +147,18 @@ class ScenarioInferenceDialog(QDialog):
 
         self._configure_preview_table(self._batch_preview_table)
         self._configure_preview_table(self._result_table)
+        self._overview_scroll_area.setWidgetResizable(True)
+        self._overview_scroll_area.setFrameShape(QScrollArea.NoFrame)
+        self._overview_layout.setContentsMargins(0, 0, 0, 0)
+        self._overview_layout.setSpacing(14)
+        self._overview_scroll_area.setWidget(self._overview_container)
+        self._overview_scroll_area.setMaximumHeight(380)
+        self._input_tabs.setMaximumHeight(280)
+        self._result_group.setMaximumHeight(250)
+        self._row_editor.setMaximumHeight(190)
+        self._batch_file_list.setMaximumHeight(110)
+        self._batch_preview_table.setMaximumHeight(120)
+        self._result_table.setMaximumHeight(130)
 
         model_row = QHBoxLayout()
         model_row.setSpacing(12)
@@ -166,12 +182,15 @@ class ScenarioInferenceDialog(QDialog):
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
 
+        self._overview_layout.addWidget(self._input_tabs)
+        self._overview_layout.addWidget(self._build_result_panel())
+        self._overview_layout.addStretch(1)
+
         layout.addWidget(self._title_label)
         layout.addWidget(self._summary_label)
         layout.addWidget(self._context_label)
         layout.addLayout(model_row)
-        layout.addWidget(self._input_tabs)
-        layout.addWidget(self._build_result_panel())
+        layout.addWidget(self._overview_scroll_area)
         layout.addWidget(splitter, 1)
         layout.addWidget(self._message_label)
 

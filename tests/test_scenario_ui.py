@@ -1093,6 +1093,12 @@ def test_scenario_inference_dialog_queues_manual_prediction_with_best_model(
 
         assert dialog.windowTitle() == "Prediction"
         assert dialog._title_label.text() == "Sales Demand Forecast"
+        assert dialog.height() <= 760
+        assert dialog._overview_scroll_area.maximumHeight() == 380
+        assert dialog._input_tabs.maximumHeight() == 280
+        assert dialog._result_group.maximumHeight() == 250
+        assert dialog._row_editor.maximumHeight() == 190
+        assert dialog._result_table.maximumHeight() == 130
         assert dialog._best_model_label.text().startswith("Best model selected:")
         assert dialog._manual_submit_button.isEnabled() is False
 
@@ -1246,6 +1252,8 @@ def test_scenario_inference_dialog_uses_selected_model_and_previews_batch_input(
         app.processEvents()
 
         assert dialog._model_selector.count() >= 2
+        assert dialog._batch_file_list.maximumHeight() == 110
+        assert dialog._batch_preview_table.maximumHeight() == 120
         dialog._load_batch_files([str(batch_file.resolve())])
         app.processEvents()
 
@@ -1253,9 +1261,11 @@ def test_scenario_inference_dialog_uses_selected_model_and_previews_batch_input(
         assert dialog._batch_preview_table.rowCount() == 5
         assert "batch-preview.csv" in dialog._batch_preview_summary_label.text()
 
-        selected_index = dialog._model_selector.findText("Ridge Regression")
-        if selected_index < 0:
-            selected_index = dialog._model_selector.findText("[Best] Ridge Regression")
+        selected_index = -1
+        for index in range(dialog._model_selector.count()):
+            if "Ridge Regression" in dialog._model_selector.itemText(index):
+                selected_index = index
+                break
         assert selected_index >= 0
         dialog._model_selector.setCurrentIndex(selected_index)
         app.processEvents()
