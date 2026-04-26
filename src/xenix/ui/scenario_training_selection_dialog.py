@@ -54,6 +54,8 @@ class _ScenarioTrainingOptionCard(QFrame):
 
         self._selected_checkbox = QCheckBox()
         self._model_name_label = QLabel(self._catalog_entry.display_name)
+        self._metadata_label = QLabel()
+        self._guidance_label = QLabel()
         self._operation_label = QLabel()
         self._operation_selector = QComboBox()
         self._operation_summary_label = QLabel()
@@ -99,6 +101,15 @@ class _ScenarioTrainingOptionCard(QFrame):
 
     def retranslate_ui(self) -> None:
         self._selected_checkbox.setText(self.tr("Include this model"))
+        self._metadata_label.setText(
+            self.tr("{family} · {recommendation}").format(
+                family=self._catalog_entry.family,
+                recommendation=self._translate_recommendation_tier(self._catalog_entry.recommendation_tier),
+            )
+        )
+        self._guidance_label.setText(
+            self._catalog_entry.guidance or self.tr("General-purpose model for this scenario.")
+        )
         self._operation_label.setText(self.tr("Training mode"))
         self._reload_operation_selector()
         self._refresh_operation_summary()
@@ -116,12 +127,18 @@ class _ScenarioTrainingOptionCard(QFrame):
         layout.setSpacing(12)
 
         self._model_name_label.setStyleSheet("font-size: 16px; font-weight: 600;")
+        self._metadata_label.setStyleSheet("color: #475467; font-size: 12px; font-weight: 600;")
+        self._guidance_label.setStyleSheet("color: #344054; font-size: 12px;")
+        self._metadata_label.setWordWrap(True)
+        self._guidance_label.setWordWrap(True)
         self._operation_summary_label.setWordWrap(True)
 
         header_layout = QVBoxLayout()
         header_layout.setSpacing(6)
         header_layout.addWidget(self._selected_checkbox)
         header_layout.addWidget(self._model_name_label)
+        header_layout.addWidget(self._metadata_label)
+        header_layout.addWidget(self._guidance_label)
 
         operation_row = QHBoxLayout()
         operation_row.setSpacing(10)
@@ -215,6 +232,15 @@ class _ScenarioTrainingOptionCard(QFrame):
         }
         return labels[operation]
 
+    def _translate_recommendation_tier(self, tier: int) -> str:
+        if tier <= 20:
+            return self.tr("Recommended")
+        if tier <= 40:
+            return self.tr("Strong alternative")
+        if tier <= 60:
+            return self.tr("Advanced option")
+        return self.tr("Specialized option")
+
 
 class ScenarioTrainingSelectionDialog(QDialog):
     def __init__(
@@ -231,6 +257,7 @@ class ScenarioTrainingSelectionDialog(QDialog):
         self._available_models = self._training_preset_service.list_available_models(self._template.key)
         self._default_steps = self._training_preset_service.load_default_steps(self._template.key)
         self._model_cards: dict[str, _ScenarioTrainingOptionCard] = {}
+        self._section_labels: dict[str, QLabel] = {}
 
         self._title_label = QLabel()
         self._summary_label = QLabel()
@@ -276,6 +303,10 @@ class ScenarioTrainingSelectionDialog(QDialog):
             self._message_label.setText(self.tr("No compatible models are available for this scenario template yet."))
         elif not self._message_label.text():
             self._message_label.setText(self.tr("Select at least one model to continue."))
+        if "recommended" in self._section_labels:
+            self._section_labels["recommended"].setText(self.tr("Recommended plan"))
+        if "additional" in self._section_labels:
+            self._section_labels["additional"].setText(self.tr("Additional compatible models"))
         for card in self._model_cards.values():
             card.retranslate_ui()
 
@@ -314,7 +345,15 @@ class ScenarioTrainingSelectionDialog(QDialog):
 
     def _build_cards(self) -> None:
         default_steps_by_model = {step.model_key: step for step in self._default_steps}
+        current_section: str | None = None
         for entry in self._ordered_models():
+            section_key = "recommended" if entry.model_key in default_steps_by_model else "additional"
+            if section_key != current_section:
+                section_label = QLabel(parent=self._cards_container)
+                section_label.setStyleSheet("color: #101828; font-size: 13px; font-weight: 700;")
+                self._cards_layout.addWidget(section_label)
+                self._section_labels[section_key] = section_label
+                current_section = section_key
             card = _ScenarioTrainingOptionCard(
                 catalog_entry=entry,
                 initial_step=default_steps_by_model.get(entry.model_key),
@@ -326,11 +365,17 @@ class ScenarioTrainingSelectionDialog(QDialog):
         self._cards_layout.addStretch(1)
 
     def _ordered_models(self) -> list[ModelCatalogEntry]:
-        priority_keys = [step.model_key for step in self._template.training_plan]
+        priority_keys = [step.model_key for step in self._default_steps]
         priority_index = {model_key: index for index, model_key in enumerate(priority_keys)}
         return sorted(
             self._available_models,
-            key=lambda entry: (priority_index.get(entry.model_key, len(priority_index)), entry.display_name),
+            key=lambda entry: (
+                0 if entry.model_key in priority_index else 1,
+                priority_index.get(entry.model_key, len(priority_index)),
+                entry.recommendation_tier,
+                entry.family,
+                entry.display_name,
+            ),
         )
 
     def _wire_events(self) -> None:

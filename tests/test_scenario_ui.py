@@ -617,12 +617,16 @@ def test_scenario_training_selection_dialog_persists_default_model_selection(
         assert dialog.windowTitle() == "Choose Models and Train"
         assert [step.model_key for step in dialog.selected_steps()] == [
             "regression.linear",
-            "regression.ridge",
-            "regression.random_forest",
+            "regression.bayesian_ridge",
+            "regression.gradient_boosting",
         ]
+        assert dialog._section_labels["recommended"].text() == "Recommended plan"
+        assert dialog._section_labels["additional"].text() == "Additional compatible models"
+        assert dialog._model_cards["regression.linear"]._metadata_label.text() == "Linear baseline · Recommended"
+        assert dialog._model_cards["regression.gradient_boosting"]._guidance_label.text()
 
-        dialog._model_cards["regression.ridge"]._selected_checkbox.setChecked(False)
-        dialog._model_cards["regression.random_forest"]._selected_checkbox.setChecked(False)
+        dialog._model_cards["regression.bayesian_ridge"]._selected_checkbox.setChecked(False)
+        dialog._model_cards["regression.gradient_boosting"]._selected_checkbox.setChecked(False)
         app.processEvents()
         dialog._save_defaults_button.click()
         app.processEvents()
@@ -851,8 +855,12 @@ def test_main_window_train_new_flow_opens_training_selection_and_starts_selected
         assert isinstance(window._scenario_training_selection_dialog, ScenarioTrainingSelectionDialog)
         assert window._scenario_training_selection_dialog.isVisible()
 
-        window._scenario_training_selection_dialog._model_cards["regression.ridge"]._selected_checkbox.setChecked(False)
-        window._scenario_training_selection_dialog._model_cards["regression.random_forest"]._selected_checkbox.setChecked(False)
+        window._scenario_training_selection_dialog._model_cards[
+            "regression.bayesian_ridge"
+        ]._selected_checkbox.setChecked(False)
+        window._scenario_training_selection_dialog._model_cards[
+            "regression.gradient_boosting"
+        ]._selected_checkbox.setChecked(False)
         app.processEvents()
         window._scenario_training_selection_dialog._start_training_button.click()
         app.processEvents()
@@ -1068,9 +1076,106 @@ def test_scenario_training_dialog_shows_regression_result_cards_with_metrics_and
         card = dialog._result_cards["fit_linear"]
         assert "R²" in card._metrics_label.text()
         assert "MSE" in card._metrics_label.text()
+        assert card._rank_label.text() == "Rank #1 by r2"
         assert "saved automatically" in card._save_state_label.text().lower()
         assert "Best Model" in card._title_label.text()
         assert dialog._continue_button.isEnabled() is True
+    finally:
+        dialog.close()
+
+
+def test_scenario_training_dialog_orders_supervised_results_by_metric(
+    app: QApplication,
+) -> None:
+    template = ScenarioTemplateService().get_template("sales_demand_forecast.v1")
+    prepared = ScenarioWorkItemPreparationResult(
+        template_key=template.key,
+        project_id="project-1",
+        work_item_id="work-item-1",
+        dataset_id="dataset-1",
+        feature_columns=["feature_a", "feature_b"],
+        target_columns=["target"],
+    )
+    fake_run = ScenarioTrainingRun(
+        template_key=template.key,
+        work_item_id=prepared.work_item_id,
+        steps=template.training_plan[:2],
+        root_task_ids=["root-1", "root-2"],
+    )
+
+    class _WorkflowServiceStub:
+        def start_training_run(self, _input):
+            return fake_run
+
+        def get_training_run_snapshot(self, _run):
+            return ScenarioTrainingRunSnapshot(
+                template_key=template.key,
+                work_item_id=prepared.work_item_id,
+                step_snapshots=[
+                    ScenarioTrainingStepSnapshot(
+                        step_key="fit_linear",
+                        operation=template.training_plan[0].operation,
+                        model_key="regression.linear",
+                        model_display_name="Linear Regression",
+                        root_task_id="root-1",
+                        root_status=MLTaskStatus.SUCCEEDED,
+                        evaluate_task_id="eval-1",
+                        evaluate_status=MLTaskStatus.SUCCEEDED,
+                        trained_model_id="trained-weak",
+                        evaluation_metrics={"r2": 0.71, "rmse": 2.0, "mae": 1.3},
+                        primary_metric_name="r2",
+                        primary_metric_value=0.71,
+                        status=ScenarioTrainingStepStatus.SUCCEEDED,
+                    ),
+                    ScenarioTrainingStepSnapshot(
+                        step_key="tune_bayesian_ridge",
+                        operation=template.training_plan[1].operation,
+                        model_key="regression.bayesian_ridge",
+                        model_display_name="Bayesian Ridge Regression",
+                        root_task_id="root-2",
+                        root_status=MLTaskStatus.SUCCEEDED,
+                        evaluate_task_id="eval-2",
+                        evaluate_status=MLTaskStatus.SUCCEEDED,
+                        trained_model_id="trained-strong",
+                        evaluation_metrics={"r2": 0.93, "rmse": 0.8, "mae": 0.5},
+                        primary_metric_name="r2",
+                        primary_metric_value=0.93,
+                        status=ScenarioTrainingStepStatus.SUCCEEDED,
+                    ),
+                ],
+                best_trained_model_id="trained-strong",
+                is_terminal=True,
+                can_proceed_to_inference=True,
+            )
+
+    class _MLServiceStub:
+        def list_trained_models(self, _work_item_id):
+            return []
+
+        def list_work_item_tasks(self, _work_item_id):
+            return []
+
+        def get_task_details(self, task_id):
+            return SimpleNamespace(
+                task=SimpleNamespace(id=task_id, result_payload={}),
+                artifacts=[],
+                logs=[],
+            )
+
+    dialog = ScenarioTrainingDialog(
+        template=template,
+        preparation_result=prepared,
+        workflow_service=_WorkflowServiceStub(),
+        ml_service=_MLServiceStub(),
+    )
+    try:
+        dialog.show()
+        app.processEvents()
+
+        first_widget = dialog._results_layout.itemAt(0).widget()
+        assert first_widget is dialog._result_cards["tune_bayesian_ridge"]
+        assert dialog._result_cards["tune_bayesian_ridge"]._rank_label.text() == "Rank #1 by r2"
+        assert dialog._result_cards["fit_linear"]._rank_label.text() == "Rank #2 by r2"
     finally:
         dialog.close()
 

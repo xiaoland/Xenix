@@ -22,6 +22,9 @@ class KMeansClusteringService(UnsupervisedClusteringModelService):
     key = "clustering.kmeans"
     display_name = "KMeans Clustering"
     problem_kind = ProblemKind.CLUSTERING
+    family = "Centroid clustering"
+    guidance = "Creates a chosen number of compact segments around representative centers."
+    recommendation_tier = 10
     params_model = KMeansParams
 
     @classmethod
@@ -35,6 +38,9 @@ class DBSCANClusteringService(UnsupervisedClusteringModelService):
     key = "clustering.dbscan"
     display_name = "DBSCAN Clustering"
     problem_kind = ProblemKind.CLUSTERING
+    family = "Density clustering"
+    guidance = "Finds dense natural groups and marks sparse rows as noise."
+    recommendation_tier = 25
     params_model = DBSCANParams
 
     @classmethod

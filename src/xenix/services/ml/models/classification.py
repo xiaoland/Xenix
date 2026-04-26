@@ -119,6 +119,9 @@ class LogisticRegressionService(NumericAndCategoricalModelService):
     key = "classification.logistic_regression"
     display_name = "Logistic Regression"
     problem_kind = ProblemKind.CLASSIFICATION
+    family = "Linear baseline"
+    guidance = "Fast baseline for customer outcome classification with clear probability scores."
+    recommendation_tier = 10
     params_model = LogisticRegressionParams
     param_grid_model = LogisticRegressionParamGrid
     scaler_for_numeric = True
@@ -135,6 +138,9 @@ class NaiveBayesClassificationService(NumericAndCategoricalModelService):
     key = "classification.naive_bayes"
     display_name = "Naive Bayes Classifier"
     problem_kind = ProblemKind.CLASSIFICATION
+    family = "Probabilistic baseline"
+    guidance = "Simple probabilistic model that is useful as a quick classification benchmark."
+    recommendation_tier = 20
     params_model = NaiveBayesClassificationParams
     param_grid_model = NaiveBayesClassificationParamGrid
     scaler_for_numeric = True
@@ -149,6 +155,9 @@ class RandomForestClassificationService(NumericAndCategoricalModelService):
     key = "classification.random_forest"
     display_name = "Random Forest Classifier"
     problem_kind = ProblemKind.CLASSIFICATION
+    family = "Tree ensemble"
+    guidance = "Robust nonlinear benchmark for mixed customer and operations data."
+    recommendation_tier = 35
     params_model = RandomForestClassificationParams
     param_grid_model = RandomForestClassificationParamGrid
 
@@ -168,6 +177,9 @@ class KNeighborsClassificationService(NumericAndCategoricalModelService):
     key = "classification.knn"
     display_name = "K-Nearest Neighbors Classifier"
     problem_kind = ProblemKind.CLASSIFICATION
+    family = "Similarity based"
+    guidance = "Classifies by nearby examples; works best when similar rows should share outcomes."
+    recommendation_tier = 60
     params_model = KNeighborsClassificationParams
     param_grid_model = KNeighborsClassificationParamGrid
     scaler_for_numeric = True
@@ -181,6 +193,9 @@ class DecisionTreeClassificationService(NumericAndCategoricalModelService):
     key = "classification.decision_tree"
     display_name = "Decision Tree Classifier"
     problem_kind = ProblemKind.CLASSIFICATION
+    family = "Tree model"
+    guidance = "Explainable nonlinear baseline for simple branching business rules."
+    recommendation_tier = 50
     params_model = DecisionTreeClassificationParams
     param_grid_model = DecisionTreeClassificationParamGrid
 
@@ -199,6 +214,9 @@ class GradientBoostingClassificationService(NumericAndCategoricalModelService):
     key = "classification.gradient_boosting"
     display_name = "Gradient Boosting Classifier"
     problem_kind = ProblemKind.CLASSIFICATION
+    family = "Boosted trees"
+    guidance = "Strong nonlinear candidate for churn, conversion, and other tabular outcomes."
+    recommendation_tier = 25
     params_model = GradientBoostingClassificationParams
     param_grid_model = GradientBoostingClassificationParamGrid
 
@@ -215,6 +233,9 @@ class AdaBoostClassificationService(NumericAndCategoricalModelService):
     key = "classification.ada_boost"
     display_name = "AdaBoost Classifier"
     problem_kind = ProblemKind.CLASSIFICATION
+    family = "Boosted trees"
+    guidance = "Combines small trees to focus on rows previous trees misclassified."
+    recommendation_tier = 45
     params_model = AdaBoostClassificationParams
     param_grid_model = AdaBoostClassificationParamGrid
 

@@ -158,8 +158,8 @@ def test_start_training_run_submits_root_tasks_in_template_order_and_enables_pro
     ]
     assert [_extract_model_key(task) for task in root_tasks] == [
         "regression.linear",
-        "regression.ridge",
-        "regression.random_forest",
+        "regression.bayesian_ridge",
+        "regression.gradient_boosting",
     ]
     assert initial_snapshot.can_proceed_to_inference is False
     assert len(all_tasks) in {5, 6}

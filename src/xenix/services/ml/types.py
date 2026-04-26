@@ -23,6 +23,9 @@ class ModelCatalogEntry(BaseModel):
     model_key: str
     display_name: str
     problem_kind: ProblemKind
+    family: str = "General"
+    guidance: str = ""
+    recommendation_tier: int = 100
     requires_target: bool
     supports_fit: bool = True
     supports_hyperparameter_tuning: bool
@@ -34,6 +37,9 @@ class ModelServiceBase(ABC):
     key: ClassVar[str]
     display_name: ClassVar[str]
     problem_kind: ClassVar[ProblemKind]
+    family: ClassVar[str] = "General"
+    guidance: ClassVar[str] = ""
+    recommendation_tier: ClassVar[int] = 100
     requires_target: ClassVar[bool] = True
     supports_fit: ClassVar[bool] = True
     supports_hyperparameter_tuning: ClassVar[bool] = True
@@ -46,6 +52,9 @@ class ModelServiceBase(ABC):
             model_key=cls.key,
             display_name=cls.display_name,
             problem_kind=cls.problem_kind,
+            family=cls.family,
+            guidance=cls.guidance,
+            recommendation_tier=cls.recommendation_tier,
             requires_target=cls.requires_target,
             supports_fit=cls.supports_fit,
             supports_hyperparameter_tuning=cls.supports_hyperparameter_tuning,

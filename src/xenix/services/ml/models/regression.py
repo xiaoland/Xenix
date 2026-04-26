@@ -172,6 +172,9 @@ class LinearRegressionService(NumericAndCategoricalModelService):
     key = "regression.linear"
     display_name = "Linear Regression"
     problem_kind = ProblemKind.REGRESSION
+    family = "Linear baseline"
+    guidance = "Fast baseline for mostly linear numeric relationships."
+    recommendation_tier = 10
     params_model = LinearRegressionParams
     param_grid_model = BooleanGridModel
     scaler_for_numeric = True
@@ -185,6 +188,9 @@ class LassoRegressionService(NumericAndCategoricalModelService):
     key = "regression.lasso"
     display_name = "Lasso Regression"
     problem_kind = ProblemKind.REGRESSION
+    family = "Regularized linear"
+    guidance = "Shrinks weaker signals and can make wide feature sets easier to interpret."
+    recommendation_tier = 30
     params_model = LassoParams
     param_grid_model = LassoParamGrid
     scaler_for_numeric = True
@@ -200,6 +206,9 @@ class BayesianRidgeRegressionService(NumericAndCategoricalModelService):
     key = "regression.bayesian_ridge"
     display_name = "Bayesian Ridge Regression"
     problem_kind = ProblemKind.REGRESSION
+    family = "Regularized linear"
+    guidance = "Stable regularized linear model for smaller datasets or correlated inputs."
+    recommendation_tier = 15
     params_model = BayesianRidgeParams
     param_grid_model = BayesianRidgeParamGrid
     scaler_for_numeric = True
@@ -214,6 +223,9 @@ class RidgeRegressionService(NumericAndCategoricalModelService):
     key = "regression.ridge"
     display_name = "Ridge Regression"
     problem_kind = ProblemKind.REGRESSION
+    family = "Regularized linear"
+    guidance = "Stabilizes linear regression when input columns move together."
+    recommendation_tier = 20
     params_model = RidgeParams
     param_grid_model = RidgeParamGrid
     scaler_for_numeric = True
@@ -227,6 +239,9 @@ class RandomForestRegressionService(NumericAndCategoricalModelService):
     key = "regression.random_forest"
     display_name = "Random Forest Regressor"
     problem_kind = ProblemKind.REGRESSION
+    family = "Tree ensemble"
+    guidance = "Robust nonlinear benchmark for mixed business tables."
+    recommendation_tier = 35
     params_model = RandomForestRegressionParams
     param_grid_model = RandomForestRegressionParamGrid
 
@@ -246,6 +261,9 @@ class KNeighborsRegressionService(NumericAndCategoricalModelService):
     key = "regression.knn"
     display_name = "K-Nearest Neighbors Regressor"
     problem_kind = ProblemKind.REGRESSION
+    family = "Similarity based"
+    guidance = "Predicts from nearby rows; works best when numeric inputs share comparable scale."
+    recommendation_tier = 60
     params_model = KNeighborsRegressionParams
     param_grid_model = KNeighborsRegressionParamGrid
     scaler_for_numeric = True
@@ -259,6 +277,9 @@ class DecisionTreeRegressionService(NumericAndCategoricalModelService):
     key = "regression.decision_tree"
     display_name = "Decision Tree Regressor"
     problem_kind = ProblemKind.REGRESSION
+    family = "Tree model"
+    guidance = "Explainable nonlinear baseline that can overfit small datasets."
+    recommendation_tier = 50
     params_model = DecisionTreeRegressionParams
     param_grid_model = DecisionTreeRegressionParamGrid
 
@@ -277,6 +298,9 @@ class GradientBoostingRegressionService(NumericAndCategoricalModelService):
     key = "regression.gradient_boosting"
     display_name = "Gradient Boosting Regressor"
     problem_kind = ProblemKind.REGRESSION
+    family = "Boosted trees"
+    guidance = "Strong nonlinear candidate for tabular demand and value prediction."
+    recommendation_tier = 25
     params_model = GradientBoostingRegressionParams
     param_grid_model = GradientBoostingRegressionParamGrid
 
@@ -293,6 +317,9 @@ class AdaBoostRegressionService(NumericAndCategoricalModelService):
     key = "regression.ada_boost"
     display_name = "AdaBoost Regressor"
     problem_kind = ProblemKind.REGRESSION
+    family = "Boosted trees"
+    guidance = "Builds a sequence of small trees to improve difficult rows."
+    recommendation_tier = 45
     params_model = AdaBoostRegressionParams
     param_grid_model = AdaBoostRegressionParamGrid
 
@@ -323,6 +350,9 @@ class PolynomialRegressionService(NumericAndCategoricalModelService):
     key = "regression.polynomial"
     display_name = "Polynomial Regression"
     problem_kind = ProblemKind.REGRESSION
+    family = "Feature expansion"
+    guidance = "Captures curved numeric relationships when a simple line underfits."
+    recommendation_tier = 70
     params_model = PolynomialRegressionParams
     param_grid_model = PolynomialRegressionParamGrid
     scaler_for_numeric = True

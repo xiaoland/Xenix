@@ -20,6 +20,9 @@ from PySide6.QtWidgets import (
 )
 
 from ..exceptions import XenixError
+from ..services.ml.contracts import MetricDirection
+from ..services.ml.evaluation import get_default_policy
+from ..services.ml.registry import get_model_catalog_entry
 from ..services.ml_service import MLService
 from ..services.scenario_template_service import (
     ScenarioTemplate,
@@ -50,6 +53,7 @@ class _ScenarioTrainingResultCard(QWidget):
         self._frame = QFrame(self)
         self._title_label = QLabel()
         self._status_label = QLabel()
+        self._rank_label = QLabel()
         self._mode_label = QLabel()
         self._metrics_label = QLabel()
         self._params_label = QLabel()
@@ -69,6 +73,7 @@ class _ScenarioTrainingResultCard(QWidget):
         save_state_text: str,
         hint_text: str,
         mode_text: str,
+        rank_text: str,
         status_text: str,
     ) -> None:
         self._step_key = snapshot.step_key
@@ -77,6 +82,8 @@ class _ScenarioTrainingResultCard(QWidget):
             title = self.tr("{model_name} · Best Model").format(model_name=title)
         self._title_label.setText(title)
         self._status_label.setText(status_text)
+        self._rank_label.setText(rank_text)
+        self._rank_label.setVisible(bool(rank_text))
         self._mode_label.setText(mode_text)
         self._metrics_label.setText(metrics_text)
         self._params_label.setText(params_text)
@@ -99,6 +106,7 @@ class _ScenarioTrainingResultCard(QWidget):
         self._frame.setCursor(Qt.PointingHandCursor)
         self._title_label.setObjectName("resultCardTitle")
         self._status_label.setObjectName("resultCardStatus")
+        self._rank_label.setObjectName("resultCardRank")
         self._mode_label.setObjectName("resultCardMode")
         self._metrics_label.setObjectName("resultCardMetrics")
         self._params_label.setObjectName("resultCardParams")
@@ -113,6 +121,7 @@ class _ScenarioTrainingResultCard(QWidget):
         self._params_label.setWordWrap(True)
         self._save_state_label.setWordWrap(True)
         self._hint_label.setWordWrap(True)
+        self._rank_label.setWordWrap(True)
 
         header_layout = QHBoxLayout()
         header_layout.setSpacing(10)
@@ -120,6 +129,7 @@ class _ScenarioTrainingResultCard(QWidget):
         header_layout.addWidget(self._status_label, 0)
 
         card_layout.addLayout(header_layout)
+        card_layout.addWidget(self._rank_label)
         card_layout.addWidget(self._mode_label)
         card_layout.addWidget(self._metrics_label)
         card_layout.addWidget(self._params_label)
@@ -172,6 +182,11 @@ class _ScenarioTrainingResultCard(QWidget):
                 color: #475467;
                 font-size: 12px;
                 font-weight: 500;
+            }}
+            QLabel#resultCardRank {{
+                color: #17643a;
+                font-size: 12px;
+                font-weight: 700;
             }}
             QLabel#resultCardMetrics {{
                 color: #101828;
@@ -450,13 +465,15 @@ class ScenarioTrainingDialog(QDialog):
             self._results_layout.removeWidget(card)
             card.deleteLater()
 
-        for step in snapshot.step_snapshots:
+        ordered_steps = self._ordered_step_snapshots(snapshot)
+        rank_by_step_key = self._rank_by_step_key(ordered_steps)
+        for index, step in enumerate(ordered_steps):
             card = self._result_cards.get(step.step_key)
             if card is None:
                 card = _ScenarioTrainingResultCard(self._results_container)
                 card.clicked.connect(self._select_step_key)
-                self._results_layout.addWidget(card)
                 self._result_cards[step.step_key] = card
+            self._results_layout.insertWidget(index, card)
             is_best_model = step.trained_model_id is not None and step.trained_model_id == snapshot.best_trained_model_id
             card.set_snapshot(
                 step,
@@ -467,26 +484,83 @@ class ScenarioTrainingDialog(QDialog):
                 save_state_text=self._build_save_state_text(step, is_best_model=is_best_model),
                 hint_text=self._build_hint_text(step, is_best_model=is_best_model),
                 mode_text=self._build_mode_text(step),
+                rank_text=self._build_rank_text(step, rank_by_step_key),
                 status_text=self._translate_step_status(step.status),
             )
 
-        if snapshot.step_snapshots and self._selected_step_key not in valid_step_keys:
-            self._selected_step_key = snapshot.step_snapshots[0].step_key
+        if ordered_steps and self._selected_step_key not in valid_step_keys:
+            self._selected_step_key = ordered_steps[0].step_key
             self._load_selected_step_details()
             self._refresh_result_cards(snapshot)
             return
-        if not snapshot.step_snapshots:
+        if not ordered_steps:
             self._selected_step_key = None
             self._task_details_label.setText(self.tr("Select a model result card to inspect task details."))
             self._clear_output_file_action()
             self._task_log_view.clear()
             return
         if self._selected_step_key is None:
-            self._selected_step_key = snapshot.step_snapshots[0].step_key
+            self._selected_step_key = ordered_steps[0].step_key
             self._load_selected_step_details()
             self._refresh_result_cards(snapshot)
             return
         self._load_selected_step_details()
+
+    def _ordered_step_snapshots(self, snapshot: ScenarioTrainingRunSnapshot) -> list[ScenarioTrainingStepSnapshot]:
+        steps = list(snapshot.step_snapshots)
+        if not self._template.supervised_required:
+            return steps
+        if not any(step.primary_metric_value is not None for step in steps):
+            return steps
+        try:
+            problem_kind = get_model_catalog_entry(steps[0].model_key).problem_kind
+            direction = get_default_policy(problem_kind).primary_metric_direction
+        except Exception:
+            direction = MetricDirection.MAX
+
+        def sort_key(step: ScenarioTrainingStepSnapshot) -> tuple[int, float, str]:
+            if step.status is ScenarioTrainingStepStatus.SUCCEEDED and step.primary_metric_value is not None:
+                status_order = 0
+            elif step.status is ScenarioTrainingStepStatus.SUCCEEDED:
+                status_order = 1
+            elif step.status is ScenarioTrainingStepStatus.RUNNING:
+                status_order = 2
+            else:
+                status_order = 3
+            metric_value = step.primary_metric_value
+            if metric_value is None:
+                normalized_metric = 0.0
+            elif direction is MetricDirection.MAX:
+                normalized_metric = -metric_value
+            else:
+                normalized_metric = metric_value
+            return status_order, normalized_metric, step.model_display_name
+
+        return sorted(steps, key=sort_key)
+
+    def _rank_by_step_key(self, steps: list[ScenarioTrainingStepSnapshot]) -> dict[str, int]:
+        if not self._template.supervised_required:
+            return {}
+        ranked_steps = [
+            step
+            for step in steps
+            if step.status is ScenarioTrainingStepStatus.SUCCEEDED and step.primary_metric_value is not None
+        ]
+        return {step.step_key: index + 1 for index, step in enumerate(ranked_steps)}
+
+    def _build_rank_text(
+        self,
+        step: ScenarioTrainingStepSnapshot,
+        rank_by_step_key: dict[str, int],
+    ) -> str:
+        rank = rank_by_step_key.get(step.step_key)
+        if rank is None:
+            return ""
+        metric_name = step.primary_metric_name or self.tr("primary metric")
+        return self.tr("Rank #{rank} by {metric_name}").format(
+            rank=str(rank),
+            metric_name=metric_name,
+        )
 
     def _select_step_key(self, step_key: str) -> None:
         self._selected_step_key = step_key

@@ -14,6 +14,9 @@ def test_model_catalog_exposes_json_schema_and_problem_kinds() -> None:
     assert ridge.problem_kind is ProblemKind.REGRESSION
     assert "properties" in ridge.param_schema
     assert ridge.param_grid_schema is not None
+    assert ridge.family == "Regularized linear"
+    assert ridge.guidance
+    assert ridge.recommendation_tier == 20
     lasso = get_model_catalog_entry("regression.lasso")
     assert lasso.param_schema["properties"]["alpha"]["default"] == 1.0
     gradient_boosting = get_model_catalog_entry("classification.gradient_boosting")
@@ -28,6 +31,8 @@ def test_model_catalog_exposes_json_schema_and_problem_kinds() -> None:
     assert polynomial.param_grid_schema["properties"]["degree"]["default"] == [1, 2, 3]
     naive_bayes = get_model_catalog_entry("classification.naive_bayes")
     assert naive_bayes.param_schema["properties"]["var_smoothing"]["default"] == 1e-9
+    assert naive_bayes.family == "Probabilistic baseline"
+    assert naive_bayes.recommendation_tier == 20
     knn = get_model_catalog_entry("classification.knn")
     assert knn.param_grid_schema is not None
     assert knn.param_grid_schema["properties"]["n_neighbors"]["default"] == [3, 5, 7]
