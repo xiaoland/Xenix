@@ -325,16 +325,24 @@ class ScenarioTrainingDialog(QDialog):
     def retranslate_ui(self) -> None:
         self.setWindowTitle(self.tr("Training Dashboard"))
         self._title_label.setText(localized_template_display_name(self._template))
-        if self._template.supervised_required:
+        if self._continues_to_prediction():
             self._summary_label.setText(
                 self.tr("The selected model plan is running in the background. Review the result and continue when a best model is ready.")
+            )
+        elif self._is_key_driver_template():
+            self._summary_label.setText(
+                self.tr("The selected key-driver analysis plan is running in the background. Review the saved driver outputs when each result is ready.")
+            )
+        elif self._is_anomaly_template():
+            self._summary_label.setText(
+                self.tr("The selected anomaly detection plan is running in the background. Review the saved anomaly score outputs when each result is ready.")
             )
         else:
             self._summary_label.setText(
                 self.tr("The selected clustering plan is running in the background. Review the saved clustering outputs when each result is ready.")
-            )
+        )
         self._run_again_button.setText(self.tr("Run Selected Plan Again"))
-        if self._template.supervised_required:
+        if self._continues_to_prediction():
             self._continue_button.setText(self.tr("Continue to Prediction"))
         else:
             self._continue_button.setText(self.tr("Close Results"))
@@ -375,7 +383,7 @@ class ScenarioTrainingDialog(QDialog):
         self._current_snapshot = self._workflow_service.get_training_run_snapshot(self._current_run)
         self._refresh_summary(self._current_snapshot)
         self._refresh_result_cards(self._current_snapshot)
-        if self._template.supervised_required:
+        if self._continues_to_prediction():
             self._continue_button.setEnabled(self._current_snapshot.can_proceed_to_inference)
         else:
             self._continue_button.setEnabled(self._current_snapshot.is_terminal)
@@ -385,15 +393,9 @@ class ScenarioTrainingDialog(QDialog):
     def _refresh_summary(self, snapshot: ScenarioTrainingRunSnapshot) -> None:
         succeeded_count = sum(1 for step in snapshot.step_snapshots if step.status is ScenarioTrainingStepStatus.SUCCEEDED)
         failed_count = sum(1 for step in snapshot.step_snapshots if step.status is ScenarioTrainingStepStatus.FAILED)
-        if snapshot.can_proceed_to_inference:
+        if self._continues_to_prediction() and snapshot.can_proceed_to_inference:
             self._status_summary_label.setText(
                 self.tr("Training finished. {succeeded_count} model result(s) succeeded and the best model is ready.").format(
-                    succeeded_count=str(succeeded_count)
-                )
-            )
-        elif not self._template.supervised_required and snapshot.is_terminal:
-            self._status_summary_label.setText(
-                self.tr("Clustering finished. {succeeded_count} model result(s) are ready for review.").format(
                     succeeded_count=str(succeeded_count)
                 )
             )
@@ -406,6 +408,24 @@ class ScenarioTrainingDialog(QDialog):
                     failed_count=str(failed_count),
                 )
             )
+        elif self._template.supervised_required and not self._continues_to_prediction() and snapshot.is_terminal:
+            self._status_summary_label.setText(
+                self.tr("Analysis finished. {succeeded_count} model result(s) are ready for review.").format(
+                    succeeded_count=str(succeeded_count)
+                )
+            )
+        elif self._is_anomaly_template() and snapshot.is_terminal:
+            self._status_summary_label.setText(
+                self.tr("Anomaly detection finished. {succeeded_count} model result(s) are ready for review.").format(
+                    succeeded_count=str(succeeded_count)
+                )
+            )
+        elif not self._template.supervised_required and snapshot.is_terminal:
+            self._status_summary_label.setText(
+                self.tr("Clustering finished. {succeeded_count} model result(s) are ready for review.").format(
+                    succeeded_count=str(succeeded_count)
+                )
+            )
         else:
             self._status_summary_label.setText(
                 self.tr("Training is running. {succeeded_count} model result(s) completed so far.").format(
@@ -415,6 +435,24 @@ class ScenarioTrainingDialog(QDialog):
         self._best_model_label.setText(self._build_best_model_text(snapshot))
 
     def _build_best_model_text(self, snapshot: ScenarioTrainingRunSnapshot) -> str:
+        if self._is_key_driver_template():
+            succeeded_models = sum(
+                1 for step in snapshot.step_snapshots if step.status is ScenarioTrainingStepStatus.SUCCEEDED
+            )
+            if succeeded_models == 0:
+                return self.tr("Key driver outputs: waiting for successful model results.")
+            return self.tr("Key driver outputs: {count} saved report(s) are ready.").format(
+                count=str(succeeded_models)
+            )
+        if self._is_anomaly_template():
+            succeeded_models = sum(
+                1 for step in snapshot.step_snapshots if step.status is ScenarioTrainingStepStatus.SUCCEEDED
+            )
+            if succeeded_models == 0:
+                return self.tr("Anomaly outputs: waiting for successful model results.")
+            return self.tr("Anomaly outputs: {count} saved score file(s) are ready.").format(
+                count=str(succeeded_models)
+            )
         if not self._template.supervised_required:
             succeeded_models = sum(
                 1 for step in snapshot.step_snapshots if step.status is ScenarioTrainingStepStatus.SUCCEEDED
@@ -604,7 +642,14 @@ class ScenarioTrainingDialog(QDialog):
         if selected_snapshot.failure_summary:
             lines.append(self.tr("Failure: {summary}").format(summary=selected_snapshot.failure_summary))
         self._task_details_label.setText("\n".join(lines))
-        self._set_output_file_action(self._find_openable_output_file(details.artifacts))
+        output_file_path = self._find_openable_output_file(details.artifacts)
+        if output_file_path is None and selected_snapshot.evaluate_task_id is not None:
+            try:
+                root_details = self._ml_service.get_task_details(selected_snapshot.root_task_id)
+                output_file_path = self._find_openable_output_file(root_details.artifacts)
+            except XenixError:
+                output_file_path = None
+        self._set_output_file_action(output_file_path)
         self._task_log_view.set_logs(details.logs)
 
     def _build_mode_text(self, step: ScenarioTrainingStepSnapshot) -> str:
@@ -616,6 +661,27 @@ class ScenarioTrainingDialog(QDialog):
         return self.tr("Mode: Hyperparameter tuning{candidate_suffix}").format(candidate_suffix=candidate_suffix)
 
     def _build_metrics_text(self, step: ScenarioTrainingStepSnapshot) -> str:
+        if (
+            self._template.supervised_required
+            and not self._continues_to_prediction()
+            and step.result_summary.get("key_driver_report") is True
+        ):
+            top_driver_text = self._format_top_key_drivers(step.result_summary)
+            if top_driver_text:
+                return self.tr("Top drivers: {drivers}").format(drivers=top_driver_text)
+        if self._is_anomaly_template() and step.result_summary:
+            anomaly_count = step.result_summary.get("anomaly_count")
+            row_count = step.result_summary.get("row_count")
+            anomaly_rate = step.result_summary.get("anomaly_rate")
+            parts: list[str] = []
+            if isinstance(anomaly_count, int):
+                parts.append(self.tr("Anomalies {value}").format(value=str(anomaly_count)))
+            if isinstance(row_count, int):
+                parts.append(self.tr("Rows {value}").format(value=str(row_count)))
+            if isinstance(anomaly_rate, (int, float)):
+                parts.append(self.tr("Rate {value}").format(value=f"{float(anomaly_rate):.2%}"))
+            if parts:
+                return " · ".join(parts)
         if step.result_summary:
             cluster_count = step.result_summary.get("cluster_count")
             noise_count = step.result_summary.get("noise_count")
@@ -684,19 +750,44 @@ class ScenarioTrainingDialog(QDialog):
         return self.tr("Save state: saved automatically")
 
     def _build_hint_text(self, step: ScenarioTrainingStepSnapshot, *, is_best_model: bool) -> str:
+        has_key_driver_report = step.result_summary.get("key_driver_report") is True
+        has_anomaly_output = self._is_anomaly_template() and bool(step.result_summary)
         if step.status is ScenarioTrainingStepStatus.RUNNING:
+            if has_key_driver_report:
+                return self.tr("Hint: the key-driver report is ready; evaluation is still running.")
+            if has_anomaly_output:
+                return self.tr("Hint: anomaly score output is being finalized in the background.")
             if step.result_summary:
                 return self.tr("Hint: clustering output is being finalized in the background.")
             if not self._template.supervised_required:
+                if self._is_anomaly_template():
+                    return self.tr("Hint: anomaly detection is progressing in the background.")
                 return self.tr("Hint: clustering is progressing in the background.")
             return self.tr("Hint: training and evaluation are progressing in the background.")
         if step.status is ScenarioTrainingStepStatus.FAILED:
             return self.tr("Hint: open the advanced task details to inspect the failure summary and logs.")
+        if has_key_driver_report:
+            return self.tr("Hint: open the output CSV to review ranked business drivers.")
+        if has_anomaly_output:
+            return self.tr("Hint: open the output CSV to review ranked anomaly scores.")
         if step.result_summary:
             return self.tr("Hint: review the saved clustering output file from the task artifacts or advanced details.")
         if is_best_model:
             return self.tr("Hint: this model currently gives the strongest result for the prepared dataset.")
         return self.tr("Hint: this saved model remains available for comparison and later reuse.")
+
+    def _format_top_key_drivers(self, result_summary: dict[str, Any]) -> str:
+        top_drivers = result_summary.get("top_key_drivers")
+        if not isinstance(top_drivers, list):
+            return ""
+        names: list[str] = []
+        for item in top_drivers[:3]:
+            if not isinstance(item, dict):
+                continue
+            feature = item.get("feature")
+            if isinstance(feature, str) and feature:
+                names.append(feature)
+        return ", ".join(names)
 
     def _format_mapping(self, payload: dict[str, Any]) -> str:
         if not payload:
@@ -743,6 +834,18 @@ class ScenarioTrainingDialog(QDialog):
     def _summarize_result(self, result_payload: dict[str, Any]) -> str:
         if isinstance(result_payload.get("result_summary"), dict):
             summary = result_payload["result_summary"]
+            if summary.get("key_driver_report") is True:
+                drivers = self._format_top_key_drivers(summary)
+                if drivers:
+                    return self.tr("top drivers={drivers}").format(drivers=drivers)
+                return self.tr("key driver report ready")
+            if "anomaly_count" in summary:
+                anomaly_count = summary.get("anomaly_count")
+                anomaly_rate = summary.get("anomaly_rate")
+                return self.tr("anomalies={anomaly_count}, rate={anomaly_rate}").format(
+                    anomaly_count=str(anomaly_count if anomaly_count is not None else ""),
+                    anomaly_rate=f"{float(anomaly_rate):.2%}" if isinstance(anomaly_rate, (int, float)) else "",
+                )
             cluster_count = summary.get("cluster_count")
             noise_count = summary.get("noise_count")
             return self.tr("clusters={cluster_count}, noise={noise_count}").format(
@@ -763,7 +866,7 @@ class ScenarioTrainingDialog(QDialog):
     def _continue_to_prediction(self) -> None:
         if self._current_snapshot is None:
             return
-        if not self._template.supervised_required:
+        if not self._continues_to_prediction():
             if self._current_snapshot.is_terminal:
                 self.close()
             return
@@ -773,8 +876,12 @@ class ScenarioTrainingDialog(QDialog):
         self.close()
 
     def _build_empty_best_model_text(self) -> str:
-        if self._template.supervised_required:
+        if self._continues_to_prediction():
             return self.tr("Best model: waiting for evaluation.")
+        if self._is_key_driver_template():
+            return self.tr("Key driver outputs: waiting for successful model results.")
+        if self._is_anomaly_template():
+            return self.tr("Anomaly outputs: waiting for successful model results.")
         return self.tr("Clustering outputs: waiting for successful model results.")
 
     def _find_openable_output_file(self, artifacts: list[Any]) -> str | None:
@@ -820,7 +927,7 @@ class ScenarioTrainingDialog(QDialog):
             QMessageBox.warning(
                 self,
                 self.tr("Open Output Failed"),
-                self.tr("The clustering output file could not be opened."),
+                self.tr("The output file could not be opened."),
             )
 
     def _trained_model_metadata(self, trained_model_id: str) -> Any:
@@ -837,3 +944,12 @@ class ScenarioTrainingDialog(QDialog):
             return self._ml_service.get_model(model_key).display_name
         except Exception:
             return model_key
+
+    def _continues_to_prediction(self) -> bool:
+        return self._template.supervised_required and self._template.continues_to_prediction
+
+    def _is_key_driver_template(self) -> bool:
+        return self._template.key == "key_driver_analysis.v1"
+
+    def _is_anomaly_template(self) -> bool:
+        return self._template.key == "anomaly_detection.v1"

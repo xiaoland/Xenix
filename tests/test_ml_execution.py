@@ -157,7 +157,15 @@ def test_fit_with_evaluate_runs_in_background_and_persists_best_model(monkeypatc
     assert len(trained_models) == 1
     assert best_model_id == trained_models[0].id
     assert work_item_after.best_trained_model_id == trained_models[0].id
-    assert len(fit_details.artifacts) == 2
+    assert len(fit_details.artifacts) == 3
+    key_driver_artifacts = [
+        artifact for artifact in fit_details.artifacts if artifact.artifact_kind is MLTaskArtifactKind.EXPORT_FILE
+    ]
+    assert len(key_driver_artifacts) == 1
+    key_driver_path = Path(key_driver_artifacts[0].absolute_path)
+    assert key_driver_path.name == "key_drivers.csv"
+    assert "feature,importance" in key_driver_path.read_text(encoding="utf-8")
+    assert fit_details.task.result_payload["result_summary"]["key_driver_report"] is True
     assert any(log.level == "INFO" for log in fit_details.logs)
     metadata = parse_trained_model_metadata(trained_models[0].metadata_payload)
     assert metadata is not None
@@ -234,6 +242,64 @@ def test_clustering_fit_runs_without_follow_up_evaluate_and_persists_export_arti
     assert metadata is not None
     assert metadata.target_columns == []
     assert metadata.feature_columns == ["spend", "visits", "segment"]
+
+
+def test_anomaly_fit_runs_without_follow_up_evaluate_and_persists_score_artifact(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    project_service, work_item_service, dataset_service, _ml_task_service, ml_service = _build_services(
+        monkeypatch, tmp_path
+    )
+    project = project_service.create_project(CreateProjectInput(name="Operations"))
+    dataset_file = tmp_path / "anomalies.csv"
+    dataset_file.write_text(
+        "amount,count,region\n"
+        "10,1,North\n"
+        "11,1,North\n"
+        "12,1,North\n"
+        "13,2,North\n"
+        "14,2,North\n"
+        "15,2,North\n"
+        "120,20,South\n",
+        encoding="utf-8",
+    )
+    dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Anomalies")
+    work_item = _create_work_item(
+        work_item_service,
+        project.id,
+        dataset.id,
+        name="Anomaly Run",
+        feature_columns=["amount", "count", "region"],
+        target_columns=[],
+    )
+
+    fit_task = ml_service.fit_with_evaluate(
+        FitWithEvaluateInput(
+            work_item_id=work_item.id,
+            model_key="anomaly.isolation_forest",
+            params={"n_estimators": 50, "contamination": "auto", "max_samples": "auto"},
+        )
+    )
+
+    tasks = _wait_for_terminal_tasks(ml_service, work_item.id, expected_count=1)
+    fit_details = ml_service.get_task_details(fit_task.id)
+    export_artifacts = [
+        artifact for artifact in fit_details.artifacts if artifact.artifact_kind is MLTaskArtifactKind.EXPORT_FILE
+    ]
+
+    assert len(tasks) == 1
+    assert tasks[0].task_type is MLTaskType.FIT
+    assert tasks[0].status is MLTaskStatus.SUCCEEDED
+    assert len(export_artifacts) == 1
+    output_path = Path(export_artifacts[0].absolute_path)
+    assert output_path.name == "anomaly_scores.csv"
+    output_text = output_path.read_text(encoding="utf-8")
+    assert "anomaly_label" in output_text
+    assert "anomaly_score" in output_text
+    assert "anomaly_rank" in output_text
+    assert fit_details.task.result_payload["result_summary"]["anomaly_count"] >= 0
+    assert fit_details.task.result_payload["result_summary"]["row_count"] == 7
 
 
 def test_polynomial_regression_fit_with_evaluate_uses_p1_pipeline(

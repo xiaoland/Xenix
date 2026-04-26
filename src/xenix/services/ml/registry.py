@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ...exceptions import NotFoundError
+from .models.anomaly import IsolationForestAnomalyService, LocalOutlierFactorAnomalyService
 from .models.classification import (
     AdaBoostClassificationService,
     DecisionTreeClassificationService,
@@ -47,6 +48,8 @@ _MODEL_SERVICES: dict[str, type[ModelServiceBase]] = {
         RandomForestClassificationService,
         KMeansClusteringService,
         DBSCANClusteringService,
+        IsolationForestAnomalyService,
+        LocalOutlierFactorAnomalyService,
     )
 }
 

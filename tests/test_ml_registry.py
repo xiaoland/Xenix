@@ -8,7 +8,7 @@ from xenix.services.storage.models import ProblemKind
 def test_model_catalog_exposes_json_schema_and_problem_kinds() -> None:
     catalog = list_model_catalog()
 
-    assert len(catalog) == 19
+    assert len(catalog) == 21
     assert all(isinstance(entry, ModelCatalogEntry) for entry in catalog)
     ridge = get_model_catalog_entry("regression.ridge")
     assert ridge.problem_kind is ProblemKind.REGRESSION
@@ -41,12 +41,26 @@ def test_model_catalog_exposes_json_schema_and_problem_kinds() -> None:
     assert clustering.requires_target is False
     assert clustering.supports_hyperparameter_tuning is False
     assert clustering.param_grid_schema is None
+    anomaly = get_model_catalog_entry("anomaly.isolation_forest")
+    assert anomaly.problem_kind is ProblemKind.ANOMALY_DETECTION
+    assert anomaly.requires_target is False
+    assert anomaly.supports_hyperparameter_tuning is False
+    assert anomaly.param_grid_schema is None
 
 
 def test_clustering_policy_uses_non_split_metric_defaults() -> None:
     policy = get_default_policy(ProblemKind.CLUSTERING)
 
     assert policy.primary_metric_name == "cluster_count"
+    assert policy.split_strategy == "none"
+    assert policy.test_size == 0.0
+    assert policy.cv_folds is None
+
+
+def test_anomaly_policy_uses_non_split_metric_defaults() -> None:
+    policy = get_default_policy(ProblemKind.ANOMALY_DETECTION)
+
+    assert policy.primary_metric_name == "anomaly_count"
     assert policy.split_strategy == "none"
     assert policy.test_size == 0.0
     assert policy.cv_folds is None

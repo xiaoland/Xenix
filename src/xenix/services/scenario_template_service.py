@@ -32,6 +32,7 @@ class ScenarioTemplate(SQLModel):
     display_name: str
     description: str
     supervised_required: bool
+    continues_to_prediction: bool = True
     min_feature_columns: int
     required_target_count: int
     training_plan: list[ScenarioTrainingPlanStep] = Field(default_factory=list)
@@ -126,6 +127,7 @@ _TEMPLATES: tuple[ScenarioTemplate, ...] = (
         display_name="Customer Segmentation Clustering",
         description="Group similar entities into segments from feature-only business data.",
         supervised_required=False,
+        continues_to_prediction=False,
         min_feature_columns=1,
         required_target_count=0,
         training_plan=[
@@ -146,6 +148,71 @@ _TEMPLATES: tuple[ScenarioTemplate, ...] = (
                 params={
                     "eps": 0.5,
                     "min_samples": 5,
+                },
+            ),
+        ],
+    ),
+    ScenarioTemplate(
+        key="anomaly_detection.v1",
+        display_name="Anomaly Detection",
+        description="Detect unusual records, rank anomaly severity, and inspect abnormal patterns.",
+        supervised_required=False,
+        continues_to_prediction=False,
+        min_feature_columns=1,
+        required_target_count=0,
+        training_plan=[
+            ScenarioTrainingPlanStep(
+                step_key="fit_isolation_forest",
+                operation=ScenarioTrainingOperation.FIT,
+                model_key="anomaly.isolation_forest",
+                params={
+                    "n_estimators": 100,
+                    "contamination": "auto",
+                    "max_samples": "auto",
+                },
+            ),
+            ScenarioTrainingPlanStep(
+                step_key="fit_local_outlier_factor",
+                operation=ScenarioTrainingOperation.FIT,
+                model_key="anomaly.local_outlier_factor",
+                params={
+                    "n_neighbors": 20,
+                    "contamination": "auto",
+                    "metric": "minkowski",
+                },
+            ),
+        ],
+    ),
+    ScenarioTemplate(
+        key="key_driver_analysis.v1",
+        display_name="Key Driver Analysis",
+        description="Rank input columns by their influence on a numeric business target.",
+        supervised_required=True,
+        continues_to_prediction=False,
+        min_feature_columns=1,
+        required_target_count=1,
+        training_plan=[
+            ScenarioTrainingPlanStep(
+                step_key="fit_gradient_boosting_drivers",
+                operation=ScenarioTrainingOperation.FIT,
+                model_key="regression.gradient_boosting",
+                params={
+                    "n_estimators": 150,
+                    "learning_rate": 0.05,
+                    "max_depth": 3,
+                    "min_samples_split": 2,
+                    "min_samples_leaf": 1,
+                    "subsample": 1.0,
+                    "max_features": "all",
+                },
+            ),
+            ScenarioTrainingPlanStep(
+                step_key="fit_lasso_drivers",
+                operation=ScenarioTrainingOperation.FIT,
+                model_key="regression.lasso",
+                params={
+                    "alpha": 0.01,
+                    "fit_intercept": True,
                 },
             ),
         ],

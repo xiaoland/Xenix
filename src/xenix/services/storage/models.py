@@ -44,6 +44,7 @@ class ProblemKind(StrEnum):
     REGRESSION = "regression"
     CLASSIFICATION = "classification"
     CLUSTERING = "clustering"
+    ANOMALY_DETECTION = "anomaly_detection"
 
 
 class MLTaskArtifactKind(StrEnum):

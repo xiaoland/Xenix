@@ -1971,19 +1971,39 @@ Created at: {created_at}</source>
         <translation>客户分群聚类</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_template_text.py" line="20"/>
+        <location filename="../ui/scenario_template_text.py" line="16"/>
+        <source>Anomaly Detection</source>
+        <translation>异常检测</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_template_text.py" line="18"/>
+        <source>Key Driver Analysis</source>
+        <translation>关键因素分析</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_template_text.py" line="24"/>
         <source>Forecast numeric business outcomes from a historical dataset.</source>
         <translation>根据历史数据预测数值型业务结果。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_template_text.py" line="25"/>
+        <location filename="../ui/scenario_template_text.py" line="29"/>
         <source>Classify a customer outcome such as churn or conversion.</source>
         <translation>对客户结果进行分类，例如流失或转化。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_template_text.py" line="30"/>
+        <location filename="../ui/scenario_template_text.py" line="34"/>
         <source>Group similar entities into segments from feature-only business data.</source>
         <translation>根据仅包含输入特征的业务数据，将相似对象分组成群。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_template_text.py" line="39"/>
+        <source>Detect unusual records, rank anomaly severity, and inspect abnormal patterns.</source>
+        <translation>检测异常记录，对异常严重程度排序，并查看异常模式。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_template_text.py" line="44"/>
+        <source>Rank input columns by their influence on a numeric business target.</source>
+        <translation>按输入列对数值型业务目标的影响程度进行排名。</translation>
     </message>
 </context>
 <context>
@@ -2002,7 +2022,7 @@ Created at: {created_at}</source>
         <translation type="vanished">重新完整运行计划</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="338"/>
+        <location filename="../ui/scenario_training_dialog.py" line="346"/>
         <source>Continue to Prediction</source>
         <translation>继续到预测</translation>
     </message>
@@ -2016,7 +2036,7 @@ Created at: {created_at}</source>
         <translation>当前选定的模型方案正在后台运行。最佳模型准备完成后，可查看结果并继续。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="336"/>
+        <location filename="../ui/scenario_training_dialog.py" line="344"/>
         <source>Run Selected Plan Again</source>
         <translation>重新运行所选方案</translation>
     </message>
@@ -2049,13 +2069,13 @@ Created at: {created_at}</source>
         <translation type="vanished">状态</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="346"/>
+        <location filename="../ui/scenario_training_dialog.py" line="354"/>
         <source>Preparing the training plan...</source>
         <translation>正在准备训练计划...</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="428"/>
-        <location filename="../ui/scenario_training_dialog.py" line="777"/>
+        <location filename="../ui/scenario_training_dialog.py" line="466"/>
+        <location filename="../ui/scenario_training_dialog.py" line="880"/>
         <source>Best model: waiting for evaluation.</source>
         <translation>最佳模型：等待评估中。</translation>
     </message>
@@ -2076,12 +2096,12 @@ Created at: {created_at}</source>
         <translation type="vanished">训练正在运行。目前已完成 {succeeded_count} 个步骤。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="452"/>
+        <location filename="../ui/scenario_training_dialog.py" line="490"/>
         <source>Best model: {model_key} ({metric_name}={metric_value})</source>
         <translation>最佳模型：{model_key}（{metric_name}={metric_value}）</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="457"/>
+        <location filename="../ui/scenario_training_dialog.py" line="495"/>
         <source>Best model: {model_key}</source>
         <translation>最佳模型：{model_key}</translation>
     </message>
@@ -2098,334 +2118,436 @@ Created at: {created_at}</source>
         <translation type="vanished">当前所选步骤的任务详情暂时不可用。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="598"/>
+        <location filename="../ui/scenario_training_dialog.py" line="636"/>
         <source>Task: {task_id}</source>
         <translation>任务：{task_id}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="599"/>
+        <location filename="../ui/scenario_training_dialog.py" line="637"/>
         <source>Model: {model_key}</source>
         <translation>模型：{model_key}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="600"/>
+        <location filename="../ui/scenario_training_dialog.py" line="638"/>
         <source>Status: {status}</source>
         <translation>状态：{status}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="603"/>
+        <location filename="../ui/scenario_training_dialog.py" line="641"/>
         <source>Result: {summary}</source>
         <translation>结果：{summary}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="605"/>
+        <location filename="../ui/scenario_training_dialog.py" line="643"/>
         <source>Failure: {summary}</source>
         <translation>失败：{summary}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="612"/>
+        <location filename="../ui/scenario_training_dialog.py" line="657"/>
         <source>Mode: Fit training</source>
         <translation>模式：单次训练</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="615"/>
+        <location filename="../ui/scenario_training_dialog.py" line="660"/>
         <source> · {count} candidates</source>
         <translation> · {count} 个候选值</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="616"/>
+        <location filename="../ui/scenario_training_dialog.py" line="661"/>
         <source>Mode: Hyperparameter tuning{candidate_suffix}</source>
         <translation>模式：超参数调优{candidate_suffix}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="625"/>
+        <location filename="../ui/scenario_training_dialog.py" line="671"/>
+        <source>Top drivers: {drivers}</source>
+        <translation>关键因素：{drivers}</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="691"/>
         <source>Clusters {value}</source>
         <translation>聚类 {value}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="627"/>
+        <location filename="../ui/scenario_training_dialog.py" line="693"/>
         <source>Noise {value}</source>
         <translation>噪声 {value}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="629"/>
+        <location filename="../ui/scenario_training_dialog.py" line="680"/>
+        <location filename="../ui/scenario_training_dialog.py" line="695"/>
         <source>Rows {value}</source>
         <translation>行数 {value}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="634"/>
+        <location filename="../ui/scenario_training_dialog.py" line="338"/>
+        <source>The selected anomaly detection plan is running in the background. Review the saved anomaly score outputs when each result is ready.</source>
+        <translation>所选异常检测方案正在后台运行。每个结果就绪后可查看已保存的异常分数输出。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="419"/>
+        <source>Anomaly detection finished. {succeeded_count} model result(s) are ready for review.</source>
+        <translation>异常检测已完成。{succeeded_count} 个模型结果可供查看。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="452"/>
+        <location filename="../ui/scenario_training_dialog.py" line="884"/>
+        <source>Anomaly outputs: waiting for successful model results.</source>
+        <translation>异常输出：等待成功的模型结果。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="453"/>
+        <source>Anomaly outputs: {count} saved score file(s) are ready.</source>
+        <translation>异常输出：{count} 个已保存分数文件已就绪。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="678"/>
+        <source>Anomalies {value}</source>
+        <translation>异常 {value}</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="682"/>
+        <source>Rate {value}</source>
+        <translation>比例 {value}</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="700"/>
         <source>Metrics: evaluation did not complete.</source>
         <translation>指标：评估尚未完成。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="636"/>
+        <location filename="../ui/scenario_training_dialog.py" line="702"/>
         <source>Metrics: evaluation is in progress.</source>
         <translation>指标：评估进行中。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="637"/>
+        <location filename="../ui/scenario_training_dialog.py" line="703"/>
         <source>Metrics: waiting for evaluation.</source>
         <translation>指标：等待评估。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="644"/>
+        <location filename="../ui/scenario_training_dialog.py" line="710"/>
         <source>R² {value}</source>
         <translation>R² {value}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="646"/>
+        <location filename="../ui/scenario_training_dialog.py" line="712"/>
         <source>MSE {value}</source>
         <translation>MSE {value}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="648"/>
+        <location filename="../ui/scenario_training_dialog.py" line="714"/>
         <source>MAE {value}</source>
         <translation>MAE {value}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="656"/>
+        <location filename="../ui/scenario_training_dialog.py" line="722"/>
         <source>{label} {value}</source>
         <translation>{label} {value}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="661"/>
+        <location filename="../ui/scenario_training_dialog.py" line="727"/>
         <source>Metrics: available in task details.</source>
         <translation>指标：可在任务详情中查看。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="667"/>
+        <location filename="../ui/scenario_training_dialog.py" line="733"/>
         <source>Parameters: {params}</source>
         <translation>参数：{params}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="668"/>
+        <location filename="../ui/scenario_training_dialog.py" line="734"/>
         <source>Parameters: default model configuration</source>
         <translation>参数：模型默认配置</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="672"/>
+        <location filename="../ui/scenario_training_dialog.py" line="738"/>
         <source>Save state: waiting for persisted model</source>
         <translation>保存状态：等待模型持久化</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="676"/>
+        <location filename="../ui/scenario_training_dialog.py" line="742"/>
         <source>Save state: saved automatically as {file_name} and leading this run</source>
         <translation>保存状态：已自动保存为 {file_name}，并处于本轮领先</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="679"/>
+        <location filename="../ui/scenario_training_dialog.py" line="745"/>
         <source>Save state: saved automatically as {file_name}</source>
         <translation>保存状态：已自动保存为 {file_name}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="683"/>
+        <location filename="../ui/scenario_training_dialog.py" line="749"/>
         <source>Save state: saved automatically and leading this run</source>
         <translation>保存状态：已自动保存，并处于本轮领先</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="684"/>
+        <location filename="../ui/scenario_training_dialog.py" line="750"/>
         <source>Save state: saved automatically</source>
         <translation>保存状态：已自动保存</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="689"/>
+        <location filename="../ui/scenario_training_dialog.py" line="757"/>
+        <source>Hint: the key-driver report is ready; evaluation is still running.</source>
+        <translation>提示：关键因素报告已就绪，评估仍在运行。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="759"/>
+        <source>Hint: anomaly score output is being finalized in the background.</source>
+        <translation>提示：异常分数输出正在后台完成整理。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="761"/>
         <source>Hint: clustering output is being finalized in the background.</source>
         <translation>提示：聚类输出正在后台完成整理。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="691"/>
+        <location filename="../ui/scenario_training_dialog.py" line="764"/>
+        <source>Hint: anomaly detection is progressing in the background.</source>
+        <translation>提示：异常检测正在后台运行。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="765"/>
         <source>Hint: clustering is progressing in the background.</source>
         <translation>提示：聚类正在后台运行。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="692"/>
+        <location filename="../ui/scenario_training_dialog.py" line="766"/>
         <source>Hint: training and evaluation are progressing in the background.</source>
         <translation>提示：训练与评估正在后台推进。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="694"/>
+        <location filename="../ui/scenario_training_dialog.py" line="768"/>
         <source>Hint: open the advanced task details to inspect the failure summary and logs.</source>
         <translation>提示：打开进阶任务详情即可查看失败摘要与日志。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="696"/>
+        <location filename="../ui/scenario_training_dialog.py" line="770"/>
+        <source>Hint: open the output CSV to review ranked business drivers.</source>
+        <translation>提示：打开输出 CSV 查看已排名的业务关键因素。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="772"/>
+        <source>Hint: open the output CSV to review ranked anomaly scores.</source>
+        <translation>提示：打开输出 CSV 查看已排名的异常分数。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="774"/>
         <source>Hint: review the saved clustering output file from the task artifacts or advanced details.</source>
         <translation>提示：可在任务制品或进阶详情中查看已保存的聚类输出文件。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="698"/>
+        <location filename="../ui/scenario_training_dialog.py" line="776"/>
         <source>Hint: this model currently gives the strongest result for the prepared dataset.</source>
         <translation>提示：这个模型目前为当前数据集给出了最强结果。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="699"/>
+        <location filename="../ui/scenario_training_dialog.py" line="777"/>
         <source>Hint: this saved model remains available for comparison and later reuse.</source>
         <translation>提示：这个已保存模型可继续用于比较与后续复用。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="703"/>
+        <location filename="../ui/scenario_training_dialog.py" line="794"/>
         <source>(empty)</source>
         <translation>（空）</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="717"/>
+        <location filename="../ui/scenario_training_dialog.py" line="808"/>
         <source>F1</source>
         <translation>F1</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="718"/>
+        <location filename="../ui/scenario_training_dialog.py" line="809"/>
         <source>Accuracy</source>
         <translation>准确率</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="719"/>
+        <location filename="../ui/scenario_training_dialog.py" line="810"/>
         <source>Precision</source>
         <translation>精确率</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="720"/>
+        <location filename="../ui/scenario_training_dialog.py" line="811"/>
         <source>Recall</source>
         <translation>召回率</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="726"/>
+        <location filename="../ui/scenario_training_dialog.py" line="817"/>
         <source>Pending</source>
         <translation>待处理</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="727"/>
-        <location filename="../ui/scenario_training_dialog.py" line="737"/>
+        <location filename="../ui/scenario_training_dialog.py" line="818"/>
+        <location filename="../ui/scenario_training_dialog.py" line="828"/>
         <source>Running</source>
         <translation>运行中</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="728"/>
-        <location filename="../ui/scenario_training_dialog.py" line="738"/>
+        <location filename="../ui/scenario_training_dialog.py" line="819"/>
+        <location filename="../ui/scenario_training_dialog.py" line="829"/>
         <source>Succeeded</source>
         <translation>成功</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="729"/>
-        <location filename="../ui/scenario_training_dialog.py" line="739"/>
+        <location filename="../ui/scenario_training_dialog.py" line="820"/>
+        <location filename="../ui/scenario_training_dialog.py" line="830"/>
         <source>Failed</source>
         <translation>失败</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="730"/>
+        <location filename="../ui/scenario_training_dialog.py" line="821"/>
         <source>Cancelled</source>
         <translation>已取消</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="748"/>
+        <location filename="../ui/scenario_training_dialog.py" line="840"/>
+        <source>top drivers={drivers}</source>
+        <translation>关键因素={drivers}</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="841"/>
+        <source>key driver report ready</source>
+        <translation>关键因素报告已就绪</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="845"/>
+        <source>anomalies={anomaly_count}, rate={anomaly_rate}</source>
+        <translation>异常数={anomaly_count}，比例={anomaly_rate}</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="851"/>
         <source>clusters={cluster_count}, noise={noise_count}</source>
         <translation>聚类数={cluster_count}，噪声={noise_count}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="754"/>
+        <location filename="../ui/scenario_training_dialog.py" line="857"/>
         <source>metric</source>
         <translation>指标</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="665"/>
-        <location filename="../ui/scenario_training_dialog.py" line="758"/>
+        <location filename="../ui/scenario_training_dialog.py" line="930"/>
+        <source>The output file could not be opened.</source>
+        <translation>无法打开输出文件。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="731"/>
+        <location filename="../ui/scenario_training_dialog.py" line="861"/>
         <source>Best params: {params}</source>
         <translation>最佳参数：{params}</translation>
     </message>
     <message>
         <location filename="../ui/scenario_training_dialog.py" line="334"/>
+        <source>The selected key-driver analysis plan is running in the background. Review the saved driver outputs when each result is ready.</source>
+        <translation>所选关键因素分析方案正在后台运行。每个结果就绪后可查看已保存的关键因素输出。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="342"/>
         <source>The selected clustering plan is running in the background. Review the saved clustering outputs when each result is ready.</source>
         <translation>所选聚类方案正在后台运行。每个结果就绪后可查看已保存的聚类输出。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="340"/>
+        <location filename="../ui/scenario_training_dialog.py" line="348"/>
         <source>Close Results</source>
         <translation>关闭结果</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="341"/>
+        <location filename="../ui/scenario_training_dialog.py" line="349"/>
         <source>Model Results</source>
         <translation>模型结果</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="342"/>
+        <location filename="../ui/scenario_training_dialog.py" line="350"/>
         <source>Advanced Task Details</source>
         <translation>进阶任务详情</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="343"/>
+        <location filename="../ui/scenario_training_dialog.py" line="351"/>
         <source>Open Output CSV</source>
         <translation>打开输出 CSV</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="396"/>
+        <location filename="../ui/scenario_training_dialog.py" line="413"/>
+        <source>Analysis finished. {succeeded_count} model result(s) are ready for review.</source>
+        <translation>分析已完成。{succeeded_count} 个模型结果可供查看。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="425"/>
         <source>Clustering finished. {succeeded_count} model result(s) are ready for review.</source>
         <translation>聚类已完成。{succeeded_count} 个模型结果可供查看。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="423"/>
-        <location filename="../ui/scenario_training_dialog.py" line="778"/>
+        <location filename="../ui/scenario_training_dialog.py" line="443"/>
+        <location filename="../ui/scenario_training_dialog.py" line="882"/>
+        <source>Key driver outputs: waiting for successful model results.</source>
+        <translation>关键因素输出：等待成功的模型结果。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="444"/>
+        <source>Key driver outputs: {count} saved report(s) are ready.</source>
+        <translation>关键因素输出：{count} 个已保存报告已就绪。</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="461"/>
+        <location filename="../ui/scenario_training_dialog.py" line="885"/>
         <source>Clustering outputs: waiting for successful model results.</source>
         <translation>聚类输出：等待成功的模型结果。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="424"/>
+        <location filename="../ui/scenario_training_dialog.py" line="462"/>
         <source>Clustering outputs: {count} saved model result(s) are ready.</source>
         <translation>聚类输出：{count} 个已保存的模型结果已就绪。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="559"/>
+        <location filename="../ui/scenario_training_dialog.py" line="597"/>
         <source>primary metric</source>
         <translation>主指标</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="560"/>
+        <location filename="../ui/scenario_training_dialog.py" line="598"/>
         <source>Rank #{rank} by {metric_name}</source>
         <translation>按 {metric_name} 排名第 {rank}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="798"/>
+        <location filename="../ui/scenario_training_dialog.py" line="905"/>
         <source>Output file: {file_name}</source>
         <translation>输出文件：{file_name}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="822"/>
+        <location filename="../ui/scenario_training_dialog.py" line="929"/>
         <source>Open Output Failed</source>
         <translation>打开输出失败</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="823"/>
         <source>The clustering output file could not be opened.</source>
-        <translation>无法打开聚类输出文件。</translation>
+        <translation type="vanished">无法打开聚类输出文件。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="348"/>
-        <location filename="../ui/scenario_training_dialog.py" line="498"/>
-        <location filename="../ui/scenario_training_dialog.py" line="577"/>
+        <location filename="../ui/scenario_training_dialog.py" line="356"/>
+        <location filename="../ui/scenario_training_dialog.py" line="536"/>
+        <location filename="../ui/scenario_training_dialog.py" line="615"/>
         <source>Select a model result card to inspect task details.</source>
         <translation>请选择一个模型结果卡片查看任务详情。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="390"/>
+        <location filename="../ui/scenario_training_dialog.py" line="398"/>
         <source>Training finished. {succeeded_count} model result(s) succeeded and the best model is ready.</source>
         <translation>训练已完成。{succeeded_count} 个模型结果已成功，最佳模型已就绪。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="403"/>
+        <location filename="../ui/scenario_training_dialog.py" line="405"/>
         <source>Training finished with partial failure. {succeeded_count} model result(s) succeeded and {failed_count} model result(s) failed.</source>
         <translation>训练已完成，存在部分失败。{succeeded_count} 个模型结果成功，{failed_count} 个模型结果失败。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="411"/>
+        <location filename="../ui/scenario_training_dialog.py" line="431"/>
         <source>Training is running. {succeeded_count} model result(s) completed so far.</source>
         <translation>训练正在运行。目前已完成 {succeeded_count} 个模型结果。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="592"/>
+        <location filename="../ui/scenario_training_dialog.py" line="630"/>
         <source>Task details are temporarily unavailable for the selected model result.</source>
         <translation>当前所选模型结果的任务详情暂时不可用。</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="760"/>
+        <location filename="../ui/scenario_training_dialog.py" line="863"/>
         <source>Params: {params}</source>
         <translation>参数：{params}</translation>
     </message>

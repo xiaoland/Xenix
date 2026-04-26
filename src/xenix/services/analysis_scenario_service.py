@@ -36,13 +36,13 @@ _SCENARIOS: tuple[AnalysisScenario, ...] = (
     ),
     AnalysisScenario(
         key="anomaly_detection",
-        linked_template_keys=(),
-        availability=AnalysisScenarioAvailability.PLANNED,
+        linked_template_keys=("anomaly_detection.v1",),
+        availability=AnalysisScenarioAvailability.AVAILABLE,
     ),
     AnalysisScenario(
         key="key_driver_analysis",
-        linked_template_keys=(),
-        availability=AnalysisScenarioAvailability.PLANNED,
+        linked_template_keys=("key_driver_analysis.v1",),
+        availability=AnalysisScenarioAvailability.AVAILABLE,
     ),
 )
 

@@ -169,7 +169,7 @@ class MainWindow(QMainWindow):
         if result is None:
             return
         template = self._scenario_template_service.get_template(result.template_key)
-        if not template.supervised_required:
+        if not template.supervised_required or not template.continues_to_prediction:
             self._scenario_training_selection_dialog = ScenarioTrainingSelectionDialog(
                 template=template,
                 preparation_result=result,

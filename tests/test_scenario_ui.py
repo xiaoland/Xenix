@@ -84,6 +84,8 @@ def test_prediction_scenario_card_opens_data_preparation_dialog(
         assert window._home_view._analysis_buttons["prediction"].isEnabled() is True
         assert window._home_view._analysis_buttons["classification"].isEnabled() is True
         assert window._home_view._analysis_buttons["clustering"].isEnabled() is True
+        assert window._home_view._analysis_buttons["anomaly_detection"].isEnabled() is True
+        assert window._home_view._analysis_buttons["key_driver_analysis"].isEnabled() is True
 
         window._home_view._analysis_buttons["prediction"].click()
         app.processEvents()
@@ -91,6 +93,54 @@ def test_prediction_scenario_card_opens_data_preparation_dialog(
         assert isinstance(window._scenario_data_preparation_dialog, ScenarioDataPreparationDialog)
         assert window._scenario_data_preparation_dialog.isVisible()
         assert window._scenario_data_preparation_dialog.windowTitle() == "Prepare Scenario Data"
+    finally:
+        if window._scenario_data_preparation_dialog is not None:
+            window._scenario_data_preparation_dialog.close()
+        window._ml_workspace._timer.stop()
+        window.close()
+
+
+def test_key_driver_scenario_card_opens_data_preparation_dialog(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    _app, window = build_main_window(show=False)
+    try:
+        window._home_view._analysis_buttons["key_driver_analysis"].click()
+        app.processEvents()
+
+        assert isinstance(window._scenario_data_preparation_dialog, ScenarioDataPreparationDialog)
+        assert window._scenario_data_preparation_dialog.isVisible()
+        assert window._scenario_data_preparation_dialog._title_label.text() == "Key Driver Analysis"
+    finally:
+        if window._scenario_data_preparation_dialog is not None:
+            window._scenario_data_preparation_dialog.close()
+        window._ml_workspace._timer.stop()
+        window.close()
+
+
+def test_anomaly_scenario_card_opens_data_preparation_dialog(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    _app, window = build_main_window(show=False)
+    try:
+        window._home_view._analysis_buttons["anomaly_detection"].click()
+        app.processEvents()
+
+        assert isinstance(window._scenario_data_preparation_dialog, ScenarioDataPreparationDialog)
+        assert window._scenario_data_preparation_dialog.isVisible()
+        assert window._scenario_data_preparation_dialog._title_label.text() == "Anomaly Detection"
     finally:
         if window._scenario_data_preparation_dialog is not None:
             window._scenario_data_preparation_dialog.close()
@@ -415,6 +465,92 @@ def test_clustering_preparation_routes_directly_to_training_selection_dialog(
 
         assert window._scenario_model_source_dialog is None
         assert isinstance(window._scenario_training_selection_dialog, ScenarioTrainingSelectionDialog)
+        assert "Prediction target: not required" in window._scenario_training_selection_dialog._selection_label.text()
+    finally:
+        if window._scenario_training_selection_dialog is not None:
+            window._scenario_training_selection_dialog.close()
+        window._ml_workspace._timer.stop()
+        window.close()
+
+
+def test_key_driver_preparation_routes_directly_to_training_selection_dialog(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    _app, window = build_main_window(show=False)
+    prepared = ScenarioWorkItemPreparationResult(
+        template_key="key_driver_analysis.v1",
+        project_id="project-1",
+        work_item_id="work-item-1",
+        dataset_id="dataset-1",
+        feature_columns=["feature_a", "feature_b"],
+        target_columns=["target"],
+    )
+
+    class _PreparedDialog:
+        def preparation_result(self):
+            return prepared
+
+    try:
+        window._scenario_data_preparation_dialog = _PreparedDialog()
+
+        window._open_model_source_after_preparation()
+        app.processEvents()
+
+        assert window._scenario_model_source_dialog is None
+        assert isinstance(window._scenario_training_selection_dialog, ScenarioTrainingSelectionDialog)
+        assert [step.model_key for step in window._scenario_training_selection_dialog.selected_steps()] == [
+            "regression.gradient_boosting",
+            "regression.lasso",
+        ]
+        assert "Prediction target: target" in window._scenario_training_selection_dialog._selection_label.text()
+    finally:
+        if window._scenario_training_selection_dialog is not None:
+            window._scenario_training_selection_dialog.close()
+        window._ml_workspace._timer.stop()
+        window.close()
+
+
+def test_anomaly_preparation_routes_directly_to_training_selection_dialog(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    _app, window = build_main_window(show=False)
+    prepared = ScenarioWorkItemPreparationResult(
+        template_key="anomaly_detection.v1",
+        project_id="project-1",
+        work_item_id="work-item-1",
+        dataset_id="dataset-1",
+        feature_columns=["feature_a", "feature_b"],
+        target_columns=[],
+    )
+
+    class _PreparedDialog:
+        def preparation_result(self):
+            return prepared
+
+    try:
+        window._scenario_data_preparation_dialog = _PreparedDialog()
+
+        window._open_model_source_after_preparation()
+        app.processEvents()
+
+        assert window._scenario_model_source_dialog is None
+        assert isinstance(window._scenario_training_selection_dialog, ScenarioTrainingSelectionDialog)
+        assert [step.model_key for step in window._scenario_training_selection_dialog.selected_steps()] == [
+            "anomaly.isolation_forest",
+            "anomaly.local_outlier_factor",
+        ]
         assert "Prediction target: not required" in window._scenario_training_selection_dialog._selection_label.text()
     finally:
         if window._scenario_training_selection_dialog is not None:
@@ -1294,6 +1430,276 @@ def test_scenario_training_dialog_opens_clustering_output_artifact(
         assert dialog._output_file_label.text() == "Output file: cluster_assignments.csv"
         assert dialog._open_output_button.isVisible() is True
         assert dialog._open_output_button.isEnabled() is True
+
+        dialog._open_output_button.click()
+        app.processEvents()
+
+        assert [Path(path) for path in opened_paths] == [output_file]
+    finally:
+        dialog.close()
+
+
+def test_scenario_training_dialog_opens_key_driver_output_from_root_task(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    project_service = ProjectService(context.session_factory)
+    work_item_service = WorkItemService(context.session_factory, paths)
+    dataset_service = DatasetService(context.session_factory, paths)
+    ml_task_service = MLTaskService(context.session_factory, paths)
+    ml_service = MLService(
+        paths,
+        context.session_factory,
+        dataset_service,
+        work_item_service,
+        ml_task_service,
+    )
+    template_service = ScenarioTemplateService()
+    workflow_service = ScenarioWorkflowService(
+        project_service=project_service,
+        work_item_service=work_item_service,
+        dataset_service=dataset_service,
+        ml_service=ml_service,
+        template_service=template_service,
+    )
+    template = template_service.get_template("key_driver_analysis.v1")
+    prepared = ScenarioWorkItemPreparationResult(
+        template_key=template.key,
+        project_id="project-1",
+        work_item_id="work-item-1",
+        dataset_id="dataset-1",
+        feature_columns=["feature_a", "feature_b"],
+        target_columns=["target"],
+    )
+    output_file = tmp_path / "key_drivers.csv"
+    output_file.write_text("rank,feature,importance\n1,feature_a,0.8\n", encoding="utf-8")
+    fake_run = ScenarioTrainingRun(
+        template_key=template.key,
+        work_item_id=prepared.work_item_id,
+        steps=template.training_plan[:1],
+        root_task_ids=["root-1"],
+    )
+
+    def fake_start_training_run(_input):
+        return fake_run
+
+    def fake_get_training_run_snapshot(_run):
+        return ScenarioTrainingRunSnapshot(
+            template_key=template.key,
+            work_item_id=prepared.work_item_id,
+            step_snapshots=[
+                ScenarioTrainingStepSnapshot(
+                    step_key="fit_gradient_boosting_drivers",
+                    operation=template.training_plan[0].operation,
+                    model_key="regression.gradient_boosting",
+                    model_display_name="Gradient Boosting Regressor",
+                    root_task_id="root-1",
+                    root_status=MLTaskStatus.SUCCEEDED,
+                    evaluate_task_id="eval-1",
+                    evaluate_status=MLTaskStatus.SUCCEEDED,
+                    trained_model_id="trained-1",
+                    result_summary={
+                        "key_driver_report": True,
+                        "driver_count": 2,
+                        "top_key_drivers": [{"feature": "feature_a", "importance": 0.8}],
+                    },
+                    evaluation_metrics={"r2": 0.9, "rmse": 1.0, "mae": 0.5},
+                    primary_metric_name="r2",
+                    primary_metric_value=0.9,
+                    status=ScenarioTrainingStepStatus.SUCCEEDED,
+                )
+            ],
+            best_trained_model_id="trained-1",
+            is_terminal=True,
+            can_proceed_to_inference=False,
+        )
+
+    def fake_get_task_details(task_id):
+        if task_id == "root-1":
+            return SimpleNamespace(
+                task=SimpleNamespace(
+                    id=task_id,
+                    result_payload={
+                        "result_summary": {
+                            "key_driver_report": True,
+                            "top_key_drivers": [{"feature": "feature_a", "importance": 0.8}],
+                        }
+                    },
+                ),
+                artifacts=[
+                    SimpleNamespace(
+                        artifact_kind=MLTaskArtifactKind.EXPORT_FILE,
+                        absolute_path=str(output_file),
+                        ready_to_open=True,
+                    )
+                ],
+                logs=[],
+            )
+        return SimpleNamespace(
+            task=SimpleNamespace(id=task_id, result_payload={"evaluation": {"primary_metric_name": "r2"}}),
+            artifacts=[],
+            logs=[],
+        )
+
+    opened_paths: list[str] = []
+
+    def fake_open_url(url):
+        opened_paths.append(url.toLocalFile())
+        return True
+
+    monkeypatch.setattr(workflow_service, "start_training_run", fake_start_training_run)
+    monkeypatch.setattr(workflow_service, "get_training_run_snapshot", fake_get_training_run_snapshot)
+    monkeypatch.setattr(ml_service, "get_task_details", fake_get_task_details)
+    monkeypatch.setattr("xenix.ui.scenario_training_dialog.QDesktopServices.openUrl", fake_open_url)
+
+    dialog = ScenarioTrainingDialog(
+        template=template,
+        preparation_result=prepared,
+        workflow_service=workflow_service,
+        ml_service=ml_service,
+    )
+    try:
+        dialog.show()
+        app.processEvents()
+
+        card = dialog._result_cards["fit_gradient_boosting_drivers"]
+        assert card._metrics_label.text() == "Top drivers: feature_a"
+        assert dialog._continue_button.text() == "Close Results"
+        assert dialog._continue_button.isEnabled() is True
+        assert dialog._output_file_label.text() == "Output file: key_drivers.csv"
+
+        dialog._open_output_button.click()
+        app.processEvents()
+
+        assert [Path(path) for path in opened_paths] == [output_file]
+    finally:
+        dialog.close()
+
+
+def test_scenario_training_dialog_opens_anomaly_output_artifact(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    project_service = ProjectService(context.session_factory)
+    work_item_service = WorkItemService(context.session_factory, paths)
+    dataset_service = DatasetService(context.session_factory, paths)
+    ml_task_service = MLTaskService(context.session_factory, paths)
+    ml_service = MLService(
+        paths,
+        context.session_factory,
+        dataset_service,
+        work_item_service,
+        ml_task_service,
+    )
+    template_service = ScenarioTemplateService()
+    workflow_service = ScenarioWorkflowService(
+        project_service=project_service,
+        work_item_service=work_item_service,
+        dataset_service=dataset_service,
+        ml_service=ml_service,
+        template_service=template_service,
+    )
+    template = template_service.get_template("anomaly_detection.v1")
+    prepared = ScenarioWorkItemPreparationResult(
+        template_key=template.key,
+        project_id="project-1",
+        work_item_id="work-item-1",
+        dataset_id="dataset-1",
+        feature_columns=["feature_a", "feature_b"],
+        target_columns=[],
+    )
+    output_file = tmp_path / "anomaly_scores.csv"
+    output_file.write_text("feature_a,feature_b,anomaly_label,anomaly_score,anomaly_rank\n1,2,normal,0.1,2\n", encoding="utf-8")
+    fake_run = ScenarioTrainingRun(
+        template_key=template.key,
+        work_item_id=prepared.work_item_id,
+        steps=template.training_plan[:1],
+        root_task_ids=["root-1"],
+    )
+
+    def fake_start_training_run(_input):
+        return fake_run
+
+    def fake_get_training_run_snapshot(_run):
+        return ScenarioTrainingRunSnapshot(
+            template_key=template.key,
+            work_item_id=prepared.work_item_id,
+            step_snapshots=[
+                ScenarioTrainingStepSnapshot(
+                    step_key="fit_isolation_forest",
+                    operation=template.training_plan[0].operation,
+                    model_key="anomaly.isolation_forest",
+                    model_display_name="Isolation Forest",
+                    root_task_id="root-1",
+                    root_status=MLTaskStatus.SUCCEEDED,
+                    trained_model_id="trained-1",
+                    training_params={"n_estimators": 100},
+                    result_summary={"anomaly_count": 2, "anomaly_rate": 0.25, "row_count": 8},
+                    status=ScenarioTrainingStepStatus.SUCCEEDED,
+                )
+            ],
+            best_trained_model_id=None,
+            is_terminal=True,
+            can_proceed_to_inference=False,
+        )
+
+    def fake_get_task_details(task_id):
+        return SimpleNamespace(
+            task=SimpleNamespace(
+                id=task_id,
+                result_payload={"result_summary": {"anomaly_count": 2, "anomaly_rate": 0.25, "row_count": 8}},
+            ),
+            artifacts=[
+                SimpleNamespace(
+                    artifact_kind=MLTaskArtifactKind.EXPORT_FILE,
+                    absolute_path=str(output_file),
+                    ready_to_open=True,
+                )
+            ],
+            logs=[],
+        )
+
+    opened_paths: list[str] = []
+
+    def fake_open_url(url):
+        opened_paths.append(url.toLocalFile())
+        return True
+
+    monkeypatch.setattr(workflow_service, "start_training_run", fake_start_training_run)
+    monkeypatch.setattr(workflow_service, "get_training_run_snapshot", fake_get_training_run_snapshot)
+    monkeypatch.setattr(ml_service, "get_task_details", fake_get_task_details)
+    monkeypatch.setattr("xenix.ui.scenario_training_dialog.QDesktopServices.openUrl", fake_open_url)
+
+    dialog = ScenarioTrainingDialog(
+        template=template,
+        preparation_result=prepared,
+        workflow_service=workflow_service,
+        ml_service=ml_service,
+    )
+    try:
+        dialog.show()
+        app.processEvents()
+
+        card = dialog._result_cards["fit_isolation_forest"]
+        assert "Anomalies 2" in card._metrics_label.text()
+        assert "Rate 25.00%" in card._metrics_label.text()
+        assert dialog._continue_button.text() == "Close Results"
+        assert dialog._continue_button.isEnabled() is True
+        assert dialog._output_file_label.text() == "Output file: anomaly_scores.csv"
 
         dialog._open_output_button.click()
         app.processEvents()

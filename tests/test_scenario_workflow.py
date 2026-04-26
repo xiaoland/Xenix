@@ -16,7 +16,7 @@ from xenix.services.scenario_workflow_service import (
     StartScenarioTrainingRunInput,
 )
 from xenix.services.storage import StorageBootstrapService
-from xenix.services.storage.models import MLTaskStatus, MLTaskType
+from xenix.services.storage.models import MLTaskArtifactKind, MLTaskStatus, MLTaskType
 from xenix.services.work_item_service import CreateWorkItemInput, WorkItemService
 
 
@@ -338,3 +338,144 @@ def test_clustering_training_run_finishes_without_inference_gate(
     assert all(step.status is ScenarioTrainingStepStatus.SUCCEEDED for step in terminal_snapshot.step_snapshots)
     assert all(step.evaluate_task_id is None for step in terminal_snapshot.step_snapshots)
     assert all(isinstance(step.result_summary.get("cluster_count"), int) for step in terminal_snapshot.step_snapshots)
+
+
+def test_anomaly_training_run_finishes_without_inference_gate(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    (
+        _project_service,
+        work_item_service,
+        dataset_service,
+        _ml_task_service,
+        ml_service,
+        workflow_service,
+    ) = _build_services(monkeypatch, tmp_path)
+    scenario_project = workflow_service.ensure_scenario_project()
+
+    dataset_file = tmp_path / "anomaly-run.csv"
+    dataset_file.write_text(
+        "amount,count,region\n"
+        "10,1,North\n"
+        "11,1,North\n"
+        "12,1,North\n"
+        "13,2,North\n"
+        "14,2,North\n"
+        "15,2,North\n"
+        "120,20,South\n",
+        encoding="utf-8",
+    )
+    dataset = _register_dataset(dataset_service, scenario_project.id, dataset_file, name="Anomaly Run")
+    work_item = work_item_service.create_work_item(
+        CreateWorkItemInput(
+            project_id=scenario_project.id,
+            name="Anomaly Run",
+            source_dataset_id=dataset.id,
+            feature_columns=["amount", "count", "region"],
+            target_columns=[],
+        )
+    )
+
+    run = workflow_service.start_training_run(
+        StartScenarioTrainingRunInput(
+            template_key="anomaly_detection.v1",
+            work_item_id=work_item.id,
+        )
+    )
+    terminal_snapshot = _wait_for_terminal_run(workflow_service, run)
+    root_tasks = [ml_service.get_task_details(task_id).task for task_id in run.root_task_ids]
+    all_tasks = ml_service.list_work_item_tasks(work_item.id)
+
+    assert [task.task_type for task in root_tasks] == [
+        MLTaskType.FIT,
+        MLTaskType.FIT,
+    ]
+    assert [_extract_model_key(task) for task in root_tasks] == [
+        "anomaly.isolation_forest",
+        "anomaly.local_outlier_factor",
+    ]
+    assert terminal_snapshot.is_terminal is True
+    assert terminal_snapshot.can_proceed_to_inference is False
+    assert len(all_tasks) == 2
+    assert all(step.evaluate_task_id is None for step in terminal_snapshot.step_snapshots)
+    assert all(isinstance(step.result_summary.get("anomaly_count"), int) for step in terminal_snapshot.step_snapshots)
+    for task_id in run.root_task_ids:
+        details = ml_service.get_task_details(task_id)
+        export_artifacts = [
+            artifact for artifact in details.artifacts if artifact.artifact_kind is MLTaskArtifactKind.EXPORT_FILE
+        ]
+        assert len(export_artifacts) == 1
+        assert Path(export_artifacts[0].absolute_path).name == "anomaly_scores.csv"
+
+
+def test_key_driver_training_run_exports_reports_without_inference_gate(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    (
+        _project_service,
+        work_item_service,
+        dataset_service,
+        _ml_task_service,
+        ml_service,
+        workflow_service,
+    ) = _build_services(monkeypatch, tmp_path)
+    scenario_project = workflow_service.ensure_scenario_project()
+
+    dataset_file = tmp_path / "drivers.csv"
+    dataset_file.write_text(
+        "price,discount,region,revenue\n"
+        "10,1,North,120\n"
+        "11,1,North,130\n"
+        "12,2,North,150\n"
+        "20,1,South,190\n"
+        "21,2,South,215\n"
+        "22,2,South,230\n"
+        "30,3,West,330\n"
+        "31,3,West,340\n"
+        "32,4,West,365\n"
+        "33,4,West,380\n",
+        encoding="utf-8",
+    )
+    dataset = _register_dataset(dataset_service, scenario_project.id, dataset_file, name="Drivers")
+    work_item = work_item_service.create_work_item(
+        CreateWorkItemInput(
+            project_id=scenario_project.id,
+            name="Driver Run",
+            source_dataset_id=dataset.id,
+            feature_columns=["price", "discount", "region"],
+            target_columns=["revenue"],
+        )
+    )
+
+    run = workflow_service.start_training_run(
+        StartScenarioTrainingRunInput(
+            template_key="key_driver_analysis.v1",
+            work_item_id=work_item.id,
+        )
+    )
+    terminal_snapshot = _wait_for_terminal_run(workflow_service, run)
+    root_tasks = [ml_service.get_task_details(task_id).task for task_id in run.root_task_ids]
+    all_tasks = ml_service.list_work_item_tasks(work_item.id)
+
+    assert [task.task_type for task in root_tasks] == [
+        MLTaskType.FIT,
+        MLTaskType.FIT,
+    ]
+    assert [_extract_model_key(task) for task in root_tasks] == [
+        "regression.gradient_boosting",
+        "regression.lasso",
+    ]
+    assert terminal_snapshot.is_terminal is True
+    assert terminal_snapshot.can_proceed_to_inference is False
+    assert [task.task_type for task in all_tasks].count(MLTaskType.EVALUATE) == 2
+    assert all(step.evaluate_task_id is not None for step in terminal_snapshot.step_snapshots)
+    assert all(step.result_summary.get("key_driver_report") is True for step in terminal_snapshot.step_snapshots)
+    for task_id in run.root_task_ids:
+        details = ml_service.get_task_details(task_id)
+        export_artifacts = [
+            artifact for artifact in details.artifacts if artifact.artifact_kind is MLTaskArtifactKind.EXPORT_FILE
+        ]
+        assert len(export_artifacts) == 1
+        assert Path(export_artifacts[0].absolute_path).name == "key_drivers.csv"

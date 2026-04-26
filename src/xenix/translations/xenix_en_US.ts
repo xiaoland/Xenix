@@ -1823,18 +1823,38 @@ Preview first row: {first_row}</translation>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_template_text.py" line="20"/>
+        <location filename="../ui/scenario_template_text.py" line="16"/>
+        <source>Anomaly Detection</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_template_text.py" line="18"/>
+        <source>Key Driver Analysis</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_template_text.py" line="24"/>
         <source>Forecast numeric business outcomes from a historical dataset.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_template_text.py" line="25"/>
+        <location filename="../ui/scenario_template_text.py" line="29"/>
         <source>Classify a customer outcome such as churn or conversion.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_template_text.py" line="30"/>
+        <location filename="../ui/scenario_template_text.py" line="34"/>
         <source>Group similar entities into segments from feature-only business data.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_template_text.py" line="39"/>
+        <source>Detect unusual records, rank anomaly severity, and inspect abnormal patterns.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_template_text.py" line="44"/>
+        <source>Rank input columns by their influence on a numeric business target.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1846,7 +1866,7 @@ Preview first row: {first_row}</translation>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="338"/>
+        <location filename="../ui/scenario_training_dialog.py" line="346"/>
         <source>Continue to Prediction</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1856,7 +1876,7 @@ Preview first row: {first_row}</translation>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="336"/>
+        <location filename="../ui/scenario_training_dialog.py" line="344"/>
         <source>Run Selected Plan Again</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1881,355 +1901,457 @@ Preview first row: {first_row}</translation>
         <translation type="obsolete">Status</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="346"/>
+        <location filename="../ui/scenario_training_dialog.py" line="354"/>
         <source>Preparing the training plan...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="396"/>
+        <location filename="../ui/scenario_training_dialog.py" line="413"/>
+        <source>Analysis finished. {succeeded_count} model result(s) are ready for review.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="425"/>
         <source>Clustering finished. {succeeded_count} model result(s) are ready for review.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="423"/>
-        <location filename="../ui/scenario_training_dialog.py" line="778"/>
+        <location filename="../ui/scenario_training_dialog.py" line="443"/>
+        <location filename="../ui/scenario_training_dialog.py" line="882"/>
+        <source>Key driver outputs: waiting for successful model results.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="444"/>
+        <source>Key driver outputs: {count} saved report(s) are ready.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="461"/>
+        <location filename="../ui/scenario_training_dialog.py" line="885"/>
         <source>Clustering outputs: waiting for successful model results.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="424"/>
+        <location filename="../ui/scenario_training_dialog.py" line="462"/>
         <source>Clustering outputs: {count} saved model result(s) are ready.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="428"/>
-        <location filename="../ui/scenario_training_dialog.py" line="777"/>
+        <location filename="../ui/scenario_training_dialog.py" line="466"/>
+        <location filename="../ui/scenario_training_dialog.py" line="880"/>
         <source>Best model: waiting for evaluation.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="452"/>
+        <location filename="../ui/scenario_training_dialog.py" line="490"/>
         <source>Best model: {model_key} ({metric_name}={metric_value})</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="457"/>
+        <location filename="../ui/scenario_training_dialog.py" line="495"/>
         <source>Best model: {model_key}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="559"/>
+        <location filename="../ui/scenario_training_dialog.py" line="597"/>
         <source>primary metric</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="560"/>
+        <location filename="../ui/scenario_training_dialog.py" line="598"/>
         <source>Rank #{rank} by {metric_name}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="598"/>
+        <location filename="../ui/scenario_training_dialog.py" line="636"/>
         <source>Task: {task_id}</source>
         <translation type="unfinished">Task: {task_id}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="599"/>
+        <location filename="../ui/scenario_training_dialog.py" line="637"/>
         <source>Model: {model_key}</source>
         <translation type="unfinished">Model: {model_key}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="600"/>
+        <location filename="../ui/scenario_training_dialog.py" line="638"/>
         <source>Status: {status}</source>
         <translation type="unfinished">Status: {status}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="603"/>
+        <location filename="../ui/scenario_training_dialog.py" line="641"/>
         <source>Result: {summary}</source>
         <translation type="unfinished">Result: {summary}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="605"/>
+        <location filename="../ui/scenario_training_dialog.py" line="643"/>
         <source>Failure: {summary}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="612"/>
+        <location filename="../ui/scenario_training_dialog.py" line="657"/>
         <source>Mode: Fit training</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="615"/>
+        <location filename="../ui/scenario_training_dialog.py" line="660"/>
         <source> · {count} candidates</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="616"/>
+        <location filename="../ui/scenario_training_dialog.py" line="661"/>
         <source>Mode: Hyperparameter tuning{candidate_suffix}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="625"/>
-        <source>Clusters {value}</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="627"/>
-        <source>Noise {value}</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="629"/>
-        <source>Rows {value}</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="634"/>
-        <source>Metrics: evaluation did not complete.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="636"/>
-        <source>Metrics: evaluation is in progress.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="637"/>
-        <source>Metrics: waiting for evaluation.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="644"/>
-        <source>R² {value}</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="646"/>
-        <source>MSE {value}</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="648"/>
-        <source>MAE {value}</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="656"/>
-        <source>{label} {value}</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="661"/>
-        <source>Metrics: available in task details.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="667"/>
-        <source>Parameters: {params}</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="668"/>
-        <source>Parameters: default model configuration</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="672"/>
-        <source>Save state: waiting for persisted model</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="676"/>
-        <source>Save state: saved automatically as {file_name} and leading this run</source>
-        <translation>Save state: saved automatically as {file_name} and leading this run</translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="679"/>
-        <source>Save state: saved automatically as {file_name}</source>
-        <translation>Save state: saved automatically as {file_name}</translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="683"/>
-        <source>Save state: saved automatically and leading this run</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="684"/>
-        <source>Save state: saved automatically</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="689"/>
-        <source>Hint: clustering output is being finalized in the background.</source>
+        <location filename="../ui/scenario_training_dialog.py" line="671"/>
+        <source>Top drivers: {drivers}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../ui/scenario_training_dialog.py" line="691"/>
-        <source>Hint: clustering is progressing in the background.</source>
+        <source>Clusters {value}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="692"/>
-        <source>Hint: training and evaluation are progressing in the background.</source>
+        <location filename="../ui/scenario_training_dialog.py" line="693"/>
+        <source>Noise {value}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="694"/>
-        <source>Hint: open the advanced task details to inspect the failure summary and logs.</source>
+        <location filename="../ui/scenario_training_dialog.py" line="680"/>
+        <location filename="../ui/scenario_training_dialog.py" line="695"/>
+        <source>Rows {value}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="696"/>
-        <source>Hint: review the saved clustering output file from the task artifacts or advanced details.</source>
+        <location filename="../ui/scenario_training_dialog.py" line="338"/>
+        <source>The selected anomaly detection plan is running in the background. Review the saved anomaly score outputs when each result is ready.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="698"/>
-        <source>Hint: this model currently gives the strongest result for the prepared dataset.</source>
+        <location filename="../ui/scenario_training_dialog.py" line="419"/>
+        <source>Anomaly detection finished. {succeeded_count} model result(s) are ready for review.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="699"/>
-        <source>Hint: this saved model remains available for comparison and later reuse.</source>
+        <location filename="../ui/scenario_training_dialog.py" line="452"/>
+        <location filename="../ui/scenario_training_dialog.py" line="884"/>
+        <source>Anomaly outputs: waiting for successful model results.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="453"/>
+        <source>Anomaly outputs: {count} saved score file(s) are ready.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="678"/>
+        <source>Anomalies {value}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="682"/>
+        <source>Rate {value}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="700"/>
+        <source>Metrics: evaluation did not complete.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="702"/>
+        <source>Metrics: evaluation is in progress.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../ui/scenario_training_dialog.py" line="703"/>
+        <source>Metrics: waiting for evaluation.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="710"/>
+        <source>R² {value}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="712"/>
+        <source>MSE {value}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="714"/>
+        <source>MAE {value}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="722"/>
+        <source>{label} {value}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="727"/>
+        <source>Metrics: available in task details.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="733"/>
+        <source>Parameters: {params}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="734"/>
+        <source>Parameters: default model configuration</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="738"/>
+        <source>Save state: waiting for persisted model</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="742"/>
+        <source>Save state: saved automatically as {file_name} and leading this run</source>
+        <translation>Save state: saved automatically as {file_name} and leading this run</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="745"/>
+        <source>Save state: saved automatically as {file_name}</source>
+        <translation>Save state: saved automatically as {file_name}</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="749"/>
+        <source>Save state: saved automatically and leading this run</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="750"/>
+        <source>Save state: saved automatically</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="757"/>
+        <source>Hint: the key-driver report is ready; evaluation is still running.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="759"/>
+        <source>Hint: anomaly score output is being finalized in the background.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="761"/>
+        <source>Hint: clustering output is being finalized in the background.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="764"/>
+        <source>Hint: anomaly detection is progressing in the background.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="765"/>
+        <source>Hint: clustering is progressing in the background.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="766"/>
+        <source>Hint: training and evaluation are progressing in the background.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="768"/>
+        <source>Hint: open the advanced task details to inspect the failure summary and logs.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="770"/>
+        <source>Hint: open the output CSV to review ranked business drivers.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="772"/>
+        <source>Hint: open the output CSV to review ranked anomaly scores.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="774"/>
+        <source>Hint: review the saved clustering output file from the task artifacts or advanced details.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="776"/>
+        <source>Hint: this model currently gives the strongest result for the prepared dataset.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="777"/>
+        <source>Hint: this saved model remains available for comparison and later reuse.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="794"/>
         <source>(empty)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="717"/>
+        <location filename="../ui/scenario_training_dialog.py" line="808"/>
         <source>F1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="718"/>
+        <location filename="../ui/scenario_training_dialog.py" line="809"/>
         <source>Accuracy</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="719"/>
+        <location filename="../ui/scenario_training_dialog.py" line="810"/>
         <source>Precision</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="720"/>
+        <location filename="../ui/scenario_training_dialog.py" line="811"/>
         <source>Recall</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="726"/>
+        <location filename="../ui/scenario_training_dialog.py" line="817"/>
         <source>Pending</source>
         <translation type="unfinished">Pending</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="727"/>
-        <location filename="../ui/scenario_training_dialog.py" line="737"/>
+        <location filename="../ui/scenario_training_dialog.py" line="818"/>
+        <location filename="../ui/scenario_training_dialog.py" line="828"/>
         <source>Running</source>
         <translation type="unfinished">Running</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="728"/>
-        <location filename="../ui/scenario_training_dialog.py" line="738"/>
+        <location filename="../ui/scenario_training_dialog.py" line="819"/>
+        <location filename="../ui/scenario_training_dialog.py" line="829"/>
         <source>Succeeded</source>
         <translation type="unfinished">Succeeded</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="729"/>
-        <location filename="../ui/scenario_training_dialog.py" line="739"/>
+        <location filename="../ui/scenario_training_dialog.py" line="820"/>
+        <location filename="../ui/scenario_training_dialog.py" line="830"/>
         <source>Failed</source>
         <translation type="unfinished">Failed</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="730"/>
+        <location filename="../ui/scenario_training_dialog.py" line="821"/>
         <source>Cancelled</source>
         <translation type="unfinished">Cancelled</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="748"/>
+        <location filename="../ui/scenario_training_dialog.py" line="840"/>
+        <source>top drivers={drivers}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="841"/>
+        <source>key driver report ready</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="845"/>
+        <source>anomalies={anomaly_count}, rate={anomaly_rate}</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="851"/>
         <source>clusters={cluster_count}, noise={noise_count}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="754"/>
+        <location filename="../ui/scenario_training_dialog.py" line="857"/>
         <source>metric</source>
         <translation type="unfinished">metric</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="665"/>
-        <location filename="../ui/scenario_training_dialog.py" line="758"/>
+        <location filename="../ui/scenario_training_dialog.py" line="930"/>
+        <source>The output file could not be opened.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="731"/>
+        <location filename="../ui/scenario_training_dialog.py" line="861"/>
         <source>Best params: {params}</source>
         <translation type="unfinished">Best params: {params}</translation>
     </message>
     <message>
         <location filename="../ui/scenario_training_dialog.py" line="334"/>
-        <source>The selected clustering plan is running in the background. Review the saved clustering outputs when each result is ready.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="340"/>
-        <source>Close Results</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/scenario_training_dialog.py" line="341"/>
-        <source>Model Results</source>
+        <source>The selected key-driver analysis plan is running in the background. Review the saved driver outputs when each result is ready.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../ui/scenario_training_dialog.py" line="342"/>
+        <source>The selected clustering plan is running in the background. Review the saved clustering outputs when each result is ready.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="348"/>
+        <source>Close Results</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="349"/>
+        <source>Model Results</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="350"/>
         <source>Advanced Task Details</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="343"/>
+        <location filename="../ui/scenario_training_dialog.py" line="351"/>
         <source>Open Output CSV</source>
         <translation>Open Output CSV</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="798"/>
+        <location filename="../ui/scenario_training_dialog.py" line="905"/>
         <source>Output file: {file_name}</source>
         <translation>Output file: {file_name}</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="822"/>
+        <location filename="../ui/scenario_training_dialog.py" line="929"/>
         <source>Open Output Failed</source>
         <translation>Open Output Failed</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="823"/>
         <source>The clustering output file could not be opened.</source>
-        <translation>The clustering output file could not be opened.</translation>
+        <translation type="vanished">The clustering output file could not be opened.</translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="348"/>
-        <location filename="../ui/scenario_training_dialog.py" line="498"/>
-        <location filename="../ui/scenario_training_dialog.py" line="577"/>
+        <location filename="../ui/scenario_training_dialog.py" line="356"/>
+        <location filename="../ui/scenario_training_dialog.py" line="536"/>
+        <location filename="../ui/scenario_training_dialog.py" line="615"/>
         <source>Select a model result card to inspect task details.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="390"/>
+        <location filename="../ui/scenario_training_dialog.py" line="398"/>
         <source>Training finished. {succeeded_count} model result(s) succeeded and the best model is ready.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="403"/>
+        <location filename="../ui/scenario_training_dialog.py" line="405"/>
         <source>Training finished with partial failure. {succeeded_count} model result(s) succeeded and {failed_count} model result(s) failed.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="411"/>
+        <location filename="../ui/scenario_training_dialog.py" line="431"/>
         <source>Training is running. {succeeded_count} model result(s) completed so far.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="592"/>
+        <location filename="../ui/scenario_training_dialog.py" line="630"/>
         <source>Task details are temporarily unavailable for the selected model result.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/scenario_training_dialog.py" line="760"/>
+        <location filename="../ui/scenario_training_dialog.py" line="863"/>
         <source>Params: {params}</source>
         <translation type="unfinished">Params: {params}</translation>
     </message>

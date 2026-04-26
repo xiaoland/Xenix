@@ -207,7 +207,12 @@ class ScenarioWorkflowService:
             snapshot.status in {ScenarioTrainingStepStatus.SUCCEEDED, ScenarioTrainingStepStatus.FAILED}
             for snapshot in step_snapshots
         )
-        can_proceed = template.supervised_required and is_terminal and work_item.best_trained_model_id is not None
+        can_proceed = (
+            template.supervised_required
+            and template.continues_to_prediction
+            and is_terminal
+            and work_item.best_trained_model_id is not None
+        )
         return ScenarioTrainingRunSnapshot(
             template_key=run.template_key,
             work_item_id=run.work_item_id,

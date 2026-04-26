@@ -12,6 +12,10 @@ def localized_template_display_name(template: ScenarioTemplate) -> str:
         return QCoreApplication.translate("ScenarioTemplateText", "Customer Outcome Classification")
     if template.key == "customer_segmentation_clustering.v1":
         return QCoreApplication.translate("ScenarioTemplateText", "Customer Segmentation Clustering")
+    if template.key == "anomaly_detection.v1":
+        return QCoreApplication.translate("ScenarioTemplateText", "Anomaly Detection")
+    if template.key == "key_driver_analysis.v1":
+        return QCoreApplication.translate("ScenarioTemplateText", "Key Driver Analysis")
     return template.display_name
 
 
@@ -30,5 +34,15 @@ def localized_template_description(template: ScenarioTemplate) -> str:
         return QCoreApplication.translate(
             "ScenarioTemplateText",
             "Group similar entities into segments from feature-only business data.",
+        )
+    if template.key == "anomaly_detection.v1":
+        return QCoreApplication.translate(
+            "ScenarioTemplateText",
+            "Detect unusual records, rank anomaly severity, and inspect abnormal patterns.",
+        )
+    if template.key == "key_driver_analysis.v1":
+        return QCoreApplication.translate(
+            "ScenarioTemplateText",
+            "Rank input columns by their influence on a numeric business target.",
         )
     return template.description
