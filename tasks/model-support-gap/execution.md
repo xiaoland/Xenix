@@ -71,10 +71,13 @@
   - enabled `clustering` in scenario-first mode with `customer_segmentation_clustering.v1`
   - feature-only preparation now bypasses model-source selection and routes directly into training selection
   - clustering training finishes without inference gating and surfaces saved-output summaries in the training dashboard
+  - clustering training dashboard now exposes the selected step's `cluster_assignments.csv` artifact through an `Open Output CSV` action
+  - the new output action is translated and compiled into the runtime `.qm` files
   - targeted regression tests added for registry, execution, workflow, and UI coverage
   - compile succeeded
   - targeted pytest suite passed: `31 passed`
-  - full pytest suite passed: `59 passed`
+  - follow-up UI artifact test passed
+  - full pytest suite passed: `60 passed`
 
 ## Promotion Notes
 

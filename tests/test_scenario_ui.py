@@ -2,6 +2,7 @@ import shutil
 import threading
 import time
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -33,7 +34,7 @@ from xenix.services.scenario_workflow_service import (
     StartScenarioTrainingRunInput,
 )
 from xenix.services.storage import StorageBootstrapService
-from xenix.services.storage.models import MLTaskStatus, MLTaskType
+from xenix.services.storage.models import MLTaskArtifactKind, MLTaskStatus, MLTaskType
 from xenix.services.work_item_service import WorkItemService
 from xenix.ui.scenario_data_preparation_dialog import ScenarioDataPreparationDialog
 from xenix.ui.inference_history_dialog import InferenceHistoryDialog
@@ -1070,6 +1071,129 @@ def test_scenario_training_dialog_shows_regression_result_cards_with_metrics_and
         assert "saved automatically" in card._save_state_label.text().lower()
         assert "Best Model" in card._title_label.text()
         assert dialog._continue_button.isEnabled() is True
+    finally:
+        dialog.close()
+
+
+def test_scenario_training_dialog_opens_clustering_output_artifact(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    project_service = ProjectService(context.session_factory)
+    work_item_service = WorkItemService(context.session_factory, paths)
+    dataset_service = DatasetService(context.session_factory, paths)
+    ml_task_service = MLTaskService(context.session_factory, paths)
+    ml_service = MLService(
+        paths,
+        context.session_factory,
+        dataset_service,
+        work_item_service,
+        ml_task_service,
+    )
+    template_service = ScenarioTemplateService()
+    workflow_service = ScenarioWorkflowService(
+        project_service=project_service,
+        work_item_service=work_item_service,
+        dataset_service=dataset_service,
+        ml_service=ml_service,
+        template_service=template_service,
+    )
+    template = template_service.get_template("customer_segmentation_clustering.v1")
+    prepared = ScenarioWorkItemPreparationResult(
+        template_key=template.key,
+        project_id="project-1",
+        work_item_id="work-item-1",
+        dataset_id="dataset-1",
+        feature_columns=["feature_a", "feature_b"],
+        target_columns=[],
+    )
+    output_file = tmp_path / "cluster_assignments.csv"
+    output_file.write_text("feature_a,feature_b,cluster_id\n1,2,1\n", encoding="utf-8")
+    fake_run = ScenarioTrainingRun(
+        template_key=template.key,
+        work_item_id=prepared.work_item_id,
+        steps=template.training_plan[:1],
+        root_task_ids=["root-1"],
+    )
+
+    def fake_start_training_run(_input):
+        return fake_run
+
+    def fake_get_training_run_snapshot(_run):
+        return ScenarioTrainingRunSnapshot(
+            template_key=template.key,
+            work_item_id=prepared.work_item_id,
+            step_snapshots=[
+                ScenarioTrainingStepSnapshot(
+                    step_key="fit_kmeans",
+                    operation=template.training_plan[0].operation,
+                    model_key="clustering.kmeans",
+                    model_display_name="KMeans Clustering",
+                    root_task_id="root-1",
+                    root_status=MLTaskStatus.SUCCEEDED,
+                    trained_model_id="trained-1",
+                    training_params={"n_clusters": 4},
+                    result_summary={"cluster_count": 2, "noise_count": 0, "row_count": 1},
+                    status=ScenarioTrainingStepStatus.SUCCEEDED,
+                )
+            ],
+            best_trained_model_id=None,
+            is_terminal=True,
+            can_proceed_to_inference=False,
+        )
+
+    def fake_get_task_details(task_id):
+        return SimpleNamespace(
+            task=SimpleNamespace(
+                id=task_id,
+                result_payload={"result_summary": {"cluster_count": 2, "noise_count": 0, "row_count": 1}},
+            ),
+            artifacts=[
+                SimpleNamespace(
+                    artifact_kind=MLTaskArtifactKind.EXPORT_FILE,
+                    absolute_path=str(output_file),
+                    ready_to_open=True,
+                )
+            ],
+            logs=[],
+        )
+
+    opened_paths: list[str] = []
+
+    def fake_open_url(url):
+        opened_paths.append(url.toLocalFile())
+        return True
+
+    monkeypatch.setattr(workflow_service, "start_training_run", fake_start_training_run)
+    monkeypatch.setattr(workflow_service, "get_training_run_snapshot", fake_get_training_run_snapshot)
+    monkeypatch.setattr(ml_service, "get_task_details", fake_get_task_details)
+    monkeypatch.setattr("xenix.ui.scenario_training_dialog.QDesktopServices.openUrl", fake_open_url)
+
+    dialog = ScenarioTrainingDialog(
+        template=template,
+        preparation_result=prepared,
+        workflow_service=workflow_service,
+        ml_service=ml_service,
+    )
+    try:
+        dialog.show()
+        app.processEvents()
+
+        assert dialog._output_file_label.text() == "Output file: cluster_assignments.csv"
+        assert dialog._open_output_button.isVisible() is True
+        assert dialog._open_output_button.isEnabled() is True
+
+        dialog._open_output_button.click()
+        app.processEvents()
+
+        assert [Path(path) for path in opened_paths] == [output_file]
     finally:
         dialog.close()
 

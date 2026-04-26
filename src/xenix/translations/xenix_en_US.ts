@@ -2085,6 +2085,26 @@ Preview first row: {first_row}</translation>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../ui/scenario_training_dialog.py" line="326"/>
+        <source>Open Output CSV</source>
+        <translation>Open Output CSV</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="718"/>
+        <source>Output file: {file_name}</source>
+        <translation>Output file: {file_name}</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="738"/>
+        <source>Open Output Failed</source>
+        <translation>Open Output Failed</translation>
+    </message>
+    <message>
+        <location filename="../ui/scenario_training_dialog.py" line="739"/>
+        <source>The clustering output file could not be opened.</source>
+        <translation>The clustering output file could not be opened.</translation>
+    </message>
+    <message>
         <location filename="../ui/scenario_training_dialog.py" line="314"/>
         <location filename="../ui/scenario_training_dialog.py" line="442"/>
         <location filename="../ui/scenario_training_dialog.py" line="462"/>

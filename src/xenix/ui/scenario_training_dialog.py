@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QEvent, QTimer, Qt, Signal
-from PySide6.QtGui import QMouseEvent
+from PySide6.QtCore import QEvent, QTimer, Qt, QUrl, Signal
+from PySide6.QtGui import QDesktopServices, QMouseEvent
 from PySide6.QtWidgets import (
     QDialog,
     QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QSplitter,
@@ -33,7 +35,7 @@ from ..services.scenario_workflow_service import (
     ScenarioWorkItemPreparationResult,
     StartScenarioTrainingRunInput,
 )
-from ..services.storage.models import MLTaskType
+from ..services.storage.models import MLTaskArtifactKind, MLTaskType
 from ..services.trained_model_metadata import parse_trained_model_metadata
 from .scenario_template_text import localized_template_display_name
 from .widgets.task_log_view import TaskLogView
@@ -230,6 +232,10 @@ class ScenarioTrainingDialog(QDialog):
         self._results_layout = QVBoxLayout(self._results_container)
         self._task_details_label = QLabel()
         self._task_details_label.setWordWrap(True)
+        self._output_file_path: str | None = None
+        self._output_file_label = QLabel()
+        self._output_file_label.setWordWrap(True)
+        self._open_output_button = QPushButton()
         self._task_log_view = TaskLogView()
         self._step_group = QGroupBox()
         self._detail_group = QGroupBox()
@@ -290,6 +296,8 @@ class ScenarioTrainingDialog(QDialog):
         layout.setContentsMargins(0, 0, 0, 0)
         detail_layout = QVBoxLayout(self._detail_group)
         detail_layout.addWidget(self._task_details_label)
+        detail_layout.addWidget(self._output_file_label)
+        detail_layout.addWidget(self._open_output_button)
         detail_layout.addWidget(self._task_log_view, 1)
         layout.addWidget(self._detail_group, 1)
         return widget
@@ -297,6 +305,7 @@ class ScenarioTrainingDialog(QDialog):
     def _wire_events(self) -> None:
         self._run_again_button.clicked.connect(self._start_training_run)
         self._continue_button.clicked.connect(self._continue_to_prediction)
+        self._open_output_button.clicked.connect(self._open_selected_output_file)
 
     def retranslate_ui(self) -> None:
         self.setWindowTitle(self.tr("Training Dashboard"))
@@ -316,11 +325,13 @@ class ScenarioTrainingDialog(QDialog):
             self._continue_button.setText(self.tr("Close Results"))
         self._step_group.setTitle(self.tr("Model Results"))
         self._detail_group.setTitle(self.tr("Advanced Task Details"))
+        self._open_output_button.setText(self.tr("Open Output CSV"))
         self._continue_button.setVisible(True)
         if self._current_snapshot is None:
             self._status_summary_label.setText(self.tr("Preparing the training plan..."))
             self._best_model_label.setText(self._build_empty_best_model_text())
             self._task_details_label.setText(self.tr("Select a model result card to inspect task details."))
+            self._clear_output_file_action()
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == QEvent.LanguageChange:
@@ -467,12 +478,15 @@ class ScenarioTrainingDialog(QDialog):
         if not snapshot.step_snapshots:
             self._selected_step_key = None
             self._task_details_label.setText(self.tr("Select a model result card to inspect task details."))
+            self._clear_output_file_action()
             self._task_log_view.clear()
             return
         if self._selected_step_key is None:
             self._selected_step_key = snapshot.step_snapshots[0].step_key
             self._load_selected_step_details()
             self._refresh_result_cards(snapshot)
+            return
+        self._load_selected_step_details()
 
     def _select_step_key(self, step_key: str) -> None:
         self._selected_step_key = step_key
@@ -487,11 +501,13 @@ class ScenarioTrainingDialog(QDialog):
         step_key = self._selected_step_key
         if step_key is None:
             self._task_details_label.setText(self.tr("Select a model result card to inspect task details."))
+            self._clear_output_file_action()
             self._task_log_view.clear()
             return
 
         selected_snapshot = next((step for step in snapshot.step_snapshots if step.step_key == step_key), None)
         if selected_snapshot is None:
+            self._clear_output_file_action()
             return
 
         task_id = selected_snapshot.evaluate_task_id or selected_snapshot.root_task_id
@@ -501,6 +517,7 @@ class ScenarioTrainingDialog(QDialog):
             self._task_details_label.setText(
                 self.tr("Task details are temporarily unavailable for the selected model result.")
             )
+            self._clear_output_file_action()
             self._task_log_view.clear()
             return
         lines = [
@@ -513,6 +530,7 @@ class ScenarioTrainingDialog(QDialog):
         if selected_snapshot.failure_summary:
             lines.append(self.tr("Failure: {summary}").format(summary=selected_snapshot.failure_summary))
         self._task_details_label.setText("\n".join(lines))
+        self._set_output_file_action(self._find_openable_output_file(details.artifacts))
         self._task_log_view.set_logs(details.logs)
 
     def _build_mode_text(self, step: ScenarioTrainingStepSnapshot) -> str:
@@ -684,6 +702,52 @@ class ScenarioTrainingDialog(QDialog):
         if self._template.supervised_required:
             return self.tr("Best model: waiting for evaluation.")
         return self.tr("Clustering outputs: waiting for successful model results.")
+
+    def _find_openable_output_file(self, artifacts: list[Any]) -> str | None:
+        for artifact in artifacts:
+            artifact_kind = getattr(artifact, "artifact_kind", None)
+            is_export = artifact_kind in {MLTaskArtifactKind.EXPORT_FILE, MLTaskArtifactKind.EXPORT_FILE.value}
+            if not is_export or not getattr(artifact, "ready_to_open", False):
+                continue
+            absolute_path = getattr(artifact, "absolute_path", None)
+            if isinstance(absolute_path, str) and absolute_path:
+                return absolute_path
+        return None
+
+    def _set_output_file_action(self, output_file_path: str | None) -> None:
+        self._output_file_path = output_file_path
+        if output_file_path is None:
+            self._clear_output_file_action()
+            return
+        output_path = Path(output_file_path)
+        self._output_file_label.setText(
+            self.tr("Output file: {file_name}").format(file_name=output_path.name)
+        )
+        self._output_file_label.setToolTip(str(output_path))
+        self._output_file_label.show()
+        self._open_output_button.setToolTip(str(output_path))
+        self._open_output_button.setEnabled(True)
+        self._open_output_button.show()
+
+    def _clear_output_file_action(self) -> None:
+        self._output_file_path = None
+        self._output_file_label.clear()
+        self._output_file_label.setToolTip("")
+        self._output_file_label.hide()
+        self._open_output_button.setToolTip("")
+        self._open_output_button.setEnabled(False)
+        self._open_output_button.hide()
+
+    def _open_selected_output_file(self) -> None:
+        if self._output_file_path is None:
+            return
+        opened = QDesktopServices.openUrl(QUrl.fromLocalFile(self._output_file_path))
+        if not opened:
+            QMessageBox.warning(
+                self,
+                self.tr("Open Output Failed"),
+                self.tr("The clustering output file could not be opened."),
+            )
 
     def _trained_model_metadata(self, trained_model_id: str) -> Any:
         if self._current_snapshot is None:
