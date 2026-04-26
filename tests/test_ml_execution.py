@@ -236,6 +236,64 @@ def test_clustering_fit_runs_without_follow_up_evaluate_and_persists_export_arti
     assert metadata.feature_columns == ["spend", "visits", "segment"]
 
 
+def test_polynomial_regression_fit_with_evaluate_uses_p1_pipeline(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    project_service, work_item_service, dataset_service, _ml_task_service, ml_service = _build_services(
+        monkeypatch, tmp_path
+    )
+    project = project_service.create_project(CreateProjectInput(name="Retail"))
+    dataset_file = tmp_path / "polynomial-demand.csv"
+    dataset_file.write_text(
+        "feature_a,feature_b,target\n"
+        "1,1,3\n"
+        "2,1,6\n"
+        "3,2,13\n"
+        "4,2,22\n"
+        "5,3,37\n"
+        "6,3,54\n"
+        "7,4,79\n"
+        "8,4,106\n"
+        "9,5,141\n"
+        "10,5,178\n",
+        encoding="utf-8",
+    )
+    dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Polynomial Demand")
+    work_item = _create_work_item(
+        work_item_service,
+        project.id,
+        dataset.id,
+        name="Polynomial Demand",
+        feature_columns=["feature_a", "feature_b"],
+        target_columns=["target"],
+    )
+
+    fit_task = ml_service.fit_with_evaluate(
+        FitWithEvaluateInput(
+            work_item_id=work_item.id,
+            model_key="regression.polynomial",
+            params={"degree": 2, "fit_intercept": True},
+        )
+    )
+
+    tasks = _wait_for_terminal_tasks(ml_service, work_item.id, expected_count=2)
+    trained_models = ml_service.list_trained_models(work_item.id)
+    best_model_id = _wait_for_best_trained_model_id(work_item_service, work_item.id)
+    fit_details = ml_service.get_task_details(fit_task.id)
+
+    assert {task.task_type for task in tasks} == {MLTaskType.FIT, MLTaskType.EVALUATE}
+    assert all(task.status is MLTaskStatus.SUCCEEDED for task in tasks)
+    assert len(trained_models) == 1
+    assert best_model_id == trained_models[0].id
+    assert fit_details.task.result_payload is not None
+    assert fit_details.task.result_payload["params"] == {"degree": 2, "fit_intercept": True}
+    metadata = parse_trained_model_metadata(trained_models[0].metadata_payload)
+    assert metadata is not None
+    assert metadata.model_key == "regression.polynomial"
+    assert metadata.evaluation_primary_metric_name == "r2"
+
+
 def test_bulk_tuning_creates_one_tuning_task_per_model_and_follow_up_evaluations(
     monkeypatch,
     tmp_path: Path,
@@ -299,6 +357,67 @@ def test_bulk_tuning_creates_one_tuning_task_per_model_and_follow_up_evaluations
     assert [task.task_type for task in tasks].count(MLTaskType.EVALUATE) == 2
     assert all(task.status is MLTaskStatus.SUCCEEDED for task in tasks)
     assert len(ml_service.list_trained_models(work_item.id)) == 2
+
+
+def test_naive_bayes_tuning_with_evaluate_uses_p1_dense_preprocessing(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    project_service, work_item_service, dataset_service, _ml_task_service, ml_service = _build_services(
+        monkeypatch, tmp_path
+    )
+    project = project_service.create_project(CreateProjectInput(name="Retail"))
+    dataset_file = tmp_path / "p1-churn.csv"
+    dataset_file.write_text(
+        "age,tenure,segment,label\n"
+        "22,1,A,0\n"
+        "24,2,A,0\n"
+        "26,3,A,0\n"
+        "28,4,B,0\n"
+        "30,5,B,0\n"
+        "32,6,B,0\n"
+        "42,1,C,1\n"
+        "44,2,C,1\n"
+        "46,3,C,1\n"
+        "48,4,D,1\n"
+        "50,5,D,1\n"
+        "52,6,D,1\n",
+        encoding="utf-8",
+    )
+    dataset = _register_dataset(dataset_service, project.id, dataset_file, name="P1 Churn")
+    work_item = _create_work_item(
+        work_item_service,
+        project.id,
+        dataset.id,
+        name="P1 Churn",
+        feature_columns=["age", "tenure", "segment"],
+        target_columns=["label"],
+    )
+
+    tuning_task = ml_service.tune_with_evaluate(
+        TuneWithEvaluateInput(
+            work_item_id=work_item.id,
+            model_key="classification.naive_bayes",
+            param_grid={"var_smoothing": [1e-9, 1e-8]},
+        )
+    )
+
+    tasks = _wait_for_terminal_tasks(ml_service, work_item.id, expected_count=2)
+    trained_models = ml_service.list_trained_models(work_item.id)
+    best_model_id = _wait_for_best_trained_model_id(work_item_service, work_item.id)
+    tuning_details = ml_service.get_task_details(tuning_task.id)
+
+    assert {task.task_type for task in tasks} == {MLTaskType.HYPERPARAMETER_TUNING, MLTaskType.EVALUATE}
+    assert all(task.status is MLTaskStatus.SUCCEEDED for task in tasks)
+    assert len(trained_models) == 1
+    assert best_model_id == trained_models[0].id
+    assert tuning_details.task.result_payload is not None
+    assert tuning_details.task.result_payload["model_key"] == "classification.naive_bayes"
+    assert tuning_details.task.result_payload["tuning_summary"]["cv_summary"]["candidate_count"] == 2
+    metadata = parse_trained_model_metadata(trained_models[0].metadata_payload)
+    assert metadata is not None
+    assert metadata.model_key == "classification.naive_bayes"
+    assert metadata.evaluation_primary_metric_name == "f1_weighted"
 
 
 def test_tuning_rejects_empty_param_grid_sequences_before_worker(monkeypatch, tmp_path: Path) -> None:

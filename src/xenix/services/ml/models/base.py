@@ -35,6 +35,7 @@ from ..types import ModelServiceBase
 
 class NumericAndCategoricalModelService(ModelServiceBase):
     scaler_for_numeric: bool = False
+    dense_preprocessing: bool = False
 
     @classmethod
     def fit(cls, request: FitTaskRequest, task_dir: Path) -> FitTaskResult:
@@ -225,17 +226,21 @@ class NumericAndCategoricalModelService(ModelServiceBase):
         if cls.scaler_for_numeric:
             numeric_transformer_steps.append(("scaler", StandardScaler()))
         numeric_transformer = Pipeline(steps=numeric_transformer_steps)
+        encoder_kwargs: dict[str, Any] = {"handle_unknown": "ignore"}
+        if cls.dense_preprocessing:
+            encoder_kwargs["sparse_output"] = False
         categorical_transformer = Pipeline(
             steps=[
                 ("imputer", SimpleImputer(strategy="most_frequent")),
-                ("encoder", OneHotEncoder(handle_unknown="ignore")),
+                ("encoder", OneHotEncoder(**encoder_kwargs)),
             ]
         )
         return ColumnTransformer(
             transformers=[
                 ("numeric", numeric_transformer, cls._numeric_selector),
                 ("categorical", categorical_transformer, cls._categorical_selector),
-            ]
+            ],
+            sparse_threshold=0.0 if cls.dense_preprocessing else 0.3,
         )
 
     @staticmethod

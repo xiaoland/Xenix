@@ -2,17 +2,24 @@ from __future__ import annotations
 
 from ...exceptions import NotFoundError
 from .models.classification import (
+    AdaBoostClassificationService,
     DecisionTreeClassificationService,
     GradientBoostingClassificationService,
+    KNeighborsClassificationService,
     LogisticRegressionService,
+    NaiveBayesClassificationService,
     RandomForestClassificationService,
 )
 from .models.clustering import DBSCANClusteringService, KMeansClusteringService
 from .models.regression import (
+    AdaBoostRegressionService,
+    BayesianRidgeRegressionService,
     DecisionTreeRegressionService,
     GradientBoostingRegressionService,
+    KNeighborsRegressionService,
     LassoRegressionService,
     LinearRegressionService,
+    PolynomialRegressionService,
     RandomForestRegressionService,
     RidgeRegressionService,
 )
@@ -24,12 +31,19 @@ _MODEL_SERVICES: dict[str, type[ModelServiceBase]] = {
         LinearRegressionService,
         LassoRegressionService,
         RidgeRegressionService,
+        BayesianRidgeRegressionService,
+        KNeighborsRegressionService,
         DecisionTreeRegressionService,
         GradientBoostingRegressionService,
+        AdaBoostRegressionService,
+        PolynomialRegressionService,
         RandomForestRegressionService,
         LogisticRegressionService,
+        NaiveBayesClassificationService,
+        KNeighborsClassificationService,
         DecisionTreeClassificationService,
         GradientBoostingClassificationService,
+        AdaBoostClassificationService,
         RandomForestClassificationService,
         KMeansClusteringService,
         DBSCANClusteringService,

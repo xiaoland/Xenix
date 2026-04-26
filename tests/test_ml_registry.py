@@ -8,7 +8,7 @@ from xenix.services.storage.models import ProblemKind
 def test_model_catalog_exposes_json_schema_and_problem_kinds() -> None:
     catalog = list_model_catalog()
 
-    assert len(catalog) == 12
+    assert len(catalog) == 19
     assert all(isinstance(entry, ModelCatalogEntry) for entry in catalog)
     ridge = get_model_catalog_entry("regression.ridge")
     assert ridge.problem_kind is ProblemKind.REGRESSION
@@ -21,6 +21,16 @@ def test_model_catalog_exposes_json_schema_and_problem_kinds() -> None:
     random_forest = get_model_catalog_entry("classification.random_forest")
     assert random_forest.param_grid_schema is not None
     assert random_forest.param_grid_schema["properties"]["n_estimators"]["default"] == [100, 200, 300]
+    bayesian_ridge = get_model_catalog_entry("regression.bayesian_ridge")
+    assert bayesian_ridge.param_schema["properties"]["alpha_1"]["default"] == 1e-6
+    polynomial = get_model_catalog_entry("regression.polynomial")
+    assert polynomial.param_grid_schema is not None
+    assert polynomial.param_grid_schema["properties"]["degree"]["default"] == [1, 2, 3]
+    naive_bayes = get_model_catalog_entry("classification.naive_bayes")
+    assert naive_bayes.param_schema["properties"]["var_smoothing"]["default"] == 1e-9
+    knn = get_model_catalog_entry("classification.knn")
+    assert knn.param_grid_schema is not None
+    assert knn.param_grid_schema["properties"]["n_neighbors"]["default"] == [3, 5, 7]
     clustering = get_model_catalog_entry("clustering.kmeans")
     assert clustering.problem_kind is ProblemKind.CLUSTERING
     assert clustering.requires_target is False
