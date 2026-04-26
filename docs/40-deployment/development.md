@@ -53,6 +53,7 @@ pdm run i18n-compile
 
 - `pdm run i18n-extract` refreshes the Qt Linguist `.ts` catalogs from the current Python widget source.
 - `pdm run i18n-compile` compiles `.ts` catalogs into `.qm` files used by `QTranslator` at runtime.
+- In Codex App, use the `Compile .qm` project action to run the same compile step from the action bar.
 
 ## Package
 
