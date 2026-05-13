@@ -6,15 +6,15 @@ This guidance applies to `src/xenix/ui/` except `src/xenix/ui/widgets/`, which m
 
 ## Rules
 
-- Keep scenario mode as the default operator path. `MainWindow`, Home, Window A/B/C, History, and Settings are first-class UI surfaces.
-- Do not reintroduce project or work-item selectors into scenario dialogs. Scenario mode may hide those details, but the UI must still obtain ids and paths from services.
+- Keep ChatBox as the default operator path. `MainWindow` should host the ChatBox-first shell.
+- Treat Message rendering, file drop intake, artifact preview, tool progress, and stop control as first-class UI surfaces.
 - UI code must stay service-driven. Do not parse datasets, invent storage paths, or reconstruct hidden container state in the UI layer.
 - Any dialog or widget with user-visible text should provide `retranslate_ui()` and respond to `QEvent.LanguageChange`.
 - Any dialog that starts a `QTimer` must also own its shutdown in `closeEvent()` so background refresh does not survive window closure.
-- Prefer small focused dialogs plus shared widgets over cross-dialog inheritance when scenario and technical flows overlap.
+- Prefer small focused widgets plus shared renderers over cross-dialog inheritance when ChatBox content and technical views overlap.
 
 ## Boundaries
 
-- `ScenarioWorkflowService` owns scenario preparation and the hidden scenario project container.
-- `MLService` and `InferenceHistoryService` own task status, logs, and result metadata.
+- Agent Harness service owns Thread, Turn, Message, tool-call, tool-result, run recording, and LLM tool execution.
+- Artifact, data, and ML services own domain behavior and resolved output paths.
 - UI opens files or exports only after services resolve the canonical path or dataset id.

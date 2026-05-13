@@ -24,10 +24,10 @@ Current runtime files and subdirectories:
 
 - `config/locale.json`
 - `state/xenix.db`
-- `artifacts/datasets/work-items/`
+- `artifacts/datasets/`
 - `artifacts/models/`
-- `artifacts/training/`
-- `artifacts/inference/`
+- `artifacts/reports/`
+- `artifacts/predictions/`
 - `artifacts/ml-tasks/<ml-task-id>/`
 
 ## Inspect
@@ -36,7 +36,7 @@ Current runtime files and subdirectories:
 2. Read the resolved paths from the main window.
 3. Open the log directory from the UI or inspect files directly on disk.
 4. Inspect `config/locale.json` for the persisted UI language preference when debugging localization behavior.
-5. Inspect `state/xenix.db` for metadata, `artifacts/datasets/work-items/` for app-managed work-item dataset copies, `artifacts/ml-tasks/` for per-ML-task working directories, and `artifacts/models/<work-item-id>/` for canonical trained-model files.
+5. Inspect `state/xenix.db` for metadata, `artifacts/datasets/` for app-managed dataset artifacts, `artifacts/ml-tasks/` for per-ML-task working directories, and `artifacts/models/` for canonical trained-model files.
 
 ## Reset
 
@@ -46,7 +46,7 @@ Current runtime files and subdirectories:
 
 Do not store canonical datasets inside the runtime directory. Dataset registration keeps source files external.
 
-Dataset import and dataset inspection read the user-managed source file directly. Work-item creation then materializes an app-managed dataset copy under `artifacts/datasets/work-items/<work-item-id>/` and persists a dataset row that points to that copied file.
+Dataset import and dataset inspection read the user-managed source file directly. Agent Harness and data services register app-managed dataset artifacts when data tools produce derived files.
 
 Issue `#72` adds ML task working directories with this shape:
 
@@ -56,11 +56,11 @@ Issue `#72` adds ML task working directories with this shape:
 - `artifacts/ml-tasks/<ml-task-id>/input/`
 - `artifacts/ml-tasks/<ml-task-id>/models/`
 
-Canonical trained models are copied out of task-local working directories into:
+Canonical trained models are registered as artifacts under:
 
-- `artifacts/models/<work-item-id>/`
+- `artifacts/models/`
 
 ## Backup Guidance
 
-- Back up `state/xenix.db` together with any app-managed work-item dataset copies, model artifacts, inference outputs, or ML task working directories you need to preserve.
+- Back up `state/xenix.db` together with any app-managed dataset artifacts, model artifacts, prediction outputs, reports, or ML task working directories you need to preserve.
 - User-managed source datasets should be backed up by normal user filesystem practices, not by app reset flows.

@@ -65,7 +65,8 @@ ML tasks surfaced after the original dialog closes, such as inference results sh
 Result ownership rules:
 
 - Source dataset registrations may point to user-managed files.
-- Work-item dataset records used by ML tasks may point to app-managed copies under `artifacts/datasets/work-items/<work-item-id>/`.
+- ML task requests carry explicit dataset, feature column, target column, model selection, and artifact output owner inputs from service contracts.
+- App-managed dataset artifacts used by ML tasks are registered through service-owned artifact metadata.
 - Generated models, exports, and reports live in service-managed directories on the local filesystem.
 - ML task working directories live under `artifacts/ml-tasks/<ml-task-id>/`.
 - An ML task is not `succeeded` until every declared output path exists.

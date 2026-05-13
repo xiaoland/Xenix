@@ -6,16 +6,15 @@ This guidance applies to the native ML workflow under `src/xenix/services/ml/`, 
 
 ## Boundaries
 
-- `MLService` is the workflow-facing boundary used by the UI.
+- `MLService` is the service-facing boundary used by Agent Harness tools and other services.
 - `MLTaskService` owns atomic task queueing, worker dispatch, task completion/failure, and task artifact registration.
 - `MLWorkerRunner` is only a process helper. It must not own ML task lifecycle or workflow branching.
 - `DatasetService` keeps dataset inspection ownership. ML code may consume inspection results, but it must not re-own dataset analysis.
-- `WorkItem` remains the persistence owner for dataset linkage plus feature/target selection.
+- Agent Harness and tool results carry the first-slice working record. ML service inputs should be explicit dataset id, feature columns, target columns, model selections, and artifact output owner.
 
 ## Execution Rules
 
 - Each persisted `MLTask` is one model and one operation.
-- Issue `#72` supports `fit`, `hyperparameter_tuning`, and `evaluate`.
 - `fit` and `hyperparameter_tuning` may request workflow-owned follow-up `evaluate` tasks through `MLService`.
 - Sequential execution is intentional in v1: only one worker process runs at a time.
 - Use `multiprocessing` with `spawn`-compatible top-level entrypoints so the packaged app does not depend on an external Python CLI.
@@ -24,7 +23,7 @@ This guidance applies to the native ML workflow under `src/xenix/services/ml/`, 
 
 - SQLite stores task metadata, task status, request/result payloads, and trained-model registration rows.
 - Worker-owned execution files stay under `artifacts/ml-tasks/<ml-task-id>/`.
-- Canonical trained model files stay under `artifacts/models/<work-item-id>/`.
+- Canonical trained model files stay under service-managed model artifact directories.
 - Dataset source files stay external and user-managed.
 - Dataset inspection metadata remains ephemeral and must not be persisted as ML-owned state.
 

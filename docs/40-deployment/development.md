@@ -22,17 +22,15 @@ Runtime dependencies now include:
 pdm run dev
 ```
 
-Expected result: the app opens the native desktop shell on a scenario-first home surface with guided templates, `History`, and `Settings`.
+Expected result: the app opens the native desktop shell on the ChatBox-first surface.
 
 The delivered workflow includes:
 
-- scenario data import by file picker or drag-and-drop
-- guided checkbox-group selection of one prediction target and one or more input columns
-- application-managed scenario work-item preparation
-- fixed template-driven background training with logs and best-model tracking
-- manual and batch-file prediction against the best trained model
-- prediction history browsing with result-file opening and export
-- scenario-first surfaces exposed as the current operator path
+- conversation plus file drag-and-drop
+- Agent Harness tool calls for data inspection, integration, cleaning, feature selection, training, hyperparameter training, and inference
+- markdown summaries with `artifact://...` links
+- ChatBox previews for generated datasets, reports, metrics, models, images, and prediction files
+- local persistence for conversations, messages, tool calls, tool results, artifacts, ML task metadata, and logs
 
 ## Verify
 

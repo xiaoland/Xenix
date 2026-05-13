@@ -1,15 +1,18 @@
-# Dataset Domain Guidance
+# Service Layer Guidance
 
 ## Scope
 
-This guidance applies to dataset registration, dataset inspection, and work-item dataset materialization plus dataset-selection state under `src/xenix/services/`.
+This guidance applies to AI-first service boundaries under `src/xenix/services/`.
 
 ## Rules
 
+- Agent Harness is a service under `src/xenix/services/agent/`.
+- Agent Harness owns Thread, Turn, Message, tool-call, tool-result, run recording, provider interaction, and tool execution.
+- Storage provides persistence interfaces for service-owned records.
 - Keep source dataset registrations pointed at user-managed source files.
-- Work-item creation may materialize an app-managed dataset copy under runtime artifacts.
-- Persist both source-dataset metadata and app-managed dataset-copy metadata on `Dataset`.
-- Persist selected dataset, feature columns, and target columns on `WorkItem`.
+- Data services may register app-managed dataset artifacts under runtime artifacts.
+- Persist both source-dataset metadata and app-managed dataset-artifact metadata through service-owned records.
+- Feature/target selection in the first AI-first slice is represented by tool results and artifact records.
 - Keep dataset inspection metadata ephemeral and runtime-derived.
 - Validate column selections through service code, not UI-only checks.
 - Do not let UI code parse `.csv` or `.xlsx` files for business decisions.
@@ -17,5 +20,6 @@ This guidance applies to dataset registration, dataset inspection, and work-item
 ## Boundaries
 
 - `DatasetService` owns source dataset registration, source-file inspection, and dataset export helpers.
-- `WorkItemService` owns work-item dataset materialization and persisted work-item dataset-selection state.
-- Issue `#72` should consume the dataset-analysis capability built here rather than reimplementing it.
+- Artifact service owns artifact registration and artifact link resolution.
+- ML service APIs should accept explicit dataset id, feature columns, target columns, model selections, and artifact output owner.
+- `WorkItemService` exits the target AI-first service topology.
