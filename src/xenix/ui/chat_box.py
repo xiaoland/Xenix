@@ -145,8 +145,12 @@ class ChatMessageBubble(QFrame):
 
         card_layout = QVBoxLayout(card)
         card_layout.setObjectName("chatMessageCardLayout")
-        card_layout.setContentsMargins(14, 12, 14, 12)
-        card_layout.setSpacing(7)
+        if self._is_turn_end(blocks):
+            card_layout.setContentsMargins(0, 8, 0, 0)
+            card_layout.setSpacing(0)
+        else:
+            card_layout.setContentsMargins(14, 12, 14, 12)
+            card_layout.setSpacing(7)
 
         if self._shows_author(author, blocks):
             author_label = QLabel(author)
@@ -154,6 +158,8 @@ class ChatMessageBubble(QFrame):
             card_layout.addWidget(author_label)
 
         browser = AutoHeightTextBrowser()
+        self._browser = browser
+        self._blocks = list(blocks)
         browser.setObjectName("chatMessageBody")
         browser.setOpenExternalLinks(False)
         browser.setFrameShape(QFrame.NoFrame)
@@ -200,7 +206,7 @@ class ChatMessageBubble(QFrame):
                 file_path = Path(str(block.get("path", "")))
                 parts.append(f"`{file_path.name}`")
             elif block_type == "turn_end":
-                parts.append(str(block.get("summary") or "Turn ended."))
+                continue
             elif block_type == "tool_call_result":
                 tool_name = str(block.get("tool_name") or "tool")
                 parts.append(f"`{tool_name}` completed.")
@@ -209,6 +215,16 @@ class ChatMessageBubble(QFrame):
     def set_available_width(self, width: int) -> None:
         if self._card.objectName() == "chatMessageUser":
             self._card.setMaximumWidth(max(280, int(width * 0.6)))
+
+    def set_blocks(self, blocks: list[dict[str, Any]]) -> None:
+        self._blocks = list(blocks)
+        self._browser.setMarkdown(self._render_blocks(self._blocks))
+
+    def append_markdown_delta(self, delta: str) -> None:
+        if not self._blocks or self._blocks[-1].get("type") != "markdown":
+            self._blocks.append({"type": "markdown", "text": ""})
+        self._blocks[-1]["text"] = str(self._blocks[-1].get("text", "")) + delta
+        self._browser.setMarkdown(self._render_blocks(self._blocks))
 
 
 class AttachmentChip(QFrame):
@@ -234,6 +250,7 @@ class ThreadDetailView(QWidget):
         self.setAcceptDrops(True)
         self._attached_files: list[str] = []
         self._running = False
+        self._streaming_assistant_bubble: ChatMessageBubble | None = None
 
         self._message_container = QWidget()
         self._message_container.setObjectName("chatMessageContainer")
@@ -348,11 +365,16 @@ class ThreadDetailView(QWidget):
         self._apply_style()
 
     def render_snapshot(self, snapshot: ThreadSnapshot) -> None:
+        self.finish_streaming_assistant_message()
         self.clear_messages()
         for message in snapshot.messages:
             if message.kind is AgentMessageKind.SYSTEM:
                 continue
             if message.kind is AgentMessageKind.TOOL_CALL:
+                if self._is_turn_end_message(message.content_blocks):
+                    self.add_message(self._author_label(message.ui_author), message.content_blocks, auto_scroll=False)
+                continue
+            if message.kind is AgentMessageKind.TOOL_CALL_RESULT and self._is_turn_end_result_message(message.content_blocks):
                 continue
             self.add_message(self._author_label(message.ui_author), message.content_blocks, auto_scroll=False)
         self._scroll_to_latest()
@@ -370,6 +392,22 @@ class ThreadDetailView(QWidget):
         self._message_layout.insertWidget(self._message_layout.count() - 1, bubble)
         if auto_scroll:
             self._scroll_to_latest()
+
+    def append_assistant_delta(self, delta: str) -> None:
+        if not delta:
+            return
+        if self._streaming_assistant_bubble is None:
+            self._streaming_assistant_bubble = ChatMessageBubble(
+                author="Xenix",
+                blocks=[{"type": "markdown", "text": ""}],
+                parent=self,
+            )
+            self._message_layout.insertWidget(self._message_layout.count() - 1, self._streaming_assistant_bubble)
+        self._streaming_assistant_bubble.append_markdown_delta(delta)
+        self._scroll_to_latest()
+
+    def finish_streaming_assistant_message(self) -> None:
+        self._streaming_assistant_bubble = None
 
     def resizeEvent(self, event) -> None:  # type: ignore[override]
         super().resizeEvent(event)
@@ -460,6 +498,18 @@ class ThreadDetailView(QWidget):
         if author is AgentMessageAuthor.SYSTEM:
             return "System"
         return "Xenix"
+
+    def _is_turn_end_message(self, blocks: list[dict[str, Any]]) -> bool:
+        return bool(blocks) and all(block.get("type") == "turn_end" for block in blocks)
+
+    def _is_turn_end_result_message(self, blocks: list[dict[str, Any]]) -> bool:
+        for block in blocks:
+            if block.get("type") == "tool_call_result" and block.get("tool_name") == "turn_end":
+                return True
+            payload = block.get("payload")
+            if block.get("type") == "tool_result_payload" and isinstance(payload, dict) and payload.get("turn_end") is True:
+                return True
+        return False
 
     def _apply_style(self) -> None:
         self.setStyleSheet(

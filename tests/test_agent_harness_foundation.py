@@ -59,7 +59,7 @@ def test_conversation_store_persists_thread_turn_messages_and_turn_end(monkeypat
             thread_id=thread.id,
             turn_id=turn.id,
             tool_name="turn_end",
-            arguments_payload={"reason": "needs_user_input"},
+            arguments_payload={},
         )
     )
     result_message, completed_tool_call = conversations.complete_tool_call(
@@ -84,7 +84,9 @@ def test_conversation_store_persists_thread_turn_messages_and_turn_end(monkeypat
         AgentMessageKind.TOOL_CALL_RESULT,
     ]
     assert snapshot.messages[1].id == assistant_message.id
+    assert snapshot.messages[2].content_blocks == [{"type": "turn_end"}]
     assert snapshot.tool_calls[0].tool_name == "turn_end"
+    assert snapshot.tool_calls[0].arguments_payload == {}
 
 
 def test_artifact_service_registers_and_resolves_artifact_links(monkeypatch, tmp_path: Path) -> None:
@@ -148,4 +150,3 @@ def test_artifact_service_rejects_mismatched_turn_owner(monkeypatch, tmp_path: P
                 absolute_path=str(artifact_path.resolve()),
             )
         )
-

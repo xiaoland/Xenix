@@ -11,7 +11,8 @@
       "justMyCode": true,
       "preLaunchTask": "PDM: install",
       "env": {
-        "PYTHONPATH": "${workspaceFolder}/src"
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "XENIX_ENV": "development"
       }
     },
     {
@@ -25,7 +26,8 @@
       "preLaunchTask": "PDM: install",
       "env": {
         "PYTHONPATH": "${workspaceFolder}/src",
-        "XENIX_APP_HOME": "${workspaceFolder}/.runtime"
+        "XENIX_APP_HOME": "${workspaceFolder}/.runtime",
+        "XENIX_ENV": "development"
       }
     },
     {

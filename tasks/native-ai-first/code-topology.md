@@ -382,7 +382,7 @@ Deterministic E2E tests
 - Whether provider roles should be stored durably or derived by adapter from `harness_kind`.
 - Whether a visible assistant message with text plus a tool call persists as one Message, matching Anthropic, or as sequential Messages for easier UI progress rendering.
 - OpenAI provider dialect is OpenAI-compatible `/v1/chat/completions`.
-- Exact Turn persistence schema and `turn_end` tool result contract.
+- Exact Turn persistence schema and final `turn_end` divider styling.
 
 ## Impact Forecast
 

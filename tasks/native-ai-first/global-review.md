@@ -26,7 +26,7 @@
 - A turn starts with one user Message.
 - A turn ends with an explicit turn-end Message.
 - Xenix provides reserved tool `turn_end` because the target providers lack a native turn-end item.
-- A valid `turn_end` tool result is persisted as a tool-call-result Message and rendered by ChatBox as the divider that allows the next user input.
+- A valid `turn_end` tool call has no input arguments. Its tool-call Message is rendered by ChatBox as the turn divider; the paired tool-call-result Message remains durable execution evidence.
 - Agent Harness owns Thread, Turn, Message, tool-call, tool-result, run recorder, and first-slice working context.
 - Storage provides standardized persistence interfaces for Agent Harness and other services.
 - First-slice working context is derived from persisted messages, tool results, and artifacts.
@@ -195,7 +195,7 @@ These are implementation-impacting decisions that should be settled before low-l
 The following are intentionally deferred until the high-level decisions above are stable:
 
 - Exact Message fields, enum values, and provider refs.
-- Exact `turn_end` tool schema and recorder rows.
+- Exact final styling for the `turn_end` divider.
 - Exact working-context projection and prompt injection format.
 - Exact Pydantic schemas for each tool.
 - Exact future DuckDB SQL validation rules and input alias mechanics.

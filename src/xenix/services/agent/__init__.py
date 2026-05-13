@@ -9,13 +9,24 @@ from .conversation_store import (
     ThreadSnapshot,
     ConversationStore,
 )
-from .harness_service import AgentHarnessService, SubmitUserTurnInput
-from .providers import OpenAICompatibleChatProvider, ProviderResponse, ProviderToolCall, ScriptedAgentProvider
+from .harness_service import AgentHarnessService, AgentHarnessStreamEvent, SubmitUserTurnInput
+from .providers import (
+    OpenAICompatibleChatProvider,
+    ProviderResponse,
+    ProviderStreamEvent,
+    ProviderToolCall,
+    ScriptedAgentProvider,
+)
+from .settings import AgentSettings, AgentSettingsService, AimockSettings
 from .tools import AgentToolRegistry
 
 __all__ = [
     "AgentHarnessService",
+    "AgentHarnessStreamEvent",
+    "AgentSettings",
+    "AgentSettingsService",
     "AgentToolRegistry",
+    "AimockSettings",
     "AppendAgentMessageInput",
     "CompleteToolCallInput",
     "ConversationStore",
@@ -24,6 +35,7 @@ __all__ = [
     "FinishAgentRunInput",
     "OpenAICompatibleChatProvider",
     "ProviderResponse",
+    "ProviderStreamEvent",
     "ProviderToolCall",
     "ScriptedAgentProvider",
     "StartAgentRunInput",

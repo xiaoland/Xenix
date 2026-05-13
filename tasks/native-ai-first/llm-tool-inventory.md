@@ -55,22 +55,20 @@ Purpose: explicitly end the current turn.
 Inputs:
 
 ```text
-summary?
-next_actions?
-user_visible_final_text?
+none
 ```
 
 Output:
 
 ```text
-turn_end_message_id
-summary
+turn_end: true
 ```
 
 Notes:
 
 - Reserved Harness tool.
 - A turn starts with one user message and ends with this tool.
+- The tool-call Message renders as the ChatBox divider.
 - Most providers do not have a native turn-end message, so this remains required.
 
 ## Data Tools

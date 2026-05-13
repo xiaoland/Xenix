@@ -33,6 +33,30 @@
       "problemMatcher": []
     },
     {
+      "label": "AIMock: serve fixtures",
+      "type": "shell",
+      "command": "npx",
+      "args": [
+        "--yes",
+        "@copilotkit/aimock",
+        "--config",
+        "aimock.json",
+        "--port",
+        "4010",
+        "--host",
+        "127.0.0.1"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "PDM: test",
       "type": "shell",
       "command": "pdm",

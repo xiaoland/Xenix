@@ -96,11 +96,11 @@ Most LLM providers do not produce an explicit turn-end message. Xenix adds a res
 Reserved tool:
 
 ```text
-turn_end(summary?, next_actions?, user_visible_final_text?)
+turn_end()
   side_effect_level: read_only
 ```
 
-The Harness owns and persists the turn-end Message after a valid `turn_end` call through a storage interface.
+The Harness persists the `turn_end` tool-call Message as the visible turn divider. The paired tool-call-result Message remains durable execution evidence and stays outside the ChatBox visible projection.
 
 ## HarnessCore
 

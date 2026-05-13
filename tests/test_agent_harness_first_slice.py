@@ -79,7 +79,7 @@ class FirstSliceProvider:
                 ProviderToolCall(
                     provider_call_id="call-end",
                     tool_name="turn_end",
-                    arguments={"summary": "Prediction analysis completed."},
+                    arguments={},
                 )
             ],
         )
@@ -180,4 +180,3 @@ def test_agent_harness_first_slice_runs_from_file_to_prediction(monkeypatch, tmp
     prediction_artifacts = [artifact for artifact in snapshot.artifacts if artifact.kind.value == "prediction"]
     assert len(prediction_artifacts) == 1
     assert Path(prediction_artifacts[0].absolute_path).read_text(encoding="utf-8").splitlines()[0].endswith("prediction")
-

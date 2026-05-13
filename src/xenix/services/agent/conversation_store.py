@@ -185,13 +185,16 @@ class ConversationStore:
 
         content_blocks = input_data.content_blocks
         if content_blocks is None:
-            content_blocks = [
-                {
-                    "type": "tool_call",
-                    "tool_name": tool_name,
-                    "arguments": dict(input_data.arguments_payload),
-                }
-            ]
+            if tool_name == "turn_end":
+                content_blocks = [{"type": "turn_end"}]
+            else:
+                content_blocks = [
+                    {
+                        "type": "tool_call",
+                        "tool_name": tool_name,
+                        "arguments": dict(input_data.arguments_payload),
+                    }
+                ]
 
         now = _utc_now()
         with self._session_factory() as session:

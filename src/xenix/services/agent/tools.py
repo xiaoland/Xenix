@@ -94,9 +94,7 @@ class AgentToolRegistry:
                 description="End the current turn when the assistant has completed all useful work for this user input.",
                 parameters_schema={
                     "type": "object",
-                    "properties": {
-                        "summary": {"type": "string"},
-                    },
+                    "properties": {},
                     "additionalProperties": False,
                 },
             ),
@@ -249,10 +247,9 @@ class AgentToolRegistry:
         )
 
     def _turn_end(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
-        summary = str(arguments.get("summary") or "Turn ended.")
         return ToolExecutionResult(
-            payload={"turn_end": True, "summary": summary},
-            content_blocks=[{"type": "turn_end", "summary": summary}],
+            payload={"turn_end": True},
+            content_blocks=[],
         )
 
     def _data_peek(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
@@ -648,4 +645,3 @@ class AgentToolRegistry:
     def _slug(self, value: str) -> str:
         normalized = "".join(char.lower() if char.isalnum() else "-" for char in value).strip("-")
         return normalized or "dataset"
-

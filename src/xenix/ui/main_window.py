@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 
 from ..config import AppPaths
 from ..i18n import TranslationManager
-from ..services.agent import AgentHarnessService, SubmitUserTurnInput, ThreadSnapshot
+from ..services.agent import AgentHarnessService, AgentSettingsService, SubmitUserTurnInput, ThreadSnapshot
 from ..services.analysis_scenario_service import AnalysisScenarioService
 from ..services.dataset_service import DatasetService
 from ..services.inference_history_service import InferenceHistoryService
@@ -47,6 +47,7 @@ from .settings_dialog import SettingsDialog
 class MainWindow(QMainWindow):
     _harness_snapshot_ready = Signal(object)
     _harness_failed = Signal(str)
+    _harness_stream_event = Signal(object)
 
     def __init__(
         self,
@@ -64,6 +65,7 @@ class MainWindow(QMainWindow):
         scenario_template_service: ScenarioTemplateService,
         scenario_training_preset_service: ScenarioTrainingPresetService,
         scenario_workflow_service: ScenarioWorkflowService,
+        agent_settings_service: AgentSettingsService,
         agent_harness_service: AgentHarnessService | None = None,
     ) -> None:
         super().__init__()
@@ -82,6 +84,7 @@ class MainWindow(QMainWindow):
         self._scenario_training_preset_service = scenario_training_preset_service
         self._scenario_workflow_service = scenario_workflow_service
         self._agent_harness_service = agent_harness_service
+        self._agent_settings_service = agent_settings_service
         self._agent_thread_id: str | None = None
         self._settings_dialog: SettingsDialog | None = None
         self._scenario_data_preparation_dialog: ScenarioDataPreparationDialog | None = None
@@ -117,6 +120,10 @@ class MainWindow(QMainWindow):
         self._history_sidebar = QFrame(parent=self)
         self._history_sidebar.setObjectName("historySidebar")
         self._history_label = QLabel(parent=self._history_sidebar)
+        self._new_thread_button = QPushButton(parent=self._history_sidebar)
+        self._new_thread_button.setObjectName("newThreadButton")
+        self._new_thread_button.setFixedSize(28, 28)
+        self._new_thread_button.clicked.connect(self._create_agent_thread)
         self._history_list = QListWidget(parent=self._history_sidebar)
         self._history_list.itemClicked.connect(self._open_history_thread)
         self._refreshing_history = False
@@ -126,6 +133,7 @@ class MainWindow(QMainWindow):
         self._chat_box.stop_requested.connect(self._request_harness_stop)
         self._harness_snapshot_ready.connect(self._render_harness_snapshot)
         self._harness_failed.connect(self._render_harness_error)
+        self._harness_stream_event.connect(self._render_harness_stream_event)
 
         self.resize(1080, 760)
         self._setup_ui()
@@ -159,7 +167,14 @@ class MainWindow(QMainWindow):
         self._history_sidebar.setFixedWidth(248)
         self._history_label.setObjectName("historySidebarTitle")
         self._history_list.setObjectName("historyList")
-        sidebar_layout.addWidget(self._history_label)
+        history_header_layout = QHBoxLayout()
+        history_header_layout.setObjectName("historyHeaderLayout")
+        history_header_layout.setContentsMargins(0, 0, 0, 0)
+        history_header_layout.setSpacing(8)
+        history_header_layout.addWidget(self._history_label)
+        history_header_layout.addStretch(1)
+        history_header_layout.addWidget(self._new_thread_button)
+        sidebar_layout.addLayout(history_header_layout)
         sidebar_layout.addWidget(self._history_list, 1)
 
         content_layout = QHBoxLayout()
@@ -183,6 +198,8 @@ class MainWindow(QMainWindow):
         self._title_label.setText(self.tr("Xenix"))
         self._settings_button.setText(self.tr("Settings"))
         self._history_label.setText(self.tr("History"))
+        self._new_thread_button.setText("+")
+        self._new_thread_button.setToolTip(self.tr("New thread"))
         if self._settings_dialog is not None:
             self._settings_dialog.retranslate_ui()
 
@@ -198,8 +215,10 @@ class MainWindow(QMainWindow):
                 log_path=self._log_path,
                 db_path=self._db_path,
                 translation_manager=self._translation_manager,
+                agent_settings_service=self._agent_settings_service,
                 parent=self,
             )
+            self._settings_dialog.agent_settings_saved.connect(self._reload_agent_provider)
         self._settings_dialog.show()
         self._settings_dialog.raise_()
         self._settings_dialog.activateWindow()
@@ -362,14 +381,14 @@ class MainWindow(QMainWindow):
 
         def run_harness() -> None:
             try:
-                snapshot = self._agent_harness_service.submit_user_turn(
+                for event in self._agent_harness_service.submit_user_turn_stream(
                     SubmitUserTurnInput(
                         thread_id=self._agent_thread_id,
                         text=text,
                         file_paths=file_paths,
                     )
-                )
-                self._harness_snapshot_ready.emit(snapshot)
+                ):
+                    self._harness_stream_event.emit(event)
             except Exception as exc:
                 self._harness_failed.emit(str(exc))
 
@@ -381,12 +400,40 @@ class MainWindow(QMainWindow):
         self._chat_box.set_running(False)
         self._refresh_history_sidebar(selected_thread_id=snapshot.thread.id)
 
+    def _render_harness_stream_event(self, event) -> None:
+        if event.kind == "turn_started":
+            if event.thread_id is not None:
+                self._agent_thread_id = event.thread_id
+                self._refresh_history_sidebar(selected_thread_id=event.thread_id)
+            return
+        if event.kind == "assistant_delta":
+            self._chat_box.append_assistant_delta(event.delta_text)
+            return
+        if event.kind == "assistant_message_finished":
+            self._chat_box.finish_streaming_assistant_message()
+            return
+        if event.kind == "snapshot" and event.snapshot is not None:
+            self._render_harness_snapshot(event.snapshot)
+
     def _render_harness_error(self, message: str) -> None:
         self._chat_box.show_error(message)
         self._chat_box.set_running(False)
 
     def _request_harness_stop(self) -> None:
         self._chat_box.show_error("Stop requested. Xenix will stop after the active step returns.")
+
+    def _reload_agent_provider(self) -> None:
+        if self._agent_harness_service is None or self._agent_settings_service is None:
+            return
+        self._agent_harness_service.set_provider(self._agent_settings_service.build_provider())
+
+    def _create_agent_thread(self) -> None:
+        if self._agent_harness_service is None:
+            return
+        snapshot = self._agent_harness_service.create_thread()
+        self._agent_thread_id = snapshot.thread.id
+        self._chat_box.render_snapshot(snapshot)
+        self._refresh_history_sidebar(selected_thread_id=snapshot.thread.id)
 
     def _refresh_history_sidebar(self, *, selected_thread_id: str | None = None) -> None:
         self._history_list.clear()
@@ -430,6 +477,17 @@ class MainWindow(QMainWindow):
             #historySidebarTitle {
                 font-weight: 600;
                 color: #303640;
+            }
+            #newThreadButton {
+                background: #f1f3f6;
+                border: 1px solid #d3d8e2;
+                border-radius: 6px;
+                color: #303640;
+                font-size: 18px;
+                font-weight: 600;
+            }
+            #newThreadButton:hover {
+                background: #e8ebf0;
             }
             #historyList {
                 background: transparent;

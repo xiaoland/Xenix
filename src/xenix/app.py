@@ -14,9 +14,9 @@ from .logging import setup_logging
 from .resources import package_resource_path
 from .services.agent import (
     AgentHarnessService,
+    AgentSettingsService,
     AgentToolRegistry,
     ConversationStore,
-    OpenAICompatibleChatProvider,
 )
 from .services.agent.dev_fixtures import ensure_mock_conversation_history
 from .services.analysis_scenario_service import AnalysisScenarioService
@@ -89,6 +89,7 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
     inference_history_service = InferenceHistoryService(context.session_factory)
     artifact_service = ArtifactService(context.session_factory)
     conversation_store = ConversationStore(context.session_factory)
+    agent_settings_service = AgentSettingsService(paths)
     ensure_mock_conversation_history(conversation_store)
     agent_tool_registry = AgentToolRegistry(
         paths=paths,
@@ -99,7 +100,7 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
     )
     agent_harness_service = AgentHarnessService(
         session_factory=context.session_factory,
-        provider=OpenAICompatibleChatProvider(),
+        provider=agent_settings_service.build_provider(),
         tool_registry=agent_tool_registry,
         conversation_store=conversation_store,
     )
@@ -123,6 +124,7 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
         scenario_training_preset_service=scenario_training_preset_service,
         scenario_workflow_service=scenario_workflow_service,
         agent_harness_service=agent_harness_service,
+        agent_settings_service=agent_settings_service,
     )
     if show:
         window.show()

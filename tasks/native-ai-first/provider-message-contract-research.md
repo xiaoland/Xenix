@@ -146,7 +146,7 @@ Message
 - LLM providers translate canonical Messages into provider-specific request shapes.
 - LLM providers translate provider responses back into canonical Messages before UI rendering.
 - Tool calls and tool results are Agent Harness messages, and Xenix service tools live inside Agent Harness.
-- A valid `turn_end` tool result becomes a durable tool-call-result Message whose `turn_end` content block lets ChatBox render the turn divider.
+- A valid `turn_end` tool call carries no arguments. Its durable tool-call Message carries the `turn_end` content block that lets ChatBox render the turn divider.
 
 ## Open Questions
 

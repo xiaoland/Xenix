@@ -2,21 +2,21 @@
 
 ## Status
 
-- Mode: Explore.
-- Scope: possible CopilotKit AIMock integration modes for Xenix.
+- Mode: Execute.
+- Scope: CopilotKit AIMock local setup for Xenix's OpenAI-compatible provider boundary.
 
 ## Boundary
 
 AIMock attaches at the LLM provider boundary.
 
-Xenix provider clients point their base URL at an AIMock server in tests:
+Xenix provider clients point their base URL at an AIMock server during local development:
 
 ```text
 OpenAIChatCompletionsV1Provider
-  base_url = http://127.0.0.1:4010/v1
+  base_url = http://127.0.0.1:4010
 
 DeepSeekChatCompletionsProvider
-  base_url = http://127.0.0.1:4010/v1
+  base_url = http://127.0.0.1:4010
 ```
 
 ## Integration Modes
@@ -70,9 +70,80 @@ This is less relevant for Xenix Python tests unless a future frontend/plugin tes
 
 ## First-Slice Recommendation
 
-Use Docker or `npx llmock` as a real HTTP mock server and configure the Xenix LLM provider base URL to AIMock.
+Use `npx @copilotkit/aimock --config aimock.json` as a real HTTP mock server and configure the Xenix LLM provider base URL to AIMock.
 
-This keeps tests language-agnostic and validates the same provider boundary used in production.
+This keeps local mock traffic on the same provider boundary used in production.
+
+## Current Native Mock Foundation
+
+Product code has a single LLM provider contract: OpenAI-compatible `/v1/chat/completions`.
+
+LLM provider configuration is stored in `config/agent_settings.json` and edited through Settings. `XENIX_LLM_*` environment variables are not provider configuration inputs.
+
+Development-only AIMock settings are visible when:
+
+```powershell
+$env:XENIX_ENV = "development"
+```
+
+Implemented OpenAI-compatible streaming parser:
+
+- request body sets `stream: true`
+- SSE `delta.content` becomes provider-independent assistant deltas
+- SSE `delta.tool_calls` are accumulated into canonical tool calls at stream completion
+
+HTTP AIMock remains attached through the same provider boundary:
+
+```text
+Settings -> AIMock -> Use AIMock
+AIMock base URL = http://127.0.0.1:4010
+AIMock API key = test
+```
+
+## Local Setup
+
+Repository setup:
+
+- `aimock.json`: npx AIMock configuration.
+- `fixtures/aimock/10-xenix-streaming.json`: preset Xenix ChatBox streaming, tool-round, and rich Markdown preview fixtures.
+- `fixtures/data/aimock-sales-demand.csv`: drag-and-drop sample training dataset.
+- `fixtures/data/aimock-sales-future.csv`: drag-and-drop sample future rows.
+- `.vscode/tasks.json`: `AIMock: serve fixtures` task.
+
+Start AIMock from VSCode:
+
+```text
+Terminal -> Run Task... -> AIMock: serve fixtures
+```
+
+Equivalent shell command:
+
+```powershell
+npx --yes @copilotkit/aimock --config aimock.json --port 4010 --host 127.0.0.1
+```
+
+Run Xenix in development mode, open Settings, then configure:
+
+```text
+LLM provider:
+  Model = gpt-4o-mini
+  Streaming = enabled
+
+AIMock:
+  Use AIMock = enabled
+  AIMock base URL = http://127.0.0.1:4010
+  AIMock API key = test
+```
+
+Preset prompts:
+
+- `inspect uploaded dataset`: drag `fixtures/data/aimock-sales-demand.csv` into the composer, then sends a real `data.peek` tool call; the follow-up fixture is keyed by `toolCallId=call_xenix_data_peek`.
+- `show analysis result`: streams a rich Markdown analysis result with tables, artifact links, an image link, and `turn_end`.
+- `stream test`: streams assistant text plus a small Markdown table and calls `turn_end`.
+- `hello xenix`: validates that the OpenAI-compatible provider boundary is routed to AIMock.
+- Any other chat request hits the final catch-all fixture, which returns the available preset prompts and calls `turn_end`.
+
+See `tasks/native-ai-first/streaming-message-mock.md` for the implemented streaming path and verification.
 
 ## Sources
 
