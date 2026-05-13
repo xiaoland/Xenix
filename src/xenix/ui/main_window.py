@@ -4,7 +4,7 @@ import threading
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, Signal
-from PySide6.QtWidgets import QMainWindow, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QPushButton, QVBoxLayout, QWidget
 
 from ..config import AppPaths
 from ..i18n import TranslationManager
@@ -100,6 +100,9 @@ class MainWindow(QMainWindow):
             parent=self,
         )
         self._home_view = ScenarioHomeView(self._analysis_scenario_service.list_scenarios(), parent=self)
+        self._title_label = QLabel(parent=self)
+        self._settings_button = QPushButton(parent=self)
+        self._settings_button.clicked.connect(self._open_settings)
         self._chat_box = ChatBox(parent=self)
         self._chat_box.message_submitted.connect(self._submit_chat_message)
         self._chat_box.stop_requested.connect(self._request_harness_stop)
@@ -114,16 +117,27 @@ class MainWindow(QMainWindow):
         root = QWidget(self)
         layout = QVBoxLayout(root)
         layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        layout.setSpacing(12)
         self._home_view.open_settings_requested.connect(self._open_settings)
         self._home_view.open_history_requested.connect(self._open_history)
         self._home_view.scenario_selected.connect(self._open_scenario)
+        header_layout = QHBoxLayout()
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(12)
+        self._title_label.setStyleSheet("font-size: 18px; font-weight: 600;")
+        self._settings_button.setMinimumWidth(96)
+        header_layout.addWidget(self._title_label)
+        header_layout.addStretch(1)
+        header_layout.addWidget(self._settings_button)
+        layout.addLayout(header_layout)
         layout.addWidget(self._chat_box, 1)
 
         self.setCentralWidget(root)
 
     def retranslate_ui(self) -> None:
         self.setWindowTitle(self.tr("Xenix Native"))
+        self._title_label.setText(self.tr("Xenix"))
+        self._settings_button.setText(self.tr("Settings"))
         if self._settings_dialog is not None:
             self._settings_dialog.retranslate_ui()
 
