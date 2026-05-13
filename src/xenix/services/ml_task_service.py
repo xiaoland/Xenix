@@ -30,6 +30,8 @@ from .ml.operations import run_evaluate_task, run_fit_task, run_hyperparameter_t
 from .storage.layout import (
     canonical_inference_dir,
     canonical_model_dir,
+    dataset_inference_dir,
+    dataset_model_dir,
     ml_task_root,
     task_input_dir,
     task_logs_path,
@@ -80,7 +82,7 @@ ALLOWED_TRANSITIONS: dict[MLTaskStatus, set[MLTaskStatus]] = {
 
 class CreateMLTaskInput(SQLModel):
     project_id: str
-    work_item_id: str
+    work_item_id: str | None = None
     dataset_id: str | None = None
     task_type: MLTaskType
     request_payload: dict[str, Any] = Field(default_factory=dict)
@@ -156,11 +158,12 @@ class MLTaskService:
             if project is None:
                 raise NotFoundError(f"Project '{input_data.project_id}' was not found.")
 
-            work_item = self._work_items.get(session, input_data.work_item_id)
-            if work_item is None:
-                raise NotFoundError(f"Work item '{input_data.work_item_id}' was not found.")
-            if work_item.project_id != project.id:
-                raise ValidationError("ML task work item does not belong to the provided project.")
+            if input_data.work_item_id is not None:
+                work_item = self._work_items.get(session, input_data.work_item_id)
+                if work_item is None:
+                    raise NotFoundError(f"Work item '{input_data.work_item_id}' was not found.")
+                if work_item.project_id != project.id:
+                    raise ValidationError("ML task work item does not belong to the provided project.")
 
             if input_data.dataset_id is not None:
                 dataset = self._datasets.get(session, input_data.dataset_id)
@@ -257,6 +260,10 @@ class MLTaskService:
     def list_ml_tasks(self, work_item_id: str) -> list[MLTaskRow]:
         with self._session_factory() as session:
             return self._ml_tasks.list_by_work_item(session, work_item_id)
+
+    def list_dataset_ml_tasks(self, dataset_id: str) -> list[MLTaskRow]:
+        with self._session_factory() as session:
+            return self._ml_tasks.list_by_dataset(session, dataset_id)
 
     def get_ml_task(self, ml_task_id: str) -> MLTaskRow:
         with self._session_factory() as session:
@@ -379,7 +386,7 @@ class MLTaskService:
             row.created_at,
             row.id,
         )
-        canonical_path = self._copy_canonical_model(row.work_item_id, artifact_file_name, model_path)
+        canonical_path = self._copy_canonical_model(row, artifact_file_name, model_path)
         metadata = TrainedModelMetadata(
             model_key=result.model_key,
             model_display_name=model_display_name,
@@ -407,6 +414,7 @@ class MLTaskService:
             session,
             TrainedModelRow(
                 work_item_id=row.work_item_id,
+                dataset_id=row.dataset_id,
                 ml_task_id=row.id,
                 model_key=result.model_key,
                 problem_kind=result.problem_kind,
@@ -464,7 +472,7 @@ class MLTaskService:
             row.created_at,
             row.id,
         )
-        canonical_path = self._copy_canonical_model(row.work_item_id, artifact_file_name, model_path)
+        canonical_path = self._copy_canonical_model(row, artifact_file_name, model_path)
         metadata = TrainedModelMetadata(
             model_key=result.model_key,
             model_display_name=model_display_name,
@@ -496,6 +504,7 @@ class MLTaskService:
             session,
             TrainedModelRow(
                 work_item_id=row.work_item_id,
+                dataset_id=row.dataset_id,
                 ml_task_id=row.id,
                 model_key=result.model_key,
                 problem_kind=result.problem_kind,
@@ -547,13 +556,15 @@ class MLTaskService:
 
         output_path = Path(result.output_file_path)
         self._require_existing_path(output_path)
-        canonical_path = self._copy_canonical_inference_output(row.work_item_id, row.id, output_path)
-        work_item = self._work_items.get(session, row.work_item_id)
-        if work_item is None:
-            raise NotFoundError(f"Work item '{row.work_item_id}' was not found.")
+        canonical_path = self._copy_canonical_inference_output(row, output_path)
+        work_item = self._work_items.get(session, row.work_item_id) if row.work_item_id is not None else None
+        dataset = self._datasets.get(session, row.dataset_id) if row.dataset_id is not None else None
+        if dataset is None:
+            raise NotFoundError(f"Dataset '{row.dataset_id}' was not found.")
+        result_name_owner = work_item.name if work_item is not None else dataset.name
         dataset_row = DatasetRow(
             project_id=row.project_id,
-            name=f"{work_item.name} predictions",
+            name=f"{result_name_owner} predictions",
             source_path=str(canonical_path),
             source_format=DatasetSourceFormat.CSV,
             copied_from=None,
@@ -619,11 +630,16 @@ class MLTaskService:
 
     def _copy_canonical_model(
         self,
-        work_item_id: str,
+        row: MLTaskRow,
         artifact_file_name: str,
         source_path: Path,
     ) -> Path:
-        destination_dir = canonical_model_dir(self._paths, work_item_id)
+        if row.work_item_id is not None:
+            destination_dir = canonical_model_dir(self._paths, row.work_item_id)
+        elif row.dataset_id is not None:
+            destination_dir = dataset_model_dir(self._paths, row.dataset_id)
+        else:
+            destination_dir = task_models_dir(self._paths, row.id)
         destination_dir.mkdir(parents=True, exist_ok=True)
         destination_path = destination_dir / artifact_file_name
         shutil.copy2(source_path, destination_path)
@@ -631,13 +647,17 @@ class MLTaskService:
 
     def _copy_canonical_inference_output(
         self,
-        work_item_id: str,
-        ml_task_id: str,
+        row: MLTaskRow,
         source_path: Path,
     ) -> Path:
-        destination_dir = canonical_inference_dir(self._paths, work_item_id)
+        if row.work_item_id is not None:
+            destination_dir = canonical_inference_dir(self._paths, row.work_item_id)
+        elif row.dataset_id is not None:
+            destination_dir = dataset_inference_dir(self._paths, row.dataset_id)
+        else:
+            destination_dir = task_output_dir(self._paths, row.id)
         destination_dir.mkdir(parents=True, exist_ok=True)
-        destination_path = destination_dir / f"{ml_task_id}-predictions.csv"
+        destination_path = destination_dir / f"{row.id}-predictions.csv"
         shutil.copy2(source_path, destination_path)
         return destination_path
 
@@ -649,12 +669,13 @@ class MLTaskService:
     ) -> TrainedModelContextPayload:
         if request_context is not None:
             return request_context
-        work_item = self._work_items.get(session, row.work_item_id)
+        work_item = self._work_items.get(session, row.work_item_id) if row.work_item_id is not None else None
         dataset = self._datasets.get(session, row.dataset_id) if row.dataset_id is not None else None
         dataset_name = dataset.name if dataset is not None else ""
         dataset_file_name = Path(dataset.source_path).name if dataset is not None else ""
+        context_name = work_item.name if work_item is not None else dataset_name or row.id
         return TrainedModelContextPayload(
-            work_item_name=work_item.name if work_item is not None else row.work_item_id,
+            work_item_name=context_name,
             dataset_name=dataset_name,
             dataset_file_name=dataset_file_name,
             feature_columns=list(work_item.feature_columns) if work_item is not None else [],

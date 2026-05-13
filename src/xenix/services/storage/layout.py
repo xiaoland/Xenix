@@ -71,6 +71,14 @@ def canonical_model_dir(paths: AppPaths, work_item_id: str) -> Path:
     return artifact_models_root(paths) / work_item_id
 
 
+def dataset_model_dir(paths: AppPaths, dataset_id: str) -> Path:
+    return artifact_models_root(paths) / "datasets" / dataset_id
+
+
+def dataset_inference_dir(paths: AppPaths, dataset_id: str) -> Path:
+    return artifact_inference_root(paths) / "datasets" / dataset_id
+
+
 def ensure_storage_layout(paths: AppPaths) -> None:
     for directory in (
         artifact_datasets_root(paths),

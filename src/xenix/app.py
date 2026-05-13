@@ -12,7 +12,14 @@ from .exceptions import install_exception_hooks
 from .i18n import TranslationManager
 from .logging import setup_logging
 from .resources import package_resource_path
+from .services.agent import (
+    AgentHarnessService,
+    AgentToolRegistry,
+    ConversationStore,
+    OpenAICompatibleChatProvider,
+)
 from .services.analysis_scenario_service import AnalysisScenarioService
+from .services.artifact_service import ArtifactService
 from .services.dataset_service import DatasetService
 from .services.inference_history_service import InferenceHistoryService
 from .services.ml_service import MLService
@@ -79,6 +86,21 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
         template_service=scenario_template_service,
     )
     inference_history_service = InferenceHistoryService(context.session_factory)
+    artifact_service = ArtifactService(context.session_factory)
+    conversation_store = ConversationStore(context.session_factory)
+    agent_tool_registry = AgentToolRegistry(
+        paths=paths,
+        project_service=project_service,
+        dataset_service=dataset_service,
+        ml_service=ml_service,
+        artifact_service=artifact_service,
+    )
+    agent_harness_service = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=OpenAICompatibleChatProvider(),
+        tool_registry=agent_tool_registry,
+        conversation_store=conversation_store,
+    )
 
     app = create_application()
     translation_manager = TranslationManager(app, paths)
@@ -98,6 +120,7 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
         scenario_template_service=scenario_template_service,
         scenario_training_preset_service=scenario_training_preset_service,
         scenario_workflow_service=scenario_workflow_service,
+        agent_harness_service=agent_harness_service,
     )
     if show:
         window.show()

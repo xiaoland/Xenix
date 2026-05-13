@@ -29,6 +29,14 @@ class TrainedModelRepository:
         )
         return list(session.exec(statement))
 
+    def list_by_dataset(self, session: Session, dataset_id: str) -> list[TrainedModelRow]:
+        statement = (
+            select(TrainedModelRow)
+            .where(TrainedModelRow.dataset_id == dataset_id)
+            .order_by(TrainedModelRow.created_at)
+        )
+        return list(session.exec(statement))
+
     def update_metadata(
         self,
         session: Session,

@@ -57,6 +57,53 @@ class MLTaskArtifactKind(StrEnum):
     OTHER = "other"
 
 
+class AgentTurnStatus(StrEnum):
+    OPEN = "open"
+    ENDED = "ended"
+    CANCELLED = "cancelled"
+
+
+class AgentMessageKind(StrEnum):
+    SYSTEM = "system"
+    USER = "user"
+    ASSISTANT = "assistant"
+    TOOL_CALL = "tool_call"
+    TOOL_CALL_RESULT = "tool_call_result"
+
+
+class AgentMessageAuthor(StrEnum):
+    USER = "user"
+    ASSISTANT = "assistant"
+    SYSTEM = "system"
+    TOOL = "tool"
+
+
+class AgentRunStatus(StrEnum):
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class AgentToolCallStatus(StrEnum):
+    REQUESTED = "requested"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class ArtifactKind(StrEnum):
+    DATASET = "dataset"
+    MODEL = "model"
+    METRICS = "metrics"
+    REPORT = "report"
+    IMAGE = "image"
+    PREDICTION = "prediction"
+    FILE = "file"
+    OTHER = "other"
+
+
 class ProjectRow(SQLModel, table=True):
     __tablename__ = "project"
 
@@ -112,7 +159,7 @@ class MLTaskRow(SQLModel, table=True):
 
     id: str = Field(default_factory=generate_id, primary_key=True)
     project_id: str = Field(foreign_key="project.id", index=True)
-    work_item_id: str = Field(foreign_key="work_item.id", index=True)
+    work_item_id: str | None = Field(default=None, foreign_key="work_item.id", index=True)
     dataset_id: str | None = Field(default=None, foreign_key="dataset.id", index=True)
     task_type: MLTaskType = Field(index=True)
     status: MLTaskStatus = Field(index=True)
@@ -142,11 +189,120 @@ class MLTaskArtifactRow(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utc_now)
 
 
+class AgentThreadRow(SQLModel, table=True):
+    __tablename__ = "agent_thread"
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    title: str | None = Field(default=None, index=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class AgentTurnRow(SQLModel, table=True):
+    __tablename__ = "agent_turn"
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    thread_id: str = Field(foreign_key="agent_thread.id", index=True)
+    sequence_index: int = Field(index=True)
+    status: AgentTurnStatus = Field(default=AgentTurnStatus.OPEN, index=True)
+    user_message_id: str | None = Field(default=None, foreign_key="agent_message.id", index=True)
+    end_message_id: str | None = Field(default=None, foreign_key="agent_message.id", index=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    ended_at: datetime | None = None
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class AgentMessageRow(SQLModel, table=True):
+    __tablename__ = "agent_message"
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    thread_id: str = Field(foreign_key="agent_thread.id", index=True)
+    turn_id: str | None = Field(default=None, foreign_key="agent_turn.id", index=True)
+    sequence_index: int = Field(index=True)
+    kind: AgentMessageKind = Field(index=True)
+    ui_author: AgentMessageAuthor = Field(index=True)
+    content_blocks: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    provider_payload: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class AgentRunRow(SQLModel, table=True):
+    __tablename__ = "agent_run"
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    thread_id: str = Field(foreign_key="agent_thread.id", index=True)
+    turn_id: str = Field(foreign_key="agent_turn.id", index=True)
+    status: AgentRunStatus = Field(default=AgentRunStatus.RUNNING, index=True)
+    provider_name: str | None = Field(default=None, index=True)
+    started_at: datetime = Field(default_factory=utc_now)
+    finished_at: datetime | None = None
+    error_summary: str | None = None
+    usage_payload: dict[str, Any] | None = Field(
+        default=None,
+        sa_column=Column(JSON, nullable=True),
+    )
+
+
+class AgentToolCallRow(SQLModel, table=True):
+    __tablename__ = "agent_tool_call"
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    thread_id: str = Field(foreign_key="agent_thread.id", index=True)
+    turn_id: str = Field(foreign_key="agent_turn.id", index=True)
+    request_message_id: str = Field(foreign_key="agent_message.id", index=True)
+    result_message_id: str | None = Field(default=None, foreign_key="agent_message.id", index=True)
+    tool_name: str = Field(index=True)
+    status: AgentToolCallStatus = Field(default=AgentToolCallStatus.REQUESTED, index=True)
+    arguments_payload: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    result_payload: dict[str, Any] | None = Field(
+        default=None,
+        sa_column=Column(JSON, nullable=True),
+    )
+    error_summary: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class ArtifactRow(SQLModel, table=True):
+    __tablename__ = "artifact"
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    thread_id: str | None = Field(default=None, foreign_key="agent_thread.id", index=True)
+    turn_id: str | None = Field(default=None, foreign_key="agent_turn.id", index=True)
+    message_id: str | None = Field(default=None, foreign_key="agent_message.id", index=True)
+    tool_call_id: str | None = Field(default=None, foreign_key="agent_tool_call.id", index=True)
+    kind: ArtifactKind = Field(default=ArtifactKind.OTHER, index=True)
+    title: str = Field(index=True)
+    absolute_path: str
+    mime_type: str | None = Field(default=None, index=True)
+    summary: str | None = None
+    preview_payload: dict[str, Any] | None = Field(
+        default=None,
+        sa_column=Column(JSON, nullable=True),
+    )
+    metadata_payload: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    ready_to_open: bool = True
+    created_at: datetime = Field(default_factory=utc_now)
+
+
 class TrainedModelRow(SQLModel, table=True):
     __tablename__ = "trained_model"
 
     id: str = Field(default_factory=generate_id, primary_key=True)
-    work_item_id: str = Field(foreign_key="work_item.id", index=True)
+    work_item_id: str | None = Field(default=None, foreign_key="work_item.id", index=True)
+    dataset_id: str | None = Field(default=None, foreign_key="dataset.id", index=True)
     ml_task_id: str = Field(foreign_key="ml_task.id", index=True, unique=True)
     model_key: str = Field(index=True)
     problem_kind: ProblemKind = Field(index=True)

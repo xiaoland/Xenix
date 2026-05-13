@@ -93,6 +93,24 @@ def _wait_for_terminal_tasks(
     raise AssertionError("Timed out waiting for ML tasks to complete.")
 
 
+def _wait_for_terminal_dataset_tasks(
+    ml_service: MLService,
+    dataset_id: str,
+    expected_count: int,
+    timeout_seconds: float = 60.0,
+) -> list:
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        tasks = ml_service.list_dataset_tasks(dataset_id)
+        if len(tasks) >= expected_count and all(
+            task.status in {MLTaskStatus.SUCCEEDED, MLTaskStatus.FAILED, MLTaskStatus.CANCELLED}
+            for task in tasks
+        ):
+            return tasks
+        time.sleep(0.1)
+    raise AssertionError("Timed out waiting for dataset-scoped ML tasks to complete.")
+
+
 def _wait_for_best_trained_model_id(
     work_item_service: WorkItemService,
     work_item_id: str,
@@ -105,6 +123,27 @@ def _wait_for_best_trained_model_id(
             return work_item.best_trained_model_id
         time.sleep(0.1)
     raise AssertionError("Timed out waiting for the work item to receive a best trained model.")
+
+
+def _wait_for_dataset_trained_models(
+    ml_service: MLService,
+    dataset_id: str,
+    expected_count: int,
+    *,
+    require_evaluation: bool = False,
+    timeout_seconds: float = 30.0,
+) -> list:
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        trained_models = ml_service.list_dataset_trained_models(dataset_id)
+        if len(trained_models) >= expected_count:
+            if not require_evaluation:
+                return trained_models
+            metadata = parse_trained_model_metadata(trained_models[0].metadata_payload)
+            if metadata is not None and metadata.evaluation_primary_metric_name is not None:
+                return trained_models
+        time.sleep(0.1)
+    raise AssertionError("Timed out waiting for dataset-scoped trained models.")
 
 
 def test_fit_with_evaluate_runs_in_background_and_persists_best_model(monkeypatch, tmp_path: Path) -> None:
@@ -179,6 +218,77 @@ def test_fit_with_evaluate_runs_in_background_and_persists_best_model(monkeypatc
     assert metadata.evaluation_primary_metric_name == "r2"
     assert "r2" in metadata.evaluation_metrics
     assert metadata.artifact_file_name.endswith(".joblib")
+
+
+def test_dataset_scoped_fit_evaluate_and_inference_run_without_work_item(monkeypatch, tmp_path: Path) -> None:
+    project_service, _work_item_service, dataset_service, _ml_task_service, ml_service = _build_services(
+        monkeypatch, tmp_path
+    )
+    project = project_service.create_project(CreateProjectInput(name="Retail"))
+    dataset_file = tmp_path / "direct-demand.csv"
+    dataset_file.write_text(
+        "feature_a,feature_b,target\n"
+        "1,2,5\n"
+        "2,1,5\n"
+        "3,5,11\n"
+        "4,2,10\n"
+        "5,3,13\n"
+        "6,6,18\n"
+        "7,5,19\n"
+        "8,4,20\n"
+        "9,7,25\n"
+        "10,8,28\n",
+        encoding="utf-8",
+    )
+    dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Direct Demand")
+
+    fit_task = ml_service.fit_with_evaluate(
+        FitWithEvaluateInput(
+            dataset_id=dataset.id,
+            feature_columns=["feature_a", "feature_b"],
+            target_columns=["target"],
+            run_name="Direct demand analysis",
+            model_key="regression.linear",
+            params={"fit_intercept": True},
+        )
+    )
+    tasks = _wait_for_terminal_dataset_tasks(ml_service, dataset.id, expected_count=2)
+    trained_models = _wait_for_dataset_trained_models(
+        ml_service,
+        dataset.id,
+        expected_count=1,
+        require_evaluation=True,
+    )
+    fit_details = ml_service.get_task_details(fit_task.id)
+
+    inference_input = tmp_path / "direct-infer.csv"
+    inference_input.write_text("feature_a,feature_b\n11,9\n12,10\n", encoding="utf-8")
+    inference_task = ml_service.infer(
+        InferWithFilesInput(
+            dataset_id=dataset.id,
+            feature_columns=["feature_a", "feature_b"],
+            trained_model_id=trained_models[0].id,
+            input_files=[str(inference_input.resolve())],
+        )
+    )
+    tasks_after_inference = _wait_for_terminal_dataset_tasks(ml_service, dataset.id, expected_count=3)
+    inference_details = ml_service.get_task_details(inference_task.id)
+    result_dataset = dataset_service.get_dataset_by_ml_task(inference_task.id)
+    metadata = parse_trained_model_metadata(trained_models[0].metadata_payload)
+
+    assert {task.task_type for task in tasks} == {MLTaskType.FIT, MLTaskType.EVALUATE}
+    assert all(task.work_item_id is None for task in tasks_after_inference)
+    assert all(task.status is MLTaskStatus.SUCCEEDED for task in tasks_after_inference)
+    assert len(trained_models) == 1
+    assert fit_details.task.result_payload is not None
+    assert fit_details.task.result_payload["trained_model_id"] == trained_models[0].id
+    assert metadata is not None
+    assert metadata.source_work_item_name == "Direct demand analysis"
+    assert metadata.evaluation_primary_metric_name == "r2"
+    assert inference_details.task.task_type is MLTaskType.INFERENCE
+    assert result_dataset is not None
+    assert "prediction" in Path(result_dataset.source_path).read_text(encoding="utf-8").splitlines()[0]
+    assert [artifact.artifact_kind for artifact in inference_details.artifacts] == [MLTaskArtifactKind.INFERENCE_RESULT]
 
 
 def test_clustering_fit_runs_without_follow_up_evaluate_and_persists_export_artifact(

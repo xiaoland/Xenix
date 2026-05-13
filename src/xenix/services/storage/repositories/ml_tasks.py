@@ -26,6 +26,14 @@ class MLTaskRepository:
         )
         return list(session.exec(statement))
 
+    def list_by_dataset(self, session: Session, dataset_id: str) -> list[MLTaskRow]:
+        statement = (
+            select(MLTaskRow)
+            .where(MLTaskRow.dataset_id == dataset_id)
+            .order_by(MLTaskRow.created_at)
+        )
+        return list(session.exec(statement))
+
     def update_status(
         self,
         session: Session,

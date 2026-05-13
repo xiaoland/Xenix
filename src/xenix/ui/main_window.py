@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
-from PySide6.QtCore import QEvent
+from PySide6.QtCore import QEvent, Signal
 from PySide6.QtWidgets import QMainWindow, QVBoxLayout, QWidget
 
 from ..config import AppPaths
 from ..i18n import TranslationManager
+from ..services.agent import AgentHarnessService, SubmitUserTurnInput, ThreadSnapshot
 from ..services.analysis_scenario_service import AnalysisScenarioService
 from ..services.dataset_service import DatasetService
 from ..services.inference_history_service import InferenceHistoryService
@@ -17,6 +19,7 @@ from ..services.scenario_template_service import ScenarioTemplateService
 from ..services.scenario_training_preset_service import ScenarioTrainingPresetService
 from ..services.scenario_workflow_service import ScenarioWorkflowService
 from ..services.work_item_service import WorkItemService
+from .chat_box import ChatBox
 from .dataset_workspace import DatasetWorkspace
 from .inference_history_dialog import InferenceHistoryDialog
 from .inference_workspace import InferenceWorkspace
@@ -31,6 +34,9 @@ from .settings_dialog import SettingsDialog
 
 
 class MainWindow(QMainWindow):
+    _harness_snapshot_ready = Signal(object)
+    _harness_failed = Signal(str)
+
     def __init__(
         self,
         paths: AppPaths,
@@ -47,6 +53,7 @@ class MainWindow(QMainWindow):
         scenario_template_service: ScenarioTemplateService,
         scenario_training_preset_service: ScenarioTrainingPresetService,
         scenario_workflow_service: ScenarioWorkflowService,
+        agent_harness_service: AgentHarnessService | None = None,
     ) -> None:
         super().__init__()
         self._paths = paths
@@ -63,6 +70,8 @@ class MainWindow(QMainWindow):
         self._scenario_template_service = scenario_template_service
         self._scenario_training_preset_service = scenario_training_preset_service
         self._scenario_workflow_service = scenario_workflow_service
+        self._agent_harness_service = agent_harness_service
+        self._agent_thread_id: str | None = None
         self._settings_dialog: SettingsDialog | None = None
         self._scenario_data_preparation_dialog: ScenarioDataPreparationDialog | None = None
         self._scenario_model_source_dialog: ScenarioModelSourceDialog | None = None
@@ -91,6 +100,11 @@ class MainWindow(QMainWindow):
             parent=self,
         )
         self._home_view = ScenarioHomeView(self._analysis_scenario_service.list_scenarios(), parent=self)
+        self._chat_box = ChatBox(parent=self)
+        self._chat_box.message_submitted.connect(self._submit_chat_message)
+        self._chat_box.stop_requested.connect(self._request_harness_stop)
+        self._harness_snapshot_ready.connect(self._render_harness_snapshot)
+        self._harness_failed.connect(self._render_harness_error)
 
         self.resize(1080, 760)
         self._setup_ui()
@@ -104,7 +118,7 @@ class MainWindow(QMainWindow):
         self._home_view.open_settings_requested.connect(self._open_settings)
         self._home_view.open_history_requested.connect(self._open_history)
         self._home_view.scenario_selected.connect(self._open_scenario)
-        layout.addWidget(self._home_view, 1)
+        layout.addWidget(self._chat_box, 1)
 
         self.setCentralWidget(root)
 
@@ -274,3 +288,42 @@ class MainWindow(QMainWindow):
         self._scenario_inference_dialog.show()
         self._scenario_inference_dialog.raise_()
         self._scenario_inference_dialog.activateWindow()
+
+    def _submit_chat_message(self, text: str, file_paths: list[str]) -> None:
+        if self._agent_harness_service is None:
+            self._chat_box.show_error("Agent Harness service is unavailable.")
+            return
+        user_blocks = []
+        if text:
+            user_blocks.append({"type": "text", "text": text})
+        for file_path in file_paths:
+            user_blocks.append({"type": "file", "path": file_path})
+        self._chat_box.add_message("You", user_blocks)
+        self._chat_box.set_running(True)
+
+        def run_harness() -> None:
+            try:
+                snapshot = self._agent_harness_service.submit_user_turn(
+                    SubmitUserTurnInput(
+                        thread_id=self._agent_thread_id,
+                        text=text,
+                        file_paths=file_paths,
+                    )
+                )
+                self._harness_snapshot_ready.emit(snapshot)
+            except Exception as exc:
+                self._harness_failed.emit(str(exc))
+
+        threading.Thread(target=run_harness, name="xenix-agent-harness", daemon=True).start()
+
+    def _render_harness_snapshot(self, snapshot: ThreadSnapshot) -> None:
+        self._agent_thread_id = snapshot.thread.id
+        self._chat_box.render_snapshot(snapshot)
+        self._chat_box.set_running(False)
+
+    def _render_harness_error(self, message: str) -> None:
+        self._chat_box.show_error(message)
+        self._chat_box.set_running(False)
+
+    def _request_harness_stop(self) -> None:
+        self._chat_box.show_error("Stop requested. Xenix will stop after the active step returns.")

@@ -7,7 +7,7 @@ from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.database import create_engine_for_path
 from xenix.services.storage.layout import database_path
-from xenix.services.storage.migrations import get_user_version, run_migrations
+from xenix.services.storage.migrations import CURRENT_SCHEMA_VERSION, get_user_version, run_migrations
 from xenix.services.storage.models import (
     DatasetRow,
     DatasetSourceFormat,
@@ -365,7 +365,7 @@ def test_trained_model_repository_round_trip(monkeypatch, tmp_path: Path) -> Non
     assert refreshed.metadata_payload["saved_name"] == "Churn · Ridge Regression · 2026-04-24 09:35"
 
 
-def test_run_migrations_upgrades_v4_trained_model_table_to_v5(monkeypatch, tmp_path: Path) -> None:
+def test_run_migrations_upgrades_v4_trained_model_table_to_current(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     engine = create_engine_for_path(database_path(paths))
@@ -394,6 +394,6 @@ def test_run_migrations_upgrades_v4_trained_model_table_to_v5(monkeypatch, tmp_p
             for row in connection.exec_driver_sql("PRAGMA table_info(trained_model)").all()
         }
 
-    assert version == 5
-    assert get_user_version(engine) == 5
+    assert version == get_user_version(engine)
+    assert get_user_version(engine) == CURRENT_SCHEMA_VERSION
     assert "metadata_payload" in columns

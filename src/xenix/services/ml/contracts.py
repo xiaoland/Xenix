@@ -43,7 +43,7 @@ class EvaluationPolicySnapshot(BaseModel):
 class TaskRequestBase(BaseModel):
     task_id: str
     project_id: str
-    work_item_id: str
+    work_item_id: str | None = None
     dataset_id: str
     dataset_source_path: str
     problem_kind: ProblemKind
@@ -100,7 +100,7 @@ class InferenceModelPayload(BaseModel):
 class InferenceTaskRequest(BaseModel):
     task_id: str
     project_id: str
-    work_item_id: str
+    work_item_id: str | None = None
     dataset_id: str
     dataset_source_path: str
     feature_columns: list[str]
