@@ -3,7 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QTimer, Qt, Signal
+from PySide6.QtGui import QTextOption
 from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -12,13 +13,125 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QTextBrowser,
     QVBoxLayout,
     QWidget,
 )
+from shiboken6 import isValid
 
 from ..services.agent import ThreadSnapshot
 from ..services.storage.models import AgentMessageAuthor, AgentMessageKind
+
+
+class AutoHeightTextBrowser(QTextBrowser):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.document().contentsChanged.connect(self._sync_height)
+
+    def resizeEvent(self, event) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        self.document().setTextWidth(self.viewport().width())
+        self._sync_height()
+
+    def _sync_height(self) -> None:
+        self.document().setTextWidth(self.viewport().width())
+        document_height = self.document().size().height()
+        margins = self.contentsMargins()
+        height = int(document_height + margins.top() + margins.bottom() + self.frameWidth() * 2 + 2)
+        self.setFixedHeight(max(1, height))
+        _propagate_geometry_change(self)
+
+
+class AutoGrowingTextEdit(QPlainTextEdit):
+    multiline_changed = Signal(bool)
+
+    def __init__(self, *, max_lines: int = 6, min_height: int = 34, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._max_lines = max(1, max_lines)
+        self._min_height = min_height
+        self._multiline = False
+        self._viewport_insets = (0, 0)
+        self.setLineWrapMode(QPlainTextEdit.WidgetWidth)
+        self.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setViewportMargins(0, 0, 0, 0)
+        self.document().setDocumentMargin(0)
+        self.textChanged.connect(self._sync_height)
+        self._sync_height()
+
+    def resizeEvent(self, event) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        self._sync_height()
+
+    def _sync_height(self) -> None:
+        font_metrics = self.fontMetrics()
+        line_height = max(1, font_metrics.lineSpacing())
+        document = self.document()
+        document.setTextWidth(max(1, self.viewport().width()))
+        document.adjustSize()
+        visual_line_count = self._visual_line_count()
+        document_height = max(document.size().height(), visual_line_count * line_height)
+        frame = self.frameWidth() * 2
+        vertical_padding = frame + 12
+        min_height = max(self._min_height, line_height + vertical_padding)
+        max_height = line_height * self._max_lines + vertical_padding
+        desired_height = int(max(min_height, min(max_height, document_height + vertical_padding)))
+        self.setFixedHeight(desired_height)
+        should_scroll = document_height + vertical_padding > max_height
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded if should_scroll else Qt.ScrollBarAlwaysOff)
+        self._sync_viewport_insets(
+            visual_line_count=visual_line_count,
+            line_height=line_height,
+            editor_height=desired_height,
+            should_scroll=should_scroll,
+        )
+        _propagate_geometry_change(self)
+
+        is_multiline = visual_line_count > 1
+        if is_multiline != self._multiline:
+            self._multiline = is_multiline
+            self.multiline_changed.emit(is_multiline)
+
+    def _visual_line_count(self) -> int:
+        document = self.document()
+        count = 0
+        block = document.firstBlock()
+        while block.isValid():
+            layout = block.layout()
+            count += max(1, layout.lineCount() if layout is not None else 1)
+            block = block.next()
+        return max(1, count)
+
+    def _sync_viewport_insets(
+        self,
+        *,
+        visual_line_count: int,
+        line_height: int,
+        editor_height: int,
+        should_scroll: bool,
+    ) -> None:
+        if visual_line_count <= 1 and not should_scroll:
+            top = max(0, (editor_height - line_height) // 2)
+            bottom = 0
+        else:
+            top = 6
+            bottom = 6 if not should_scroll else 0
+        insets = (top, bottom)
+        if insets != self._viewport_insets:
+            self._viewport_insets = insets
+            self.setViewportMargins(0, top, 0, bottom)
+
+
+def _propagate_geometry_change(widget: QWidget) -> None:
+    current: QWidget | None = widget
+    while current is not None:
+        current.updateGeometry()
+        current = current.parentWidget()
 
 
 class ChatMessageBubble(QFrame):
@@ -27,27 +140,28 @@ class ChatMessageBubble(QFrame):
         self.setObjectName("chatMessageRow")
 
         card = QFrame(self)
+        self._card = card
         card.setObjectName(self._card_object_name(author, blocks))
 
         card_layout = QVBoxLayout(card)
+        card_layout.setObjectName("chatMessageCardLayout")
         card_layout.setContentsMargins(14, 12, 14, 12)
         card_layout.setSpacing(7)
 
-        if not self._is_turn_end(blocks):
+        if self._shows_author(author, blocks):
             author_label = QLabel(author)
             author_label.setObjectName("chatMessageAuthor")
             card_layout.addWidget(author_label)
 
-        browser = QTextBrowser()
+        browser = AutoHeightTextBrowser()
         browser.setObjectName("chatMessageBody")
         browser.setOpenExternalLinks(False)
         browser.setFrameShape(QFrame.NoFrame)
-        browser.setMinimumHeight(28)
-        browser.setMaximumHeight(360)
         browser.setMarkdown(self._render_blocks(blocks))
         card_layout.addWidget(browser)
 
         row_layout = QHBoxLayout(self)
+        row_layout.setObjectName("chatMessageRowLayout")
         row_layout.setContentsMargins(0, 0, 0, 0)
         row_layout.setSpacing(0)
         if author == "You":
@@ -71,6 +185,11 @@ class ChatMessageBubble(QFrame):
     def _is_turn_end(self, blocks: list[dict[str, Any]]) -> bool:
         return bool(blocks) and all(block.get("type") == "turn_end" for block in blocks)
 
+    def _shows_author(self, author: str, blocks: list[dict[str, Any]]) -> bool:
+        if self._is_turn_end(blocks):
+            return False
+        return author not in {"You", "Xenix"}
+
     def _render_blocks(self, blocks: list[dict[str, Any]]) -> str:
         parts: list[str] = []
         for block in blocks:
@@ -87,6 +206,10 @@ class ChatMessageBubble(QFrame):
                 parts.append(f"`{tool_name}` completed.")
         return "\n\n".join(part for part in parts if part)
 
+    def set_available_width(self, width: int) -> None:
+        if self._card.objectName() == "chatMessageUser":
+            self._card.setMaximumWidth(max(280, int(width * 0.6)))
+
 
 class AttachmentChip(QFrame):
     def __init__(self, path: str, parent: QWidget | None = None) -> None:
@@ -101,32 +224,33 @@ class AttachmentChip(QFrame):
         layout.addWidget(name_label)
 
 
-class ChatBox(QWidget):
+class ThreadDetailView(QWidget):
     message_submitted = Signal(str, list)
     stop_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self.setObjectName("threadDetailView")
         self.setAcceptDrops(True)
         self._attached_files: list[str] = []
         self._running = False
 
         self._message_container = QWidget()
+        self._message_container.setObjectName("chatMessageContainer")
         self._message_outer_layout = QHBoxLayout(self._message_container)
-        self._message_outer_layout.setContentsMargins(0, 0, 0, 0)
+        self._message_outer_layout.setObjectName("chatMessageOuterLayout")
+        self._message_outer_layout.setContentsMargins(20, 0, 20, 0)
         self._message_outer_layout.setSpacing(0)
 
         self._message_column = QWidget()
         self._message_column.setObjectName("chatMessageColumn")
-        self._message_column.setMaximumWidth(920)
         self._message_layout = QVBoxLayout(self._message_column)
+        self._message_layout.setObjectName("chatMessageLayout")
         self._message_layout.setContentsMargins(0, 20, 0, 20)
         self._message_layout.setSpacing(12)
         self._message_layout.addStretch(1)
 
-        self._message_outer_layout.addStretch(1)
-        self._message_outer_layout.addWidget(self._message_column, 4)
-        self._message_outer_layout.addStretch(1)
+        self._message_outer_layout.addWidget(self._message_column, 1)
 
         self._scroll = QScrollArea()
         self._scroll.setObjectName("chatScrollArea")
@@ -137,11 +261,14 @@ class ChatBox(QWidget):
         self._composer = QFrame()
         self._composer.setObjectName("chatComposer")
         composer_layout = QVBoxLayout(self._composer)
+        composer_layout.setObjectName("chatComposerLayout")
         composer_layout.setContentsMargins(10, 8, 10, 8)
         composer_layout.setSpacing(7)
 
         self._attachment_bar = QWidget()
+        self._attachment_bar.setObjectName("chatAttachmentBar")
         self._attachment_layout = QHBoxLayout(self._attachment_bar)
+        self._attachment_layout.setObjectName("chatAttachmentLayout")
         self._attachment_layout.setContentsMargins(0, 0, 0, 0)
         self._attachment_layout.setSpacing(6)
         self._attachment_layout.addStretch(1)
@@ -152,42 +279,72 @@ class ChatBox(QWidget):
         self._attach_button.setToolTip("Attach files")
         self._attach_button.clicked.connect(self._choose_files)
 
-        self._editor = QPlainTextEdit()
+        self._expanded_attach_button = QPushButton("+")
+        self._expanded_attach_button.setObjectName("attachButton")
+        self._expanded_attach_button.setFixedSize(34, 34)
+        self._expanded_attach_button.setToolTip("Attach files")
+        self._expanded_attach_button.clicked.connect(self._choose_files)
+
+        self._editor = AutoGrowingTextEdit(max_lines=6)
         self._editor.setObjectName("chatComposerEditor")
         self._editor.setPlaceholderText("Message Xenix")
-        self._editor.setMinimumHeight(46)
-        self._editor.setMaximumHeight(120)
+        self._editor.multiline_changed.connect(self._set_composer_multiline)
 
         self._send_button = QPushButton("Send")
         self._send_button.setObjectName("sendButton")
         self._send_button.setMinimumWidth(76)
+        self._send_button.setFixedHeight(34)
         self._send_button.clicked.connect(self._handle_button_clicked)
 
-        input_row = QHBoxLayout()
-        input_row.setContentsMargins(0, 0, 0, 0)
-        input_row.setSpacing(8)
-        input_row.addWidget(self._attach_button)
-        input_row.addWidget(self._editor, 1)
-        input_row.addWidget(self._send_button)
+        self._expanded_send_button = QPushButton("Send")
+        self._expanded_send_button.setObjectName("sendButton")
+        self._expanded_send_button.setMinimumWidth(76)
+        self._expanded_send_button.setFixedHeight(34)
+        self._expanded_send_button.clicked.connect(self._handle_button_clicked)
+
+        self._compact_input_row = QHBoxLayout()
+        self._compact_input_row.setObjectName("chatComposerCompactRow")
+        self._compact_input_row.setContentsMargins(0, 0, 0, 0)
+        self._compact_input_row.setSpacing(8)
+        self._compact_input_row.addWidget(self._attach_button)
+        self._compact_input_row.addWidget(self._editor, 1, Qt.AlignVCenter)
+        self._compact_input_row.addWidget(self._send_button)
+
+        self._expanded_editor_row = QVBoxLayout()
+        self._expanded_editor_row.setObjectName("chatComposerExpandedEditorRow")
+        self._expanded_editor_row.setContentsMargins(0, 0, 0, 0)
+        self._expanded_editor_row.setSpacing(0)
+
+        self._expanded_controls_row = QHBoxLayout()
+        self._expanded_controls_row.setObjectName("chatComposerExpandedControlsRow")
+        self._expanded_controls_row.setContentsMargins(0, 0, 0, 0)
+        self._expanded_controls_row.setSpacing(8)
+        self._expanded_controls_row.addWidget(self._expanded_attach_button)
+        self._expanded_controls_row.addStretch(1)
+        self._expanded_controls_row.addWidget(self._expanded_send_button)
 
         composer_layout.addWidget(self._attachment_bar)
-        composer_layout.addLayout(input_row)
+        composer_layout.addLayout(self._compact_input_row)
+        composer_layout.addLayout(self._expanded_editor_row)
+        composer_layout.addLayout(self._expanded_controls_row)
 
         self._composer_shell = QWidget()
+        self._composer_shell.setObjectName("chatComposerShell")
         composer_shell_layout = QHBoxLayout(self._composer_shell)
+        composer_shell_layout.setObjectName("chatComposerShellLayout")
         composer_shell_layout.setContentsMargins(0, 0, 0, 0)
         composer_shell_layout.setSpacing(0)
-        composer_shell_layout.addStretch(1)
-        composer_shell_layout.addWidget(self._composer, 4)
-        composer_shell_layout.addStretch(1)
+        composer_shell_layout.addWidget(self._composer, 1)
 
         root = QVBoxLayout(self)
+        root.setObjectName("threadDetailLayout")
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(10)
         root.addWidget(self._scroll, 1)
         root.addWidget(self._composer_shell, 0)
 
         self._refresh_attachment_chips()
+        self._set_composer_multiline(False)
         self._apply_style()
 
     def render_snapshot(self, snapshot: ThreadSnapshot) -> None:
@@ -197,7 +354,8 @@ class ChatBox(QWidget):
                 continue
             if message.kind is AgentMessageKind.TOOL_CALL:
                 continue
-            self.add_message(self._author_label(message.ui_author), message.content_blocks)
+            self.add_message(self._author_label(message.ui_author), message.content_blocks, auto_scroll=False)
+        self._scroll_to_latest()
 
     def clear_messages(self) -> None:
         while self._message_layout.count() > 1:
@@ -206,16 +364,25 @@ class ChatBox(QWidget):
             if widget is not None:
                 widget.deleteLater()
 
-    def add_message(self, author: str, blocks: list[dict[str, Any]]) -> None:
+    def add_message(self, author: str, blocks: list[dict[str, Any]], *, auto_scroll: bool = True) -> None:
         bubble = ChatMessageBubble(author=author, blocks=blocks, parent=self)
+        bubble.set_available_width(self._message_column.width())
         self._message_layout.insertWidget(self._message_layout.count() - 1, bubble)
-        self._scroll.verticalScrollBar().setValue(self._scroll.verticalScrollBar().maximum())
+        if auto_scroll:
+            self._scroll_to_latest()
+
+    def resizeEvent(self, event) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        self._resize_user_messages()
 
     def set_running(self, running: bool) -> None:
         self._running = running
-        self._send_button.setText("Stop" if running else "Send")
+        send_text = "Stop" if running else "Send"
+        self._send_button.setText(send_text)
+        self._expanded_send_button.setText(send_text)
         self._editor.setEnabled(not running)
         self._attach_button.setEnabled(not running)
+        self._expanded_attach_button.setEnabled(not running)
 
     def show_error(self, message: str) -> None:
         self.add_message("System", [{"type": "markdown", "text": f"Error: {message}"}])
@@ -264,6 +431,17 @@ class ChatBox(QWidget):
         self._refresh_attachment_chips()
         self.message_submitted.emit(text, files)
 
+    def _set_composer_multiline(self, multiline: bool) -> None:
+        self._attach_button.setVisible(not multiline)
+        self._send_button.setVisible(not multiline)
+        self._expanded_attach_button.setVisible(multiline)
+        self._expanded_send_button.setVisible(multiline)
+        if multiline:
+            if self._expanded_editor_row.indexOf(self._editor) == -1:
+                self._expanded_editor_row.addWidget(self._editor)
+        elif self._compact_input_row.indexOf(self._editor) == -1:
+            self._compact_input_row.insertWidget(1, self._editor, 1, Qt.AlignVCenter)
+
     def _refresh_attachment_chips(self) -> None:
         while self._attachment_layout.count() > 1:
             item = self._attachment_layout.takeAt(0)
@@ -308,7 +486,6 @@ class ChatBox(QWidget):
                 background: #e9f0ff;
                 border: 1px solid #cbd9fb;
                 border-radius: 8px;
-                max-width: 520px;
             }
             #chatMessageTool {
                 background: #ffffff;
@@ -345,7 +522,7 @@ class ChatBox(QWidget):
             #chatComposerEditor {
                 background: #ffffff;
                 border: 0;
-                padding: 6px;
+                padding: 0;
             }
             #attachButton {
                 background: #f1f3f6;
@@ -381,3 +558,31 @@ class ChatBox(QWidget):
             """
         )
 
+    def _resize_user_messages(self) -> None:
+        width = self._message_column.width()
+        for index in range(self._message_layout.count()):
+            item = self._message_layout.itemAt(index)
+            widget = item.widget()
+            if isinstance(widget, ChatMessageBubble):
+                widget.set_available_width(width)
+
+    def _scroll_to_latest(self, *, settle_ticks: int = 4) -> None:
+        self._scroll_to_latest_after_layout(max(0, settle_ticks))
+
+    def _scroll_to_latest_after_layout(self, remaining_ticks: int) -> None:
+        if not self._is_scroll_target_alive():
+            return
+        if remaining_ticks == 0:
+            scrollbar = self._scroll.verticalScrollBar()
+            scrollbar.setValue(scrollbar.maximum())
+            return
+        QTimer.singleShot(0, lambda: self._scroll_to_latest_after_layout(remaining_ticks - 1))
+
+    def _is_scroll_target_alive(self) -> bool:
+        try:
+            return isValid(self) and isValid(self._scroll)
+        except RuntimeError:
+            return False
+
+
+ChatBox = ThreadDetailView

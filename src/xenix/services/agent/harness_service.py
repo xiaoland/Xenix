@@ -51,6 +51,12 @@ class AgentHarnessService:
         thread = self._conversation_store.create_thread(CreateAgentThreadInput(title=title))
         return self._conversation_store.get_thread_snapshot(thread.id)
 
+    def list_threads(self):
+        return self._conversation_store.list_threads()
+
+    def get_thread_snapshot(self, thread_id: str) -> ThreadSnapshot:
+        return self._conversation_store.get_thread_snapshot(thread_id)
+
     def submit_user_turn(self, input_data: SubmitUserTurnInput) -> ThreadSnapshot:
         text = input_data.text.strip()
         if not text and not input_data.file_paths:

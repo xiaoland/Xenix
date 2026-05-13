@@ -3,8 +3,18 @@ from __future__ import annotations
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, Signal
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtCore import QEvent, Qt, Signal
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QMainWindow,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ..config import AppPaths
 from ..i18n import TranslationManager
@@ -19,10 +29,11 @@ from ..services.scenario_template_service import ScenarioTemplateService
 from ..services.scenario_training_preset_service import ScenarioTrainingPresetService
 from ..services.scenario_workflow_service import ScenarioWorkflowService
 from ..services.work_item_service import WorkItemService
-from .chat_box import ChatBox
+from .chat_box import ThreadDetailView
 from .dataset_workspace import DatasetWorkspace
 from .inference_history_dialog import InferenceHistoryDialog
 from .inference_workspace import InferenceWorkspace
+from .layout_debug import dump_layout_if_enabled
 from .ml_workspace import MLWorkspace
 from .scenario_data_preparation_dialog import ScenarioDataPreparationDialog
 from .scenario_home_view import ScenarioHomeView
@@ -103,7 +114,14 @@ class MainWindow(QMainWindow):
         self._title_label = QLabel(parent=self)
         self._settings_button = QPushButton(parent=self)
         self._settings_button.clicked.connect(self._open_settings)
-        self._chat_box = ChatBox(parent=self)
+        self._history_sidebar = QFrame(parent=self)
+        self._history_sidebar.setObjectName("historySidebar")
+        self._history_label = QLabel(parent=self._history_sidebar)
+        self._history_list = QListWidget(parent=self._history_sidebar)
+        self._history_list.itemClicked.connect(self._open_history_thread)
+        self._refreshing_history = False
+        self._thread_detail_view = ThreadDetailView(parent=self)
+        self._chat_box = self._thread_detail_view
         self._chat_box.message_submitted.connect(self._submit_chat_message)
         self._chat_box.stop_requested.connect(self._request_harness_stop)
         self._harness_snapshot_ready.connect(self._render_harness_snapshot)
@@ -115,13 +133,16 @@ class MainWindow(QMainWindow):
 
     def _setup_ui(self) -> None:
         root = QWidget(self)
+        root.setObjectName("mainWindowRoot")
         layout = QVBoxLayout(root)
+        layout.setObjectName("mainWindowRootLayout")
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(12)
         self._home_view.open_settings_requested.connect(self._open_settings)
         self._home_view.open_history_requested.connect(self._open_history)
         self._home_view.scenario_selected.connect(self._open_scenario)
         header_layout = QHBoxLayout()
+        header_layout.setObjectName("mainHeaderLayout")
         header_layout.setContentsMargins(0, 0, 0, 0)
         header_layout.setSpacing(12)
         self._title_label.setStyleSheet("font-size: 18px; font-weight: 600;")
@@ -130,14 +151,38 @@ class MainWindow(QMainWindow):
         header_layout.addStretch(1)
         header_layout.addWidget(self._settings_button)
         layout.addLayout(header_layout)
-        layout.addWidget(self._chat_box, 1)
+
+        sidebar_layout = QVBoxLayout(self._history_sidebar)
+        sidebar_layout.setObjectName("historySidebarLayout")
+        sidebar_layout.setContentsMargins(10, 10, 10, 10)
+        sidebar_layout.setSpacing(8)
+        self._history_sidebar.setFixedWidth(248)
+        self._history_label.setObjectName("historySidebarTitle")
+        self._history_list.setObjectName("historyList")
+        sidebar_layout.addWidget(self._history_label)
+        sidebar_layout.addWidget(self._history_list, 1)
+
+        content_layout = QHBoxLayout()
+        content_layout.setObjectName("mainContentLayout")
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(14)
+        content_layout.addWidget(self._history_sidebar)
+        content_layout.addWidget(self._chat_box, 1)
+        layout.addLayout(content_layout, 1)
 
         self.setCentralWidget(root)
+        self._refresh_history_sidebar()
+        current_item = self._history_list.currentItem()
+        if current_item is not None:
+            self._open_history_thread(current_item)
+        self._apply_shell_style()
+        dump_layout_if_enabled(root, reason="main-window-setup")
 
     def retranslate_ui(self) -> None:
         self.setWindowTitle(self.tr("Xenix Native"))
         self._title_label.setText(self.tr("Xenix"))
         self._settings_button.setText(self.tr("Settings"))
+        self._history_label.setText(self.tr("History"))
         if self._settings_dialog is not None:
             self._settings_dialog.retranslate_ui()
 
@@ -334,6 +379,7 @@ class MainWindow(QMainWindow):
         self._agent_thread_id = snapshot.thread.id
         self._chat_box.render_snapshot(snapshot)
         self._chat_box.set_running(False)
+        self._refresh_history_sidebar(selected_thread_id=snapshot.thread.id)
 
     def _render_harness_error(self, message: str) -> None:
         self._chat_box.show_error(message)
@@ -341,3 +387,66 @@ class MainWindow(QMainWindow):
 
     def _request_harness_stop(self) -> None:
         self._chat_box.show_error("Stop requested. Xenix will stop after the active step returns.")
+
+    def _refresh_history_sidebar(self, *, selected_thread_id: str | None = None) -> None:
+        self._history_list.clear()
+        if self._agent_harness_service is None:
+            return
+        self._refreshing_history = True
+        try:
+            selected_row = -1
+            for index, thread in enumerate(self._agent_harness_service.list_threads()):
+                title = thread.title or "Untitled conversation"
+                item = QListWidgetItem(title)
+                item.setData(Qt.UserRole, thread.id)
+                self._history_list.addItem(item)
+                if thread.id == selected_thread_id:
+                    selected_row = index
+            if selected_row >= 0:
+                self._history_list.setCurrentRow(selected_row)
+            elif selected_thread_id is None and self._agent_thread_id is None and self._history_list.count() > 0:
+                self._history_list.setCurrentRow(0)
+        finally:
+            self._refreshing_history = False
+
+    def _open_history_thread(self, item: QListWidgetItem) -> None:
+        if self._refreshing_history or self._agent_harness_service is None:
+            return
+        thread_id = item.data(Qt.UserRole)
+        if not isinstance(thread_id, str):
+            return
+        snapshot = self._agent_harness_service.get_thread_snapshot(thread_id)
+        self._agent_thread_id = thread_id
+        self._chat_box.render_snapshot(snapshot)
+
+    def _apply_shell_style(self) -> None:
+        self.setStyleSheet(
+            """
+            #historySidebar {
+                background: #ffffff;
+                border: 1px solid #d8dde6;
+                border-radius: 8px;
+            }
+            #historySidebarTitle {
+                font-weight: 600;
+                color: #303640;
+            }
+            #historyList {
+                background: transparent;
+                border: 0;
+                outline: 0;
+            }
+            #historyList::item {
+                padding: 8px 9px;
+                border-radius: 6px;
+                color: #303640;
+            }
+            #historyList::item:selected {
+                background: #e9f0ff;
+                color: #1f3b70;
+            }
+            #historyList::item:hover {
+                background: #f1f3f6;
+            }
+            """
+        )

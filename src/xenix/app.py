@@ -18,6 +18,7 @@ from .services.agent import (
     ConversationStore,
     OpenAICompatibleChatProvider,
 )
+from .services.agent.dev_fixtures import ensure_mock_conversation_history
 from .services.analysis_scenario_service import AnalysisScenarioService
 from .services.artifact_service import ArtifactService
 from .services.dataset_service import DatasetService
@@ -88,6 +89,7 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
     inference_history_service = InferenceHistoryService(context.session_factory)
     artifact_service = ArtifactService(context.session_factory)
     conversation_store = ConversationStore(context.session_factory)
+    ensure_mock_conversation_history(conversation_store)
     agent_tool_registry = AgentToolRegistry(
         paths=paths,
         project_service=project_service,

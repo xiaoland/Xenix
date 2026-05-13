@@ -101,6 +101,10 @@ class ConversationStore:
             session.commit()
             return row
 
+    def list_threads(self) -> list[AgentThreadRow]:
+        with self._session_factory() as session:
+            return self._conversations.list_threads(session)
+
     def get_thread_snapshot(self, thread_id: str) -> ThreadSnapshot:
         with self._session_factory() as session:
             thread = self._conversations.get_thread(session, thread_id)
