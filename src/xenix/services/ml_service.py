@@ -31,7 +31,7 @@ from .ml.contracts import (
 )
 from .ml.evaluation import compare_metric_snapshots, get_default_policy
 from .ml.registry import get_model_catalog_entry, get_model_service, list_model_catalog
-from .ml_task_service import CreateMLTaskInput, MLTaskService
+from .ml_task_service import CancelMLTaskInput, CreateMLTaskInput, MLTaskService
 from .trained_model_metadata import parse_trained_model_metadata, with_evaluation
 from .storage.models import MLTaskArtifactRow, MLTaskRow, MLTaskStatus, MLTaskType, TrainedModelRow
 from .storage.repositories import MLTaskRepository, TrainedModelRepository, WorkItemRepository
@@ -198,6 +198,9 @@ class MLService:
         artifacts = self._ml_task_service.list_ml_task_artifacts(ml_task_id)
         logs = self._ml_task_service.read_task_logs(ml_task_id)
         return MLTaskDetails(task=task, artifacts=artifacts, logs=logs)
+
+    def cancel_task(self, ml_task_id: str) -> MLTaskRow:
+        return self._ml_task_service.cancel_ml_task(CancelMLTaskInput(ml_task_id=ml_task_id))
 
     def list_trained_models(self, work_item_id: str) -> list[TrainedModelRow]:
         with self._session_factory() as session:

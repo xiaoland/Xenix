@@ -14,6 +14,7 @@ from ..models import (
     AgentToolCallStatus,
     AgentTurnRow,
     AgentTurnStatus,
+    ArtifactRow,
 )
 
 
@@ -30,6 +31,64 @@ class AgentConversationRepository:
     def list_threads(self, session: Session) -> list[AgentThreadRow]:
         statement = select(AgentThreadRow).order_by(AgentThreadRow.updated_at.desc())
         return list(session.exec(statement))
+
+    def rename_thread(
+        self,
+        session: Session,
+        thread_id: str,
+        title: str | None,
+        now: datetime,
+    ) -> AgentThreadRow | None:
+        row = self.get_thread(session, thread_id)
+        if row is None:
+            return None
+
+        row.title = title
+        row.updated_at = now
+        session.add(row)
+        session.flush()
+        session.refresh(row)
+        return row
+
+    def delete_thread(self, session: Session, thread_id: str) -> AgentThreadRow | None:
+        row = self.get_thread(session, thread_id)
+        if row is None:
+            return None
+
+        artifacts = session.exec(select(ArtifactRow).where(ArtifactRow.thread_id == thread_id)).all()
+        for artifact in artifacts:
+            session.delete(artifact)
+        session.flush()
+
+        turns = session.exec(select(AgentTurnRow).where(AgentTurnRow.thread_id == thread_id)).all()
+        for turn in turns:
+            turn.user_message_id = None
+            turn.end_message_id = None
+            session.add(turn)
+        session.flush()
+
+        runs = session.exec(select(AgentRunRow).where(AgentRunRow.thread_id == thread_id)).all()
+        for run in runs:
+            session.delete(run)
+        session.flush()
+
+        tool_calls = session.exec(select(AgentToolCallRow).where(AgentToolCallRow.thread_id == thread_id)).all()
+        for tool_call in tool_calls:
+            session.delete(tool_call)
+        session.flush()
+
+        messages = session.exec(select(AgentMessageRow).where(AgentMessageRow.thread_id == thread_id)).all()
+        for message in messages:
+            session.delete(message)
+        session.flush()
+
+        for turn in turns:
+            session.delete(turn)
+        session.flush()
+
+        session.delete(row)
+        session.flush()
+        return row
 
     def next_turn_sequence(self, session: Session, thread_id: str) -> int:
         statement = select(func.max(col(AgentTurnRow.sequence_index))).where(AgentTurnRow.thread_id == thread_id)
@@ -91,6 +150,19 @@ class AgentConversationRepository:
         session.refresh(row)
         return row
 
+    def cancel_turn(self, session: Session, turn_id: str, now: datetime) -> AgentTurnRow | None:
+        row = self.get_turn(session, turn_id)
+        if row is None:
+            return None
+
+        row.status = AgentTurnStatus.CANCELLED
+        row.ended_at = now
+        row.updated_at = now
+        session.add(row)
+        session.flush()
+        session.refresh(row)
+        return row
+
     def next_message_sequence(self, session: Session, thread_id: str) -> int:
         statement = select(func.max(col(AgentMessageRow.sequence_index))).where(AgentMessageRow.thread_id == thread_id)
         current = session.exec(statement).one()
@@ -114,6 +186,30 @@ class AgentConversationRepository:
         return list(session.exec(statement))
 
     def create_run(self, session: Session, row: AgentRunRow) -> AgentRunRow:
+        session.add(row)
+        session.flush()
+        session.refresh(row)
+        return row
+
+    def get_run(self, session: Session, run_id: str) -> AgentRunRow | None:
+        return session.get(AgentRunRow, run_id)
+
+    def update_run_status(
+        self,
+        session: Session,
+        run_id: str,
+        status: AgentRunStatus,
+        *,
+        usage_payload: dict | None = None,
+        error_summary: str | None = None,
+    ) -> AgentRunRow | None:
+        row = self.get_run(session, run_id)
+        if row is None:
+            return None
+
+        row.status = status
+        row.usage_payload = usage_payload
+        row.error_summary = error_summary
         session.add(row)
         session.flush()
         session.refresh(row)

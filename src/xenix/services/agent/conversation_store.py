@@ -31,6 +31,11 @@ class CreateAgentThreadInput(SQLModel):
     title: str | None = None
 
 
+class RenameAgentThreadInput(SQLModel):
+    thread_id: str
+    title: str | None = None
+
+
 class StartTurnInput(SQLModel):
     thread_id: str
     user_content_blocks: list[dict[str, Any]] = Field(default_factory=list)
@@ -68,6 +73,7 @@ class StartAgentRunInput(SQLModel):
     thread_id: str
     turn_id: str
     provider_name: str | None = None
+    usage_payload: dict[str, Any] | None = None
 
 
 class FinishAgentRunInput(SQLModel):
@@ -104,6 +110,24 @@ class ConversationStore:
     def list_threads(self) -> list[AgentThreadRow]:
         with self._session_factory() as session:
             return self._conversations.list_threads(session)
+
+    def rename_thread(self, input_data: RenameAgentThreadInput) -> AgentThreadRow:
+        title = input_data.title.strip() if input_data.title else None
+        now = _utc_now()
+        with self._session_factory() as session:
+            row = self._conversations.rename_thread(session, input_data.thread_id, title, now)
+            if row is None:
+                raise NotFoundError(f"Thread '{input_data.thread_id}' was not found.")
+            session.commit()
+            return row
+
+    def delete_thread(self, thread_id: str) -> AgentThreadRow:
+        with self._session_factory() as session:
+            row = self._conversations.delete_thread(session, thread_id)
+            if row is None:
+                raise NotFoundError(f"Thread '{thread_id}' was not found.")
+            session.commit()
+            return row
 
     def get_thread_snapshot(self, thread_id: str) -> ThreadSnapshot:
         with self._session_factory() as session:
@@ -292,6 +316,19 @@ class ConversationStore:
             session.commit()
             return updated
 
+    def cancel_turn(self, thread_id: str, turn_id: str) -> AgentTurnRow:
+        now = _utc_now()
+        with self._session_factory() as session:
+            self._require_thread(session, thread_id)
+            turn = self._require_open_turn(session, thread_id, turn_id)
+            updated = self._conversations.cancel_turn(session, turn.id, now)
+            if updated is None:
+                raise NotFoundError(f"Turn '{turn.id}' was not found.")
+            thread = self._require_thread(session, thread_id)
+            self._touch_thread(session, thread, now)
+            session.commit()
+            return updated
+
     def start_run(self, input_data: StartAgentRunInput) -> AgentRunRow:
         now = _utc_now()
         with self._session_factory() as session:
@@ -303,8 +340,42 @@ class ConversationStore:
                 status=AgentRunStatus.RUNNING,
                 provider_name=input_data.provider_name,
                 started_at=now,
+                usage_payload=input_data.usage_payload,
             )
             self._conversations.create_run(session, row)
+            session.commit()
+            return row
+
+    def get_run(self, run_id: str) -> AgentRunRow:
+        with self._session_factory() as session:
+            row = self._conversations.get_run(session, run_id)
+            if row is None:
+                raise NotFoundError(f"Agent run '{run_id}' was not found.")
+            return row
+
+    def pause_run_for_confirmation(self, run_id: str, usage_payload: dict[str, Any]) -> AgentRunRow:
+        with self._session_factory() as session:
+            row = self._conversations.update_run_status(
+                session,
+                run_id,
+                AgentRunStatus.AWAITING_CONFIRMATION,
+                usage_payload=usage_payload,
+            )
+            if row is None:
+                raise NotFoundError(f"Agent run '{run_id}' was not found.")
+            session.commit()
+            return row
+
+    def resume_run_after_confirmation(self, run_id: str, usage_payload: dict[str, Any]) -> AgentRunRow:
+        with self._session_factory() as session:
+            row = self._conversations.update_run_status(
+                session,
+                run_id,
+                AgentRunStatus.RUNNING,
+                usage_payload=usage_payload,
+            )
+            if row is None:
+                raise NotFoundError(f"Agent run '{run_id}' was not found.")
             session.commit()
             return row
 

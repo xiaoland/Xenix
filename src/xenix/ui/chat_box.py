@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QTimer, Qt, Signal
+from PySide6.QtCore import QEvent, QPoint, QTimer, Qt, Signal
 from PySide6.QtGui import QTextOption
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -48,6 +48,7 @@ class AutoHeightTextBrowser(QTextBrowser):
 
 class AutoGrowingTextEdit(QPlainTextEdit):
     multiline_changed = Signal(bool)
+    submit_requested = Signal()
 
     def __init__(self, *, max_lines: int = 6, min_height: int = 34, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -67,6 +68,13 @@ class AutoGrowingTextEdit(QPlainTextEdit):
     def resizeEvent(self, event) -> None:  # type: ignore[override]
         super().resizeEvent(event)
         self._sync_height()
+
+    def keyPressEvent(self, event) -> None:  # type: ignore[override]
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter) and not (event.modifiers() & Qt.ShiftModifier):
+            event.accept()
+            self.submit_requested.emit()
+            return
+        super().keyPressEvent(event)
 
     def _sync_height(self) -> None:
         font_metrics = self.fontMetrics()
@@ -205,16 +213,26 @@ class ChatMessageBubble(QFrame):
             elif block_type == "file":
                 file_path = Path(str(block.get("path", "")))
                 parts.append(f"`{file_path.name}`")
+            elif block_type == "step_confirmation":
+                parts.append(str(block.get("text", "")))
+            elif block_type == "thinking":
+                parts.append(str(block.get("text") or "Thinking..."))
             elif block_type == "turn_end":
                 continue
+            elif block_type == "tool_call":
+                tool_name = str(block.get("tool_name") or "tool")
+                parts.append(f"Calling `{tool_name}`...")
             elif block_type == "tool_call_result":
                 tool_name = str(block.get("tool_name") or "tool")
-                parts.append(f"`{tool_name}` completed.")
+                status = str(block.get("status") or "completed")
+                parts.append(f"`{tool_name}` {status}.")
         return "\n\n".join(part for part in parts if part)
 
     def set_available_width(self, width: int) -> None:
         if self._card.objectName() == "chatMessageUser":
             self._card.setMaximumWidth(max(280, int(width * 0.6)))
+        elif self._card.objectName() in {"chatMessageTool", "chatMessageSystem"}:
+            self._card.setMaximumWidth(max(320, int(width * 0.78)))
 
     def set_blocks(self, blocks: list[dict[str, Any]]) -> None:
         self._blocks = list(blocks)
@@ -243,6 +261,8 @@ class AttachmentChip(QFrame):
 class ThreadDetailView(QWidget):
     message_submitted = Signal(str, list)
     stop_requested = Signal()
+    step_budget_continue_requested = Signal()
+    step_budget_stop_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -250,7 +270,9 @@ class ThreadDetailView(QWidget):
         self.setAcceptDrops(True)
         self._attached_files: list[str] = []
         self._running = False
+        self._awaiting_step_confirmation = False
         self._streaming_assistant_bubble: ChatMessageBubble | None = None
+        self._thinking_bubble: ChatMessageBubble | None = None
 
         self._message_container = QWidget()
         self._message_container.setObjectName("chatMessageContainer")
@@ -306,6 +328,7 @@ class ThreadDetailView(QWidget):
         self._editor.setObjectName("chatComposerEditor")
         self._editor.setPlaceholderText("Message Xenix")
         self._editor.multiline_changed.connect(self._set_composer_multiline)
+        self._editor.submit_requested.connect(self._handle_button_clicked)
 
         self._send_button = QPushButton("Send")
         self._send_button.setObjectName("sendButton")
@@ -318,6 +341,29 @@ class ThreadDetailView(QWidget):
         self._expanded_send_button.setMinimumWidth(76)
         self._expanded_send_button.setFixedHeight(34)
         self._expanded_send_button.clicked.connect(self._handle_button_clicked)
+
+        self._step_confirmation_bar = QFrame()
+        self._step_confirmation_bar.setObjectName("stepConfirmationBar")
+        step_confirmation_layout = QHBoxLayout(self._step_confirmation_bar)
+        step_confirmation_layout.setContentsMargins(10, 8, 10, 8)
+        step_confirmation_layout.setSpacing(8)
+
+        self._step_confirmation_label = QLabel()
+        self._step_confirmation_label.setObjectName("stepConfirmationLabel")
+        self._step_confirmation_label.setWordWrap(True)
+
+        self._step_continue_button = QPushButton("Continue")
+        self._step_continue_button.setObjectName("stepContinueButton")
+        self._step_continue_button.clicked.connect(self.step_budget_continue_requested.emit)
+
+        self._step_stop_button = QPushButton("Stop")
+        self._step_stop_button.setObjectName("stepStopButton")
+        self._step_stop_button.clicked.connect(self.step_budget_stop_requested.emit)
+
+        step_confirmation_layout.addWidget(self._step_confirmation_label, 1)
+        step_confirmation_layout.addWidget(self._step_continue_button, 0, Qt.AlignVCenter)
+        step_confirmation_layout.addWidget(self._step_stop_button, 0, Qt.AlignVCenter)
+        self._step_confirmation_bar.hide()
 
         self._compact_input_row = QHBoxLayout()
         self._compact_input_row.setObjectName("chatComposerCompactRow")
@@ -340,6 +386,7 @@ class ThreadDetailView(QWidget):
         self._expanded_controls_row.addStretch(1)
         self._expanded_controls_row.addWidget(self._expanded_send_button)
 
+        composer_layout.addWidget(self._step_confirmation_bar)
         composer_layout.addWidget(self._attachment_bar)
         composer_layout.addLayout(self._compact_input_row)
         composer_layout.addLayout(self._expanded_editor_row)
@@ -353,6 +400,27 @@ class ThreadDetailView(QWidget):
         composer_shell_layout.setSpacing(0)
         composer_shell_layout.addWidget(self._composer, 1)
 
+        self._composer_drop_overlay = QFrame(self._composer_shell)
+        self._composer_drop_overlay.setObjectName("composerDropOverlay")
+        self._composer_drop_overlay.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        composer_drop_layout = QVBoxLayout(self._composer_drop_overlay)
+        composer_drop_layout.setContentsMargins(12, 10, 12, 10)
+        composer_drop_layout.setSpacing(3)
+        composer_drop_layout.setAlignment(Qt.AlignCenter)
+
+        self._composer_drop_title = QLabel("Drop files to attach")
+        self._composer_drop_title.setObjectName("composerDropTitle")
+        self._composer_drop_title.setAlignment(Qt.AlignCenter)
+
+        self._composer_drop_hint = QLabel("Release here to add them to the next message")
+        self._composer_drop_hint.setObjectName("composerDropHint")
+        self._composer_drop_hint.setAlignment(Qt.AlignCenter)
+
+        composer_drop_layout.addWidget(self._composer_drop_title)
+        composer_drop_layout.addWidget(self._composer_drop_hint)
+        self._composer_drop_overlay.hide()
+        self._install_composer_drop_filters()
+
         root = QVBoxLayout(self)
         root.setObjectName("threadDetailLayout")
         root.setContentsMargins(0, 0, 0, 0)
@@ -362,10 +430,12 @@ class ThreadDetailView(QWidget):
 
         self._refresh_attachment_chips()
         self._set_composer_multiline(False)
+        self._sync_composer_drop_overlay_geometry()
         self._apply_style()
 
     def render_snapshot(self, snapshot: ThreadSnapshot) -> None:
         self.finish_streaming_assistant_message()
+        self.hide_thinking_indicator()
         self.clear_messages()
         for message in snapshot.messages:
             if message.kind is AgentMessageKind.SYSTEM:
@@ -373,6 +443,8 @@ class ThreadDetailView(QWidget):
             if message.kind is AgentMessageKind.TOOL_CALL:
                 if self._is_turn_end_message(message.content_blocks):
                     self.add_message(self._author_label(message.ui_author), message.content_blocks, auto_scroll=False)
+                    continue
+                self.add_message(self._author_label(message.ui_author), message.content_blocks, auto_scroll=False)
                 continue
             if message.kind is AgentMessageKind.TOOL_CALL_RESULT and self._is_turn_end_result_message(message.content_blocks):
                 continue
@@ -380,6 +452,7 @@ class ThreadDetailView(QWidget):
         self._scroll_to_latest()
 
     def clear_messages(self) -> None:
+        self._thinking_bubble = None
         while self._message_layout.count() > 1:
             item = self._message_layout.takeAt(0)
             widget = item.widget()
@@ -389,55 +462,138 @@ class ThreadDetailView(QWidget):
     def add_message(self, author: str, blocks: list[dict[str, Any]], *, auto_scroll: bool = True) -> None:
         bubble = ChatMessageBubble(author=author, blocks=blocks, parent=self)
         bubble.set_available_width(self._message_column.width())
-        self._message_layout.insertWidget(self._message_layout.count() - 1, bubble)
+        self._message_layout.insertWidget(self._message_insert_index(), bubble)
         if auto_scroll:
             self._scroll_to_latest()
 
     def append_assistant_delta(self, delta: str) -> None:
         if not delta:
             return
+        self.hide_thinking_indicator()
         if self._streaming_assistant_bubble is None:
             self._streaming_assistant_bubble = ChatMessageBubble(
                 author="Xenix",
                 blocks=[{"type": "markdown", "text": ""}],
                 parent=self,
             )
-            self._message_layout.insertWidget(self._message_layout.count() - 1, self._streaming_assistant_bubble)
+            self._message_layout.insertWidget(self._message_insert_index(), self._streaming_assistant_bubble)
         self._streaming_assistant_bubble.append_markdown_delta(delta)
         self._scroll_to_latest()
 
     def finish_streaming_assistant_message(self) -> None:
         self._streaming_assistant_bubble = None
 
+    def show_thinking_indicator(self) -> None:
+        if self._thinking_bubble is not None:
+            self._scroll_to_latest()
+            return
+        self._thinking_bubble = ChatMessageBubble(
+            author="Xenix",
+            blocks=[{"type": "thinking", "text": "Thinking..."}],
+            parent=self,
+        )
+        self._thinking_bubble.set_available_width(self._message_column.width())
+        self._message_layout.insertWidget(self._message_layout.count() - 1, self._thinking_bubble)
+        self._scroll_to_latest()
+
+    def hide_thinking_indicator(self) -> None:
+        if self._thinking_bubble is None:
+            return
+        bubble = self._thinking_bubble
+        self._thinking_bubble = None
+        self._message_layout.removeWidget(bubble)
+        bubble.deleteLater()
+
+    def _message_insert_index(self) -> int:
+        if self._thinking_bubble is None:
+            return self._message_layout.count() - 1
+        for index in range(self._message_layout.count()):
+            item = self._message_layout.itemAt(index)
+            if item is not None and item.widget() is self._thinking_bubble:
+                return index
+        self._thinking_bubble = None
+        return self._message_layout.count() - 1
+
     def resizeEvent(self, event) -> None:  # type: ignore[override]
         super().resizeEvent(event)
         self._resize_user_messages()
+        self._sync_composer_drop_overlay_geometry()
+
+    def eventFilter(self, watched, event) -> bool:  # type: ignore[override]
+        if watched is self._composer_shell and event.type() == QEvent.Resize:
+            self._sync_composer_drop_overlay_geometry()
+        if self._is_composer_drop_target(watched):
+            if event.type() in {QEvent.DragEnter, QEvent.DragMove}:
+                if self._can_accept_file_drop(event):
+                    event.acceptProposedAction()
+                    self._set_composer_drop_hover(True)
+                    return True
+                self._set_composer_drop_hover(False)
+                event.ignore()
+                return True
+            if event.type() == QEvent.Drop:
+                self._set_composer_drop_hover(False)
+                if self._can_accept_file_drop(event):
+                    self._add_local_files(self._local_file_paths(event))
+                    event.acceptProposedAction()
+                    return True
+                event.ignore()
+                return True
+            if event.type() == QEvent.DragLeave and watched is self._composer_shell:
+                self._set_composer_drop_hover(False)
+        return super().eventFilter(watched, event)
 
     def set_running(self, running: bool) -> None:
         self._running = running
+        if running:
+            self._set_composer_drop_hover(False)
+            self.clear_step_confirmation()
         send_text = "Stop" if running else "Send"
         self._send_button.setText(send_text)
         self._expanded_send_button.setText(send_text)
-        self._editor.setEnabled(not running)
-        self._attach_button.setEnabled(not running)
-        self._expanded_attach_button.setEnabled(not running)
+        self._sync_composer_controls_enabled()
+
+    def show_step_confirmation(self, message: str) -> None:
+        self._awaiting_step_confirmation = True
+        self._set_composer_drop_hover(False)
+        self._step_confirmation_label.setText(message)
+        self._step_confirmation_bar.show()
+        self._sync_composer_controls_enabled()
+
+    def clear_step_confirmation(self) -> None:
+        self._awaiting_step_confirmation = False
+        self._step_confirmation_label.clear()
+        self._step_confirmation_bar.hide()
+        self._sync_composer_controls_enabled()
 
     def show_error(self, message: str) -> None:
         self.add_message("System", [{"type": "markdown", "text": f"Error: {message}"}])
 
     def dragEnterEvent(self, event) -> None:  # type: ignore[override]
-        mime_data = event.mimeData()
-        if mime_data is not None and any(url.isLocalFile() for url in mime_data.urls()):
+        if self._can_accept_file_drop(event):
             event.acceptProposedAction()
+            self._set_composer_drop_hover(self._is_event_over_composer(event))
             return
         event.ignore()
 
+    def dragMoveEvent(self, event) -> None:  # type: ignore[override]
+        if self._can_accept_file_drop(event):
+            event.acceptProposedAction()
+            self._set_composer_drop_hover(self._is_event_over_composer(event))
+            return
+        self._set_composer_drop_hover(False)
+        event.ignore()
+
+    def dragLeaveEvent(self, event) -> None:  # type: ignore[override]
+        self._set_composer_drop_hover(False)
+        super().dragLeaveEvent(event)
+
     def dropEvent(self, event) -> None:  # type: ignore[override]
-        mime_data = event.mimeData()
-        if mime_data is None:
+        self._set_composer_drop_hover(False)
+        if not self._can_accept_file_drop(event) or not self._is_event_over_composer(event):
             event.ignore()
             return
-        self._add_local_files([url.toLocalFile() for url in mime_data.urls() if url.isLocalFile()])
+        self._add_local_files(self._local_file_paths(event))
         event.acceptProposedAction()
 
     def _choose_files(self) -> None:
@@ -456,9 +612,71 @@ class ThreadDetailView(QWidget):
                 self._attached_files.append(path)
         self._refresh_attachment_chips()
 
+    def _install_composer_drop_filters(self) -> None:
+        widgets = [
+            self._composer_shell,
+            self._composer,
+            self._attachment_bar,
+            self._attach_button,
+            self._expanded_attach_button,
+            self._editor,
+            self._editor.viewport(),
+            self._send_button,
+            self._expanded_send_button,
+        ]
+        for widget in widgets:
+            widget.setAcceptDrops(True)
+            widget.installEventFilter(self)
+
+    def _is_composer_drop_target(self, watched) -> bool:
+        return isinstance(watched, QWidget) and (
+            watched is self._composer_shell
+            or watched is self._editor.viewport()
+            or self._composer_shell.isAncestorOf(watched)
+        )
+
+    def _can_accept_file_drop(self, event) -> bool:
+        if self._running or self._awaiting_step_confirmation:
+            return False
+        return bool(self._local_file_paths(event))
+
+    def _local_file_paths(self, event) -> list[str]:
+        mime_data = event.mimeData()
+        if mime_data is None:
+            return []
+        return [url.toLocalFile() for url in mime_data.urls() if url.isLocalFile()]
+
+    def _is_event_over_composer(self, event) -> bool:
+        point = self._event_point(event)
+        if point is None:
+            return True
+        return self._composer_shell.geometry().contains(point)
+
+    def _event_point(self, event) -> QPoint | None:
+        if hasattr(event, "position"):
+            position = event.position()
+            if hasattr(position, "toPoint"):
+                return position.toPoint()
+        if hasattr(event, "pos"):
+            return event.pos()
+        return None
+
+    def _set_composer_drop_hover(self, visible: bool) -> None:
+        if visible:
+            self._sync_composer_drop_overlay_geometry()
+            self._composer_drop_overlay.show()
+            self._composer_drop_overlay.raise_()
+            return
+        self._composer_drop_overlay.hide()
+
+    def _sync_composer_drop_overlay_geometry(self) -> None:
+        self._composer_drop_overlay.setGeometry(self._composer_shell.rect())
+
     def _handle_button_clicked(self) -> None:
         if self._running:
             self.stop_requested.emit()
+            return
+        if self._awaiting_step_confirmation:
             return
         text = self._editor.toPlainText().strip()
         files = list(self._attached_files)
@@ -479,6 +697,16 @@ class ThreadDetailView(QWidget):
                 self._expanded_editor_row.addWidget(self._editor)
         elif self._compact_input_row.indexOf(self._editor) == -1:
             self._compact_input_row.insertWidget(1, self._editor, 1, Qt.AlignVCenter)
+
+    def _sync_composer_controls_enabled(self) -> None:
+        can_edit = not self._running and not self._awaiting_step_confirmation
+        self._editor.setEnabled(can_edit)
+        self._attach_button.setEnabled(can_edit)
+        self._expanded_attach_button.setEnabled(can_edit)
+        self._send_button.setEnabled(not self._awaiting_step_confirmation)
+        self._expanded_send_button.setEnabled(not self._awaiting_step_confirmation)
+        self._step_continue_button.setEnabled(self._awaiting_step_confirmation)
+        self._step_stop_button.setEnabled(self._awaiting_step_confirmation)
 
     def _refresh_attachment_chips(self) -> None:
         while self._attachment_layout.count() > 1:
@@ -573,6 +801,48 @@ class ThreadDetailView(QWidget):
                 background: #ffffff;
                 border: 0;
                 padding: 0;
+            }
+            #stepConfirmationBar {
+                background: #f8fafc;
+                border: 1px solid #d7dce5;
+                border-radius: 7px;
+            }
+            #stepConfirmationLabel {
+                background: transparent;
+                color: #303640;
+                font-size: 13px;
+            }
+            #stepContinueButton {
+                background: #244f9e;
+                color: white;
+                border: 0;
+                border-radius: 6px;
+                padding: 7px 12px;
+                font-weight: 600;
+            }
+            #stepStopButton {
+                background: #f1f3f6;
+                color: #303640;
+                border: 1px solid #d3d8e2;
+                border-radius: 6px;
+                padding: 7px 12px;
+                font-weight: 600;
+            }
+            #composerDropOverlay {
+                background: rgba(36, 79, 158, 40);
+                border: 1px dashed #244f9e;
+                border-radius: 8px;
+            }
+            #composerDropTitle {
+                background: transparent;
+                color: #1d4081;
+                font-size: 14px;
+                font-weight: 700;
+            }
+            #composerDropHint {
+                background: transparent;
+                color: #3b4a61;
+                font-size: 12px;
             }
             #attachButton {
                 background: #f1f3f6;

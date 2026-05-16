@@ -80,6 +80,7 @@ class AgentMessageAuthor(StrEnum):
 
 class AgentRunStatus(StrEnum):
     RUNNING = "running"
+    AWAITING_CONFIRMATION = "awaiting_confirmation"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     CANCELLED = "cancelled"

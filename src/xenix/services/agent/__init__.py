@@ -4,12 +4,13 @@ from .conversation_store import (
     CreateAgentThreadInput,
     CreateToolCallInput,
     FinishAgentRunInput,
+    RenameAgentThreadInput,
     StartAgentRunInput,
     StartTurnInput,
     ThreadSnapshot,
     ConversationStore,
 )
-from .harness_service import AgentHarnessService, AgentHarnessStreamEvent, SubmitUserTurnInput
+from .harness_service import AgentHarnessService, AgentHarnessStreamEvent, ContinueStepBudgetInput, SubmitUserTurnInput
 from .providers import (
     OpenAICompatibleChatProvider,
     ProviderResponse,
@@ -33,10 +34,12 @@ __all__ = [
     "CreateAgentThreadInput",
     "CreateToolCallInput",
     "FinishAgentRunInput",
+    "ContinueStepBudgetInput",
     "OpenAICompatibleChatProvider",
     "ProviderResponse",
     "ProviderStreamEvent",
     "ProviderToolCall",
+    "RenameAgentThreadInput",
     "ScriptedAgentProvider",
     "StartAgentRunInput",
     "StartTurnInput",

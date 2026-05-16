@@ -318,7 +318,11 @@ class MLTaskService:
             return_code = self._worker_runner.run(
                 self._resolve_entrypoint(running_task.task_type),
                 ml_task_root(self._paths, ml_task_id),
+                cancel_requested=lambda: self.get_ml_task(ml_task_id).status is MLTaskStatus.CANCELLED,
             )
+            current = self.get_ml_task(ml_task_id)
+            if current.status is MLTaskStatus.CANCELLED:
+                return current
             if return_code == 0:
                 return self._finalize_success(ml_task_id)
             return self._finalize_failure(ml_task_id, return_code)

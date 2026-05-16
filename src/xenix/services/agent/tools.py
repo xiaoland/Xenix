@@ -27,6 +27,7 @@ class ToolExecutionContext:
     turn_id: str
     tool_call_id: str
     attached_files: list[str]
+    cancel_requested: Callable[[], bool] = lambda: False
 
 
 class ToolExecutionResult(BaseModel):
@@ -81,10 +82,13 @@ class AgentToolRegistry:
         arguments: dict[str, Any],
         context: ToolExecutionContext,
     ) -> ToolExecutionResult:
+        self._raise_if_cancelled(context)
         tool = self._tools.get(tool_name)
         if tool is None:
             raise ValidationError(f"Tool '{tool_name}' is not registered.")
-        return tool.handler(arguments, context)
+        result = tool.handler(arguments, context)
+        self._raise_if_cancelled(context)
+        return result
 
     def _build_turn_end_tool(self) -> AgentTool:
         return AgentTool(
@@ -253,6 +257,7 @@ class AgentToolRegistry:
         )
 
     def _data_peek(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+        self._raise_if_cancelled(context)
         source_path = self._resolve_source_path(arguments.get("source_path"), context)
         project_id = self._resolve_project_id(arguments.get("project_id"))
         name = str(arguments.get("name") or source_path.stem)
@@ -293,6 +298,7 @@ class AgentToolRegistry:
         )
 
     def _data_integrate(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+        self._raise_if_cancelled(context)
         raw_paths = arguments.get("source_paths")
         if not isinstance(raw_paths, list) or not raw_paths:
             raise ValidationError("data.integrate requires at least one source path.")
@@ -311,6 +317,7 @@ class AgentToolRegistry:
         )
 
     def _data_clean(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+        self._raise_if_cancelled(context)
         dataset_id = self._require_string(arguments, "dataset_id")
         dataset = self._dataset_service.get_dataset(dataset_id)
         frame = self._load_frame(Path(dataset.source_path))
@@ -342,6 +349,7 @@ class AgentToolRegistry:
         return result
 
     def _data_feature_select(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+        self._raise_if_cancelled(context)
         dataset_id = self._require_string(arguments, "dataset_id")
         feature_columns = self._require_string_list(arguments, "feature_columns")
         target_columns = self._optional_string_list(arguments, "target_columns")
@@ -370,6 +378,7 @@ class AgentToolRegistry:
         )
 
     def _model_train(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+        self._raise_if_cancelled(context)
         dataset_id = self._require_string(arguments, "dataset_id")
         feature_columns = self._require_string_list(arguments, "feature_columns")
         target_columns = self._optional_string_list(arguments, "target_columns")
@@ -378,6 +387,7 @@ class AgentToolRegistry:
         before_ids = {task.id for task in self._ml_service.list_dataset_tasks(dataset_id)}
         created_task_ids: list[str] = []
         for model_key in models:
+            self._raise_if_cancelled(context)
             created = self._ml_service.fit_with_evaluate(
                 FitWithEvaluateInput(
                     dataset_id=dataset_id,
@@ -389,7 +399,7 @@ class AgentToolRegistry:
                 )
             )
             created_task_ids.append(created.id)
-        tasks = self._wait_for_new_dataset_tasks(dataset_id, before_ids, created_task_ids)
+        tasks = self._wait_for_new_dataset_tasks(dataset_id, before_ids, created_task_ids, context=context)
         trained_models = self._ml_service.list_dataset_trained_models(dataset_id)
         payload = {
             "dataset_id": dataset_id,
@@ -402,6 +412,7 @@ class AgentToolRegistry:
         )
 
     def _model_hyper_train(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+        self._raise_if_cancelled(context)
         dataset_id = self._require_string(arguments, "dataset_id")
         feature_columns = self._require_string_list(arguments, "feature_columns")
         target_columns = self._optional_string_list(arguments, "target_columns")
@@ -411,6 +422,7 @@ class AgentToolRegistry:
         before_ids = {task.id for task in self._ml_service.list_dataset_tasks(dataset_id)}
         created_task_ids: list[str] = []
         for model_key, grid in grids.items():
+            self._raise_if_cancelled(context)
             created = self._ml_service.tune_with_evaluate(
                 TuneWithEvaluateInput(
                     dataset_id=dataset_id,
@@ -422,7 +434,7 @@ class AgentToolRegistry:
                 )
             )
             created_task_ids.append(created.id)
-        tasks = self._wait_for_new_dataset_tasks(dataset_id, before_ids, created_task_ids)
+        tasks = self._wait_for_new_dataset_tasks(dataset_id, before_ids, created_task_ids, context=context)
         trained_models = self._ml_service.list_dataset_trained_models(dataset_id)
         payload = {
             "dataset_id": dataset_id,
@@ -435,6 +447,7 @@ class AgentToolRegistry:
         )
 
     def _model_inference(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+        self._raise_if_cancelled(context)
         dataset_id = self._require_string(arguments, "dataset_id")
         feature_columns = self._require_string_list(arguments, "feature_columns")
         trained_model_id = self._require_string(arguments, "trained_model_id")
@@ -447,7 +460,7 @@ class AgentToolRegistry:
                 input_files=input_files,
             )
         )
-        task = self._wait_for_task(task.id)
+        task = self._wait_for_task(task.id, context=context)
         details = self._ml_service.get_task_details(task.id)
         output_artifact = next(
             artifact
@@ -571,6 +584,8 @@ class AgentToolRegistry:
         dataset_id: str,
         before_ids: set[str],
         created_task_ids: list[str],
+        *,
+        context: ToolExecutionContext,
         timeout_seconds: float = 120.0,
     ) -> list:
         expected_count = 0
@@ -580,6 +595,7 @@ class AgentToolRegistry:
             expected_count += 2 if catalog.requires_target else 1
         deadline = time.time() + timeout_seconds
         while time.time() < deadline:
+            self._raise_if_cancelled(context, ml_task_ids=created_task_ids)
             new_tasks = [task for task in self._ml_service.list_dataset_tasks(dataset_id) if task.id not in before_ids]
             if len(new_tasks) >= expected_count and all(task.status in self._terminal_statuses() for task in new_tasks):
                 failed = [task for task in new_tasks if task.status is not MLTaskStatus.SUCCEEDED]
@@ -589,9 +605,10 @@ class AgentToolRegistry:
             time.sleep(0.1)
         raise ValidationError("Timed out waiting for ML training tasks.")
 
-    def _wait_for_task(self, task_id: str, timeout_seconds: float = 120.0):
+    def _wait_for_task(self, task_id: str, *, context: ToolExecutionContext, timeout_seconds: float = 120.0):
         deadline = time.time() + timeout_seconds
         while time.time() < deadline:
+            self._raise_if_cancelled(context, ml_task_ids=[task_id])
             task = self._ml_service.get_task_details(task_id).task
             if task.status in self._terminal_statuses():
                 if task.status is not MLTaskStatus.SUCCEEDED:
@@ -599,6 +616,17 @@ class AgentToolRegistry:
                 return task
             time.sleep(0.1)
         raise ValidationError(f"Timed out waiting for ML task '{task_id}'.")
+
+    def _raise_if_cancelled(self, context: ToolExecutionContext, *, ml_task_ids: list[str] | None = None) -> None:
+        if not context.cancel_requested():
+            return
+        if ml_task_ids:
+            for task_id in ml_task_ids:
+                try:
+                    self._ml_service.cancel_task(task_id)
+                except Exception:
+                    continue
+        raise ValidationError("Agent run was cancelled.")
 
     def _terminal_statuses(self) -> set[MLTaskStatus]:
         return {MLTaskStatus.SUCCEEDED, MLTaskStatus.FAILED, MLTaskStatus.CANCELLED}

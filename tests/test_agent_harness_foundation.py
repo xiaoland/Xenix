@@ -3,13 +3,15 @@ from pathlib import Path
 import pytest
 
 from xenix.config import ensure_app_dirs, get_app_paths
-from xenix.exceptions import ValidationError
+from xenix.exceptions import NotFoundError, ValidationError
 from xenix.services.agent import (
     AppendAgentMessageInput,
     CompleteToolCallInput,
     ConversationStore,
     CreateAgentThreadInput,
     CreateToolCallInput,
+    RenameAgentThreadInput,
+    StartAgentRunInput,
     StartTurnInput,
 )
 from xenix.services.artifact_service import (
@@ -87,6 +89,56 @@ def test_conversation_store_persists_thread_turn_messages_and_turn_end(monkeypat
     assert snapshot.messages[2].content_blocks == [{"type": "turn_end"}]
     assert snapshot.tool_calls[0].tool_name == "turn_end"
     assert snapshot.tool_calls[0].arguments_payload == {}
+
+
+def test_conversation_store_renames_and_deletes_thread_records(monkeypatch, tmp_path: Path) -> None:
+    conversations, artifacts = _build_services(monkeypatch, tmp_path)
+
+    thread = conversations.create_thread(CreateAgentThreadInput(title="Original"))
+    renamed = conversations.rename_thread(RenameAgentThreadInput(thread_id=thread.id, title="Renamed"))
+    turn, user_message = conversations.start_turn(
+        StartTurnInput(
+            thread_id=thread.id,
+            user_content_blocks=[{"type": "text", "text": "Analyze this file"}],
+        )
+    )
+    _assistant_message = conversations.append_message(
+        AppendAgentMessageInput(
+            thread_id=thread.id,
+            turn_id=turn.id,
+            kind=AgentMessageKind.ASSISTANT,
+            ui_author=AgentMessageAuthor.ASSISTANT,
+            content_blocks=[{"type": "markdown", "text": "Done."}],
+        )
+    )
+    conversations.start_run(StartAgentRunInput(thread_id=thread.id, turn_id=turn.id, provider_name="test"))
+    conversations.create_tool_call(
+        CreateToolCallInput(
+            thread_id=thread.id,
+            turn_id=turn.id,
+            tool_name="data.peek",
+            arguments_payload={"source_path": "attached.csv"},
+        )
+    )
+    artifact_path = tmp_path / "result.csv"
+    artifact_path.write_text("prediction\n1\n", encoding="utf-8")
+    artifacts.register_artifact(
+        RegisterArtifactInput(
+            thread_id=thread.id,
+            turn_id=turn.id,
+            message_id=user_message.id,
+            kind=ArtifactKind.PREDICTION,
+            title="Prediction",
+            absolute_path=str(artifact_path.resolve()),
+        )
+    )
+
+    conversations.delete_thread(thread.id)
+
+    assert renamed.title == "Renamed"
+    assert all(row.id != thread.id for row in conversations.list_threads())
+    with pytest.raises(NotFoundError):
+        conversations.get_thread_snapshot(thread.id)
 
 
 def test_artifact_service_registers_and_resolves_artifact_links(monkeypatch, tmp_path: Path) -> None:

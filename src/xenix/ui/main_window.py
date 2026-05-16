@@ -3,14 +3,17 @@ from __future__ import annotations
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, Qt, Signal
+from PySide6.QtCore import QEvent, QPoint, Qt, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMenu,
+    QMessageBox,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -18,7 +21,14 @@ from PySide6.QtWidgets import (
 
 from ..config import AppPaths
 from ..i18n import TranslationManager
-from ..services.agent import AgentHarnessService, AgentSettingsService, SubmitUserTurnInput, ThreadSnapshot
+from ..services.agent import (
+    AgentHarnessService,
+    AgentHarnessStreamEvent,
+    AgentSettingsService,
+    ContinueStepBudgetInput,
+    SubmitUserTurnInput,
+    ThreadSnapshot,
+)
 from ..services.analysis_scenario_service import AnalysisScenarioService
 from ..services.dataset_service import DatasetService
 from ..services.inference_history_service import InferenceHistoryService
@@ -86,6 +96,9 @@ class MainWindow(QMainWindow):
         self._agent_harness_service = agent_harness_service
         self._agent_settings_service = agent_settings_service
         self._agent_thread_id: str | None = None
+        self._active_agent_run_id: str | None = None
+        self._pending_step_confirmation: AgentHarnessStreamEvent | None = None
+        self._cancelled_agent_run_ids: set[str] = set()
         self._settings_dialog: SettingsDialog | None = None
         self._scenario_data_preparation_dialog: ScenarioDataPreparationDialog | None = None
         self._scenario_model_source_dialog: ScenarioModelSourceDialog | None = None
@@ -126,11 +139,15 @@ class MainWindow(QMainWindow):
         self._new_thread_button.clicked.connect(self._create_agent_thread)
         self._history_list = QListWidget(parent=self._history_sidebar)
         self._history_list.itemClicked.connect(self._open_history_thread)
+        self._history_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self._history_list.customContextMenuRequested.connect(self._open_history_item_menu)
         self._refreshing_history = False
         self._thread_detail_view = ThreadDetailView(parent=self)
         self._chat_box = self._thread_detail_view
         self._chat_box.message_submitted.connect(self._submit_chat_message)
         self._chat_box.stop_requested.connect(self._request_harness_stop)
+        self._chat_box.step_budget_continue_requested.connect(self._continue_step_budget)
+        self._chat_box.step_budget_stop_requested.connect(self._stop_step_budget)
         self._harness_snapshot_ready.connect(self._render_harness_snapshot)
         self._harness_failed.connect(self._render_harness_error)
         self._harness_stream_event.connect(self._render_harness_stream_event)
@@ -371,6 +388,8 @@ class MainWindow(QMainWindow):
         if self._agent_harness_service is None:
             self._chat_box.show_error("Agent Harness service is unavailable.")
             return
+        self._pending_step_confirmation = None
+        self._chat_box.clear_step_confirmation()
         user_blocks = []
         if text:
             user_blocks.append({"type": "text", "text": text})
@@ -396,31 +415,134 @@ class MainWindow(QMainWindow):
 
     def _render_harness_snapshot(self, snapshot: ThreadSnapshot) -> None:
         self._agent_thread_id = snapshot.thread.id
+        self._active_agent_run_id = None
+        self._pending_step_confirmation = None
+        self._chat_box.hide_thinking_indicator()
         self._chat_box.render_snapshot(snapshot)
+        self._chat_box.clear_step_confirmation()
         self._chat_box.set_running(False)
         self._refresh_history_sidebar(selected_thread_id=snapshot.thread.id)
 
     def _render_harness_stream_event(self, event) -> None:
+        if event.run_id in self._cancelled_agent_run_ids and event.kind != "snapshot":
+            return
         if event.kind == "turn_started":
             if event.thread_id is not None:
                 self._agent_thread_id = event.thread_id
                 self._refresh_history_sidebar(selected_thread_id=event.thread_id)
+            self._active_agent_run_id = event.run_id
+            return
+        if event.kind == "thinking_started":
+            self._chat_box.show_thinking_indicator()
+            return
+        if event.kind == "thinking_finished":
+            self._chat_box.hide_thinking_indicator()
             return
         if event.kind == "assistant_delta":
+            self._chat_box.hide_thinking_indicator()
             self._chat_box.append_assistant_delta(event.delta_text)
             return
         if event.kind == "assistant_message_finished":
             self._chat_box.finish_streaming_assistant_message()
             return
+        if event.kind == "step_confirmation_required":
+            self._render_step_confirmation(event)
+            return
+        if event.kind == "turn_resumed":
+            if event.thread_id is not None:
+                self._agent_thread_id = event.thread_id
+                self._refresh_history_sidebar(selected_thread_id=event.thread_id)
+            self._active_agent_run_id = event.run_id
+            return
         if event.kind == "snapshot" and event.snapshot is not None:
+            if event.run_id is not None:
+                self._cancelled_agent_run_ids.discard(event.run_id)
             self._render_harness_snapshot(event.snapshot)
 
     def _render_harness_error(self, message: str) -> None:
+        self._pending_step_confirmation = None
+        self._chat_box.clear_step_confirmation()
+        self._chat_box.hide_thinking_indicator()
         self._chat_box.show_error(message)
         self._chat_box.set_running(False)
 
     def _request_harness_stop(self) -> None:
-        self._chat_box.show_error("Stop requested. Xenix will stop after the active step returns.")
+        if self._agent_harness_service is not None and self._active_agent_run_id is not None:
+            self._agent_harness_service.cancel_run(self._active_agent_run_id)
+            self._cancelled_agent_run_ids.add(self._active_agent_run_id)
+        self._chat_box.hide_thinking_indicator()
+        self._chat_box.set_running(False)
+        self._chat_box.show_error("Stopped.")
+
+    def _render_step_confirmation(self, event: AgentHarnessStreamEvent) -> None:
+        if event.snapshot is not None:
+            self._agent_thread_id = event.snapshot.thread.id
+            self._chat_box.render_snapshot(event.snapshot)
+            self._refresh_history_sidebar(selected_thread_id=event.snapshot.thread.id)
+        elif event.thread_id is not None:
+            self._agent_thread_id = event.thread_id
+            self._refresh_history_sidebar(selected_thread_id=event.thread_id)
+        self._pending_step_confirmation = event
+        self._active_agent_run_id = None
+        self._chat_box.set_running(False)
+        self._chat_box.show_step_confirmation(
+            self.tr("Step budget used: {used}/{max}. Continue with up to {steps} more steps?").format(
+                used=str(event.used_steps),
+                max=str(event.max_total_steps),
+                steps=str(event.suggested_steps),
+            )
+        )
+
+    def _continue_step_budget(self) -> None:
+        if self._agent_harness_service is None or self._pending_step_confirmation is None:
+            return
+        pending = self._pending_step_confirmation
+        if pending.thread_id is None or pending.turn_id is None or pending.run_id is None:
+            return
+        self._pending_step_confirmation = None
+        self._active_agent_run_id = pending.run_id
+        self._cancelled_agent_run_ids.discard(pending.run_id)
+        self._chat_box.clear_step_confirmation()
+        self._chat_box.set_running(True)
+
+        def run_harness() -> None:
+            try:
+                for event in self._agent_harness_service.continue_step_budget_stream(
+                    ContinueStepBudgetInput(
+                        thread_id=pending.thread_id or "",
+                        turn_id=pending.turn_id or "",
+                        run_id=pending.run_id or "",
+                        additional_steps=pending.suggested_steps,
+                    )
+                ):
+                    self._harness_stream_event.emit(event)
+            except Exception as exc:
+                self._harness_failed.emit(str(exc))
+
+        threading.Thread(target=run_harness, name="xenix-agent-harness-resume", daemon=True).start()
+
+    def _stop_step_budget(self) -> None:
+        if self._agent_harness_service is None or self._pending_step_confirmation is None:
+            return
+        pending = self._pending_step_confirmation
+        if pending.thread_id is None or pending.turn_id is None or pending.run_id is None:
+            return
+        self._pending_step_confirmation = None
+        self._active_agent_run_id = None
+        self._chat_box.clear_step_confirmation()
+        try:
+            snapshot = self._agent_harness_service.stop_step_budget_confirmation(
+                ContinueStepBudgetInput(
+                    thread_id=pending.thread_id,
+                    turn_id=pending.turn_id,
+                    run_id=pending.run_id,
+                    additional_steps=0,
+                )
+            )
+        except Exception as exc:
+            self._render_harness_error(str(exc))
+            return
+        self._render_harness_snapshot(snapshot)
 
     def _reload_agent_provider(self) -> None:
         if self._agent_harness_service is None or self._agent_settings_service is None:
@@ -430,6 +552,9 @@ class MainWindow(QMainWindow):
     def _create_agent_thread(self) -> None:
         if self._agent_harness_service is None:
             return
+        self._pending_step_confirmation = None
+        self._active_agent_run_id = None
+        self._chat_box.clear_step_confirmation()
         snapshot = self._agent_harness_service.create_thread()
         self._agent_thread_id = snapshot.thread.id
         self._chat_box.render_snapshot(snapshot)
@@ -459,12 +584,95 @@ class MainWindow(QMainWindow):
     def _open_history_thread(self, item: QListWidgetItem) -> None:
         if self._refreshing_history or self._agent_harness_service is None:
             return
-        thread_id = item.data(Qt.UserRole)
-        if not isinstance(thread_id, str):
+        thread_id = self._thread_id_from_history_item(item)
+        if thread_id is None:
             return
         snapshot = self._agent_harness_service.get_thread_snapshot(thread_id)
         self._agent_thread_id = thread_id
+        if self._pending_step_confirmation is not None and self._pending_step_confirmation.thread_id != thread_id:
+            self._pending_step_confirmation = None
+            self._active_agent_run_id = None
+            self._chat_box.clear_step_confirmation()
         self._chat_box.render_snapshot(snapshot)
+
+    def _open_history_item_menu(self, position: QPoint) -> None:
+        item = self._history_list.itemAt(position)
+        if item is None or self._agent_harness_service is None:
+            return
+
+        menu = QMenu(self)
+        rename_action = menu.addAction(self.tr("Rename"))
+        delete_action = menu.addAction(self.tr("Delete"))
+        selected_action = menu.exec(self._history_list.viewport().mapToGlobal(position))
+
+        if selected_action is rename_action:
+            self._rename_history_thread(item)
+        elif selected_action is delete_action:
+            self._delete_history_thread(item)
+
+    def _rename_history_thread(self, item: QListWidgetItem) -> None:
+        if self._agent_harness_service is None:
+            return
+        thread_id = self._thread_id_from_history_item(item)
+        if thread_id is None:
+            return
+
+        title, accepted = QInputDialog.getText(
+            self,
+            self.tr("Rename Thread"),
+            self.tr("Thread name"),
+            text=item.text(),
+        )
+        if not accepted:
+            return
+
+        snapshot = self._agent_harness_service.rename_thread(thread_id, title.strip() or None)
+        self._refresh_history_sidebar(selected_thread_id=snapshot.thread.id)
+
+    def _delete_history_thread(self, item: QListWidgetItem) -> None:
+        if self._agent_harness_service is None:
+            return
+        thread_id = self._thread_id_from_history_item(item)
+        if thread_id is None:
+            return
+
+        if self._chat_box._running and self._agent_thread_id == thread_id:
+            QMessageBox.information(
+                self,
+                self.tr("Delete Thread"),
+                self.tr("Stop the current run before deleting this thread."),
+            )
+            return
+
+        title = item.text()
+        response = QMessageBox.question(
+            self,
+            self.tr("Delete Thread"),
+            self.tr('Delete "{title}"? This action cannot be undone.').format(title=title),
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if response != QMessageBox.Yes:
+            return
+
+        deleting_current = self._agent_thread_id == thread_id
+        self._agent_harness_service.delete_thread(thread_id)
+        if deleting_current:
+            self._agent_thread_id = None
+            self._pending_step_confirmation = None
+            self._active_agent_run_id = None
+            self._chat_box.clear_step_confirmation()
+            self._chat_box.clear_messages()
+
+        self._refresh_history_sidebar(selected_thread_id=None if deleting_current else self._agent_thread_id)
+        if deleting_current:
+            current_item = self._history_list.currentItem()
+            if current_item is not None:
+                self._open_history_thread(current_item)
+
+    def _thread_id_from_history_item(self, item: QListWidgetItem) -> str | None:
+        thread_id = item.data(Qt.UserRole)
+        return thread_id if isinstance(thread_id, str) else None
 
     def _apply_shell_style(self) -> None:
         self.setStyleSheet(
