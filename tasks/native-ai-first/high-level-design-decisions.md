@@ -97,7 +97,6 @@ Current decision:
 Current proposal:
 
 ```text
-turn_end
 data_peek
 data_integrate
 data_clean

@@ -50,7 +50,7 @@ The local AIMock service can be started through the VSCode task `AIMock: serve f
 - AIMock is configured through Settings and attached through provider base URL.
 - Preset AIMock fixtures cover fixed streaming text, rich Markdown result rendering, and one real `data.peek` tool-round keyed by `toolCallId`.
 - A final chat catch-all fixture keeps arbitrary development prompts inside AIMock and returns the available fixture prompts.
-- `turn_end` is a zero-argument tool. Its tool-call Message renders as the visible divider, and its tool-call-result Message is retained as execution evidence.
+- Turns end when the final provider response has no tool calls. ChatBox renders turn dividers before user Messages.
 - Full data-to-prediction AIMock fixtures need dynamic fixture responses or another mechanism that can read runtime `dataset_id` and `trained_model_id` values from tool results.
 
 ## References

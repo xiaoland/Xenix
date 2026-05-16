@@ -8,6 +8,14 @@ from uuid import uuid4
 from sqlalchemy import Column, JSON
 from sqlmodel import Field, SQLModel
 
+DEFAULT_AGENT_THREAD_SYSTEM_PROMPT = """You are Xenix, a data analysis agent for non-technical users.
+
+Your job is to help users complete practical data analysis tasks through conversation, including inspecting data, cleaning data, selecting features, training models, evaluating models, and running predictions through the tools provided by Xenix.
+
+Communicate in the user's language. Prefer clear explanations, concrete next steps, and artifact links when tool results produce files, tables, charts, models, or prediction outputs.
+
+Ask concise follow-up questions when you need further user input to continue."""
+
 
 def generate_id() -> str:
     return uuid4().hex
@@ -195,6 +203,7 @@ class AgentThreadRow(SQLModel, table=True):
 
     id: str = Field(default_factory=generate_id, primary_key=True)
     title: str | None = Field(default=None, index=True)
+    system_prompt: str = Field(default=DEFAULT_AGENT_THREAD_SYSTEM_PROMPT)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
@@ -207,7 +216,6 @@ class AgentTurnRow(SQLModel, table=True):
     sequence_index: int = Field(index=True)
     status: AgentTurnStatus = Field(default=AgentTurnStatus.OPEN, index=True)
     user_message_id: str | None = Field(default=None, foreign_key="agent_message.id", index=True)
-    end_message_id: str | None = Field(default=None, foreign_key="agent_message.id", index=True)
     created_at: datetime = Field(default_factory=utc_now)
     ended_at: datetime | None = None
     updated_at: datetime = Field(default_factory=utc_now)

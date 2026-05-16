@@ -33,7 +33,7 @@ The working hypothesis is that the first Xenix ChatBox should follow the structu
 - Use a centered conversation column.
 - Render assistant output as list-style content for readability.
 - Render user messages as right-aligned compact bubbles.
-- Render tool results as bordered cards and turn end as a divider.
+- Render tool results as bordered cards and turn boundaries as dividers before user messages.
 - Use a bottom composer with a `+` attachment action, file chips, multiline input, and Send/Stop control.
 - Keep artifact links inside markdown; richer preview remains a follow-up.
 

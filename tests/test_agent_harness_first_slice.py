@@ -75,13 +75,7 @@ class FirstSliceProvider:
             )
         return ProviderResponse(
             assistant_content_blocks=[{"type": "markdown", "text": f"Analysis complete. {artifact_link}"}],
-            tool_calls=[
-                ProviderToolCall(
-                    provider_call_id="call-end",
-                    tool_name="turn_end",
-                    arguments={},
-                )
-            ],
+            tool_calls=[],
         )
 
     def _find_payload_value(self, messages: list[Any], key: str) -> str | None:
@@ -175,7 +169,6 @@ def test_agent_harness_first_slice_runs_from_file_to_prediction(monkeypatch, tmp
         "data.peek",
         "model.train",
         "model.inference",
-        "turn_end",
     ]
     prediction_artifacts = [artifact for artifact in snapshot.artifacts if artifact.kind.value == "prediction"]
     assert len(prediction_artifacts) == 1

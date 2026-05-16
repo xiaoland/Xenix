@@ -78,6 +78,12 @@ Canonical Messages + Tool Definitions
   -> canonical FunctionCallingEvents
 ```
 
+## Thread System Prompt
+
+Each `Thread` owns a thread-level system prompt as metadata. It is not a durable `Message`, does not belong to a turn, and is not rendered by ChatBox.
+
+When Agent Harness constructs provider messages, it prepends the thread system prompt as the first role message before durable thread messages.
+
 ## Turn
 
 A `Thread` is composed of `Turn` records. A turn is a bounded group of messages.
@@ -88,19 +94,10 @@ Turn invariant:
 Turn
   starts with exactly one user Message
   contains zero or more assistant/tool-call/tool-result/cancellation/error Messages
-  ends with one explicit turn-end Message
+  ends when a provider response returns no tool calls
 ```
 
-Most LLM providers do not produce an explicit turn-end message. Xenix adds a reserved `turn_end` tool so the model can explicitly close the turn through normal function-calling mechanics.
-
-Reserved tool:
-
-```text
-turn_end()
-  side_effect_level: read_only
-```
-
-The Harness persists the `turn_end` tool-call Message as the visible turn divider. The paired tool-call-result Message remains durable execution evidence and stays outside the ChatBox visible projection.
+If the final provider response includes assistant text, the Harness persists that assistant Message before ending the turn. If the final provider response has empty assistant text and no tool calls, the Harness ends the turn without creating an empty assistant Message.
 
 ## HarnessCore
 
@@ -114,7 +111,7 @@ It:
 - Observes canonical events such as assistant output and tool-call requests.
 - Sends each valid tool-call request to the `ToolExecutor`.
 - Feeds canonical tool results back into the next provider call.
-- Stops on `turn_end`, cancellation, provider error, tool error, or iteration limit.
+- Stops on empty tool-call response, cancellation, provider error, tool error, or iteration limit.
 - Emits canonical run events for UI streaming and persistence.
 
 It owns turn progression and user-message intake. Provider-specific request assembly, provider-specific payload parsing, persistence interfaces, and business logic live in their own boundaries.
@@ -183,7 +180,6 @@ build_static_tool_registry(services) -> AgentToolRegistry
 Candidate first-slice registry:
 
 ```text
-turn_end
 data_peek
 data_integrate
 data_clean
@@ -197,7 +193,7 @@ model_inference
 
 First-slice user control is cancellation: the send button becomes a stop button while the provider or a tool is running.
 
-Agent instructions expose tool semantics, constraints, and the `turn_end` convention. Tool choice and ordering remain model-owned.
+The thread system prompt exposes identity and durable instructions. Tool descriptions expose tool semantics. Tool choice and ordering remain model-owned.
 
 Contextual constraints still belong in validation:
 

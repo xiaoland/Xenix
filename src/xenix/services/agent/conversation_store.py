@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any
 
@@ -19,8 +20,10 @@ from ..storage.models import (
     AgentTurnRow,
     AgentTurnStatus,
     ArtifactRow,
+    DEFAULT_AGENT_THREAD_SYSTEM_PROMPT,
 )
 from ..storage.repositories import AgentConversationRepository, ArtifactRepository
+from .providers import ProviderMessage
 
 
 def _utc_now() -> datetime:
@@ -29,6 +32,7 @@ def _utc_now() -> datetime:
 
 class CreateAgentThreadInput(SQLModel):
     title: str | None = None
+    system_prompt: str | None = None
 
 
 class RenameAgentThreadInput(SQLModel):
@@ -90,6 +94,28 @@ class ThreadSnapshot(SQLModel):
     tool_calls: list[AgentToolCallRow] = Field(default_factory=list)
     artifacts: list[ArtifactRow] = Field(default_factory=list)
 
+    def provider_messages(self) -> list[ProviderMessage]:
+        rows = [
+            ProviderMessage(
+                role="system",
+                content=self.thread.system_prompt,
+                content_blocks=[{"type": "text", "text": self.thread.system_prompt}],
+            )
+        ]
+        for message in self.messages:
+            role = _provider_role_for_message(message)
+            if role is None:
+                continue
+            rows.append(
+                ProviderMessage(
+                    role=role,
+                    content=_content_blocks_to_text(message.content_blocks),
+                    content_blocks=list(message.content_blocks),
+                    provider_payload=dict(message.provider_payload),
+                )
+            )
+        return rows
+
 
 class ConversationStore:
     def __init__(self, session_factory: sessionmaker) -> None:
@@ -100,8 +126,11 @@ class ConversationStore:
     def create_thread(self, input_data: CreateAgentThreadInput | None = None) -> AgentThreadRow:
         input_data = input_data or CreateAgentThreadInput()
         title = input_data.title.strip() if input_data.title else None
+        system_prompt = (
+            input_data.system_prompt.strip() if input_data.system_prompt else ""
+        ) or DEFAULT_AGENT_THREAD_SYSTEM_PROMPT
         now = _utc_now()
-        row = AgentThreadRow(title=title, created_at=now, updated_at=now)
+        row = AgentThreadRow(title=title, system_prompt=system_prompt, created_at=now, updated_at=now)
         with self._session_factory() as session:
             self._conversations.create_thread(session, row)
             session.commit()
@@ -209,16 +238,13 @@ class ConversationStore:
 
         content_blocks = input_data.content_blocks
         if content_blocks is None:
-            if tool_name == "turn_end":
-                content_blocks = [{"type": "turn_end"}]
-            else:
-                content_blocks = [
-                    {
-                        "type": "tool_call",
-                        "tool_name": tool_name,
-                        "arguments": dict(input_data.arguments_payload),
-                    }
-                ]
+            content_blocks = [
+                {
+                    "type": "tool_call",
+                    "tool_name": tool_name,
+                    "arguments": dict(input_data.arguments_payload),
+                }
+            ]
 
         now = _utc_now()
         with self._session_factory() as session:
@@ -297,18 +323,12 @@ class ConversationStore:
             session.commit()
             return message, updated
 
-    def end_turn(self, thread_id: str, turn_id: str, end_message_id: str) -> AgentTurnRow:
+    def end_turn(self, thread_id: str, turn_id: str) -> AgentTurnRow:
         now = _utc_now()
         with self._session_factory() as session:
             self._require_thread(session, thread_id)
             turn = self._require_open_turn(session, thread_id, turn_id)
-            message = self._conversations.get_message(session, end_message_id)
-            if message is None:
-                raise NotFoundError(f"Message '{end_message_id}' was not found.")
-            if message.thread_id != thread_id or message.turn_id != turn.id:
-                raise ValidationError("Turn end message does not belong to the provided turn.")
-
-            updated = self._conversations.end_turn(session, turn.id, message.id, now)
+            updated = self._conversations.end_turn(session, turn.id, now)
             if updated is None:
                 raise NotFoundError(f"Turn '{turn.id}' was not found.")
             thread = self._require_thread(session, thread_id)
@@ -414,3 +434,30 @@ class ConversationStore:
     def _touch_thread(self, session, thread: AgentThreadRow, now: datetime) -> None:
         thread.updated_at = now
         session.add(thread)
+
+
+def _provider_role_for_message(message: AgentMessageRow) -> str | None:
+    if message.kind is AgentMessageKind.SYSTEM:
+        return "system"
+    if message.kind is AgentMessageKind.USER:
+        return "user"
+    if message.kind is AgentMessageKind.ASSISTANT:
+        return "assistant"
+    if message.kind is AgentMessageKind.TOOL_CALL_RESULT:
+        return "tool"
+    return None
+
+
+def _content_blocks_to_text(blocks: list[dict[str, Any]]) -> str:
+    lines: list[str] = []
+    for block in blocks:
+        block_type = block.get("type")
+        if block_type in {"text", "markdown"}:
+            lines.append(str(block.get("text", "")))
+        elif block_type == "file":
+            lines.append(f"Attached file: {block.get('path')}")
+        elif block_type == "step_confirmation":
+            lines.append(str(block.get("text", "")))
+        else:
+            lines.append(json.dumps(block, ensure_ascii=False))
+    return "\n".join(line for line in lines if line)

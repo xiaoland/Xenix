@@ -63,7 +63,6 @@ class AgentConversationRepository:
         turns = session.exec(select(AgentTurnRow).where(AgentTurnRow.thread_id == thread_id)).all()
         for turn in turns:
             turn.user_message_id = None
-            turn.end_message_id = None
             session.add(turn)
         session.flush()
 
@@ -134,7 +133,6 @@ class AgentConversationRepository:
         self,
         session: Session,
         turn_id: str,
-        end_message_id: str,
         now: datetime,
     ) -> AgentTurnRow | None:
         row = self.get_turn(session, turn_id)
@@ -142,7 +140,6 @@ class AgentConversationRepository:
             return None
 
         row.status = AgentTurnStatus.ENDED
-        row.end_message_id = end_message_id
         row.ended_at = now
         row.updated_at = now
         session.add(row)

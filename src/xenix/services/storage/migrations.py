@@ -6,7 +6,7 @@ from sqlmodel import SQLModel
 from ...exceptions import ValidationError
 from . import models  # noqa: F401
 
-CURRENT_SCHEMA_VERSION = 7
+CURRENT_SCHEMA_VERSION = 9
 
 
 def get_user_version(engine: Engine) -> int:
@@ -148,6 +148,112 @@ def apply_v7(engine: Engine) -> None:
     set_user_version(engine, 7)
 
 
+def apply_v8(engine: Engine) -> None:
+    SQLModel.metadata.create_all(engine)
+    with engine.begin() as connection:
+        agent_thread_columns = {
+            str(row[1])
+            for row in connection.exec_driver_sql("PRAGMA table_info(agent_thread)").all()
+        }
+        if "system_prompt" not in agent_thread_columns:
+            default_prompt = models.DEFAULT_AGENT_THREAD_SYSTEM_PROMPT.replace("'", "''")
+            connection.exec_driver_sql(
+                f"ALTER TABLE agent_thread ADD COLUMN system_prompt TEXT NOT NULL DEFAULT '{default_prompt}'"
+            )
+    set_user_version(engine, 8)
+
+
+def apply_v9(engine: Engine) -> None:
+    SQLModel.metadata.create_all(engine)
+    with engine.connect() as connection:
+        agent_turn_columns = {
+            str(row[1])
+            for row in connection.exec_driver_sql("PRAGMA table_info(agent_turn)").all()
+        }
+    needs_turn_rebuild = "end_message_id" in agent_turn_columns
+
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as connection:
+        connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+        connection.exec_driver_sql("BEGIN")
+        try:
+            if needs_turn_rebuild:
+                connection.exec_driver_sql(
+                    """
+                    CREATE TABLE agent_turn_v9 (
+                        id TEXT NOT NULL,
+                        thread_id TEXT NOT NULL,
+                        sequence_index INTEGER NOT NULL,
+                        status VARCHAR NOT NULL,
+                        user_message_id TEXT,
+                        created_at DATETIME NOT NULL,
+                        ended_at DATETIME,
+                        updated_at DATETIME NOT NULL,
+                        PRIMARY KEY (id),
+                        FOREIGN KEY(thread_id) REFERENCES agent_thread (id),
+                        FOREIGN KEY(user_message_id) REFERENCES agent_message (id)
+                    )
+                    """
+                )
+                connection.exec_driver_sql(
+                    """
+                    INSERT INTO agent_turn_v9 (
+                        id, thread_id, sequence_index, status, user_message_id,
+                        created_at, ended_at, updated_at
+                    )
+                    SELECT
+                        id, thread_id, sequence_index, status, user_message_id,
+                        created_at, ended_at, updated_at
+                    FROM agent_turn
+                    """
+                )
+                connection.exec_driver_sql("DROP TABLE agent_turn")
+                connection.exec_driver_sql("ALTER TABLE agent_turn_v9 RENAME TO agent_turn")
+                connection.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS ix_agent_turn_thread_id ON agent_turn (thread_id)"
+                )
+                connection.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS ix_agent_turn_sequence_index ON agent_turn (sequence_index)"
+                )
+                connection.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_turn_status ON agent_turn (status)")
+                connection.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS ix_agent_turn_user_message_id ON agent_turn (user_message_id)"
+                )
+
+            connection.exec_driver_sql("CREATE TEMP TABLE turn_end_message_ids (id TEXT PRIMARY KEY)")
+            connection.exec_driver_sql(
+                """
+                INSERT OR IGNORE INTO turn_end_message_ids (id)
+                SELECT request_message_id
+                FROM agent_tool_call
+                WHERE tool_name = 'turn_end' AND request_message_id IS NOT NULL
+                """
+            )
+            connection.exec_driver_sql(
+                """
+                INSERT OR IGNORE INTO turn_end_message_ids (id)
+                SELECT result_message_id
+                FROM agent_tool_call
+                WHERE tool_name = 'turn_end' AND result_message_id IS NOT NULL
+                """
+            )
+            connection.exec_driver_sql("DELETE FROM agent_tool_call WHERE tool_name = 'turn_end'")
+            connection.exec_driver_sql(
+                "DELETE FROM agent_message WHERE id IN (SELECT id FROM turn_end_message_ids)"
+            )
+            connection.exec_driver_sql("DROP TABLE turn_end_message_ids")
+            connection.exec_driver_sql(
+                "UPDATE agent_thread SET system_prompt = ? WHERE system_prompt LIKE '%turn_end%'",
+                (models.DEFAULT_AGENT_THREAD_SYSTEM_PROMPT,),
+            )
+            connection.exec_driver_sql("COMMIT")
+        except Exception:
+            connection.exec_driver_sql("ROLLBACK")
+            raise
+        finally:
+            connection.exec_driver_sql("PRAGMA foreign_keys=ON")
+    set_user_version(engine, 9)
+
+
 def run_migrations(engine: Engine) -> int:
     current_version = get_user_version(engine)
     if current_version == 0:
@@ -161,10 +267,16 @@ def run_migrations(engine: Engine) -> int:
         current_version = 6
     if current_version == 6:
         apply_v7(engine)
+        current_version = 7
+    if current_version == 7:
+        apply_v8(engine)
+        current_version = 8
+    if current_version == 8:
+        apply_v9(engine)
         return CURRENT_SCHEMA_VERSION
     if current_version < CURRENT_SCHEMA_VERSION:
         raise ValidationError(
             f"Local schema version {current_version} is no longer supported for automatic migration. "
-            "Delete the local database and restart the app to bootstrap schema v6."
+            f"Delete the local database and restart the app to bootstrap schema v{CURRENT_SCHEMA_VERSION}."
         )
     return current_version

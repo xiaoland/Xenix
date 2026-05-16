@@ -24,9 +24,8 @@
 - `Thread` is the first-slice workspace.
 - A thread contains ordered `Turn` records.
 - A turn starts with one user Message.
-- A turn ends with an explicit turn-end Message.
-- Xenix provides reserved tool `turn_end` because the target providers lack a native turn-end item.
-- A valid `turn_end` tool call has no input arguments. Its tool-call Message is rendered by ChatBox as the turn divider; the paired tool-call-result Message remains durable execution evidence.
+- A turn ends when the provider response has an empty tool-call list.
+- ChatBox renders turn dividers before user Messages.
 - Agent Harness owns Thread, Turn, Message, tool-call, tool-result, run recorder, and first-slice working context.
 - Storage provides standardized persistence interfaces for Agent Harness and other services.
 - First-slice working context is derived from persisted messages, tool results, and artifacts.
@@ -55,7 +54,6 @@
 First-slice provider-facing tool names:
 
 ```text
-turn_end
 data_peek
 data_integrate
 data_clean
@@ -104,7 +102,7 @@ file drag/drop
   -> ChatBox previews
 ```
 
-This scenario validates the product path. System/developer instructions describe tool semantics, boundaries, and `turn_end`; planning and tool ordering remain model-owned.
+This scenario validates the product path. The thread system prompt describes identity and durable instructions; tool descriptions describe tool semantics and boundaries. Planning and tool ordering remain model-owned.
 
 Model-specific preprocessing remains inside model training pipelines.
 
@@ -195,7 +193,7 @@ These are implementation-impacting decisions that should be settled before low-l
 The following are intentionally deferred until the high-level decisions above are stable:
 
 - Exact Message fields, enum values, and provider refs.
-- Exact final styling for the `turn_end` divider.
+- Exact final styling for the turn-boundary divider.
 - Exact working-context projection and prompt injection format.
 - Exact Pydantic schemas for each tool.
 - Exact future DuckDB SQL validation rules and input alias mechanics.

@@ -40,8 +40,7 @@
   - `FunctionCallingLoop` should be renamed to `HarnessCore`.
   - HarnessCore also owns user-message intake.
   - A thread is composed of turns.
-  - A turn is a group of messages that starts with a user message and ends with a clear turn-end message.
-  - Most LLM providers lack native turn-end messages, so Xenix should provide a `turn_end` tool.
+  - A turn is a group of messages that starts with a user message and ends when the provider response has no tool calls.
   - CopilotKit AIMock belongs at the LLM provider boundary.
   - Workspace context injection required further design.
 - User clarification on WorkItem on 2026-05-11:
@@ -75,7 +74,7 @@
   - Generic script runtime is deferred.
 - User clarification on first-slice scope and service direction on 2026-05-12:
   - First slice excludes `data_transform`.
-  - First-slice LLM tools are `data.peek`, `data.integrate`, `data.clean`, `data.feature.select`, `model.train`, `model.hyper_train`, and `model.inference`, plus reserved `turn_end`.
+  - First-slice LLM tools are `data.peek`, `data.integrate`, `data.clean`, `data.feature.select`, `model.train`, `model.hyper_train`, and `model.inference`.
   - Service implementation direction changes to refactor-first.
   - Old UI exits the target path immediately.
   - `WorkItemService` can be removed from the target service topology.
@@ -147,7 +146,7 @@
 - Which existing UI capabilities become tools, message renderers, or supporting native widgets inside messages.
 - Exact storage shape for conversation threads, messages, tool calls, tool results, artifacts, and cancellation state.
 - High-level working-context projection from messages, tool results, and artifacts.
-- Exact `Turn` schema and `turn_end` tool behavior.
+- Exact `Turn` schema and empty-tool-call ending behavior.
 - Exact `ModelingPlanner` input/output contract.
 - Exact minimal data/model tool schemas.
 - Markdown artifact link contract for ChatBox preview rendering.
@@ -193,7 +192,7 @@
 - Decide first-slice working-context projection.
 - Decide the first tool contract set.
 - Decide working-context projection and injection strategy.
-- Decide `turn_end` message/tool contract.
+- Decide provider empty-tool-call turn ending contract.
 - Decide the first training preset contract.
 - Decide markdown artifact link and preview contract.
 

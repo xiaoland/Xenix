@@ -49,7 +49,6 @@ Notes:
 - JSON schema is generated from typed models.
 - `handler` is Python code wired to Xenix services through dependency injection.
 - `render_hint` helps the UI choose table, chart, artifact card, progress, or plain text rendering.
-- `turn_end` is a reserved Harness tool and should be present in the static registry.
 
 ## Tool Call Contract
 
@@ -93,7 +92,6 @@ First-slice default:
 - Feature selection: `agent_record_write`.
 - Training start: `ml_task_start`
 - Prediction start: `prediction_artifact_write`
-- `turn_end`: `read_only`
 
 ## Idempotency
 

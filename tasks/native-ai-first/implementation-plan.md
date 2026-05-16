@@ -22,10 +22,10 @@ drag CSV/XLSX files into ChatBox
   -> model_train or model_hyper_train
   -> model_inference
   -> markdown summaries and artifact previews in ChatBox
-  -> turn_end
+  -> provider response with empty tool call list
 ```
 
-This scenario validates that the app can complete the end-to-end job. System/developer instructions describe tool semantics, boundaries, and the `turn_end` convention; planning and tool ordering remain model-owned.
+This scenario validates that the app can complete the end-to-end job. The thread system prompt describes identity and durable instructions; tool descriptions describe tool semantics and boundaries. Planning and tool ordering remain model-owned.
 
 ## Confirmed Direction
 
@@ -136,7 +136,6 @@ Moves:
 
 - Add Agent Harness module with HarnessCore, provider protocol, static tool registry, tool executor, run recorder, and cancellation.
 - Register first-slice tools:
-  - `turn_end`
   - `data_peek`
   - `data_integrate`
   - `data_clean`
@@ -220,7 +219,7 @@ Exit proof:
 - Model training or hyperparameter training produces model and metrics artifacts.
 - Inference produces prediction artifacts.
 - ChatBox renders markdown summaries and previews artifact links.
-- A turn ends through `turn_end`.
+- A turn ends when the provider response has an empty tool-call list.
 - Conversation, messages, tool calls, tool results, and artifacts persist through Agent Harness-owned boundaries.
 - Deterministic AIMock E2E covers the full happy path.
 

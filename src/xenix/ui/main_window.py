@@ -395,7 +395,7 @@ class MainWindow(QMainWindow):
             user_blocks.append({"type": "text", "text": text})
         for file_path in file_paths:
             user_blocks.append({"type": "file", "path": file_path})
-        self._chat_box.add_message("You", user_blocks)
+        self._chat_box.add_user_message(user_blocks)
         self._chat_box.set_running(True)
 
         def run_harness() -> None:

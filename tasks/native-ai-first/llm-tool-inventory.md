@@ -46,31 +46,6 @@ model.hyper_train      -> model_hyper_train
 model.inference        -> model_inference
 ```
 
-## Required Turn Tool
-
-### `turn_end`
-
-Purpose: explicitly end the current turn.
-
-Inputs:
-
-```text
-none
-```
-
-Output:
-
-```text
-turn_end: true
-```
-
-Notes:
-
-- Reserved Harness tool.
-- A turn starts with one user message and ends with this tool.
-- The tool-call Message renders as the ChatBox divider.
-- Most providers do not have a native turn-end message, so this remains required.
-
 ## Data Tools
 
 ### `data_peek`
@@ -276,7 +251,6 @@ Side effect: creates prediction artifacts.
 ## First-Slice Static Registry
 
 ```text
-turn_end
 data_peek
 data_integrate
 data_clean

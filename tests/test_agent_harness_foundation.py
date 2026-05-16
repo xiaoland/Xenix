@@ -27,6 +27,7 @@ from xenix.services.storage.models import (
     AgentToolCallStatus,
     AgentTurnStatus,
     ArtifactKind,
+    DEFAULT_AGENT_THREAD_SYSTEM_PROMPT,
 )
 
 
@@ -37,7 +38,7 @@ def _build_services(monkeypatch, tmp_path: Path) -> tuple[ConversationStore, Art
     return ConversationStore(context.session_factory), ArtifactService(context.session_factory)
 
 
-def test_conversation_store_persists_thread_turn_messages_and_turn_end(monkeypatch, tmp_path: Path) -> None:
+def test_conversation_store_persists_thread_turn_messages_and_tool_calls(monkeypatch, tmp_path: Path) -> None:
     conversations, _artifacts = _build_services(monkeypatch, tmp_path)
 
     thread = conversations.create_thread(CreateAgentThreadInput(title="First analysis"))
@@ -60,35 +61,49 @@ def test_conversation_store_persists_thread_turn_messages_and_turn_end(monkeypat
         CreateToolCallInput(
             thread_id=thread.id,
             turn_id=turn.id,
-            tool_name="turn_end",
-            arguments_payload={},
+            tool_name="data.peek",
+            arguments_payload={"name": "First analysis"},
         )
     )
     result_message, completed_tool_call = conversations.complete_tool_call(
         CompleteToolCallInput(
             tool_call_id=tool_call.id,
             status=AgentToolCallStatus.SUCCEEDED,
-            result_payload={"status": "ended"},
+            result_payload={"dataset_id": "dataset-1"},
         )
     )
-    ended_turn = conversations.end_turn(thread.id, turn.id, result_message.id)
+    final_assistant_message = conversations.append_message(
+        AppendAgentMessageInput(
+            thread_id=thread.id,
+            turn_id=turn.id,
+            kind=AgentMessageKind.ASSISTANT,
+            ui_author=AgentMessageAuthor.ASSISTANT,
+            content_blocks=[{"type": "markdown", "text": "The dataset is ready."}],
+        )
+    )
+    ended_turn = conversations.end_turn(thread.id, turn.id)
 
     snapshot = conversations.get_thread_snapshot(thread.id)
+    provider_messages = snapshot.provider_messages()
 
+    assert snapshot.thread.system_prompt == DEFAULT_AGENT_THREAD_SYSTEM_PROMPT
     assert ended_turn.status is AgentTurnStatus.ENDED
     assert ended_turn.user_message_id == user_message.id
-    assert ended_turn.end_message_id == result_message.id
     assert completed_tool_call.result_message_id == result_message.id
     assert [message.kind for message in snapshot.messages] == [
         AgentMessageKind.USER,
         AgentMessageKind.ASSISTANT,
         AgentMessageKind.TOOL_CALL,
         AgentMessageKind.TOOL_CALL_RESULT,
+        AgentMessageKind.ASSISTANT,
     ]
     assert snapshot.messages[1].id == assistant_message.id
-    assert snapshot.messages[2].content_blocks == [{"type": "turn_end"}]
-    assert snapshot.tool_calls[0].tool_name == "turn_end"
-    assert snapshot.tool_calls[0].arguments_payload == {}
+    assert snapshot.messages[4].id == final_assistant_message.id
+    assert snapshot.tool_calls[0].tool_name == "data.peek"
+    assert snapshot.tool_calls[0].arguments_payload == {"name": "First analysis"}
+    assert provider_messages[0].role == "system"
+    assert provider_messages[0].content == DEFAULT_AGENT_THREAD_SYSTEM_PROMPT
+    assert [message.role for message in provider_messages[1:]] == ["user", "assistant", "tool", "assistant"]
 
 
 def test_conversation_store_renames_and_deletes_thread_records(monkeypatch, tmp_path: Path) -> None:

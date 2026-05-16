@@ -97,7 +97,7 @@ def test_main_window_seeds_mock_history_and_renders_sidebar_selection(monkeypatc
         window.close()
 
 
-def test_main_window_renders_turn_end_tool_call_as_divider(monkeypatch, tmp_path: Path) -> None:
+def test_main_window_renders_turn_divider_before_user_messages(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
@@ -115,30 +115,27 @@ def test_main_window_renders_turn_end_tool_call_as_divider(monkeypatch, tmp_path
         window._open_history_thread(target_item)
         app.processEvents()
 
-        divider_bubbles = []
-        visible_turn_end_results = []
+        card_names = []
         for index in range(window._chat_box._message_layout.count()):
             item = window._chat_box._message_layout.itemAt(index)
             bubble = item.widget() if item is not None else None
             card = getattr(bubble, "_card", None)
-            if card is not None and card.objectName() == "chatMessageDivider":
-                divider_bubbles.append(bubble)
-            for block in getattr(bubble, "_blocks", []):
-                payload = block.get("payload")
-                if block.get("type") == "tool_call_result" and block.get("tool_name") == "turn_end":
-                    visible_turn_end_results.append(block)
-                if block.get("type") == "tool_result_payload" and isinstance(payload, dict) and payload.get("turn_end") is True:
-                    visible_turn_end_results.append(block)
+            if card is not None:
+                card_names.append(card.objectName())
 
-        assert divider_bubbles
-        assert all(bubble._blocks == [{"type": "turn_end"}] for bubble in divider_bubbles)
-        assert visible_turn_end_results == []
+        user_indexes = [index for index, name in enumerate(card_names) if name == "chatMessageUser"]
+        divider_indexes = [index for index, name in enumerate(card_names) if name == "chatMessageDivider"]
+
+        assert user_indexes
+        assert len(divider_indexes) == len(user_indexes) - 1
+        assert user_indexes[0] == 0 or card_names[user_indexes[0] - 1] != "chatMessageDivider"
+        assert all(user_index > 0 and card_names[user_index - 1] == "chatMessageDivider" for user_index in user_indexes[1:])
     finally:
         window._ml_workspace._timer.stop()
         window.close()
 
 
-def test_main_window_renders_non_turn_end_tool_calls(monkeypatch, tmp_path: Path) -> None:
+def test_main_window_renders_tool_calls(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
@@ -638,24 +635,6 @@ def test_main_window_uses_aimock_settings_in_development(monkeypatch, tmp_path: 
             chunks = [
                 {"choices": [{"delta": {"content": "AIMock streamed "}}]},
                 {"choices": [{"delta": {"content": "this response."}}]},
-                {
-                    "choices": [
-                        {
-                            "delta": {
-                                "tool_calls": [
-                                    {
-                                        "index": 0,
-                                        "id": "call_turn_end",
-                                        "function": {
-                                            "name": "turn_end",
-                                            "arguments": "{}",
-                                        },
-                                    }
-                                ]
-                            }
-                        }
-                    ]
-                },
             ]
             for chunk in chunks:
                 yield f"data: {json.dumps(chunk)}\n\n".encode("utf-8")

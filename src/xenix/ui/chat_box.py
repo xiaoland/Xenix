@@ -153,12 +153,8 @@ class ChatMessageBubble(QFrame):
 
         card_layout = QVBoxLayout(card)
         card_layout.setObjectName("chatMessageCardLayout")
-        if self._is_turn_end(blocks):
-            card_layout.setContentsMargins(0, 8, 0, 0)
-            card_layout.setSpacing(0)
-        else:
-            card_layout.setContentsMargins(14, 12, 14, 12)
-            card_layout.setSpacing(7)
+        card_layout.setContentsMargins(14, 12, 14, 12)
+        card_layout.setSpacing(7)
 
         if self._shows_author(author, blocks):
             author_label = QLabel(author)
@@ -186,8 +182,6 @@ class ChatMessageBubble(QFrame):
             row_layout.addStretch(0)
 
     def _card_object_name(self, author: str, blocks: list[dict[str, Any]]) -> str:
-        if self._is_turn_end(blocks):
-            return "chatMessageDivider"
         if author == "You":
             return "chatMessageUser"
         if author == "Tool":
@@ -196,12 +190,7 @@ class ChatMessageBubble(QFrame):
             return "chatMessageSystem"
         return "chatMessageAssistant"
 
-    def _is_turn_end(self, blocks: list[dict[str, Any]]) -> bool:
-        return bool(blocks) and all(block.get("type") == "turn_end" for block in blocks)
-
     def _shows_author(self, author: str, blocks: list[dict[str, Any]]) -> bool:
-        if self._is_turn_end(blocks):
-            return False
         return author not in {"You", "Xenix"}
 
     def _render_blocks(self, blocks: list[dict[str, Any]]) -> str:
@@ -217,8 +206,6 @@ class ChatMessageBubble(QFrame):
                 parts.append(str(block.get("text", "")))
             elif block_type == "thinking":
                 parts.append(str(block.get("text") or "Thinking..."))
-            elif block_type == "turn_end":
-                continue
             elif block_type == "tool_call":
                 tool_name = str(block.get("tool_name") or "tool")
                 parts.append(f"Calling `{tool_name}`...")
@@ -243,6 +230,23 @@ class ChatMessageBubble(QFrame):
             self._blocks.append({"type": "markdown", "text": ""})
         self._blocks[-1]["text"] = str(self._blocks[-1].get("text", "")) + delta
         self._browser.setMarkdown(self._render_blocks(self._blocks))
+
+
+class TurnDivider(QFrame):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("chatTurnDivider")
+        self._blocks: list[dict[str, Any]] = []
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 8, 0, 0)
+        layout.setSpacing(0)
+
+        line = QFrame(self)
+        self._card = line
+        line.setObjectName("chatMessageDivider")
+        line.setFixedHeight(1)
+        layout.addWidget(line)
 
 
 class AttachmentChip(QFrame):
@@ -437,16 +441,18 @@ class ThreadDetailView(QWidget):
         self.finish_streaming_assistant_message()
         self.hide_thinking_indicator()
         self.clear_messages()
+        has_rendered_user_message = False
         for message in snapshot.messages:
             if message.kind is AgentMessageKind.SYSTEM:
                 continue
-            if message.kind is AgentMessageKind.TOOL_CALL:
-                if self._is_turn_end_message(message.content_blocks):
-                    self.add_message(self._author_label(message.ui_author), message.content_blocks, auto_scroll=False)
-                    continue
+            if message.kind is AgentMessageKind.USER:
+                if has_rendered_user_message:
+                    self.add_turn_divider(auto_scroll=False)
                 self.add_message(self._author_label(message.ui_author), message.content_blocks, auto_scroll=False)
+                has_rendered_user_message = True
                 continue
-            if message.kind is AgentMessageKind.TOOL_CALL_RESULT and self._is_turn_end_result_message(message.content_blocks):
+            if message.kind is AgentMessageKind.TOOL_CALL:
+                self.add_message(self._author_label(message.ui_author), message.content_blocks, auto_scroll=False)
                 continue
             self.add_message(self._author_label(message.ui_author), message.content_blocks, auto_scroll=False)
         self._scroll_to_latest()
@@ -463,6 +469,17 @@ class ThreadDetailView(QWidget):
         bubble = ChatMessageBubble(author=author, blocks=blocks, parent=self)
         bubble.set_available_width(self._message_column.width())
         self._message_layout.insertWidget(self._message_insert_index(), bubble)
+        if auto_scroll:
+            self._scroll_to_latest()
+
+    def add_user_message(self, blocks: list[dict[str, Any]], *, auto_scroll: bool = True) -> None:
+        if self._has_user_message():
+            self.add_turn_divider(auto_scroll=False)
+        self.add_message("You", blocks, auto_scroll=auto_scroll)
+
+    def add_turn_divider(self, *, auto_scroll: bool = True) -> None:
+        divider = TurnDivider(parent=self)
+        self._message_layout.insertWidget(self._message_insert_index(), divider)
         if auto_scroll:
             self._scroll_to_latest()
 
@@ -727,15 +744,12 @@ class ThreadDetailView(QWidget):
             return "System"
         return "Xenix"
 
-    def _is_turn_end_message(self, blocks: list[dict[str, Any]]) -> bool:
-        return bool(blocks) and all(block.get("type") == "turn_end" for block in blocks)
-
-    def _is_turn_end_result_message(self, blocks: list[dict[str, Any]]) -> bool:
-        for block in blocks:
-            if block.get("type") == "tool_call_result" and block.get("tool_name") == "turn_end":
-                return True
-            payload = block.get("payload")
-            if block.get("type") == "tool_result_payload" and isinstance(payload, dict) and payload.get("turn_end") is True:
+    def _has_user_message(self) -> bool:
+        for index in range(self._message_layout.count()):
+            item = self._message_layout.itemAt(index)
+            widget = item.widget() if item is not None else None
+            card = getattr(widget, "_card", None)
+            if card is not None and card.objectName() == "chatMessageUser":
                 return True
         return False
 

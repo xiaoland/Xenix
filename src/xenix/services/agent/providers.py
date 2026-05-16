@@ -8,7 +8,6 @@ from urllib import error, request
 from sqlmodel import Field, SQLModel
 
 from ...exceptions import ValidationError
-from ..storage.models import AgentMessageKind, AgentMessageRow
 
 
 class AgentToolSpec(SQLModel):
@@ -16,6 +15,13 @@ class AgentToolSpec(SQLModel):
     provider_name: str
     description: str
     parameters_schema: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProviderMessage(SQLModel):
+    role: str
+    content: str
+    content_blocks: list[dict[str, Any]] = Field(default_factory=list)
+    provider_payload: dict[str, Any] = Field(default_factory=dict)
 
 
 class ProviderToolCall(SQLModel):
@@ -48,7 +54,7 @@ class ProviderStreamEvent:
 class AgentProvider(Protocol):
     def complete(
         self,
-        messages: list[AgentMessageRow],
+        messages: list[ProviderMessage],
         tools: list[AgentToolSpec],
     ) -> ProviderResponse:
         ...
@@ -60,7 +66,7 @@ class ScriptedAgentProvider:
 
     def complete(
         self,
-        messages: list[AgentMessageRow],
+        messages: list[ProviderMessage],
         tools: list[AgentToolSpec],
     ) -> ProviderResponse:
         if not self._responses:
@@ -86,7 +92,7 @@ class OpenAICompatibleChatProvider:
 
     def complete(
         self,
-        messages: list[AgentMessageRow],
+        messages: list[ProviderMessage],
         tools: list[AgentToolSpec],
     ) -> ProviderResponse:
         if not self._api_key:
@@ -98,7 +104,7 @@ class OpenAICompatibleChatProvider:
 
     def stream(
         self,
-        messages: list[AgentMessageRow],
+        messages: list[ProviderMessage],
         tools: list[AgentToolSpec],
     ):
         if not self._streaming_enabled:
@@ -133,7 +139,7 @@ class OpenAICompatibleChatProvider:
 
     def _build_payload(
         self,
-        messages: list[AgentMessageRow],
+        messages: list[ProviderMessage],
         tools: list[AgentToolSpec],
         *,
         stream: bool,
@@ -293,30 +299,11 @@ class OpenAICompatibleChatProvider:
             )
         return tool_calls
 
-    def _build_messages(self, rows: list[AgentMessageRow]) -> list[dict[str, Any]]:
+    def _build_messages(self, rows: list[ProviderMessage]) -> list[dict[str, Any]]:
         provider_messages: list[dict[str, Any]] = []
         for row in rows:
-            text = self._content_blocks_to_text(row.content_blocks)
-            if row.kind is AgentMessageKind.SYSTEM:
-                provider_messages.append({"role": "system", "content": text})
-            elif row.kind is AgentMessageKind.USER:
-                provider_messages.append({"role": "user", "content": text})
-            elif row.kind is AgentMessageKind.ASSISTANT:
-                provider_messages.append({"role": "assistant", "content": text})
-            elif row.kind is AgentMessageKind.TOOL_CALL_RESULT:
-                provider_messages.append({"role": "tool", "content": text, "tool_call_id": row.provider_payload.get("tool_call_id", "")})
+            message = {"role": row.role, "content": row.content}
+            if row.role == "tool":
+                message["tool_call_id"] = row.provider_payload.get("tool_call_id", "")
+            provider_messages.append(message)
         return provider_messages
-
-    def _content_blocks_to_text(self, blocks: list[dict[str, Any]]) -> str:
-        lines: list[str] = []
-        for block in blocks:
-            block_type = block.get("type")
-            if block_type in {"text", "markdown"}:
-                lines.append(str(block.get("text", "")))
-            elif block_type == "file":
-                lines.append(f"Attached file: {block.get('path')}")
-            elif block_type == "step_confirmation":
-                lines.append(str(block.get("text", "")))
-            else:
-                lines.append(json.dumps(block, ensure_ascii=False))
-        return "\n".join(line for line in lines if line)

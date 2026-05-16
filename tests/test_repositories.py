@@ -11,6 +11,7 @@ from xenix.services.storage.migrations import CURRENT_SCHEMA_VERSION, get_user_v
 from xenix.services.storage.models import (
     DatasetRow,
     DatasetSourceFormat,
+    DEFAULT_AGENT_THREAD_SYSTEM_PROMPT,
     MLTaskArtifactKind,
     MLTaskArtifactRow,
     MLTaskRow,
@@ -397,3 +398,172 @@ def test_run_migrations_upgrades_v4_trained_model_table_to_current(monkeypatch, 
     assert version == get_user_version(engine)
     assert get_user_version(engine) == CURRENT_SCHEMA_VERSION
     assert "metadata_payload" in columns
+
+
+def test_run_migrations_upgrades_v7_agent_threads_with_system_prompt(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    engine = create_engine_for_path(database_path(paths))
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE agent_thread (
+                id TEXT PRIMARY KEY,
+                title TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            """
+            INSERT INTO agent_thread (id, title, created_at, updated_at)
+            VALUES ('thread-1', 'Legacy thread', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')
+            """
+        )
+        connection.exec_driver_sql("PRAGMA user_version=7")
+
+    version = run_migrations(engine)
+
+    with engine.connect() as connection:
+        columns = {
+            str(row[1])
+            for row in connection.exec_driver_sql("PRAGMA table_info(agent_thread)").all()
+        }
+        prompt = connection.exec_driver_sql(
+            "SELECT system_prompt FROM agent_thread WHERE id='thread-1'"
+        ).scalar_one()
+
+    assert version == CURRENT_SCHEMA_VERSION
+    assert "system_prompt" in columns
+    assert prompt == DEFAULT_AGENT_THREAD_SYSTEM_PROMPT
+
+
+def test_run_migrations_upgrades_v8_turn_schema_and_removes_turn_end_rows(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    engine = create_engine_for_path(database_path(paths))
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE agent_thread (
+                id TEXT PRIMARY KEY,
+                title TEXT,
+                system_prompt TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE agent_turn (
+                id TEXT PRIMARY KEY,
+                thread_id TEXT NOT NULL,
+                sequence_index INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                user_message_id TEXT,
+                end_message_id TEXT,
+                created_at TEXT NOT NULL,
+                ended_at TEXT,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE agent_message (
+                id TEXT PRIMARY KEY,
+                thread_id TEXT NOT NULL,
+                turn_id TEXT,
+                sequence_index INTEGER NOT NULL,
+                kind TEXT NOT NULL,
+                ui_author TEXT NOT NULL,
+                content_blocks JSON NOT NULL,
+                provider_payload JSON NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE agent_tool_call (
+                id TEXT PRIMARY KEY,
+                thread_id TEXT NOT NULL,
+                turn_id TEXT NOT NULL,
+                request_message_id TEXT NOT NULL,
+                result_message_id TEXT,
+                tool_name TEXT NOT NULL,
+                status TEXT NOT NULL,
+                arguments_payload JSON NOT NULL,
+                result_payload JSON,
+                error_summary TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            """
+            INSERT INTO agent_thread (id, title, system_prompt, created_at, updated_at)
+            VALUES ('thread-1', 'Legacy thread', 'Must call turn_end if input is needed.', '2026-01-01', '2026-01-01')
+            """
+        )
+        connection.exec_driver_sql(
+            """
+            INSERT INTO agent_turn (
+                id, thread_id, sequence_index, status, user_message_id, end_message_id,
+                created_at, ended_at, updated_at
+            )
+            VALUES ('turn-1', 'thread-1', 0, 'ended', 'message-user', 'message-result', '2026-01-01', '2026-01-01', '2026-01-01')
+            """
+        )
+        connection.exec_driver_sql(
+            """
+            INSERT INTO agent_message (
+                id, thread_id, turn_id, sequence_index, kind, ui_author,
+                content_blocks, provider_payload, created_at
+            )
+            VALUES
+                ('message-user', 'thread-1', 'turn-1', 0, 'user', 'user', '[{"type":"text","text":"hi"}]', '{}', '2026-01-01'),
+                ('message-request', 'thread-1', 'turn-1', 1, 'tool_call', 'tool', '[{"type":"turn_end"}]', '{}', '2026-01-01'),
+                ('message-result', 'thread-1', 'turn-1', 2, 'tool_call_result', 'tool', '[{"type":"tool_result_payload","payload":{"turn_end":true}}]', '{}', '2026-01-01')
+            """
+        )
+        connection.exec_driver_sql(
+            """
+            INSERT INTO agent_tool_call (
+                id, thread_id, turn_id, request_message_id, result_message_id,
+                tool_name, status, arguments_payload, result_payload, error_summary,
+                created_at, updated_at
+            )
+            VALUES (
+                'tool-call-1', 'thread-1', 'turn-1', 'message-request', 'message-result',
+                'turn_end', 'succeeded', '{}', '{"turn_end": true}', NULL,
+                '2026-01-01', '2026-01-01'
+            )
+            """
+        )
+        connection.exec_driver_sql("PRAGMA user_version=8")
+
+    version = run_migrations(engine)
+
+    with engine.connect() as connection:
+        turn_columns = {
+            str(row[1])
+            for row in connection.exec_driver_sql("PRAGMA table_info(agent_turn)").all()
+        }
+        remaining_messages = {
+            str(row[0])
+            for row in connection.exec_driver_sql("SELECT id FROM agent_message").all()
+        }
+        tool_call_count = connection.exec_driver_sql("SELECT COUNT(*) FROM agent_tool_call").scalar_one()
+        prompt = connection.exec_driver_sql(
+            "SELECT system_prompt FROM agent_thread WHERE id='thread-1'"
+        ).scalar_one()
+
+    assert version == CURRENT_SCHEMA_VERSION
+    assert "end_message_id" not in turn_columns
+    assert remaining_messages == {"message-user"}
+    assert tool_call_count == 0
+    assert prompt == DEFAULT_AGENT_THREAD_SYSTEM_PROMPT

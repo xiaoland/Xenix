@@ -6,22 +6,24 @@ Implement the first executable ChatBox-first slice behind the Native AI First de
 
 - Persist Agent Harness threads, turns, messages, tool calls, run records, and artifact records.
 - Refactor ML service inputs so the Agent Harness can train, evaluate, and infer from explicit dataset/feature/target/model inputs.
-- Provide a static tool registry for the first-slice tools: `turn_end`, `data.peek`, `data.integrate`, `data.clean`, `data.feature.select`, `model.train`, `model.hyper_train`, and `model.inference`.
+- Provide a static tool registry for the first-slice tools: `data.peek`, `data.integrate`, `data.clean`, `data.feature.select`, `model.train`, `model.hyper_train`, and `model.inference`.
 - Replace the default Qt center surface with a ChatBox shell and route submitted messages into Agent Harness.
 
 The hypothesis is that a first-slice user journey can be proven without WorkItem as the primary workspace by deriving working context from messages, tool results, and artifacts.
 
 ## Guardrails Touched
 
-- `src/xenix/services/storage/`: schema v7, Agent Harness records, generic artifact records, dataset-scoped task/model queries.
+- `src/xenix/services/storage/`: schema v9, Agent Harness records, thread-level system prompt metadata, generic artifact records, dataset-scoped task/model queries.
 - `src/xenix/services/ml_service.py`: dataset-scoped training, tuning, inference inputs added while preserving WorkItem-compatible entrypoints.
 - `src/xenix/services/ml_task_service.py`: `work_item_id` is optional for ML task execution and canonical output paths can be dataset-scoped.
 - `src/xenix/services/agent/`: provider boundary, Harness loop, static tool registry, tool execution context.
 - `src/xenix/services/agent/`: step budget is now a user-confirmed pause/resume contract when the current budget is exhausted.
 - `src/xenix/services/agent/`: active runs now carry a cooperative cancellation signal used by provider loops and tool execution context.
+- `src/xenix/services/agent/`: provider requests now use a ThreadSnapshot projection that prepends the thread system prompt as the first provider message.
+- `src/xenix/services/agent/`: a turn now ends when the provider response has no tool calls; empty assistant text with no tool calls is a valid turn end.
 - `src/xenix/ui/`: ChatBox is now the default main surface; legacy widgets remain instanced for compatibility while target flow moves to ChatBox.
 - `src/xenix/ui/`: ChatBox owns the step-budget confirmation control surfaced from Agent Harness stream events.
-- `src/xenix/ui/`: ChatBox renders provider-wait `Thinking...` and non-`turn_end` tool-call messages in the message list.
+- `src/xenix/ui/`: ChatBox renders provider-wait `Thinking...`, tool-call messages, and turn-boundary dividers before user messages.
 
 ## Verification
 
@@ -30,9 +32,12 @@ The hypothesis is that a first-slice user journey can be proven without WorkItem
 - `pdm run pytest tests/test_ml_execution.py`
 - `pdm run pytest tests/test_services.py tests/test_inference_history.py`
 - `pdm run pytest tests/test_main.py tests/test_agent_harness_foundation.py tests/test_agent_harness_first_slice.py`
+- `pdm run pytest tests/test_agent_harness_foundation.py tests/test_agent_harness_streaming.py tests/test_repositories.py tests/test_migrations.py tests/test_storage_bootstrap.py`
+- `pdm run pytest tests/test_agent_harness_first_slice.py tests/test_main.py`
+- `pdm run pytest tests/test_agent_harness_foundation.py tests/test_agent_harness_streaming.py tests/test_agent_harness_first_slice.py tests/test_main.py tests/test_repositories.py tests/test_migrations.py tests/test_storage_bootstrap.py`
 - `pdm run pytest`
 
-Full-suite result: `78 passed in 203.48s`.
+Full-suite result: `109 passed in 288.04s`.
 
 ## Current Gaps
 

@@ -345,12 +345,11 @@ class AgentHarnessService:
         file_paths: list[str],
         step_state: dict[str, int],
     ) -> ThreadSnapshot | StepBudgetPause:
-        reminder_sent = False
         while step_state["used_steps"] < step_state["granted_steps"]:
             step_state["used_steps"] += 1
             self._raise_if_cancelled(run_id)
             snapshot = self._conversation_store.get_thread_snapshot(thread_id)
-            provider_response = self._provider.complete(snapshot.messages, self._tool_registry.list_specs())
+            provider_response = self._provider.complete(snapshot.provider_messages(), self._tool_registry.list_specs())
             self._raise_if_cancelled(run_id)
             if provider_response.assistant_content_blocks:
                 self._conversation_store.append_message(
@@ -365,24 +364,8 @@ class AgentHarnessService:
                 )
 
             if not provider_response.tool_calls:
-                if reminder_sent:
-                    raise ValidationError("Provider stopped without calling turn_end.")
-                self._conversation_store.append_message(
-                    AppendAgentMessageInput(
-                        thread_id=thread_id,
-                        turn_id=turn_id,
-                        kind=AgentMessageKind.SYSTEM,
-                        ui_author=AgentMessageAuthor.SYSTEM,
-                        content_blocks=[
-                            {
-                                "type": "text",
-                                "text": "If the turn is complete and user input is needed, call turn_end.",
-                            }
-                        ],
-                    )
-                )
-                reminder_sent = True
-                continue
+                self._conversation_store.end_turn(thread_id, turn_id)
+                return self._conversation_store.get_thread_snapshot(thread_id)
 
             for tool_call in provider_response.tool_calls:
                 self._raise_if_cancelled(run_id)
@@ -420,7 +403,7 @@ class AgentHarnessService:
                         status = AgentToolCallStatus.FAILED
                         error_summary = str(exc)
 
-                result_message, _completed = self._conversation_store.complete_tool_call(
+                _result_message, _completed = self._conversation_store.complete_tool_call(
                     CompleteToolCallInput(
                         tool_call_id=persisted_tool_call.id,
                         status=status,
@@ -435,10 +418,6 @@ class AgentHarnessService:
                 )
                 if status is AgentToolCallStatus.CANCELLED:
                     raise AgentRunCancelled()
-                if tool_call.tool_name == "turn_end" and status is AgentToolCallStatus.SUCCEEDED:
-                    self._conversation_store.end_turn(thread_id, turn_id, result_message.id)
-                    return self._conversation_store.get_thread_snapshot(thread_id)
-
         return self._pause_for_step_confirmation(
             thread_id=thread_id,
             turn_id=turn_id,
@@ -455,14 +434,13 @@ class AgentHarnessService:
         file_paths: list[str],
         step_state: dict[str, int],
     ):
-        reminder_sent = False
         while step_state["used_steps"] < step_state["granted_steps"]:
             step_state["used_steps"] += 1
             self._raise_if_cancelled(run_id)
             snapshot = self._conversation_store.get_thread_snapshot(thread_id)
             provider_response: ProviderResponse | None = None
             yield AgentHarnessStreamEvent(kind="thinking_started", thread_id=thread_id, turn_id=turn_id, run_id=run_id)
-            for stream_event in self._provider_stream(snapshot.messages, self._tool_registry.list_specs()):
+            for stream_event in self._provider_stream(snapshot.provider_messages(), self._tool_registry.list_specs()):
                 self._raise_if_cancelled(run_id)
                 if stream_event.delta_text:
                     yield AgentHarnessStreamEvent(
@@ -496,24 +474,8 @@ class AgentHarnessService:
                 )
 
             if not provider_response.tool_calls:
-                if reminder_sent:
-                    raise ValidationError("Provider stopped without calling turn_end.")
-                self._conversation_store.append_message(
-                    AppendAgentMessageInput(
-                        thread_id=thread_id,
-                        turn_id=turn_id,
-                        kind=AgentMessageKind.SYSTEM,
-                        ui_author=AgentMessageAuthor.SYSTEM,
-                        content_blocks=[
-                            {
-                                "type": "text",
-                                "text": "If the turn is complete and user input is needed, call turn_end.",
-                            }
-                        ],
-                    )
-                )
-                reminder_sent = True
-                continue
+                self._conversation_store.end_turn(thread_id, turn_id)
+                return self._conversation_store.get_thread_snapshot(thread_id)
 
             for tool_call in provider_response.tool_calls:
                 self._raise_if_cancelled(run_id)
@@ -551,7 +513,7 @@ class AgentHarnessService:
                         status = AgentToolCallStatus.FAILED
                         error_summary = str(exc)
 
-                result_message, _completed = self._conversation_store.complete_tool_call(
+                _result_message, _completed = self._conversation_store.complete_tool_call(
                     CompleteToolCallInput(
                         tool_call_id=persisted_tool_call.id,
                         status=status,
@@ -566,10 +528,6 @@ class AgentHarnessService:
                 )
                 if status is AgentToolCallStatus.CANCELLED:
                     raise AgentRunCancelled()
-                if tool_call.tool_name == "turn_end" and status is AgentToolCallStatus.SUCCEEDED:
-                    self._conversation_store.end_turn(thread_id, turn_id, result_message.id)
-                    return self._conversation_store.get_thread_snapshot(thread_id)
-
         return self._pause_for_step_confirmation(
             thread_id=thread_id,
             turn_id=turn_id,
@@ -718,8 +676,6 @@ class AgentHarnessService:
         return self._conversation_store.get_thread_snapshot(thread_id)
 
     def _tool_call_arguments(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
-        if tool_name == "turn_end":
-            return {}
         return arguments
 
     def _provider_stream(

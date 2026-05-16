@@ -138,10 +138,10 @@ AIMock:
 Preset prompts:
 
 - `inspect uploaded dataset`: drag `fixtures/data/aimock-sales-demand.csv` into the composer, then sends a real `data.peek` tool call; the follow-up fixture is keyed by `toolCallId=call_xenix_data_peek`.
-- `show analysis result`: streams a rich Markdown analysis result with tables, artifact links, an image link, and `turn_end`.
-- `stream test`: streams assistant text plus a small Markdown table and calls `turn_end`.
+- `show analysis result`: streams a rich Markdown analysis result with tables, artifact links, and an image link.
+- `stream test`: streams assistant text plus a small Markdown table.
 - `hello xenix`: validates that the OpenAI-compatible provider boundary is routed to AIMock.
-- Any other chat request hits the final catch-all fixture, which returns the available preset prompts and calls `turn_end`.
+- Any other chat request hits the final catch-all fixture, which returns the available preset prompts.
 
 See `tasks/native-ai-first/streaming-message-mock.md` for the implemented streaming path and verification.
 

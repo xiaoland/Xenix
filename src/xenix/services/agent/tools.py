@@ -62,7 +62,6 @@ class AgentToolRegistry:
         self._tools = {
             tool.spec.name: tool
             for tool in (
-                self._build_turn_end_tool(),
                 self._build_data_peek_tool(),
                 self._build_data_integrate_tool(),
                 self._build_data_clean_tool(),
@@ -89,21 +88,6 @@ class AgentToolRegistry:
         result = tool.handler(arguments, context)
         self._raise_if_cancelled(context)
         return result
-
-    def _build_turn_end_tool(self) -> AgentTool:
-        return AgentTool(
-            spec=AgentToolSpec(
-                name="turn_end",
-                provider_name="turn_end",
-                description="End the current turn when the assistant has completed all useful work for this user input.",
-                parameters_schema={
-                    "type": "object",
-                    "properties": {},
-                    "additionalProperties": False,
-                },
-            ),
-            handler=self._turn_end,
-        )
 
     def _build_data_peek_tool(self) -> AgentTool:
         return AgentTool(
@@ -248,12 +232,6 @@ class AgentToolRegistry:
                 },
             ),
             handler=self._model_inference,
-        )
-
-    def _turn_end(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
-        return ToolExecutionResult(
-            payload={"turn_end": True},
-            content_blocks=[],
         )
 
     def _data_peek(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:

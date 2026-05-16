@@ -13,6 +13,7 @@ from .conversation_store import (
 from .harness_service import AgentHarnessService, AgentHarnessStreamEvent, ContinueStepBudgetInput, SubmitUserTurnInput
 from .providers import (
     OpenAICompatibleChatProvider,
+    ProviderMessage,
     ProviderResponse,
     ProviderStreamEvent,
     ProviderToolCall,
@@ -36,6 +37,7 @@ __all__ = [
     "FinishAgentRunInput",
     "ContinueStepBudgetInput",
     "OpenAICompatibleChatProvider",
+    "ProviderMessage",
     "ProviderResponse",
     "ProviderStreamEvent",
     "ProviderToolCall",

@@ -96,23 +96,7 @@ def _create_message_rendering_fixture(store: ConversationStore) -> None:
             ],
         )
     )
-    _turn_end_message, turn_end_call = store.create_tool_call(
-        CreateToolCallInput(
-            thread_id=thread.id,
-            turn_id=first_turn.id,
-            tool_name="turn_end",
-            arguments_payload={},
-        )
-    )
-    turn_end_result, _completed = store.complete_tool_call(
-        CompleteToolCallInput(
-            tool_call_id=turn_end_call.id,
-            status=AgentToolCallStatus.SUCCEEDED,
-            result_payload={"turn_end": True},
-            content_blocks=[],
-        )
-    )
-    store.end_turn(thread.id, first_turn.id, turn_end_result.id)
+    store.end_turn(thread.id, first_turn.id)
 
     second_turn, _second_user = store.start_turn(
         StartTurnInput(
@@ -216,23 +200,7 @@ def _create_message_rendering_fixture(store: ConversationStore) -> None:
             ],
         )
     )
-    _second_end_message, second_end_call = store.create_tool_call(
-        CreateToolCallInput(
-            thread_id=thread.id,
-            turn_id=second_turn.id,
-            tool_name="turn_end",
-            arguments_payload={},
-        )
-    )
-    second_end_result, _second_completed = store.complete_tool_call(
-        CompleteToolCallInput(
-            tool_call_id=second_end_call.id,
-            status=AgentToolCallStatus.SUCCEEDED,
-            result_payload={"turn_end": True},
-            content_blocks=[],
-        )
-    )
-    store.end_turn(thread.id, second_turn.id, second_end_result.id)
+    store.end_turn(thread.id, second_turn.id)
 
 
 def _create_short_history_fixture(store: ConversationStore) -> None:
@@ -257,20 +225,4 @@ def _create_short_history_fixture(store: ConversationStore) -> None:
             ],
         )
     )
-    _end_message, end_call = store.create_tool_call(
-        CreateToolCallInput(
-            thread_id=thread.id,
-            turn_id=turn.id,
-            tool_name="turn_end",
-            arguments_payload={},
-        )
-    )
-    end_result, _completed = store.complete_tool_call(
-        CompleteToolCallInput(
-            tool_call_id=end_call.id,
-            status=AgentToolCallStatus.SUCCEEDED,
-            result_payload={"turn_end": True},
-            content_blocks=[],
-        )
-    )
-    store.end_turn(thread.id, turn.id, end_result.id)
+    store.end_turn(thread.id, turn.id)

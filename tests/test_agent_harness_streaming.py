@@ -10,6 +10,7 @@ from xenix.services.agent import (
     ConversationStore,
     ContinueStepBudgetInput,
     OpenAICompatibleChatProvider,
+    ProviderMessage,
     ProviderResponse,
     ProviderStreamEvent,
     ProviderToolCall,
@@ -30,7 +31,7 @@ class StreamingProviderFixture:
     def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
         return ProviderResponse(
             assistant_content_blocks=[{"type": "markdown", "text": self._text}],
-            tool_calls=[self._turn_end_call()],
+            tool_calls=[],
         )
 
     def stream(self, messages: list[Any], tools: list[Any]):
@@ -39,32 +40,31 @@ class StreamingProviderFixture:
         yield ProviderStreamEvent(
             response=ProviderResponse(
                 assistant_content_blocks=[{"type": "markdown", "text": self._text}],
-                tool_calls=[self._turn_end_call()],
+                tool_calls=[],
             )
         )
 
-    def _turn_end_call(self) -> ProviderToolCall:
-        return ProviderToolCall(
-            provider_call_id="fixture-turn-end",
-            tool_name="turn_end",
-            arguments={},
+
+class CapturingProviderFixture:
+    def __init__(self) -> None:
+        self.messages: list[ProviderMessage] = []
+
+    def complete(self, messages: list[ProviderMessage], tools: list[Any]) -> ProviderResponse:
+        self.messages = list(messages)
+        return ProviderResponse(
+            assistant_content_blocks=[{"type": "markdown", "text": "Done."}],
+            tool_calls=[],
         )
 
 
-class TurnEndOnlyRegistry:
+class EmptyProviderFixture:
+    def complete(self, messages: list[ProviderMessage], tools: list[Any]) -> ProviderResponse:
+        return ProviderResponse()
+
+
+class EmptyToolRegistry:
     def list_specs(self) -> list[AgentToolSpec]:
-        return [
-            AgentToolSpec(
-                name="turn_end",
-                provider_name="turn_end",
-                description="End the current turn.",
-                parameters_schema={
-                    "type": "object",
-                    "properties": {},
-                    "additionalProperties": False,
-                },
-            )
-        ]
+        return []
 
     def execute(
         self,
@@ -72,10 +72,7 @@ class TurnEndOnlyRegistry:
         arguments: dict[str, Any],
         context: ToolExecutionContext,
     ) -> ToolExecutionResult:
-        return ToolExecutionResult(
-            payload={"turn_end": True},
-            content_blocks=[],
-        )
+        raise AssertionError(f"Unexpected tool execution: {tool_name}")
 
 
 class BudgetedProviderFixture:
@@ -97,20 +94,13 @@ class BudgetedProviderFixture:
             )
         return ProviderResponse(
             assistant_content_blocks=[{"type": "markdown", "text": "Finished after extension."}],
-            tool_calls=[
-                ProviderToolCall(
-                    provider_call_id="call-turn-end",
-                    tool_name="turn_end",
-                    arguments={},
-                )
-            ],
+            tool_calls=[],
         )
 
 
-class BudgetedRegistry(TurnEndOnlyRegistry):
+class BudgetedRegistry:
     def list_specs(self) -> list[AgentToolSpec]:
         return [
-            *super().list_specs(),
             AgentToolSpec(
                 name="dummy.step",
                 provider_name="dummy_step",
@@ -134,7 +124,7 @@ class BudgetedRegistry(TurnEndOnlyRegistry):
                 payload={"dummy_step": True},
                 content_blocks=[{"type": "markdown", "text": "Dummy step completed."}],
             )
-        return super().execute(tool_name, arguments, context)
+        raise AssertionError(f"Unexpected tool execution: {tool_name}")
 
 
 class BlockingToolProvider:
@@ -202,12 +192,12 @@ def test_openai_compatible_provider_streams_sse_text_and_tool_calls(monkeypatch)
                                 "tool_calls": [
                                     {
                                         "index": 0,
-                                        "id": "call_turn_end",
-                                        "type": "function",
-                                        "function": {
-                                            "name": "turn_end",
-                                            "arguments": "{",
-                                        },
+                                            "id": "call_data_peek",
+                                            "type": "function",
+                                            "function": {
+                                                "name": "data_peek",
+                                                "arguments": "{\"name\": \"",
+                                            },
                                     }
                                 ]
                             }
@@ -222,7 +212,7 @@ def test_openai_compatible_provider_streams_sse_text_and_tool_calls(monkeypatch)
                                     {
                                         "index": 0,
                                         "function": {
-                                            "arguments": "}",
+                                            "arguments": "sample\"}",
                                         },
                                     }
                                 ]
@@ -243,18 +233,36 @@ def test_openai_compatible_provider_streams_sse_text_and_tool_calls(monkeypatch)
     provider = OpenAICompatibleChatProvider(base_url="http://aimock.local", api_key="test", model="mock-model")
     events = list(
         provider.stream(
-            [],
-            TurnEndOnlyRegistry().list_specs(),
+            [
+                ProviderMessage(role="system", content="You are Xenix."),
+                ProviderMessage(role="user", content="Hello"),
+            ],
+            [
+                AgentToolSpec(
+                    name="data.peek",
+                    provider_name="data_peek",
+                    description="Inspect a dataset.",
+                    parameters_schema={
+                        "type": "object",
+                        "properties": {"name": {"type": "string"}},
+                        "additionalProperties": False,
+                    },
+                )
+            ],
         )
     )
 
     assert captured_payload["stream"] is True
+    assert captured_payload["messages"][:2] == [
+        {"role": "system", "content": "You are Xenix."},
+        {"role": "user", "content": "Hello"},
+    ]
     assert "".join(event.delta_text for event in events if event.is_delta) == "Hello"
     final_response = [event.response for event in events if event.is_complete][0]
     assert final_response is not None
     assert final_response.assistant_content_blocks == [{"type": "markdown", "text": "Hello"}]
-    assert final_response.tool_calls[0].tool_name == "turn_end"
-    assert final_response.tool_calls[0].arguments == {}
+    assert final_response.tool_calls[0].tool_name == "data.peek"
+    assert final_response.tool_calls[0].arguments == {"name": "sample"}
 
 
 def test_agent_harness_streams_deltas_and_persists_final_message(monkeypatch, tmp_path: Path) -> None:
@@ -264,7 +272,7 @@ def test_agent_harness_streams_deltas_and_persists_final_message(monkeypatch, tm
     harness = AgentHarnessService(
         session_factory=context.session_factory,
         provider=StreamingProviderFixture("streamed assistant text", chunk_size=6),
-        tool_registry=TurnEndOnlyRegistry(),
+        tool_registry=EmptyToolRegistry(),
         conversation_store=ConversationStore(context.session_factory),
     )
 
@@ -278,16 +286,50 @@ def test_agent_harness_streams_deltas_and_persists_final_message(monkeypatch, tm
     assert [message.kind for message in snapshot.messages] == [
         AgentMessageKind.USER,
         AgentMessageKind.ASSISTANT,
-        AgentMessageKind.TOOL_CALL,
-        AgentMessageKind.TOOL_CALL_RESULT,
     ]
     assert snapshot.messages[1].content_blocks == [{"type": "markdown", "text": "streamed assistant text"}]
-    assert snapshot.messages[2].content_blocks == [{"type": "turn_end"}]
-    assert snapshot.messages[3].content_blocks == [{"type": "tool_result_payload", "payload": {"turn_end": True}}]
-    assert snapshot.tool_calls[0].tool_name == "turn_end"
-    assert snapshot.tool_calls[0].arguments_payload == {}
+    assert snapshot.tool_calls == []
     assert "thinking_started" in [event.kind for event in events]
     assert "thinking_finished" in [event.kind for event in events]
+
+
+def test_agent_harness_projects_thread_system_prompt_as_first_provider_message(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    provider = CapturingProviderFixture()
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=provider,
+        tool_registry=EmptyToolRegistry(),
+        conversation_store=ConversationStore(context.session_factory),
+    )
+
+    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="show me the data"))
+
+    assert snapshot.messages[0].kind is AgentMessageKind.USER
+    assert provider.messages[0].role == "system"
+    assert provider.messages[0].content == snapshot.thread.system_prompt
+    assert provider.messages[1].role == "user"
+    assert provider.messages[1].content == "show me the data"
+
+
+def test_agent_harness_ends_turn_on_empty_provider_response(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=EmptyProviderFixture(),
+        tool_registry=EmptyToolRegistry(),
+        conversation_store=ConversationStore(context.session_factory),
+    )
+
+    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="wait for next input"))
+
+    assert snapshot.turns[0].status is AgentTurnStatus.ENDED
+    assert [message.kind for message in snapshot.messages] == [AgentMessageKind.USER]
+    assert snapshot.tool_calls == []
 
 
 def test_agent_harness_pauses_for_step_budget_confirmation_and_resumes(monkeypatch, tmp_path: Path) -> None:
@@ -341,7 +383,7 @@ def test_agent_harness_pauses_for_step_budget_confirmation_and_resumes(monkeypat
     assert resumed_snapshot is not None
     assert resumed_snapshot.turns[0].status is AgentTurnStatus.ENDED
     assert conversations.get_run(pause_event.run_id).status is AgentRunStatus.SUCCEEDED
-    assert [tool.tool_name for tool in resumed_snapshot.tool_calls] == ["dummy.step", "turn_end"]
+    assert [tool.tool_name for tool in resumed_snapshot.tool_calls] == ["dummy.step"]
     assert provider.calls == 2
 
 
@@ -381,8 +423,8 @@ def test_agent_harness_cancel_run_stops_active_tool_call(monkeypatch, tmp_path: 
 def test_streaming_provider_fixture_can_return_non_streaming_response() -> None:
     provider = StreamingProviderFixture("same fixture content", chunk_size=4)
 
-    response = provider.complete([], TurnEndOnlyRegistry().list_specs())
-    events = list(provider.stream([], TurnEndOnlyRegistry().list_specs()))
+    response = provider.complete([], EmptyToolRegistry().list_specs())
+    events = list(provider.stream([], EmptyToolRegistry().list_specs()))
 
     assert response.assistant_content_blocks == [{"type": "markdown", "text": "same fixture content"}]
     assert "".join(event.delta_text for event in events if isinstance(event, ProviderStreamEvent)) == "same fixture content"

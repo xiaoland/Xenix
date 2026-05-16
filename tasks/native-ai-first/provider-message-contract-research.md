@@ -124,7 +124,6 @@ Message
     - table
     - chart
     - artifact_ref
-    - turn_end
     - cancellation
     - error
   provider_refs:
@@ -142,11 +141,11 @@ Message
 - `Message` is the durable unit.
 - Visible UI messages map 1:1 to Harness Messages.
 - `content_blocks` are not standalone user-visible messages.
-- System and developer instructions are persisted as hidden Messages.
+- Thread-level system prompt is persisted as thread metadata and projected as the first provider message.
 - LLM providers translate canonical Messages into provider-specific request shapes.
 - LLM providers translate provider responses back into canonical Messages before UI rendering.
 - Tool calls and tool results are Agent Harness messages, and Xenix service tools live inside Agent Harness.
-- A valid `turn_end` tool call carries no arguments. Its durable tool-call Message carries the `turn_end` content block that lets ChatBox render the turn divider.
+- Turn boundaries are derived from `turn_id`; ChatBox renders a divider before each user Message.
 
 ## Open Questions
 

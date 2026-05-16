@@ -59,7 +59,6 @@ Native Qt MainWindow
       -> Xenix service tools
           -> Data tools
           -> Model tools
-          -> Turn tool
   -> Refactored services
       -> DatasetService
       -> MLService
@@ -216,7 +215,6 @@ Turn
   thread_id
   sequence_index
   started_by_message_id
-  ended_by_message_id
   status
   created_at
   ended_at
@@ -282,11 +280,10 @@ Invariants:
 
 - Visible UI messages map 1:1 to Harness Messages.
 - Thread is composed of turns.
-- A turn starts with one user Message and ends with an explicit turn-end Message.
-- Xenix provides reserved `turn_end` tool because most LLM providers do not produce a native turn-end message.
+- A turn starts with one user Message and ends when the provider response has no tool calls.
 - UI distinguishes visible `user` and `assistant` messages.
 - Harness distinguishes provider-facing message kind and tool lifecycle state.
-- System and developer instructions are persisted as hidden Messages.
+- Thread-level system prompt is persisted as Thread metadata and projected as the first provider message.
 - LLM providers own conversion between canonical Messages and provider-specific message or item contracts.
 - The tool registry is static for a given native app version; runtime context affects argument validation and required artifact checks.
 - HarnessCore emits run events; run recorder persists those events into durable rows.
@@ -301,7 +298,6 @@ The authoritative proposed LLM-facing tool list lives in `tasks/native-ai-first/
 Condensed groups:
 
 ```text
-turn control
 data preprocessing
 model training and inference
 ```
@@ -382,7 +378,7 @@ Deterministic E2E tests
 - Whether provider roles should be stored durably or derived by adapter from `harness_kind`.
 - Whether a visible assistant message with text plus a tool call persists as one Message, matching Anthropic, or as sequential Messages for easier UI progress rendering.
 - OpenAI provider dialect is OpenAI-compatible `/v1/chat/completions`.
-- Exact Turn persistence schema and final `turn_end` divider styling.
+- Exact Turn persistence schema and final turn-boundary divider styling.
 
 ## Impact Forecast
 
