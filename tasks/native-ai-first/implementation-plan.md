@@ -19,6 +19,7 @@ drag CSV/XLSX files into ChatBox
   -> data_integrate
   -> data_clean
   -> data_feature_select
+  -> model_metadata
   -> model_train or model_hyper_train
   -> model_inference
   -> markdown summaries and artifact previews in ChatBox
@@ -140,6 +141,7 @@ Moves:
   - `data_integrate`
   - `data_clean`
   - `data_feature_select`
+  - `model_metadata`
   - `model_train`
   - `model_hyper_train`
   - `model_inference`
@@ -214,6 +216,7 @@ Exit proof:
 - User can drag CSV/XLSX files into ChatBox.
 - User can request basic analysis through conversation.
 - LLM can call first-slice tools through Agent Harness.
+- LLM can inspect available model keys, capabilities, and parameter schemas through `model_metadata`.
 - Data is inspected, integrated, cleaned, and prepared for modeling.
 - Feature/target selection is captured as a tool result or artifact-backed record.
 - Model training or hyperparameter training produces model and metrics artifacts.

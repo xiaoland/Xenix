@@ -41,6 +41,7 @@ data.peek              -> data_peek
 data.integrate         -> data_integrate
 data.clean             -> data_clean
 data.feature.select    -> data_feature_select
+model.metadata         -> model_metadata
 model.train            -> model_train
 model.hyper_train      -> model_hyper_train
 model.inference        -> model_inference
@@ -164,6 +165,44 @@ Side effect: emits a feature-selection tool result for later model tools to use.
 
 ## Model Tools
 
+### `model_metadata`
+
+Alias: `model.metadata`
+
+Purpose: expose the static ML model catalog, canonical model keys, model capabilities, and optional parameter schemas.
+
+Inputs:
+
+```text
+model_keys?
+problem_kind?
+capability?
+include_param_schema?
+include_param_grid_schema?
+```
+
+Output:
+
+```text
+model_keys
+models
+  model_key
+  display_name
+  problem_kind
+  family
+  guidance
+  requires_target
+  supports_fit
+  supports_hyperparameter_tuning
+  param_schema?
+  param_grid_schema?
+markdown_summary
+```
+
+Side effect: read-only.
+
+Contract note: `model_keys.items.enum` lists canonical ML registry keys. Training tools keep lightweight string inputs and rely on this tool for discovery.
+
 ### `model_train`
 
 Alias: `model.train`
@@ -191,6 +230,8 @@ artifact_links
 ```
 
 Side effect: starts training/evaluation and registers model + metrics artifacts.
+
+Contract note: `models` accepts canonical model keys. The tool also tolerates common aliases such as `linear_regression` and normalizes them before calling ML services.
 
 ### `model_hyper_train`
 
@@ -221,6 +262,8 @@ artifact_links
 ```
 
 Side effect: starts hyperparameter training/evaluation and registers model + metrics artifacts.
+
+Contract note: `param_grids_by_model` is keyed by canonical model keys. The tool validates `supports_hyperparameter_tuning` before starting ML tasks.
 
 ### `model_inference`
 
@@ -255,6 +298,7 @@ data_peek
 data_integrate
 data_clean
 data_feature_select
+model_metadata
 model_train
 model_hyper_train
 model_inference

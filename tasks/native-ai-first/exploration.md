@@ -79,6 +79,10 @@
   - Old UI exits the target path immediately.
   - `WorkItemService` can be removed from the target service topology.
   - First-slice working context needs further high-level design.
+- User clarification on model tool discovery on 2026-05-16:
+  - Add `model.metadata` so the LLM can inspect canonical model keys, capabilities, and parameter schemas.
+  - `model.train` and `model.hyper_train` keep lightweight model-key string inputs.
+  - `model.metadata.model_keys.items.enum` is the model catalog discovery point.
 - User clarification on Agent autonomy and ownership on 2026-05-12:
   - The first-slice flow is an acceptance scenario.
   - System/developer prompts expose tools and boundaries while planning and tool ordering remain model-owned.

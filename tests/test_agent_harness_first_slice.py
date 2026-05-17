@@ -1,7 +1,10 @@
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from xenix.config import ensure_app_dirs, get_app_paths
+from xenix.exceptions import ValidationError
 from xenix.services.agent import (
     AgentHarnessService,
     AgentToolRegistry,
@@ -11,6 +14,7 @@ from xenix.services.agent import (
     SubmitUserTurnInput,
 )
 from xenix.services.agent.providers import AgentProvider
+from xenix.services.agent.tools import ToolExecutionContext
 from xenix.services.artifact_service import ArtifactService
 from xenix.services.dataset_service import DatasetService
 from xenix.services.ml_service import MLService
@@ -50,8 +54,8 @@ class FirstSliceProvider:
                             "dataset_id": dataset_id,
                             "feature_columns": ["feature_a", "feature_b"],
                             "target_columns": ["target"],
-                            "models": ["regression.linear"],
-                            "params_by_model": {"regression.linear": {"fit_intercept": True}},
+                            "models": ["linear_regression"],
+                            "params_by_model": {"linear_regression": {"fit_intercept": True}},
                             "run_name": "Harness demand analysis",
                         },
                     )
@@ -108,7 +112,7 @@ class FirstSliceProvider:
         )
 
 
-def test_agent_harness_first_slice_runs_from_file_to_prediction(monkeypatch, tmp_path: Path) -> None:
+def _build_first_slice_runtime(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
@@ -131,6 +135,71 @@ def test_agent_harness_first_slice_runs_from_file_to_prediction(monkeypatch, tmp
         ml_service=ml_service,
         artifact_service=artifact_service,
     )
+    return context, registry
+
+
+def _tool_context() -> ToolExecutionContext:
+    return ToolExecutionContext(
+        thread_id="thread-id",
+        turn_id="turn-id",
+        tool_call_id="tool-call-id",
+        attached_files=[],
+    )
+
+
+def test_agent_harness_model_metadata_exposes_catalog_without_train_enums(monkeypatch, tmp_path: Path) -> None:
+    _context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
+
+    specs = {spec.name: spec for spec in registry.list_specs()}
+    result = registry.execute(
+        "model.metadata",
+        {
+            "model_keys": [
+                "linear_regression",
+                "random_forest",
+                "decision_tree",
+                "gradient_boosting",
+            ],
+            "include_param_schema": True,
+            "include_param_grid_schema": True,
+        },
+        _tool_context(),
+    )
+
+    assert "model.metadata" in specs
+    metadata_key_enum = specs["model.metadata"].parameters_schema["properties"]["model_keys"]["items"]["enum"]
+    assert "regression.linear" in metadata_key_enum
+    assert "enum" not in specs["model.train"].parameters_schema["properties"]["models"]["items"]
+    assert result.payload["model_keys"] == [
+        "regression.linear",
+        "regression.gradient_boosting",
+        "regression.random_forest",
+        "regression.decision_tree",
+    ]
+    assert result.payload["models"][0]["supports_hyperparameter_tuning"] is True
+    assert "param_schema" in result.payload["models"][0]
+    assert "param_grid_schema" in result.payload["models"][0]
+    with pytest.raises(ValidationError, match="xgboost"):
+        registry.execute("model.metadata", {"model_keys": ["xgboost"]}, _tool_context())
+
+
+def test_agent_harness_hyper_train_validates_tuning_capability_before_execution(monkeypatch, tmp_path: Path) -> None:
+    _context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
+
+    with pytest.raises(ValidationError, match="hyperparameter_tuning support"):
+        registry.execute(
+            "model.hyper_train",
+            {
+                "dataset_id": "missing-dataset",
+                "feature_columns": ["feature_a"],
+                "param_grids_by_model": {"kmeans": {}},
+            },
+            _tool_context(),
+        )
+
+
+def test_agent_harness_first_slice_runs_from_file_to_prediction(monkeypatch, tmp_path: Path) -> None:
+    context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
 
     training_file = tmp_path / "demand.csv"
     training_file.write_text(

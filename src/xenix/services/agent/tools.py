@@ -10,15 +10,32 @@ import pandas as pd
 from pydantic import BaseModel, Field
 
 from ...config import AppPaths
-from ...exceptions import NotFoundError, ValidationError
+from ...exceptions import ValidationError
 from ..artifact_service import ArtifactService, RegisterArtifactInput, build_artifact_markdown_link
 from ..dataset_inspection import InspectDatasetInput, detect_source_format, load_dataframe
 from ..dataset_service import DatasetService, RegisterDatasetInput
-from ..ml.registry import get_model_catalog_entry
+from ..ml.registry import get_model_catalog_entry, list_model_catalog, list_model_keys
 from ..ml_service import FitWithEvaluateInput, InferWithFilesInput, MLService, TuneWithEvaluateInput
 from ..project_service import CreateProjectInput, ProjectService
-from ..storage.models import ArtifactKind, MLTaskArtifactKind, MLTaskStatus, TrainedModelRow
+from ..storage.models import ArtifactKind, MLTaskArtifactKind, MLTaskStatus, ProblemKind, TrainedModelRow
 from .providers import AgentToolSpec
+
+
+_MODEL_ALIAS_SUFFIXES = {
+    "classification",
+    "classifier",
+    "clustering",
+    "regression",
+    "regressor",
+}
+_MODEL_KEY_ALIAS_OVERRIDES = {
+    "k_neighbors": "regression.knn",
+    "kneighbors": "regression.knn",
+    "k_neighbors_classifier": "classification.knn",
+    "kneighborsclassifier": "classification.knn",
+    "k_neighbors_regressor": "regression.knn",
+    "kneighborsregressor": "regression.knn",
+}
 
 
 @dataclass(frozen=True)
@@ -59,6 +76,7 @@ class AgentToolRegistry:
         self._dataset_service = dataset_service
         self._ml_service = ml_service
         self._artifact_service = artifact_service
+        self._model_key_aliases = self._build_model_key_aliases()
         self._tools = {
             tool.spec.name: tool
             for tool in (
@@ -66,6 +84,7 @@ class AgentToolRegistry:
                 self._build_data_integrate_tool(),
                 self._build_data_clean_tool(),
                 self._build_data_feature_select_tool(),
+                self._build_model_metadata_tool(),
                 self._build_model_train_tool(),
                 self._build_model_hyper_train_tool(),
                 self._build_model_inference_tool(),
@@ -168,12 +187,48 @@ class AgentToolRegistry:
             handler=self._data_feature_select,
         )
 
+    def _build_model_metadata_tool(self) -> AgentTool:
+        return AgentTool(
+            spec=AgentToolSpec(
+                name="model.metadata",
+                provider_name="model_metadata",
+                description=(
+                    "List available model keys, capabilities, and optional parameter schemas. "
+                    "Call this before model.train or model.hyper_train when model keys or parameters are unclear."
+                ),
+                parameters_schema={
+                    "type": "object",
+                    "properties": {
+                        "model_keys": {
+                            "type": "array",
+                            "items": {"type": "string", "enum": list_model_keys()},
+                        },
+                        "problem_kind": {
+                            "type": "string",
+                            "enum": [kind.value for kind in ProblemKind],
+                        },
+                        "capability": {
+                            "type": "string",
+                            "enum": ["fit", "hyperparameter_tuning"],
+                        },
+                        "include_param_schema": {"type": "boolean"},
+                        "include_param_grid_schema": {"type": "boolean"},
+                    },
+                    "additionalProperties": False,
+                },
+            ),
+            handler=self._model_metadata,
+        )
+
     def _build_model_train_tool(self) -> AgentTool:
         return AgentTool(
             spec=AgentToolSpec(
                 name="model.train",
                 provider_name="model_train",
-                description="Train and evaluate one or more models for a dataset and explicit column selection.",
+                description=(
+                    "Train and evaluate one or more models for a dataset and explicit column selection. "
+                    "Use model.metadata to inspect available canonical model keys and parameter schemas."
+                ),
                 parameters_schema={
                     "type": "object",
                     "properties": {
@@ -196,7 +251,10 @@ class AgentToolRegistry:
             spec=AgentToolSpec(
                 name="model.hyper_train",
                 provider_name="model_hyper_train",
-                description="Run hyperparameter training for one or more models.",
+                description=(
+                    "Run hyperparameter training for one or more models. "
+                    "Use model.metadata with capability=hyperparameter_tuning to inspect supported models and grids."
+                ),
                 parameters_schema={
                     "type": "object",
                     "properties": {
@@ -355,13 +413,71 @@ class AgentToolRegistry:
             ],
         )
 
+    def _model_metadata(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+        self._raise_if_cancelled(context)
+        raw_model_keys = self._optional_string_list(arguments, "model_keys")
+        if raw_model_keys:
+            model_keys = self._normalize_model_keys(raw_model_keys, field_name="model_keys")
+            catalog_entries = [get_model_catalog_entry(model_key) for model_key in model_keys]
+        else:
+            catalog_entries = list_model_catalog()
+
+        problem_kind = str(arguments.get("problem_kind") or "").strip()
+        if problem_kind:
+            try:
+                selected_problem_kind = ProblemKind(problem_kind)
+            except ValueError as exc:
+                raise ValidationError(f"Unknown problem_kind '{problem_kind}'.") from exc
+            catalog_entries = [
+                entry for entry in catalog_entries if entry.problem_kind == selected_problem_kind
+            ]
+
+        capability = str(arguments.get("capability") or "").strip()
+        if capability == "fit":
+            catalog_entries = [entry for entry in catalog_entries if entry.supports_fit]
+        elif capability == "hyperparameter_tuning":
+            catalog_entries = [
+                entry for entry in catalog_entries if entry.supports_hyperparameter_tuning
+            ]
+        elif capability:
+            raise ValidationError(f"Unknown model capability '{capability}'.")
+
+        catalog_entries = sorted(
+            catalog_entries,
+            key=lambda entry: (entry.problem_kind.value, entry.recommendation_tier, entry.model_key),
+        )
+        include_param_schema = bool(arguments.get("include_param_schema"))
+        include_param_grid_schema = bool(arguments.get("include_param_grid_schema"))
+        models = [
+            self._model_catalog_payload(
+                entry,
+                include_param_schema=include_param_schema,
+                include_param_grid_schema=include_param_grid_schema,
+            )
+            for entry in catalog_entries
+        ]
+        payload = {
+            "model_keys": [model["model_key"] for model in models],
+            "models": models,
+        }
+        return ToolExecutionResult(
+            payload=payload,
+            content_blocks=[{"type": "markdown", "text": self._model_metadata_markdown(models)}],
+        )
+
     def _model_train(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
         dataset_id = self._require_string(arguments, "dataset_id")
         feature_columns = self._require_string_list(arguments, "feature_columns")
         target_columns = self._optional_string_list(arguments, "target_columns")
-        models = self._require_string_list(arguments, "models")
-        params_by_model = arguments.get("params_by_model") if isinstance(arguments.get("params_by_model"), dict) else {}
+        models = self._normalize_model_keys(
+            self._require_string_list(arguments, "models"),
+            field_name="models",
+        )
+        params_by_model = self._normalize_model_mapping(
+            arguments.get("params_by_model"),
+            field_name="params_by_model",
+        )
         before_ids = {task.id for task in self._ml_service.list_dataset_tasks(dataset_id)}
         created_task_ids: list[str] = []
         for model_key in models:
@@ -397,9 +513,14 @@ class AgentToolRegistry:
         grids = arguments.get("param_grids_by_model")
         if not isinstance(grids, dict) or not grids:
             raise ValidationError("model.hyper_train requires param_grids_by_model.")
+        normalized_grids = self._normalize_model_mapping(
+            grids,
+            field_name="param_grids_by_model",
+            require_hyperparameter_tuning=True,
+        )
         before_ids = {task.id for task in self._ml_service.list_dataset_tasks(dataset_id)}
         created_task_ids: list[str] = []
-        for model_key, grid in grids.items():
+        for model_key, grid in normalized_grids.items():
             self._raise_if_cancelled(context)
             created = self._ml_service.tune_with_evaluate(
                 TuneWithEvaluateInput(
@@ -407,7 +528,7 @@ class AgentToolRegistry:
                     feature_columns=feature_columns,
                     target_columns=target_columns,
                     run_name=str(arguments.get("run_name") or ""),
-                    model_key=str(model_key),
+                    model_key=model_key,
                     param_grid=dict(grid),
                 )
             )
@@ -624,6 +745,178 @@ class AgentToolRegistry:
         for model in models:
             lines.append(f"- `{model['model_key']}` trained model id: `{model['trained_model_id']}`")
         return "\n".join(lines)
+
+    def _model_catalog_payload(
+        self,
+        entry,
+        *,
+        include_param_schema: bool,
+        include_param_grid_schema: bool,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "model_key": entry.model_key,
+            "display_name": entry.display_name,
+            "problem_kind": entry.problem_kind.value,
+            "family": entry.family,
+            "guidance": entry.guidance,
+            "recommendation_tier": entry.recommendation_tier,
+            "requires_target": entry.requires_target,
+            "supports_fit": entry.supports_fit,
+            "supports_hyperparameter_tuning": entry.supports_hyperparameter_tuning,
+        }
+        if include_param_schema:
+            payload["param_schema"] = entry.param_schema
+        if include_param_grid_schema:
+            payload["param_grid_schema"] = entry.param_grid_schema
+        return payload
+
+    def _model_metadata_markdown(self, models: list[dict[str, Any]]) -> str:
+        if not models:
+            return "No models match the requested filters."
+        lines = ["Available models:"]
+        for model in models:
+            capabilities = ["fit"] if model["supports_fit"] else []
+            if model["supports_hyperparameter_tuning"]:
+                capabilities.append("hyperparameter_tuning")
+            lines.append(
+                "- "
+                f"`{model['model_key']}` ({model['display_name']}, {model['problem_kind']}); "
+                f"capabilities: {', '.join(capabilities)}"
+            )
+        return "\n".join(lines)
+
+    def _normalize_model_mapping(
+        self,
+        raw_mapping: Any,
+        *,
+        field_name: str,
+        require_hyperparameter_tuning: bool = False,
+    ) -> dict[str, Any]:
+        if raw_mapping is None:
+            return {}
+        if not isinstance(raw_mapping, dict):
+            raise ValidationError(f"{field_name} must be an object keyed by model key.")
+        normalized: dict[str, Any] = {}
+        failures: list[str] = []
+        for raw_key, value in raw_mapping.items():
+            model_key = self._canonical_model_key(str(raw_key))
+            if model_key is None:
+                failures.append(str(raw_key))
+                continue
+            if value is None:
+                value = {}
+            if not isinstance(value, dict):
+                failures.append(f"{raw_key} must map to an object")
+                continue
+            if require_hyperparameter_tuning:
+                catalog = get_model_catalog_entry(model_key)
+                if not catalog.supports_hyperparameter_tuning:
+                    failures.append(f"{raw_key} lacks hyperparameter_tuning support")
+                    continue
+            normalized[model_key] = value
+        if failures:
+            raise ValidationError(self._model_key_error_message(field_name, failures))
+        return normalized
+
+    def _normalize_model_keys(
+        self,
+        raw_keys: list[str],
+        *,
+        field_name: str,
+        require_hyperparameter_tuning: bool = False,
+    ) -> list[str]:
+        normalized: list[str] = []
+        failures: list[str] = []
+        for raw_key in raw_keys:
+            model_key = self._canonical_model_key(raw_key)
+            if model_key is None:
+                failures.append(raw_key)
+                continue
+            if require_hyperparameter_tuning:
+                catalog = get_model_catalog_entry(model_key)
+                if not catalog.supports_hyperparameter_tuning:
+                    failures.append(f"{raw_key} lacks hyperparameter_tuning support")
+                    continue
+            if model_key not in normalized:
+                normalized.append(model_key)
+        if failures:
+            raise ValidationError(self._model_key_error_message(field_name, failures))
+        return normalized
+
+    def _canonical_model_key(self, raw_key: str) -> str | None:
+        value = raw_key.strip()
+        available = set(list_model_keys())
+        if value in available:
+            return value
+        lowered = value.lower()
+        if lowered in available:
+            return lowered
+        for token in self._model_key_alias_tokens(value):
+            aliased = self._model_key_aliases.get(token)
+            if aliased in available:
+                return aliased
+        return None
+
+    def _build_model_key_aliases(self) -> dict[str, str]:
+        aliases: dict[str, str] = {}
+        priorities: dict[str, int] = {}
+        for entry in list_model_catalog():
+            priority = self._model_alias_priority(entry.problem_kind)
+            for token in self._model_entry_alias_tokens(entry):
+                if priority < priorities.get(token, 100):
+                    aliases[token] = entry.model_key
+                    priorities[token] = priority
+        aliases.update(_MODEL_KEY_ALIAS_OVERRIDES)
+        return aliases
+
+    def _model_entry_alias_tokens(self, entry) -> set[str]:
+        leaf_key = entry.model_key.split(".", 1)[-1]
+        values = {
+            entry.model_key,
+            entry.model_key.replace(".", "_"),
+            leaf_key,
+            entry.display_name,
+            f"{entry.problem_kind.value}_{leaf_key}",
+        }
+        tokens: set[str] = set()
+        for value in values:
+            for token in self._model_key_alias_tokens(value):
+                tokens.add(token)
+                stripped = self._strip_model_alias_suffix(token)
+                if stripped:
+                    tokens.update(self._model_key_alias_tokens(stripped))
+        return tokens
+
+    def _model_alias_priority(self, problem_kind: ProblemKind) -> int:
+        order = {
+            ProblemKind.REGRESSION: 0,
+            ProblemKind.CLASSIFICATION: 1,
+            ProblemKind.CLUSTERING: 2,
+            ProblemKind.ANOMALY_DETECTION: 3,
+        }
+        return order[problem_kind]
+
+    def _model_key_alias_tokens(self, value: str) -> list[str]:
+        token = "".join(char.lower() if char.isalnum() else "_" for char in value).strip("_")
+        while "__" in token:
+            token = token.replace("__", "_")
+        if not token:
+            return []
+        compact = token.replace("_", "")
+        return [token] if compact == token else [token, compact]
+
+    def _strip_model_alias_suffix(self, token: str) -> str:
+        parts = token.split("_")
+        if len(parts) > 1 and parts[-1] in _MODEL_ALIAS_SUFFIXES:
+            return "_".join(parts[:-1])
+        return ""
+
+    def _model_key_error_message(self, field_name: str, failures: list[str]) -> str:
+        return (
+            f"{field_name} contains unsupported model keys: {', '.join(failures)}. "
+            "Call model.metadata to inspect available canonical model keys. "
+            f"Available keys: {', '.join(list_model_keys())}."
+        )
 
     def _require_string(self, arguments: dict[str, Any], key: str) -> str:
         value = str(arguments.get(key) or "").strip()

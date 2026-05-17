@@ -38,6 +38,7 @@ Current discussion should defer:
 - Agent Harness owns Thread, Turn, Message, tool-call, tool-result, run recorder, and first-slice working context.
 - Storage provides persistence interfaces.
 - First slice defers structured domain state for derived dataset, feature selection, best model, and prediction refs.
+- `model_metadata` exposes the ML catalog, canonical model keys, capabilities, and optional parameter schemas; train and hyper-train schemas stay lightweight.
 
 ## High-Level Decisions To Make
 
@@ -101,6 +102,7 @@ data_peek
 data_integrate
 data_clean
 data_feature_select
+model_metadata
 model_train
 model_hyper_train
 model_inference

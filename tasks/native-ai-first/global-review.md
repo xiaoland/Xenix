@@ -58,6 +58,7 @@ data_peek
 data_integrate
 data_clean
 data_feature_select
+model_metadata
 model_train
 model_hyper_train
 model_inference
@@ -70,6 +71,7 @@ data.peek
 data.integrate
 data.clean
 data.feature.select
+model.metadata
 model.train
 model.hyper_train
 model.inference
@@ -96,6 +98,7 @@ file drag/drop
   -> data_integrate
   -> data_clean
   -> data_feature_select
+  -> model_metadata
   -> model_train or model_hyper_train
   -> model_inference
   -> markdown artifact links

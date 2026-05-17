@@ -184,6 +184,7 @@ data_peek
 data_integrate
 data_clean
 data_feature_select
+model_metadata
 model_train
 model_hyper_train
 model_inference
@@ -199,6 +200,7 @@ Contextual constraints still belong in validation:
 
 - Data tools require file references from the ChatBox or resolvable prior tool results/artifact references in Agent Harness records.
 - Model tools require explicit dataset, feature columns, and target columns, or resolvable prior tool results/artifact references in Agent Harness records.
+- `model_metadata` exposes canonical model keys, model capabilities, and optional parameter/grid schemas for train and hyper-train planning.
 - `model_inference` requires a trained model and input data.
 - Export/open operations are handled through markdown artifact links and UI affordances in the first slice.
 
