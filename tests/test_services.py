@@ -63,6 +63,24 @@ def test_dataset_service_inspects_csv_summary_and_column_kinds(monkeypatch, tmp_
     assert inspection.columns[0].kind.value == "numeric"
 
 
+def test_dataset_service_registers_dataset_without_product_project(monkeypatch, tmp_path: Path) -> None:
+    _project_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
+    dataset_file = tmp_path / "customers.csv"
+    dataset_file.write_text("age,city\n30,Shanghai\n", encoding="utf-8")
+
+    dataset = dataset_service.register_dataset(
+        RegisterDatasetInput(
+            source_path=str(dataset_file.resolve()),
+            name="Customers",
+        )
+    )
+    sources = dataset_service.list_source_datasets()
+
+    assert dataset.project_id
+    assert dataset.derived_from_dataset_id is None
+    assert [row.id for row in sources] == [dataset.id]
+
+
 def test_dataset_service_rejects_empty_dataset_file(monkeypatch, tmp_path: Path) -> None:
     _project_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
     dataset_file = tmp_path / "empty.csv"

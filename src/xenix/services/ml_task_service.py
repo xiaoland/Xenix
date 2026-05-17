@@ -552,6 +552,7 @@ class MLTaskService:
             source_format=DatasetSourceFormat.CSV,
             copied_from=None,
             copied_at=None,
+            derived_from_dataset_id=row.dataset_id,
             ml_task_id=row.id,
         )
         self._datasets.create(session, dataset_row)

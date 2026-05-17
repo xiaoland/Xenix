@@ -9,10 +9,10 @@ Preserve the local invariants for the Chatbot-first Qt UI. This document governs
 MainWindow hosts:
 
 - left History sidebar with thread selection, create, rename, and delete actions
-- central `ThreadDetailView` as the ChatBox surface
+- central `ThreadDetailView` as the Chatbot surface
 - Settings entry for provider configuration and development AIMock controls
 
-The central ChatBox stretches to consume remaining horizontal space. Message list and composer width come from the ChatBox parent.
+The central Chatbot stretches to consume remaining horizontal space. Message list and composer width come from the Chatbot parent.
 
 ## ThreadDetailView Contract
 

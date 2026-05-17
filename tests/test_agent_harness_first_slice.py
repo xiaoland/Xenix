@@ -16,10 +16,10 @@ from xenix.services.agent import (
 from xenix.services.agent.providers import AgentProvider
 from xenix.services.agent.tools import ToolExecutionContext
 from xenix.services.artifact_service import ArtifactService
+from xenix.services.data_cleaning import DataCleaningService
 from xenix.services.dataset_service import DatasetService
 from xenix.services.ml_service import MLService
 from xenix.services.ml_task_service import MLTaskService
-from xenix.services.project_service import ProjectService
 from xenix.services.storage import StorageBootstrapService
 
 
@@ -115,8 +115,8 @@ def _build_first_slice_runtime(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
-    project_service = ProjectService(context.session_factory)
     dataset_service = DatasetService(context.session_factory, paths)
+    data_cleaning_service = DataCleaningService(paths)
     ml_task_service = MLTaskService(context.session_factory, paths)
     ml_service = MLService(
         paths,
@@ -127,8 +127,8 @@ def _build_first_slice_runtime(monkeypatch, tmp_path: Path):
     artifact_service = ArtifactService(context.session_factory)
     registry = AgentToolRegistry(
         paths=paths,
-        project_service=project_service,
         dataset_service=dataset_service,
+        data_cleaning_service=data_cleaning_service,
         ml_service=ml_service,
         artifact_service=artifact_service,
     )

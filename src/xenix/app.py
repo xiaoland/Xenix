@@ -19,10 +19,10 @@ from .services.agent import (
     ConversationStore,
 )
 from .services.artifact_service import ArtifactService
+from .services.data_cleaning import DataCleaningService
 from .services.dataset_service import DatasetService
 from .services.ml_service import MLService
 from .services.ml_task_service import MLTaskService
-from .services.project_service import ProjectService
 from .services.storage import StorageBootstrapService
 from .services.storage.layout import database_path
 from .ui.main_window import MainWindow
@@ -50,8 +50,8 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
     install_exception_hooks()
     context = StorageBootstrapService().initialize(paths)
 
-    project_service = ProjectService(context.session_factory)
     dataset_service = DatasetService(context.session_factory, paths)
+    data_cleaning_service = DataCleaningService(paths)
     ml_task_service = MLTaskService(context.session_factory, paths)
     ml_service = MLService(
         paths,
@@ -64,8 +64,8 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
     agent_settings_service = AgentSettingsService(paths)
     agent_tool_registry = AgentToolRegistry(
         paths=paths,
-        project_service=project_service,
         dataset_service=dataset_service,
+        data_cleaning_service=data_cleaning_service,
         ml_service=ml_service,
         artifact_service=artifact_service,
     )

@@ -22,14 +22,14 @@ Runtime dependencies now include:
 pdm run dev
 ```
 
-Expected result: the app opens the native desktop shell on the Chatbot-first surface, with ChatBox as the main analysis interface.
+Expected result: the app opens the native desktop shell on the Chatbot-first surface.
 
 The delivered workflow includes:
 
 - conversation plus file drag-and-drop
 - Agent Harness tool calls for data inspection, integration, cleaning, feature selection, training, hyperparameter training, and inference
 - markdown summaries with `artifact://...` links
-- ChatBox previews for generated datasets, reports, metrics, models, images, and prediction files
+- Chatbot previews for generated datasets, reports, metrics, models, images, and prediction files
 - local persistence for conversations, messages, tool calls, tool results, artifacts, ML task metadata, and logs
 
 LLM provider settings are stored through the Settings dialog in `config/agent_settings.json`. `XENIX_ENV=development` exposes development-only mock controls in Settings. AIMock uses the same OpenAI-compatible provider HTTP boundary as the live provider.

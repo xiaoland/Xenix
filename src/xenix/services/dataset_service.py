@@ -19,7 +19,7 @@ from .dataset_inspection import (
     inspect_dataset_file,
     load_dataframe,
 )
-from .storage.models import DatasetRow, DatasetSourceFormat
+from .storage.models import DatasetRow, DatasetSourceFormat, ProjectRow
 from .storage.repositories import DatasetRepository, ProjectRepository
 
 
@@ -28,9 +28,10 @@ def _utc_now() -> datetime:
 
 
 class RegisterDatasetInput(SQLModel):
-    project_id: str
     source_path: str
+    project_id: str | None = None
     name: str | None = None
+    derived_from_dataset_id: str | None = None
 
 
 class RenameDatasetInput(SQLModel):
@@ -71,22 +72,32 @@ class DatasetService:
         if not name:
             raise ValidationError("Dataset name cannot be empty.")
 
-        now = _utc_now()
-        row = DatasetRow(
-            project_id=input_data.project_id,
-            name=name,
-            source_path=str(source_path),
-            source_format=source_format,
-            copied_from=None,
-            copied_at=None,
-            ml_task_id=None,
-            created_at=now,
-            updated_at=now,
-        )
-
         with self._session_factory() as session:
-            if self._projects.get(session, input_data.project_id) is None:
-                raise NotFoundError(f"Project '{input_data.project_id}' was not found.")
+            derived_from = None
+            if input_data.derived_from_dataset_id:
+                derived_from = self._datasets.get(session, input_data.derived_from_dataset_id)
+                if derived_from is None:
+                    raise NotFoundError(
+                        f"Dataset '{input_data.derived_from_dataset_id}' was not found."
+                    )
+            project_id = self._resolve_project_id(
+                session,
+                input_data.project_id,
+                derived_from=derived_from,
+            )
+            now = _utc_now()
+            row = DatasetRow(
+                project_id=project_id,
+                name=name,
+                source_path=str(source_path),
+                source_format=source_format,
+                copied_from=None,
+                copied_at=None,
+                derived_from_dataset_id=derived_from.id if derived_from else None,
+                ml_task_id=None,
+                created_at=now,
+                updated_at=now,
+            )
             self._datasets.create(session, row)
             session.commit()
             return row
@@ -116,17 +127,29 @@ class DatasetService:
             session.commit()
             return row
 
-    def list_datasets(self, project_id: str) -> list[DatasetRow]:
+    def list_datasets(self, project_id: str | None = None) -> list[DatasetRow]:
         with self._session_factory() as session:
+            if project_id is None:
+                return self._datasets.list_all(session)
             return self._datasets.list_by_project(session, project_id)
 
-    def list_source_datasets(self, project_id: str) -> list[DatasetRow]:
+    def list_source_datasets(self, project_id: str | None = None) -> list[DatasetRow]:
         with self._session_factory() as session:
+            if project_id is None:
+                return self._datasets.list_sources(session)
             return self._datasets.list_source_by_project(session, project_id)
 
-    def list_generated_datasets(self, project_id: str) -> list[DatasetRow]:
+    def list_generated_datasets(self, project_id: str | None = None) -> list[DatasetRow]:
         with self._session_factory() as session:
+            if project_id is None:
+                return self._datasets.list_generated(session)
             return self._datasets.list_generated_by_project(session, project_id)
+
+    def list_derived_datasets(self, source_dataset_id: str) -> list[DatasetRow]:
+        with self._session_factory() as session:
+            if self._datasets.get(session, source_dataset_id) is None:
+                raise NotFoundError(f"Dataset '{source_dataset_id}' was not found.")
+            return self._datasets.list_derived_by_source(session, source_dataset_id)
 
     def get_dataset(self, dataset_id: str) -> DatasetRow:
         with self._session_factory() as session:
@@ -213,3 +236,26 @@ class DatasetService:
             return codecs.lookup(normalized).name
         except LookupError as exc:
             raise ValidationError(f"CSV export encoding '{encoding_name}' is not supported.") from exc
+
+    def _resolve_project_id(
+        self,
+        session,
+        project_id: str | None,
+        *,
+        derived_from: DatasetRow | None = None,
+    ) -> str:
+        normalized = project_id.strip() if project_id else ""
+        if normalized:
+            if self._projects.get(session, normalized) is None:
+                raise NotFoundError(f"Project '{normalized}' was not found.")
+            if derived_from is not None and derived_from.project_id != normalized:
+                raise ValidationError("Derived dataset source does not belong to the provided project.")
+            return normalized
+        if derived_from is not None:
+            return derived_from.project_id
+        projects = self._projects.list_all(session)
+        if projects:
+            return projects[0].id
+        row = ProjectRow(name="Agent Analysis")
+        self._projects.create(session, row)
+        return row.id

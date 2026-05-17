@@ -6,12 +6,12 @@ This guidance applies to `src/xenix/ui/` except `src/xenix/ui/widgets/`, which m
 
 ## Rules
 
-- Keep ChatBox as the default operator path. `MainWindow` should host the ChatBox-first shell.
+- Keep Chatbot as the default operator path. `MainWindow` should host the Chatbot-first shell.
 - Treat Message rendering, file drop intake, artifact preview, tool progress, and stop control as first-class UI surfaces.
 - UI code must stay service-driven. Do not parse datasets, invent storage paths, or reconstruct hidden container state in the UI layer.
 - Any dialog or widget with user-visible text should provide `retranslate_ui()` and respond to `QEvent.LanguageChange`.
 - Any dialog that starts a `QTimer` must also own its shutdown in `closeEvent()` so background refresh does not survive window closure.
-- Prefer small focused widgets plus shared renderers over cross-dialog inheritance when ChatBox content and technical views overlap.
+- Prefer small focused widgets plus shared renderers over cross-dialog inheritance when Chatbot content and technical views overlap.
 
 ## Boundaries
 

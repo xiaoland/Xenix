@@ -104,20 +104,34 @@ def test_dataset_repository_provenance_queries(monkeypatch, tmp_path: Path) -> N
             source_format=DatasetSourceFormat.CSV,
             copied_from=None,
             copied_at=None,
+            derived_from_dataset_id=None,
             ml_task_id=task.id,
+        )
+        derived_dataset = DatasetRow(
+            project_id=project.id,
+            name="Customers cleaned",
+            source_path=str((tmp_path / "cleaned.csv").resolve()),
+            source_format=DatasetSourceFormat.CSV,
+            copied_from=None,
+            copied_at=None,
+            derived_from_dataset_id=source_dataset.id,
+            ml_task_id=None,
         )
         datasets.create(session, copied_dataset)
         datasets.create(session, generated_dataset)
+        datasets.create(session, derived_dataset)
         session.commit()
 
         sources = datasets.list_source_by_project(session, project.id)
         generated = datasets.list_generated_by_project(session, project.id)
         copies = datasets.list_copies_by_source(session, source_dataset.id)
+        derived = datasets.list_derived_by_source(session, source_dataset.id)
         by_task = datasets.get_by_ml_task(session, task.id)
 
     assert [row.id for row in sources] == [source_dataset.id]
-    assert [row.id for row in generated] == [generated_dataset.id]
+    assert [row.id for row in generated] == [generated_dataset.id, derived_dataset.id]
     assert [row.id for row in copies] == [copied_dataset.id]
+    assert [row.id for row in derived] == [derived_dataset.id]
     assert by_task is not None
     assert by_task.id == generated_dataset.id
 
@@ -234,4 +248,3 @@ def test_trained_model_repository_round_trip_by_dataset(monkeypatch, tmp_path: P
     assert [row.id for row in listed] == [trained_model.id]
     assert refreshed is not None
     assert refreshed.metadata_payload["saved_name"] == "Demand · Ridge Regression · 2026-04-24 09:35"
-

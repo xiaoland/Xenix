@@ -13,6 +13,14 @@ from xenix.services.storage.layout import (
 from xenix.services.storage.migrations import CURRENT_SCHEMA_VERSION, get_user_version
 
 
+def _table_columns(context, table_name: str) -> set[str]:
+    with context.engine.connect() as connection:
+        return {
+            str(row[1])
+            for row in connection.exec_driver_sql(f"PRAGMA table_info({table_name})").all()
+        }
+
+
 def test_storage_bootstrap_creates_database_and_sets_user_version(
     monkeypatch,
     tmp_path: Path,
@@ -44,6 +52,77 @@ def test_storage_bootstrap_is_idempotent(monkeypatch, tmp_path: Path) -> None:
     assert get_user_version(second.engine) == CURRENT_SCHEMA_VERSION
 
 
+def test_storage_bootstrap_migrates_v1_dataset_lineage_schema(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    db_path = database_path(paths)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    import sqlite3
+
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE dataset (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                project_id VARCHAR NOT NULL,
+                name VARCHAR NOT NULL,
+                source_path VARCHAR NOT NULL,
+                source_format VARCHAR,
+                copied_from VARCHAR,
+                copied_at DATETIME,
+                ml_task_id VARCHAR,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO dataset (
+                id,
+                project_id,
+                name,
+                source_path,
+                source_format,
+                copied_from,
+                copied_at,
+                ml_task_id,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                'dataset-1',
+                'project-1',
+                'Customers',
+                'C:/data/customers.csv',
+                'csv',
+                NULL,
+                NULL,
+                NULL,
+                '2026-05-17T00:00:00Z',
+                '2026-05-17T00:00:00Z'
+            )
+            """
+        )
+        connection.execute("PRAGMA user_version=1")
+
+    context = StorageBootstrapService().initialize(paths)
+
+    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
+    assert "derived_from_dataset_id" in _table_columns(context, "dataset")
+    with context.engine.connect() as connection:
+        migrated_row = connection.exec_driver_sql(
+            "SELECT id, derived_from_dataset_id FROM dataset WHERE id='dataset-1'"
+        ).first()
+        indexes = {
+            str(row[1])
+            for row in connection.exec_driver_sql("PRAGMA index_list(dataset)").all()
+        }
+    assert migrated_row == ("dataset-1", None)
+    assert "ix_dataset_derived_from_dataset_id" in indexes
+
+
 def test_storage_bootstrap_uses_ai_first_baseline_without_work_item_schema(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
@@ -59,12 +138,17 @@ def test_storage_bootstrap_uses_ai_first_baseline_without_work_item_schema(monke
             str(row[1])
             for row in connection.exec_driver_sql("PRAGMA table_info(ml_task)").all()
         }
+        dataset_columns = {
+            str(row[1])
+            for row in connection.exec_driver_sql("PRAGMA table_info(dataset)").all()
+        }
         trained_model_columns = {
             str(row[1])
             for row in connection.exec_driver_sql("PRAGMA table_info(trained_model)").all()
         }
 
-    assert CURRENT_SCHEMA_VERSION == 1
+    assert CURRENT_SCHEMA_VERSION == 2
     assert "work_item" not in table_names
+    assert "derived_from_dataset_id" in dataset_columns
     assert "work_item_id" not in ml_task_columns
     assert "work_item_id" not in trained_model_columns

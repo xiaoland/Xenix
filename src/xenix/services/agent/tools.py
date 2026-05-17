@@ -12,11 +12,11 @@ from pydantic import BaseModel, Field
 from ...config import AppPaths
 from ...exceptions import ValidationError
 from ..artifact_service import ArtifactService, RegisterArtifactInput, build_artifact_markdown_link
+from ..data_cleaning import CleanDatasetInput, DataCleaningService
 from ..dataset_inspection import InspectDatasetInput, detect_source_format, load_dataframe
 from ..dataset_service import DatasetService, RegisterDatasetInput
 from ..ml.registry import get_model_catalog_entry, list_model_catalog, list_model_keys
 from ..ml_service import FitWithEvaluateInput, InferWithFilesInput, MLService, TuneWithEvaluateInput
-from ..project_service import CreateProjectInput, ProjectService
 from ..storage.models import ArtifactKind, MLTaskArtifactKind, MLTaskStatus, ProblemKind, TrainedModelRow
 from .providers import AgentToolSpec
 
@@ -66,14 +66,14 @@ class AgentToolRegistry:
         self,
         *,
         paths: AppPaths,
-        project_service: ProjectService,
         dataset_service: DatasetService,
+        data_cleaning_service: DataCleaningService,
         ml_service: MLService,
         artifact_service: ArtifactService,
     ) -> None:
         self._paths = paths
-        self._project_service = project_service
         self._dataset_service = dataset_service
+        self._data_cleaning_service = data_cleaning_service
         self._ml_service = ml_service
         self._artifact_service = artifact_service
         self._model_key_aliases = self._build_model_key_aliases()
@@ -118,7 +118,6 @@ class AgentToolRegistry:
                     "type": "object",
                     "properties": {
                         "source_path": {"type": "string"},
-                        "project_id": {"type": "string"},
                         "name": {"type": "string"},
                     },
                     "additionalProperties": False,
@@ -137,7 +136,6 @@ class AgentToolRegistry:
                     "type": "object",
                     "properties": {
                         "source_paths": {"type": "array", "items": {"type": "string"}},
-                        "project_id": {"type": "string"},
                         "name": {"type": "string"},
                     },
                     "required": ["source_paths"],
@@ -152,13 +150,119 @@ class AgentToolRegistry:
             spec=AgentToolSpec(
                 name="data.clean",
                 provider_name="data_clean",
-                description="Create a cleaned dataset by dropping duplicates and filling missing values.",
+                description=(
+                    "Create a new derived dataset by applying atomic predefined cleaning operations "
+                    "to one registered dataset."
+                ),
                 parameters_schema={
                     "type": "object",
                     "properties": {
                         "dataset_id": {"type": "string"},
                         "name": {"type": "string"},
                         "drop_duplicates": {"type": "boolean"},
+                        "duplicate_policy": {
+                            "type": "object",
+                            "properties": {
+                                "mode": {
+                                    "type": "string",
+                                    "enum": ["none", "exact_rows", "key_columns"],
+                                },
+                                "columns": {"type": "array", "items": {"type": "string"}},
+                                "keep": {"type": "string", "enum": ["first", "last", "false"]},
+                            },
+                            "additionalProperties": False,
+                        },
+                        "missing_policy": {
+                            "type": "object",
+                            "properties": {
+                                "default_numeric": {
+                                    "type": "string",
+                                    "enum": ["none", "mean", "median", "mode", "constant", "forward_fill", "drop_rows"],
+                                },
+                                "default_text": {
+                                    "type": "string",
+                                    "enum": ["none", "mode", "constant", "forward_fill", "drop_rows"],
+                                },
+                                "fill_values": {"type": "object"},
+                                "rules": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "columns": {"type": "array", "items": {"type": "string"}},
+                                            "strategy": {
+                                                "type": "string",
+                                                "enum": [
+                                                    "none",
+                                                    "mean",
+                                                    "median",
+                                                    "mode",
+                                                    "constant",
+                                                    "forward_fill",
+                                                    "drop_rows",
+                                                ],
+                                            },
+                                            "value": {},
+                                        },
+                                        "required": ["columns", "strategy"],
+                                        "additionalProperties": False,
+                                    },
+                                },
+                            },
+                            "additionalProperties": False,
+                        },
+                        "type_corrections": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "column": {"type": "string"},
+                                    "target_type": {
+                                        "type": "string",
+                                        "enum": ["numeric", "integer", "datetime", "text", "boolean"],
+                                    },
+                                    "date_format": {"type": "string"},
+                                },
+                                "required": ["column", "target_type"],
+                                "additionalProperties": False,
+                            },
+                        },
+                        "text_standardization": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "columns": {"type": "array", "items": {"type": "string"}},
+                                    "trim": {"type": "boolean"},
+                                    "lowercase": {"type": "boolean"},
+                                    "uppercase": {"type": "boolean"},
+                                    "collapse_whitespace": {"type": "boolean"},
+                                    "empty_to_null": {"type": "boolean"},
+                                    "value_map": {"type": "object"},
+                                },
+                                "required": ["columns"],
+                                "additionalProperties": False,
+                            },
+                        },
+                        "validation_rules": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {"type": "string"},
+                                    "column": {"type": "string"},
+                                    "rule": {
+                                        "type": "string",
+                                        "enum": ["not_null", "non_negative", "min", "max", "allowed_values", "regex"],
+                                    },
+                                    "action": {"type": "string", "enum": ["report_only", "drop_rows"]},
+                                    "value": {},
+                                    "values": {"type": "array"},
+                                },
+                                "required": ["column", "rule"],
+                                "additionalProperties": False,
+                            },
+                        },
                     },
                     "required": ["dataset_id"],
                     "additionalProperties": False,
@@ -295,11 +399,9 @@ class AgentToolRegistry:
     def _data_peek(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
         source_path = self._resolve_source_path(arguments.get("source_path"), context)
-        project_id = self._resolve_project_id(arguments.get("project_id"))
         name = str(arguments.get("name") or source_path.stem)
         dataset = self._dataset_service.register_dataset(
             RegisterDatasetInput(
-                project_id=project_id,
                 source_path=str(source_path),
                 name=name,
             )
@@ -345,7 +447,6 @@ class AgentToolRegistry:
         output_path = output_dir / f"{self._slug(name)}-{int(time.time())}.csv"
         pd.concat(frames, ignore_index=True).to_csv(output_path, index=False)
         return self._register_generated_dataset_result(
-            arguments,
             context,
             output_path=output_path,
             name=name,
@@ -356,32 +457,32 @@ class AgentToolRegistry:
         self._raise_if_cancelled(context)
         dataset_id = self._require_string(arguments, "dataset_id")
         dataset = self._dataset_service.get_dataset(dataset_id)
-        frame = self._load_frame(Path(dataset.source_path))
-        before_rows = int(len(frame.index))
-        if bool(arguments.get("drop_duplicates", True)):
-            frame = frame.drop_duplicates()
-        for column in frame.columns:
-            if frame[column].isna().any():
-                if pd.api.types.is_numeric_dtype(frame[column]):
-                    frame[column] = frame[column].fillna(frame[column].median())
-                else:
-                    mode = frame[column].dropna().mode()
-                    frame[column] = frame[column].fillna("" if mode.empty else mode.iloc[0])
-        output_dir = self._paths.artifacts / "datasets" / "cleaned"
-        output_dir.mkdir(parents=True, exist_ok=True)
         name = str(arguments.get("name") or f"{dataset.name} cleaned").strip() or f"{dataset.name} cleaned"
-        output_path = output_dir / f"{self._slug(name)}-{int(time.time())}.csv"
-        frame.to_csv(output_path, index=False)
-        result = self._register_generated_dataset_result(
-            arguments,
-            context,
-            output_path=output_path,
-            name=name,
-            summary=f"Cleaned dataset created. Rows: {before_rows} -> {len(frame.index)}.",
-            parent_dataset_id=dataset.id,
+        clean_result = self._data_cleaning_service.clean_dataset(
+            CleanDatasetInput(
+                source_path=dataset.source_path,
+                name=name,
+                drop_duplicates=arguments.get("drop_duplicates"),
+                duplicate_policy=arguments.get("duplicate_policy"),
+                missing_policy=arguments.get("missing_policy"),
+                type_corrections=arguments.get("type_corrections") or [],
+                text_standardization=arguments.get("text_standardization") or [],
+                validation_rules=arguments.get("validation_rules") or [],
+            )
         )
-        result.payload["row_count_before"] = before_rows
-        result.payload["row_count_after"] = int(len(frame.index))
+        row_count_before = int(clean_result.report.get("row_count_before", 0))
+        row_count_after = int(clean_result.report.get("row_count_after", 0))
+        result = self._register_generated_dataset_result(
+            context,
+            output_path=Path(clean_result.output_path),
+            name=name,
+            summary=f"Cleaned dataset created. Rows: {row_count_before} -> {row_count_after}.",
+            derived_from_dataset_id=dataset.id,
+            metadata_payload={"cleaning_report": clean_result.report},
+        )
+        result.payload["row_count_before"] = row_count_before
+        result.payload["row_count_after"] = row_count_after
+        result.payload["cleaning_report"] = clean_result.report
         return result
 
     def _data_feature_select(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
@@ -592,30 +693,32 @@ class AgentToolRegistry:
 
     def _register_generated_dataset_result(
         self,
-        arguments: dict[str, Any],
         context: ToolExecutionContext,
         *,
         output_path: Path,
         name: str,
         summary: str,
-        parent_dataset_id: str | None = None,
+        derived_from_dataset_id: str | None = None,
+        metadata_payload: dict[str, Any] | None = None,
     ) -> ToolExecutionResult:
-        project_id = self._resolve_project_id(arguments.get("project_id"))
         dataset = self._dataset_service.register_dataset(
             RegisterDatasetInput(
-                project_id=project_id,
                 source_path=str(output_path.resolve()),
                 name=name,
+                derived_from_dataset_id=derived_from_dataset_id,
             )
         )
         inspection = self._dataset_service.inspect_source_file(InspectDatasetInput(source_path=dataset.source_path))
+        artifact_metadata = dict(metadata_payload or {})
+        if derived_from_dataset_id:
+            artifact_metadata["derived_from_dataset_id"] = derived_from_dataset_id
         artifact = self._register_dataset_artifact(
             context,
             title=dataset.name,
             path=Path(dataset.source_path),
             dataset_id=dataset.id,
             preview_payload=inspection.model_dump(mode="json"),
-            metadata_payload={"parent_dataset_id": parent_dataset_id} if parent_dataset_id else {},
+            metadata_payload=artifact_metadata,
         )
         link = build_artifact_markdown_link(artifact)
         return ToolExecutionResult(
@@ -662,15 +765,6 @@ class AgentToolRegistry:
         if not path.exists() or not path.is_file():
             raise ValidationError("Source path must point to an existing file.")
         return path
-
-    def _resolve_project_id(self, raw_project_id: Any) -> str:
-        project_id = str(raw_project_id or "").strip()
-        if project_id:
-            return self._project_service.get_project(project_id).id
-        projects = self._project_service.list_projects()
-        if projects:
-            return projects[0].id
-        return self._project_service.create_project(CreateProjectInput(name="Agent Analysis")).id
 
     def _load_frame(self, path: Path) -> pd.DataFrame:
         source_format = detect_source_format(path)

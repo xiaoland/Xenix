@@ -72,7 +72,7 @@ Result ownership rules:
 - Generated models, exports, and reports live in service-managed directories on the local filesystem.
 - ML task working directories live under `artifacts/ml-tasks/<ml-task-id>/`.
 - An ML task reaches `succeeded` only after every declared output path exists.
-- ChatBox result presentation flows through markdown summaries and `artifact://...` links registered by services.
+- Chatbot result presentation flows through markdown summaries and `artifact://...` links registered by services.
 
 ## Failure Contract
 

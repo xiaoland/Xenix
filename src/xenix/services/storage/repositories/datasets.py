@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 from sqlmodel import Session, select
 
 from ..models import DatasetRow
@@ -26,6 +26,10 @@ class DatasetRepository:
         )
         return list(session.exec(statement))
 
+    def list_all(self, session: Session) -> list[DatasetRow]:
+        statement = select(DatasetRow).order_by(DatasetRow.created_at)
+        return list(session.exec(statement))
+
     def list_source_by_project(self, session: Session, project_id: str) -> list[DatasetRow]:
         statement = (
             select(DatasetRow)
@@ -33,6 +37,21 @@ class DatasetRepository:
                 and_(
                     DatasetRow.project_id == project_id,
                     DatasetRow.copied_from.is_(None),
+                    DatasetRow.derived_from_dataset_id.is_(None),
+                    DatasetRow.ml_task_id.is_(None),
+                )
+            )
+            .order_by(DatasetRow.created_at)
+        )
+        return list(session.exec(statement))
+
+    def list_sources(self, session: Session) -> list[DatasetRow]:
+        statement = (
+            select(DatasetRow)
+            .where(
+                and_(
+                    DatasetRow.copied_from.is_(None),
+                    DatasetRow.derived_from_dataset_id.is_(None),
                     DatasetRow.ml_task_id.is_(None),
                 )
             )
@@ -46,7 +65,23 @@ class DatasetRepository:
             .where(
                 and_(
                     DatasetRow.project_id == project_id,
+                    or_(
+                        DatasetRow.ml_task_id.is_not(None),
+                        DatasetRow.derived_from_dataset_id.is_not(None),
+                    ),
+                )
+            )
+            .order_by(DatasetRow.created_at)
+        )
+        return list(session.exec(statement))
+
+    def list_generated(self, session: Session) -> list[DatasetRow]:
+        statement = (
+            select(DatasetRow)
+            .where(
+                or_(
                     DatasetRow.ml_task_id.is_not(None),
+                    DatasetRow.derived_from_dataset_id.is_not(None),
                 )
             )
             .order_by(DatasetRow.created_at)
@@ -57,6 +92,14 @@ class DatasetRepository:
         statement = (
             select(DatasetRow)
             .where(DatasetRow.copied_from == source_dataset_id)
+            .order_by(DatasetRow.created_at)
+        )
+        return list(session.exec(statement))
+
+    def list_derived_by_source(self, session: Session, source_dataset_id: str) -> list[DatasetRow]:
+        statement = (
+            select(DatasetRow)
+            .where(DatasetRow.derived_from_dataset_id == source_dataset_id)
             .order_by(DatasetRow.created_at)
         )
         return list(session.exec(statement))

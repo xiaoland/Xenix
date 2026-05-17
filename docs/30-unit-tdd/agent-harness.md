@@ -52,13 +52,13 @@ A provider response with empty assistant content and zero tool calls ends the tu
 
 The system prompt is stored on `AgentThreadRow.system_prompt`.
 
-`ThreadSnapshot.provider_messages()` prepends it as the first provider message with role `system`. It is metadata for provider calls and hidden from the ChatBox timeline.
+`ThreadSnapshot.provider_messages()` prepends it as the first provider message with role `system`. It is metadata for provider calls and hidden from the Chatbot timeline.
 
 ## Step Budget And Cancellation
 
 The initial step budget is enforced by Agent Harness. When the granted step budget is exhausted, Agent Harness pauses the run with `AgentRunStatus.AWAITING_CONFIRMATION` and emits a confirmation event. The user may grant more steps up to the configured total limit or stop the run.
 
-Cancellation is user-driven from the ChatBox stop control. A cancel request stops provider/tool progression, attempts to cancel active ML tasks when available, records a system cancellation Message, cancels the Turn, and marks the AgentRun cancelled.
+Cancellation is user-driven from the Chatbot stop control. A cancel request stops provider/tool progression, attempts to cancel active ML tasks when available, records a system cancellation Message, cancels the Turn, and marks the AgentRun cancelled.
 
 ## Tool Registry
 

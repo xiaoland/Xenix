@@ -31,7 +31,7 @@ Forbidden dependency direction:
 The UI is responsible for:
 
 - Presenting the Chatbot-first shell through MainWindow, History sidebar, ThreadDetailView, Composer, and Settings
-- Collecting user intent from ChatBox, composer, and file drop intake
+- Collecting user intent from Chatbot, composer, and file drop intake
 - Rendering visible user and assistant Messages
 - Rendering tool progress, cancellation state, and artifact previews
 - Rendering ML task status, validation errors, and result locations
@@ -52,14 +52,22 @@ Services are responsible for:
 - Owning product and workflow semantics
 - Providing Agent Harness, artifact, data, and ML boundaries
 - Validating user requests before long-running ML work starts
-- Translating ChatBox and tool actions into local service operations
+- Translating Chatbot and tool actions into local service operations
 - Persisting ML task metadata and status transitions
 - Resolving runtime paths
 - Coordinating ML adapters and export paths
-- Registering and resolving artifacts used by ChatBox markdown links
+- Registering and resolving artifacts used by Chatbot markdown links
 - Accepting explicit dataset, feature, target, model, and artifact owner inputs for ML work
 
 Service APIs should be designed around explicit request/result objects or narrow methods. They should return structured outcomes so the UI receives explicit success, failure, and output metadata.
+
+`DataCleaningService` owns deterministic data-cleaning execution for `data.clean`.
+`data.clean` is an LLM-facing Agent tool that applies atomic predefined cleaning operations to one registered dataset and creates a new derived dataset.
+The tool handler coordinates dataset lookup, service execution, dataset registration, and artifact registration; cleaning algorithms stay in the service layer.
+DuckDB DSL execution belongs to a separate future tool boundary.
+
+Dataset registration in the AI-first path can use a compatibility Project internally while Agent tools avoid product-facing Project inputs.
+Dataset lineage is represented through dataset metadata instead of Project ownership.
 
 ## Agent Harness Contract
 
@@ -74,7 +82,7 @@ Agent Harness owns:
 - Run recording and cancellation
 - Step budget tracking and user confirmation when a turn needs additional provider/tool steps
 
-Thread records own a system prompt. When Agent Harness constructs provider messages, it prepends that system prompt as the first provider-facing system message. The system prompt stays thread metadata and stays hidden from the ChatBox timeline.
+Thread records own a system prompt. When Agent Harness constructs provider messages, it prepends that system prompt as the first provider-facing system message. The system prompt stays thread metadata and stays hidden from the Chatbot timeline.
 
 Turn progression:
 
@@ -127,5 +135,6 @@ Add contract tests when any of the following change:
 - Agent Harness record semantics
 - LLM provider serialization
 - ML task state transitions
+- Data-cleaning tool schemas or service request/result shapes
 - Service-to-ML adapter invocation shape
 - Storage location rules for logs, models, datasets, or results

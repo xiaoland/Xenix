@@ -133,6 +133,7 @@ class DatasetRow(SQLModel, table=True):
     source_format: DatasetSourceFormat = Field(default=DatasetSourceFormat.UNKNOWN, index=True)
     copied_from: str | None = Field(default=None, foreign_key="dataset.id", index=True)
     copied_at: datetime | None = None
+    derived_from_dataset_id: str | None = Field(default=None, foreign_key="dataset.id", index=True)
     ml_task_id: str | None = Field(default=None, foreign_key="ml_task.id", index=True, unique=True)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)

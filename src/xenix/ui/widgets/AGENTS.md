@@ -6,7 +6,7 @@ This guidance applies to `src/xenix/ui/widgets/`.
 
 ## Rules
 
-- Shared widgets must stay policy-light. Avoid baking old scenario assumptions into widgets that can serve ChatBox renderers or technical views.
+- Shared widgets must stay policy-light. Avoid baking old scenario assumptions into widgets that can serve Chatbot renderers or technical views.
 - When a specific view needs stricter behavior, prefer an explicit constructor flag or narrow adapter over a forked widget copy.
 - Widgets may manage local selection or presentation state, but they must not call services or own filesystem business logic.
 - User-visible strings must participate in `retranslate_ui()` and respond to `QEvent.LanguageChange`.

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define the cross-unit result presentation contract for Chatbot-first analysis. Agent Harness tools and services produce local files and metadata; ChatBox presents those results through markdown links and previews.
+Define the cross-unit result presentation contract for Chatbot-first analysis. Agent Harness tools and services produce local files and metadata; Chatbot presents those results through markdown links and previews.
 
 ## URI Shape
 
@@ -26,7 +26,7 @@ Examples:
 - `ArtifactService` registers artifacts and resolves `artifact://...` URIs.
 - Artifact rows store the local absolute path, title, kind, MIME type, preview payload, metadata payload, readiness, and optional Thread/Turn/Message/ToolCall ownership ids.
 - Agent Harness tools return markdown summaries containing artifact links when they create or expose user-openable outputs.
-- ChatBox intercepts artifact links and asks services to resolve them before opening files or rendering previews.
+- Chatbot intercepts artifact links and asks services to resolve them before opening files or rendering previews.
 - File paths remain service-owned implementation details.
 
 ## Result Flow
@@ -37,15 +37,15 @@ Tool handler
   -> ArtifactService.register_artifact(...)
   -> tool result payload stores artifact_id and artifact_link
   -> tool result Message stores markdown content
-  -> ChatBox renders markdown
+  -> Chatbot renders markdown
   -> user activates artifact:// link
   -> ArtifactService.resolve_uri(...)
-  -> ChatBox opens or previews the resolved artifact
+  -> Chatbot opens or previews the resolved artifact
 ```
 
 ## View Hints
 
-`view` is a rendering hint. Supported hints can grow over time as ChatBox gains richer renderers.
+`view` is a rendering hint. Supported hints can grow over time as Chatbot gains richer renderers.
 
 Current durable meanings:
 
