@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from ...services.dataset_inspection import DatasetColumnMetadata
+from ..native_widgets import emphasize_label
 
 
 class ColumnSelectionWidget(QFrame):
@@ -69,7 +70,7 @@ class ColumnSelectionWidget(QFrame):
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         title_label.setAlignment(Qt.AlignLeft)
-        title_label.setStyleSheet("font-weight: 600;")
+        emphasize_label(title_label)
         layout.addWidget(title_label)
 
         scroll = QScrollArea()

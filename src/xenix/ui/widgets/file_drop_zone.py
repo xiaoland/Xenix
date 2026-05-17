@@ -3,6 +3,8 @@ from __future__ import annotations
 from PySide6.QtCore import QEvent, Qt, Signal
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 
+from ..native_widgets import emphasize_label
+
 
 class FileDropZone(QFrame):
     file_dropped = Signal(str)
@@ -21,7 +23,7 @@ class FileDropZone(QFrame):
         layout.setSpacing(6)
 
         self._title_label.setAlignment(Qt.AlignCenter)
-        self._title_label.setStyleSheet("font-size: 16px; font-weight: 600;")
+        emphasize_label(self._title_label)
 
         self._subtitle_label.setAlignment(Qt.AlignCenter)
         self._subtitle_label.setWordWrap(True)

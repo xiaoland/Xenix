@@ -37,6 +37,7 @@ from ..services.inference_history_service import (
 )
 from ..services.ml_service import MLService
 from ..services.storage.models import MLTaskStatus
+from .native_widgets import mark_status_label
 from .widgets.task_log_view import TaskLogView
 
 
@@ -410,4 +411,4 @@ class InferenceHistoryDialog(QDialog):
 
     def _set_message(self, message: str, *, is_error: bool) -> None:
         self._message_label.setText(message)
-        self._message_label.setStyleSheet("color: #b42318;" if is_error else "color: #17643a;")
+        mark_status_label(self._message_label, is_error=is_error)

@@ -26,6 +26,7 @@ from ..services.scenario_workflow_service import (
     ScenarioWorkflowService,
 )
 from .scenario_template_text import localized_template_display_name
+from .native_widgets import emphasize_label, mark_status_label
 from .widgets.column_selection import ColumnSelectionWidget
 from .widgets.dataset_summary import DatasetSummaryWidget
 from .widgets.file_drop_zone import FileDropZone
@@ -89,7 +90,7 @@ class ScenarioDataPreparationDialog(QDialog):
         self._summary_label.setWordWrap(True)
         self._busy_label.setWordWrap(True)
         self._message_label.setWordWrap(True)
-        self._title_label.setStyleSheet("font-size: 20px; font-weight: 600;")
+        emphasize_label(self._title_label, point_delta=2)
         self._busy_indicator.setRange(0, 0)
         self._busy_indicator.setTextVisible(False)
         self._busy_indicator.hide()
@@ -194,7 +195,7 @@ class ScenarioDataPreparationDialog(QDialog):
 
     def _set_message(self, message: str, *, is_error: bool) -> None:
         self._message_label.setText(message)
-        self._message_label.setStyleSheet("color: #b42318;" if is_error else "color: #17643a;")
+        mark_status_label(self._message_label, is_error=is_error)
 
     def _run_inspection(self, operation_id: int, file_path: str) -> None:
         try:

@@ -40,6 +40,7 @@ from ..services.scenario_workflow_service import ScenarioWorkItemPreparationResu
 from ..services.storage.models import MLTaskStatus, MLTaskType, TrainedModelRow, WorkItemRow
 from ..services.trained_model_metadata import parse_trained_model_metadata
 from ..services.work_item_service import WorkItemService
+from .native_widgets import emphasize_label, mark_status_label
 from .scenario_template_text import localized_template_display_name
 from .widgets.inference_row_editor import InferenceRowEditorWidget
 from .widgets.task_log_view import TaskLogView
@@ -133,7 +134,7 @@ class ScenarioInferenceDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(14)
 
-        self._title_label.setStyleSheet("font-size: 20px; font-weight: 600;")
+        emphasize_label(self._title_label, point_delta=2)
         self._summary_label.setWordWrap(True)
         self._context_label.setWordWrap(True)
         self._best_model_label.setWordWrap(True)
@@ -141,7 +142,7 @@ class ScenarioInferenceDialog(QDialog):
         self._task_details_label.setWordWrap(True)
         self._manual_hint_label.setWordWrap(True)
         self._batch_hint_label.setWordWrap(True)
-        self._batch_preview_label.setStyleSheet("font-size: 13px; font-weight: 600;")
+        emphasize_label(self._batch_preview_label)
         self._batch_preview_summary_label.setWordWrap(True)
         self._result_summary_label.setWordWrap(True)
 
@@ -805,14 +806,14 @@ class ScenarioInferenceDialog(QDialog):
         self._message_kwargs = {key: str(value) for key, value in kwargs.items()}
         self._raw_message = None
         self._message_label.setText(self.tr(template).format(**self._message_kwargs))
-        self._message_label.setStyleSheet("color: #b42318;" if is_error else "color: #17643a;")
+        mark_status_label(self._message_label, is_error=is_error)
 
     def _set_raw_message(self, message: str, *, is_error: bool = False) -> None:
         self._message_template = None
         self._message_kwargs = {}
         self._raw_message = message
         self._message_label.setText(message)
-        self._message_label.setStyleSheet("color: #b42318;" if is_error else "color: #17643a;")
+        mark_status_label(self._message_label, is_error=is_error)
 
     def _reload_message_label(self) -> None:
         if self._message_template is not None:

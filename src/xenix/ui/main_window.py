@@ -47,6 +47,7 @@ from .inference_history_dialog import InferenceHistoryDialog
 from .inference_workspace import InferenceWorkspace
 from .layout_debug import dump_layout_if_enabled
 from .ml_workspace import MLWorkspace
+from .native_widgets import emphasize_label
 from .scenario_data_preparation_dialog import ScenarioDataPreparationDialog
 from .scenario_home_view import ScenarioHomeView
 from .scenario_inference_dialog import ScenarioInferenceDialog
@@ -136,6 +137,7 @@ class MainWindow(QMainWindow):
         self._settings_button.clicked.connect(self._open_settings)
         self._history_sidebar = QFrame(parent=self)
         self._history_sidebar.setObjectName("historySidebar")
+        self._history_sidebar.setFrameShape(QFrame.StyledPanel)
         self._history_label = QLabel(parent=self._history_sidebar)
         self._new_thread_button = QPushButton(parent=self._history_sidebar)
         self._new_thread_button.setObjectName("newThreadButton")
@@ -175,7 +177,7 @@ class MainWindow(QMainWindow):
         header_layout.setObjectName("mainHeaderLayout")
         header_layout.setContentsMargins(0, 0, 0, 0)
         header_layout.setSpacing(12)
-        self._title_label.setStyleSheet("font-size: 18px; font-weight: 600;")
+        emphasize_label(self._title_label, point_delta=2)
         self._settings_button.setMinimumWidth(96)
         header_layout.addWidget(self._title_label)
         header_layout.addStretch(1)
@@ -212,7 +214,6 @@ class MainWindow(QMainWindow):
         current_item = self._history_list.currentItem()
         if current_item is not None:
             self._open_history_thread(current_item)
-        self._apply_shell_style()
         dump_layout_if_enabled(root, reason="main-window-setup")
 
     def retranslate_ui(self) -> None:
@@ -700,46 +701,3 @@ class MainWindow(QMainWindow):
     def _thread_id_from_history_item(self, item: QListWidgetItem) -> str | None:
         thread_id = item.data(Qt.UserRole)
         return thread_id if isinstance(thread_id, str) else None
-
-    def _apply_shell_style(self) -> None:
-        self.setStyleSheet(
-            """
-            #historySidebar {
-                background: #ffffff;
-                border: 1px solid #d8dde6;
-                border-radius: 8px;
-            }
-            #historySidebarTitle {
-                font-weight: 600;
-                color: #303640;
-            }
-            #newThreadButton {
-                background: #f1f3f6;
-                border: 1px solid #d3d8e2;
-                border-radius: 6px;
-                color: #303640;
-                font-size: 18px;
-                font-weight: 600;
-            }
-            #newThreadButton:hover {
-                background: #e8ebf0;
-            }
-            #historyList {
-                background: transparent;
-                border: 0;
-                outline: 0;
-            }
-            #historyList::item {
-                padding: 8px 9px;
-                border-radius: 6px;
-                color: #303640;
-            }
-            #historyList::item:selected {
-                background: #e9f0ff;
-                color: #1f3b70;
-            }
-            #historyList::item:hover {
-                background: #f1f3f6;
-            }
-            """
-        )

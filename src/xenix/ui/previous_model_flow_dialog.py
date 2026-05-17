@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QDialog, QLabel, QPushButton, QVBoxLayout, QWidget
 from ..datetime_utils import format_datetime_for_display
 from ..services.scenario_model_source_service import CompatibleTrainedModelOption
 from ..services.scenario_template_service import ScenarioTemplate
+from .native_widgets import emphasize_label
 from .scenario_template_text import localized_template_display_name
 
 
@@ -36,7 +37,7 @@ class PreviousModelFlowDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(14)
 
-        self._title_label.setStyleSheet("font-size: 20px; font-weight: 600;")
+        emphasize_label(self._title_label, point_delta=2)
         self._summary_label.setWordWrap(True)
         self._template_label.setWordWrap(True)
         self._model_label.setWordWrap(True)

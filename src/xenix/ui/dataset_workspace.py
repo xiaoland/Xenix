@@ -22,6 +22,7 @@ from ..services.dataset_inspection import DatasetInspection, InspectDatasetInput
 from ..services.dataset_service import DatasetService, RegisterDatasetInput
 from ..services.project_service import CreateProjectInput, ProjectService
 from ..services.work_item_service import CreateWorkItemInput, WorkItemService
+from .native_widgets import mark_status_label
 from .widgets.column_selection import ColumnSelectionWidget
 from .widgets.dataset_summary import DatasetSummaryWidget
 from .widgets.file_drop_zone import FileDropZone
@@ -264,11 +265,11 @@ class DatasetWorkspace(QWidget):
         self._message_kwargs = {key: str(value) for key, value in kwargs.items()}
         self._raw_message = None
         self._message_label.setText(self.tr(template).format(**self._message_kwargs))
-        self._message_label.setStyleSheet("color: #b42318;" if is_error else "color: #17643a;")
+        mark_status_label(self._message_label, is_error=is_error)
 
     def _set_raw_message(self, message: str, *, is_error: bool = False) -> None:
         self._message_template = None
         self._message_kwargs = {}
         self._raw_message = message
         self._message_label.setText(message)
-        self._message_label.setStyleSheet("color: #b42318;" if is_error else "color: #17643a;")
+        mark_status_label(self._message_label, is_error=is_error)

@@ -36,6 +36,7 @@ from ..services.project_service import ProjectService
 from ..services.storage.models import MLTaskStatus, MLTaskType
 from ..services.trained_model_metadata import parse_trained_model_metadata
 from ..services.work_item_service import WorkItemService
+from .native_widgets import mark_status_label
 from .widgets.inference_row_editor import InferenceRowEditorWidget
 from .widgets.task_log_view import TaskLogView
 
@@ -549,14 +550,14 @@ class InferenceWorkspace(QWidget):
         self._message_kwargs = {key: str(value) for key, value in kwargs.items()}
         self._raw_message = None
         self._message_label.setText(self.tr(template).format(**self._message_kwargs))
-        self._message_label.setStyleSheet("color: #b42318;" if is_error else "color: #17643a;")
+        mark_status_label(self._message_label, is_error=is_error)
 
     def _set_raw_message(self, message: str, *, is_error: bool = False) -> None:
         self._message_template = None
         self._message_kwargs = {}
         self._raw_message = message
         self._message_label.setText(message)
-        self._message_label.setStyleSheet("color: #b42318;" if is_error else "color: #17643a;")
+        mark_status_label(self._message_label, is_error=is_error)
 
     def _reload_message_label(self) -> None:
         if self._message_template is not None:

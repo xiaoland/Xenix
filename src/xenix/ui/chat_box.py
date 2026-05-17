@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QEvent, QPoint, QTimer, Qt, Signal
-from PySide6.QtGui import QTextOption
+from PySide6.QtGui import QColor, QFont, QPalette, QTextOption
 from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -23,10 +23,17 @@ from shiboken6 import isValid
 from ..services.agent import ThreadSnapshot
 from ..services.storage.models import AgentMessageAuthor, AgentMessageKind
 
+USER_MESSAGE_BACKGROUND = QColor("#000000")
+USER_MESSAGE_FOREGROUND = QColor("#ffffff")
+
 
 class AutoHeightTextBrowser(QTextBrowser):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setAutoFillBackground(False)
+        self.viewport().setAttribute(Qt.WA_TranslucentBackground, True)
+        self.viewport().setAutoFillBackground(False)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -152,6 +159,7 @@ class ChatMessageBubble(QFrame):
         card = QFrame(self)
         self._card = card
         card.setObjectName(self._card_object_name(author, blocks))
+        card.setFrameShape(QFrame.StyledPanel)
 
         card_layout = QVBoxLayout(card)
         card_layout.setObjectName("chatMessageCardLayout")
@@ -161,6 +169,9 @@ class ChatMessageBubble(QFrame):
         if self._shows_author(author, blocks):
             author_label = QLabel(author)
             author_label.setObjectName("chatMessageAuthor")
+            author_font = QFont(author_label.font())
+            author_font.setBold(True)
+            author_label.setFont(author_font)
             card_layout.addWidget(author_label)
 
         browser = AutoHeightTextBrowser()
@@ -171,6 +182,7 @@ class ChatMessageBubble(QFrame):
         browser.setOpenExternalLinks(False)
         browser.setFrameShape(QFrame.NoFrame)
         browser.anchorClicked.connect(self._handle_link_activated)
+        self._apply_message_palette(author, card, browser)
         browser.setMarkdown(self._render_blocks(blocks))
         card_layout.addWidget(browser)
 
@@ -196,6 +208,30 @@ class ChatMessageBubble(QFrame):
 
     def _shows_author(self, author: str, blocks: list[dict[str, Any]]) -> bool:
         return author not in {"You", "Xenix"}
+
+    def _apply_message_palette(self, author: str, card: QFrame, browser: QTextBrowser) -> None:
+        if author != "You":
+            card.setAutoFillBackground(False)
+            return
+
+        card_palette = QPalette(card.palette())
+        card_palette.setColor(QPalette.ColorRole.Window, USER_MESSAGE_BACKGROUND)
+        card_palette.setColor(QPalette.ColorRole.WindowText, USER_MESSAGE_FOREGROUND)
+        card.setPalette(card_palette)
+        card.setAutoFillBackground(True)
+
+        text_palette = QPalette(browser.palette())
+        for role in (
+            QPalette.ColorRole.Text,
+            QPalette.ColorRole.WindowText,
+            QPalette.ColorRole.BrightText,
+            QPalette.ColorRole.ButtonText,
+        ):
+            text_palette.setColor(role, USER_MESSAGE_FOREGROUND)
+        text_palette.setColor(QPalette.ColorRole.Link, USER_MESSAGE_FOREGROUND)
+        text_palette.setColor(QPalette.ColorRole.LinkVisited, USER_MESSAGE_FOREGROUND)
+        browser.setPalette(text_palette)
+        browser.viewport().setPalette(text_palette)
 
     def _render_blocks(self, blocks: list[dict[str, Any]]) -> str:
         parts: list[str] = []
@@ -252,7 +288,8 @@ class TurnDivider(QFrame):
         line = QFrame(self)
         self._card = line
         line.setObjectName("chatMessageDivider")
-        line.setFixedHeight(1)
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken)
         layout.addWidget(line)
 
 
@@ -261,6 +298,7 @@ class AttachmentChip(QFrame):
         super().__init__(parent)
         self.path = path
         self.setObjectName("attachmentChip")
+        self.setFrameShape(QFrame.StyledPanel)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(9, 5, 9, 5)
         layout.setSpacing(6)
@@ -311,6 +349,7 @@ class ThreadDetailView(QWidget):
 
         self._composer = QFrame()
         self._composer.setObjectName("chatComposer")
+        self._composer.setFrameShape(QFrame.StyledPanel)
         composer_layout = QVBoxLayout(self._composer)
         composer_layout.setObjectName("chatComposerLayout")
         composer_layout.setContentsMargins(10, 8, 10, 8)
@@ -356,6 +395,7 @@ class ThreadDetailView(QWidget):
 
         self._step_confirmation_bar = QFrame()
         self._step_confirmation_bar.setObjectName("stepConfirmationBar")
+        self._step_confirmation_bar.setFrameShape(QFrame.StyledPanel)
         step_confirmation_layout = QHBoxLayout(self._step_confirmation_bar)
         step_confirmation_layout.setContentsMargins(10, 8, 10, 8)
         step_confirmation_layout.setSpacing(8)
@@ -415,6 +455,9 @@ class ThreadDetailView(QWidget):
         self._composer_drop_overlay = QFrame(self._composer_shell)
         self._composer_drop_overlay.setObjectName("composerDropOverlay")
         self._composer_drop_overlay.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self._composer_drop_overlay.setAutoFillBackground(True)
+        self._composer_drop_overlay.setFrameShape(QFrame.StyledPanel)
+        self._composer_drop_overlay.setFrameShadow(QFrame.Raised)
         composer_drop_layout = QVBoxLayout(self._composer_drop_overlay)
         composer_drop_layout.setContentsMargins(12, 10, 12, 10)
         composer_drop_layout.setSpacing(3)
@@ -423,6 +466,9 @@ class ThreadDetailView(QWidget):
         self._composer_drop_title = QLabel("Drop files to attach")
         self._composer_drop_title.setObjectName("composerDropTitle")
         self._composer_drop_title.setAlignment(Qt.AlignCenter)
+        composer_drop_title_font = QFont(self._composer_drop_title.font())
+        composer_drop_title_font.setBold(True)
+        self._composer_drop_title.setFont(composer_drop_title_font)
 
         self._composer_drop_hint = QLabel("Release here to add them to the next message")
         self._composer_drop_hint.setObjectName("composerDropHint")
@@ -443,7 +489,6 @@ class ThreadDetailView(QWidget):
         self._refresh_attachment_chips()
         self._set_composer_multiline(False)
         self._sync_composer_drop_overlay_geometry()
-        self._apply_style()
 
     def render_snapshot(self, snapshot: ThreadSnapshot) -> None:
         self.finish_streaming_assistant_message()
@@ -763,145 +808,6 @@ class ThreadDetailView(QWidget):
             if card is not None and card.objectName() == "chatMessageUser":
                 return True
         return False
-
-    def _apply_style(self) -> None:
-        self.setStyleSheet(
-            """
-            QWidget {
-                background: #f6f7f9;
-                color: #20242a;
-                font-size: 14px;
-            }
-            #chatScrollArea {
-                background: transparent;
-            }
-            #chatMessageColumn {
-                background: transparent;
-            }
-            #chatMessageRow {
-                background: transparent;
-            }
-            #chatMessageAssistant {
-                background: transparent;
-                border: 0;
-            }
-            #chatMessageUser {
-                background: #e9f0ff;
-                border: 1px solid #cbd9fb;
-                border-radius: 8px;
-            }
-            #chatMessageTool {
-                background: #ffffff;
-                border: 1px solid #d8dde6;
-                border-radius: 8px;
-            }
-            #chatMessageSystem {
-                background: #fff7ed;
-                border: 1px solid #fed7aa;
-                border-radius: 8px;
-            }
-            #chatMessageDivider {
-                background: transparent;
-                border-top: 1px solid #d7dce5;
-                border-bottom: 0;
-                border-left: 0;
-                border-right: 0;
-                color: #667085;
-            }
-            #chatMessageAuthor {
-                background: transparent;
-                font-weight: 600;
-                color: #3a4048;
-            }
-            #chatMessageBody {
-                background: transparent;
-                color: #20242a;
-            }
-            #chatComposer {
-                background: #ffffff;
-                border: 1px solid #cfd5df;
-                border-radius: 8px;
-            }
-            #chatComposerEditor {
-                background: #ffffff;
-                border: 0;
-                padding: 0;
-            }
-            #stepConfirmationBar {
-                background: #f8fafc;
-                border: 1px solid #d7dce5;
-                border-radius: 7px;
-            }
-            #stepConfirmationLabel {
-                background: transparent;
-                color: #303640;
-                font-size: 13px;
-            }
-            #stepContinueButton {
-                background: #244f9e;
-                color: white;
-                border: 0;
-                border-radius: 6px;
-                padding: 7px 12px;
-                font-weight: 600;
-            }
-            #stepStopButton {
-                background: #f1f3f6;
-                color: #303640;
-                border: 1px solid #d3d8e2;
-                border-radius: 6px;
-                padding: 7px 12px;
-                font-weight: 600;
-            }
-            #composerDropOverlay {
-                background: rgba(36, 79, 158, 40);
-                border: 1px dashed #244f9e;
-                border-radius: 8px;
-            }
-            #composerDropTitle {
-                background: transparent;
-                color: #1d4081;
-                font-size: 14px;
-                font-weight: 700;
-            }
-            #composerDropHint {
-                background: transparent;
-                color: #3b4a61;
-                font-size: 12px;
-            }
-            #attachButton {
-                background: #f1f3f6;
-                border: 1px solid #d3d8e2;
-                border-radius: 6px;
-                color: #303640;
-                font-weight: 700;
-            }
-            #attachButton:hover {
-                background: #e8ebf0;
-            }
-            #sendButton {
-                background: #244f9e;
-                color: white;
-                border: 0;
-                border-radius: 6px;
-                padding: 8px 14px;
-                font-weight: 600;
-            }
-            #sendButton:hover {
-                background: #1d4081;
-            }
-            #attachmentChip {
-                background: #eef2f8;
-                border: 1px solid #d4dae5;
-                border-radius: 8px;
-            }
-            #attachmentChipLabel {
-                background: transparent;
-                color: #303640;
-                font-size: 12px;
-            }
-            """
-        )
 
     def _resize_user_messages(self) -> None:
         width = self._message_column.width()

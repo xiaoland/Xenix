@@ -24,6 +24,7 @@ from ..services.scenario_template_service import (
 )
 from ..services.scenario_training_preset_service import ScenarioTrainingPresetService
 from ..services.scenario_workflow_service import ScenarioWorkItemPreparationResult
+from .native_widgets import emphasize_label, mark_status_label
 from .scenario_template_text import localized_template_display_name
 from .widgets.json_schema_form import JsonSchemaFormWidget
 
@@ -126,9 +127,8 @@ class _ScenarioTrainingOptionCard(QFrame):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
 
-        self._model_name_label.setStyleSheet("font-size: 16px; font-weight: 600;")
-        self._metadata_label.setStyleSheet("color: #475467; font-size: 12px; font-weight: 600;")
-        self._guidance_label.setStyleSheet("color: #344054; font-size: 12px;")
+        emphasize_label(self._model_name_label)
+        emphasize_label(self._metadata_label)
         self._metadata_label.setWordWrap(True)
         self._guidance_label.setWordWrap(True)
         self._operation_summary_label.setWordWrap(True)
@@ -320,7 +320,7 @@ class ScenarioTrainingSelectionDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(14)
 
-        self._title_label.setStyleSheet("font-size: 20px; font-weight: 600;")
+        emphasize_label(self._title_label, point_delta=2)
         self._summary_label.setWordWrap(True)
         self._selection_label.setWordWrap(True)
         self._message_label.setWordWrap(True)
@@ -350,7 +350,7 @@ class ScenarioTrainingSelectionDialog(QDialog):
             section_key = "recommended" if entry.model_key in default_steps_by_model else "additional"
             if section_key != current_section:
                 section_label = QLabel(parent=self._cards_container)
-                section_label.setStyleSheet("color: #101828; font-size: 13px; font-weight: 700;")
+                emphasize_label(section_label)
                 self._cards_layout.addWidget(section_label)
                 self._section_labels[section_key] = section_label
                 current_section = section_key
@@ -388,8 +388,8 @@ class ScenarioTrainingSelectionDialog(QDialog):
         self._save_defaults_button.setEnabled(has_selection)
         self._start_training_button.setEnabled(has_selection)
         if not self._available_models:
-            self._message_label.setStyleSheet("color: #b42318;")
             self._message_label.setText(self.tr("No compatible models are available for this scenario template yet."))
+            mark_status_label(self._message_label, is_error=True)
             return
         if has_selection:
             self._set_message(
@@ -415,7 +415,7 @@ class ScenarioTrainingSelectionDialog(QDialog):
 
     def _set_message(self, message: str, *, is_error: bool) -> None:
         self._message_label.setText(message)
-        self._message_label.setStyleSheet("color: #b42318;" if is_error else "color: #17643a;")
+        mark_status_label(self._message_label, is_error=is_error)
 
     def _build_selection_text(self) -> str:
         if self._template.required_target_count == 0:

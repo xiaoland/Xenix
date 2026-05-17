@@ -22,6 +22,7 @@ from ..services.scenario_model_source_service import (
 )
 from ..services.scenario_template_service import ScenarioTemplate
 from ..services.scenario_workflow_service import ScenarioWorkItemPreparationResult
+from .native_widgets import emphasize_label
 from .scenario_template_text import localized_template_display_name
 
 
@@ -94,12 +95,12 @@ class ScenarioModelSourceDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(14)
 
-        self._title_label.setStyleSheet("font-size: 20px; font-weight: 600;")
+        emphasize_label(self._title_label, point_delta=2)
         self._summary_label.setWordWrap(True)
         self._selection_label.setWordWrap(True)
-        self._train_title_label.setStyleSheet("font-size: 16px; font-weight: 600;")
+        emphasize_label(self._train_title_label)
         self._train_description_label.setWordWrap(True)
-        self._trained_title_label.setStyleSheet("font-size: 16px; font-weight: 600;")
+        emphasize_label(self._trained_title_label)
         self._trained_description_label.setWordWrap(True)
         self._compatible_count_label.setWordWrap(True)
         self._selected_model_label.setWordWrap(True)

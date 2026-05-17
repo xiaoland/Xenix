@@ -6,6 +6,7 @@ from PySide6.QtCore import QEvent, Signal
 from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from ..services.analysis_scenario_service import AnalysisScenario, AnalysisScenarioAvailability
+from .native_widgets import emphasize_label
 from .analysis_scenario_text import (
     localized_analysis_scenario_description,
     localized_analysis_scenario_display_name,
@@ -40,9 +41,9 @@ class ScenarioHomeView(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(18)
 
-        self._title_label.setStyleSheet("font-size: 24px; font-weight: 600;")
+        emphasize_label(self._title_label, point_delta=3)
         self._summary_label.setWordWrap(True)
-        self._cards_label.setStyleSheet("font-size: 16px; font-weight: 600;")
+        emphasize_label(self._cards_label)
 
         layout.addWidget(self._title_label)
         layout.addWidget(self._summary_label)
@@ -80,7 +81,6 @@ class ScenarioHomeView(QWidget):
 
             status = QLabel()
             status.setWordWrap(True)
-            status.setStyleSheet("font-size: 12px; color: #5b5b5b;")
 
             card_layout.addWidget(button)
             card_layout.addWidget(description)

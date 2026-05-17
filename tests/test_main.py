@@ -3,8 +3,9 @@ import time
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QMimeData, QPointF, Qt, QUrl
+from PySide6.QtGui import QPalette
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QMessageBox, QWidget
+from PySide6.QtWidgets import QFrame, QMessageBox, QTextBrowser, QWidget
 
 from xenix.app import build_main_window
 from xenix.main import main
@@ -555,6 +556,67 @@ def test_thread_detail_view_message_cards_fit_content_height(monkeypatch, tmp_pa
                     content_bottom = max(content_bottom, child.geometry().y() + child.height())
 
             assert card.height() >= content_bottom + margins.bottom()
+    finally:
+        window._ml_workspace._timer.stop()
+        window.close()
+
+
+def test_thread_detail_view_message_text_uses_transparent_native_background(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=True)
+    try:
+        app.processEvents()
+        view = window._thread_detail_view
+        view.clear_messages()
+        view.add_message("Xenix", [{"type": "markdown", "text": "Transparent message text."}], auto_scroll=False)
+        app.processEvents()
+
+        bubble_item = view._message_layout.itemAt(0)
+        bubble = bubble_item.widget() if bubble_item is not None else None
+        card = getattr(bubble, "_card", None)
+        browser = bubble.findChild(QTextBrowser) if bubble is not None else None
+
+        assert card is not None
+        assert card.frameShape() == QFrame.StyledPanel
+        assert browser is not None
+        assert not browser.autoFillBackground()
+        assert browser.testAttribute(Qt.WA_TranslucentBackground)
+        assert not browser.viewport().autoFillBackground()
+        assert browser.viewport().testAttribute(Qt.WA_TranslucentBackground)
+    finally:
+        window._ml_workspace._timer.stop()
+        window.close()
+
+
+def test_thread_detail_view_user_message_uses_native_black_panel(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=True)
+    try:
+        app.processEvents()
+        view = window._thread_detail_view
+        view.clear_messages()
+        view.add_message("You", [{"type": "markdown", "text": "User message."}], auto_scroll=False)
+        app.processEvents()
+
+        bubble_item = view._message_layout.itemAt(0)
+        bubble = bubble_item.widget() if bubble_item is not None else None
+        card = getattr(bubble, "_card", None)
+        browser = bubble.findChild(QTextBrowser) if bubble is not None else None
+
+        assert card is not None
+        assert card.objectName() == "chatMessageUser"
+        assert card.frameShape() == QFrame.StyledPanel
+        assert card.autoFillBackground()
+        assert card.palette().color(QPalette.ColorRole.Window).name() == "#000000"
+        assert browser is not None
+        assert browser.palette().color(QPalette.ColorRole.Text).name() == "#ffffff"
+        assert browser.viewport().palette().color(QPalette.ColorRole.Text).name() == "#ffffff"
     finally:
         window._ml_workspace._timer.stop()
         window.close()

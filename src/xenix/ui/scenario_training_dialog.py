@@ -40,6 +40,7 @@ from ..services.scenario_workflow_service import (
 )
 from ..services.storage.models import MLTaskArtifactKind, MLTaskType
 from ..services.trained_model_metadata import parse_trained_model_metadata
+from .native_widgets import emphasize_label, mark_status_label
 from .scenario_template_text import localized_template_display_name
 from .widgets.task_log_view import TaskLogView
 
@@ -89,7 +90,7 @@ class _ScenarioTrainingResultCard(QWidget):
         self._params_label.setText(params_text)
         self._save_state_label.setText(save_state_text)
         self._hint_label.setText(hint_text)
-        self._refresh_style(snapshot.status, is_selected, is_best_model)
+        self._refresh_native_state(snapshot.status, is_selected, is_best_model)
 
     def mousePressEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
         if event.button() == Qt.LeftButton and self._step_key is not None:
@@ -103,6 +104,7 @@ class _ScenarioTrainingResultCard(QWidget):
         self.setCursor(Qt.PointingHandCursor)
         self._frame.setObjectName("resultCardFrame")
         self._frame.setFrameShape(QFrame.StyledPanel)
+        self._frame.setFrameShadow(QFrame.Raised)
         self._frame.setCursor(Qt.PointingHandCursor)
         self._title_label.setObjectName("resultCardTitle")
         self._status_label.setObjectName("resultCardStatus")
@@ -122,6 +124,13 @@ class _ScenarioTrainingResultCard(QWidget):
         self._save_state_label.setWordWrap(True)
         self._hint_label.setWordWrap(True)
         self._rank_label.setWordWrap(True)
+        self._status_label.setFrameShape(QFrame.StyledPanel)
+        self._status_label.setMargin(2)
+        emphasize_label(self._title_label)
+        emphasize_label(self._status_label)
+        emphasize_label(self._rank_label)
+        emphasize_label(self._metrics_label)
+        emphasize_label(self._save_state_label)
 
         header_layout = QHBoxLayout()
         header_layout.setSpacing(10)
@@ -137,77 +146,18 @@ class _ScenarioTrainingResultCard(QWidget):
         card_layout.addWidget(self._hint_label)
         root_layout.addWidget(self._frame)
 
-    def _refresh_style(
+    def _refresh_native_state(
         self,
         status: ScenarioTrainingStepStatus,
         is_selected: bool,
         is_best_model: bool,
     ) -> None:
-        status_palette = {
-            ScenarioTrainingStepStatus.RUNNING: ("#9a6700", "#fff7e6", "#f4c86a"),
-            ScenarioTrainingStepStatus.SUCCEEDED: ("#17643a", "#ecfdf3", "#8fd3a8"),
-            ScenarioTrainingStepStatus.FAILED: ("#b42318", "#fef3f2", "#f3a7a0"),
-        }
-        status_color, status_background, status_border = status_palette[status]
-        border_color = "#7aa2f7" if is_selected else "#d0d5dd"
-        background = "#f5f8ff" if is_selected else "#ffffff"
-        title_color = "#17643a" if is_best_model else "#101828"
-        save_state_color = "#17643a" if is_best_model else "#344054"
-        self._frame.setStyleSheet(
-            f"""
-            QFrame#resultCardFrame {{
-                background-color: {background};
-                border: 1px solid {border_color};
-                border-radius: 10px;
-            }}
-            QLabel {{
-                background: transparent;
-                border: none;
-            }}
-            QLabel#resultCardTitle {{
-                color: {title_color};
-                font-size: 16px;
-                font-weight: 600;
-            }}
-            QLabel#resultCardStatus {{
-                color: {status_color};
-                background-color: {status_background};
-                border: 1px solid {status_border};
-                border-radius: 10px;
-                font-size: 12px;
-                font-weight: 600;
-                padding: 2px 8px;
-            }}
-            QLabel#resultCardMode {{
-                color: #475467;
-                font-size: 12px;
-                font-weight: 500;
-            }}
-            QLabel#resultCardRank {{
-                color: #17643a;
-                font-size: 12px;
-                font-weight: 700;
-            }}
-            QLabel#resultCardMetrics {{
-                color: #101828;
-                font-size: 14px;
-                font-weight: 600;
-            }}
-            QLabel#resultCardParams {{
-                color: #344054;
-                font-size: 12px;
-            }}
-            QLabel#resultCardSaveState {{
-                color: {save_state_color};
-                font-size: 12px;
-                font-weight: 600;
-            }}
-            QLabel#resultCardHint {{
-                color: #667085;
-                font-size: 12px;
-            }}
-            """
-        )
+        self._frame.setFrameShadow(QFrame.Sunken if is_selected else QFrame.Raised)
+        self._frame.setLineWidth(2 if is_selected else 1)
+        self._frame.setAccessibleDescription("selected" if is_selected else "")
+        self._title_label.setProperty("xenixBestModel", is_best_model)
+        self._save_state_label.setProperty("xenixBestModel", is_best_model)
+        mark_status_label(self._status_label, is_error=status is ScenarioTrainingStepStatus.FAILED)
 
 
 class ScenarioTrainingDialog(QDialog):
@@ -271,7 +221,7 @@ class ScenarioTrainingDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(14)
 
-        self._title_label.setStyleSheet("font-size: 20px; font-weight: 600;")
+        emphasize_label(self._title_label, point_delta=2)
         self._summary_label.setWordWrap(True)
         self._status_summary_label.setWordWrap(True)
         self._best_model_label.setWordWrap(True)
