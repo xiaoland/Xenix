@@ -25,6 +25,7 @@ The hypothesis is that a first-slice user journey can be proven without WorkItem
 - `src/xenix/ui/`: ChatBox is now the default main surface; legacy widgets remain instanced for compatibility while target flow moves to ChatBox.
 - `src/xenix/ui/`: ChatBox owns the step-budget confirmation control surfaced from Agent Harness stream events.
 - `src/xenix/ui/`: ChatBox renders provider-wait `Thinking...`, tool-call messages, and turn-boundary dividers before user messages.
+- `src/xenix/ui/`: ChatBox message links are intercepted at the message bubble boundary; `artifact://...` links resolve through `ArtifactService` before the UI opens the file path.
 
 ## Verification
 
@@ -38,8 +39,10 @@ The hypothesis is that a first-slice user journey can be proven without WorkItem
 - `pdm run pytest tests/test_agent_harness_foundation.py tests/test_agent_harness_streaming.py tests/test_agent_harness_first_slice.py tests/test_main.py tests/test_repositories.py tests/test_migrations.py tests/test_storage_bootstrap.py`
 - `pdm run pytest`
 - `pdm run pytest tests/test_agent_harness_first_slice.py tests/test_agent_harness_foundation.py tests/test_agent_harness_streaming.py`
+- `pdm run pytest tests/test_main.py -k "artifact_link or thread_detail_view or chatbox"`
+- `pdm run pytest tests/test_main.py`
 
-Full-suite result: `111 passed in 258.76s`.
+Full-suite result: `112 passed in 282.62s`.
 
 ## Current Gaps
 

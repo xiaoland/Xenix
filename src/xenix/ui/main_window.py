@@ -3,7 +3,8 @@ from __future__ import annotations
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QPoint, Qt, Signal
+from PySide6.QtCore import QEvent, QPoint, Qt, QUrl, Signal
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -30,6 +31,7 @@ from ..services.agent import (
     ThreadSnapshot,
 )
 from ..services.analysis_scenario_service import AnalysisScenarioService
+from ..services.artifact_service import ArtifactService
 from ..services.dataset_service import DatasetService
 from ..services.inference_history_service import InferenceHistoryService
 from ..services.ml_service import MLService
@@ -76,6 +78,7 @@ class MainWindow(QMainWindow):
         scenario_training_preset_service: ScenarioTrainingPresetService,
         scenario_workflow_service: ScenarioWorkflowService,
         agent_settings_service: AgentSettingsService,
+        artifact_service: ArtifactService,
         agent_harness_service: AgentHarnessService | None = None,
     ) -> None:
         super().__init__()
@@ -95,6 +98,7 @@ class MainWindow(QMainWindow):
         self._scenario_workflow_service = scenario_workflow_service
         self._agent_harness_service = agent_harness_service
         self._agent_settings_service = agent_settings_service
+        self._artifact_service = artifact_service
         self._agent_thread_id: str | None = None
         self._active_agent_run_id: str | None = None
         self._pending_step_confirmation: AgentHarnessStreamEvent | None = None
@@ -145,6 +149,7 @@ class MainWindow(QMainWindow):
         self._thread_detail_view = ThreadDetailView(parent=self)
         self._chat_box = self._thread_detail_view
         self._chat_box.message_submitted.connect(self._submit_chat_message)
+        self._chat_box.artifact_link_activated.connect(self._open_artifact_link)
         self._chat_box.stop_requested.connect(self._request_harness_stop)
         self._chat_box.step_budget_continue_requested.connect(self._continue_step_budget)
         self._chat_box.step_budget_stop_requested.connect(self._stop_step_budget)
@@ -465,6 +470,28 @@ class MainWindow(QMainWindow):
         self._chat_box.hide_thinking_indicator()
         self._chat_box.show_error(message)
         self._chat_box.set_running(False)
+
+    def _open_artifact_link(self, uri: str) -> None:
+        url = QUrl(uri)
+        if url.scheme() != "artifact":
+            opened = QDesktopServices.openUrl(url)
+            if not opened:
+                self._chat_box.show_error(self.tr("Could not open link: {uri}").format(uri=uri))
+            return
+        try:
+            artifact = self._artifact_service.resolve_uri(uri)
+        except Exception as exc:
+            self._chat_box.show_error(str(exc))
+            return
+        if not artifact.ready_to_open:
+            self._chat_box.show_error(self.tr("Artifact is not ready to open."))
+            return
+        if not artifact.exists:
+            self._chat_box.show_error(self.tr("Artifact file is missing: {path}").format(path=artifact.absolute_path))
+            return
+        opened = QDesktopServices.openUrl(QUrl.fromLocalFile(artifact.absolute_path))
+        if not opened:
+            self._chat_box.show_error(self.tr("Could not open artifact: {path}").format(path=artifact.absolute_path))
 
     def _request_harness_stop(self) -> None:
         if self._agent_harness_service is not None and self._active_agent_run_id is not None:

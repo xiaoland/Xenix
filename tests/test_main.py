@@ -10,6 +10,8 @@ from xenix.app import build_main_window
 from xenix.main import main
 from xenix.services.agent import AgentHarnessStreamEvent
 from xenix.services.agent.dev_fixtures import MESSAGE_RENDERING_FIXTURE_TITLE
+from xenix.services.artifact_service import RegisterArtifactInput
+from xenix.services.storage.models import ArtifactKind
 
 
 class _FakeFileDropEvent:
@@ -613,6 +615,53 @@ def test_thread_detail_view_appends_streaming_delta_to_one_assistant_message(mon
         view.finish_streaming_assistant_message()
 
         assert view._streaming_assistant_bubble is None
+    finally:
+        window._ml_workspace._timer.stop()
+        window.close()
+
+
+def test_chatbox_artifact_link_resolves_and_opens_file(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    artifact_path = tmp_path / "predictions.csv"
+    artifact_path.write_text("prediction\n42\n", encoding="utf-8")
+    opened_urls = []
+
+    def fake_open_url(url):
+        opened_urls.append(url)
+        return True
+
+    monkeypatch.setattr("xenix.ui.main_window.QDesktopServices.openUrl", fake_open_url)
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=True)
+    try:
+        thread_id = window._agent_thread_id
+        assert thread_id is not None
+        artifact = window._artifact_service.register_artifact(
+            RegisterArtifactInput(
+                thread_id=thread_id,
+                title="Prediction results",
+                absolute_path=str(artifact_path.resolve()),
+                kind=ArtifactKind.PREDICTION,
+                mime_type="text/csv",
+            )
+        )
+        uri = f"artifact://{artifact.id}?view=preview"
+
+        window._chat_box.add_message(
+            "Xenix",
+            [{"type": "markdown", "text": f"Prediction results are ready: [Prediction results]({uri})"}],
+        )
+        app.processEvents()
+
+        bubble = window._chat_box._message_layout.itemAt(window._chat_box._message_layout.count() - 2).widget()
+        assert bubble._browser.openLinks() is False
+
+        bubble.link_activated.emit(uri)
+        app.processEvents()
+
+        assert [Path(url.toLocalFile()) for url in opened_urls] == [artifact_path.resolve()]
     finally:
         window._ml_workspace._timer.stop()
         window.close()

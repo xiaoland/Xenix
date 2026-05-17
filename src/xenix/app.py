@@ -125,6 +125,7 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
         scenario_workflow_service=scenario_workflow_service,
         agent_harness_service=agent_harness_service,
         agent_settings_service=agent_settings_service,
+        artifact_service=artifact_service,
     )
     if show:
         window.show()

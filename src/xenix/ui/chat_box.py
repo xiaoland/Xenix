@@ -143,6 +143,8 @@ def _propagate_geometry_change(widget: QWidget) -> None:
 
 
 class ChatMessageBubble(QFrame):
+    link_activated = Signal(str)
+
     def __init__(self, *, author: str, blocks: list[dict[str, Any]], parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("chatMessageRow")
@@ -165,8 +167,10 @@ class ChatMessageBubble(QFrame):
         self._browser = browser
         self._blocks = list(blocks)
         browser.setObjectName("chatMessageBody")
+        browser.setOpenLinks(False)
         browser.setOpenExternalLinks(False)
         browser.setFrameShape(QFrame.NoFrame)
+        browser.anchorClicked.connect(self._handle_link_activated)
         browser.setMarkdown(self._render_blocks(blocks))
         card_layout.addWidget(browser)
 
@@ -231,6 +235,9 @@ class ChatMessageBubble(QFrame):
         self._blocks[-1]["text"] = str(self._blocks[-1].get("text", "")) + delta
         self._browser.setMarkdown(self._render_blocks(self._blocks))
 
+    def _handle_link_activated(self, url) -> None:
+        self.link_activated.emit(url.toString())
+
 
 class TurnDivider(QFrame):
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -264,6 +271,7 @@ class AttachmentChip(QFrame):
 
 class ThreadDetailView(QWidget):
     message_submitted = Signal(str, list)
+    artifact_link_activated = Signal(str)
     stop_requested = Signal()
     step_budget_continue_requested = Signal()
     step_budget_stop_requested = Signal()
@@ -467,6 +475,7 @@ class ThreadDetailView(QWidget):
 
     def add_message(self, author: str, blocks: list[dict[str, Any]], *, auto_scroll: bool = True) -> None:
         bubble = ChatMessageBubble(author=author, blocks=blocks, parent=self)
+        bubble.link_activated.connect(self.artifact_link_activated.emit)
         bubble.set_available_width(self._message_column.width())
         self._message_layout.insertWidget(self._message_insert_index(), bubble)
         if auto_scroll:
@@ -493,6 +502,7 @@ class ThreadDetailView(QWidget):
                 blocks=[{"type": "markdown", "text": ""}],
                 parent=self,
             )
+            self._streaming_assistant_bubble.link_activated.connect(self.artifact_link_activated.emit)
             self._message_layout.insertWidget(self._message_insert_index(), self._streaming_assistant_bubble)
         self._streaming_assistant_bubble.append_markdown_delta(delta)
         self._scroll_to_latest()
@@ -509,6 +519,7 @@ class ThreadDetailView(QWidget):
             blocks=[{"type": "thinking", "text": "Thinking..."}],
             parent=self,
         )
+        self._thinking_bubble.link_activated.connect(self.artifact_link_activated.emit)
         self._thinking_bubble.set_available_width(self._message_column.width())
         self._message_layout.insertWidget(self._message_layout.count() - 1, self._thinking_bubble)
         self._scroll_to_latest()
