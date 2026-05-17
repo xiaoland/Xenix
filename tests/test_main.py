@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QFrame, QMessageBox, QTextBrowser, QWidget
 from xenix.app import build_main_window
 from xenix.main import main
 from xenix.services.agent import AgentHarnessStreamEvent
-from xenix.services.agent.dev_fixtures import MESSAGE_RENDERING_FIXTURE_TITLE
+from xenix.services.agent.dev_fixtures import MESSAGE_RENDERING_FIXTURE_TITLE, ensure_mock_conversation_history
 from xenix.services.artifact_service import RegisterArtifactInput
 from xenix.services.storage.models import ArtifactKind
 
@@ -37,6 +37,14 @@ class _FakeFileDropEvent:
 
     def ignore(self) -> None:
         self.ignored = True
+
+
+def _seed_mock_history(window) -> None:
+    ensure_mock_conversation_history(window._agent_harness_service._conversation_store)
+    window._refresh_history_sidebar()
+    current_item = window._history_list.currentItem()
+    if current_item is not None:
+        window._open_history_thread(current_item)
 
 
 def test_smoke_test_bootstraps_runtime_in_fresh_app_home(monkeypatch, tmp_path: Path) -> None:
@@ -76,7 +84,6 @@ def test_main_window_keeps_settings_entry_on_chatbox_shell(monkeypatch, tmp_path
     finally:
         if window._settings_dialog is not None:
             window._settings_dialog.close()
-        window._ml_workspace._timer.stop()
         window.close()
 
 
@@ -87,6 +94,7 @@ def test_main_window_seeds_mock_history_and_renders_sidebar_selection(monkeypatc
 
     app, window = build_main_window(show=False)
     try:
+        _seed_mock_history(window)
         app.processEvents()
 
         titles = [window._history_list.item(index).text() for index in range(window._history_list.count())]
@@ -96,7 +104,6 @@ def test_main_window_seeds_mock_history_and_renders_sidebar_selection(monkeypatc
         assert window._history_list.count() >= 2
         assert window._chat_box._message_layout.count() > 1
     finally:
-        window._ml_workspace._timer.stop()
         window.close()
 
 
@@ -107,6 +114,7 @@ def test_main_window_renders_turn_divider_before_user_messages(monkeypatch, tmp_
 
     app, window = build_main_window(show=False)
     try:
+        _seed_mock_history(window)
         target_item = None
         for index in range(window._history_list.count()):
             item = window._history_list.item(index)
@@ -134,7 +142,6 @@ def test_main_window_renders_turn_divider_before_user_messages(monkeypatch, tmp_
         assert user_indexes[0] == 0 or card_names[user_indexes[0] - 1] != "chatMessageDivider"
         assert all(user_index > 0 and card_names[user_index - 1] == "chatMessageDivider" for user_index in user_indexes[1:])
     finally:
-        window._ml_workspace._timer.stop()
         window.close()
 
 
@@ -145,6 +152,7 @@ def test_main_window_renders_tool_calls(monkeypatch, tmp_path: Path) -> None:
 
     app, window = build_main_window(show=True)
     try:
+        _seed_mock_history(window)
         target_item = None
         for index in range(window._history_list.count()):
             item = window._history_list.item(index)
@@ -168,7 +176,6 @@ def test_main_window_renders_tool_calls(monkeypatch, tmp_path: Path) -> None:
         assert tool_call_bubbles
         assert any("Calling" in bubble._browser.toPlainText() for bubble in tool_call_bubbles)
     finally:
-        window._ml_workspace._timer.stop()
         window.close()
 
 
@@ -193,7 +200,6 @@ def test_main_window_new_thread_button_creates_and_selects_empty_thread(monkeypa
         assert current_item.text() == "Untitled conversation"
         assert window._chat_box._message_layout.count() == 1
     finally:
-        window._ml_workspace._timer.stop()
         window.close()
 
 
@@ -244,7 +250,6 @@ def test_main_window_history_item_handlers_rename_and_delete_thread(monkeypatch,
         assert thread_id not in remaining_thread_ids
         assert window._agent_thread_id != thread_id
     finally:
-        window._ml_workspace._timer.stop()
         window.close()
 
 
@@ -302,7 +307,6 @@ def test_main_window_step_budget_confirmation_can_continue(monkeypatch, tmp_path
         assert window._pending_step_confirmation is None
         assert window._chat_box._step_confirmation_bar.isHidden() is True
     finally:
-        window._ml_workspace._timer.stop()
         window.close()
 
 
@@ -328,7 +332,6 @@ def test_main_window_stop_cancels_active_agent_run(monkeypatch, tmp_path: Path) 
         assert window._chat_box._thinking_bubble is None
         assert "run-to-stop" in window._cancelled_agent_run_ids
     finally:
-        window._ml_workspace._timer.stop()
         window.close()
 
 
@@ -356,7 +359,6 @@ def test_chatbox_composer_switches_layout_when_text_wraps(monkeypatch, tmp_path:
         assert window._chat_box._expanded_attach_button.isHidden() is False
         assert window._chat_box._expanded_send_button.isHidden() is False
     finally:
-        window._ml_workspace._timer.stop()
         window.close()
 
 
@@ -393,7 +395,6 @@ def test_chatbox_enter_submits_and_shift_enter_inserts_newline(monkeypatch, tmp_
         assert submitted == [("send with enter", [])]
         assert editor.toPlainText() == "line one\nline two"
     finally:
-        window._ml_workspace._timer.stop()
         window.close()
 
 
@@ -420,7 +421,6 @@ def test_chatbox_thinking_indicator_is_bottom_temporary_message(monkeypatch, tmp
 
         assert view._thinking_bubble is None
     finally:
-        window._ml_workspace._timer.stop()
         window.close()
 
 
@@ -473,7 +473,6 @@ def test_chatbox_composer_file_drag_hover_attaches_files(monkeypatch, tmp_path: 
         assert view._attached_files == [str(data_file.resolve())]
         assert view._attachment_bar.isVisibleTo(window)
     finally:
-        window._ml_workspace._timer.stop()
         window.close()
 
 
@@ -500,7 +499,6 @@ def test_chatbox_compact_editor_text_is_centered_with_buttons(monkeypatch, tmp_p
         assert abs(cursor_center_y - attach_center_y) <= 1
         assert abs(cursor_center_y - send_center_y) <= 1
     finally:
-        window._ml_workspace._timer.stop()
         window.close()
 
 
@@ -511,6 +509,7 @@ def test_thread_detail_view_uses_available_width_for_user_messages(monkeypatch, 
 
     app, window = build_main_window(show=False)
     try:
+        _seed_mock_history(window)
         window.resize(1200, 760)
         app.processEvents()
         view = window._thread_detail_view
@@ -529,7 +528,6 @@ def test_thread_detail_view_uses_available_width_for_user_messages(monkeypatch, 
         assert user_cards
         assert user_cards[0].maximumWidth() == max(280, int(view._message_column.width() * 0.6))
     finally:
-        window._ml_workspace._timer.stop()
         window.close()
 
 
@@ -557,7 +555,6 @@ def test_thread_detail_view_message_cards_fit_content_height(monkeypatch, tmp_pa
 
             assert card.height() >= content_bottom + margins.bottom()
     finally:
-        window._ml_workspace._timer.stop()
         window.close()
 
 
@@ -587,7 +584,6 @@ def test_thread_detail_view_message_text_uses_transparent_native_background(monk
         assert not browser.viewport().autoFillBackground()
         assert browser.viewport().testAttribute(Qt.WA_TranslucentBackground)
     finally:
-        window._ml_workspace._timer.stop()
         window.close()
 
 
@@ -618,7 +614,6 @@ def test_thread_detail_view_user_message_uses_native_black_panel(monkeypatch, tm
         assert browser.palette().color(QPalette.ColorRole.Text).name() == "#ffffff"
         assert browser.viewport().palette().color(QPalette.ColorRole.Text).name() == "#ffffff"
     finally:
-        window._ml_workspace._timer.stop()
         window.close()
 
 
@@ -650,7 +645,6 @@ def test_thread_detail_view_scrolls_to_latest_message_after_append(monkeypatch, 
         assert scrollbar.maximum() > 0
         assert scrollbar.value() == scrollbar.maximum()
     finally:
-        window._ml_workspace._timer.stop()
         window.close()
 
 
@@ -678,7 +672,6 @@ def test_thread_detail_view_appends_streaming_delta_to_one_assistant_message(mon
 
         assert view._streaming_assistant_bubble is None
     finally:
-        window._ml_workspace._timer.stop()
         window.close()
 
 
@@ -698,6 +691,8 @@ def test_chatbox_artifact_link_resolves_and_opens_file(monkeypatch, tmp_path: Pa
 
     app, window = build_main_window(show=True)
     try:
+        window._create_agent_thread()
+        app.processEvents()
         thread_id = window._agent_thread_id
         assert thread_id is not None
         artifact = window._artifact_service.register_artifact(
@@ -725,7 +720,6 @@ def test_chatbox_artifact_link_resolves_and_opens_file(monkeypatch, tmp_path: Pa
 
         assert [Path(url.toLocalFile()) for url in opened_urls] == [artifact_path.resolve()]
     finally:
-        window._ml_workspace._timer.stop()
         window.close()
 
 
@@ -800,5 +794,4 @@ def test_main_window_uses_aimock_settings_in_development(monkeypatch, tmp_path: 
     finally:
         if window._settings_dialog is not None:
             window._settings_dialog.close()
-        window._ml_workspace._timer.stop()
         window.close()

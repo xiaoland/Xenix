@@ -42,3 +42,29 @@ def test_storage_bootstrap_is_idempotent(monkeypatch, tmp_path: Path) -> None:
 
     assert get_user_version(first.engine) == CURRENT_SCHEMA_VERSION
     assert get_user_version(second.engine) == CURRENT_SCHEMA_VERSION
+
+
+def test_storage_bootstrap_uses_ai_first_baseline_without_work_item_schema(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+
+    context = StorageBootstrapService().initialize(paths)
+
+    with context.engine.connect() as connection:
+        table_names = {
+            str(row[0])
+            for row in connection.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'").all()
+        }
+        ml_task_columns = {
+            str(row[1])
+            for row in connection.exec_driver_sql("PRAGMA table_info(ml_task)").all()
+        }
+        trained_model_columns = {
+            str(row[1])
+            for row in connection.exec_driver_sql("PRAGMA table_info(trained_model)").all()
+        }
+
+    assert CURRENT_SCHEMA_VERSION == 1
+    assert "work_item" not in table_names
+    assert "work_item_id" not in ml_task_columns
+    assert "work_item_id" not in trained_model_columns

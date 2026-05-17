@@ -13,9 +13,9 @@ The hypothesis is that a first-slice user journey can be proven without WorkItem
 
 ## Guardrails Touched
 
-- `src/xenix/services/storage/`: schema v9, Agent Harness records, thread-level system prompt metadata, generic artifact records, dataset-scoped task/model queries.
+- `src/xenix/services/storage/`: AI-first schema v1 baseline, Agent Harness records, thread-level system prompt metadata, generic artifact records, dataset-scoped task/model queries.
 - `src/xenix/services/ml_service.py`: dataset-scoped training, tuning, inference inputs added while preserving WorkItem-compatible entrypoints.
-- `src/xenix/services/ml_task_service.py`: `work_item_id` is optional for ML task execution and canonical output paths can be dataset-scoped.
+- `src/xenix/services/ml_task_service.py`: ML task execution and canonical output paths use dataset-scoped ownership.
 - `src/xenix/services/agent/`: provider boundary, Harness loop, static tool registry, tool execution context.
 - `src/xenix/services/agent/`: step budget is now a user-confirmed pause/resume contract when the current budget is exhausted.
 - `src/xenix/services/agent/`: active runs now carry a cooperative cancellation signal used by provider loops and tool execution context.
@@ -26,6 +26,10 @@ The hypothesis is that a first-slice user journey can be proven without WorkItem
 - `src/xenix/ui/`: ChatBox owns the step-budget confirmation control surfaced from Agent Harness stream events.
 - `src/xenix/ui/`: ChatBox renders provider-wait `Thinking...`, tool-call messages, and turn-boundary dividers before user messages.
 - `src/xenix/ui/`: ChatBox message links are intercepted at the message bubble boundary; `artifact://...` links resolve through `ArtifactService` before the UI opens the file path.
+- `src/xenix/app.py` and `src/xenix/ui/main_window.py`: runtime composition now starts directly into the ChatBox-first shell with Settings, History sidebar, Agent Harness, and Artifact resolver only.
+- `src/xenix/services/ml_service.py`: public ML service contract is dataset-scoped: explicit dataset id, feature columns, target columns, model keys, parameters, trained model id, and input files.
+- `src/xenix/services/ml_task_service.py`: task creation and canonical model/inference output paths now follow dataset-scoped ownership.
+- Old scenario/workspace Qt modules, `WorkItemService`, `ScenarioWorkflowService`, and inference-history service modules have exited active source composition.
 
 ## Verification
 
@@ -41,8 +45,13 @@ The hypothesis is that a first-slice user journey can be proven without WorkItem
 - `pdm run pytest tests/test_agent_harness_first_slice.py tests/test_agent_harness_foundation.py tests/test_agent_harness_streaming.py`
 - `pdm run pytest tests/test_main.py -k "artifact_link or thread_detail_view or chatbox"`
 - `pdm run pytest tests/test_main.py`
+- `pdm run python -m compileall src tests`
+- `pdm run pytest tests/test_main.py tests/test_i18n.py tests/test_services.py tests/test_repositories.py tests/test_agent_harness_first_slice.py -q`
+- `pdm run pytest tests/test_ml_execution.py -q`
+- `pdm run pytest tests/test_storage_bootstrap.py tests/test_migrations.py tests/test_repositories.py tests/test_services.py tests/test_ml_execution.py tests/test_agent_harness_first_slice.py -q`
+- `pdm run pytest`
 
-Full-suite result: `112 passed in 282.62s`.
+Full-suite result after storage schema reset: `70 passed in 71.46s`.
 
 ## Current Gaps
 
@@ -50,3 +59,4 @@ Full-suite result: `112 passed in 282.62s`.
 - The ChatBox stop button now immediately requests Agent Harness cancellation and returns the UI to an editable state; tool wait loops and spawned ML worker processes observe cancellation cooperatively.
 - OpenAI-compatible provider is present, with canonical tool names mapped to provider-safe function names. CopilotKit AIMock HTTP boundary remains a follow-up adapter/test harness task.
 - Artifact preview rendering is link-based in ChatBox. Rich inline table/image preview remains a UI follow-up.
+- Storage migrations have been reset to a development baseline before production release. Fresh schema excludes WorkItem tables/columns; obsolete local development databases must be deleted and rebuilt.

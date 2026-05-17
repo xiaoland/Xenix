@@ -28,8 +28,6 @@ from .ml.registry import get_model_catalog_entry
 from .ml.execution import MLWorkerRunner
 from .ml.operations import run_evaluate_task, run_fit_task, run_hyperparameter_tuning_task, run_inference_task
 from .storage.layout import (
-    canonical_inference_dir,
-    canonical_model_dir,
     dataset_inference_dir,
     dataset_model_dir,
     ml_task_root,
@@ -62,7 +60,6 @@ from .storage.repositories import (
     MLTaskRepository,
     ProjectRepository,
     TrainedModelRepository,
-    WorkItemRepository,
 )
 
 
@@ -82,7 +79,6 @@ ALLOWED_TRANSITIONS: dict[MLTaskStatus, set[MLTaskStatus]] = {
 
 class CreateMLTaskInput(SQLModel):
     project_id: str
-    work_item_id: str | None = None
     dataset_id: str | None = None
     task_type: MLTaskType
     request_payload: dict[str, Any] = Field(default_factory=dict)
@@ -123,7 +119,6 @@ class MLTaskService:
         self._session_factory = session_factory
         self._paths = paths
         self._projects = ProjectRepository()
-        self._work_items = WorkItemRepository()
         self._datasets = DatasetRepository()
         self._ml_tasks = MLTaskRepository()
         self._trained_models = TrainedModelRepository()
@@ -144,7 +139,6 @@ class MLTaskService:
         now = _utc_now()
         row = MLTaskRow(
             project_id=input_data.project_id,
-            work_item_id=input_data.work_item_id,
             dataset_id=input_data.dataset_id,
             task_type=input_data.task_type,
             status=MLTaskStatus.PENDING,
@@ -157,13 +151,6 @@ class MLTaskService:
             project = self._projects.get(session, input_data.project_id)
             if project is None:
                 raise NotFoundError(f"Project '{input_data.project_id}' was not found.")
-
-            if input_data.work_item_id is not None:
-                work_item = self._work_items.get(session, input_data.work_item_id)
-                if work_item is None:
-                    raise NotFoundError(f"Work item '{input_data.work_item_id}' was not found.")
-                if work_item.project_id != project.id:
-                    raise ValidationError("ML task work item does not belong to the provided project.")
 
             if input_data.dataset_id is not None:
                 dataset = self._datasets.get(session, input_data.dataset_id)
@@ -256,10 +243,6 @@ class MLTaskService:
             cancelled = self._ml_tasks.cancel(session, row.id, _utc_now())
             session.commit()
             return cancelled
-
-    def list_ml_tasks(self, work_item_id: str) -> list[MLTaskRow]:
-        with self._session_factory() as session:
-            return self._ml_tasks.list_by_work_item(session, work_item_id)
 
     def list_dataset_ml_tasks(self, dataset_id: str) -> list[MLTaskRow]:
         with self._session_factory() as session:
@@ -385,7 +368,7 @@ class MLTaskService:
             self._require_existing_path(export_path)
         model_display_name = get_model_catalog_entry(result.model_key).display_name
         artifact_file_name = build_artifact_file_name(
-            trained_model_context.work_item_name,
+            trained_model_context.run_name,
             model_display_name,
             row.created_at,
             row.id,
@@ -396,14 +379,14 @@ class MLTaskService:
             model_display_name=model_display_name,
             display_name=model_display_name,
             saved_name=build_saved_name(
-                trained_model_context.work_item_name,
+                trained_model_context.run_name,
                 model_display_name,
                 row.created_at,
             ),
             artifact_file_name=artifact_file_name_from_path(str(canonical_path)),
             save_note=build_save_note(model_display_name),
             training_operation=row.task_type.value,
-            source_work_item_name=trained_model_context.work_item_name,
+            source_run_name=trained_model_context.run_name,
             source_dataset_name=trained_model_context.dataset_name,
             source_dataset_file_name=trained_model_context.dataset_file_name,
             feature_columns=list(trained_model_context.feature_columns),
@@ -417,7 +400,6 @@ class MLTaskService:
         trained_model = self._trained_models.create(
             session,
             TrainedModelRow(
-                work_item_id=row.work_item_id,
                 dataset_id=row.dataset_id,
                 ml_task_id=row.id,
                 model_key=result.model_key,
@@ -471,7 +453,7 @@ class MLTaskService:
             self._require_existing_path(export_path)
         model_display_name = get_model_catalog_entry(result.model_key).display_name
         artifact_file_name = build_artifact_file_name(
-            trained_model_context.work_item_name,
+            trained_model_context.run_name,
             model_display_name,
             row.created_at,
             row.id,
@@ -482,14 +464,14 @@ class MLTaskService:
             model_display_name=model_display_name,
             display_name=model_display_name,
             saved_name=build_saved_name(
-                trained_model_context.work_item_name,
+                trained_model_context.run_name,
                 model_display_name,
                 row.created_at,
             ),
             artifact_file_name=artifact_file_name_from_path(str(canonical_path)),
             save_note=build_save_note(model_display_name),
             training_operation=row.task_type.value,
-            source_work_item_name=trained_model_context.work_item_name,
+            source_run_name=trained_model_context.run_name,
             source_dataset_name=trained_model_context.dataset_name,
             source_dataset_file_name=trained_model_context.dataset_file_name,
             feature_columns=list(trained_model_context.feature_columns),
@@ -507,7 +489,6 @@ class MLTaskService:
         trained_model = self._trained_models.create(
             session,
             TrainedModelRow(
-                work_item_id=row.work_item_id,
                 dataset_id=row.dataset_id,
                 ml_task_id=row.id,
                 model_key=result.model_key,
@@ -561,14 +542,12 @@ class MLTaskService:
         output_path = Path(result.output_file_path)
         self._require_existing_path(output_path)
         canonical_path = self._copy_canonical_inference_output(row, output_path)
-        work_item = self._work_items.get(session, row.work_item_id) if row.work_item_id is not None else None
         dataset = self._datasets.get(session, row.dataset_id) if row.dataset_id is not None else None
         if dataset is None:
             raise NotFoundError(f"Dataset '{row.dataset_id}' was not found.")
-        result_name_owner = work_item.name if work_item is not None else dataset.name
         dataset_row = DatasetRow(
             project_id=row.project_id,
-            name=f"{result_name_owner} predictions",
+            name=f"{dataset.name} predictions",
             source_path=str(canonical_path),
             source_format=DatasetSourceFormat.CSV,
             copied_from=None,
@@ -638,9 +617,7 @@ class MLTaskService:
         artifact_file_name: str,
         source_path: Path,
     ) -> Path:
-        if row.work_item_id is not None:
-            destination_dir = canonical_model_dir(self._paths, row.work_item_id)
-        elif row.dataset_id is not None:
+        if row.dataset_id is not None:
             destination_dir = dataset_model_dir(self._paths, row.dataset_id)
         else:
             destination_dir = task_models_dir(self._paths, row.id)
@@ -654,9 +631,7 @@ class MLTaskService:
         row: MLTaskRow,
         source_path: Path,
     ) -> Path:
-        if row.work_item_id is not None:
-            destination_dir = canonical_inference_dir(self._paths, row.work_item_id)
-        elif row.dataset_id is not None:
+        if row.dataset_id is not None:
             destination_dir = dataset_inference_dir(self._paths, row.dataset_id)
         else:
             destination_dir = task_output_dir(self._paths, row.id)
@@ -673,17 +648,16 @@ class MLTaskService:
     ) -> TrainedModelContextPayload:
         if request_context is not None:
             return request_context
-        work_item = self._work_items.get(session, row.work_item_id) if row.work_item_id is not None else None
         dataset = self._datasets.get(session, row.dataset_id) if row.dataset_id is not None else None
         dataset_name = dataset.name if dataset is not None else ""
         dataset_file_name = Path(dataset.source_path).name if dataset is not None else ""
-        context_name = work_item.name if work_item is not None else dataset_name or row.id
+        context_name = dataset_name or row.id
         return TrainedModelContextPayload(
-            work_item_name=context_name,
+            run_name=context_name,
             dataset_name=dataset_name,
             dataset_file_name=dataset_file_name,
-            feature_columns=list(work_item.feature_columns) if work_item is not None else [],
-            target_columns=list(work_item.target_columns) if work_item is not None else [],
+            feature_columns=[],
+            target_columns=[],
             dataset_row_count=0,
             dataset_column_count=0,
             preview_columns=[],

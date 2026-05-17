@@ -18,21 +18,13 @@ from .services.agent import (
     AgentToolRegistry,
     ConversationStore,
 )
-from .services.agent.dev_fixtures import ensure_mock_conversation_history
-from .services.analysis_scenario_service import AnalysisScenarioService
 from .services.artifact_service import ArtifactService
 from .services.dataset_service import DatasetService
-from .services.inference_history_service import InferenceHistoryService
 from .services.ml_service import MLService
 from .services.ml_task_service import MLTaskService
 from .services.project_service import ProjectService
-from .services.scenario_model_source_service import ScenarioModelSourceService
-from .services.scenario_template_service import ScenarioTemplateService
-from .services.scenario_training_preset_service import ScenarioTrainingPresetService
-from .services.scenario_workflow_service import ScenarioWorkflowService
 from .services.storage import StorageBootstrapService
 from .services.storage.layout import database_path
-from .services.work_item_service import WorkItemService
 from .ui.main_window import MainWindow
 
 LOGGER = logging.getLogger("xenix.bootstrap")
@@ -59,38 +51,17 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
     context = StorageBootstrapService().initialize(paths)
 
     project_service = ProjectService(context.session_factory)
-    work_item_service = WorkItemService(context.session_factory, paths)
     dataset_service = DatasetService(context.session_factory, paths)
     ml_task_service = MLTaskService(context.session_factory, paths)
     ml_service = MLService(
         paths,
         context.session_factory,
         dataset_service,
-        work_item_service,
         ml_task_service,
     )
-    scenario_template_service = ScenarioTemplateService()
-    analysis_scenario_service = AnalysisScenarioService()
-    scenario_model_source_service = ScenarioModelSourceService(
-        context.session_factory,
-        scenario_template_service,
-    )
-    scenario_training_preset_service = ScenarioTrainingPresetService(
-        paths,
-        scenario_template_service,
-    )
-    scenario_workflow_service = ScenarioWorkflowService(
-        project_service=project_service,
-        work_item_service=work_item_service,
-        dataset_service=dataset_service,
-        ml_service=ml_service,
-        template_service=scenario_template_service,
-    )
-    inference_history_service = InferenceHistoryService(context.session_factory)
     artifact_service = ArtifactService(context.session_factory)
     conversation_store = ConversationStore(context.session_factory)
     agent_settings_service = AgentSettingsService(paths)
-    ensure_mock_conversation_history(conversation_store)
     agent_tool_registry = AgentToolRegistry(
         paths=paths,
         project_service=project_service,
@@ -113,16 +84,6 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
         log_path=log_path,
         db_path=database_path(paths),
         translation_manager=translation_manager,
-        project_service=project_service,
-        work_item_service=work_item_service,
-        dataset_service=dataset_service,
-        ml_service=ml_service,
-        inference_history_service=inference_history_service,
-        analysis_scenario_service=analysis_scenario_service,
-        scenario_model_source_service=scenario_model_source_service,
-        scenario_template_service=scenario_template_service,
-        scenario_training_preset_service=scenario_training_preset_service,
-        scenario_workflow_service=scenario_workflow_service,
         agent_harness_service=agent_harness_service,
         agent_settings_service=agent_settings_service,
         artifact_service=artifact_service,

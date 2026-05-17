@@ -29,7 +29,7 @@ def test_storage_bootstrap_rejects_legacy_local_database(monkeypatch, tmp_path: 
         StorageBootstrapService().initialize(paths)
 
 
-def test_storage_bootstrap_bootstraps_fresh_v4_schema(monkeypatch, tmp_path: Path) -> None:
+def test_storage_bootstrap_bootstraps_fresh_v1_schema(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
 

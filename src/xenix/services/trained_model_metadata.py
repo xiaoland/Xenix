@@ -13,7 +13,7 @@ _SLUG_PATTERN = re.compile(r"[^\w]+", re.UNICODE)
 
 
 class TrainedModelContextPayload(BaseModel):
-    work_item_name: str
+    run_name: str
     dataset_name: str
     dataset_file_name: str
     feature_columns: list[str] = Field(default_factory=list)
@@ -33,7 +33,7 @@ class TrainedModelMetadata(BaseModel):
     artifact_file_name: str
     save_note: str
     training_operation: str
-    source_work_item_name: str
+    source_run_name: str
     source_dataset_name: str
     source_dataset_file_name: str
     feature_columns: list[str] = Field(default_factory=list)
@@ -60,25 +60,25 @@ def parse_trained_model_metadata(payload: dict[str, Any] | None) -> TrainedModel
 
 
 def build_saved_name(
-    work_item_name: str,
+    run_name: str,
     model_display_name: str,
     created_at: datetime,
 ) -> str:
     timestamp = created_at.strftime(_SAVE_LABEL_DATETIME_FORMAT)
-    return f"{work_item_name} · {model_display_name} · {timestamp}"
+    return f"{run_name} · {model_display_name} · {timestamp}"
 
 
 def build_artifact_file_name(
-    work_item_name: str,
+    run_name: str,
     model_display_name: str,
     created_at: datetime,
     ml_task_id: str,
 ) -> str:
-    work_item_slug = _slugify(work_item_name)
+    run_slug = _slugify(run_name)
     model_slug = _slugify(model_display_name)
     timestamp = created_at.strftime(_SAVE_FILE_DATETIME_FORMAT)
     task_suffix = ml_task_id[:8]
-    return f"{work_item_slug}-{model_slug}-{timestamp}-{task_suffix}.joblib"
+    return f"{run_slug}-{model_slug}-{timestamp}-{task_suffix}.joblib"
 
 
 def build_save_note(model_display_name: str) -> str:

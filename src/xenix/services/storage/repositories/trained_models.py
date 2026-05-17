@@ -21,14 +21,6 @@ class TrainedModelRepository:
         statement = select(TrainedModelRow).where(TrainedModelRow.ml_task_id == ml_task_id)
         return session.exec(statement).first()
 
-    def list_by_work_item(self, session: Session, work_item_id: str) -> list[TrainedModelRow]:
-        statement = (
-            select(TrainedModelRow)
-            .where(TrainedModelRow.work_item_id == work_item_id)
-            .order_by(TrainedModelRow.created_at)
-        )
-        return list(session.exec(statement))
-
     def list_by_dataset(self, session: Session, dataset_id: str) -> list[TrainedModelRow]:
         statement = (
             select(TrainedModelRow)

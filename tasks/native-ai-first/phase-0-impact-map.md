@@ -2,8 +2,8 @@
 
 ## Status
 
-- Mode: Solidify.
-- Scope: alignment and impact map before implementation phases.
+- Mode: Execute.
+- Scope: alignment, impact map, and Phase 6 cleanup evidence.
 - Date: 2026-05-12.
 
 ## Phase 0 Objective
@@ -44,17 +44,12 @@ Make durable docs, local rules, and task packet truth coherent for the AI-first 
 ### Composition Root
 
 - `src/xenix/app.py`
-  - Currently constructs `WorkItemService`.
-  - Currently constructs `ScenarioWorkflowService`.
-  - Currently wires scenario services into `MainWindow`.
-  - Target composition constructs Agent Harness, artifact/data/ML services, provider config, and ChatBox shell.
+  - Constructs Agent Harness, artifact/data/ML services, provider config, and ChatBox shell.
 
 ### UI Active Path
 
 - `src/xenix/ui/main_window.py`
-  - Currently uses `ScenarioHomeView` as central path.
-  - Currently creates dataset, ML, inference workspaces and scenario dialogs.
-  - Target `MainWindow` hosts ChatBox and delegates interaction to Agent Harness.
+  - Hosts ChatBox, Settings, History sidebar, artifact link opening, and Agent Harness event handling.
 
 ### Old UI Surfaces
 
@@ -71,12 +66,16 @@ Target removal or rewrite candidates:
 - `src/xenix/ui/inference_workspace.py`
 - `src/xenix/ui/inference_history_dialog.py`
 
-Reusable UI behavior to preserve:
+Reusable UI behavior preserved or moved forward:
 
 - Dataset preview presentation patterns.
 - Long-running task progress rendering patterns.
 - Artifact/file opening affordances after service path resolution.
 - Existing i18n discipline through `retranslate_ui()` and `QEvent.LanguageChange`.
+
+Cleanup result:
+
+- Old scenario/workspace Qt modules have exited source composition.
 
 ### Service Layer
 
@@ -95,63 +94,63 @@ Reusable service behavior to preserve:
 - `dataset_inspection.py` CSV/XLSX inspection and dataframe loading utilities.
 - `MLTaskService` queueing, worker dispatch, status, logs, and task artifact handling.
 - `services/ml/` model registry, model services, evaluation policy, and execution operations.
-- `InferenceHistoryService` result-row building ideas, after artifact ownership is replaced.
+- Prediction result browsing now flows through artifacts and ChatBox links.
+
+Cleanup result:
+
+- `WorkItemService`, `ScenarioWorkflowService`, scenario support services, and inference history service have exited source composition.
 
 ### Storage Layer
 
 Target refactor candidates:
 
 - `src/xenix/services/storage/models.py`
-  - currently includes WorkItem rows and work-item-linked ML task/model records.
+  - uses the AI-first baseline without WorkItem rows or work-item-linked ML task/model columns.
 - `src/xenix/services/storage/repositories/work_items.py`
-  - exits target topology.
+  - exited source composition.
 - `src/xenix/services/storage/repositories/ml_tasks.py`
-  - currently indexes/list tasks by work item.
+  - lists tasks by dataset for active service paths.
 - `src/xenix/services/storage/repositories/trained_models.py`
-  - currently indexes/list models by work item.
+  - lists models by dataset for active service paths.
 - `src/xenix/services/storage/layout.py`
-  - currently includes work-item-specific dataset, model, and inference directories.
+  - uses dataset-scoped model and inference directories for active service paths.
 - `src/xenix/services/storage/migrations.py`
-  - needs migration path for Agent Harness records and artifact metadata.
+  - reset to development baseline v1 before production release.
 
 New persistence interfaces needed:
 
 - Agent Harness records: Thread, Turn, Message, tool-call, tool-result, run records.
 - Artifact records: kind, title, path, mime/preview metadata, ownership refs.
 - ML task records using explicit task input ownership rather than work-item ownership.
+- Fresh schema contains no `work_item` table and no `work_item_id` columns.
 
 ### ML Layer
 
 Target refactor candidates:
 
 - `src/xenix/services/ml_service.py`
-  - current public inputs use `work_item_id`.
-  - target public inputs use dataset id, feature columns, target columns, model selections, and artifact output owner.
+  - public inputs use dataset id, feature columns, target columns, model selections, trained model id, and input files.
 - `src/xenix/services/ml_task_service.py`
-  - current task creation and canonical artifact copying use work-item ids.
-  - target task creation uses explicit owner/artifact refs and artifact service registration.
+  - task creation and canonical artifact copying use dataset ids for active paths.
 - `src/xenix/services/trained_model_metadata.py`
-  - current metadata includes source work-item naming.
-  - target metadata should use artifact/source dataset/modeling context fields.
+  - metadata uses source run naming and source dataset fields.
 
 Reusable ML behavior to preserve:
 
 - Model catalog and parameter validation.
 - Fit, hyperparameter tuning, evaluation, and inference operation implementations.
 - Spawn-compatible worker execution.
-- Evaluation metric policy and best-candidate comparison logic, adapted to artifact-backed results.
+- Evaluation metric policy remains; best-candidate comparison is deferred until a dataset/thread-level model selection contract exists.
 
 ## Test Impact
 
 Target rewrite groups:
 
-- `tests/test_scenario_ui.py`: replace with ChatBox UI and artifact preview tests.
-- `tests/test_scenario_workflow.py`: replace with Agent Harness tool and service integration tests.
-- `tests/test_i18n.py`: replace scenario dialog expectations with ChatBox/message renderer expectations.
-- `tests/test_services.py`: replace WorkItemService tests with data/artifact service tests.
-- `tests/test_repositories.py`: replace WorkItem repository tests with Agent Harness and artifact repository tests.
-- `tests/test_ml_execution.py`: refactor setup to explicit ML service inputs.
-- `tests/test_inference_history.py`: refactor or replace with artifact-backed prediction result browsing.
+- Scenario UI/workflow tests exited with the retired source modules.
+- `tests/test_i18n.py` now covers ChatBox shell translation.
+- `tests/test_services.py` now covers data service and dataset-scoped ML task state transitions.
+- `tests/test_repositories.py` now covers dataset-scoped task/model repositories plus migrations.
+- `tests/test_ml_execution.py` now uses explicit dataset-scoped ML service inputs.
 
 Reusable test ideas:
 
@@ -165,5 +164,4 @@ Reusable test ideas:
 - Durable docs now name ChatBox and Agent Harness as the target direction.
 - Local AGENTS rules now match AI-first ownership.
 - Impact areas are mapped for app composition, UI, services, storage, ML, and tests.
-- Implementation remains pending until Phase 1 low-level contracts are confirmed.
-
+- Phase 6 cleanup removed old composition paths and old service modules while preserving historical storage compatibility.

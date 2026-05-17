@@ -16,18 +16,16 @@ from xenix.services.ml_task_service import CompleteMLTaskInput, CreateMLTaskInpu
 from xenix.services.project_service import CreateProjectInput, ProjectService
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import MLTaskType
-from xenix.services.work_item_service import CreateWorkItemInput, WorkItemService
 
 
-def _build_services(monkeypatch, tmp_path: Path) -> tuple[ProjectService, WorkItemService, DatasetService, MLTaskService]:
+def _build_services(monkeypatch, tmp_path: Path) -> tuple[ProjectService, DatasetService, MLTaskService]:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
     project_service = ProjectService(context.session_factory)
-    work_item_service = WorkItemService(context.session_factory, paths)
     dataset_service = DatasetService(context.session_factory, paths)
     ml_task_service = MLTaskService(context.session_factory, paths)
-    return project_service, work_item_service, dataset_service, ml_task_service
+    return project_service, dataset_service, ml_task_service
 
 
 def _register_dataset(
@@ -47,7 +45,7 @@ def _register_dataset(
 
 
 def test_dataset_service_inspects_csv_summary_and_column_kinds(monkeypatch, tmp_path: Path) -> None:
-    _project_service, _work_item_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
+    _project_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
     dataset_file = tmp_path / "customers.csv"
     dataset_file.write_text(
         "age,city,active\n30,Shanghai,True\n41,Suzhou,False\n",
@@ -66,7 +64,7 @@ def test_dataset_service_inspects_csv_summary_and_column_kinds(monkeypatch, tmp_
 
 
 def test_dataset_service_rejects_empty_dataset_file(monkeypatch, tmp_path: Path) -> None:
-    _project_service, _work_item_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
+    _project_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
     dataset_file = tmp_path / "empty.csv"
     dataset_file.write_text("age,name\n", encoding="utf-8")
 
@@ -74,55 +72,11 @@ def test_dataset_service_rejects_empty_dataset_file(monkeypatch, tmp_path: Path)
         dataset_service.inspect_source_file(InspectDatasetInput(source_path=str(dataset_file.resolve())))
 
 
-def test_work_item_service_creates_dataset_bound_copy_with_locked_columns(monkeypatch, tmp_path: Path) -> None:
-    project_service, work_item_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
-    project = project_service.create_project(CreateProjectInput(name="Retail"))
-    dataset_file = tmp_path / "customers.csv"
-    dataset_file.write_text("age,income,label\n30,9000,1\n41,12000,0\n", encoding="utf-8")
-    source_dataset = _register_dataset(dataset_service, project.id, dataset_file)
-
-    work_item = work_item_service.create_work_item(
-        CreateWorkItemInput(
-            project_id=project.id,
-            name="Churn",
-            source_dataset_id=source_dataset.id,
-            feature_columns=["age", "income"],
-            target_columns=["label"],
-        )
-    )
-    copied_dataset = dataset_service.get_dataset(work_item.dataset_id)
-
-    assert work_item.dataset_id != source_dataset.id
-    assert work_item.feature_columns == ["age", "income"]
-    assert work_item.target_columns == ["label"]
-    assert copied_dataset.project_id == project.id
-    assert copied_dataset.copied_from == source_dataset.id
-    assert copied_dataset.copied_at is not None
-    assert Path(copied_dataset.source_path).exists()
-    assert Path(copied_dataset.source_path).read_text(encoding="utf-8") == dataset_file.read_text(encoding="utf-8")
-
-
-def test_work_item_service_rejects_overlapping_feature_and_target_columns(monkeypatch, tmp_path: Path) -> None:
-    project_service, work_item_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
-    project = project_service.create_project(CreateProjectInput(name="Retail"))
-    dataset_file = tmp_path / "customers.csv"
-    dataset_file.write_text("age,income,label\n30,9000,1\n41,12000,0\n", encoding="utf-8")
-    source_dataset = _register_dataset(dataset_service, project.id, dataset_file)
-
-    with pytest.raises(ValidationError):
-        work_item_service.create_work_item(
-            CreateWorkItemInput(
-                project_id=project.id,
-                name="Churn",
-                source_dataset_id=source_dataset.id,
-                feature_columns=["age", "label"],
-                target_columns=["label"],
-            )
-        )
-
-
-def test_dataset_service_materializes_manual_inference_csv_and_exports_utf8_by_default(monkeypatch, tmp_path: Path) -> None:
-    project_service, _work_item_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
+def test_dataset_service_materializes_manual_inference_csv_and_exports_utf8_by_default(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    project_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
     project = project_service.create_project(CreateProjectInput(name="Retail"))
     dataset_file = tmp_path / "predictions.csv"
     dataset_file.write_text("城市,prediction\n上海,1\n", encoding="utf-8")
@@ -149,7 +103,7 @@ def test_dataset_service_materializes_manual_inference_csv_and_exports_utf8_by_d
 
 
 def test_dataset_service_exports_csv_with_selected_encoding_and_xlsx(monkeypatch, tmp_path: Path) -> None:
-    project_service, _work_item_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
+    project_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
     project = project_service.create_project(CreateProjectInput(name="Retail"))
     dataset_file = tmp_path / "predictions.csv"
     dataset_file.write_text("城市,prediction\n上海,1\n苏州,0\n", encoding="utf-8")
@@ -183,25 +137,15 @@ def test_dataset_service_exports_csv_with_selected_encoding_and_xlsx(monkeypatch
 
 
 def test_ml_task_service_rejects_invalid_state_transition(monkeypatch, tmp_path: Path) -> None:
-    project_service, work_item_service, dataset_service, ml_task_service = _build_services(monkeypatch, tmp_path)
+    project_service, dataset_service, ml_task_service = _build_services(monkeypatch, tmp_path)
     project = project_service.create_project(CreateProjectInput(name="Retail"))
     dataset_file = tmp_path / "customers.csv"
     dataset_file.write_text("age,income,label\n30,9000,1\n41,12000,0\n", encoding="utf-8")
-    source_dataset = _register_dataset(dataset_service, project.id, dataset_file)
-    work_item = work_item_service.create_work_item(
-        CreateWorkItemInput(
-            project_id=project.id,
-            name="Churn",
-            source_dataset_id=source_dataset.id,
-            feature_columns=["age", "income"],
-            target_columns=["label"],
-        )
-    )
+    dataset = _register_dataset(dataset_service, project.id, dataset_file)
     task = ml_task_service.create_ml_task(
         CreateMLTaskInput(
             project_id=project.id,
-            work_item_id=work_item.id,
-            dataset_id=work_item.dataset_id,
+            dataset_id=dataset.id,
             task_type=MLTaskType.FIT,
             request_payload={"model": "regression.ridge"},
         )

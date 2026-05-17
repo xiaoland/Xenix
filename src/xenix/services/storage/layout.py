@@ -35,14 +35,6 @@ def ml_task_root(paths: AppPaths, ml_task_id: str) -> Path:
     return ml_task_parent_root(paths) / ml_task_id
 
 
-def work_item_dataset_dir(paths: AppPaths, work_item_id: str) -> Path:
-    return artifact_datasets_root(paths) / "work-items" / work_item_id
-
-
-def canonical_inference_dir(paths: AppPaths, work_item_id: str) -> Path:
-    return artifact_inference_root(paths) / work_item_id
-
-
 def task_input_dir(paths: AppPaths, ml_task_id: str) -> Path:
     return ml_task_root(paths, ml_task_id) / "input"
 
@@ -65,10 +57,6 @@ def task_result_path(paths: AppPaths, ml_task_id: str) -> Path:
 
 def task_logs_path(paths: AppPaths, ml_task_id: str) -> Path:
     return ml_task_root(paths, ml_task_id) / "logs.jsonl"
-
-
-def canonical_model_dir(paths: AppPaths, work_item_id: str) -> Path:
-    return artifact_models_root(paths) / work_item_id
 
 
 def dataset_model_dir(paths: AppPaths, dataset_id: str) -> Path:

@@ -18,14 +18,6 @@ class MLTaskRepository:
     def get(self, session: Session, ml_task_id: str) -> MLTaskRow | None:
         return session.get(MLTaskRow, ml_task_id)
 
-    def list_by_work_item(self, session: Session, work_item_id: str) -> list[MLTaskRow]:
-        statement = (
-            select(MLTaskRow)
-            .where(MLTaskRow.work_item_id == work_item_id)
-            .order_by(MLTaskRow.created_at)
-        )
-        return list(session.exec(statement))
-
     def list_by_dataset(self, session: Session, dataset_id: str) -> list[MLTaskRow]:
         statement = (
             select(MLTaskRow)

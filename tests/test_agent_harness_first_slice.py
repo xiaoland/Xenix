@@ -21,7 +21,6 @@ from xenix.services.ml_service import MLService
 from xenix.services.ml_task_service import MLTaskService
 from xenix.services.project_service import ProjectService
 from xenix.services.storage import StorageBootstrapService
-from xenix.services.work_item_service import WorkItemService
 
 
 class FirstSliceProvider:
@@ -117,14 +116,12 @@ def _build_first_slice_runtime(monkeypatch, tmp_path: Path):
     paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
     project_service = ProjectService(context.session_factory)
-    work_item_service = WorkItemService(context.session_factory, paths)
     dataset_service = DatasetService(context.session_factory, paths)
     ml_task_service = MLTaskService(context.session_factory, paths)
     ml_service = MLService(
         paths,
         context.session_factory,
         dataset_service,
-        work_item_service,
         ml_task_service,
     )
     artifact_service = ArtifactService(context.session_factory)

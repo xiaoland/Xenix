@@ -8,7 +8,7 @@ Add a left-side conversation history surface and seed local SQLite with mock Age
 
 - `ConversationStore` now exposes `list_threads()`.
 - `AgentHarnessService` exposes thread listing and snapshot loading for UI.
-- `build_main_window()` seeds idempotent dev mock conversations into the current local SQLite database.
+- Thread mock data is test-owned through `services/agent/dev_fixtures.py`; runtime bootstrap does not seed mock conversations into SQLite.
 - `MainWindow` renders a left-side history sidebar and loads selected thread snapshots into ChatBox.
 
 ## Verification
@@ -19,3 +19,4 @@ Add a left-side conversation history surface and seed local SQLite with mock Age
 
 Full-suite result: `80 passed in 186.65s`.
 
+Update: runtime mock seeding was removed during the storage schema reset cleanup. Tests that need the rendering fixture call `ensure_mock_conversation_history()` explicitly.

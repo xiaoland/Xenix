@@ -1059,8 +1059,64 @@
         <translation>Xenix 原生版</translation>
     </message>
     <message>
+        <source>Settings</source>
+        <translation>设置</translation>
+    </message>
+    <message>
         <source>History</source>
-        <translation type="vanished">历史</translation>
+        <translation>历史</translation>
+    </message>
+    <message>
+        <source>New thread</source>
+        <translation>新建对话</translation>
+    </message>
+    <message>
+        <source>Could not open link: {uri}</source>
+        <translation>无法打开链接：{uri}</translation>
+    </message>
+    <message>
+        <source>Artifact is not ready to open.</source>
+        <translation>制品尚未准备好打开。</translation>
+    </message>
+    <message>
+        <source>Artifact file is missing: {path}</source>
+        <translation>制品文件缺失：{path}</translation>
+    </message>
+    <message>
+        <source>Could not open artifact: {path}</source>
+        <translation>无法打开制品：{path}</translation>
+    </message>
+    <message>
+        <source>Step budget used: {used}/{max}. Continue with up to {steps} more steps?</source>
+        <translation>步骤预算已使用：{used}/{max}。继续执行最多 {steps} 个步骤？</translation>
+    </message>
+    <message>
+        <source>Rename</source>
+        <translation>重命名</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation>删除</translation>
+    </message>
+    <message>
+        <source>Rename Thread</source>
+        <translation>重命名对话</translation>
+    </message>
+    <message>
+        <source>Thread name</source>
+        <translation>对话名称</translation>
+    </message>
+    <message>
+        <source>Delete Thread</source>
+        <translation>删除对话</translation>
+    </message>
+    <message>
+        <source>Stop the current run before deleting this thread.</source>
+        <translation>删除该对话前请先停止当前运行。</translation>
+    </message>
+    <message>
+        <source>Delete &quot;{title}&quot;? This action cannot be undone.</source>
+        <translation>删除“{title}”？此操作无法撤销。</translation>
     </message>
     <message>
         <source>Inference history is the next scenario-mode surface to wire.</source>

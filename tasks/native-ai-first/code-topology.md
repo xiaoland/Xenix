@@ -62,7 +62,7 @@ Native Qt MainWindow
   -> Refactored services
       -> DatasetService
       -> MLService
-      -> InferenceHistoryService
+      -> ArtifactService
   -> Existing adapters and storage interfaces
       -> services/ml
       -> SQLite metadata
@@ -313,11 +313,11 @@ build_main_window()
   -> build refactored services
   -> build AgentHarness service
   -> build LLMProvider from settings/config
-  -> build MainWindow(agent_harness, translation_manager, paths)
-  -> MainWindow sets ChatBox as central widget
+  -> build MainWindow(paths, translation_manager, agent_harness, settings, artifacts)
+  -> MainWindow hosts History sidebar, Settings, and ThreadDetailView
 ```
 
-The target `MainWindow` owns a ChatBox-centered shell. Old scenario dialogs and workspaces exit the target path immediately. `ScenarioWorkflowService` and `WorkItemService` are removed from the target composition.
+The current `MainWindow` owns a ChatBox-centered shell. Old scenario dialogs, technical workspaces, `ScenarioWorkflowService`, and `WorkItemService` have exited the active source composition.
 
 ## Test Topology
 
@@ -365,7 +365,7 @@ Deterministic E2E tests
 8. Wire `MainWindow` to ChatBox and Agent Harness.
 9. Add first-slice service integration tests for data-to-prediction tool runs.
 10. Add deterministic E2E testing through CopilotKit AIMock at LLM provider boundary.
-11. Remove `ScenarioWorkflowService`, `WorkItemService`, and scenario-first Qt surfaces from the target composition.
+11. Remove `ScenarioWorkflowService`, `WorkItemService`, and scenario-first Qt surfaces from the target composition. Completed in the cleanup slice.
 
 ## Design Questions
 
