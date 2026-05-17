@@ -15,7 +15,11 @@ SQLite is reserved for small, queryable application metadata:
 - User selections and lightweight preferences
 - References to files owned by the application
 
-SQLite must not store:
+The current AI-first SQLite baseline is schema version `1`. It contains Agent Harness conversation tables, artifact metadata, dataset metadata, ML task metadata, and trained-model metadata. The legacy work item table and `work_item_id` columns are outside this baseline.
+
+Agent Thread rows store the thread-level system prompt. Agent Turn rows store the turn sequence and status. Agent Message rows store chronological content blocks and provider payloads. Tool-call rows store execution status, arguments, result payload, and links back to request/result Messages.
+
+SQLite stays limited to metadata and excludes:
 
 - Full datasets
 - Trained model binaries
@@ -53,13 +57,14 @@ Current app-managed runtime layout includes:
 - Source dataset registration stores the external source path and stable naming metadata.
 - Dataset inspection metadata such as row counts, inferred column kinds, and previews is runtime-derived and should not be persisted by default.
 - Feature/target selection, model outputs, and prediction outputs are represented by tool results and artifact metadata in the first AI-first slice.
-- Trained-model registration rows are durable metadata pointers to canonical model artifacts, not a duplication of task-owned training payloads.
-- Task working files such as `request.json`, `result.json`, `logs.jsonl`, and holdout artifacts are execution-scoped ML task files, not canonical storage.
+- Artifact links resolve through `ArtifactService`; ChatBox receives an artifact id and view hint, while filesystem access stays behind services.
+- Trained-model registration rows are durable metadata pointers to canonical model artifacts.
+- Task working files such as `request.json`, `result.json`, `logs.jsonl`, and holdout artifacts are execution-scoped ML task files.
 
 ## Deletion Rules
 
-- Deleting a SQLite row must not silently delete user-managed dataset files.
-- Deleting an app-managed dataset artifact must not affect the original external source file.
+- Deleting a SQLite row leaves user-managed dataset files in place.
+- Deleting an app-managed dataset artifact leaves the original external source file in place.
 - Deleting an app-managed artifact should update SQLite metadata in the same service operation.
-- Cache cleanup may remove reproducible files, but not canonical datasets, models, or exports.
-- Deleting ML task working files must not affect canonical trained-model artifacts or external dataset source files.
+- Cache cleanup may remove reproducible files. Canonical datasets, models, and exports stay under their owning services.
+- Deleting ML task working files leaves canonical trained-model artifacts and external dataset source files in place.

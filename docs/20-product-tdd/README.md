@@ -7,4 +7,5 @@ Current canonical documents:
 - `runtime-boundaries.md`
 - `ml-task-lifecycle.md`
 - `storage-ownership.md`
+- `artifact-links.md`
 - `adr/` decision records for product-level technical constraints

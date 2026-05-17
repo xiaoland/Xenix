@@ -30,6 +30,7 @@ Forbidden dependency direction:
 
 The UI is responsible for:
 
+- Presenting the Chatbot-first shell through MainWindow, History sidebar, ThreadDetailView, Composer, and Settings
 - Collecting user intent from ChatBox, composer, and file drop intake
 - Rendering visible user and assistant Messages
 - Rendering tool progress, cancellation state, and artifact previews
@@ -37,12 +38,12 @@ The UI is responsible for:
 - Invoking services with plain Python inputs
 - Opening files or directories after a service reports a successful output
 
-The UI must not:
+The UI stays outside:
 
-- Parse datasets directly for training logic
-- Invent hidden ids or result paths outside service mediation
-- Select models by reading arbitrary files on disk without service mediation
-- Maintain hidden business state beyond view state
+- Dataset parsing for training logic
+- Hidden id or result path creation outside service mediation
+- Model selection by arbitrary disk file reads outside service mediation
+- Hidden business state beyond view state
 
 ## Service Contract
 
@@ -55,8 +56,10 @@ Services are responsible for:
 - Persisting ML task metadata and status transitions
 - Resolving runtime paths
 - Coordinating ML adapters and export paths
+- Registering and resolving artifacts used by ChatBox markdown links
+- Accepting explicit dataset, feature, target, model, and artifact owner inputs for ML work
 
-Service APIs should be designed around explicit request/result objects or narrow methods. They should return structured outcomes rather than leaving the UI to infer success from side effects.
+Service APIs should be designed around explicit request/result objects or narrow methods. They should return structured outcomes so the UI receives explicit success, failure, and output metadata.
 
 ## Agent Harness Contract
 
@@ -69,8 +72,32 @@ Agent Harness owns:
 - Static LLM-facing tool registry
 - Tool execution sequencing
 - Run recording and cancellation
+- Step budget tracking and user confirmation when a turn needs additional provider/tool steps
 
-Storage provides persistence interfaces for Agent Harness records. Storage does not own Agent Harness semantics.
+Thread records own a system prompt. When Agent Harness constructs provider messages, it prepends that system prompt as the first provider-facing system message. The system prompt stays thread metadata and stays hidden from the ChatBox timeline.
+
+Turn progression:
+
+- A turn starts by persisting one user Message.
+- A provider response with assistant content persists an assistant Message.
+- A provider response with tool calls persists tool-call Messages, executes matching tools, persists tool-result Messages, and continues the provider loop.
+- A provider response with zero tool calls ends the turn.
+- Empty assistant content with zero tool calls also ends the turn.
+
+Provider boundaries:
+
+- The first provider dialect is OpenAI-compatible `/v1/chat/completions`.
+- DeepSeek uses the same provider boundary where its API remains OpenAI-compatible.
+- CopilotKit AIMock attaches at the LLM provider HTTP boundary during development tests.
+- Provider adapters own request assembly, response parsing, streaming chunk accumulation, and provider-specific tool-name mapping.
+
+Tool boundaries:
+
+- The tool registry is static for the current application capability set.
+- Runtime thread, turn, file, dataset, model, and artifact context is passed through validated tool arguments and `ToolExecutionContext`.
+- First-slice tool names are `data.peek`, `data.integrate`, `data.clean`, `data.feature.select`, `model.metadata`, `model.train`, `model.hyper_train`, and `model.inference`.
+
+Storage provides persistence interfaces for Agent Harness records. Agent Harness semantics stay in the Agent Harness service.
 
 ## ML Adapter Contract
 
@@ -88,7 +115,9 @@ ML adapters must assume:
 
 ## Agent Autonomy Contract
 
-The first-slice acceptance scenario validates end-to-end capability. System and developer prompts describe tool semantics, boundaries, and the `turn_end` convention. Planning and tool ordering remain model-owned within tool validation and cancellation boundaries.
+The first-slice acceptance scenario validates end-to-end capability. Prompts describe Xenix identity, tool semantics, and service boundaries. Planning and tool ordering remain model-owned within tool validation, step-budget, and cancellation boundaries.
+
+Acceptance scenarios should prove that a user can complete basic analysis from file intake through prediction with conversation, file drag-and-drop, service-backed tools, and artifact previews.
 
 ## Boundary Tests Required
 

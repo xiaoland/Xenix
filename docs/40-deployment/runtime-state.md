@@ -23,6 +23,7 @@ Current runtime directories:
 Current runtime files and subdirectories:
 
 - `config/locale.json`
+- `config/agent_settings.json`
 - `state/xenix.db`
 - `artifacts/datasets/`
 - `artifacts/models/`
@@ -36,7 +37,8 @@ Current runtime files and subdirectories:
 2. Read the resolved paths from the main window.
 3. Open the log directory from the UI or inspect files directly on disk.
 4. Inspect `config/locale.json` for the persisted UI language preference when debugging localization behavior.
-5. Inspect `state/xenix.db` for metadata, `artifacts/datasets/` for app-managed dataset artifacts, `artifacts/ml-tasks/` for per-ML-task working directories, and `artifacts/models/` for canonical trained-model files.
+5. Inspect `config/agent_settings.json` for the persisted LLM provider and development AIMock settings.
+6. Inspect `state/xenix.db` for metadata, `artifacts/datasets/` for app-managed dataset artifacts, `artifacts/ml-tasks/` for per-ML-task working directories, and `artifacts/models/` for canonical trained-model files.
 
 ## Reset
 
@@ -44,9 +46,11 @@ Current runtime files and subdirectories:
 2. Delete only the runtime directory you intend to reset under `XENIX_APP_HOME`.
 3. Restart the app so bootstrap recreates `config/`, `logs/`, `cache/`, `state/`, `temp/`, and `artifacts/`.
 
-Do not store canonical datasets inside the runtime directory. Dataset registration keeps source files external.
+Keep canonical source datasets outside the runtime directory. Dataset registration keeps source files external.
 
 Dataset import and dataset inspection read the user-managed source file directly. Agent Harness and data services register app-managed dataset artifacts when data tools produce derived files.
+
+Current SQLite development baseline is `user_version=1`. If a local development database belongs to an obsolete schema baseline, delete `state/xenix.db` under the active runtime home and restart the app so bootstrap recreates the current AI-first schema.
 
 Issue `#72` adds ML task working directories with this shape:
 

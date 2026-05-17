@@ -18,6 +18,8 @@ Each persisted ML task must have:
 
 SQLite is the default store for ML task metadata.
 
+Current AI-first service contracts are dataset-scoped. Training, hyperparameter training, evaluation, and inference requests carry explicit dataset id, feature columns, target columns, model selection, and run name inputs. Agent Harness tools call these contracts from tool arguments and thread context.
+
 ## Status Contract
 
 Allowed status values:
@@ -69,7 +71,8 @@ Result ownership rules:
 - App-managed dataset artifacts used by ML tasks are registered through service-owned artifact metadata.
 - Generated models, exports, and reports live in service-managed directories on the local filesystem.
 - ML task working directories live under `artifacts/ml-tasks/<ml-task-id>/`.
-- An ML task is not `succeeded` until every declared output path exists.
+- An ML task reaches `succeeded` only after every declared output path exists.
+- ChatBox result presentation flows through markdown summaries and `artifact://...` links registered by services.
 
 ## Failure Contract
 

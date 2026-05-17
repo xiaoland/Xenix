@@ -10,4 +10,9 @@ Add a unit TDD only when:
 - repeated regressions suggest hidden invariants
 - the behavior is expensive to rediscover from code history
 
-Do not create unit TDDs for simple or stable modules.
+Keep simple or stable modules in code and tests.
+
+Current unit documents:
+
+- `agent-harness.md`
+- `chatbot-ui.md`
