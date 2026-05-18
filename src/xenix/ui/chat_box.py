@@ -57,10 +57,18 @@ class AutoGrowingTextEdit(QPlainTextEdit):
     multiline_changed = Signal(bool)
     submit_requested = Signal()
 
-    def __init__(self, *, max_lines: int = 6, min_height: int = 34, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        max_lines: int = 6,
+        min_height: int = 34,
+        horizontal_padding: int = 8,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self._max_lines = max(1, max_lines)
         self._min_height = min_height
+        self._horizontal_padding = max(0, horizontal_padding)
         self._multiline = False
         self._viewport_insets = (0, 0)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
@@ -75,7 +83,7 @@ class AutoGrowingTextEdit(QPlainTextEdit):
         self.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setViewportMargins(0, 0, 0, 0)
+        self.setViewportMargins(self._horizontal_padding, 0, self._horizontal_padding, 0)
         self.document().setDocumentMargin(0)
         self.textChanged.connect(self._sync_height)
         self._sync_height()
@@ -147,7 +155,7 @@ class AutoGrowingTextEdit(QPlainTextEdit):
         insets = (top, bottom)
         if insets != self._viewport_insets:
             self._viewport_insets = insets
-            self.setViewportMargins(0, top, 0, bottom)
+            self.setViewportMargins(self._horizontal_padding, top, self._horizontal_padding, bottom)
 
 
 def _propagate_geometry_change(widget: QWidget) -> None:

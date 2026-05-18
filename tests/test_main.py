@@ -382,6 +382,11 @@ def test_chatbox_composer_editor_uses_transparent_native_background(monkeypatch,
         assert editor.testAttribute(Qt.WA_TranslucentBackground)
         assert not editor.viewport().autoFillBackground()
         assert editor.viewport().testAttribute(Qt.WA_TranslucentBackground)
+        assert editor.palette().color(QPalette.ColorRole.Base).alpha() == 0
+        assert editor.viewport().palette().color(QPalette.ColorRole.Base).alpha() == 0
+        margins = editor.viewportMargins()
+        assert margins.left() == 8
+        assert margins.right() == 8
     finally:
         window.close()
 
