@@ -12,6 +12,7 @@ Runtime dependencies now include:
 
 - `pandas`
 - `openpyxl`
+- `duckdb`
 - `pydantic`
 - `joblib`
 - `scikit-learn`
@@ -27,7 +28,7 @@ Expected result: the app opens the native desktop shell on the Chatbot-first sur
 The delivered workflow includes:
 
 - conversation plus file drag-and-drop
-- Agent Harness tool calls for data inspection, integration, cleaning, feature selection, training, hyperparameter training, and inference
+- Agent Harness tool calls for data inspection, integration, cleaning, read-only querying, transformation, feature selection, training, hyperparameter training, and inference
 - markdown summaries with `artifact://...` links
 - Chatbot previews for generated datasets, reports, metrics, models, images, and prediction files
 - local persistence for conversations, messages, tool calls, tool results, artifacts, ML task metadata, and logs
@@ -67,6 +68,7 @@ Expected result:
 - packaged executable path is `dist/xenix/xenix.exe`
 - package resources are available under the bundled `xenix/resources/` path
 - compiled translations are available under the bundled `xenix/translations/` path
+- DuckDB Python runtime imports successfully and can run an in-memory query inside the packaged app
 
 ## Packaged Smoke Verification
 
@@ -108,4 +110,5 @@ Smoke verification should confirm that these directories are created in a fresh 
 - If packaging succeeds but the EXE does not start, rerun `pdm run smoke-package` first. It validates the packaged startup path without requiring manual UI interaction.
 - If resources fail to load in the packaged app, verify that `xenix.spec` still copies `src/xenix/resources` into `xenix/resources`.
 - If language switching fails in a packaged app, verify that `src/xenix/translations/*.qm` were rebuilt and copied into `xenix/translations`.
+- If DuckDB-backed tools fail only in the packaged app, rerun `pdm run smoke-package` and inspect whether PyInstaller collected DuckDB's package metadata and native library.
 - If you need an isolated local run, set `XENIX_APP_HOME` to an empty directory or use the VSCode workspace-home launch profile.

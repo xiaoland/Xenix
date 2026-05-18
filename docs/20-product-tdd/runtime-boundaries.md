@@ -64,7 +64,11 @@ Service APIs should be designed around explicit request/result objects or narrow
 `DataCleaningService` owns deterministic data-cleaning execution for `data.clean`.
 `data.clean` is an LLM-facing Agent tool that applies atomic predefined cleaning operations to one registered dataset and creates a new derived dataset.
 The tool handler coordinates dataset lookup, service execution, dataset registration, and artifact registration; cleaning algorithms stay in the service layer.
-DuckDB DSL execution belongs to a separate future tool boundary.
+DuckDB-backed SQL execution belongs to internal data query/transform services.
+`data.query` is an LLM-facing Agent tool for read-only SELECT/CTE queries over registered dataset bindings. It returns bounded result rows and metadata and creates no dataset artifact by default.
+`data.transform` is an LLM-facing Agent tool for SELECT/CTE transformations over registered dataset bindings. It materializes the result as a new derived dataset artifact.
+`data.duckdb` is not exposed as an LLM-facing tool.
+DuckDB SQL validation must reject mutation, DDL, extension-management, direct filesystem scan, and multi-statement shapes before execution.
 
 Dataset registration in the AI-first path can use a compatibility Project internally while Agent tools avoid product-facing Project inputs.
 Dataset lineage is represented through dataset metadata instead of Project ownership.
@@ -103,7 +107,7 @@ Tool boundaries:
 
 - The tool registry is static for the current application capability set.
 - Runtime thread, turn, file, dataset, model, and artifact context is passed through validated tool arguments and `ToolExecutionContext`.
-- First-slice tool names are `data.peek`, `data.integrate`, `data.clean`, `data.feature.select`, `model.metadata`, `model.train`, `model.hyper_train`, and `model.inference`.
+- Current tool names are `data.peek`, `data.integrate`, `data.clean`, `data.query`, `data.transform`, `data.feature.select`, `model.metadata`, `model.train`, `model.hyper_train`, and `model.inference`.
 
 Storage provides persistence interfaces for Agent Harness records. Agent Harness semantics stay in the Agent Harness service.
 
@@ -136,5 +140,6 @@ Add contract tests when any of the following change:
 - LLM provider serialization
 - ML task state transitions
 - Data-cleaning tool schemas or service request/result shapes
+- Data query/transform tool schemas, SQL validator rules, or service request/result shapes
 - Service-to-ML adapter invocation shape
 - Storage location rules for logs, models, datasets, or results

@@ -56,6 +56,9 @@ Current app-managed runtime layout includes:
 - UI code consumes resolved paths from services instead of constructing storage layouts itself.
 - Source dataset registration stores the external source path and stable naming metadata.
 - Derived dataset registration stores the generated artifact path and an explicit `derived_from_dataset_id` when one source dataset owns the lineage.
+- Query results returned by `data.query` are tool-result payloads by default and do not create dataset rows or artifact rows.
+- `data.transform` stores transformed output files under app-managed dataset artifact directories and registers them as derived datasets.
+- Multi-input transforms record input dataset ids in artifact metadata until storage has a first-class multi-parent lineage field.
 - `copied_from` is retained for compatibility copy semantics; data cleaning and transformation use derived lineage.
 - Dataset inspection metadata such as row counts, inferred column kinds, and previews is runtime-derived and should not be persisted by default.
 - Feature/target selection, model outputs, and prediction outputs are represented by tool results and artifact metadata in the first AI-first slice.

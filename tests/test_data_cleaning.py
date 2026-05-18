@@ -8,6 +8,7 @@ from xenix.services.agent.conversation_store import CreateToolCallInput, StartTu
 from xenix.services.agent.tools import AgentToolRegistry, ToolExecutionContext
 from xenix.services.artifact_service import ArtifactService
 from xenix.services.data_cleaning import CleanDatasetInput, DataCleaningService
+from xenix.services.data_transform import DataQueryTransformService
 from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
 from xenix.services.ml_service import MLService
 from xenix.services.ml_task_service import MLTaskService
@@ -20,6 +21,7 @@ def _build_runtime(monkeypatch, tmp_path: Path):
     context = StorageBootstrapService().initialize(paths)
     dataset_service = DatasetService(context.session_factory, paths)
     data_cleaning_service = DataCleaningService(paths)
+    data_transform_service = DataQueryTransformService(paths)
     ml_task_service = MLTaskService(context.session_factory, paths)
     ml_service = MLService(
         paths,
@@ -32,6 +34,7 @@ def _build_runtime(monkeypatch, tmp_path: Path):
         paths=paths,
         dataset_service=dataset_service,
         data_cleaning_service=data_cleaning_service,
+        data_transform_service=data_transform_service,
         ml_service=ml_service,
         artifact_service=artifact_service,
     )

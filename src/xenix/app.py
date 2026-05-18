@@ -20,6 +20,7 @@ from .services.agent import (
 )
 from .services.artifact_service import ArtifactService
 from .services.data_cleaning import DataCleaningService
+from .services.data_transform import DataQueryInput, DataQueryTransformService, DatasetSqlBinding
 from .services.dataset_service import DatasetService
 from .services.ml_service import MLService
 from .services.ml_task_service import MLTaskService
@@ -52,6 +53,7 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
 
     dataset_service = DatasetService(context.session_factory, paths)
     data_cleaning_service = DataCleaningService(paths)
+    data_transform_service = DataQueryTransformService(paths)
     ml_task_service = MLTaskService(context.session_factory, paths)
     ml_service = MLService(
         paths,
@@ -66,6 +68,7 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
         paths=paths,
         dataset_service=dataset_service,
         data_cleaning_service=data_cleaning_service,
+        data_transform_service=data_transform_service,
         ml_service=ml_service,
         artifact_service=artifact_service,
     )
@@ -95,9 +98,30 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
     return app, window
 
 
+def _run_smoke_checks(paths) -> None:
+    duckdb_smoke_path = paths.temp / "duckdb-smoke.csv"
+    duckdb_smoke_path.write_text("value\n1\n2\n", encoding="utf-8")
+    result = DataQueryTransformService(paths).query(
+        DataQueryInput(
+            bindings=[
+                DatasetSqlBinding(
+                    alias="input",
+                    dataset_id="smoke-dataset",
+                    source_path=str(duckdb_smoke_path.resolve()),
+                )
+            ],
+            sql="SELECT SUM(value) AS total FROM input",
+            limit=1,
+        )
+    )
+    if not result.rows or result.rows[0].get("total") != 3:
+        raise RuntimeError("DuckDB smoke query failed.")
+
+
 def run(*, smoke_test: bool = False) -> int:
     app, window = build_main_window(show=not smoke_test)
     if smoke_test:
+        _run_smoke_checks(ensure_app_dirs(get_app_paths()))
         window.show()
         app.processEvents()
         window.close()

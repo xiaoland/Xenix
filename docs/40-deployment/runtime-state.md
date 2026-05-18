@@ -26,6 +26,7 @@ Current runtime files and subdirectories:
 - `config/agent_settings.json`
 - `state/xenix.db`
 - `artifacts/datasets/`
+- `artifacts/datasets/transformed/`
 - `artifacts/models/`
 - `artifacts/reports/`
 - `artifacts/predictions/`
@@ -48,7 +49,7 @@ Current runtime files and subdirectories:
 
 Keep canonical source datasets outside the runtime directory. Dataset registration keeps source files external.
 
-Dataset import and dataset inspection read the user-managed source file directly. Agent Harness and data services register app-managed dataset artifacts when data tools produce derived files.
+Dataset import and dataset inspection read the user-managed source file directly. Agent Harness and data services register app-managed dataset artifacts when data tools produce derived files. `data.query` returns bounded tool-result payloads by default; `data.transform` writes transformed CSV artifacts under `artifacts/datasets/transformed/`.
 
 Current SQLite development baseline is `user_version=2`. If a local development database belongs to an obsolete schema baseline, delete `state/xenix.db` under the active runtime home and restart the app so bootstrap recreates the current AI-first schema.
 

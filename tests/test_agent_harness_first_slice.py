@@ -17,6 +17,7 @@ from xenix.services.agent.providers import AgentProvider
 from xenix.services.agent.tools import ToolExecutionContext
 from xenix.services.artifact_service import ArtifactService
 from xenix.services.data_cleaning import DataCleaningService
+from xenix.services.data_transform import DataQueryTransformService
 from xenix.services.dataset_service import DatasetService
 from xenix.services.ml_service import MLService
 from xenix.services.ml_task_service import MLTaskService
@@ -117,6 +118,7 @@ def _build_first_slice_runtime(monkeypatch, tmp_path: Path):
     context = StorageBootstrapService().initialize(paths)
     dataset_service = DatasetService(context.session_factory, paths)
     data_cleaning_service = DataCleaningService(paths)
+    data_transform_service = DataQueryTransformService(paths)
     ml_task_service = MLTaskService(context.session_factory, paths)
     ml_service = MLService(
         paths,
@@ -129,6 +131,7 @@ def _build_first_slice_runtime(monkeypatch, tmp_path: Path):
         paths=paths,
         dataset_service=dataset_service,
         data_cleaning_service=data_cleaning_service,
+        data_transform_service=data_transform_service,
         ml_service=ml_service,
         artifact_service=artifact_service,
     )

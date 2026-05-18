@@ -13,6 +13,12 @@ from ...config import AppPaths
 from ...exceptions import ValidationError
 from ..artifact_service import ArtifactService, RegisterArtifactInput, build_artifact_markdown_link
 from ..data_cleaning import CleanDatasetInput, DataCleaningService
+from ..data_transform import (
+    DataQueryInput,
+    DataQueryTransformService,
+    DataTransformInput,
+    DatasetSqlBinding,
+)
 from ..dataset_inspection import InspectDatasetInput, detect_source_format, load_dataframe
 from ..dataset_service import DatasetService, RegisterDatasetInput
 from ..ml.registry import get_model_catalog_entry, list_model_catalog, list_model_keys
@@ -68,12 +74,14 @@ class AgentToolRegistry:
         paths: AppPaths,
         dataset_service: DatasetService,
         data_cleaning_service: DataCleaningService,
+        data_transform_service: DataQueryTransformService,
         ml_service: MLService,
         artifact_service: ArtifactService,
     ) -> None:
         self._paths = paths
         self._dataset_service = dataset_service
         self._data_cleaning_service = data_cleaning_service
+        self._data_transform_service = data_transform_service
         self._ml_service = ml_service
         self._artifact_service = artifact_service
         self._model_key_aliases = self._build_model_key_aliases()
@@ -83,6 +91,8 @@ class AgentToolRegistry:
                 self._build_data_peek_tool(),
                 self._build_data_integrate_tool(),
                 self._build_data_clean_tool(),
+                self._build_data_query_tool(),
+                self._build_data_transform_tool(),
                 self._build_data_feature_select_tool(),
                 self._build_model_metadata_tool(),
                 self._build_model_train_tool(),
@@ -269,6 +279,79 @@ class AgentToolRegistry:
                 },
             ),
             handler=self._data_clean,
+        )
+
+    def _build_data_query_tool(self) -> AgentTool:
+        binding_schema = {
+            "type": "object",
+            "properties": {
+                "alias": {
+                    "type": "string",
+                    "description": "SQL table alias for this registered dataset, such as orders or customers.",
+                },
+                "dataset_id": {"type": "string"},
+            },
+            "required": ["alias", "dataset_id"],
+            "additionalProperties": False,
+        }
+        return AgentTool(
+            spec=AgentToolSpec(
+                name="data.query",
+                provider_name="data_query",
+                description=(
+                    "Run a read-only SELECT/CTE query over registered datasets. "
+                    "Use dataset_id for one input aliased as input, or bindings for multiple inputs. "
+                    "Returns bounded rows and does not create a dataset artifact."
+                ),
+                parameters_schema={
+                    "type": "object",
+                    "properties": {
+                        "dataset_id": {"type": "string"},
+                        "bindings": {"type": "array", "items": binding_schema},
+                        "sql": {"type": "string"},
+                        "limit": {"type": "integer", "minimum": 1, "maximum": 200},
+                    },
+                    "required": ["sql"],
+                    "additionalProperties": False,
+                },
+            ),
+            handler=self._data_query,
+        )
+
+    def _build_data_transform_tool(self) -> AgentTool:
+        binding_schema = {
+            "type": "object",
+            "properties": {
+                "alias": {
+                    "type": "string",
+                    "description": "SQL table alias for this registered dataset, such as orders or customers.",
+                },
+                "dataset_id": {"type": "string"},
+            },
+            "required": ["alias", "dataset_id"],
+            "additionalProperties": False,
+        }
+        return AgentTool(
+            spec=AgentToolSpec(
+                name="data.transform",
+                provider_name="data_transform",
+                description=(
+                    "Create a new derived dataset artifact from a SELECT/CTE query over registered datasets. "
+                    "Use dataset_id for one input aliased as input, or bindings for multiple inputs."
+                ),
+                parameters_schema={
+                    "type": "object",
+                    "properties": {
+                        "dataset_id": {"type": "string"},
+                        "bindings": {"type": "array", "items": binding_schema},
+                        "sql": {"type": "string"},
+                        "name": {"type": "string"},
+                    },
+                    "required": ["sql"],
+                    "additionalProperties": False,
+                },
+            ),
+            handler=self._data_transform,
         )
 
     def _build_data_feature_select_tool(self) -> AgentTool:
@@ -485,6 +568,60 @@ class AgentToolRegistry:
         result.payload["cleaning_report"] = clean_result.report
         return result
 
+    def _data_query(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+        self._raise_if_cancelled(context)
+        bindings = self._resolve_sql_bindings(arguments, tool_name="data.query")
+        query_result = self._data_transform_service.query(
+            DataQueryInput(
+                bindings=bindings,
+                sql=self._require_string(arguments, "sql"),
+                limit=self._optional_integer(arguments, "limit", default=50),
+            )
+        )
+        payload = query_result.model_dump(mode="json")
+        payload["input_dataset_ids"] = [binding.dataset_id for binding in bindings]
+        payload["bindings"] = [
+            {"alias": binding.alias, "dataset_id": binding.dataset_id}
+            for binding in bindings
+        ]
+        return ToolExecutionResult(
+            payload=payload,
+            content_blocks=[{"type": "markdown", "text": self._query_result_markdown(payload)}],
+        )
+
+    def _data_transform(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+        self._raise_if_cancelled(context)
+        bindings = self._resolve_sql_bindings(arguments, tool_name="data.transform")
+        input_dataset_ids = [binding.dataset_id for binding in bindings]
+        default_name = "Transformed dataset"
+        if len(bindings) == 1:
+            default_name = f"{self._dataset_service.get_dataset(bindings[0].dataset_id).name} transformed"
+        name = str(arguments.get("name") or default_name).strip() or default_name
+        transform_result = self._data_transform_service.transform(
+            DataTransformInput(
+                bindings=bindings,
+                sql=self._require_string(arguments, "sql"),
+                name=name,
+            )
+        )
+        derived_from_dataset_id = input_dataset_ids[0] if len(set(input_dataset_ids)) == 1 else None
+        result = self._register_generated_dataset_result(
+            context,
+            output_path=Path(transform_result.output_path),
+            name=name,
+            summary=f"Transformed dataset created. Rows: {transform_result.row_count}.",
+            derived_from_dataset_id=derived_from_dataset_id,
+            metadata_payload={
+                "transform_report": transform_result.transform_report,
+                "input_dataset_ids": input_dataset_ids,
+            },
+        )
+        result.payload["row_count"] = transform_result.row_count
+        result.payload["columns"] = transform_result.columns
+        result.payload["transform_report"] = transform_result.transform_report
+        result.payload["input_dataset_ids"] = input_dataset_ids
+        return result
+
     def _data_feature_select(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
         dataset_id = self._require_string(arguments, "dataset_id")
@@ -690,6 +827,77 @@ class AgentToolRegistry:
             },
             content_blocks=[{"type": "markdown", "text": f"Prediction results are ready: {link}"}],
         )
+
+    def _resolve_sql_bindings(self, arguments: dict[str, Any], *, tool_name: str) -> list[DatasetSqlBinding]:
+        raw_bindings = arguments.get("bindings")
+        raw_dataset_id = str(arguments.get("dataset_id") or "").strip()
+        if raw_bindings:
+            if raw_dataset_id:
+                raise ValidationError(f"{tool_name} accepts dataset_id for one input or bindings for multiple inputs.")
+            if not isinstance(raw_bindings, list):
+                raise ValidationError(f"{tool_name} bindings must be a list.")
+            bindings: list[DatasetSqlBinding] = []
+            for raw_binding in raw_bindings:
+                if not isinstance(raw_binding, dict):
+                    raise ValidationError(f"{tool_name} bindings must contain objects.")
+                alias = str(raw_binding.get("alias") or "").strip()
+                dataset_id = str(raw_binding.get("dataset_id") or "").strip()
+                if not alias or not dataset_id:
+                    raise ValidationError(f"{tool_name} bindings require alias and dataset_id.")
+                dataset = self._dataset_service.get_dataset(dataset_id)
+                bindings.append(
+                    DatasetSqlBinding(
+                        alias=alias,
+                        dataset_id=dataset.id,
+                        source_path=dataset.source_path,
+                    )
+                )
+            return bindings
+
+        dataset_id = self._require_string(arguments, "dataset_id")
+        dataset = self._dataset_service.get_dataset(dataset_id)
+        return [
+            DatasetSqlBinding(
+                alias="input",
+                dataset_id=dataset.id,
+                source_path=dataset.source_path,
+            )
+        ]
+
+    def _query_result_markdown(self, payload: dict[str, Any]) -> str:
+        returned = int(payload.get("returned_row_count") or 0)
+        limit = int(payload.get("limit") or 0)
+        suffix = " (truncated)" if payload.get("truncated") else ""
+        lines = [f"Query returned {returned} row(s) with limit {limit}{suffix}."]
+        rows = payload.get("rows")
+        columns = payload.get("columns")
+        if not isinstance(rows, list) or not rows:
+            return "\n".join(lines)
+        if not isinstance(columns, list) or not columns:
+            return "\n".join(lines)
+        column_names = [str(column.get("name")) for column in columns if isinstance(column, dict)]
+        preview_rows = rows[:10]
+        lines.extend(
+            [
+                "",
+                "| " + " | ".join(self._markdown_cell(column) for column in column_names) + " |",
+                "| " + " | ".join("---" for _column in column_names) + " |",
+            ]
+        )
+        for row in preview_rows:
+            if not isinstance(row, dict):
+                continue
+            lines.append(
+                "| "
+                + " | ".join(self._markdown_cell(row.get(column)) for column in column_names)
+                + " |"
+            )
+        return "\n".join(lines)
+
+    def _markdown_cell(self, value: Any) -> str:
+        if value is None:
+            return ""
+        return str(value).replace("\n", " ").replace("|", "\\|")
 
     def _register_generated_dataset_result(
         self,
@@ -1034,6 +1242,15 @@ class AgentToolRegistry:
         if not isinstance(values, list):
             raise ValidationError(f"{key} must be a list.")
         return [str(value).strip() for value in values if str(value).strip()]
+
+    def _optional_integer(self, arguments: dict[str, Any], key: str, *, default: int) -> int:
+        value = arguments.get(key)
+        if value is None:
+            return default
+        try:
+            return int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError(f"{key} must be an integer.") from exc
 
     def _slug(self, value: str) -> str:
         normalized = "".join(char.lower() if char.isalnum() else "-" for char in value).strip("-")

@@ -59,22 +59,24 @@
   - Service tests for each included operation.
   - Tool-boundary test for output dataset, artifact, lineage, report payload, and backward-compatible default behavior.
 
-### Slice 2: DuckDB DSL Tool Design
+### Slice 2: DuckDB Query And Transform Tool Design
 
-- Goal: Define the separate LLM-facing DuckDB DSL tool contract before adding DuckDB as a dependency.
+- Goal: Define the separate LLM-facing query and transform contracts before adding DuckDB as a dependency.
 - Durable docs to update:
   - `docs/20-product-tdd/runtime-boundaries.md`: define the DuckDB DSL service boundary and allowed execution shape.
   - `docs/20-product-tdd/storage-ownership.md`: define output artifact and derived dataset rules for DSL-produced datasets.
   - `docs/40-deployment/development.md`: add planned dependency and verification notes only when the dependency is selected.
-- Candidate tool name:
-  - `data.transform`
-  - `data.query`
-  - `data.duckdb`
+- Public LLM-facing tool names:
+  - `data.query`: read-only SELECT/CTE over registered datasets; returns bounded rows and summary payloads.
+  - `data.transform`: SELECT/CTE over registered datasets; materializes the result as a new derived dataset artifact.
+- Internal implementation naming:
+  - DuckDB belongs in service/validator names, not as a public `data.duckdb` tool.
 - Contract constraints:
   - Registered datasets only.
   - SELECT/CTE-only query shape.
   - No runtime extension downloads by default.
-  - Output must be a new artifact/dataset, never in-place mutation.
+  - `data.query` creates no dataset artifact by default.
+  - `data.transform` output must be a new artifact/dataset, never in-place mutation.
   - Query, bindings, and validation summary must be auditable.
 - Verification:
   - Static query validator tests.
@@ -83,7 +85,7 @@
 
 ### Slice 3: DuckDB Dependency And Packaging
 
-- Goal: Add DuckDB only when Slice 2 is ready for execution.
+- Goal: Add DuckDB for `data.query` and `data.transform` execution once the public contracts are fixed.
 - Durable docs to update:
   - `docs/40-deployment/development.md`: add DuckDB to runtime dependency and package verification guidance.
   - `docs/40-deployment/runtime-state.md`: add any DuckDB-related cache or artifact paths if introduced.
@@ -91,6 +93,7 @@
 - Candidate changes:
   - Add `duckdb` to runtime dependencies with a pinned compatible range.
   - Use in-memory DuckDB execution first.
+  - Load registered CSV/XLS/XLSX datasets through Pandas DataFrames and register them as DuckDB input views.
   - Verify PyInstaller packaging with the available DuckDB hook.
   - Add packaged smoke coverage for a minimal DuckDB query.
 - Verification:
@@ -116,9 +119,9 @@
 
 ## Current Recommendation
 
-- Implement Slice 0 and Slice 1 first.
-- Keep Slice 2 as design-only until `data.clean` pressure proves a DSL tool is needed.
-- Add DuckDB in Slice 3, not during Python-first `data.clean`.
+- Slice 0 and Slice 1 are implemented.
+- Implement Slice 2 and Slice 3 together so the LLM can use `data.query` and `data.transform` for read-only analysis and derived-dataset transformation.
+- Keep `data.clean` Python-first and compact while expressive SQL belongs to `data.query` and `data.transform`.
 
 ## Durable Documentation Promotion Plan
 
@@ -133,7 +136,7 @@
 - Chatbot is the user-facing entry point; `data.clean` is an LLM-facing tool.
 - `data.clean` applies atomic predefined cleaning operations to one specified dataset and produces a new derived dataset.
 - `profile` belongs outside `data.clean`.
-- DuckDB DSL belongs to a separate LLM-facing tool.
+- DuckDB-backed SQL belongs behind `data.query` and `data.transform`; `data.duckdb` is not exposed as an LLM tool.
 - Artifacts are produced durable outputs such as datasets, reports, images, models, predictions, and other generated files.
 - Dataset lineage should use explicit derived-from semantics.
 - Project should exit the AI-first product ownership model.
@@ -143,4 +146,4 @@
 - How far Project cleanup should go before Issue 83 implementation starts.
 - Whether `derived_from_dataset_id` should support only one parent in v1 or a parent list for integrated datasets.
 - Whether validation rules in `data.clean` should only report by default.
-- Which DuckDB DSL tool name best communicates the boundary to the LLM.
+- Whether multi-input transformed datasets need a first-class multi-parent lineage field beyond artifact metadata.

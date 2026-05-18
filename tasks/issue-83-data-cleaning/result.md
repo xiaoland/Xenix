@@ -78,6 +78,6 @@
 
 ## Deferred Items
 
-- DuckDB DSL tool design and dependency addition remain Slice 2 and Slice 3.
+- DuckDB-backed `data.query` and `data.transform` moved to `slice-2-3-result.md`.
 - Dynamic cleaning tool family loading remains Slice 4.
 - Full Project table removal remains a dedicated migration because ML task code still uses `project_id`.
