@@ -22,7 +22,7 @@ Storage owns persistence mechanics. Data, artifact, project, and ML services own
 
 - `Thread`: persisted conversation workspace with title and system prompt.
 - `Turn`: ordered group of messages started by one user Message.
-- `Message`: chronological content-block record with Harness kind and UI author.
+- `Message`: chronological content-block record with Harness kind, UI author, lifecycle status, and content blocks.
 - `ToolCall`: execution record linking a tool-call Message to its result Message.
 - `AgentRun`: one provider/tool orchestration attempt for a turn.
 
@@ -37,7 +37,7 @@ submit_user_turn
   -> start AgentRun
   -> build provider messages from ThreadSnapshot
   -> call provider complete/stream
-  -> persist assistant Message when provider returns assistant content
+  -> create/update/finalize assistant Message as stream content arrives or final content is known
   -> end turn when provider returns zero tool calls
   -> for each tool call:
        persist tool-call Message and ToolCall row
@@ -47,6 +47,20 @@ submit_user_turn
 ```
 
 A provider response with empty assistant content and zero tool calls ends the turn. A turn-end tool is outside the current contract.
+
+## Streaming Contract
+
+Agent Harness exposes Chatbot timeline changes as message-centric events. Chatbot UI must not consume provider deltas, tool-call execution rows, or run records as timeline events.
+
+`submit_user_turn_stream()` and `continue_step_budget_stream()` emit:
+
+- `snapshot`: a full `ThreadSnapshot` for turn start/resume and final convergence. `is_final=False` means the turn is still running; `is_final=True` means the UI may leave running state.
+- `message_created`: a persisted `Message` has been created.
+- `message_updated`: a persisted `Message` has changed content or lifecycle state.
+- `message_finalized`: a persisted in-progress `Message` reached a terminal lifecycle state.
+- `step_confirmation_required`: control state for user approval after the step budget is exhausted; the corresponding system Message is still persisted and emitted as a message event.
+
+Provider streaming remains an internal Harness input. The Harness converts provider text chunks into updates on one assistant Message. Tool-call and tool-result timeline rows are only `Message` records with `AgentMessageKind.TOOL_CALL` and `AgentMessageKind.TOOL_CALL_RESULT`; `AgentToolCallRow` remains execution metadata.
 
 ## System Prompt
 
@@ -96,7 +110,8 @@ Contract tests should cover:
 - provider message projection with system prompt first
 - user turn persistence and turn ending on zero tool calls
 - empty-text zero-tool provider response ending a turn
-- assistant streaming delta rendering events and final persisted assistant Message
+- assistant streaming as message create/update/finalize events on a single persisted assistant Message
+- tool-call and tool-result message events before final turn snapshot
 - tool-call and tool-result persistence
 - step-budget pause, resume, stop, and maximum total limit
 - cancellation during provider and tool execution

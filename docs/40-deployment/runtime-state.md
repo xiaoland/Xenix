@@ -51,7 +51,17 @@ Keep canonical source datasets outside the runtime directory. Dataset registrati
 
 Dataset import and dataset inspection read the user-managed source file directly. Agent Harness and data services register app-managed dataset artifacts when data tools produce derived files. `data.query` returns bounded tool-result payloads by default; `data.transform` writes transformed CSV artifacts under `artifacts/datasets/transformed/`.
 
-Current SQLite development baseline is `user_version=2`. If a local development database belongs to an obsolete schema baseline, delete `state/xenix.db` under the active runtime home and restart the app so bootstrap recreates the current AI-first schema.
+Current SQLite development baseline is `user_version=4`. Application startup runs forward migrations from supported earlier baselines. If a local development database belongs to an obsolete schema baseline, delete `state/xenix.db` under the active runtime home and restart the app so bootstrap recreates the current AI-first schema.
+
+When a migration fails during development:
+
+1. Stop the app.
+2. Confirm the active runtime home and inspect `state/xenix.db`.
+3. Check `PRAGMA user_version` and the affected table rows directly.
+4. Fix app-owned bad persisted values with a new forward-only data migration. Do not mask known bad SQLite rows with tolerant ORM reads.
+5. Re-run bootstrap or `pdm run smoke` against the same runtime home.
+
+Agent Message lifecycle status is stored as lowercase enum values in SQLite, for example `in_progress`, `completed`, `failed`, and `cancelled`.
 
 Issue `#72` adds ML task working directories with this shape:
 

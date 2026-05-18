@@ -23,11 +23,11 @@ The central Chatbot stretches to consume remaining horizontal space. Message lis
 - composer
 - attachment chips
 - file drag hover overlay scoped to the full composer shell
-- Thinking indicator while waiting for provider response
+- message-level in-progress rendering while Agent Harness is running
 - stop control while provider or tool execution is running
 - step-budget confirmation controls
 
-Message list renders from `ThreadSnapshot.messages`. System messages are hidden from the normal timeline. Visible user messages after the first one receive a turn divider above them. The first user message starts the timeline directly.
+Message list renders from `ThreadSnapshot.messages` and message-level stream events emitted by Agent Harness. System messages are hidden from the normal timeline. Visible user messages after the first one receive a turn divider above them. The first user message starts the timeline directly.
 
 ## Message Rendering
 
@@ -56,9 +56,11 @@ During a running turn:
 
 - user message appears immediately
 - send button becomes stop
-- Thinking indicator appears at the bottom while awaiting provider output
-- assistant deltas stream into a temporary assistant bubble
-- final snapshot replaces temporary streaming state with persisted messages
+- non-final snapshots initialize or resume the running turn without releasing the composer
+- message events create, update, or finalize visible timeline messages by Message id
+- assistant streaming updates one persisted assistant Message; no provider-delta UI event or temporary assistant bubble is part of the Chatbot contract
+- tool-call and tool-result rows appear as soon as their Messages are created
+- final snapshot replaces incremental state with the authoritative persisted timeline and releases the running state
 - message list scrolls to the latest visible item
 
 ## Test Obligations
@@ -73,5 +75,6 @@ Qt boundary tests should cover:
 - composer auto-grow layout switch
 - Enter submit and Shift+Enter newline
 - file drag hover overlay across the composer shell and textarea
-- Thinking indicator and streaming assistant delta behavior
+- message event create/update/finalize behavior for assistant streaming
+- tool-call and tool-result message events during open turns
 - stop control propagation to Agent Harness

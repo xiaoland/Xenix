@@ -15,9 +15,9 @@ SQLite is reserved for small, queryable application metadata:
 - User selections and lightweight preferences
 - References to files owned by the application
 
-The current AI-first SQLite baseline is schema version `2`. It contains Agent Harness conversation tables, artifact metadata, dataset metadata, ML task metadata, and trained-model metadata. The legacy work item table and `work_item_id` columns are outside this baseline.
+The current AI-first SQLite baseline is schema version `4`. It contains Agent Harness conversation tables, artifact metadata, dataset metadata, ML task metadata, and trained-model metadata. The legacy work item table and `work_item_id` columns are outside this baseline.
 
-Agent Thread rows store the thread-level system prompt. Agent Turn rows store the turn sequence and status. Agent Message rows store chronological content blocks and provider payloads. Tool-call rows store execution status, arguments, result payload, and links back to request/result Messages.
+Agent Thread rows store the thread-level system prompt. Agent Turn rows store the turn sequence and status. Agent Message rows store chronological content blocks, provider payloads, lifecycle status, update timestamps, and finalization timestamps. Message lifecycle statuses are persisted as lowercase enum values such as `in_progress` and `completed`. Tool-call rows store execution status, arguments, result payload, and links back to request/result Messages.
 
 SQLite stays limited to metadata and excludes:
 

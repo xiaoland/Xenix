@@ -16,6 +16,9 @@ This guidance applies to AI-first service boundaries under `src/xenix/services/`
 - Keep dataset inspection metadata ephemeral and runtime-derived.
 - Validate column selections through service code, not UI-only checks.
 - Do not let UI code parse `.csv` or `.xlsx` files for business decisions.
+- Before changing storage models, repositories, or migrations, read `docs/40-deployment/local-state-evolution.md`.
+- Fix app-owned bad SQLite data through forward-only data migrations; do not use tolerant ORM reads to hide known invalid persisted values.
+- Any SQLite schema or data migration change must update the schema version, cover fresh bootstrap and upgrade/data-migration tests, and update durable storage/runtime docs.
 
 ## Boundaries
 
