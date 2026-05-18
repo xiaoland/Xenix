@@ -23,7 +23,7 @@ def _create_legacy_database(db_path: Path, version: int) -> None:
 def test_storage_bootstrap_rejects_legacy_local_database(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
-    _create_legacy_database(database_path(paths), 3)
+    _create_legacy_database(database_path(paths), 99)
 
     with pytest.raises(StorageBootstrapError):
         StorageBootstrapService().initialize(paths)

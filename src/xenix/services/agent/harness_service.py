@@ -11,6 +11,8 @@ from ...exceptions import ValidationError
 from ..storage.models import (
     AgentMessageAuthor,
     AgentMessageKind,
+    AgentMessageRow,
+    AgentMessageStatus,
     AgentRunStatus,
     AgentToolCallStatus,
 )
@@ -25,6 +27,7 @@ from .conversation_store import (
     StartAgentRunInput,
     StartTurnInput,
     ThreadSnapshot,
+    UpdateAgentMessageInput,
 )
 from .providers import AgentProvider, ProviderResponse, ProviderStreamEvent
 from .tools import AgentToolRegistry, ToolExecutionContext
@@ -50,8 +53,9 @@ class AgentHarnessStreamEvent:
     turn_id: str | None = None
     run_id: str | None = None
     message_id: str | None = None
-    delta_text: str = ""
+    message: AgentMessageRow | None = None
     snapshot: ThreadSnapshot | None = None
+    is_final: bool = False
     used_steps: int = 0
     suggested_steps: int = 0
     max_total_steps: int = 0
@@ -62,6 +66,7 @@ class StepBudgetPause:
     thread_id: str
     turn_id: str
     run_id: str
+    message: AgentMessageRow
     used_steps: int
     suggested_steps: int
     max_total_steps: int
@@ -157,11 +162,12 @@ class AgentHarnessService:
     def submit_user_turn_stream(self, input_data: SubmitUserTurnInput):
         thread_id, turn_id, run_id, file_paths = self._start_user_turn(input_data)
         yield AgentHarnessStreamEvent(
-            kind="turn_started",
+            kind="snapshot",
             thread_id=thread_id,
             turn_id=turn_id,
             run_id=run_id,
             snapshot=self._conversation_store.get_thread_snapshot(thread_id),
+            is_final=False,
         )
 
         try:
@@ -187,6 +193,7 @@ class AgentHarnessService:
                 turn_id=turn_id,
                 run_id=run_id,
                 snapshot=outcome,
+                is_final=True,
             )
         except AgentRunCancelled:
             snapshot = self._cancel_run_and_turn(thread_id, turn_id, run_id)
@@ -196,6 +203,7 @@ class AgentHarnessService:
                 turn_id=turn_id,
                 run_id=run_id,
                 snapshot=snapshot,
+                is_final=True,
             )
             return
         except Exception as exc:
@@ -225,11 +233,12 @@ class AgentHarnessService:
         snapshot = self._conversation_store.get_thread_snapshot(input_data.thread_id)
         file_paths = self._attached_files_for_turn(snapshot, input_data.turn_id)
         yield AgentHarnessStreamEvent(
-            kind="turn_resumed",
+            kind="snapshot",
             thread_id=input_data.thread_id,
             turn_id=input_data.turn_id,
             run_id=input_data.run_id,
             snapshot=snapshot,
+            is_final=False,
         )
 
         try:
@@ -255,6 +264,7 @@ class AgentHarnessService:
                 turn_id=input_data.turn_id,
                 run_id=input_data.run_id,
                 snapshot=outcome,
+                is_final=True,
             )
         except AgentRunCancelled:
             snapshot = self._cancel_run_and_turn(input_data.thread_id, input_data.turn_id, input_data.run_id)
@@ -264,6 +274,7 @@ class AgentHarnessService:
                 turn_id=input_data.turn_id,
                 run_id=input_data.run_id,
                 snapshot=snapshot,
+                is_final=True,
             )
             return
         except Exception as exc:
@@ -439,39 +450,96 @@ class AgentHarnessService:
             self._raise_if_cancelled(run_id)
             snapshot = self._conversation_store.get_thread_snapshot(thread_id)
             provider_response: ProviderResponse | None = None
-            yield AgentHarnessStreamEvent(kind="thinking_started", thread_id=thread_id, turn_id=turn_id, run_id=run_id)
-            for stream_event in self._provider_stream(snapshot.provider_messages(), self._tool_registry.list_specs()):
+            assistant_message: AgentMessageRow | None = None
+            assistant_text = ""
+            try:
+                for stream_event in self._provider_stream(snapshot.provider_messages(), self._tool_registry.list_specs()):
+                    self._raise_if_cancelled(run_id)
+                    if stream_event.delta_text:
+                        assistant_text += stream_event.delta_text
+                        assistant_blocks = [{"type": "markdown", "text": assistant_text}]
+                        if assistant_message is None:
+                            assistant_message = self._conversation_store.append_message(
+                                AppendAgentMessageInput(
+                                    thread_id=thread_id,
+                                    turn_id=turn_id,
+                                    kind=AgentMessageKind.ASSISTANT,
+                                    ui_author=AgentMessageAuthor.ASSISTANT,
+                                    content_blocks=assistant_blocks,
+                                    status=AgentMessageStatus.IN_PROGRESS,
+                                )
+                            )
+                            yield self._message_event("message_created", assistant_message, run_id)
+                        else:
+                            assistant_message = self._conversation_store.update_message(
+                                UpdateAgentMessageInput(
+                                    message_id=assistant_message.id,
+                                    content_blocks=assistant_blocks,
+                                    status=AgentMessageStatus.IN_PROGRESS,
+                                )
+                            )
+                            yield self._message_event("message_updated", assistant_message, run_id)
+                    if stream_event.response is not None:
+                        provider_response = stream_event.response
                 self._raise_if_cancelled(run_id)
-                if stream_event.delta_text:
-                    yield AgentHarnessStreamEvent(
-                        kind="assistant_delta",
-                        thread_id=thread_id,
-                        delta_text=stream_event.delta_text,
+            except AgentRunCancelled:
+                if assistant_message is not None:
+                    assistant_message = self._conversation_store.update_message(
+                        UpdateAgentMessageInput(
+                            message_id=assistant_message.id,
+                            status=AgentMessageStatus.CANCELLED,
+                        )
                     )
-                if stream_event.response is not None:
-                    provider_response = stream_event.response
-            yield AgentHarnessStreamEvent(kind="thinking_finished", thread_id=thread_id, turn_id=turn_id, run_id=run_id)
-            self._raise_if_cancelled(run_id)
+                    yield self._message_event("message_finalized", assistant_message, run_id)
+                raise
+            except Exception:
+                if assistant_message is not None:
+                    assistant_message = self._conversation_store.update_message(
+                        UpdateAgentMessageInput(
+                            message_id=assistant_message.id,
+                            status=AgentMessageStatus.FAILED,
+                        )
+                    )
+                    yield self._message_event("message_finalized", assistant_message, run_id)
+                raise
 
             if provider_response is None:
+                if assistant_message is not None:
+                    assistant_message = self._conversation_store.update_message(
+                        UpdateAgentMessageInput(
+                            message_id=assistant_message.id,
+                            status=AgentMessageStatus.FAILED,
+                        )
+                    )
+                    yield self._message_event("message_finalized", assistant_message, run_id)
                 raise ValidationError("Provider stream ended without a completed response.")
 
-            if provider_response.assistant_content_blocks:
-                assistant_message = self._conversation_store.append_message(
-                    AppendAgentMessageInput(
-                        thread_id=thread_id,
-                        turn_id=turn_id,
-                        kind=AgentMessageKind.ASSISTANT,
-                        ui_author=AgentMessageAuthor.ASSISTANT,
-                        content_blocks=provider_response.assistant_content_blocks,
-                        provider_payload=provider_response.raw_payload,
+            final_assistant_blocks = provider_response.assistant_content_blocks
+            if assistant_message is not None and not final_assistant_blocks:
+                final_assistant_blocks = list(assistant_message.content_blocks)
+            if final_assistant_blocks:
+                if assistant_message is None:
+                    assistant_message = self._conversation_store.append_message(
+                        AppendAgentMessageInput(
+                            thread_id=thread_id,
+                            turn_id=turn_id,
+                            kind=AgentMessageKind.ASSISTANT,
+                            ui_author=AgentMessageAuthor.ASSISTANT,
+                            content_blocks=final_assistant_blocks,
+                            provider_payload=provider_response.raw_payload,
+                        )
                     )
-                )
-                yield AgentHarnessStreamEvent(
-                    kind="assistant_message_finished",
-                    thread_id=thread_id,
-                    message_id=assistant_message.id,
-                )
+                    yield self._message_event("message_created", assistant_message, run_id)
+                else:
+                    assistant_message = self._conversation_store.update_message(
+                        UpdateAgentMessageInput(
+                            message_id=assistant_message.id,
+                            content_blocks=final_assistant_blocks,
+                            provider_payload=provider_response.raw_payload,
+                            status=AgentMessageStatus.COMPLETED,
+                        )
+                    )
+                    yield self._message_event("message_finalized", assistant_message, run_id)
 
             if not provider_response.tool_calls:
                 self._conversation_store.end_turn(thread_id, turn_id)
@@ -480,7 +548,7 @@ class AgentHarnessService:
             for tool_call in provider_response.tool_calls:
                 self._raise_if_cancelled(run_id)
                 arguments = self._tool_call_arguments(tool_call.tool_name, tool_call.arguments)
-                _request_message, persisted_tool_call = self._conversation_store.create_tool_call(
+                request_message, persisted_tool_call = self._conversation_store.create_tool_call(
                     CreateToolCallInput(
                         thread_id=thread_id,
                         turn_id=turn_id,
@@ -489,6 +557,7 @@ class AgentHarnessService:
                         provider_payload={"tool_call_id": tool_call.provider_call_id},
                     )
                 )
+                yield self._message_event("message_created", request_message, run_id)
                 try:
                     result = self._tool_registry.execute(
                         tool_call.tool_name,
@@ -513,7 +582,7 @@ class AgentHarnessService:
                         status = AgentToolCallStatus.FAILED
                         error_summary = str(exc)
 
-                _result_message, _completed = self._conversation_store.complete_tool_call(
+                result_message, _completed = self._conversation_store.complete_tool_call(
                     CompleteToolCallInput(
                         tool_call_id=persisted_tool_call.id,
                         status=status,
@@ -526,14 +595,17 @@ class AgentHarnessService:
                         provider_payload={"tool_call_id": tool_call.provider_call_id},
                     )
                 )
+                yield self._message_event("message_created", result_message, run_id)
                 if status is AgentToolCallStatus.CANCELLED:
                     raise AgentRunCancelled()
-        return self._pause_for_step_confirmation(
+        pause = self._pause_for_step_confirmation(
             thread_id=thread_id,
             turn_id=turn_id,
             run_id=run_id,
             step_state=step_state,
         )
+        yield self._message_event("message_created", pause.message, run_id)
+        return pause
 
     def _initial_step_state(self) -> dict[str, int]:
         return {
@@ -579,7 +651,7 @@ class AgentHarnessService:
         if remaining <= 0:
             raise ValidationError("Provider exceeded the maximum total tool-calling steps.")
         suggested_steps = min(step_state["extension_step_limit"], remaining)
-        self._conversation_store.append_message(
+        message = self._conversation_store.append_message(
             AppendAgentMessageInput(
                 thread_id=thread_id,
                 turn_id=turn_id,
@@ -605,6 +677,7 @@ class AgentHarnessService:
             thread_id=thread_id,
             turn_id=turn_id,
             run_id=run_id,
+            message=message,
             used_steps=step_state["used_steps"],
             suggested_steps=suggested_steps,
             max_total_steps=step_state["max_total_steps"],
@@ -621,6 +694,16 @@ class AgentHarnessService:
             used_steps=pause.used_steps,
             suggested_steps=pause.suggested_steps,
             max_total_steps=pause.max_total_steps,
+        )
+
+    def _message_event(self, kind: str, message: AgentMessageRow, run_id: str) -> AgentHarnessStreamEvent:
+        return AgentHarnessStreamEvent(
+            kind=kind,
+            thread_id=message.thread_id,
+            turn_id=message.turn_id,
+            run_id=run_id,
+            message_id=message.id,
+            message=message,
         )
 
     def _attached_files_for_turn(self, snapshot: ThreadSnapshot, turn_id: str) -> list[str]:

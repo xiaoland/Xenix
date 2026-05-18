@@ -12,6 +12,7 @@ from ..storage.models import (
     AgentMessageAuthor,
     AgentMessageKind,
     AgentMessageRow,
+    AgentMessageStatus,
     AgentRunRow,
     AgentRunStatus,
     AgentThreadRow,
@@ -53,6 +54,14 @@ class AppendAgentMessageInput(SQLModel):
     ui_author: AgentMessageAuthor
     content_blocks: list[dict[str, Any]] = Field(default_factory=list)
     provider_payload: dict[str, Any] = Field(default_factory=dict)
+    status: AgentMessageStatus = AgentMessageStatus.COMPLETED
+
+
+class UpdateAgentMessageInput(SQLModel):
+    message_id: str
+    content_blocks: list[dict[str, Any]] | None = None
+    provider_payload: dict[str, Any] | None = None
+    status: AgentMessageStatus | None = None
 
 
 class CreateToolCallInput(SQLModel):
@@ -201,7 +210,10 @@ class ConversationStore:
                 ui_author=AgentMessageAuthor.USER,
                 content_blocks=list(input_data.user_content_blocks),
                 provider_payload=dict(input_data.provider_payload),
+                status=AgentMessageStatus.COMPLETED,
                 created_at=now,
+                updated_at=now,
+                finalized_at=now,
             )
             self._conversations.append_message(session, message)
             self._conversations.set_turn_user_message(session, turn.id, message.id, now)
@@ -224,12 +236,39 @@ class ConversationStore:
                 ui_author=input_data.ui_author,
                 content_blocks=list(input_data.content_blocks),
                 provider_payload=dict(input_data.provider_payload),
+                status=input_data.status,
                 created_at=now,
+                updated_at=now,
+                finalized_at=_finalized_at_for_status(input_data.status, now),
             )
             self._conversations.append_message(session, message)
             self._touch_thread(session, thread, now)
             session.commit()
             return message
+
+    def update_message(self, input_data: UpdateAgentMessageInput) -> AgentMessageRow:
+        now = _utc_now()
+        with self._session_factory() as session:
+            message = self._conversations.get_message(session, input_data.message_id)
+            if message is None:
+                raise NotFoundError(f"Message '{input_data.message_id}' was not found.")
+            if message.turn_id is not None:
+                self._require_open_turn(session, message.thread_id, message.turn_id)
+            thread = self._require_thread(session, message.thread_id)
+            updated = self._conversations.update_message(
+                session,
+                message.id,
+                now,
+                content_blocks=list(input_data.content_blocks) if input_data.content_blocks is not None else None,
+                provider_payload=dict(input_data.provider_payload) if input_data.provider_payload is not None else None,
+                status=input_data.status,
+                finalized_at=_finalized_at_for_status(input_data.status, now),
+            )
+            if updated is None:
+                raise NotFoundError(f"Message '{message.id}' was not found.")
+            self._touch_thread(session, thread, now)
+            session.commit()
+            return updated
 
     def create_tool_call(self, input_data: CreateToolCallInput) -> tuple[AgentMessageRow, AgentToolCallRow]:
         tool_name = input_data.tool_name.strip()
@@ -258,7 +297,10 @@ class ConversationStore:
                 ui_author=AgentMessageAuthor.TOOL,
                 content_blocks=content_blocks,
                 provider_payload=dict(input_data.provider_payload),
+                status=AgentMessageStatus.COMPLETED,
                 created_at=now,
+                updated_at=now,
+                finalized_at=now,
             )
             self._conversations.append_message(session, message)
             row = AgentToolCallRow(
@@ -304,7 +346,10 @@ class ConversationStore:
                 ui_author=AgentMessageAuthor.TOOL,
                 content_blocks=content_blocks,
                 provider_payload=dict(input_data.provider_payload),
+                status=AgentMessageStatus.COMPLETED,
                 created_at=now,
+                updated_at=now,
+                finalized_at=now,
             )
             self._conversations.append_message(session, message)
             updated = self._conversations.complete_tool_call(
@@ -461,3 +506,13 @@ def _content_blocks_to_text(blocks: list[dict[str, Any]]) -> str:
         else:
             lines.append(json.dumps(block, ensure_ascii=False))
     return "\n".join(line for line in lines if line)
+
+
+def _finalized_at_for_status(status: AgentMessageStatus | None, now: datetime) -> datetime | None:
+    if status in {
+        AgentMessageStatus.COMPLETED,
+        AgentMessageStatus.FAILED,
+        AgentMessageStatus.CANCELLED,
+    }:
+        return now
+    return None

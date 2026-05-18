@@ -217,38 +217,24 @@ class MainWindow(QMainWindow):
     def _render_harness_stream_event(self, event) -> None:
         if event.run_id in self._cancelled_agent_run_ids and event.kind != "snapshot":
             return
-        if event.kind == "turn_started":
-            if event.thread_id is not None:
-                self._agent_thread_id = event.thread_id
-                self._refresh_history_sidebar(selected_thread_id=event.thread_id)
+        if event.kind == "snapshot" and event.snapshot is not None:
+            if event.is_final:
+                if event.run_id is not None:
+                    self._cancelled_agent_run_ids.discard(event.run_id)
+                self._render_harness_snapshot(event.snapshot)
+                return
+            self._agent_thread_id = event.snapshot.thread.id
             self._active_agent_run_id = event.run_id
-            return
-        if event.kind == "thinking_started":
-            self._chat_box.show_thinking_indicator()
-            return
-        if event.kind == "thinking_finished":
-            self._chat_box.hide_thinking_indicator()
-            return
-        if event.kind == "assistant_delta":
-            self._chat_box.hide_thinking_indicator()
-            self._chat_box.append_assistant_delta(event.delta_text)
-            return
-        if event.kind == "assistant_message_finished":
-            self._chat_box.finish_streaming_assistant_message()
+            self._chat_box.render_snapshot(event.snapshot)
+            self._refresh_history_sidebar(selected_thread_id=event.snapshot.thread.id)
             return
         if event.kind == "step_confirmation_required":
             self._render_step_confirmation(event)
             return
-        if event.kind == "turn_resumed":
-            if event.thread_id is not None:
-                self._agent_thread_id = event.thread_id
-                self._refresh_history_sidebar(selected_thread_id=event.thread_id)
-            self._active_agent_run_id = event.run_id
+        if event.kind in {"message_created", "message_updated", "message_finalized"} and event.message is not None:
+            self._chat_box.hide_thinking_indicator()
+            self._chat_box.apply_message_event(event.message)
             return
-        if event.kind == "snapshot" and event.snapshot is not None:
-            if event.run_id is not None:
-                self._cancelled_agent_run_ids.discard(event.run_id)
-            self._render_harness_snapshot(event.snapshot)
 
     def _render_harness_error(self, message: str) -> None:
         self._pending_step_confirmation = None

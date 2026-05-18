@@ -12,7 +12,13 @@ from xenix.main import main
 from xenix.services.agent import AgentHarnessStreamEvent
 from xenix.services.agent.dev_fixtures import MESSAGE_RENDERING_FIXTURE_TITLE, ensure_mock_conversation_history
 from xenix.services.artifact_service import RegisterArtifactInput
-from xenix.services.storage.models import ArtifactKind
+from xenix.services.storage.models import (
+    AgentMessageAuthor,
+    AgentMessageKind,
+    AgentMessageRow,
+    AgentMessageStatus,
+    ArtifactKind,
+)
 
 
 class _FakeFileDropEvent:
@@ -289,7 +295,7 @@ def test_main_window_step_budget_confirmation_can_continue(monkeypatch, tmp_path
 
         def fake_continue(input_data):
             captured_inputs.append(input_data)
-            yield AgentHarnessStreamEvent(kind="snapshot", thread_id=thread_id, snapshot=snapshot)
+            yield AgentHarnessStreamEvent(kind="snapshot", thread_id=thread_id, snapshot=snapshot, is_final=True)
 
         monkeypatch.setattr(window._agent_harness_service, "continue_step_budget_stream", fake_continue)
         window._chat_box._step_continue_button.click()
@@ -362,6 +368,24 @@ def test_chatbox_composer_switches_layout_when_text_wraps(monkeypatch, tmp_path:
         window.close()
 
 
+def test_chatbox_composer_editor_uses_transparent_native_background(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=True)
+    try:
+        app.processEvents()
+        editor = window._chat_box._editor
+
+        assert not editor.autoFillBackground()
+        assert editor.testAttribute(Qt.WA_TranslucentBackground)
+        assert not editor.viewport().autoFillBackground()
+        assert editor.viewport().testAttribute(Qt.WA_TranslucentBackground)
+    finally:
+        window.close()
+
+
 def test_chatbox_enter_submits_and_shift_enter_inserts_newline(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
@@ -416,7 +440,18 @@ def test_chatbox_thinking_indicator_is_bottom_temporary_message(monkeypatch, tmp
         assert thinking._blocks == [{"type": "thinking", "text": "Thinking..."}]
         assert view._message_layout.itemAt(view._message_layout.count() - 2).widget() is thinking
 
-        view.append_assistant_delta("Working")
+        view.apply_message_event(
+            AgentMessageRow(
+                id="assistant-thinking-replacement",
+                thread_id="thread",
+                turn_id="turn",
+                sequence_index=1,
+                kind=AgentMessageKind.ASSISTANT,
+                ui_author=AgentMessageAuthor.ASSISTANT,
+                content_blocks=[{"type": "markdown", "text": "Working"}],
+                status=AgentMessageStatus.IN_PROGRESS,
+            )
+        )
         app.processEvents()
 
         assert view._thinking_bubble is None
@@ -648,7 +683,7 @@ def test_thread_detail_view_scrolls_to_latest_message_after_append(monkeypatch, 
         window.close()
 
 
-def test_thread_detail_view_appends_streaming_delta_to_one_assistant_message(monkeypatch, tmp_path: Path) -> None:
+def test_thread_detail_view_updates_one_assistant_message_by_id(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
@@ -657,20 +692,38 @@ def test_thread_detail_view_appends_streaming_delta_to_one_assistant_message(mon
     try:
         view = window._thread_detail_view
         view.clear_messages()
-        view.append_assistant_delta("Streaming ")
-        view.append_assistant_delta("assistant ")
-        view.append_assistant_delta("message.")
+        view.apply_message_event(
+            AgentMessageRow(
+                id="assistant-message",
+                thread_id="thread",
+                turn_id="turn",
+                sequence_index=0,
+                kind=AgentMessageKind.ASSISTANT,
+                ui_author=AgentMessageAuthor.ASSISTANT,
+                content_blocks=[{"type": "markdown", "text": "Streaming "}],
+                status=AgentMessageStatus.IN_PROGRESS,
+            )
+        )
+        view.apply_message_event(
+            AgentMessageRow(
+                id="assistant-message",
+                thread_id="thread",
+                turn_id="turn",
+                sequence_index=0,
+                kind=AgentMessageKind.ASSISTANT,
+                ui_author=AgentMessageAuthor.ASSISTANT,
+                content_blocks=[{"type": "markdown", "text": "Streaming assistant message."}],
+                status=AgentMessageStatus.COMPLETED,
+            )
+        )
         for _ in range(8):
             app.processEvents()
 
-        bubble = view._streaming_assistant_bubble
+        bubble = view._message_bubbles_by_id["assistant-message"]
         assert bubble is not None
         assert bubble._card.objectName() == "chatMessageAssistant"
         assert bubble._blocks == [{"type": "markdown", "text": "Streaming assistant message."}]
-
-        view.finish_streaming_assistant_message()
-
-        assert view._streaming_assistant_bubble is None
+        assert len(view._message_bubbles_by_id) == 1
     finally:
         window.close()
 

@@ -5,7 +5,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import Column, JSON
+from sqlalchemy import Column, Enum as SQLAlchemyEnum, JSON
 from sqlmodel import Field, SQLModel
 
 DEFAULT_AGENT_THREAD_SYSTEM_PROMPT = """You are Xenix, a data analysis agent for non-technical users.
@@ -77,6 +77,13 @@ class AgentMessageKind(StrEnum):
     ASSISTANT = "assistant"
     TOOL_CALL = "tool_call"
     TOOL_CALL_RESULT = "tool_call_result"
+
+
+class AgentMessageStatus(StrEnum):
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class AgentMessageAuthor(StrEnum):
@@ -213,7 +220,20 @@ class AgentMessageRow(SQLModel, table=True):
         default_factory=dict,
         sa_column=Column(JSON, nullable=False),
     )
+    status: AgentMessageStatus = Field(
+        default=AgentMessageStatus.COMPLETED,
+        sa_column=Column(
+            SQLAlchemyEnum(
+                AgentMessageStatus,
+                values_callable=lambda enum_class: [member.value for member in enum_class],
+            ),
+            nullable=False,
+            index=True,
+        ),
+    )
     created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+    finalized_at: datetime | None = None
 
 
 class AgentRunRow(SQLModel, table=True):

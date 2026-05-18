@@ -7,6 +7,7 @@ from sqlmodel import Session, col, select
 
 from ..models import (
     AgentMessageRow,
+    AgentMessageStatus,
     AgentRunRow,
     AgentRunStatus,
     AgentThreadRow,
@@ -181,6 +182,35 @@ class AgentConversationRepository:
             .order_by(AgentMessageRow.sequence_index)
         )
         return list(session.exec(statement))
+
+    def update_message(
+        self,
+        session: Session,
+        message_id: str,
+        now: datetime,
+        *,
+        content_blocks: list[dict] | None = None,
+        provider_payload: dict | None = None,
+        status: AgentMessageStatus | None = None,
+        finalized_at: datetime | None = None,
+    ) -> AgentMessageRow | None:
+        row = self.get_message(session, message_id)
+        if row is None:
+            return None
+
+        if content_blocks is not None:
+            row.content_blocks = content_blocks
+        if provider_payload is not None:
+            row.provider_payload = provider_payload
+        if status is not None:
+            row.status = status
+        row.updated_at = now
+        if finalized_at is not None:
+            row.finalized_at = finalized_at
+        session.add(row)
+        session.flush()
+        session.refresh(row)
+        return row
 
     def create_run(self, session: Session, row: AgentRunRow) -> AgentRunRow:
         session.add(row)

@@ -63,6 +63,14 @@ class AutoGrowingTextEdit(QPlainTextEdit):
         self._min_height = min_height
         self._multiline = False
         self._viewport_insets = (0, 0)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setAutoFillBackground(False)
+        self.viewport().setAttribute(Qt.WA_TranslucentBackground, True)
+        self.viewport().setAutoFillBackground(False)
+        palette = QPalette(self.palette())
+        palette.setColor(QPalette.ColorRole.Base, QColor(0, 0, 0, 0))
+        self.setPalette(palette)
+        self.viewport().setPalette(palette)
         self.setLineWrapMode(QPlainTextEdit.WidgetWidth)
         self.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -265,12 +273,6 @@ class ChatMessageBubble(QFrame):
         self._blocks = list(blocks)
         self._browser.setMarkdown(self._render_blocks(self._blocks))
 
-    def append_markdown_delta(self, delta: str) -> None:
-        if not self._blocks or self._blocks[-1].get("type") != "markdown":
-            self._blocks.append({"type": "markdown", "text": ""})
-        self._blocks[-1]["text"] = str(self._blocks[-1].get("text", "")) + delta
-        self._browser.setMarkdown(self._render_blocks(self._blocks))
-
     def _handle_link_activated(self, url) -> None:
         self.link_activated.emit(url.toString())
 
@@ -321,8 +323,8 @@ class ThreadDetailView(QWidget):
         self._attached_files: list[str] = []
         self._running = False
         self._awaiting_step_confirmation = False
-        self._streaming_assistant_bubble: ChatMessageBubble | None = None
         self._thinking_bubble: ChatMessageBubble | None = None
+        self._message_bubbles_by_id: dict[str, ChatMessageBubble] = {}
 
         self._message_container = QWidget()
         self._message_container.setObjectName("chatMessageContainer")
@@ -491,7 +493,6 @@ class ThreadDetailView(QWidget):
         self._sync_composer_drop_overlay_geometry()
 
     def render_snapshot(self, snapshot: ThreadSnapshot) -> None:
-        self.finish_streaming_assistant_message()
         self.hide_thinking_indicator()
         self.clear_messages()
         has_rendered_user_message = False
@@ -501,30 +502,56 @@ class ThreadDetailView(QWidget):
             if message.kind is AgentMessageKind.USER:
                 if has_rendered_user_message:
                     self.add_turn_divider(auto_scroll=False)
-                self.add_message(self._author_label(message.ui_author), message.content_blocks, auto_scroll=False)
+                self.add_message(
+                    self._author_label(message.ui_author),
+                    message.content_blocks,
+                    message_id=message.id,
+                    auto_scroll=False,
+                )
                 has_rendered_user_message = True
                 continue
             if message.kind is AgentMessageKind.TOOL_CALL:
-                self.add_message(self._author_label(message.ui_author), message.content_blocks, auto_scroll=False)
+                self.add_message(
+                    self._author_label(message.ui_author),
+                    message.content_blocks,
+                    message_id=message.id,
+                    auto_scroll=False,
+                )
                 continue
-            self.add_message(self._author_label(message.ui_author), message.content_blocks, auto_scroll=False)
+            self.add_message(
+                self._author_label(message.ui_author),
+                message.content_blocks,
+                message_id=message.id,
+                auto_scroll=False,
+            )
         self._scroll_to_latest()
 
     def clear_messages(self) -> None:
         self._thinking_bubble = None
+        self._message_bubbles_by_id.clear()
         while self._message_layout.count() > 1:
             item = self._message_layout.takeAt(0)
             widget = item.widget()
             if widget is not None:
                 widget.deleteLater()
 
-    def add_message(self, author: str, blocks: list[dict[str, Any]], *, auto_scroll: bool = True) -> None:
+    def add_message(
+        self,
+        author: str,
+        blocks: list[dict[str, Any]],
+        *,
+        message_id: str | None = None,
+        auto_scroll: bool = True,
+    ) -> ChatMessageBubble:
         bubble = ChatMessageBubble(author=author, blocks=blocks, parent=self)
         bubble.link_activated.connect(self.artifact_link_activated.emit)
         bubble.set_available_width(self._message_column.width())
         self._message_layout.insertWidget(self._message_insert_index(), bubble)
+        if message_id is not None:
+            self._message_bubbles_by_id[message_id] = bubble
         if auto_scroll:
             self._scroll_to_latest()
+        return bubble
 
     def add_user_message(self, blocks: list[dict[str, Any]], *, auto_scroll: bool = True) -> None:
         if self._has_user_message():
@@ -537,23 +564,24 @@ class ThreadDetailView(QWidget):
         if auto_scroll:
             self._scroll_to_latest()
 
-    def append_assistant_delta(self, delta: str) -> None:
-        if not delta:
+    def apply_message_event(self, message, *, auto_scroll: bool = True) -> None:
+        if message.kind is AgentMessageKind.SYSTEM:
             return
         self.hide_thinking_indicator()
-        if self._streaming_assistant_bubble is None:
-            self._streaming_assistant_bubble = ChatMessageBubble(
-                author="Xenix",
-                blocks=[{"type": "markdown", "text": ""}],
-                parent=self,
-            )
-            self._streaming_assistant_bubble.link_activated.connect(self.artifact_link_activated.emit)
-            self._message_layout.insertWidget(self._message_insert_index(), self._streaming_assistant_bubble)
-        self._streaming_assistant_bubble.append_markdown_delta(delta)
-        self._scroll_to_latest()
-
-    def finish_streaming_assistant_message(self) -> None:
-        self._streaming_assistant_bubble = None
+        existing = self._message_bubbles_by_id.get(message.id)
+        if existing is not None:
+            existing.set_blocks(message.content_blocks)
+            if auto_scroll:
+                self._scroll_to_latest()
+            return
+        if message.kind is AgentMessageKind.USER and self._has_user_message():
+            self.add_turn_divider(auto_scroll=False)
+        self.add_message(
+            self._author_label(message.ui_author),
+            message.content_blocks,
+            message_id=message.id,
+            auto_scroll=auto_scroll,
+        )
 
     def show_thinking_indicator(self) -> None:
         if self._thinking_bubble is not None:

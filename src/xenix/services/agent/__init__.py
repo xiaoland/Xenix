@@ -9,6 +9,7 @@ from .conversation_store import (
     StartTurnInput,
     ThreadSnapshot,
     ConversationStore,
+    UpdateAgentMessageInput,
 )
 from .harness_service import AgentHarnessService, AgentHarnessStreamEvent, ContinueStepBudgetInput, SubmitUserTurnInput
 from .providers import (
@@ -47,4 +48,5 @@ __all__ = [
     "StartTurnInput",
     "SubmitUserTurnInput",
     "ThreadSnapshot",
+    "UpdateAgentMessageInput",
 ]

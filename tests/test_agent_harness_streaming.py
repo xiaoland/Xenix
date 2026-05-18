@@ -20,7 +20,13 @@ from xenix.services.agent.providers import AgentToolSpec
 from xenix.services.agent.tools import ToolExecutionContext, ToolExecutionResult
 from xenix.services.storage import StorageBootstrapService
 from xenix.exceptions import ValidationError
-from xenix.services.storage.models import AgentMessageKind, AgentRunStatus, AgentToolCallStatus, AgentTurnStatus
+from xenix.services.storage.models import (
+    AgentMessageKind,
+    AgentMessageStatus,
+    AgentRunStatus,
+    AgentToolCallStatus,
+    AgentTurnStatus,
+)
 
 
 class StreamingProviderFixture:
@@ -265,7 +271,7 @@ def test_openai_compatible_provider_streams_sse_text_and_tool_calls(monkeypatch)
     assert final_response.tool_calls[0].arguments == {"name": "sample"}
 
 
-def test_agent_harness_streams_deltas_and_persists_final_message(monkeypatch, tmp_path: Path) -> None:
+def test_agent_harness_streams_assistant_as_message_events(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
@@ -277,11 +283,31 @@ def test_agent_harness_streams_deltas_and_persists_final_message(monkeypatch, tm
     )
 
     events = list(harness.submit_user_turn_stream(SubmitUserTurnInput(text="show streaming")))
-    delta_text = "".join(event.delta_text for event in events if event.kind == "assistant_delta")
+    message_events = [
+        event
+        for event in events
+        if event.kind in {"message_created", "message_updated", "message_finalized"}
+    ]
+    assistant_events = [
+        event
+        for event in message_events
+        if event.message is not None and event.message.kind is AgentMessageKind.ASSISTANT
+    ]
     snapshot = events[-1].snapshot
 
-    assert delta_text == "streamed assistant text"
+    assert [event.kind for event in assistant_events][0] == "message_created"
+    assert [event.kind for event in assistant_events][-1] == "message_finalized"
+    assert len({event.message.id for event in assistant_events if event.message is not None}) == 1
+    assert assistant_events[0].message is not None
+    assert assistant_events[0].message.status is AgentMessageStatus.IN_PROGRESS
+    assert assistant_events[-1].message is not None
+    assert assistant_events[-1].message.status is AgentMessageStatus.COMPLETED
+    assert assistant_events[-1].message.content_blocks == [{"type": "markdown", "text": "streamed assistant text"}]
     assert snapshot is not None
+    assert events[0].kind == "snapshot"
+    assert events[0].is_final is False
+    assert events[-1].kind == "snapshot"
+    assert events[-1].is_final is True
     assert snapshot.turns[0].status is AgentTurnStatus.ENDED
     assert [message.kind for message in snapshot.messages] == [
         AgentMessageKind.USER,
@@ -289,8 +315,6 @@ def test_agent_harness_streams_deltas_and_persists_final_message(monkeypatch, tm
     ]
     assert snapshot.messages[1].content_blocks == [{"type": "markdown", "text": "streamed assistant text"}]
     assert snapshot.tool_calls == []
-    assert "thinking_started" in [event.kind for event in events]
-    assert "thinking_finished" in [event.kind for event in events]
 
 
 def test_agent_harness_projects_thread_system_prompt_as_first_provider_message(monkeypatch, tmp_path: Path) -> None:
@@ -366,6 +390,17 @@ def test_agent_harness_pauses_for_step_budget_confirmation_and_resumes(monkeypat
         for block in message.content_blocks
     )
     assert conversations.get_run(pause_event.run_id).status is AgentRunStatus.AWAITING_CONFIRMATION
+    message_events = [
+        event
+        for event in events
+        if event.kind == "message_created" and event.message is not None
+    ]
+    assert [event.message.kind for event in message_events] == [
+        AgentMessageKind.ASSISTANT,
+        AgentMessageKind.TOOL_CALL,
+        AgentMessageKind.TOOL_CALL_RESULT,
+        AgentMessageKind.SYSTEM,
+    ]
 
     resumed_events = list(
         harness.continue_step_budget_stream(
@@ -379,7 +414,8 @@ def test_agent_harness_pauses_for_step_budget_confirmation_and_resumes(monkeypat
     )
     resumed_snapshot = resumed_events[-1].snapshot
 
-    assert resumed_events[0].kind == "turn_resumed"
+    assert resumed_events[0].kind == "snapshot"
+    assert resumed_events[0].is_final is False
     assert resumed_snapshot is not None
     assert resumed_snapshot.turns[0].status is AgentTurnStatus.ENDED
     assert conversations.get_run(pause_event.run_id).status is AgentRunStatus.SUCCEEDED
@@ -407,7 +443,7 @@ def test_agent_harness_cancel_run_stops_active_tool_call(monkeypatch, tmp_path: 
     thread = threading.Thread(target=run_harness)
     thread.start()
     assert registry.started.wait(timeout=5)
-    run_id = next(event.run_id for event in events if event.kind == "turn_started")
+    run_id = next(event.run_id for event in events if event.kind == "snapshot" and not event.is_final)
 
     harness.cancel_run(run_id)
     thread.join(timeout=5)
