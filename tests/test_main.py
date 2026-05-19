@@ -9,7 +9,13 @@ from PySide6.QtWidgets import QFrame, QMessageBox, QTextBrowser, QWidget
 
 from xenix.app import build_main_window
 from xenix.main import main
-from xenix.services.agent import AgentHarnessStreamEvent
+from xenix.services.agent import (
+    AgentHarnessStreamEvent,
+    ChatbotEvent,
+    ChatbotEventAuthor,
+    ChatbotEventKind,
+    ChatbotEventStatus,
+)
 from xenix.services.agent.dev_fixtures import MESSAGE_RENDERING_FIXTURE_TITLE, ensure_mock_conversation_history
 from xenix.services.artifact_service import RegisterArtifactInput
 from xenix.services.storage.models import (
@@ -113,7 +119,7 @@ def test_main_window_seeds_mock_history_and_renders_sidebar_selection(monkeypatc
         window.close()
 
 
-def test_main_window_renders_turn_divider_before_user_messages(monkeypatch, tmp_path: Path) -> None:
+def test_main_window_renders_event_list_without_turn_dividers(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
@@ -144,9 +150,7 @@ def test_main_window_renders_turn_divider_before_user_messages(monkeypatch, tmp_
         divider_indexes = [index for index, name in enumerate(card_names) if name == "chatMessageDivider"]
 
         assert user_indexes
-        assert len(divider_indexes) == len(user_indexes) - 1
-        assert user_indexes[0] == 0 or card_names[user_indexes[0] - 1] != "chatMessageDivider"
-        assert all(user_index > 0 and card_names[user_index - 1] == "chatMessageDivider" for user_index in user_indexes[1:])
+        assert divider_indexes == []
     finally:
         window.close()
 
@@ -170,17 +174,69 @@ def test_main_window_renders_tool_calls(monkeypatch, tmp_path: Path) -> None:
         window._open_history_thread(target_item)
         app.processEvents()
 
-        tool_call_bubbles = []
+        tool_items = []
+        tool_bubbles = []
         for index in range(window._chat_box._message_layout.count()):
             item = window._chat_box._message_layout.itemAt(index)
-            bubble = item.widget() if item is not None else None
-            if getattr(getattr(bubble, "_card", None), "objectName", lambda: "")() != "chatMessageTool":
-                continue
-            if any(block.get("type") == "tool_call" for block in getattr(bubble, "_blocks", [])):
-                tool_call_bubbles.append(bubble)
+            widget = item.widget() if item is not None else None
+            if getattr(widget, "objectName", lambda: "")() == "chatToolCallItem":
+                tool_items.append(widget)
+            if getattr(getattr(widget, "_card", None), "objectName", lambda: "")() == "chatMessageTool":
+                tool_bubbles.append(widget)
 
-        assert tool_call_bubbles
-        assert any("Calling" in bubble._browser.toPlainText() for bubble in tool_call_bubbles)
+        assert tool_bubbles == []
+        assert tool_items
+        assert all(item.width() == window._chat_box._message_column.width() for item in tool_items)
+        summaries = [item._summary_label.text() for item in tool_items]
+        assert "Inspected dataset" in summaries
+        assert "Trained model" in summaries
+        assert "Ran prediction" in summaries
+    finally:
+        window.close()
+
+
+def test_thread_detail_view_expands_tool_event_detail(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=True)
+    try:
+        view = window._thread_detail_view
+        view.clear_messages()
+        view.apply_chatbot_event(
+            ChatbotEvent(
+                id="tool-event",
+                kind=ChatbotEventKind.TOOL,
+                turn_id="turn",
+                sequence_index=0,
+                author=ChatbotEventAuthor.TOOL,
+                status=ChatbotEventStatus.FAILED,
+                tool_call_id="tool-call",
+                tool_name="data.peek",
+                icon_key="table",
+                summary="Failed to inspect dataset",
+                detail_blocks=[{"type": "markdown", "text": "Source file is missing."}],
+            )
+        )
+        app.processEvents()
+
+        item = view._event_widgets_by_id["tool-event"]
+        assert item.objectName() == "chatToolCallItem"
+        assert item._summary_label.text() == "Failed to inspect dataset"
+        assert item._icon_label.pixmap() is not None
+        assert not item._icon_label.pixmap().isNull()
+        assert item._detail_browser.isHidden()
+        assert item._chevron_button.arrowType() == Qt.NoArrow
+        collapsed_icon_key = item._chevron_button.icon().cacheKey()
+
+        item._chevron_button.click()
+        app.processEvents()
+
+        assert item._chevron_button.arrowType() == Qt.NoArrow
+        assert item._chevron_button.icon().cacheKey() != collapsed_icon_key
+        assert item._detail_browser.isVisible()
+        assert "Source file is missing." in item._detail_browser.toPlainText()
     finally:
         window.close()
 

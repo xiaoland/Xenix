@@ -209,7 +209,7 @@ class MainWindow(QMainWindow):
         self._active_agent_run_id = None
         self._pending_step_confirmation = None
         self._chat_box.hide_thinking_indicator()
-        self._chat_box.render_snapshot(snapshot)
+        self._chat_box.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
         self._chat_box.clear_step_confirmation()
         self._chat_box.set_running(False)
         self._refresh_history_sidebar(selected_thread_id=snapshot.thread.id)
@@ -225,15 +225,22 @@ class MainWindow(QMainWindow):
                 return
             self._agent_thread_id = event.snapshot.thread.id
             self._active_agent_run_id = event.run_id
-            self._chat_box.render_snapshot(event.snapshot)
+            self._chat_box.render_events(
+                event.chatbot_events
+                if event.chatbot_events is not None
+                else self._agent_harness_service.project_chatbot_events(event.snapshot)
+            )
             self._refresh_history_sidebar(selected_thread_id=event.snapshot.thread.id)
             return
         if event.kind == "step_confirmation_required":
             self._render_step_confirmation(event)
             return
-        if event.kind in {"message_created", "message_updated", "message_finalized"} and event.message is not None:
+        if event.kind in {"message_created", "message_updated", "message_finalized"}:
             self._chat_box.hide_thinking_indicator()
-            self._chat_box.apply_message_event(event.message)
+            if event.chatbot_event is not None:
+                self._chat_box.apply_chatbot_event(event.chatbot_event)
+            elif event.message is not None:
+                self._chat_box.apply_message_event(event.message)
             return
 
     def _render_harness_error(self, message: str) -> None:
@@ -276,7 +283,11 @@ class MainWindow(QMainWindow):
     def _render_step_confirmation(self, event: AgentHarnessStreamEvent) -> None:
         if event.snapshot is not None:
             self._agent_thread_id = event.snapshot.thread.id
-            self._chat_box.render_snapshot(event.snapshot)
+            self._chat_box.render_events(
+                event.chatbot_events
+                if event.chatbot_events is not None
+                else self._agent_harness_service.project_chatbot_events(event.snapshot)
+            )
             self._refresh_history_sidebar(selected_thread_id=event.snapshot.thread.id)
         elif event.thread_id is not None:
             self._agent_thread_id = event.thread_id
@@ -352,7 +363,7 @@ class MainWindow(QMainWindow):
         self._chat_box.clear_step_confirmation()
         snapshot = self._agent_harness_service.create_thread()
         self._agent_thread_id = snapshot.thread.id
-        self._chat_box.render_snapshot(snapshot)
+        self._chat_box.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
         self._refresh_history_sidebar(selected_thread_id=snapshot.thread.id)
 
     def _refresh_history_sidebar(self, *, selected_thread_id: str | None = None) -> None:
@@ -386,7 +397,7 @@ class MainWindow(QMainWindow):
             self._pending_step_confirmation = None
             self._active_agent_run_id = None
             self._chat_box.clear_step_confirmation()
-        self._chat_box.render_snapshot(snapshot)
+        self._chat_box.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
 
     def _open_history_item_menu(self, position: QPoint) -> None:
         item = self._history_list.itemAt(position)

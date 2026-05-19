@@ -18,25 +18,29 @@ The central Chatbot stretches to consume remaining horizontal space. Message lis
 
 `ThreadDetailView` owns:
 
-- message scroll area
-- message column with 20 px horizontal padding
+- EventList scroll area
+- EventList column with 20 px horizontal padding
 - composer
 - attachment chips
 - file drag hover overlay scoped to the full composer shell
-- message-level in-progress rendering while Agent Harness is running
+- event-level in-progress rendering while Agent Harness is running
 - stop control while provider or tool execution is running
 - step-budget confirmation controls
 
-Message list renders from `ThreadSnapshot.messages` and message-level stream events emitted by Agent Harness. System messages are hidden from the normal timeline. Visible user messages after the first one receive a turn divider above them. The first user message starts the timeline directly.
+The Chatbot EventList renders projected Chatbot Events emitted by Agent Harness. System messages are hidden from the normal EventList unless Agent Harness exposes a dedicated control event.
 
-## Message Rendering
+## Event Rendering
 
-- User messages are right-aligned and capped at about 60% of the message column width.
-- Assistant messages use the remaining readable width of the message column.
-- Tool-call and tool-result messages render as compact tool rows.
-- Message height is determined by content.
-- Sender names are hidden for user and assistant messages.
-- Message content is rendered from content blocks such as text, markdown, file attachment, thinking, tool call, tool result, and step confirmation.
+- User text events are right-aligned and capped at about 60% of the EventList column width.
+- Assistant text events use the remaining readable width of the EventList column.
+- Tool events render at full EventList column width as one compact row with tool-type icon, Harness-provided summary text, and chevron when result detail is available.
+- A tool-call request without a result renders as a pending tool event.
+- A paired tool-call request and result renders as one final tool event.
+- Event height is determined by content.
+- Sender names are hidden for user and assistant text events.
+- Text event content is rendered from content blocks such as text, markdown, file attachment, and thinking.
+- Tool event summary, status wording, icon key, and result detail come from Agent Harness projection.
+- Tool icons and chevrons use QtAwesome icons resolved in the Qt UI layer. The UI maps semantic `icon_key` values to concrete icon names; tool definitions and Harness projection do not depend on QtAwesome names.
 - Artifact links inside markdown emit `artifact_link_activated` and are resolved by services.
 
 ## Composer Contract
@@ -57,11 +61,11 @@ During a running turn:
 - user message appears immediately
 - send button becomes stop
 - non-final snapshots initialize or resume the running turn without releasing the composer
-- message events create, update, or finalize visible timeline messages by Message id
-- assistant streaming updates one persisted assistant Message; no provider-delta UI event or temporary assistant bubble is part of the Chatbot contract
-- tool-call and tool-result rows appear as soon as their Messages are created
+- Chatbot Events create, update, or finalize visible EventList items by event id
+- assistant streaming updates one persisted assistant Message and one projected assistant text event; no provider-delta UI event or temporary assistant bubble is part of the Chatbot contract
+- tool-call events appear as soon as their request Message is created, and result Messages update the same logical tool event
 - final snapshot replaces incremental state with the authoritative persisted timeline and releases the running state
-- message list scrolls to the latest visible item
+- EventList scrolls to the latest visible item
 
 ## Test Obligations
 
@@ -69,12 +73,15 @@ Qt boundary tests should cover:
 
 - new thread creation from History
 - history selection, rename, and delete
-- user message rendering with turn dividers only before later user messages
-- tool-call and tool-result message rendering
+- user text event rendering
+- assistant text event rendering and update by event id
+- request-only tool event rendering
+- paired tool-call and tool-result rendering as one item
+- tool event expand/collapse behavior
 - artifact link activation and resolution
 - composer auto-grow layout switch
 - Enter submit and Shift+Enter newline
 - file drag hover overlay across the composer shell and textarea
-- message event create/update/finalize behavior for assistant streaming
-- tool-call and tool-result message events during open turns
+- Chatbot Event create/update/finalize behavior for assistant streaming
+- tool-call and tool-result Chatbot Events during open turns
 - stop control propagation to Agent Harness

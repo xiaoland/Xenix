@@ -11,6 +11,14 @@ from .conversation_store import (
     ConversationStore,
     UpdateAgentMessageInput,
 )
+from .chatbot_events import (
+    ChatbotEvent,
+    ChatbotEventAuthor,
+    ChatbotEventKind,
+    ChatbotEventStatus,
+    build_tool_result_content_blocks,
+    project_chatbot_events,
+)
 from .harness_service import AgentHarnessService, AgentHarnessStreamEvent, ContinueStepBudgetInput, SubmitUserTurnInput
 from .providers import (
     OpenAICompatibleChatProvider,
@@ -21,7 +29,7 @@ from .providers import (
     ScriptedAgentProvider,
 )
 from .settings import AgentSettings, AgentSettingsService, AimockSettings
-from .tools import AgentToolRegistry
+from .tools import AgentToolRegistry, ToolPresentation, tool_presentation_for_name
 
 __all__ = [
     "AgentHarnessService",
@@ -31,6 +39,10 @@ __all__ = [
     "AgentToolRegistry",
     "AimockSettings",
     "AppendAgentMessageInput",
+    "ChatbotEvent",
+    "ChatbotEventAuthor",
+    "ChatbotEventKind",
+    "ChatbotEventStatus",
     "CompleteToolCallInput",
     "ConversationStore",
     "CreateAgentThreadInput",
@@ -48,5 +60,9 @@ __all__ = [
     "StartTurnInput",
     "SubmitUserTurnInput",
     "ThreadSnapshot",
+    "ToolPresentation",
     "UpdateAgentMessageInput",
+    "build_tool_result_content_blocks",
+    "project_chatbot_events",
+    "tool_presentation_for_name",
 ]

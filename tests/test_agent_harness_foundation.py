@@ -6,6 +6,8 @@ from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import NotFoundError, ValidationError
 from xenix.services.agent import (
     AppendAgentMessageInput,
+    ChatbotEventKind,
+    ChatbotEventStatus,
     CompleteToolCallInput,
     ConversationStore,
     CreateAgentThreadInput,
@@ -13,6 +15,7 @@ from xenix.services.agent import (
     RenameAgentThreadInput,
     StartAgentRunInput,
     StartTurnInput,
+    project_chatbot_events,
 )
 from xenix.services.artifact_service import (
     ArtifactService,
@@ -104,6 +107,54 @@ def test_conversation_store_persists_thread_turn_messages_and_tool_calls(monkeyp
     assert provider_messages[0].role == "system"
     assert provider_messages[0].content == DEFAULT_AGENT_THREAD_SYSTEM_PROMPT
     assert [message.role for message in provider_messages[1:]] == ["user", "assistant", "tool", "assistant"]
+
+
+def test_chatbot_event_projection_pairs_tool_call_messages(monkeypatch, tmp_path: Path) -> None:
+    conversations, _artifacts = _build_services(monkeypatch, tmp_path)
+
+    thread = conversations.create_thread(CreateAgentThreadInput(title="Tool projection"))
+    turn, user_message = conversations.start_turn(
+        StartTurnInput(
+            thread_id=thread.id,
+            user_content_blocks=[{"type": "text", "text": "Inspect the dataset"}],
+        )
+    )
+    request_message, tool_call = conversations.create_tool_call(
+        CreateToolCallInput(
+            thread_id=thread.id,
+            turn_id=turn.id,
+            tool_name="data.peek",
+            arguments_payload={"source_path": "sample.csv"},
+        )
+    )
+
+    pending_events = project_chatbot_events(conversations.get_thread_snapshot(thread.id))
+    pending_tool_events = [event for event in pending_events if event.kind is ChatbotEventKind.TOOL]
+
+    assert [event.id for event in pending_events] == [user_message.id, tool_call.id]
+    assert len(pending_tool_events) == 1
+    assert pending_tool_events[0].status is ChatbotEventStatus.PENDING
+    assert pending_tool_events[0].summary == "Inspecting dataset..."
+    assert pending_tool_events[0].source_message_ids == [request_message.id]
+
+    result_message, completed_tool_call = conversations.complete_tool_call(
+        CompleteToolCallInput(
+            tool_call_id=tool_call.id,
+            status=AgentToolCallStatus.FAILED,
+            error_summary="Source file is missing.",
+            result_payload={"error": "Source file is missing."},
+        )
+    )
+
+    final_events = project_chatbot_events(conversations.get_thread_snapshot(thread.id))
+    final_tool_events = [event for event in final_events if event.kind is ChatbotEventKind.TOOL]
+
+    assert completed_tool_call.result_message_id == result_message.id
+    assert [event.id for event in final_events] == [user_message.id, tool_call.id]
+    assert len(final_tool_events) == 1
+    assert final_tool_events[0].status is ChatbotEventStatus.FAILED
+    assert final_tool_events[0].summary == "Failed to inspect dataset"
+    assert final_tool_events[0].source_message_ids == [request_message.id, result_message.id]
 
 
 def test_conversation_store_renames_and_deletes_thread_records(monkeypatch, tmp_path: Path) -> None:

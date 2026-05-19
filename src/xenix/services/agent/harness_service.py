@@ -29,8 +29,15 @@ from .conversation_store import (
     ThreadSnapshot,
     UpdateAgentMessageInput,
 )
+from .chatbot_events import (
+    ChatbotEvent,
+    build_tool_result_content_blocks,
+    project_chatbot_events,
+    project_text_message_event,
+    project_tool_chatbot_event,
+)
 from .providers import AgentProvider, ProviderResponse, ProviderStreamEvent
-from .tools import AgentToolRegistry, ToolExecutionContext
+from .tools import AgentToolRegistry, ToolExecutionContext, tool_presentation_for_name
 
 
 class SubmitUserTurnInput(SQLModel):
@@ -54,6 +61,8 @@ class AgentHarnessStreamEvent:
     run_id: str | None = None
     message_id: str | None = None
     message: AgentMessageRow | None = None
+    chatbot_event: ChatbotEvent | None = None
+    chatbot_events: list[ChatbotEvent] | None = None
     snapshot: ThreadSnapshot | None = None
     is_final: bool = False
     used_steps: int = 0
@@ -116,6 +125,18 @@ class AgentHarnessService:
     def get_thread_snapshot(self, thread_id: str) -> ThreadSnapshot:
         return self._conversation_store.get_thread_snapshot(thread_id)
 
+    def project_chatbot_events(self, snapshot: ThreadSnapshot) -> list[ChatbotEvent]:
+        return project_chatbot_events(
+            snapshot,
+            tool_presentation_lookup=self._tool_presentation,
+        )
+
+    def _tool_presentation(self, tool_name: str):
+        lookup = getattr(self._tool_registry, "tool_presentation", None)
+        if callable(lookup):
+            return lookup(tool_name)
+        return tool_presentation_for_name(tool_name)
+
     def set_provider(self, provider: AgentProvider) -> None:
         self._provider = provider
 
@@ -161,12 +182,14 @@ class AgentHarnessService:
 
     def submit_user_turn_stream(self, input_data: SubmitUserTurnInput):
         thread_id, turn_id, run_id, file_paths = self._start_user_turn(input_data)
+        snapshot = self._conversation_store.get_thread_snapshot(thread_id)
         yield AgentHarnessStreamEvent(
             kind="snapshot",
             thread_id=thread_id,
             turn_id=turn_id,
             run_id=run_id,
-            snapshot=self._conversation_store.get_thread_snapshot(thread_id),
+            snapshot=snapshot,
+            chatbot_events=self.project_chatbot_events(snapshot),
             is_final=False,
         )
 
@@ -193,6 +216,7 @@ class AgentHarnessService:
                 turn_id=turn_id,
                 run_id=run_id,
                 snapshot=outcome,
+                chatbot_events=self.project_chatbot_events(outcome),
                 is_final=True,
             )
         except AgentRunCancelled:
@@ -203,6 +227,7 @@ class AgentHarnessService:
                 turn_id=turn_id,
                 run_id=run_id,
                 snapshot=snapshot,
+                chatbot_events=self.project_chatbot_events(snapshot),
                 is_final=True,
             )
             return
@@ -238,6 +263,7 @@ class AgentHarnessService:
             turn_id=input_data.turn_id,
             run_id=input_data.run_id,
             snapshot=snapshot,
+            chatbot_events=self.project_chatbot_events(snapshot),
             is_final=False,
         )
 
@@ -264,6 +290,7 @@ class AgentHarnessService:
                 turn_id=input_data.turn_id,
                 run_id=input_data.run_id,
                 snapshot=outcome,
+                chatbot_events=self.project_chatbot_events(outcome),
                 is_final=True,
             )
         except AgentRunCancelled:
@@ -274,6 +301,7 @@ class AgentHarnessService:
                 turn_id=input_data.turn_id,
                 run_id=input_data.run_id,
                 snapshot=snapshot,
+                chatbot_events=self.project_chatbot_events(snapshot),
                 is_final=True,
             )
             return
@@ -420,10 +448,13 @@ class AgentHarnessService:
                         status=status,
                         result_payload=result.payload,
                         error_summary=error_summary,
-                        content_blocks=[
-                            *result.content_blocks,
-                            {"type": "tool_result_payload", "payload": result.payload},
-                        ],
+                        content_blocks=self._tool_result_content_blocks(
+                            tool_name=tool_call.tool_name,
+                            status=status,
+                            result_blocks=result.content_blocks,
+                            result_payload=result.payload,
+                            error_summary=error_summary,
+                        ),
                         provider_payload={"tool_call_id": tool_call.provider_call_id},
                     )
                 )
@@ -557,7 +588,13 @@ class AgentHarnessService:
                         provider_payload={"tool_call_id": tool_call.provider_call_id},
                     )
                 )
-                yield self._message_event("message_created", request_message, run_id)
+                yield self._tool_event(
+                    "message_created",
+                    request_message,
+                    run_id,
+                    tool_call=persisted_tool_call,
+                    request_message=request_message,
+                )
                 try:
                     result = self._tool_registry.execute(
                         tool_call.tool_name,
@@ -582,20 +619,30 @@ class AgentHarnessService:
                         status = AgentToolCallStatus.FAILED
                         error_summary = str(exc)
 
-                result_message, _completed = self._conversation_store.complete_tool_call(
+                result_message, completed_tool_call = self._conversation_store.complete_tool_call(
                     CompleteToolCallInput(
                         tool_call_id=persisted_tool_call.id,
                         status=status,
                         result_payload=result.payload,
                         error_summary=error_summary,
-                        content_blocks=[
-                            *result.content_blocks,
-                            {"type": "tool_result_payload", "payload": result.payload},
-                        ],
+                        content_blocks=self._tool_result_content_blocks(
+                            tool_name=tool_call.tool_name,
+                            status=status,
+                            result_blocks=result.content_blocks,
+                            result_payload=result.payload,
+                            error_summary=error_summary,
+                        ),
                         provider_payload={"tool_call_id": tool_call.provider_call_id},
                     )
                 )
-                yield self._message_event("message_created", result_message, run_id)
+                yield self._tool_event(
+                    "message_created",
+                    result_message,
+                    run_id,
+                    tool_call=completed_tool_call,
+                    request_message=request_message,
+                    result_message=result_message,
+                )
                 if status is AgentToolCallStatus.CANCELLED:
                     raise AgentRunCancelled()
         pause = self._pause_for_step_confirmation(
@@ -691,12 +738,16 @@ class AgentHarnessService:
             turn_id=pause.turn_id,
             run_id=pause.run_id,
             snapshot=pause.snapshot,
+            chatbot_events=self.project_chatbot_events(pause.snapshot),
             used_steps=pause.used_steps,
             suggested_steps=pause.suggested_steps,
             max_total_steps=pause.max_total_steps,
         )
 
     def _message_event(self, kind: str, message: AgentMessageRow, run_id: str) -> AgentHarnessStreamEvent:
+        chatbot_event = None
+        if message.kind in {AgentMessageKind.USER, AgentMessageKind.ASSISTANT}:
+            chatbot_event = project_text_message_event(message)
         return AgentHarnessStreamEvent(
             kind=kind,
             thread_id=message.thread_id,
@@ -704,7 +755,53 @@ class AgentHarnessService:
             run_id=run_id,
             message_id=message.id,
             message=message,
+            chatbot_event=chatbot_event,
         )
+
+    def _tool_event(
+        self,
+        kind: str,
+        message: AgentMessageRow,
+        run_id: str,
+        *,
+        tool_call,
+        request_message: AgentMessageRow,
+        result_message: AgentMessageRow | None = None,
+    ) -> AgentHarnessStreamEvent:
+        return AgentHarnessStreamEvent(
+            kind=kind,
+            thread_id=message.thread_id,
+            turn_id=message.turn_id,
+            run_id=run_id,
+            message_id=message.id,
+            message=message,
+            chatbot_event=project_tool_chatbot_event(
+                tool_call,
+                request_message=request_message,
+                result_message=result_message,
+                tool_presentation_lookup=self._tool_presentation,
+            ),
+        )
+
+    def _tool_result_content_blocks(
+        self,
+        *,
+        tool_name: str,
+        status: AgentToolCallStatus,
+        result_blocks: list[dict[str, Any]],
+        result_payload: dict[str, Any],
+        error_summary: str | None,
+    ) -> list[dict[str, Any]]:
+        return [
+            *build_tool_result_content_blocks(
+                tool_name=tool_name,
+                status=status,
+                detail_blocks=list(result_blocks),
+                error_summary=error_summary,
+                tool_presentation_lookup=self._tool_presentation,
+            ),
+            {"type": "tool_result_payload", "payload": result_payload},
+        ]
 
     def _attached_files_for_turn(self, snapshot: ThreadSnapshot, turn_id: str) -> list[str]:
         paths: list[str] = []

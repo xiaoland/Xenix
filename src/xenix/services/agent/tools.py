@@ -58,6 +58,112 @@ class ToolExecutionResult(BaseModel):
     content_blocks: list[dict[str, Any]] = Field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class ToolPresentation:
+    icon_key: str
+    pending_summary: str
+    success_summary: str
+    failure_action: str
+    cancellation_summary: str
+
+    def summary_for(self, status: Any) -> str:
+        status_value = getattr(status, "value", status)
+        if status_value == "failed":
+            return f"Failed to {self.failure_action}"
+        if status_value == "cancelled":
+            return self.cancellation_summary
+        if status_value in {"requested", "running"}:
+            return self.pending_summary
+        return self.success_summary
+
+
+DEFAULT_TOOL_PRESENTATION = ToolPresentation(
+    icon_key="tool",
+    pending_summary="Running tool...",
+    success_summary="Ran tool",
+    failure_action="run tool",
+    cancellation_summary="Cancelled tool run",
+)
+
+
+TOOL_PRESENTATIONS: dict[str, ToolPresentation] = {
+    "data.peek": ToolPresentation(
+        icon_key="table",
+        pending_summary="Inspecting dataset...",
+        success_summary="Inspected dataset",
+        failure_action="inspect dataset",
+        cancellation_summary="Cancelled dataset inspection",
+    ),
+    "data.integrate": ToolPresentation(
+        icon_key="merge",
+        pending_summary="Integrating data...",
+        success_summary="Integrated data",
+        failure_action="integrate data",
+        cancellation_summary="Cancelled data integration",
+    ),
+    "data.clean": ToolPresentation(
+        icon_key="sparkles",
+        pending_summary="Cleaning dataset...",
+        success_summary="Cleaned dataset",
+        failure_action="clean dataset",
+        cancellation_summary="Cancelled dataset cleaning",
+    ),
+    "data.query": ToolPresentation(
+        icon_key="table-search",
+        pending_summary="Querying dataset...",
+        success_summary="Queried dataset",
+        failure_action="query dataset",
+        cancellation_summary="Cancelled dataset query",
+    ),
+    "data.transform": ToolPresentation(
+        icon_key="table-transform",
+        pending_summary="Transforming dataset...",
+        success_summary="Transformed dataset",
+        failure_action="transform dataset",
+        cancellation_summary="Cancelled dataset transformation",
+    ),
+    "data.feature.select": ToolPresentation(
+        icon_key="columns",
+        pending_summary="Selecting features...",
+        success_summary="Selected features",
+        failure_action="select features",
+        cancellation_summary="Cancelled feature selection",
+    ),
+    "model.metadata": ToolPresentation(
+        icon_key="list-tree",
+        pending_summary="Loading model metadata...",
+        success_summary="Loaded model metadata",
+        failure_action="load model metadata",
+        cancellation_summary="Cancelled model metadata lookup",
+    ),
+    "model.train": ToolPresentation(
+        icon_key="model",
+        pending_summary="Training model...",
+        success_summary="Trained model",
+        failure_action="train model",
+        cancellation_summary="Cancelled model training",
+    ),
+    "model.hyper_train": ToolPresentation(
+        icon_key="sliders",
+        pending_summary="Tuning model...",
+        success_summary="Tuned model",
+        failure_action="tune model",
+        cancellation_summary="Cancelled model tuning",
+    ),
+    "model.inference": ToolPresentation(
+        icon_key="prediction",
+        pending_summary="Running prediction...",
+        success_summary="Ran prediction",
+        failure_action="run prediction",
+        cancellation_summary="Cancelled prediction run",
+    ),
+}
+
+
+def tool_presentation_for_name(tool_name: str) -> ToolPresentation:
+    return TOOL_PRESENTATIONS.get(tool_name, DEFAULT_TOOL_PRESENTATION)
+
+
 ToolHandler = Callable[[dict[str, Any], ToolExecutionContext], ToolExecutionResult]
 
 
@@ -65,6 +171,7 @@ ToolHandler = Callable[[dict[str, Any], ToolExecutionContext], ToolExecutionResu
 class AgentTool:
     spec: AgentToolSpec
     handler: ToolHandler
+    presentation: ToolPresentation = DEFAULT_TOOL_PRESENTATION
 
 
 class AgentToolRegistry:
@@ -104,6 +211,12 @@ class AgentToolRegistry:
     def list_specs(self) -> list[AgentToolSpec]:
         return [tool.spec for tool in self._tools.values()]
 
+    def tool_presentation(self, tool_name: str) -> ToolPresentation:
+        tool = self._tools.get(tool_name)
+        if tool is None:
+            return DEFAULT_TOOL_PRESENTATION
+        return tool.presentation
+
     def execute(
         self,
         tool_name: str,
@@ -134,6 +247,7 @@ class AgentToolRegistry:
                 },
             ),
             handler=self._data_peek,
+            presentation=tool_presentation_for_name("data.peek"),
         )
 
     def _build_data_integrate_tool(self) -> AgentTool:
@@ -153,6 +267,7 @@ class AgentToolRegistry:
                 },
             ),
             handler=self._data_integrate,
+            presentation=tool_presentation_for_name("data.integrate"),
         )
 
     def _build_data_clean_tool(self) -> AgentTool:
@@ -279,6 +394,7 @@ class AgentToolRegistry:
                 },
             ),
             handler=self._data_clean,
+            presentation=tool_presentation_for_name("data.clean"),
         )
 
     def _build_data_query_tool(self) -> AgentTool:
@@ -316,6 +432,7 @@ class AgentToolRegistry:
                 },
             ),
             handler=self._data_query,
+            presentation=tool_presentation_for_name("data.query"),
         )
 
     def _build_data_transform_tool(self) -> AgentTool:
@@ -352,6 +469,7 @@ class AgentToolRegistry:
                 },
             ),
             handler=self._data_transform,
+            presentation=tool_presentation_for_name("data.transform"),
         )
 
     def _build_data_feature_select_tool(self) -> AgentTool:
@@ -372,6 +490,7 @@ class AgentToolRegistry:
                 },
             ),
             handler=self._data_feature_select,
+            presentation=tool_presentation_for_name("data.feature.select"),
         )
 
     def _build_model_metadata_tool(self) -> AgentTool:
@@ -405,6 +524,7 @@ class AgentToolRegistry:
                 },
             ),
             handler=self._model_metadata,
+            presentation=tool_presentation_for_name("model.metadata"),
         )
 
     def _build_model_train_tool(self) -> AgentTool:
@@ -431,6 +551,7 @@ class AgentToolRegistry:
                 },
             ),
             handler=self._model_train,
+            presentation=tool_presentation_for_name("model.train"),
         )
 
     def _build_model_hyper_train_tool(self) -> AgentTool:
@@ -456,6 +577,7 @@ class AgentToolRegistry:
                 },
             ),
             handler=self._model_hyper_train,
+            presentation=tool_presentation_for_name("model.hyper_train"),
         )
 
     def _build_model_inference_tool(self) -> AgentTool:
@@ -477,6 +599,7 @@ class AgentToolRegistry:
                 },
             ),
             handler=self._model_inference,
+            presentation=tool_presentation_for_name("model.inference"),
         )
 
     def _data_peek(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:

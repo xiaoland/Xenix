@@ -7,6 +7,8 @@ from typing import Any
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.agent import (
     AgentHarnessService,
+    ChatbotEventKind,
+    ChatbotEventStatus,
     ConversationStore,
     ContinueStepBudgetInput,
     OpenAICompatibleChatProvider,
@@ -300,8 +302,12 @@ def test_agent_harness_streams_assistant_as_message_events(monkeypatch, tmp_path
     assert len({event.message.id for event in assistant_events if event.message is not None}) == 1
     assert assistant_events[0].message is not None
     assert assistant_events[0].message.status is AgentMessageStatus.IN_PROGRESS
+    assert assistant_events[0].chatbot_event is not None
+    assert assistant_events[0].chatbot_event.status is ChatbotEventStatus.IN_PROGRESS
     assert assistant_events[-1].message is not None
     assert assistant_events[-1].message.status is AgentMessageStatus.COMPLETED
+    assert assistant_events[-1].chatbot_event is not None
+    assert assistant_events[-1].chatbot_event.status is ChatbotEventStatus.COMPLETED
     assert assistant_events[-1].message.content_blocks == [{"type": "markdown", "text": "streamed assistant text"}]
     assert snapshot is not None
     assert events[0].kind == "snapshot"
@@ -401,6 +407,16 @@ def test_agent_harness_pauses_for_step_budget_confirmation_and_resumes(monkeypat
         AgentMessageKind.TOOL_CALL_RESULT,
         AgentMessageKind.SYSTEM,
     ]
+    tool_events = [
+        event.chatbot_event
+        for event in message_events
+        if event.chatbot_event is not None and event.chatbot_event.kind is ChatbotEventKind.TOOL
+    ]
+    assert [event.status for event in tool_events] == [
+        ChatbotEventStatus.PENDING,
+        ChatbotEventStatus.COMPLETED,
+    ]
+    assert tool_events[0].id == tool_events[1].id
 
     resumed_events = list(
         harness.continue_step_budget_stream(

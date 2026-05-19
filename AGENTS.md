@@ -73,6 +73,11 @@ Mode guidance:
 - switch modes when evidence or clarity changes
 - mode selection never overrides durable ownership
 
+### Development Guidelines
+
+- Prefer solving ambiguity by making the underlying contract explicit. Avoid stacking fallback heuristics when a durable invariant or projection boundary can be defined instead.
+- For Qt Widgets UI debugging, prefer using GammaRay when available to inspect widget hierarchy, properties, layout geometry, visibility, and event behavior. Treat it as the Qt-side equivalent of a browser DOM inspector.
+
 ### Impact Handshake
 
 Before mutating durable truth after alignment expansion, or when blast radius is not obviously local, pause and restate:

@@ -503,6 +503,8 @@ def _content_blocks_to_text(blocks: list[dict[str, Any]]) -> str:
             lines.append(f"Attached file: {block.get('path')}")
         elif block_type == "step_confirmation":
             lines.append(str(block.get("text", "")))
+        elif block_type == "tool_event_summary":
+            lines.append(str(block.get("text", "")))
         else:
             lines.append(json.dumps(block, ensure_ascii=False))
     return "\n".join(line for line in lines if line)

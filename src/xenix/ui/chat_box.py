@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QEvent, QPoint, QTimer, Qt, Signal
+from PySide6.QtCore import QEvent, QPoint, QSize, QTimer, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QPalette, QTextOption
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -15,16 +15,54 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QTextBrowser,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 from shiboken6 import isValid
 
-from ..services.agent import ThreadSnapshot
+from ..services.agent import (
+    ChatbotEvent,
+    ChatbotEventAuthor,
+    ChatbotEventKind,
+    ThreadSnapshot,
+    project_chatbot_events,
+)
 from ..services.storage.models import AgentMessageAuthor, AgentMessageKind
+from .icons import chevron_icon, tool_icon
 
 USER_MESSAGE_BACKGROUND = QColor("#000000")
 USER_MESSAGE_FOREGROUND = QColor("#ffffff")
+UNBOUNDED_WIDGET_WIDTH = 16777215
+
+
+def _render_content_blocks(blocks: list[dict[str, Any]]) -> str:
+    parts: list[str] = []
+    for block in blocks:
+        block_type = block.get("type")
+        if block_type in {"text", "markdown"}:
+            parts.append(str(block.get("text", "")))
+        elif block_type == "file":
+            file_path = Path(str(block.get("path", "")))
+            parts.append(f"`{file_path.name}`")
+        elif block_type == "step_confirmation":
+            parts.append(str(block.get("text", "")))
+        elif block_type == "thinking":
+            parts.append(str(block.get("text") or "Thinking..."))
+        elif block_type == "tool_event_summary":
+            parts.append(str(block.get("text", "")))
+        elif block_type == "tool_call":
+            tool_name = str(block.get("tool_name") or "tool")
+            parts.append(f"Calling `{tool_name}`...")
+        elif block_type == "tool_call_result":
+            tool_name = str(block.get("tool_name") or "tool")
+            status = str(block.get("status") or "completed")
+            error_summary = str(block.get("error_summary") or "").strip()
+            text = f"`{tool_name}` {status}."
+            if error_summary:
+                text = f"{text} {error_summary}"
+            parts.append(text)
+    return "\n\n".join(part for part in parts if part)
 
 
 class AutoHeightTextBrowser(QTextBrowser):
@@ -44,12 +82,17 @@ class AutoHeightTextBrowser(QTextBrowser):
         self.document().setTextWidth(self.viewport().width())
         self._sync_height()
 
+    def wheelEvent(self, event) -> None:  # type: ignore[override]
+        event.ignore()
+
     def _sync_height(self) -> None:
         self.document().setTextWidth(self.viewport().width())
         document_height = self.document().size().height()
         margins = self.contentsMargins()
         height = int(document_height + margins.top() + margins.bottom() + self.frameWidth() * 2 + 2)
         self.setFixedHeight(max(1, height))
+        self.verticalScrollBar().setValue(0)
+        self.horizontalScrollBar().setValue(0)
         _propagate_geometry_change(self)
 
 
@@ -147,7 +190,7 @@ class AutoGrowingTextEdit(QPlainTextEdit):
         should_scroll: bool,
     ) -> None:
         if visual_line_count <= 1 and not should_scroll:
-            top = max(0, (editor_height - line_height) // 2)
+            top = max(0, (editor_height - line_height) // 2 - 1)
             bottom = 0
         else:
             top = 6
@@ -216,8 +259,6 @@ class ChatMessageBubble(QFrame):
     def _card_object_name(self, author: str, blocks: list[dict[str, Any]]) -> str:
         if author == "You":
             return "chatMessageUser"
-        if author == "Tool":
-            return "chatMessageTool"
         if author == "System":
             return "chatMessageSystem"
         return "chatMessageAssistant"
@@ -250,31 +291,12 @@ class ChatMessageBubble(QFrame):
         browser.viewport().setPalette(text_palette)
 
     def _render_blocks(self, blocks: list[dict[str, Any]]) -> str:
-        parts: list[str] = []
-        for block in blocks:
-            block_type = block.get("type")
-            if block_type in {"text", "markdown"}:
-                parts.append(str(block.get("text", "")))
-            elif block_type == "file":
-                file_path = Path(str(block.get("path", "")))
-                parts.append(f"`{file_path.name}`")
-            elif block_type == "step_confirmation":
-                parts.append(str(block.get("text", "")))
-            elif block_type == "thinking":
-                parts.append(str(block.get("text") or "Thinking..."))
-            elif block_type == "tool_call":
-                tool_name = str(block.get("tool_name") or "tool")
-                parts.append(f"Calling `{tool_name}`...")
-            elif block_type == "tool_call_result":
-                tool_name = str(block.get("tool_name") or "tool")
-                status = str(block.get("status") or "completed")
-                parts.append(f"`{tool_name}` {status}.")
-        return "\n\n".join(part for part in parts if part)
+        return _render_content_blocks(blocks)
 
     def set_available_width(self, width: int) -> None:
         if self._card.objectName() == "chatMessageUser":
             self._card.setMaximumWidth(max(280, int(width * 0.6)))
-        elif self._card.objectName() in {"chatMessageTool", "chatMessageSystem"}:
+        elif self._card.objectName() == "chatMessageSystem":
             self._card.setMaximumWidth(max(320, int(width * 0.78)))
 
     def set_blocks(self, blocks: list[dict[str, Any]]) -> None:
@@ -285,22 +307,87 @@ class ChatMessageBubble(QFrame):
         self.link_activated.emit(url.toString())
 
 
-class TurnDivider(QFrame):
-    def __init__(self, parent: QWidget | None = None) -> None:
+class ToolCallItem(QFrame):
+    link_activated = Signal(str)
+
+    def __init__(self, event: ChatbotEvent, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setObjectName("chatTurnDivider")
-        self._blocks: list[dict[str, Any]] = []
+        self.setObjectName("chatToolCallItem")
+        self._card = self
+        self._event = event
+        self._expanded = False
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 8, 0, 0)
-        layout.setSpacing(0)
+        layout.setObjectName("chatToolCallItemLayout")
+        layout.setContentsMargins(10, 7, 10, 7)
+        layout.setSpacing(6)
 
-        line = QFrame(self)
-        self._card = line
-        line.setObjectName("chatMessageDivider")
-        line.setFrameShape(QFrame.HLine)
-        line.setFrameShadow(QFrame.Sunken)
-        layout.addWidget(line)
+        header = QWidget(self)
+        header_layout = QHBoxLayout(header)
+        header_layout.setObjectName("chatToolCallHeaderLayout")
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(8)
+
+        self._icon_label = QLabel()
+        self._icon_label.setObjectName("chatToolCallIcon")
+        self._icon_label.setFixedWidth(22)
+        self._icon_label.setAlignment(Qt.AlignCenter)
+
+        self._summary_label = QLabel()
+        self._summary_label.setObjectName("chatToolCallSummary")
+        self._summary_label.setWordWrap(True)
+
+        self._chevron_button = QToolButton()
+        self._chevron_button.setObjectName("chatToolCallChevron")
+        self._chevron_button.setFixedSize(28, 24)
+        self._chevron_button.setAutoRaise(True)
+        self._chevron_button.setArrowType(Qt.NoArrow)
+        self._chevron_button.setIconSize(QSize(16, 16))
+        self._chevron_button.setToolTip("Show result")
+        self._chevron_button.clicked.connect(self._toggle_detail)
+
+        header_layout.addWidget(self._icon_label, 0, Qt.AlignVCenter)
+        header_layout.addWidget(self._summary_label, 1, Qt.AlignVCenter)
+        header_layout.addWidget(self._chevron_button, 0, Qt.AlignVCenter)
+        layout.addWidget(header)
+
+        self._detail_browser = AutoHeightTextBrowser()
+        self._detail_browser.setObjectName("chatToolCallDetail")
+        self._detail_browser.setOpenLinks(False)
+        self._detail_browser.setOpenExternalLinks(False)
+        self._detail_browser.setFrameShape(QFrame.NoFrame)
+        self._detail_browser.anchorClicked.connect(self._handle_link_activated)
+        layout.addWidget(self._detail_browser)
+
+        self.set_event(event)
+
+    def set_event(self, event: ChatbotEvent) -> None:
+        self._event = event
+        self._icon_label.setPixmap(tool_icon(event.icon_key).pixmap(QSize(16, 16)))
+        self._summary_label.setText(event.summary or "")
+        has_detail = bool(event.detail_blocks)
+        self._chevron_button.setVisible(has_detail)
+        self._chevron_button.setEnabled(has_detail)
+        if not has_detail:
+            self._expanded = False
+        self._chevron_button.setIcon(chevron_icon(expanded=self._expanded))
+        self._chevron_button.setToolTip("Hide result" if self._expanded else "Show result")
+        self._detail_browser.setMarkdown(_render_content_blocks(event.detail_blocks))
+        self._detail_browser.setVisible(has_detail and self._expanded)
+        _propagate_geometry_change(self)
+
+    def set_available_width(self, width: int) -> None:
+        self.setMaximumWidth(UNBOUNDED_WIDGET_WIDTH)
+
+    def _toggle_detail(self) -> None:
+        if not self._event.detail_blocks:
+            return
+        self._expanded = not self._expanded
+        self.set_event(self._event)
+
+    def _handle_link_activated(self, url) -> None:
+        self.link_activated.emit(url.toString())
 
 
 class AttachmentChip(QFrame):
@@ -332,6 +419,7 @@ class ThreadDetailView(QWidget):
         self._running = False
         self._awaiting_step_confirmation = False
         self._thinking_bubble: ChatMessageBubble | None = None
+        self._event_widgets_by_id: dict[str, QWidget] = {}
         self._message_bubbles_by_id: dict[str, ChatMessageBubble] = {}
 
         self._message_container = QWidget()
@@ -501,41 +589,18 @@ class ThreadDetailView(QWidget):
         self._sync_composer_drop_overlay_geometry()
 
     def render_snapshot(self, snapshot: ThreadSnapshot) -> None:
+        self.render_events(project_chatbot_events(snapshot))
+
+    def render_events(self, events: list[ChatbotEvent]) -> None:
         self.hide_thinking_indicator()
         self.clear_messages()
-        has_rendered_user_message = False
-        for message in snapshot.messages:
-            if message.kind is AgentMessageKind.SYSTEM:
-                continue
-            if message.kind is AgentMessageKind.USER:
-                if has_rendered_user_message:
-                    self.add_turn_divider(auto_scroll=False)
-                self.add_message(
-                    self._author_label(message.ui_author),
-                    message.content_blocks,
-                    message_id=message.id,
-                    auto_scroll=False,
-                )
-                has_rendered_user_message = True
-                continue
-            if message.kind is AgentMessageKind.TOOL_CALL:
-                self.add_message(
-                    self._author_label(message.ui_author),
-                    message.content_blocks,
-                    message_id=message.id,
-                    auto_scroll=False,
-                )
-                continue
-            self.add_message(
-                self._author_label(message.ui_author),
-                message.content_blocks,
-                message_id=message.id,
-                auto_scroll=False,
-            )
+        for event in events:
+            self.add_event(event, auto_scroll=False)
         self._scroll_to_latest()
 
     def clear_messages(self) -> None:
         self._thinking_bubble = None
+        self._event_widgets_by_id.clear()
         self._message_bubbles_by_id.clear()
         while self._message_layout.count() > 1:
             item = self._message_layout.takeAt(0)
@@ -549,12 +614,16 @@ class ThreadDetailView(QWidget):
         blocks: list[dict[str, Any]],
         *,
         message_id: str | None = None,
+        event_id: str | None = None,
         auto_scroll: bool = True,
     ) -> ChatMessageBubble:
         bubble = ChatMessageBubble(author=author, blocks=blocks, parent=self)
         bubble.link_activated.connect(self.artifact_link_activated.emit)
         bubble.set_available_width(self._message_column.width())
         self._message_layout.insertWidget(self._message_insert_index(), bubble)
+        widget_id = event_id or message_id
+        if widget_id is not None:
+            self._event_widgets_by_id[widget_id] = bubble
         if message_id is not None:
             self._message_bubbles_by_id[message_id] = bubble
         if auto_scroll:
@@ -562,18 +631,33 @@ class ThreadDetailView(QWidget):
         return bubble
 
     def add_user_message(self, blocks: list[dict[str, Any]], *, auto_scroll: bool = True) -> None:
-        if self._has_user_message():
-            self.add_turn_divider(auto_scroll=False)
         self.add_message("You", blocks, auto_scroll=auto_scroll)
 
-    def add_turn_divider(self, *, auto_scroll: bool = True) -> None:
-        divider = TurnDivider(parent=self)
-        self._message_layout.insertWidget(self._message_insert_index(), divider)
+    def add_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> QWidget:
+        if event.kind is ChatbotEventKind.TOOL:
+            return self.add_tool_event(event, auto_scroll=auto_scroll)
+        return self.add_message(
+            self._event_author_label(event.author),
+            event.content_blocks,
+            message_id=event.source_message_ids[0] if event.source_message_ids else None,
+            event_id=event.id,
+            auto_scroll=auto_scroll,
+        )
+
+    def add_tool_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> ToolCallItem:
+        item = ToolCallItem(event, parent=self)
+        item.link_activated.connect(self.artifact_link_activated.emit)
+        item.set_available_width(self._message_column.width())
+        self._message_layout.insertWidget(self._message_insert_index(), item)
+        self._event_widgets_by_id[event.id] = item
         if auto_scroll:
             self._scroll_to_latest()
+        return item
 
     def apply_message_event(self, message, *, auto_scroll: bool = True) -> None:
         if message.kind is AgentMessageKind.SYSTEM:
+            return
+        if message.kind in {AgentMessageKind.TOOL_CALL, AgentMessageKind.TOOL_CALL_RESULT}:
             return
         self.hide_thinking_indicator()
         existing = self._message_bubbles_by_id.get(message.id)
@@ -582,14 +666,25 @@ class ThreadDetailView(QWidget):
             if auto_scroll:
                 self._scroll_to_latest()
             return
-        if message.kind is AgentMessageKind.USER and self._has_user_message():
-            self.add_turn_divider(auto_scroll=False)
         self.add_message(
             self._author_label(message.ui_author),
             message.content_blocks,
             message_id=message.id,
             auto_scroll=auto_scroll,
         )
+
+    def apply_chatbot_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> None:
+        self.hide_thinking_indicator()
+        existing = self._event_widgets_by_id.get(event.id)
+        if existing is not None:
+            if isinstance(existing, ToolCallItem):
+                existing.set_event(event)
+            elif isinstance(existing, ChatMessageBubble):
+                existing.set_blocks(event.content_blocks)
+            if auto_scroll:
+                self._scroll_to_latest()
+            return
+        self.add_event(event, auto_scroll=auto_scroll)
 
     def show_thinking_indicator(self) -> None:
         if self._thinking_bubble is not None:
@@ -836,21 +931,19 @@ class ThreadDetailView(QWidget):
             return "System"
         return "Xenix"
 
-    def _has_user_message(self) -> bool:
-        for index in range(self._message_layout.count()):
-            item = self._message_layout.itemAt(index)
-            widget = item.widget() if item is not None else None
-            card = getattr(widget, "_card", None)
-            if card is not None and card.objectName() == "chatMessageUser":
-                return True
-        return False
+    def _event_author_label(self, author: ChatbotEventAuthor) -> str:
+        if author is ChatbotEventAuthor.USER:
+            return "You"
+        if author is ChatbotEventAuthor.TOOL:
+            return "Tool"
+        return "Xenix"
 
     def _resize_user_messages(self) -> None:
         width = self._message_column.width()
         for index in range(self._message_layout.count()):
             item = self._message_layout.itemAt(index)
             widget = item.widget()
-            if isinstance(widget, ChatMessageBubble):
+            if isinstance(widget, (ChatMessageBubble, ToolCallItem)):
                 widget.set_available_width(width)
 
     def _scroll_to_latest(self, *, settle_ticks: int = 4) -> None:

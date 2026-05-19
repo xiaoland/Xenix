@@ -14,6 +14,7 @@ dependencies = [
     "joblib>=1.5.0",
     "scikit-learn>=1.7.0",
     "duckdb>=1.5.2",
+    "qtawesome>=1.4.2",
 ]
 
 [dependency-groups]

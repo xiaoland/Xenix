@@ -183,6 +183,18 @@ def test_agent_harness_model_metadata_exposes_catalog_without_train_enums(monkey
         registry.execute("model.metadata", {"model_keys": ["xgboost"]}, _tool_context())
 
 
+def test_agent_tool_registry_owns_tool_presentation(monkeypatch, tmp_path: Path) -> None:
+    _context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
+
+    data_presentation = registry.tool_presentation("data.peek")
+    unknown_presentation = registry.tool_presentation("unknown.tool")
+
+    assert data_presentation.icon_key == "table"
+    assert data_presentation.pending_summary == "Inspecting dataset..."
+    assert data_presentation.summary_for("failed") == "Failed to inspect dataset"
+    assert unknown_presentation.icon_key == "tool"
+
+
 def test_agent_harness_hyper_train_validates_tuning_capability_before_execution(monkeypatch, tmp_path: Path) -> None:
     _context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
 
