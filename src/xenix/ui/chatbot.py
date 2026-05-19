@@ -29,7 +29,7 @@ from ..services.agent import (
     project_chatbot_events,
 )
 from ..services.storage.models import AgentMessageAuthor, AgentMessageKind
-from .icons import chevron_icon, tool_icon
+from .icons import attach_file_icon, chevron_icon, tool_icon
 
 USER_MESSAGE_BACKGROUND = QColor("#000000")
 USER_MESSAGE_FOREGROUND = QColor("#ffffff")
@@ -461,16 +461,12 @@ class ThreadDetailView(QWidget):
         self._attachment_layout.setSpacing(6)
         self._attachment_layout.addStretch(1)
 
-        self._attach_button = QPushButton("+")
-        self._attach_button.setObjectName("attachButton")
-        self._attach_button.setFixedSize(34, 34)
-        self._attach_button.setToolTip("Attach files")
+        self._attach_button = QPushButton()
+        self._configure_attach_button(self._attach_button)
         self._attach_button.clicked.connect(self._choose_files)
 
-        self._expanded_attach_button = QPushButton("+")
-        self._expanded_attach_button.setObjectName("attachButton")
-        self._expanded_attach_button.setFixedSize(34, 34)
-        self._expanded_attach_button.setToolTip("Attach files")
+        self._expanded_attach_button = QPushButton()
+        self._configure_attach_button(self._expanded_attach_button)
         self._expanded_attach_button.clicked.connect(self._choose_files)
 
         self._editor = AutoGrowingTextEdit(max_lines=6)
@@ -809,6 +805,13 @@ class ThreadDetailView(QWidget):
         )
         self._add_local_files(paths)
 
+    def _configure_attach_button(self, button: QPushButton) -> None:
+        button.setObjectName("attachButton")
+        button.setFixedSize(34, 34)
+        button.setIcon(attach_file_icon())
+        button.setIconSize(QSize(16, 16))
+        button.setToolTip("Attach files")
+
     def _add_local_files(self, paths: list[str]) -> None:
         for raw_path in paths:
             path = str(Path(raw_path).resolve())
@@ -963,6 +966,3 @@ class ThreadDetailView(QWidget):
             return isValid(self) and isValid(self._scroll)
         except RuntimeError:
             return False
-
-
-ChatBox = ThreadDetailView

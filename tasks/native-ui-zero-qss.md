@@ -9,7 +9,7 @@ Hypothesis: the current visual split comes from local QSS-heavy surfaces mixed w
 ## Guardrails Touched
 
 - `src/xenix/ui/`: Qt Widgets presentation only.
-- ChatBox-first shell remains the active operator path.
+- Chatbot-first shell remains the active operator path.
 - UI stays service-driven; no storage, ML, or Agent Harness contracts change.
 - User-visible text and i18n behavior remain unchanged unless structure requires a label-only adjustment.
 
@@ -30,7 +30,7 @@ Hypothesis: the current visual split comes from local QSS-heavy surfaces mixed w
 - Smoke test passed: `pdm run smoke`.
 - Message text transparency follow-up:
   - Runtime Qt inspection confirmed `QTextBrowser.viewport()` was the white background owner because it filled the `Base` palette role.
-  - Updated ChatBox message text browser and viewport to transparent native widgets with no stylesheet.
+  - Updated Chatbot message text browser and viewport to transparent native widgets with no stylesheet.
   - Added regression coverage in `tests/test_main.py`.
   - `pdm run pytest tests/test_main.py -q` -> 21 passed.
   - Runtime reinspection confirmed browser/viewport `autoFillBackground=False` and viewport translucent/no-system-background attributes.

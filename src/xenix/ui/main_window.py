@@ -31,7 +31,7 @@ from ..services.agent import (
     ThreadSnapshot,
 )
 from ..services.artifact_service import ArtifactService
-from .chat_box import ThreadDetailView
+from .chatbot import ThreadDetailView
 from .layout_debug import dump_layout_if_enabled
 from .native_widgets import emphasize_label
 from .settings_dialog import SettingsDialog
@@ -84,12 +84,11 @@ class MainWindow(QMainWindow):
         self._refreshing_history = False
 
         self._thread_detail_view = ThreadDetailView(parent=self)
-        self._chat_box = self._thread_detail_view
-        self._chat_box.message_submitted.connect(self._submit_chat_message)
-        self._chat_box.artifact_link_activated.connect(self._open_artifact_link)
-        self._chat_box.stop_requested.connect(self._request_harness_stop)
-        self._chat_box.step_budget_continue_requested.connect(self._continue_step_budget)
-        self._chat_box.step_budget_stop_requested.connect(self._stop_step_budget)
+        self._thread_detail_view.message_submitted.connect(self._submit_chat_message)
+        self._thread_detail_view.artifact_link_activated.connect(self._open_artifact_link)
+        self._thread_detail_view.stop_requested.connect(self._request_harness_stop)
+        self._thread_detail_view.step_budget_continue_requested.connect(self._continue_step_budget)
+        self._thread_detail_view.step_budget_stop_requested.connect(self._stop_step_budget)
         self._harness_failed.connect(self._render_harness_error)
         self._harness_stream_event.connect(self._render_harness_stream_event)
 
@@ -138,7 +137,7 @@ class MainWindow(QMainWindow):
         content_layout.setContentsMargins(0, 0, 0, 0)
         content_layout.setSpacing(14)
         content_layout.addWidget(self._history_sidebar)
-        content_layout.addWidget(self._chat_box, 1)
+        content_layout.addWidget(self._thread_detail_view, 1)
         layout.addLayout(content_layout, 1)
 
         self.setCentralWidget(root)
@@ -180,14 +179,14 @@ class MainWindow(QMainWindow):
 
     def _submit_chat_message(self, text: str, file_paths: list[str]) -> None:
         self._pending_step_confirmation = None
-        self._chat_box.clear_step_confirmation()
+        self._thread_detail_view.clear_step_confirmation()
         user_blocks = []
         if text:
             user_blocks.append({"type": "text", "text": text})
         for file_path in file_paths:
             user_blocks.append({"type": "file", "path": file_path})
-        self._chat_box.add_user_message(user_blocks)
-        self._chat_box.set_running(True)
+        self._thread_detail_view.add_user_message(user_blocks)
+        self._thread_detail_view.set_running(True)
 
         def run_harness() -> None:
             try:
@@ -208,10 +207,10 @@ class MainWindow(QMainWindow):
         self._agent_thread_id = snapshot.thread.id
         self._active_agent_run_id = None
         self._pending_step_confirmation = None
-        self._chat_box.hide_thinking_indicator()
-        self._chat_box.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
-        self._chat_box.clear_step_confirmation()
-        self._chat_box.set_running(False)
+        self._thread_detail_view.hide_thinking_indicator()
+        self._thread_detail_view.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
+        self._thread_detail_view.clear_step_confirmation()
+        self._thread_detail_view.set_running(False)
         self._refresh_history_sidebar(selected_thread_id=snapshot.thread.id)
 
     def _render_harness_stream_event(self, event) -> None:
@@ -225,7 +224,7 @@ class MainWindow(QMainWindow):
                 return
             self._agent_thread_id = event.snapshot.thread.id
             self._active_agent_run_id = event.run_id
-            self._chat_box.render_events(
+            self._thread_detail_view.render_events(
                 event.chatbot_events
                 if event.chatbot_events is not None
                 else self._agent_harness_service.project_chatbot_events(event.snapshot)
@@ -236,54 +235,54 @@ class MainWindow(QMainWindow):
             self._render_step_confirmation(event)
             return
         if event.kind in {"message_created", "message_updated", "message_finalized"}:
-            self._chat_box.hide_thinking_indicator()
+            self._thread_detail_view.hide_thinking_indicator()
             if event.chatbot_event is not None:
-                self._chat_box.apply_chatbot_event(event.chatbot_event)
+                self._thread_detail_view.apply_chatbot_event(event.chatbot_event)
             elif event.message is not None:
-                self._chat_box.apply_message_event(event.message)
+                self._thread_detail_view.apply_message_event(event.message)
             return
 
     def _render_harness_error(self, message: str) -> None:
         self._pending_step_confirmation = None
-        self._chat_box.clear_step_confirmation()
-        self._chat_box.hide_thinking_indicator()
-        self._chat_box.show_error(message)
-        self._chat_box.set_running(False)
+        self._thread_detail_view.clear_step_confirmation()
+        self._thread_detail_view.hide_thinking_indicator()
+        self._thread_detail_view.show_error(message)
+        self._thread_detail_view.set_running(False)
 
     def _open_artifact_link(self, uri: str) -> None:
         url = QUrl(uri)
         if url.scheme() != "artifact":
             opened = QDesktopServices.openUrl(url)
             if not opened:
-                self._chat_box.show_error(self.tr("Could not open link: {uri}").format(uri=uri))
+                self._thread_detail_view.show_error(self.tr("Could not open link: {uri}").format(uri=uri))
             return
         try:
             artifact = self._artifact_service.resolve_uri(uri)
         except Exception as exc:
-            self._chat_box.show_error(str(exc))
+            self._thread_detail_view.show_error(str(exc))
             return
         if not artifact.ready_to_open:
-            self._chat_box.show_error(self.tr("Artifact is not ready to open."))
+            self._thread_detail_view.show_error(self.tr("Artifact is not ready to open."))
             return
         if not artifact.exists:
-            self._chat_box.show_error(self.tr("Artifact file is missing: {path}").format(path=artifact.absolute_path))
+            self._thread_detail_view.show_error(self.tr("Artifact file is missing: {path}").format(path=artifact.absolute_path))
             return
         opened = QDesktopServices.openUrl(QUrl.fromLocalFile(artifact.absolute_path))
         if not opened:
-            self._chat_box.show_error(self.tr("Could not open artifact: {path}").format(path=artifact.absolute_path))
+            self._thread_detail_view.show_error(self.tr("Could not open artifact: {path}").format(path=artifact.absolute_path))
 
     def _request_harness_stop(self) -> None:
         if self._active_agent_run_id is not None:
             self._agent_harness_service.cancel_run(self._active_agent_run_id)
             self._cancelled_agent_run_ids.add(self._active_agent_run_id)
-        self._chat_box.hide_thinking_indicator()
-        self._chat_box.set_running(False)
-        self._chat_box.show_error("Stopped.")
+        self._thread_detail_view.hide_thinking_indicator()
+        self._thread_detail_view.set_running(False)
+        self._thread_detail_view.show_error("Stopped.")
 
     def _render_step_confirmation(self, event: AgentHarnessStreamEvent) -> None:
         if event.snapshot is not None:
             self._agent_thread_id = event.snapshot.thread.id
-            self._chat_box.render_events(
+            self._thread_detail_view.render_events(
                 event.chatbot_events
                 if event.chatbot_events is not None
                 else self._agent_harness_service.project_chatbot_events(event.snapshot)
@@ -294,8 +293,8 @@ class MainWindow(QMainWindow):
             self._refresh_history_sidebar(selected_thread_id=event.thread_id)
         self._pending_step_confirmation = event
         self._active_agent_run_id = None
-        self._chat_box.set_running(False)
-        self._chat_box.show_step_confirmation(
+        self._thread_detail_view.set_running(False)
+        self._thread_detail_view.show_step_confirmation(
             self.tr("Step budget used: {used}/{max}. Continue with up to {steps} more steps?").format(
                 used=str(event.used_steps),
                 max=str(event.max_total_steps),
@@ -312,8 +311,8 @@ class MainWindow(QMainWindow):
         self._pending_step_confirmation = None
         self._active_agent_run_id = pending.run_id
         self._cancelled_agent_run_ids.discard(pending.run_id)
-        self._chat_box.clear_step_confirmation()
-        self._chat_box.set_running(True)
+        self._thread_detail_view.clear_step_confirmation()
+        self._thread_detail_view.set_running(True)
 
         def run_harness() -> None:
             try:
@@ -339,7 +338,7 @@ class MainWindow(QMainWindow):
             return
         self._pending_step_confirmation = None
         self._active_agent_run_id = None
-        self._chat_box.clear_step_confirmation()
+        self._thread_detail_view.clear_step_confirmation()
         try:
             snapshot = self._agent_harness_service.stop_step_budget_confirmation(
                 ContinueStepBudgetInput(
@@ -360,10 +359,10 @@ class MainWindow(QMainWindow):
     def _create_agent_thread(self) -> None:
         self._pending_step_confirmation = None
         self._active_agent_run_id = None
-        self._chat_box.clear_step_confirmation()
+        self._thread_detail_view.clear_step_confirmation()
         snapshot = self._agent_harness_service.create_thread()
         self._agent_thread_id = snapshot.thread.id
-        self._chat_box.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
+        self._thread_detail_view.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
         self._refresh_history_sidebar(selected_thread_id=snapshot.thread.id)
 
     def _refresh_history_sidebar(self, *, selected_thread_id: str | None = None) -> None:
@@ -396,8 +395,8 @@ class MainWindow(QMainWindow):
         if self._pending_step_confirmation is not None and self._pending_step_confirmation.thread_id != thread_id:
             self._pending_step_confirmation = None
             self._active_agent_run_id = None
-            self._chat_box.clear_step_confirmation()
-        self._chat_box.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
+            self._thread_detail_view.clear_step_confirmation()
+        self._thread_detail_view.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
 
     def _open_history_item_menu(self, position: QPoint) -> None:
         item = self._history_list.itemAt(position)
@@ -436,7 +435,7 @@ class MainWindow(QMainWindow):
         if thread_id is None:
             return
 
-        if self._chat_box._running and self._agent_thread_id == thread_id:
+        if self._thread_detail_view._running and self._agent_thread_id == thread_id:
             QMessageBox.information(
                 self,
                 self.tr("Delete Thread"),
@@ -461,8 +460,8 @@ class MainWindow(QMainWindow):
             self._agent_thread_id = None
             self._pending_step_confirmation = None
             self._active_agent_run_id = None
-            self._chat_box.clear_step_confirmation()
-            self._chat_box.clear_messages()
+            self._thread_detail_view.clear_step_confirmation()
+            self._thread_detail_view.clear_messages()
 
         self._refresh_history_sidebar(selected_thread_id=None if deleting_current else self._agent_thread_id)
         if deleting_current:

@@ -80,7 +80,7 @@ Canonical Messages + Tool Definitions
 
 ## Thread System Prompt
 
-Each `Thread` owns a thread-level system prompt as metadata. It is not a durable `Message`, does not belong to a turn, and is not rendered by ChatBox.
+Each `Thread` owns a thread-level system prompt as metadata. It is not a durable `Message`, does not belong to a turn, and is not rendered by Chatbot.
 
 When Agent Harness constructs provider messages, it prepends the thread system prompt as the first role message before durable thread messages.
 
@@ -198,7 +198,7 @@ The thread system prompt exposes identity and durable instructions. Tool descrip
 
 Contextual constraints still belong in validation:
 
-- Data tools require file references from the ChatBox or resolvable prior tool results/artifact references in Agent Harness records.
+- Data tools require file references from the Chatbot or resolvable prior tool results/artifact references in Agent Harness records.
 - Model tools require explicit dataset, feature columns, and target columns, or resolvable prior tool results/artifact references in Agent Harness records.
 - `model_metadata` exposes canonical model keys, model capabilities, and optional parameter/grid schemas for train and hyper-train planning.
 - `model_inference` requires a trained model and input data.

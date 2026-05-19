@@ -73,7 +73,7 @@ ToolCallResult
 
 ## Cancellation
 
-First-slice user control is cancellation. While provider inference or a tool call is running, the ChatBox send button becomes a stop button.
+First-slice user control is cancellation. While provider inference or a tool call is running, the Chatbot send button becomes a stop button.
 
 Candidate side-effect labels help tests and logs:
 
@@ -115,7 +115,7 @@ Provider-facing tool names should use snake_case. Namespaced labels such as `dat
 
 ## Output Presentation
 
-Tools can return markdown with artifact links. ChatBox previews linked images, tables, CSV/XLSX outputs, reports, and charts.
+Tools can return markdown with artifact links. Chatbot previews linked images, tables, CSV/XLSX outputs, reports, and charts.
 
 ## Open Questions
 

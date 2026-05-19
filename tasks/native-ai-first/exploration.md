@@ -3,21 +3,21 @@
 ## Objective & Hypothesis
 
 - Objective: Redesign Xenix Native toward an AI-first interaction model while preserving the Qt Native application direction.
-- Hypothesis: The product can replace existing functional screens with a ChatBox-based interface whose atomic UI element is `Message`; Xenix services become callable tools exposed through an Agent Harness so the LLM can invoke data loading, model training, prediction, and analysis workflows through function calling.
+- Hypothesis: The product can replace existing functional screens with a Chatbot-based interface whose atomic UI element is `Message`; Xenix services become callable tools exposed through an Agent Harness so the LLM can invoke data loading, model training, prediction, and analysis workflows through function calling.
 
 ## Prompt
 
 - User request on 2026-05-11: create branch `native-ai-first` from the current branch and establish a long-running task packet for the shift to an AI First Qt Native product.
 - The named product direction keeps native Qt implementation.
-- The interaction model changes fundamentally: the main interface becomes a ChatBox, and application workflows unfold through LLM dialogue plus file drag-and-drop.
-- Existing functional screens are replaced by the ChatBox-based interface.
+- The interaction model changes fundamentally: the main interface becomes a Chatbot, and application workflows unfold through LLM dialogue plus file drag-and-drop.
+- Existing functional screens are replaced by the Chatbot-based interface.
 - A new functional area, Agent Harness, is introduced and requires design before implementation.
 - User clarification on 2026-05-11:
-  - ChatBox is the product surface, with `Message` as the atomic composition unit.
+  - Chatbot is the product surface, with `Message` as the atomic composition unit.
   - Command-center behavior means Xenix services are exposed as tools to the LLM through Harness Agent function calling.
   - Harness contracts should be exercised with independent integration tests around real services.
   - End-to-end AI behavior should use CopilotKit AIMock after feasibility is verified against official docs and current stack constraints.
-  - Minimum acceptance: a user can complete basic data analysis inside ChatBox through pure conversation and file drag-and-drop.
+  - Minimum acceptance: a user can complete basic data analysis inside Chatbot through pure conversation and file drag-and-drop.
 - User clarification on Message and harness topology on 2026-05-11:
   - LLM function calling and Xenix service tools are part of Agent Harness.
   - Basic data analysis includes the full path from data intake to prediction.
@@ -70,7 +70,7 @@
   - The previous tool registry was too complex.
   - First slice should not support LLM-authored custom training or prediction scripts.
   - LLM tools should start with `data.peek`, `data.integrate`, `data.clean`, `data.transform`, `data.feature.select`, `model.train`, `model.hyper_train`, and `model.inference`.
-  - Charts, tables, images, and prediction results should be returned as markdown artifact links, and ChatBox should auto-preview them.
+  - Charts, tables, images, and prediction results should be returned as markdown artifact links, and Chatbot should auto-preview them.
   - Generic script runtime is deferred.
 - User clarification on first-slice scope and service direction on 2026-05-12:
   - First slice excludes `data_transform`.
@@ -107,7 +107,7 @@
 ## Guardrails Touched
 
 - Native Qt Widgets application remains the implementation target.
-- Existing ML workbench behavior and business vocabulary should survive through the ChatBox and tool-call model unless later product alignment explicitly changes them.
+- Existing ML workbench behavior and business vocabulary should survive through the Chatbot and tool-call model unless later product alignment explicitly changes them.
 - Non-technical user friendliness remains a product invariant.
 - Agent-driven actions need explicit boundaries, recoverability, and evidence of side effects.
 - Durable docs and code stay unchanged during the initial exploration until scope, ownership, and invariants are restated.
@@ -121,7 +121,7 @@
 - Existing repository structure separates UI, services, ML adapters, and storage.
 - The current task starts from a native Qt product.
 - The target UI removes current functional screens from the primary interaction model.
-- The first acceptance target is basic data analysis through ChatBox conversation and file drag-and-drop.
+- The first acceptance target is basic data analysis through Chatbot conversation and file drag-and-drop.
 - CopilotKit AIMock official materials describe deterministic mock infrastructure for AI apps, with support areas including LLM calls, MCP, vector stores, and agent-to-UI event streams. Source checked: https://aimock.copilotkit.dev/ and https://www.copilotkit.ai/blog/aimock-one-tool-to-mock-your-entire-ai-stack.
 - Initial code topology draft exists at `tasks/native-ai-first/code-topology.md`.
 - Provider message contract research exists at `tasks/native-ai-first/provider-message-contract-research.md`.
@@ -142,7 +142,7 @@
 
 ## Unknowns
 
-- What exact data-to-prediction jobs the ChatBox must support in the first useful slice.
+- What exact data-to-prediction jobs the Chatbot must support in the first useful slice.
 - What `content_blocks` are required inside one persisted `Message`: text, file attachment, tool call, tool result, cancellation, analysis summary, chart/table artifact, error recovery.
 - Exact canonical function-calling request/event/result contract.
 - Which LLM provider modes are acceptable beyond OpenAI-compatible `/v1/chat/completions`, DeepSeek API, and AIMock.
@@ -153,7 +153,7 @@
 - Exact `Turn` schema and empty-tool-call ending behavior.
 - Exact `ModelingPlanner` input/output contract.
 - Exact minimal data/model tool schemas.
-- Markdown artifact link contract for ChatBox preview rendering.
+- Markdown artifact link contract for Chatbot preview rendering.
 - What privacy, security, and cost constraints govern LLM use.
 - How CopilotKit AIMock fits the Python/PySide6 native application at the LLM provider boundary.
 
@@ -170,7 +170,7 @@
 
 ## Candidate Paths
 
-1. ChatBox replacement path: build the native ChatBox surface around persisted `Message` as the atomic unit and migrate workflow output into message-rendered artifacts.
+1. Chatbot replacement path: build the native Chatbot surface around persisted `Message` as the atomic unit and migrate workflow output into message-rendered artifacts.
 2. Agent Harness path: own LLM provider dialects, HarnessCore, Turn progression, minimal static tool registry, Xenix data/model tools, cancellation boundary, run recorder, and structured tool results.
 3. Message contract path: derive the canonical Xenix Message from OpenAI, Anthropic, and Google provider contracts, then project it into UI view models.
 4. Service integration path: add independent integration tests for service tools before wiring them into the LLM-facing harness.
@@ -182,7 +182,7 @@
 - Task packet exists at `tasks/native-ai-first/exploration.md`.
 - Product docs, source code, storage schema, and service contracts remain untouched during this initial setup.
 - Next design pass should identify owner, blast radius, invariants, and smallest implementable slice before edits.
-- Minimum acceptance proof should demonstrate a user completing data-to-prediction analysis inside ChatBox with conversation plus file drag-and-drop.
+- Minimum acceptance proof should demonstrate a user completing data-to-prediction analysis inside Chatbot with conversation plus file drag-and-drop.
 - Harness proof should include service integration tests for data loading, model training or analysis, and prediction or output generation once first-slice scope is finalized.
 - E2E proof should include deterministic LLM/tool behavior through CopilotKit AIMock or a verified equivalent boundary.
 

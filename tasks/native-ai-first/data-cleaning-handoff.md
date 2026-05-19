@@ -4,12 +4,12 @@
 
 This file hands off the Native AI First branch to the next thread focused on data cleaning.
 
-The current branch state is ChatBox-first. The app starts into a History sidebar plus `ThreadDetailView`; user interaction flows through `AgentHarnessService`, persisted threads/turns/messages, static tool specs, and service-owned artifacts.
+The current branch state is Chatbot-first. The app starts into a History sidebar plus `Chatbot`; user interaction flows through `AgentHarnessService`, persisted threads/turns/messages, static tool specs, and service-owned artifacts.
 
 ## Current Architecture State
 
 - Runtime composition starts in `src/xenix/app.py`.
-- `MainWindow` in `src/xenix/ui/main_window.py` owns only the ChatBox shell, Settings entry, History sidebar, Agent Harness events, and `artifact://` link opening.
+- `MainWindow` in `src/xenix/ui/main_window.py` owns only the Chatbot shell, Settings entry, History sidebar, Agent Harness events, and `artifact://` link opening.
 - Agent Harness lives under `src/xenix/services/agent/`.
 - Tool definitions and handlers live in `src/xenix/services/agent/tools.py`.
 - Dataset registration/inspection/export remains in `src/xenix/services/dataset_service.py` and `src/xenix/services/dataset_inspection.py`.

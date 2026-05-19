@@ -105,7 +105,7 @@ AIMock API key = test
 Repository setup:
 
 - `aimock.json`: npx AIMock configuration.
-- `fixtures/aimock/10-xenix-streaming.json`: preset Xenix ChatBox streaming, tool-round, and rich Markdown preview fixtures.
+- `fixtures/aimock/10-xenix-streaming.json`: preset Xenix Chatbot streaming, tool-round, and rich Markdown preview fixtures.
 - `fixtures/data/aimock-sales-demand.csv`: drag-and-drop sample training dataset.
 - `fixtures/data/aimock-sales-future.csv`: drag-and-drop sample future rows.
 - `.vscode/tasks.json`: `AIMock: serve fixtures` task.

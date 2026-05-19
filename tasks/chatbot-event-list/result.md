@@ -15,7 +15,7 @@
 - `src/xenix/services/agent/harness_service.py`: emits projected Chatbot Events on snapshots and visible message events.
 - `src/xenix/services/agent/conversation_store.py`: projects `tool_event_summary` text into provider-facing tool content.
 - `src/xenix/ui/main_window.py`: renders snapshots and stream updates through Chatbot Events.
-- `src/xenix/ui/chat_box.py`: renders EventList items and compact expandable tool events.
+- `src/xenix/ui/chatbot.py`: renders EventList items and compact expandable tool events.
 - `src/xenix/ui/icons.py`: resolves semantic UI icon keys to QtAwesome icons.
 - `tests/test_agent_harness_foundation.py`, `tests/test_agent_harness_streaming.py`, `tests/test_main.py`: added and updated coverage.
 
@@ -33,6 +33,7 @@
   - tool events as `ToolCallItem` rows with icon, summary, chevron, and expandable detail
 - Tool events now occupy the full EventList column width.
 - Tool icons and chevrons use QtAwesome icons rather than text glyphs, Qt filled arrows, or custom painter drawing.
+- Legacy chat-surface naming has been unified to Chatbot/chatbot, while the selected-thread container remains `ThreadDetailView`.
 - Auto-height message text browsers ignore wheel events so message content does not become an internal scroll target.
 - Chatbot UI no longer inserts turn dividers.
 
@@ -58,6 +59,10 @@
   - Result: 89 passed.
 - `git diff --check`
   - Result: passed.
+- `pdm run pytest tests/test_main.py` after Chatbot naming unification
+  - Result: 24 passed.
+- `pdm run pytest` after Chatbot naming unification
+  - Result: 89 passed.
 - Note: pytest completed successfully, then Windows reported a cleanup-time `PermissionError` while removing `pytest-current` under the temp directory. This happened after test completion and did not change the pass result.
 
 ## Remaining Notes

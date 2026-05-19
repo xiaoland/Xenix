@@ -3,11 +3,11 @@
 ## Status
 
 - Mode: Explore.
-- Scope: sample artifact link format for ChatBox preview rendering.
+- Scope: sample artifact link format for Chatbot preview rendering.
 
 ## Goal
 
-Tools return markdown summaries with artifact links. ChatBox detects artifact links and renders previews for images, tables, CSV/XLSX files, reports, model metadata, and metrics.
+Tools return markdown summaries with artifact links. Chatbot detects artifact links and renders previews for images, tables, CSV/XLSX files, reports, model metadata, and metrics.
 
 ## Link Format
 
@@ -39,7 +39,7 @@ Examples:
 
 ## Artifact Lookup
 
-The URI contains only an artifact id and rendering hint. ChatBox asks the artifact resolver for:
+The URI contains only an artifact id and rendering hint. Chatbot asks the artifact resolver for:
 
 ```text
 artifact_id

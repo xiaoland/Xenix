@@ -35,6 +35,10 @@ def chevron_icon(*, expanded: bool, color: QColor | str = DEFAULT_CHEVRON_COLOR)
     return icon(name, color=color)
 
 
+def attach_file_icon(*, color: QColor | str = DEFAULT_ICON_COLOR) -> QIcon:
+    return icon("ph.paperclip", color=color)
+
+
 def _color_value(color: QColor | str) -> str:
     if isinstance(color, QColor):
         return color.name()

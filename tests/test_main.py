@@ -77,14 +77,14 @@ def test_smoke_test_bootstraps_runtime_in_fresh_app_home(monkeypatch, tmp_path: 
     assert (runtime_home / "logs" / "xenix.log").is_file()
 
 
-def test_main_window_keeps_settings_entry_on_chatbox_shell(monkeypatch, tmp_path: Path) -> None:
+def test_main_window_keeps_settings_entry_on_thread_detail_view_shell(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
 
     app, window = build_main_window(show=False)
     try:
-        assert window._chat_box.isVisibleTo(window)
+        assert window._thread_detail_view.isVisibleTo(window)
         assert window._settings_button.text() == "Settings"
 
         window._settings_button.click()
@@ -114,7 +114,7 @@ def test_main_window_seeds_mock_history_and_renders_sidebar_selection(monkeypatc
         assert MESSAGE_RENDERING_FIXTURE_TITLE in titles
         assert window._history_sidebar.isVisibleTo(window)
         assert window._history_list.count() >= 2
-        assert window._chat_box._message_layout.count() > 1
+        assert window._thread_detail_view._message_layout.count() > 1
     finally:
         window.close()
 
@@ -139,8 +139,8 @@ def test_main_window_renders_event_list_without_turn_dividers(monkeypatch, tmp_p
         app.processEvents()
 
         card_names = []
-        for index in range(window._chat_box._message_layout.count()):
-            item = window._chat_box._message_layout.itemAt(index)
+        for index in range(window._thread_detail_view._message_layout.count()):
+            item = window._thread_detail_view._message_layout.itemAt(index)
             bubble = item.widget() if item is not None else None
             card = getattr(bubble, "_card", None)
             if card is not None:
@@ -176,8 +176,8 @@ def test_main_window_renders_tool_calls(monkeypatch, tmp_path: Path) -> None:
 
         tool_items = []
         tool_bubbles = []
-        for index in range(window._chat_box._message_layout.count()):
-            item = window._chat_box._message_layout.itemAt(index)
+        for index in range(window._thread_detail_view._message_layout.count()):
+            item = window._thread_detail_view._message_layout.itemAt(index)
             widget = item.widget() if item is not None else None
             if getattr(widget, "objectName", lambda: "")() == "chatToolCallItem":
                 tool_items.append(widget)
@@ -186,7 +186,7 @@ def test_main_window_renders_tool_calls(monkeypatch, tmp_path: Path) -> None:
 
         assert tool_bubbles == []
         assert tool_items
-        assert all(item.width() == window._chat_box._message_column.width() for item in tool_items)
+        assert all(item.width() == window._thread_detail_view._message_column.width() for item in tool_items)
         summaries = [item._summary_label.text() for item in tool_items]
         assert "Inspected dataset" in summaries
         assert "Trained model" in summaries
@@ -260,7 +260,7 @@ def test_main_window_new_thread_button_creates_and_selects_empty_thread(monkeypa
         assert current_item is not None
         assert current_item.data(Qt.UserRole) == window._agent_thread_id
         assert current_item.text() == "Untitled conversation"
-        assert window._chat_box._message_layout.count() == 1
+        assert window._thread_detail_view._message_layout.count() == 1
     finally:
         window.close()
 
@@ -343,9 +343,9 @@ def test_main_window_step_budget_confirmation_can_continue(monkeypatch, tmp_path
         app.processEvents()
 
         assert window._pending_step_confirmation == event
-        assert window._chat_box._step_confirmation_bar.isVisibleTo(window)
-        assert window._chat_box._editor.isEnabled() is False
-        assert "16/64" in window._chat_box._step_confirmation_label.text()
+        assert window._thread_detail_view._step_confirmation_bar.isVisibleTo(window)
+        assert window._thread_detail_view._editor.isEnabled() is False
+        assert "16/64" in window._thread_detail_view._step_confirmation_label.text()
 
         captured_inputs = []
 
@@ -354,10 +354,10 @@ def test_main_window_step_budget_confirmation_can_continue(monkeypatch, tmp_path
             yield AgentHarnessStreamEvent(kind="snapshot", thread_id=thread_id, snapshot=snapshot, is_final=True)
 
         monkeypatch.setattr(window._agent_harness_service, "continue_step_budget_stream", fake_continue)
-        window._chat_box._step_continue_button.click()
+        window._thread_detail_view._step_continue_button.click()
         for _ in range(40):
             app.processEvents()
-            if captured_inputs and not window._chat_box._running:
+            if captured_inputs and not window._thread_detail_view._running:
                 break
             time.sleep(0.01)
 
@@ -367,7 +367,7 @@ def test_main_window_step_budget_confirmation_can_continue(monkeypatch, tmp_path
         assert captured_inputs[0].run_id == "run-for-confirmation"
         assert captured_inputs[0].additional_steps == 8
         assert window._pending_step_confirmation is None
-        assert window._chat_box._step_confirmation_bar.isHidden() is True
+        assert window._thread_detail_view._step_confirmation_bar.isHidden() is True
     finally:
         window.close()
 
@@ -384,47 +384,51 @@ def test_main_window_stop_cancels_active_agent_run(monkeypatch, tmp_path: Path) 
         monkeypatch.setattr(window._agent_harness_service, "cancel_run", lambda run_id: cancelled_run_ids.append(run_id))
 
         window._active_agent_run_id = "run-to-stop"
-        window._chat_box.set_running(True)
-        window._chat_box.show_thinking_indicator()
-        window._chat_box._send_button.click()
+        window._thread_detail_view.set_running(True)
+        window._thread_detail_view.show_thinking_indicator()
+        window._thread_detail_view._send_button.click()
         app.processEvents()
 
         assert cancelled_run_ids == ["run-to-stop"]
-        assert window._chat_box._running is False
-        assert window._chat_box._thinking_bubble is None
+        assert window._thread_detail_view._running is False
+        assert window._thread_detail_view._thinking_bubble is None
         assert "run-to-stop" in window._cancelled_agent_run_ids
     finally:
         window.close()
 
 
-def test_chatbox_composer_switches_layout_when_text_wraps(monkeypatch, tmp_path: Path) -> None:
+def test_thread_detail_view_composer_switches_layout_when_text_wraps(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
 
     app, window = build_main_window(show=False)
     try:
-        editor = window._chat_box._editor
+        editor = window._thread_detail_view._editor
         compact_height = editor.height()
 
-        assert window._chat_box._attach_button.isHidden() is False
-        assert window._chat_box._send_button.isHidden() is False
-        assert window._chat_box._expanded_attach_button.isHidden() is True
-        assert window._chat_box._expanded_send_button.isHidden() is True
+        assert window._thread_detail_view._attach_button.isHidden() is False
+        assert window._thread_detail_view._send_button.isHidden() is False
+        assert window._thread_detail_view._expanded_attach_button.isHidden() is True
+        assert window._thread_detail_view._expanded_send_button.isHidden() is True
+        assert window._thread_detail_view._attach_button.text() == ""
+        assert not window._thread_detail_view._attach_button.icon().isNull()
 
         editor.setPlainText("line one\nline two")
         app.processEvents()
 
         assert editor.height() > compact_height
-        assert window._chat_box._attach_button.isHidden() is True
-        assert window._chat_box._send_button.isHidden() is True
-        assert window._chat_box._expanded_attach_button.isHidden() is False
-        assert window._chat_box._expanded_send_button.isHidden() is False
+        assert window._thread_detail_view._attach_button.isHidden() is True
+        assert window._thread_detail_view._send_button.isHidden() is True
+        assert window._thread_detail_view._expanded_attach_button.isHidden() is False
+        assert window._thread_detail_view._expanded_send_button.isHidden() is False
+        assert window._thread_detail_view._expanded_attach_button.text() == ""
+        assert not window._thread_detail_view._expanded_attach_button.icon().isNull()
     finally:
         window.close()
 
 
-def test_chatbox_composer_editor_uses_transparent_native_background(monkeypatch, tmp_path: Path) -> None:
+def test_thread_detail_view_composer_editor_uses_transparent_native_background(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
@@ -432,7 +436,7 @@ def test_chatbox_composer_editor_uses_transparent_native_background(monkeypatch,
     app, window = build_main_window(show=True)
     try:
         app.processEvents()
-        editor = window._chat_box._editor
+        editor = window._thread_detail_view._editor
 
         assert not editor.autoFillBackground()
         assert editor.testAttribute(Qt.WA_TranslucentBackground)
@@ -447,14 +451,14 @@ def test_chatbox_composer_editor_uses_transparent_native_background(monkeypatch,
         window.close()
 
 
-def test_chatbox_enter_submits_and_shift_enter_inserts_newline(monkeypatch, tmp_path: Path) -> None:
+def test_thread_detail_view_enter_submits_and_shift_enter_inserts_newline(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
 
     app, window = build_main_window(show=True)
     try:
-        view = window._chat_box
+        view = window._thread_detail_view
         try:
             view.message_submitted.disconnect(window._submit_chat_message)
         except RuntimeError:
@@ -483,14 +487,14 @@ def test_chatbox_enter_submits_and_shift_enter_inserts_newline(monkeypatch, tmp_
         window.close()
 
 
-def test_chatbox_thinking_indicator_is_bottom_temporary_message(monkeypatch, tmp_path: Path) -> None:
+def test_thread_detail_view_thinking_indicator_is_bottom_temporary_message(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
 
     app, window = build_main_window(show=True)
     try:
-        view = window._chat_box
+        view = window._thread_detail_view
         view.clear_messages()
         view.add_message("You", [{"type": "text", "text": "Analyze this."}])
         view.show_thinking_indicator()
@@ -520,7 +524,7 @@ def test_chatbox_thinking_indicator_is_bottom_temporary_message(monkeypatch, tmp
         window.close()
 
 
-def test_chatbox_composer_file_drag_hover_attaches_files(monkeypatch, tmp_path: Path) -> None:
+def test_thread_detail_view_composer_file_drag_hover_attaches_files(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     data_file = tmp_path / "customers.csv"
     data_file.write_text("name,value\nAcme,12\n", encoding="utf-8")
@@ -529,7 +533,7 @@ def test_chatbox_composer_file_drag_hover_attaches_files(monkeypatch, tmp_path: 
 
     app, window = build_main_window(show=True)
     try:
-        view = window._chat_box
+        view = window._thread_detail_view
         for _ in range(8):
             app.processEvents()
 
@@ -572,14 +576,14 @@ def test_chatbox_composer_file_drag_hover_attaches_files(monkeypatch, tmp_path: 
         window.close()
 
 
-def test_chatbox_compact_editor_text_is_centered_with_buttons(monkeypatch, tmp_path: Path) -> None:
+def test_thread_detail_view_compact_editor_text_is_centered_with_buttons(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
 
     app, window = build_main_window(show=True)
     try:
-        editor = window._chat_box._editor
+        editor = window._thread_detail_view._editor
         editor.setPlainText("Message Xenix")
         for _ in range(8):
             app.processEvents()
@@ -589,8 +593,8 @@ def test_chatbox_compact_editor_text_is_centered_with_buttons(monkeypatch, tmp_p
             + editor.viewport().geometry().y()
             + editor.cursorRect().center().y()
         )
-        attach_center_y = window._chat_box._attach_button.geometry().center().y()
-        send_center_y = window._chat_box._send_button.geometry().center().y()
+        attach_center_y = window._thread_detail_view._attach_button.geometry().center().y()
+        send_center_y = window._thread_detail_view._send_button.geometry().center().y()
 
         assert abs(cursor_center_y - attach_center_y) <= 1
         assert abs(cursor_center_y - send_center_y) <= 1
@@ -789,7 +793,7 @@ def test_thread_detail_view_updates_one_assistant_message_by_id(monkeypatch, tmp
         window.close()
 
 
-def test_chatbox_artifact_link_resolves_and_opens_file(monkeypatch, tmp_path: Path) -> None:
+def test_thread_detail_view_artifact_link_resolves_and_opens_file(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     artifact_path = tmp_path / "predictions.csv"
     artifact_path.write_text("prediction\n42\n", encoding="utf-8")
@@ -820,13 +824,13 @@ def test_chatbox_artifact_link_resolves_and_opens_file(monkeypatch, tmp_path: Pa
         )
         uri = f"artifact://{artifact.id}?view=preview"
 
-        window._chat_box.add_message(
+        window._thread_detail_view.add_message(
             "Xenix",
             [{"type": "markdown", "text": f"Prediction results are ready: [Prediction results]({uri})"}],
         )
         app.processEvents()
 
-        bubble = window._chat_box._message_layout.itemAt(window._chat_box._message_layout.count() - 2).widget()
+        bubble = window._thread_detail_view._message_layout.itemAt(window._thread_detail_view._message_layout.count() - 2).widget()
         assert bubble._browser.openLinks() is False
 
         bubble.link_activated.emit(uri)
@@ -886,18 +890,18 @@ def test_main_window_uses_aimock_settings_in_development(monkeypatch, tmp_path: 
         window._submit_chat_message("Use AIMock.", [])
         for _ in range(100):
             app.processEvents()
-            if not window._chat_box._running:
+            if not window._thread_detail_view._running:
                 break
             time.sleep(0.01)
 
-        assert window._chat_box._running is False
+        assert window._thread_detail_view._running is False
         assert captured_urls == ["http://aimock.local/v1/chat/completions"]
         assert captured_payload["stream"] is True
         assert captured_payload["model"] == "mock-model"
         assistant_texts = [
             str(block.get("text", ""))
-            for index in range(window._chat_box._message_layout.count())
-            if (item := window._chat_box._message_layout.itemAt(index)) is not None
+            for index in range(window._thread_detail_view._message_layout.count())
+            if (item := window._thread_detail_view._message_layout.itemAt(index)) is not None
             and (bubble := item.widget()) is not None
             and getattr(getattr(bubble, "_card", None), "objectName", lambda: "")() == "chatMessageAssistant"
             for block in getattr(bubble, "_blocks", [])

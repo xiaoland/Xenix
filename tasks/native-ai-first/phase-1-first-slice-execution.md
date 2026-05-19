@@ -2,12 +2,12 @@
 
 ## Objective & Hypothesis
 
-Implement the first executable ChatBox-first slice behind the Native AI First design:
+Implement the first executable Chatbot-first slice behind the Native AI First design:
 
 - Persist Agent Harness threads, turns, messages, tool calls, run records, and artifact records.
 - Refactor ML service inputs so the Agent Harness can train, evaluate, and infer from explicit dataset/feature/target/model inputs.
 - Provide a static tool registry for the first-slice tools: `data.peek`, `data.integrate`, `data.clean`, `data.feature.select`, `model.metadata`, `model.train`, `model.hyper_train`, and `model.inference`.
-- Replace the default Qt center surface with a ChatBox shell and route submitted messages into Agent Harness.
+- Replace the default Qt center surface with a Chatbot shell and route submitted messages into Agent Harness.
 
 The hypothesis is that a first-slice user journey can be proven without WorkItem as the primary workspace by deriving working context from messages, tool results, and artifacts.
 
@@ -22,11 +22,11 @@ The hypothesis is that a first-slice user journey can be proven without WorkItem
 - `src/xenix/services/agent/`: provider requests now use a ThreadSnapshot projection that prepends the thread system prompt as the first provider message.
 - `src/xenix/services/agent/`: a turn now ends when the provider response has no tool calls; empty assistant text with no tool calls is a valid turn end.
 - `src/xenix/services/agent/tools.py`: `model.metadata` exposes the static ML catalog and optional parameter/grid schemas; `model.train` and `model.hyper_train` normalize common model aliases to canonical ML registry keys before execution.
-- `src/xenix/ui/`: ChatBox is now the default main surface; legacy widgets remain instanced for compatibility while target flow moves to ChatBox.
-- `src/xenix/ui/`: ChatBox owns the step-budget confirmation control surfaced from Agent Harness stream events.
-- `src/xenix/ui/`: ChatBox renders provider-wait `Thinking...`, tool-call messages, and turn-boundary dividers before user messages.
-- `src/xenix/ui/`: ChatBox message links are intercepted at the message bubble boundary; `artifact://...` links resolve through `ArtifactService` before the UI opens the file path.
-- `src/xenix/app.py` and `src/xenix/ui/main_window.py`: runtime composition now starts directly into the ChatBox-first shell with Settings, History sidebar, Agent Harness, and Artifact resolver only.
+- `src/xenix/ui/`: Chatbot is now the default main surface; legacy widgets remain instanced for compatibility while target flow moves to Chatbot.
+- `src/xenix/ui/`: Chatbot owns the step-budget confirmation control surfaced from Agent Harness stream events.
+- `src/xenix/ui/`: Chatbot renders provider-wait `Thinking...`, tool-call messages, and turn-boundary dividers before user messages.
+- `src/xenix/ui/`: Chatbot message links are intercepted at the message bubble boundary; `artifact://...` links resolve through `ArtifactService` before the UI opens the file path.
+- `src/xenix/app.py` and `src/xenix/ui/main_window.py`: runtime composition now starts directly into the Chatbot-first shell with Settings, History sidebar, Agent Harness, and Artifact resolver only.
 - `src/xenix/services/ml_service.py`: public ML service contract is dataset-scoped: explicit dataset id, feature columns, target columns, model keys, parameters, trained model id, and input files.
 - `src/xenix/services/ml_task_service.py`: task creation and canonical model/inference output paths now follow dataset-scoped ownership.
 - Old scenario/workspace Qt modules, `WorkItemService`, `ScenarioWorkflowService`, and inference-history service modules have exited active source composition.
@@ -43,7 +43,7 @@ The hypothesis is that a first-slice user journey can be proven without WorkItem
 - `pdm run pytest tests/test_agent_harness_foundation.py tests/test_agent_harness_streaming.py tests/test_agent_harness_first_slice.py tests/test_main.py tests/test_repositories.py tests/test_migrations.py tests/test_storage_bootstrap.py`
 - `pdm run pytest`
 - `pdm run pytest tests/test_agent_harness_first_slice.py tests/test_agent_harness_foundation.py tests/test_agent_harness_streaming.py`
-- `pdm run pytest tests/test_main.py -k "artifact_link or thread_detail_view or chatbox"`
+- `pdm run pytest tests/test_main.py -k "artifact_link or chatbot or Chatbot"`
 - `pdm run pytest tests/test_main.py`
 - `pdm run python -m compileall src tests`
 - `pdm run pytest tests/test_main.py tests/test_i18n.py tests/test_services.py tests/test_repositories.py tests/test_agent_harness_first_slice.py -q`
@@ -56,7 +56,7 @@ Full-suite result after storage schema reset: `70 passed in 71.46s`.
 ## Current Gaps
 
 - Step budget exhaustion pauses the Agent run and waits for user confirmation before continuing.
-- The ChatBox stop button now immediately requests Agent Harness cancellation and returns the UI to an editable state; tool wait loops and spawned ML worker processes observe cancellation cooperatively.
+- The Chatbot stop button now immediately requests Agent Harness cancellation and returns the UI to an editable state; tool wait loops and spawned ML worker processes observe cancellation cooperatively.
 - OpenAI-compatible provider is present, with canonical tool names mapped to provider-safe function names. CopilotKit AIMock HTTP boundary remains a follow-up adapter/test harness task.
-- Artifact preview rendering is link-based in ChatBox. Rich inline table/image preview remains a UI follow-up.
+- Artifact preview rendering is link-based in Chatbot. Rich inline table/image preview remains a UI follow-up.
 - Storage migrations have been reset to a development baseline before production release. Fresh schema excludes WorkItem tables/columns; obsolete local development databases must be deleted and rebuilt.

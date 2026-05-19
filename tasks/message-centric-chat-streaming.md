@@ -13,7 +13,7 @@
 - Scope included: message lifecycle schema, stream event shape, harness stream emission, incremental UI rendering, tests, docs.
 - Scope excluded: provider API changes, tool execution semantics, artifact service behavior, visual redesign.
 - Invariants: Chatbot timeline renders from canonical messages; Agent Harness owns message/tool execution semantics; full snapshots remain the authority for thread initialization and final convergence.
-- Likely affected files: `storage/models.py`, `storage/migrations.py`, `agent/conversation_store.py`, `agent/harness_service.py`, `ui/chat_box.py`, `ui/main_window.py`, `tests/test_agent_harness_streaming.py`, `tests/test_main.py`, storage tests, unit TDD docs.
+- Likely affected files: `storage/models.py`, `storage/migrations.py`, `agent/conversation_store.py`, `agent/harness_service.py`, `ui/chatbot.py`, `ui/main_window.py`, `tests/test_agent_harness_streaming.py`, `tests/test_main.py`, storage tests, unit TDD docs.
 - Uncertainty: Whether assistant streaming should persist partial text for every delta immediately or remain in-memory until finalization while still exposing only message events to UI.
 
 ## Guardrails Touched

@@ -145,7 +145,7 @@ Message
 - LLM providers translate canonical Messages into provider-specific request shapes.
 - LLM providers translate provider responses back into canonical Messages before UI rendering.
 - Tool calls and tool results are Agent Harness messages, and Xenix service tools live inside Agent Harness.
-- Turn boundaries are derived from `turn_id`; ChatBox renders a divider before each user Message.
+- Turn boundaries are derived from `turn_id`; Chatbot renders a divider before each user Message.
 
 ## Open Questions
 

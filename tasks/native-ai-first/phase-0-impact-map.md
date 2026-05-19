@@ -12,7 +12,7 @@ Make durable docs, local rules, and task packet truth coherent for the AI-first 
 
 ## Confirmed Target
 
-- ChatBox is the primary native operator surface.
+- Chatbot is the primary native operator surface.
 - Agent Harness is a service under `src/xenix/services/agent/`.
 - Agent Harness owns Thread, Turn, Message, tool-call, tool-result, provider interaction, tool execution, cancellation, and run recording.
 - Storage provides standardized persistence interfaces for Agent Harness and other services.
@@ -24,17 +24,17 @@ Make durable docs, local rules, and task packet truth coherent for the AI-first 
 
 ## Durable Docs Updated
 
-- `docs/10-prd/product-scope.md`: primary operator path moved to ChatBox and Agent Harness tools.
-- `docs/10-prd/glossary.md`: added ChatBox, Agent Harness, Thread, Turn, Message, Tool result, Artifact, and legacy Work item terms.
+- `docs/10-prd/product-scope.md`: primary operator path moved to Chatbot and Agent Harness tools.
+- `docs/10-prd/glossary.md`: added Chatbot, Agent Harness, Thread, Turn, Message, Tool result, Artifact, and legacy Work item terms.
 - `docs/20-product-tdd/runtime-boundaries.md`: added Agent Harness service boundary and storage-interface ownership rule.
 - `docs/20-product-tdd/storage-ownership.md`: moved conversation and artifact metadata into service-owned records persisted through storage interfaces.
 - `docs/20-product-tdd/ml-task-lifecycle.md`: changed ML task ownership from work-item inputs to explicit service inputs and artifact metadata.
-- `docs/40-deployment/development.md`: startup expectation moved to ChatBox-first shell.
+- `docs/40-deployment/development.md`: startup expectation moved to Chatbot-first shell.
 - `docs/40-deployment/runtime-state.md`: runtime artifact layout moved away from work-item-specific directories.
 
 ## Local Rules Updated
 
-- `src/xenix/ui/AGENTS.md`: ChatBox-first UI guidance replaces scenario-first guidance.
+- `src/xenix/ui/AGENTS.md`: Chatbot-first UI guidance replaces scenario-first guidance.
 - `src/xenix/ui/widgets/AGENTS.md`: shared widget guidance now avoids old scenario assumptions.
 - `src/xenix/services/AGENTS.md`: service layer guidance now names Agent Harness and artifact/data/ML boundaries.
 - `src/xenix/services/ml/AGENTS.md`: ML guidance now targets explicit service inputs and service-managed model artifacts.
@@ -44,12 +44,12 @@ Make durable docs, local rules, and task packet truth coherent for the AI-first 
 ### Composition Root
 
 - `src/xenix/app.py`
-  - Constructs Agent Harness, artifact/data/ML services, provider config, and ChatBox shell.
+  - Constructs Agent Harness, artifact/data/ML services, provider config, and Chatbot shell.
 
 ### UI Active Path
 
 - `src/xenix/ui/main_window.py`
-  - Hosts ChatBox, Settings, History sidebar, artifact link opening, and Agent Harness event handling.
+  - Hosts Chatbot, Settings, History sidebar, artifact link opening, and Agent Harness event handling.
 
 ### Old UI Surfaces
 
@@ -94,7 +94,7 @@ Reusable service behavior to preserve:
 - `dataset_inspection.py` CSV/XLSX inspection and dataframe loading utilities.
 - `MLTaskService` queueing, worker dispatch, status, logs, and task artifact handling.
 - `services/ml/` model registry, model services, evaluation policy, and execution operations.
-- Prediction result browsing now flows through artifacts and ChatBox links.
+- Prediction result browsing now flows through artifacts and Chatbot links.
 
 Cleanup result:
 
@@ -147,7 +147,7 @@ Reusable ML behavior to preserve:
 Target rewrite groups:
 
 - Scenario UI/workflow tests exited with the retired source modules.
-- `tests/test_i18n.py` now covers ChatBox shell translation.
+- `tests/test_i18n.py` now covers Chatbot shell translation.
 - `tests/test_services.py` now covers data service and dataset-scoped ML task state transitions.
 - `tests/test_repositories.py` now covers dataset-scoped task/model repositories plus migrations.
 - `tests/test_ml_execution.py` now uses explicit dataset-scoped ML service inputs.
@@ -161,7 +161,7 @@ Reusable test ideas:
 
 ## Phase 0 Exit State
 
-- Durable docs now name ChatBox and Agent Harness as the target direction.
+- Durable docs now name Chatbot and Agent Harness as the target direction.
 - Local AGENTS rules now match AI-first ownership.
 - Impact areas are mapped for app composition, UI, services, storage, ML, and tests.
 - Phase 6 cleanup removed old composition paths and old service modules while preserving historical storage compatibility.

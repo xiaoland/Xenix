@@ -20,7 +20,7 @@
 
 - `docs/30-unit-tdd/chatbot-ui.md`: Chatbot timeline rendering contract.
 - `docs/30-unit-tdd/agent-harness.md`: Agent Harness message and tool-call persistence contract.
-- `src/xenix/ui/chat_box.py`: current Qt widget implementation for the Chatbot timeline.
+- `src/xenix/ui/chatbot.py`: current Qt widget implementation for the Chatbot timeline.
 - `src/xenix/services/agent/conversation_store.py`: creates persisted tool-call and tool-call-result messages.
 - `src/xenix/services/storage/models.py`: defines Agent Message and Tool Call storage rows.
 - `tests/test_main.py`: current UI boundary coverage for tool-call rendering.
@@ -87,7 +87,7 @@
 ## Candidate Paths
 
 1. UI-local projection only
-   - Build Chatbot Event projection inside `ThreadDetailView`.
+   - Build Chatbot Event projection inside `Chatbot`.
    - Lowest initial blast radius.
    - Risk: UI keeps too much domain pairing logic.
    - Current status: disfavored after user confirmation that Agent Harness should own projection.

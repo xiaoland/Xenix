@@ -1,10 +1,10 @@
-# ChatBox UI Reference Research
+# Chatbot UI Reference Research
 
 ## Objective & Hypothesis
 
-Rework the Qt Native ChatBox around current mainstream chatbot interface patterns while keeping Xenix focused on data-analysis work.
+Rework the Qt Native Chatbot around current mainstream chatbot interface patterns while keeping Xenix focused on data-analysis work.
 
-The working hypothesis is that the first Xenix ChatBox should follow the structure shared by ChatGPT, Claude, and Cherry Studio:
+The working hypothesis is that the first Xenix Chatbot should follow the structure shared by ChatGPT, Claude, and Cherry Studio:
 
 - a centered reading column for the conversation
 - a persistent bottom composer
@@ -24,11 +24,11 @@ The working hypothesis is that the first Xenix ChatBox should follow the structu
 
 - ChatGPT emphasizes file upload from the composer/tool menu and keeping files inside a conversation/project context.
 - Claude supports direct drag/drop into the chat and uses artifacts as a separate result surface for generated outputs.
-- Cherry Studio exposes a dense desktop chat box with attachment, model/tool controls, message display settings, context controls, and token information.
+- Cherry Studio exposes a dense desktop Chatbot with attachment, model/tool controls, message display settings, context controls, and token information.
 
 ## Xenix UI Direction
 
-- Keep the central pane as ChatBox only.
+- Keep the central pane as Chatbot only.
 - Keep Settings as a window-level action in the header.
 - Use a centered conversation column.
 - Render assistant output as list-style content for readability.
@@ -60,18 +60,18 @@ Local environment check on 2026-05-13:
 
 GammaRay setup must match the target Qt runtime closely. The probe compatibility is affected by Qt version, Qt configuration, architecture, compiler vendor, and debug/release settings, with Windows compiler/ABI matching being especially important. For this project, the likely path is a GammaRay 3.3.x build compatible with Qt 6.10.x and 64-bit Windows.
 
-Debugging workflow for ChatBox layout issues:
+Debugging workflow for Chatbot layout issues:
 
 1. Run Xenix with mock thread data so all message variants are visible.
 2. Start GammaRay against the running `python.exe` process or launch Xenix through `gammaray`.
-3. Use Widget Inspector on `MainWindow -> ThreadDetailView -> chatScrollArea -> chatMessageColumn -> chatMessage*` and `chatComposer -> chatComposerEditor -> attachButton/sendButton`.
+3. Use Widget Inspector on `MainWindow -> Chatbot -> chatScrollArea -> chatMessageColumn -> chatMessage*` and `chatComposer -> chatComposerEditor -> attachButton/sendButton`.
 4. Verify actual geometry, `sizeHint`, minimum/maximum size, size policy, layout margins, layout spacing, and visibility on each suspect node.
 5. Use widget picking and the diagnostic overlay to identify unexpected empty space and misaligned composer controls.
 6. Patch the smallest owning widget/layout and rerun the targeted UI tests.
 
 Fallback while GammaRay is unavailable:
 
-- Add stable `objectName` values to intermediate ChatBox containers and rows.
+- Add stable `objectName` values to intermediate Chatbot containers and rows.
 - Add a dev-only layout dump helper guarded by an environment flag, printing widget class, object name, geometry, size hints, size policy, min/max size, layout margins, and spacing.
 - Use Qt's built-in `dumpObjectTree()` / `dumpObjectInfo()` as a coarse object hierarchy check.
 - Keep screenshot/manual inspection as confirmation after the structural layout data is known.

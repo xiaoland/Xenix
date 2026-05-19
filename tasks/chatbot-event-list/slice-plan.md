@@ -186,7 +186,7 @@ Let running turns update the UI through Chatbot Events rather than raw message r
 
 ### Goal
 
-Move `ThreadDetailView` from message rendering to event rendering.
+Move `Chatbot` from message rendering to event rendering.
 
 ### Changes
 

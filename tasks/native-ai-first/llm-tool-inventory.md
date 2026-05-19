@@ -28,7 +28,7 @@ Tool outputs can include markdown text with links to generated artifacts:
 [metrics.md](artifact://...)
 ```
 
-ChatBox previews linked images, tables, reports, and CSV/XLSX artifacts automatically. Chart/table rendering is therefore a UI renderer concern, not a separate LLM tool family.
+Chatbot previews linked images, tables, reports, and CSV/XLSX artifacts automatically. Chart/table rendering is therefore a UI renderer concern, not a separate LLM tool family.
 
 ## Provider Naming
 

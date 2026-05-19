@@ -40,4 +40,4 @@ The generic script runtime is powerful but broad. First-slice design should vali
 
 ## Presentation Rule Still Applies
 
-Tools can return markdown links to images, tables, CSV/XLSX outputs, reports, and charts. ChatBox handles preview rendering.
+Tools can return markdown links to images, tables, CSV/XLSX outputs, reports, and charts. Chatbot handles preview rendering.

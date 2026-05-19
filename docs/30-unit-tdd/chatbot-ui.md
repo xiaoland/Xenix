@@ -2,21 +2,21 @@
 
 ## Purpose
 
-Preserve the local invariants for the Chatbot-first Qt UI. This document governs `src/xenix/ui/main_window.py`, `src/xenix/ui/chat_box.py`, and nearby widgets that render conversation, files, tool progress, artifact links, and settings.
+Preserve the local invariants for the Chatbot-first Qt UI. This document governs `src/xenix/ui/main_window.py`, `src/xenix/ui/chatbot.py`, and nearby widgets that render conversation, files, tool progress, artifact links, and settings.
 
 ## Shell Contract
 
 MainWindow hosts:
 
 - left History sidebar with thread selection, create, rename, and delete actions
-- central `ThreadDetailView` as the Chatbot surface
+- central `ThreadDetailView` as the selected thread detail surface
 - Settings entry for provider configuration and development AIMock controls
 
-The central Chatbot stretches to consume remaining horizontal space. Message list and composer width come from the Chatbot parent.
+The central thread detail view stretches to consume remaining horizontal space. Message list and composer width come from the thread detail view parent.
 
 ## ThreadDetailView Contract
 
-`ThreadDetailView` owns:
+`ThreadDetailView` owns the selected thread's:
 
 - EventList scroll area
 - EventList column with 20 px horizontal padding
@@ -27,7 +27,7 @@ The central Chatbot stretches to consume remaining horizontal space. Message lis
 - stop control while provider or tool execution is running
 - step-budget confirmation controls
 
-The Chatbot EventList renders projected Chatbot Events emitted by Agent Harness. System messages are hidden from the normal EventList unless Agent Harness exposes a dedicated control event.
+The ThreadDetailView EventList renders projected Chatbot Events emitted by Agent Harness. System messages are hidden from the normal EventList unless Agent Harness exposes a dedicated control event.
 
 ## Event Rendering
 

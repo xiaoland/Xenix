@@ -31,7 +31,7 @@ Current discussion should defer:
 - `WorkItemService` exits the target service topology immediately.
 - First slice excludes `data_transform`.
 - DuckDB SQL remains a likely future DSL for deterministic data transformation.
-- Result presentation uses markdown plus `artifact://...` links as the unified ChatBox contract.
+- Result presentation uses markdown plus `artifact://...` links as the unified Chatbot contract.
 - First provider/test route uses OpenAI-compatible `/v1/chat/completions` plus CopilotKit AIMock HTTP boundary.
 - Agent autonomy principle: acceptance scenarios validate capability; prompts expose tools and boundaries while leaving planning and tool ordering to the LLM.
 - Agent Harness is a service under `src/xenix/services/agent/`.
@@ -47,13 +47,13 @@ Current discussion should defer:
 Decision needed:
 
 ```text
-User drags files into ChatBox
+User drags files into Chatbot
   -> asks for analysis
   -> LLM inspects/integrates/cleans data through tools
   -> LLM selects features/target with user confirmation only when needed
   -> LLM trains/evaluates models
   -> LLM runs inference
-  -> ChatBox shows markdown summaries and artifact previews
+  -> Chatbot shows markdown summaries and artifact previews
 ```
 
 Question:
@@ -84,7 +84,7 @@ Working interpretation:
 
 Current proposal:
 
-- Build ChatBox and Agent Harness as the active product path.
+- Build Chatbot and Agent Harness as the active product path.
 - Retire old screens from the target branch immediately.
 - Remove `ScenarioWorkflowService` from target composition.
 - Remove `WorkItemService` from target composition.
@@ -130,7 +130,7 @@ Refactor-first route:
 - Represent dataset lineage, feature/target selection, model outputs, predictions, and artifacts through tool results and artifact records in the first slice.
 - Make model training/inference accept explicit dataset id, feature columns, target columns, model selections, and output owner instead of a `work_item_id`.
 - Keep `MLTaskService` as atomic queue/worker/task artifact owner.
-- Add an Artifact service boundary that registers and resolves datasets, models, metrics, reports, images, and prediction files for ChatBox links.
+- Add an Artifact service boundary that registers and resolves datasets, models, metrics, reports, images, and prediction files for Chatbot links.
 
 ### 6. Data Transform Dependency
 
@@ -158,7 +158,7 @@ Current decision:
 Current proposal:
 
 - Tool results are markdown summaries plus `artifact://...` links.
-- ChatBox preview rendering becomes the universal presentation path.
+- Chatbot preview rendering becomes the universal presentation path.
 
 Decision needed:
 
@@ -194,5 +194,5 @@ Current decision:
 | ML task lifecycle | Training/inference can be long-running and cancellable | Minimum cancellation semantics |
 | Provider absence | Native app has no LLM provider abstraction | OpenAI-compatible provider first |
 | Deterministic AI tests | E2E must avoid live LLM nondeterminism | AIMock HTTP server at provider boundary |
-| Artifact rendering | Results move from screens/history into ChatBox | Artifact link contract as presentation spine |
+| Artifact rendering | Results move from screens/history into Chatbot | Artifact link contract as presentation spine |
 | Transform engine | Transformation DSL is useful and broad | Defer from first slice |

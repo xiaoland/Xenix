@@ -1,4 +1,4 @@
-# ChatBox History Sidebar
+# Chatbot History Sidebar
 
 ## Objective & Hypothesis
 
@@ -9,7 +9,7 @@ Add a left-side conversation history surface and seed local SQLite with mock Age
 - `ConversationStore` now exposes `list_threads()`.
 - `AgentHarnessService` exposes thread listing and snapshot loading for UI.
 - Thread mock data is test-owned through `services/agent/dev_fixtures.py`; runtime bootstrap does not seed mock conversations into SQLite.
-- `MainWindow` renders a left-side history sidebar and loads selected thread snapshots into ChatBox.
+- `MainWindow` renders a left-side history sidebar and loads selected thread snapshots into Chatbot.
 
 ## Verification
 

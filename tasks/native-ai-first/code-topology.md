@@ -36,7 +36,7 @@ AI-first Xenix has one primary interaction surface:
 
 ```text
 Native Qt MainWindow
-  -> ChatBox
+  -> Chatbot
       -> Message stream
       -> Composer
       -> File drop intake
@@ -73,7 +73,7 @@ The primary user path becomes:
 
 ```text
 User text / file drag
-  -> ChatBox composer
+  -> Chatbot composer
   -> Agent Harness service persists user Message
   -> LLM provider
   -> canonical function calling
@@ -81,7 +81,7 @@ User text / file drag
   -> Agent Harness service persists tool-call / tool-result Messages
   -> LLM provider
   -> Agent Harness service persists assistant Message
-  -> ChatBox Message renderer
+  -> Chatbot Message renderer
   -> next user turn
 ```
 
@@ -94,7 +94,7 @@ src/xenix/
     main_window.py
     chat/
       __init__.py
-      chat_box.py
+      chatbot.py
       message_list.py
       message_composer.py
       file_drop_intake.py
@@ -143,7 +143,7 @@ src/xenix/
 ### `src/xenix/ui/chat/`
 
 - Owns Qt widgets only.
-- Renders the ChatBox, message timeline, composer, dropped files, tool progress, cancellation state, tables, charts, and artifact cards.
+- Renders the Chatbot, message timeline, composer, dropped files, tool progress, cancellation state, tables, charts, and artifact cards.
 - Emits plain Python events to the Agent Harness service.
 - Receives streamed or batched harness events and maps persisted `Message` records to view models.
 - Keeps only visual state and transient widget state.
@@ -177,7 +177,7 @@ src/xenix/
 - Lives inside Agent Harness.
 - Keeps tool inputs and outputs typed.
 - Converts service exceptions into user-actionable tool results.
-- Provides integration-testable boundaries independent from the ChatBox widget.
+- Provides integration-testable boundaries independent from the Chatbot widget.
 
 ### Existing `src/xenix/services/`
 
@@ -302,7 +302,7 @@ data preprocessing
 model training and inference
 ```
 
-Tool outputs may contain markdown links to generated artifacts; ChatBox handles preview rendering for images, tables, CSV/XLSX files, and reports.
+Tool outputs may contain markdown links to generated artifacts; Chatbot handles preview rendering for images, tables, CSV/XLSX files, and reports.
 
 ## MainWindow Composition Change
 
@@ -314,10 +314,10 @@ build_main_window()
   -> build AgentHarness service
   -> build LLMProvider from settings/config
   -> build MainWindow(paths, translation_manager, agent_harness, settings, artifacts)
-  -> MainWindow hosts History sidebar, Settings, and ThreadDetailView
+  -> MainWindow hosts History sidebar, Settings, and Chatbot
 ```
 
-The current `MainWindow` owns a ChatBox-centered shell. Old scenario dialogs, technical workspaces, `ScenarioWorkflowService`, and `WorkItemService` have exited the active source composition.
+The current `MainWindow` owns a Chatbot-centered shell. Old scenario dialogs, technical workspaces, `ScenarioWorkflowService`, and `WorkItemService` have exited the active source composition.
 
 ## Test Topology
 
@@ -342,7 +342,7 @@ Harness tests
   -> running provider/tool call can be cancelled
 
 Qt boundary tests
-  -> ChatBox accepts text
+  -> Chatbot accepts text
   -> file drag intake emits attachment event
   -> tool events render as Messages
   -> artifact Messages render table/chart/file summaries
@@ -356,13 +356,13 @@ Deterministic E2E tests
 ## Migration Phases
 
 1. Solidify product and technical contracts.
-2. Add Product TDD/ADR updates for AI-first ChatBox as primary operator path.
+2. Add Product TDD/ADR updates for AI-first Chatbot as primary operator path.
 3. Add provider-informed canonical Message contract using `tasks/native-ai-first/provider-message-contract-research.md`.
 4. Add `services/agent/` with LLM providers, HarnessCore, static tool registry, typed service tools, run recorder, and fake provider harness tests.
 5. Add bounded data/model tools.
 6. Add `ui/chat/` with Message timeline, composer, and file-drop intake.
 7. Add thread/message/tool-call persistence.
-8. Wire `MainWindow` to ChatBox and Agent Harness.
+8. Wire `MainWindow` to Chatbot and Agent Harness.
 9. Add first-slice service integration tests for data-to-prediction tool runs.
 10. Add deterministic E2E testing through CopilotKit AIMock at LLM provider boundary.
 11. Remove `ScenarioWorkflowService`, `WorkItemService`, and scenario-first Qt surfaces from the target composition. Completed in the cleanup slice.
@@ -374,7 +374,7 @@ Deterministic E2E tests
 - Cancellation behavior for provider inference and running tools.
 - Modeling planner boundary for choosing model family, training plan, and evaluation strategy from data profile and user objective.
 - Exact persistence schema for conversation thread, message, tool call, tool result, and artifact references.
-- Tool output presentation contract: markdown summaries, artifact links, and ChatBox preview rendering.
+- Tool output presentation contract: markdown summaries, artifact links, and Chatbot preview rendering.
 - Whether provider roles should be stored durably or derived by adapter from `harness_kind`.
 - Whether a visible assistant message with text plus a tool call persists as one Message, matching Anthropic, or as sequential Messages for easier UI progress rendering.
 - OpenAI provider dialect is OpenAI-compatible `/v1/chat/completions`.
@@ -385,8 +385,8 @@ Deterministic E2E tests
 - `docs/10-prd/product-scope.md`: primary operator path needs AI-first revision.
 - `docs/20-product-tdd/runtime-boundaries.md`: call graph needs Agent Harness service layer.
 - `src/xenix/ui/AGENTS.md`: scenario-first rule needs replacement.
-- `src/xenix/app.py`: composition root adds Agent Harness and ChatBox dependencies.
-- `src/xenix/ui/main_window.py`: central widget changes to ChatBox.
+- `src/xenix/app.py`: composition root adds Agent Harness and Chatbot dependencies.
+- `src/xenix/ui/main_window.py`: central widget changes to Chatbot.
 - `src/xenix/services/`: new agent harness and tool adapter package.
 - `src/xenix/services/work_item_service.py`: removed from target service topology.
 - `src/xenix/services/scenario_workflow_service.py`: removed from target topology.

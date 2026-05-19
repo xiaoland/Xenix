@@ -13,11 +13,11 @@
 ### Product Surface
 
 - Xenix remains a Qt Native desktop application.
-- The primary surface is `ChatBox`.
-- Existing functional screens are removed from the active user path after ChatBox reaches the first acceptance target.
+- The primary surface is `Chatbot`.
+- Existing functional screens are removed from the active user path after Chatbot reaches the first acceptance target.
 - `Message` is the atomic UI and Harness concept.
 - User interaction begins from conversation and file drag-and-drop.
-- Tool outputs return markdown summaries and artifact links; ChatBox previews images, tables, CSV/XLSX files, metrics, reports, and model artifacts.
+- Tool outputs return markdown summaries and artifact links; Chatbot previews images, tables, CSV/XLSX files, metrics, reports, and model artifacts.
 
 ### Conversation Model
 
@@ -25,7 +25,7 @@
 - A thread contains ordered `Turn` records.
 - A turn starts with one user Message.
 - A turn ends when the provider response has an empty tool-call list.
-- ChatBox renders turn dividers before user Messages.
+- Chatbot renders turn dividers before user Messages.
 - Agent Harness owns Thread, Turn, Message, tool-call, tool-result, run recorder, and first-slice working context.
 - Storage provides standardized persistence interfaces for Agent Harness and other services.
 - First-slice working context is derived from persisted messages, tool results, and artifacts.
@@ -40,7 +40,7 @@
 - Thread, Turn, Message, tool-call, and tool-result ownership belongs to Agent Harness; storage supplies persistence interfaces.
 - `ToolExecutor` executes one normalized tool call, validates arguments, calls the Python handler, and returns a structured result.
 - Static tool registry is built at app startup from typed tool definitions and service-backed handlers.
-- First-slice user control is cancellation through the ChatBox send/stop button.
+- First-slice user control is cancellation through the Chatbot send/stop button.
 
 ### Provider Boundary
 
@@ -102,7 +102,7 @@ file drag/drop
   -> model_train or model_hyper_train
   -> model_inference
   -> markdown artifact links
-  -> ChatBox previews
+  -> Chatbot previews
 ```
 
 This scenario validates the product path. The thread system prompt describes identity and durable instructions; tool descriptions describe tool semantics and boundaries. Planning and tool ordering remain model-owned.
@@ -113,7 +113,7 @@ Model-specific preprocessing remains inside model training pipelines.
 
 ```text
 src/xenix/ui/chat/
-  chat_box.py
+  chatbot.py
   message_list.py
   message_composer.py
   file_drop_intake.py
@@ -163,15 +163,15 @@ src/xenix/services/agent/
 - Old UI exits the target path immediately.
 - `WorkItemService` exits the target service topology immediately.
 - First slice excludes `data_transform`; DuckDB remains a likely future transformation engine.
-- Result presentation uses markdown plus `artifact://...` links as the unified ChatBox contract.
+- Result presentation uses markdown plus `artifact://...` links as the unified Chatbot contract.
 - First provider/test route uses OpenAI-compatible `/v1/chat/completions` plus CopilotKit AIMock HTTP boundary.
 
 ## High-Level Design Agenda
 
 The next discussion should stay at product and architecture level.
 
-1. Product interaction model: what "basic data analysis from data to prediction" means in one ChatBox-first happy path.
-2. Ownership topology: which durable owners exist after the AI-first shift: ChatBox, Agent Harness, existing services, storage, ML adapters, and artifacts.
+1. Product interaction model: what "basic data analysis from data to prediction" means in one Chatbot-first happy path.
+2. Ownership topology: which durable owners exist after the AI-first shift: Chatbot, Agent Harness, existing services, storage, ML adapters, and artifacts.
 3. Conversation architecture: how Agent Harness reconstructs working context from messages, tool results, and artifacts.
 4. Agent responsibility split: what belongs to HarnessCore, provider dialects, tool registry, tool executor, recorder, and modeling planner.
 5. Tool surface scope: whether the eight first-slice tools are sufficient for the first acceptance target.
@@ -182,13 +182,13 @@ The next discussion should stay at product and architecture level.
 
 These are implementation-impacting decisions that should be settled before low-level design.
 
-1. Service gap: current `DatasetService`, `MLService`, and storage contracts were built for screen-driven flows; refactor service boundaries for ChatBox/Harness ownership.
+1. Service gap: current `DatasetService`, `MLService`, and storage contracts were built for screen-driven flows; refactor service boundaries for Chatbot/Harness ownership.
 2. Workspace gap: current ML contracts assume WorkItem-like ids; replace them with Agent Harness records plus explicit task inputs.
 3. Persistence gap: current storage lacks persistence interfaces for Agent Harness-owned thread, turn, message, tool-call, tool-result, and artifact-link records.
-4. UI gap: current MainWindow is scenario/screen-oriented; decide the replacement strategy for ChatBox as central widget and renderer host.
+4. UI gap: current MainWindow is scenario/screen-oriented; decide the replacement strategy for Chatbot as central widget and renderer host.
 5. Provider gap: the app currently lacks an LLM provider boundary; decide first provider implementation and AIMock test mode.
 6. Transform gap: data transformation DSL is deferred from first slice.
-7. Artifact gap: current outputs are file/history oriented; decide whether artifact links become the universal ChatBox result presentation contract.
+7. Artifact gap: current outputs are file/history oriented; decide whether artifact links become the universal Chatbot result presentation contract.
 8. Cancellation gap: long-running model training and provider calls need stop semantics; decide the minimum reliable cancellation behavior for first slice.
 
 ## Low-Level Design Backlog

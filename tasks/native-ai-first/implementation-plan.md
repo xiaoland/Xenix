@@ -8,12 +8,12 @@
 
 ## First-Slice Goal
 
-User can complete basic data analysis from files to prediction inside ChatBox through conversation plus file drag-and-drop.
+User can complete basic data analysis from files to prediction inside Chatbot through conversation plus file drag-and-drop.
 
 Acceptance scenario:
 
 ```text
-drag CSV/XLSX files into ChatBox
+drag CSV/XLSX files into Chatbot
   -> ask for analysis
   -> data_peek
   -> data_integrate
@@ -22,7 +22,7 @@ drag CSV/XLSX files into ChatBox
   -> model_metadata
   -> model_train or model_hyper_train
   -> model_inference
-  -> markdown summaries and artifact previews in ChatBox
+  -> markdown summaries and artifact previews in Chatbot
   -> provider response with empty tool call list
 ```
 
@@ -49,7 +49,7 @@ This scenario validates that the app can complete the end-to-end job. The thread
 
 ```text
 MainWindow
-  -> ChatBox
+  -> Chatbot
       -> Message timeline
       -> Composer / file drop
       -> Artifact preview renderers
@@ -84,7 +84,7 @@ Purpose: make the branch truth coherent before mutation-heavy work.
 
 Moves:
 
-- Update durable product/technical docs for ChatBox-first path.
+- Update durable product/technical docs for Chatbot-first path.
 - Replace `src/xenix/ui/AGENTS.md` scenario-first guidance.
 - Map all direct references to old UI, `ScenarioWorkflowService`, `WorkItemService`, and WorkItem storage.
 - Decide which existing service behaviors are preserved as reusable logic.
@@ -92,7 +92,7 @@ Moves:
 Exit proof:
 
 - Impact map exists at `tasks/native-ai-first/phase-0-impact-map.md`.
-- Durable docs name ChatBox as the primary operator path.
+- Durable docs name Chatbot as the primary operator path.
 - Local UI and service AGENTS rules name AI-first ownership.
 
 ### Phase 1: Agent Conversation And Artifact Foundation
@@ -154,20 +154,20 @@ Exit proof:
 - Provider serialization tests cover OpenAI-compatible `/v1/chat/completions`.
 - Cancellation test stops an active provider/tool run at the Harness boundary.
 
-### Phase 4: ChatBox UI
+### Phase 4: Chatbot UI
 
 Purpose: replace the active Qt surface with the AI-first interaction shell.
 
 Moves:
 
-- Replace `MainWindow` central path with ChatBox.
+- Replace `MainWindow` central path with Chatbot.
 - Add message timeline, composer, file drop intake, artifact preview renderers, tool progress rendering, and stop control.
 - Remove scenario-first UI composition and dialog entry points from target path.
 - Keep UI service-driven; UI never parses datasets or reconstructs business state.
 
 Exit proof:
 
-- Smoke test opens ChatBox as the first surface.
+- Smoke test opens Chatbot as the first surface.
 - Qt boundary tests cover text send, file drop, message rendering, artifact preview, and stop control state.
 
 ### Phase 5: Deterministic E2E
@@ -178,7 +178,7 @@ Moves:
 
 - Configure CopilotKit AIMock as HTTP provider boundary.
 - Add fixture-driven E2E for drag/drop plus conversation plus tool calls.
-- Assert final ChatBox contains prediction artifact links and previews.
+- Assert final Chatbot contains prediction artifact links and previews.
 
 Exit proof:
 
@@ -194,7 +194,7 @@ Moves:
 - Remove old scenario UI modules from active composition.
 - Remove `ScenarioWorkflowService` and `WorkItemService` target dependencies.
 - Clean storage/repository names and artifact paths that still imply WorkItem ownership.
-- Remove obsolete tests or rewrite them against ChatBox/Harness/service boundaries.
+- Remove obsolete tests or rewrite them against Chatbot/Harness/service boundaries.
 
 Exit proof:
 
@@ -207,13 +207,13 @@ Exit proof:
 1. Agent Harness-owned conversation persistence boundary before Phase 1.
 2. Artifact service boundary before service refactor writes outputs.
 3. ML service explicit input contract before WorkItem removal.
-4. ChatBox composition boundary before deleting old UI entry points.
+4. Chatbot composition boundary before deleting old UI entry points.
 5. AIMock fixture contract before E2E hardening.
 
 ## Acceptance Criteria
 
-- App starts directly into ChatBox.
-- User can drag CSV/XLSX files into ChatBox.
+- App starts directly into Chatbot.
+- User can drag CSV/XLSX files into Chatbot.
 - User can request basic analysis through conversation.
 - LLM can call first-slice tools through Agent Harness.
 - LLM can inspect available model keys, capabilities, and parameter schemas through `model_metadata`.
@@ -221,7 +221,7 @@ Exit proof:
 - Feature/target selection is captured as a tool result or artifact-backed record.
 - Model training or hyperparameter training produces model and metrics artifacts.
 - Inference produces prediction artifacts.
-- ChatBox renders markdown summaries and previews artifact links.
+- Chatbot renders markdown summaries and previews artifact links.
 - A turn ends when the provider response has an empty tool-call list.
 - Conversation, messages, tool calls, tool results, and artifacts persist through Agent Harness-owned boundaries.
 - Deterministic AIMock E2E covers the full happy path.
