@@ -146,6 +146,22 @@ class DatasetRow(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class DatasetColumnSelectionRow(SQLModel, table=True):
+    __tablename__ = "dataset_column_selection"
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    dataset_id: str = Field(foreign_key="dataset.id", index=True)
+    feature_columns: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    target_columns: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=utc_now)
+
+
 class MLTaskRow(SQLModel, table=True):
     __tablename__ = "ml_task"
 

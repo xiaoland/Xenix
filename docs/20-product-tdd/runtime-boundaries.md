@@ -57,7 +57,7 @@ Services are responsible for:
 - Resolving runtime paths
 - Coordinating ML adapters and export paths
 - Registering and resolving artifacts used by Chatbot markdown links
-- Accepting explicit dataset, feature, target, model, and artifact owner inputs for ML work
+- Accepting explicit column-selection, model, and artifact owner inputs for ML work while expanding ML task payloads into dataset and column snapshots before execution
 
 Service APIs should be designed around explicit request/result objects or narrow methods. They should return structured outcomes so the UI receives explicit success, failure, and output metadata.
 
@@ -108,6 +108,7 @@ Tool boundaries:
 - The tool registry is static for the current application capability set.
 - Runtime thread, turn, file, dataset, model, and artifact context is passed through validated tool arguments and `ToolExecutionContext`.
 - Current tool names are `data.peek`, `data.integrate`, `data.clean`, `data.query`, `data.transform`, `data.feature.select`, `model.metadata`, `model.train`, `model.hyper_train`, and `model.inference`.
+- `data.feature.select` creates an immutable column-selection snapshot. `model.train` and `model.hyper_train` accept `selection_id`. `model.inference` accepts a trained model and input files, then uses trained model metadata to determine required feature columns.
 
 Storage provides persistence interfaces for Agent Harness records. Agent Harness semantics stay in the Agent Harness service.
 

@@ -6,7 +6,7 @@ from sqlmodel import SQLModel
 from ...exceptions import ValidationError
 from . import models  # noqa: F401
 
-CURRENT_SCHEMA_VERSION = 4
+CURRENT_SCHEMA_VERSION = 5
 
 
 def get_user_version(engine: Engine) -> int:
@@ -114,6 +114,28 @@ def migrate_v3_to_v4(engine: Engine) -> int:
     return 4
 
 
+def migrate_v4_to_v5(engine: Engine) -> int:
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE IF NOT EXISTS dataset_column_selection (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                dataset_id VARCHAR NOT NULL,
+                feature_columns JSON NOT NULL,
+                target_columns JSON NOT NULL,
+                created_at DATETIME NOT NULL,
+                FOREIGN KEY(dataset_id) REFERENCES dataset (id)
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_dataset_column_selection_dataset_id "
+            "ON dataset_column_selection (dataset_id)"
+        )
+        connection.exec_driver_sql("PRAGMA user_version=5")
+    return 5
+
+
 def run_migrations(engine: Engine) -> int:
     current_version = get_user_version(engine)
     if current_version == 0:
@@ -124,6 +146,8 @@ def run_migrations(engine: Engine) -> int:
         current_version = migrate_v2_to_v3(engine)
     if current_version == 3:
         current_version = migrate_v3_to_v4(engine)
+    if current_version == 4:
+        current_version = migrate_v4_to_v5(engine)
     if current_version == CURRENT_SCHEMA_VERSION:
         return current_version
     raise ValidationError(

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import difflib
 from pathlib import Path
 from typing import Any
+import unicodedata
 
 from pydantic import Field
 from sqlalchemy.orm import sessionmaker
@@ -32,24 +34,46 @@ from .ml.contracts import (
 from .ml.evaluation import get_default_policy
 from .ml.registry import get_model_catalog_entry, get_model_service, list_model_catalog
 from .ml_task_service import CancelMLTaskInput, CreateMLTaskInput, MLTaskService
-from .storage.models import MLTaskArtifactRow, MLTaskRow, MLTaskStatus, MLTaskType, TrainedModelRow
-from .storage.repositories import MLTaskRepository, TrainedModelRepository
+from .storage.models import (
+    DatasetColumnSelectionRow,
+    DatasetRow,
+    MLTaskArtifactRow,
+    MLTaskRow,
+    MLTaskStatus,
+    MLTaskType,
+    TrainedModelRow,
+)
+from .storage.repositories import DatasetColumnSelectionRepository, MLTaskRepository, TrainedModelRepository
 from .trained_model_metadata import parse_trained_model_metadata, with_evaluation
 
+_COLUMN_NAME_NORMALIZATION_TRANSLATION = str.maketrans(
+    {
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u201c": '"',
+        "\u201d": '"',
+        "\u2013": "-",
+        "\u2014": "-",
+        "\u00a0": " ",
+    }
+)
 
-class FitWithEvaluateInput(SQLModel):
+
+class CreateColumnSelectionInput(SQLModel):
     dataset_id: str
     feature_columns: list[str] = Field(default_factory=list)
     target_columns: list[str] = Field(default_factory=list)
+
+
+class FitWithEvaluateInput(SQLModel):
+    selection_id: str
     run_name: str | None = None
     model_key: str
     params: dict[str, Any] = Field(default_factory=dict)
 
 
 class TuneWithEvaluateInput(SQLModel):
-    dataset_id: str
-    feature_columns: list[str] = Field(default_factory=list)
-    target_columns: list[str] = Field(default_factory=list)
+    selection_id: str
     run_name: str | None = None
     model_key: str
     param_grid: dict[str, list[Any]] = Field(default_factory=dict)
@@ -61,16 +85,12 @@ class BulkTuningSelection(SQLModel):
 
 
 class BulkTuneWithEvaluateInput(SQLModel):
-    dataset_id: str
-    feature_columns: list[str] = Field(default_factory=list)
-    target_columns: list[str] = Field(default_factory=list)
+    selection_id: str
     run_name: str | None = None
     selections: list[BulkTuningSelection] = Field(default_factory=list)
 
 
 class InferWithFilesInput(SQLModel):
-    dataset_id: str
-    feature_columns: list[str] = Field(default_factory=list)
     trained_model_id: str
     input_files: list[str] = Field(default_factory=list)
 
@@ -96,6 +116,7 @@ class MLService:
         self._ml_task_service = ml_task_service
         self._trained_models = TrainedModelRepository()
         self._ml_tasks = MLTaskRepository()
+        self._column_selections = DatasetColumnSelectionRepository()
         self._ml_task_service.register_completion_listener(self._handle_task_completion)
 
     def list_models(self) -> list[Any]:
@@ -103,6 +124,52 @@ class MLService:
 
     def get_model(self, model_key: str) -> Any:
         return get_model_catalog_entry(model_key)
+
+    def create_column_selection(self, input_data: CreateColumnSelectionInput) -> DatasetColumnSelectionRow:
+        dataset_id = input_data.dataset_id.strip()
+        if not dataset_id:
+            raise ValidationError("Column selection requires a dataset.")
+        feature_columns = self._normalize_columns(input_data.feature_columns, "feature")
+        target_columns = self._normalize_columns(input_data.target_columns, "target")
+        if set(feature_columns) & set(target_columns):
+            raise ValidationError("Feature and target columns cannot overlap.")
+
+        dataset = self._dataset_service.get_dataset(dataset_id)
+        if not Path(dataset.source_path).exists():
+            raise DatasetSourceMissingError("Dataset source file is missing.")
+        inspection = self._dataset_service.inspect_source_file(InspectDatasetInput(source_path=dataset.source_path))
+        available_columns = {column.name for column in inspection.columns}
+        missing_feature_columns = [column for column in feature_columns if column not in available_columns]
+        missing_target_columns = [column for column in target_columns if column not in available_columns]
+        if missing_feature_columns or missing_target_columns:
+            raise ValidationError(
+                self._column_selection_error_message(
+                    missing_feature_columns=missing_feature_columns,
+                    missing_target_columns=missing_target_columns,
+                    available_columns=[column.name for column in inspection.columns],
+                )
+            )
+
+        with self._session_factory() as session:
+            row = self._column_selections.create(
+                session,
+                DatasetColumnSelectionRow(
+                    dataset_id=dataset.id,
+                    feature_columns=feature_columns,
+                    target_columns=target_columns,
+                ),
+            )
+            session.commit()
+            session.refresh(row)
+            return row
+
+    def get_column_selection(self, selection_id: str) -> DatasetColumnSelectionRow:
+        with self._session_factory() as session:
+            row = self._column_selections.get(session, selection_id.strip())
+            if row is None:
+                raise ValidationError("The selected column selection is invalid.")
+            session.expunge(row)
+            return row
 
     def fit_with_evaluate(self, input_data: FitWithEvaluateInput) -> MLTaskRow:
         context = self._build_training_context(input_data, input_data.model_key)
@@ -168,9 +235,7 @@ class MLService:
             tasks.append(
                 self.tune_with_evaluate(
                     TuneWithEvaluateInput(
-                        dataset_id=input_data.dataset_id,
-                        feature_columns=list(input_data.feature_columns),
-                        target_columns=list(input_data.target_columns),
+                        selection_id=input_data.selection_id,
                         run_name=input_data.run_name,
                         model_key=selection.model_key,
                         param_grid=selection.param_grid,
@@ -272,41 +337,26 @@ class MLService:
         input_data: FitWithEvaluateInput | TuneWithEvaluateInput,
         model_key: str,
     ) -> "_TrainingContext":
-        dataset_id = input_data.dataset_id.strip()
-        if not dataset_id:
-            raise ValidationError("Training requires a dataset.")
-        feature_columns = self._normalize_columns(input_data.feature_columns, "feature")
-        target_columns = self._normalize_columns(input_data.target_columns, "target")
+        selection = self._resolve_column_selection(input_data.selection_id)
+        feature_columns = selection.feature_columns
+        target_columns = selection.target_columns
         run_name = (input_data.run_name or "").strip()
-
-        dataset = self._dataset_service.get_dataset(dataset_id)
-        if not Path(dataset.source_path).exists():
-            raise DatasetSourceMissingError("Dataset source file is missing.")
 
         catalog = get_model_catalog_entry(model_key)
         if catalog.requires_target and len(target_columns) != 1:
             raise ValidationError("The selected model requires exactly one target column.")
-        if set(feature_columns) & set(target_columns):
-            raise ValidationError("Feature and target columns cannot overlap.")
-
-        inspection = self._dataset_service.inspect_source_file(InspectDatasetInput(source_path=dataset.source_path))
-        available_columns = {column.name for column in inspection.columns}
-        if not set(feature_columns).issubset(available_columns):
-            raise ValidationError("The stored feature-column selection is invalid for the current dataset file.")
-        if not set(target_columns).issubset(available_columns):
-            raise ValidationError("The stored target-column selection is invalid for the current dataset file.")
 
         return _TrainingContext(
-            project_id=dataset.project_id,
-            dataset=dataset,
-            run_name=run_name or dataset.name,
+            project_id=selection.dataset.project_id,
+            dataset=selection.dataset,
+            run_name=run_name or selection.dataset.name,
             catalog=catalog,
             column_selection=ColumnSelection(
                 feature_columns=feature_columns,
                 target_columns=target_columns,
             ),
             evaluation_policy=get_default_policy(catalog.problem_kind),
-            inspection=inspection,
+            inspection=selection.inspection,
         )
 
     def _build_trained_model_context(self, context: "_TrainingContext") -> TrainedModelContextPayload:
@@ -361,18 +411,23 @@ class MLService:
             return row
 
     def _build_inference_context(self, input_data: InferWithFilesInput) -> "_InferenceContext":
-        dataset_id = input_data.dataset_id.strip()
-        if not dataset_id:
-            raise ValidationError("Inference requires a dataset.")
         trained_model_id = input_data.trained_model_id.strip()
         if not trained_model_id:
             raise ValidationError("Inference requires a trained model.")
 
-        dataset = self._dataset_service.get_dataset(dataset_id)
+        trained_model = self._resolve_inference_model(trained_model_id)
+        if not trained_model.dataset_id:
+            raise ValidationError("The selected trained model is not tied to a dataset.")
+        metadata = parse_trained_model_metadata(trained_model.metadata_payload)
+        if metadata is None or not metadata.feature_columns:
+            raise ValidationError("The selected trained model does not contain a feature-column contract.")
+
+        dataset = self._dataset_service.get_dataset(trained_model.dataset_id)
+        feature_columns = self._normalize_columns(metadata.feature_columns, "feature")
+        if list(metadata.feature_columns) != feature_columns:
+            raise ValidationError("The selected trained model contains an invalid feature-column contract.")
         if not Path(dataset.source_path).exists():
             raise DatasetSourceMissingError("Dataset source file is missing.")
-        feature_columns = self._normalize_columns(input_data.feature_columns, "feature")
-        trained_model = self._resolve_dataset_inference_model(dataset.id, feature_columns, trained_model_id)
         return _InferenceContext(
             project_id=dataset.project_id,
             dataset=dataset,
@@ -380,24 +435,49 @@ class MLService:
             trained_model=trained_model,
         )
 
-    def _resolve_dataset_inference_model(
+    def _resolve_inference_model(
         self,
-        dataset_id: str,
-        feature_columns: list[str],
         trained_model_id: str,
     ) -> TrainedModelRow:
         with self._session_factory() as session:
             trained_model = self._trained_models.get(session, trained_model_id)
             if trained_model is None:
                 raise ValidationError("The selected trained model is invalid for the current dataset.")
-            if trained_model.dataset_id != dataset_id:
-                raise ValidationError("The selected trained model is not tied to this dataset.")
-            metadata = parse_trained_model_metadata(trained_model.metadata_payload)
-            if metadata is not None and list(metadata.feature_columns) != list(feature_columns):
-                raise ValidationError("The selected trained model is incompatible with the current feature selection.")
             if not Path(trained_model.artifact_path).exists():
                 raise ValidationError("The selected trained model artifact is missing.")
+            session.expunge(trained_model)
             return trained_model
+
+    def _resolve_column_selection(self, selection_id: str) -> "_ResolvedColumnSelection":
+        normalized_selection_id = selection_id.strip()
+        if not normalized_selection_id:
+            raise ValidationError("Training requires a column selection.")
+        with self._session_factory() as session:
+            selection = self._column_selections.get(session, normalized_selection_id)
+            if selection is None:
+                raise ValidationError("The selected column selection is invalid.")
+            session.expunge(selection)
+
+        feature_columns = self._normalize_columns(selection.feature_columns, "feature")
+        target_columns = self._normalize_columns(selection.target_columns, "target")
+        if set(feature_columns) & set(target_columns):
+            raise ValidationError("Feature and target columns cannot overlap.")
+
+        dataset = self._dataset_service.get_dataset(selection.dataset_id)
+        if not Path(dataset.source_path).exists():
+            raise DatasetSourceMissingError("Dataset source file is missing.")
+        inspection = self._dataset_service.inspect_source_file(InspectDatasetInput(source_path=dataset.source_path))
+        available_columns = {column.name for column in inspection.columns}
+        if not set(feature_columns).issubset(available_columns):
+            raise ValidationError("The stored feature-column selection is invalid for the current dataset file.")
+        if not set(target_columns).issubset(available_columns):
+            raise ValidationError("The stored target-column selection is invalid for the current dataset file.")
+        return _ResolvedColumnSelection(
+            dataset=dataset,
+            feature_columns=feature_columns,
+            target_columns=target_columns,
+            inspection=inspection,
+        )
 
     def _build_inference_input_files(
         self,
@@ -434,6 +514,30 @@ class MLService:
             raise ValidationError(f"Duplicate {label} columns are not allowed.")
         return normalized
 
+    def _column_selection_error_message(
+        self,
+        *,
+        missing_feature_columns: list[str],
+        missing_target_columns: list[str],
+        available_columns: list[str],
+    ) -> str:
+        lines = ["Selected columns must exist in the dataset."]
+        if missing_feature_columns:
+            lines.append(f"Missing feature columns: {_format_column_names(missing_feature_columns)}.")
+        if missing_target_columns:
+            lines.append(f"Missing target columns: {_format_column_names(missing_target_columns)}.")
+        suggestions = _column_name_suggestions(
+            [*missing_feature_columns, *missing_target_columns],
+            available_columns,
+        )
+        if suggestions:
+            lines.append("Closest available column suggestions:")
+            for missing, matches in suggestions.items():
+                lines.append(f"- `{missing}` -> {_format_column_names(matches)}")
+        lines.append(f"Available columns: {_format_column_names(available_columns)}.")
+        lines.append("Use the exact column names returned by data.peek, data.query, or dataset inspection.")
+        return "\n".join(lines)
+
     def _update_trained_model_metadata_with_evaluation(
         self,
         session: Any,
@@ -466,6 +570,14 @@ class _TrainingContext:
 
 
 @dataclass(frozen=True)
+class _ResolvedColumnSelection:
+    dataset: DatasetRow
+    feature_columns: list[str]
+    target_columns: list[str]
+    inspection: Any
+
+
+@dataclass(frozen=True)
 class _InferenceContext:
     project_id: str
     dataset: Any
@@ -477,3 +589,35 @@ def _now() -> Any:
     from datetime import datetime, timezone
 
     return datetime.now(timezone.utc)
+
+
+def _format_column_names(columns: list[str]) -> str:
+    return ", ".join(f"`{column}`" for column in columns) if columns else "none"
+
+
+def _column_name_suggestions(missing_columns: list[str], available_columns: list[str]) -> dict[str, list[str]]:
+    available_by_normalized: dict[str, list[str]] = {}
+    for column in available_columns:
+        available_by_normalized.setdefault(_normalize_column_name_for_match(column), []).append(column)
+
+    suggestions: dict[str, list[str]] = {}
+    normalized_available = list(available_by_normalized)
+    for missing in missing_columns:
+        normalized_missing = _normalize_column_name_for_match(missing)
+        matches = list(available_by_normalized.get(normalized_missing) or [])
+        if not matches:
+            close_keys = difflib.get_close_matches(normalized_missing, normalized_available, n=3, cutoff=0.84)
+            for key in close_keys:
+                matches.extend(available_by_normalized[key])
+        if matches:
+            suggestions[missing] = matches[:3]
+    return suggestions
+
+
+def _normalize_column_name_for_match(value: str) -> str:
+    return (
+        unicodedata.normalize("NFKC", value)
+        .translate(_COLUMN_NAME_NORMALIZATION_TRANSLATION)
+        .casefold()
+        .strip()
+    )

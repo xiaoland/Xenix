@@ -30,6 +30,7 @@ class FirstSliceProvider:
 
     def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
         dataset_id = self._find_payload_value(messages, "dataset_id")
+        selection_id = self._find_payload_value(messages, "selection_id")
         trained_model_id = self._find_trained_model_id(messages)
         artifact_link = self._find_payload_value(messages, "artifact_link")
         if dataset_id is None:
@@ -43,6 +44,21 @@ class FirstSliceProvider:
                     )
                 ],
             )
+        if selection_id is None:
+            return ProviderResponse(
+                assistant_content_blocks=[{"type": "markdown", "text": "I will lock the feature selection."}],
+                tool_calls=[
+                    ProviderToolCall(
+                        provider_call_id="call-select",
+                        tool_name="data.feature.select",
+                        arguments={
+                            "dataset_id": dataset_id,
+                            "feature_columns": ["feature_a", "feature_b"],
+                            "target_columns": ["target"],
+                        },
+                    )
+                ],
+            )
         if trained_model_id is None:
             return ProviderResponse(
                 assistant_content_blocks=[{"type": "markdown", "text": "I will train a linear regression model."}],
@@ -51,9 +67,7 @@ class FirstSliceProvider:
                         provider_call_id="call-train",
                         tool_name="model.train",
                         arguments={
-                            "dataset_id": dataset_id,
-                            "feature_columns": ["feature_a", "feature_b"],
-                            "target_columns": ["target"],
+                            "selection_id": selection_id,
                             "models": ["linear_regression"],
                             "params_by_model": {"linear_regression": {"fit_intercept": True}},
                             "run_name": "Harness demand analysis",
@@ -69,8 +83,6 @@ class FirstSliceProvider:
                         provider_call_id="call-infer",
                         tool_name="model.inference",
                         arguments={
-                            "dataset_id": dataset_id,
-                            "feature_columns": ["feature_a", "feature_b"],
                             "trained_model_id": trained_model_id,
                             "input_files": [str(self._inference_path.resolve())],
                         },
@@ -202,8 +214,7 @@ def test_agent_harness_hyper_train_validates_tuning_capability_before_execution(
         registry.execute(
             "model.hyper_train",
             {
-                "dataset_id": "missing-dataset",
-                "feature_columns": ["feature_a"],
+                "selection_id": "missing-selection",
                 "param_grids_by_model": {"kmeans": {}},
             },
             _tool_context(),
@@ -248,6 +259,7 @@ def test_agent_harness_first_slice_runs_from_file_to_prediction(monkeypatch, tmp
     assert snapshot.turns[0].status.value == "ended"
     assert [tool.tool_name for tool in snapshot.tool_calls] == [
         "data.peek",
+        "data.feature.select",
         "model.train",
         "model.inference",
     ]

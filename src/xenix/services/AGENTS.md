@@ -12,7 +12,7 @@ This guidance applies to AI-first service boundaries under `src/xenix/services/`
 - Keep source dataset registrations pointed at user-managed source files.
 - Data services may register app-managed dataset artifacts under runtime artifacts.
 - Persist both source-dataset metadata and app-managed dataset-artifact metadata through service-owned records.
-- Feature/target selection in the first AI-first slice is represented by tool results and artifact records.
+- Feature/target selection in the first AI-first slice is represented by immutable dataset column-selection records.
 - Keep dataset inspection metadata ephemeral and runtime-derived.
 - Validate column selections through service code, not UI-only checks.
 - Do not let UI code parse `.csv` or `.xlsx` files for business decisions.
@@ -24,5 +24,5 @@ This guidance applies to AI-first service boundaries under `src/xenix/services/`
 
 - `DatasetService` owns source dataset registration, source-file inspection, and dataset export helpers.
 - Artifact service owns artifact registration and artifact link resolution.
-- ML service APIs should accept explicit dataset id, feature columns, target columns, model selections, and artifact output owner.
+- ML service training APIs should accept immutable column-selection ids, model selections, and artifact output owner inputs. ML task payloads should still expand to explicit dataset id and column snapshots before execution.
 - `WorkItemService` exits the target AI-first service topology.

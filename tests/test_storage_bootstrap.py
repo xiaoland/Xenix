@@ -270,6 +270,48 @@ def test_storage_bootstrap_migrates_v3_uppercase_agent_message_status(monkeypatc
     assert orm_row.status is AgentMessageStatus.COMPLETED
 
 
+def test_storage_bootstrap_migrates_v4_column_selection_schema(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    db_path = database_path(paths)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    import sqlite3
+
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE dataset (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                project_id VARCHAR NOT NULL,
+                name VARCHAR NOT NULL,
+                source_path VARCHAR NOT NULL,
+                source_format VARCHAR,
+                copied_from VARCHAR,
+                copied_at DATETIME,
+                derived_from_dataset_id VARCHAR,
+                ml_task_id VARCHAR,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL
+            )
+            """
+        )
+        connection.execute("PRAGMA user_version=4")
+
+    context = StorageBootstrapService().initialize(paths)
+
+    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
+    assert {"dataset_id", "feature_columns", "target_columns", "created_at"}.issubset(
+        _table_columns(context, "dataset_column_selection")
+    )
+    with context.engine.connect() as connection:
+        indexes = {
+            str(row[1])
+            for row in connection.exec_driver_sql("PRAGMA index_list(dataset_column_selection)").all()
+        }
+    assert "ix_dataset_column_selection_dataset_id" in indexes
+
+
 def test_storage_bootstrap_uses_ai_first_baseline_without_work_item_schema(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
@@ -297,10 +339,16 @@ def test_storage_bootstrap_uses_ai_first_baseline_without_work_item_schema(monke
             str(row[1])
             for row in connection.exec_driver_sql("PRAGMA table_info(agent_message)").all()
         }
+        column_selection_columns = {
+            str(row[1])
+            for row in connection.exec_driver_sql("PRAGMA table_info(dataset_column_selection)").all()
+        }
 
-    assert CURRENT_SCHEMA_VERSION == 4
+    assert CURRENT_SCHEMA_VERSION == 5
     assert "work_item" not in table_names
+    assert "dataset_column_selection" in table_names
     assert "derived_from_dataset_id" in dataset_columns
+    assert {"dataset_id", "feature_columns", "target_columns", "created_at"}.issubset(column_selection_columns)
     assert {"status", "updated_at", "finalized_at"}.issubset(agent_message_columns)
     assert "work_item_id" not in ml_task_columns
     assert "work_item_id" not in trained_model_columns

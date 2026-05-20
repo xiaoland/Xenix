@@ -22,7 +22,13 @@ from ..data_transform import (
 from ..dataset_inspection import InspectDatasetInput, detect_source_format, load_dataframe
 from ..dataset_service import DatasetService, RegisterDatasetInput
 from ..ml.registry import get_model_catalog_entry, list_model_catalog, list_model_keys
-from ..ml_service import FitWithEvaluateInput, InferWithFilesInput, MLService, TuneWithEvaluateInput
+from ..ml_service import (
+    CreateColumnSelectionInput,
+    FitWithEvaluateInput,
+    InferWithFilesInput,
+    MLService,
+    TuneWithEvaluateInput,
+)
 from ..storage.models import ArtifactKind, MLTaskArtifactKind, MLTaskStatus, ProblemKind, TrainedModelRow
 from .providers import AgentToolSpec
 
@@ -533,20 +539,18 @@ class AgentToolRegistry:
                 name="model.train",
                 provider_name="model_train",
                 description=(
-                    "Train and evaluate one or more models for a dataset and explicit column selection. "
+                    "Train and evaluate one or more models for a persisted column selection. "
                     "Use model.metadata to inspect available canonical model keys and parameter schemas."
                 ),
                 parameters_schema={
                     "type": "object",
                     "properties": {
-                        "dataset_id": {"type": "string"},
-                        "feature_columns": {"type": "array", "items": {"type": "string"}},
-                        "target_columns": {"type": "array", "items": {"type": "string"}},
+                        "selection_id": {"type": "string"},
                         "models": {"type": "array", "items": {"type": "string"}},
                         "params_by_model": {"type": "object"},
                         "run_name": {"type": "string"},
                     },
-                    "required": ["dataset_id", "feature_columns", "models"],
+                    "required": ["selection_id", "models"],
                     "additionalProperties": False,
                 },
             ),
@@ -566,13 +570,11 @@ class AgentToolRegistry:
                 parameters_schema={
                     "type": "object",
                     "properties": {
-                        "dataset_id": {"type": "string"},
-                        "feature_columns": {"type": "array", "items": {"type": "string"}},
-                        "target_columns": {"type": "array", "items": {"type": "string"}},
+                        "selection_id": {"type": "string"},
                         "param_grids_by_model": {"type": "object"},
                         "run_name": {"type": "string"},
                     },
-                    "required": ["dataset_id", "feature_columns", "param_grids_by_model"],
+                    "required": ["selection_id", "param_grids_by_model"],
                     "additionalProperties": False,
                 },
             ),
@@ -589,12 +591,10 @@ class AgentToolRegistry:
                 parameters_schema={
                     "type": "object",
                     "properties": {
-                        "dataset_id": {"type": "string"},
-                        "feature_columns": {"type": "array", "items": {"type": "string"}},
                         "trained_model_id": {"type": "string"},
                         "input_files": {"type": "array", "items": {"type": "string"}},
                     },
-                    "required": ["dataset_id", "feature_columns", "trained_model_id", "input_files"],
+                    "required": ["trained_model_id", "input_files"],
                     "additionalProperties": False,
                 },
             ),
@@ -750,25 +750,27 @@ class AgentToolRegistry:
         dataset_id = self._require_string(arguments, "dataset_id")
         feature_columns = self._require_string_list(arguments, "feature_columns")
         target_columns = self._optional_string_list(arguments, "target_columns")
-        dataset = self._dataset_service.get_dataset(dataset_id)
-        inspection = self._dataset_service.inspect_source_file(InspectDatasetInput(source_path=dataset.source_path))
-        available = {column.name for column in inspection.columns}
-        if not set(feature_columns).issubset(available) or not set(target_columns).issubset(available):
-            raise ValidationError("Selected columns must exist in the dataset.")
-        if set(feature_columns) & set(target_columns):
-            raise ValidationError("Feature and target columns cannot overlap.")
+        selection = self._ml_service.create_column_selection(
+            CreateColumnSelectionInput(
+                dataset_id=dataset_id,
+                feature_columns=feature_columns,
+                target_columns=target_columns,
+            )
+        )
         return ToolExecutionResult(
             payload={
-                "dataset_id": dataset_id,
-                "feature_columns": feature_columns,
-                "target_columns": target_columns,
+                "selection_id": selection.id,
+                "dataset_id": selection.dataset_id,
+                "feature_columns": list(selection.feature_columns),
+                "target_columns": list(selection.target_columns),
             },
             content_blocks=[
                 {
                     "type": "markdown",
                     "text": (
-                        f"Selected features: {', '.join(feature_columns)}\n\n"
-                        f"Selected targets: {', '.join(target_columns) if target_columns else 'none'}"
+                        f"Selection id: `{selection.id}`\n\n"
+                        f"Selected features: {', '.join(selection.feature_columns)}\n\n"
+                        f"Selected targets: {', '.join(selection.target_columns) if selection.target_columns else 'none'}"
                     ),
                 }
             ],
@@ -828,9 +830,7 @@ class AgentToolRegistry:
 
     def _model_train(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
-        dataset_id = self._require_string(arguments, "dataset_id")
-        feature_columns = self._require_string_list(arguments, "feature_columns")
-        target_columns = self._optional_string_list(arguments, "target_columns")
+        selection_id = self._require_string(arguments, "selection_id")
         models = self._normalize_model_keys(
             self._require_string_list(arguments, "models"),
             field_name="models",
@@ -839,15 +839,15 @@ class AgentToolRegistry:
             arguments.get("params_by_model"),
             field_name="params_by_model",
         )
+        selection = self._ml_service.get_column_selection(selection_id)
+        dataset_id = selection.dataset_id
         before_ids = {task.id for task in self._ml_service.list_dataset_tasks(dataset_id)}
         created_task_ids: list[str] = []
         for model_key in models:
             self._raise_if_cancelled(context)
             created = self._ml_service.fit_with_evaluate(
                 FitWithEvaluateInput(
-                    dataset_id=dataset_id,
-                    feature_columns=feature_columns,
-                    target_columns=target_columns,
+                    selection_id=selection_id,
                     run_name=str(arguments.get("run_name") or ""),
                     model_key=model_key,
                     params=dict(params_by_model.get(model_key) or {}),
@@ -868,9 +868,7 @@ class AgentToolRegistry:
 
     def _model_hyper_train(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
-        dataset_id = self._require_string(arguments, "dataset_id")
-        feature_columns = self._require_string_list(arguments, "feature_columns")
-        target_columns = self._optional_string_list(arguments, "target_columns")
+        selection_id = self._require_string(arguments, "selection_id")
         grids = arguments.get("param_grids_by_model")
         if not isinstance(grids, dict) or not grids:
             raise ValidationError("model.hyper_train requires param_grids_by_model.")
@@ -879,15 +877,15 @@ class AgentToolRegistry:
             field_name="param_grids_by_model",
             require_hyperparameter_tuning=True,
         )
+        selection = self._ml_service.get_column_selection(selection_id)
+        dataset_id = selection.dataset_id
         before_ids = {task.id for task in self._ml_service.list_dataset_tasks(dataset_id)}
         created_task_ids: list[str] = []
         for model_key, grid in normalized_grids.items():
             self._raise_if_cancelled(context)
             created = self._ml_service.tune_with_evaluate(
                 TuneWithEvaluateInput(
-                    dataset_id=dataset_id,
-                    feature_columns=feature_columns,
-                    target_columns=target_columns,
+                    selection_id=selection_id,
                     run_name=str(arguments.get("run_name") or ""),
                     model_key=model_key,
                     param_grid=dict(grid),
@@ -908,14 +906,10 @@ class AgentToolRegistry:
 
     def _model_inference(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
-        dataset_id = self._require_string(arguments, "dataset_id")
-        feature_columns = self._require_string_list(arguments, "feature_columns")
         trained_model_id = self._require_string(arguments, "trained_model_id")
         input_files = self._require_string_list(arguments, "input_files")
         task = self._ml_service.infer(
             InferWithFilesInput(
-                dataset_id=dataset_id,
-                feature_columns=feature_columns,
                 trained_model_id=trained_model_id,
                 input_files=input_files,
             )
@@ -936,13 +930,14 @@ class AgentToolRegistry:
                 title="Prediction results",
                 absolute_path=output_artifact.absolute_path,
                 mime_type="text/csv",
-                metadata_payload={"ml_task_id": task.id, "dataset_id": dataset_id},
+                metadata_payload={"ml_task_id": task.id, "dataset_id": task.dataset_id},
             )
         )
         link = build_artifact_markdown_link(generic_artifact)
         return ToolExecutionResult(
             payload={
                 "ml_task_id": task.id,
+                "dataset_id": task.dataset_id,
                 "result_dataset_id": details.task.result_payload.get("result_dataset_id") if details.task.result_payload else None,
                 "artifact_id": generic_artifact.id,
                 "artifact_link": link,

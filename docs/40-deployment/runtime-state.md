@@ -51,7 +51,7 @@ Keep canonical source datasets outside the runtime directory. Dataset registrati
 
 Dataset import and dataset inspection read the user-managed source file directly. Agent Harness and data services register app-managed dataset artifacts when data tools produce derived files. `data.query` returns bounded tool-result payloads by default; `data.transform` writes transformed CSV artifacts under `artifacts/datasets/transformed/`.
 
-Current SQLite development baseline is `user_version=4`. Application startup runs forward migrations from supported earlier baselines. If a local development database belongs to an obsolete schema baseline, delete `state/xenix.db` under the active runtime home and restart the app so bootstrap recreates the current AI-first schema.
+Current SQLite development baseline is `user_version=5`. Application startup runs forward migrations from supported earlier baselines. If a local development database belongs to an obsolete schema baseline, delete `state/xenix.db` under the active runtime home and restart the app so bootstrap recreates the current AI-first schema.
 
 When a migration fails during development:
 

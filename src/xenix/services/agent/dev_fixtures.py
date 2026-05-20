@@ -123,15 +123,43 @@ def _create_message_rendering_fixture(store: ConversationStore) -> None:
             ],
         )
     )
+    _selection_message, selection_call = store.create_tool_call(
+        CreateToolCallInput(
+            thread_id=thread.id,
+            turn_id=second_turn.id,
+            tool_name="data.feature.select",
+            arguments_payload={
+                "dataset_id": "mock_dataset_sales",
+                "feature_columns": ["price", "traffic"],
+                "target_columns": ["sales"],
+            },
+        )
+    )
+    store.complete_tool_call(
+        CompleteToolCallInput(
+            tool_call_id=selection_call.id,
+            status=AgentToolCallStatus.SUCCEEDED,
+            result_payload={
+                "selection_id": "mock_selection_sales",
+                "dataset_id": "mock_dataset_sales",
+                "feature_columns": ["price", "traffic"],
+                "target_columns": ["sales"],
+            },
+            content_blocks=[
+                {
+                    "type": "markdown",
+                    "text": "Selection id: `mock_selection_sales`\n\nSelected features: price, traffic\n\nSelected targets: sales",
+                }
+            ],
+        )
+    )
     _train_message, train_call = store.create_tool_call(
         CreateToolCallInput(
             thread_id=thread.id,
             turn_id=second_turn.id,
             tool_name="model.train",
             arguments_payload={
-                "dataset_id": "mock_dataset_sales",
-                "feature_columns": ["price", "traffic"],
-                "target_columns": ["sales"],
+                "selection_id": "mock_selection_sales",
                 "models": ["regression.linear"],
             },
         )
@@ -162,7 +190,6 @@ def _create_message_rendering_fixture(store: ConversationStore) -> None:
             turn_id=second_turn.id,
             tool_name="model.inference",
             arguments_payload={
-                "dataset_id": "mock_dataset_sales",
                 "trained_model_id": "mock_linear_model",
                 "input_files": ["C:/mock-data/future-plan.csv"],
             },

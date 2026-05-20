@@ -9,6 +9,7 @@ from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
 from xenix.services.ml_service import (
     BulkTuneWithEvaluateInput,
     BulkTuningSelection,
+    CreateColumnSelectionInput,
     FitWithEvaluateInput,
     InferWithFilesInput,
     MLService,
@@ -46,6 +47,21 @@ def _register_dataset(
 ) -> object:
     return dataset_service.register_dataset(
         RegisterDatasetInput(project_id=project_id, source_path=str(dataset_path.resolve()), name=name)
+    )
+
+
+def _create_selection(
+    ml_service: MLService,
+    dataset_id: str,
+    feature_columns: list[str],
+    target_columns: list[str] | None = None,
+) -> object:
+    return ml_service.create_column_selection(
+        CreateColumnSelectionInput(
+            dataset_id=dataset_id,
+            feature_columns=feature_columns,
+            target_columns=target_columns or [],
+        )
     )
 
 
@@ -107,12 +123,11 @@ def test_dataset_scoped_fit_evaluate_and_inference_run(monkeypatch, tmp_path: Pa
         encoding="utf-8",
     )
     dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Direct Demand")
+    selection = _create_selection(ml_service, dataset.id, ["feature_a", "feature_b"], ["target"])
 
     fit_task = ml_service.fit_with_evaluate(
         FitWithEvaluateInput(
-            dataset_id=dataset.id,
-            feature_columns=["feature_a", "feature_b"],
-            target_columns=["target"],
+            selection_id=selection.id,
             run_name="Direct demand analysis",
             model_key="regression.linear",
             params={"fit_intercept": True},
@@ -131,8 +146,6 @@ def test_dataset_scoped_fit_evaluate_and_inference_run(monkeypatch, tmp_path: Pa
     inference_input.write_text("feature_a,feature_b\n11,9\n12,10\n", encoding="utf-8")
     inference_task = ml_service.infer(
         InferWithFilesInput(
-            dataset_id=dataset.id,
-            feature_columns=["feature_a", "feature_b"],
             trained_model_id=trained_models[0].id,
             input_files=[str(inference_input.resolve())],
         )
@@ -174,12 +187,11 @@ def test_clustering_fit_runs_without_follow_up_evaluate_and_persists_export_arti
         encoding="utf-8",
     )
     dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Segments")
+    selection = _create_selection(ml_service, dataset.id, ["spend", "visits", "segment"])
 
     fit_task = ml_service.fit_with_evaluate(
         FitWithEvaluateInput(
-            dataset_id=dataset.id,
-            feature_columns=["spend", "visits", "segment"],
-            target_columns=[],
+            selection_id=selection.id,
             run_name="Segments",
             model_key="clustering.kmeans",
             params={"n_clusters": 2, "n_init": 10, "max_iter": 200},
@@ -231,12 +243,11 @@ def test_bulk_tuning_creates_one_tuning_task_per_model_and_follow_up_evaluations
         encoding="utf-8",
     )
     dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Churn")
+    selection = _create_selection(ml_service, dataset.id, ["age", "tenure", "segment"], ["label"])
 
     created = ml_service.bulk_tune_with_evaluate(
         BulkTuneWithEvaluateInput(
-            dataset_id=dataset.id,
-            feature_columns=["age", "tenure", "segment"],
-            target_columns=["label"],
+            selection_id=selection.id,
             run_name="Churn",
             selections=[
                 BulkTuningSelection(
@@ -280,17 +291,46 @@ def test_tuning_rejects_empty_param_grid_sequences_before_worker(monkeypatch, tm
         encoding="utf-8",
     )
     dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Churn")
+    selection = _create_selection(ml_service, dataset.id, ["age", "tenure", "segment"], ["label"])
 
     with pytest.raises(ValidationError):
         ml_service.tune_with_evaluate(
             TuneWithEvaluateInput(
-                dataset_id=dataset.id,
-                feature_columns=["age", "tenure", "segment"],
-                target_columns=["label"],
+                selection_id=selection.id,
                 model_key="classification.random_forest",
                 param_grid={"n_estimators": [], "max_depth": [3], "max_features": ["sqrt"]},
             )
         )
+
+
+def test_column_selection_error_names_missing_columns_and_suggestions(monkeypatch, tmp_path: Path) -> None:
+    project_service, dataset_service, _ml_task_service, ml_service = _build_services(monkeypatch, tmp_path)
+    project = project_service.create_project(CreateProjectInput(name="Retail"))
+    dataset_file = tmp_path / "churn.csv"
+    dataset_file.write_text(
+        "Account Balance (Yuan),Last Month’s Trading Commission (Yuan),Customer Churn (Yes/No)\n"
+        "22686.5,149.25,0\n",
+        encoding="utf-8",
+    )
+    dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Churn")
+
+    with pytest.raises(ValidationError) as exc_info:
+        ml_service.create_column_selection(
+            CreateColumnSelectionInput(
+                dataset_id=dataset.id,
+                feature_columns=[
+                    "Account Balance (Yuan)",
+                    "Last Month's Trading Commission (Yuan)",
+                ],
+                target_columns=["Customer Churn (Yes/No)"],
+            )
+        )
+
+    message = str(exc_info.value)
+    assert "Missing feature columns: `Last Month's Trading Commission (Yuan)`." in message
+    assert "`Last Month's Trading Commission (Yuan)` -> `Last Month’s Trading Commission (Yuan)`" in message
+    assert "Available columns:" in message
+    assert "Use the exact column names returned by data.peek" in message
 
 
 def test_inference_rejects_input_files_missing_required_features(monkeypatch, tmp_path: Path) -> None:
@@ -312,11 +352,10 @@ def test_inference_rejects_input_files_missing_required_features(monkeypatch, tm
         encoding="utf-8",
     )
     dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Demand")
+    selection = _create_selection(ml_service, dataset.id, ["feature_a", "feature_b"], ["target"])
     ml_service.fit_with_evaluate(
         FitWithEvaluateInput(
-            dataset_id=dataset.id,
-            feature_columns=["feature_a", "feature_b"],
-            target_columns=["target"],
+            selection_id=selection.id,
             run_name="Demand",
             model_key="regression.linear",
             params={"fit_intercept": True},
@@ -335,8 +374,6 @@ def test_inference_rejects_input_files_missing_required_features(monkeypatch, tm
     with pytest.raises(ValidationError):
         ml_service.infer(
             InferWithFilesInput(
-                dataset_id=dataset.id,
-                feature_columns=["feature_a", "feature_b"],
                 trained_model_id=trained_models[0].id,
                 input_files=[str(invalid_input.resolve())],
             )

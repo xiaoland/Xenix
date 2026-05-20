@@ -18,7 +18,7 @@ Each persisted ML task must have:
 
 SQLite is the default store for ML task metadata.
 
-Current AI-first service contracts are dataset-scoped. Training, hyperparameter training, evaluation, and inference requests carry explicit dataset id, feature columns, target columns, model selection, and run name inputs. Agent Harness tools call these contracts from tool arguments and thread context.
+Current AI-first service contracts are dataset-scoped. Feature/target selection is first persisted as an immutable column-selection snapshot. Training and hyperparameter training tools pass `selection_id`; ML task requests expand that reference into explicit dataset id, feature columns, target columns, model selection, and run name inputs before execution. Inference uses the trained model metadata as the feature-column contract.
 
 ## Status Contract
 
@@ -67,7 +67,7 @@ ML tasks surfaced after the original dialog closes, such as inference results sh
 Result ownership rules:
 
 - Source dataset registrations may point to user-managed files.
-- ML task requests carry explicit dataset, feature column, target column, model selection, and artifact output owner inputs from service contracts.
+- ML task requests carry expanded dataset, feature column, target column, model selection, and artifact output owner inputs from service contracts.
 - App-managed dataset artifacts used by ML tasks are registered through service-owned artifact metadata.
 - Generated models, exports, and reports live in service-managed directories on the local filesystem.
 - ML task working directories live under `artifacts/ml-tasks/<ml-task-id>/`.

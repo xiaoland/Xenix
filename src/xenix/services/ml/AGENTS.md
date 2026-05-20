@@ -10,7 +10,7 @@ This guidance applies to the native ML workflow under `src/xenix/services/ml/`, 
 - `MLTaskService` owns atomic task queueing, worker dispatch, task completion/failure, and task artifact registration.
 - `MLWorkerRunner` is only a process helper. It must not own ML task lifecycle or workflow branching.
 - `DatasetService` keeps dataset inspection ownership. ML code may consume inspection results, but it must not re-own dataset analysis.
-- Agent Harness and tool results carry the first-slice working record. ML service inputs should be explicit dataset id, feature columns, target columns, model selections, and artifact output owner.
+- Agent Harness and tool results carry the first-slice working record. Training and tuning service inputs should reference immutable column selections; ML task payloads should expand those references into explicit dataset id, feature columns, target columns, model selections, and artifact output owner.
 
 ## Execution Rules
 

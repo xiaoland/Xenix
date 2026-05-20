@@ -15,7 +15,7 @@ SQLite is reserved for small, queryable application metadata:
 - User selections and lightweight preferences
 - References to files owned by the application
 
-The current AI-first SQLite baseline is schema version `4`. It contains Agent Harness conversation tables, artifact metadata, dataset metadata, ML task metadata, and trained-model metadata. The legacy work item table and `work_item_id` columns are outside this baseline.
+The current AI-first SQLite baseline is schema version `5`. It contains Agent Harness conversation tables, artifact metadata, dataset metadata, immutable dataset column selections, ML task metadata, and trained-model metadata. The legacy work item table and `work_item_id` columns are outside this baseline.
 
 Agent Thread rows store the thread-level system prompt. Agent Turn rows store the turn sequence and status. Agent Message rows store chronological content blocks, provider payloads, lifecycle status, update timestamps, and finalization timestamps. Message lifecycle statuses are persisted as lowercase enum values such as `in_progress` and `completed`. Tool-call rows store execution status, arguments, result payload, and links back to request/result Messages.
 
@@ -61,7 +61,7 @@ Current app-managed runtime layout includes:
 - Multi-input transforms record input dataset ids in artifact metadata until storage has a first-class multi-parent lineage field.
 - `copied_from` is retained for compatibility copy semantics; data cleaning and transformation use derived lineage.
 - Dataset inspection metadata such as row counts, inferred column kinds, and previews is runtime-derived and should not be persisted by default.
-- Feature/target selection, model outputs, and prediction outputs are represented by tool results and artifact metadata in the first AI-first slice.
+- Feature/target selection is stored as immutable dataset column-selection metadata. Model outputs and prediction outputs are represented by service-owned metadata and artifact records.
 - Artifacts are produced durable outputs such as datasets, reports, images, models, predictions, and other generated files.
 - Artifact links resolve through `ArtifactService`; Chatbot receives an artifact id and view hint, while filesystem access stays behind services.
 - Trained-model registration rows are durable metadata pointers to canonical model artifacts.
