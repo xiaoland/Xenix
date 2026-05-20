@@ -154,6 +154,7 @@ class MainWindow(QMainWindow):
         self._history_label.setText(self.tr("History"))
         self._new_thread_button.setText("+")
         self._new_thread_button.setToolTip(self.tr("New thread"))
+        self._thread_detail_view.retranslate_ui()
         if self._settings_dialog is not None:
             self._settings_dialog.retranslate_ui()
 

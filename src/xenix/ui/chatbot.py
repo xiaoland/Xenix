@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QEvent, QPoint, QSize, QTimer, Qt, Signal
+from PySide6.QtCore import QCoreApplication, QEvent, QPoint, QSize, QTimer, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QPalette, QTextOption
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -43,27 +43,135 @@ def _render_content_blocks(blocks: list[dict[str, Any]]) -> str:
         block_type = block.get("type")
         if block_type in {"text", "markdown"}:
             parts.append(str(block.get("text", "")))
+        elif block_type == "ui_error":
+            message = str(block.get("message", ""))
+            parts.append(
+                QCoreApplication.translate("ThreadDetailView", "Error: {message}").format(
+                    message=message
+                )
+            )
         elif block_type == "file":
             file_path = Path(str(block.get("path", "")))
             parts.append(f"`{file_path.name}`")
         elif block_type == "step_confirmation":
             parts.append(str(block.get("text", "")))
         elif block_type == "thinking":
-            parts.append(str(block.get("text") or "Thinking..."))
+            text = str(block.get("text") or "")
+            if text and text != "Thinking...":
+                parts.append(text)
+            else:
+                parts.append(QCoreApplication.translate("ThreadDetailView", "Thinking..."))
         elif block_type == "tool_event_summary":
-            parts.append(str(block.get("text", "")))
+            parts.append(_translate_tool_summary(str(block.get("text", ""))))
         elif block_type == "tool_call":
-            tool_name = str(block.get("tool_name") or "tool")
-            parts.append(f"Calling `{tool_name}`...")
+            tool_name = str(
+                block.get("tool_name")
+                or QCoreApplication.translate("ThreadDetailView", "tool")
+            )
+            parts.append(
+                QCoreApplication.translate("ThreadDetailView", "Calling `{tool_name}`...").format(
+                    tool_name=tool_name
+                )
+            )
         elif block_type == "tool_call_result":
-            tool_name = str(block.get("tool_name") or "tool")
+            tool_name = str(
+                block.get("tool_name")
+                or QCoreApplication.translate("ThreadDetailView", "tool")
+            )
             status = str(block.get("status") or "completed")
             error_summary = str(block.get("error_summary") or "").strip()
-            text = f"`{tool_name}` {status}."
+            text = QCoreApplication.translate(
+                "ThreadDetailView", "`{tool_name}` {status}."
+            ).format(tool_name=tool_name, status=_translate_tool_status(status))
             if error_summary:
                 text = f"{text} {error_summary}"
             parts.append(text)
     return "\n\n".join(part for part in parts if part)
+
+
+def _translate_tool_status(status: str) -> str:
+    normalized = status.strip().lower()
+    if normalized == "completed":
+        return QCoreApplication.translate("ThreadDetailView", "completed")
+    if normalized == "failed":
+        return QCoreApplication.translate("ThreadDetailView", "failed")
+    if normalized == "cancelled":
+        return QCoreApplication.translate("ThreadDetailView", "cancelled")
+    if normalized == "running":
+        return QCoreApplication.translate("ThreadDetailView", "running")
+    if normalized == "requested":
+        return QCoreApplication.translate("ThreadDetailView", "requested")
+    return status
+
+
+def _translate_tool_summary(summary: str) -> str:
+    if summary == "Running tool...":
+        return QCoreApplication.translate("ToolCallItem", "Running tool...")
+    if summary == "Ran tool":
+        return QCoreApplication.translate("ToolCallItem", "Ran tool")
+    if summary == "Cancelled tool run":
+        return QCoreApplication.translate("ToolCallItem", "Cancelled tool run")
+    if summary == "Inspecting dataset...":
+        return QCoreApplication.translate("ToolCallItem", "Inspecting dataset...")
+    if summary == "Inspected dataset":
+        return QCoreApplication.translate("ToolCallItem", "Inspected dataset")
+    if summary == "Cancelled dataset inspection":
+        return QCoreApplication.translate("ToolCallItem", "Cancelled dataset inspection")
+    if summary == "Integrating data...":
+        return QCoreApplication.translate("ToolCallItem", "Integrating data...")
+    if summary == "Integrated data":
+        return QCoreApplication.translate("ToolCallItem", "Integrated data")
+    if summary == "Cancelled data integration":
+        return QCoreApplication.translate("ToolCallItem", "Cancelled data integration")
+    if summary == "Cleaning dataset...":
+        return QCoreApplication.translate("ToolCallItem", "Cleaning dataset...")
+    if summary == "Cleaned dataset":
+        return QCoreApplication.translate("ToolCallItem", "Cleaned dataset")
+    if summary == "Cancelled dataset cleaning":
+        return QCoreApplication.translate("ToolCallItem", "Cancelled dataset cleaning")
+    if summary == "Querying dataset...":
+        return QCoreApplication.translate("ToolCallItem", "Querying dataset...")
+    if summary == "Queried dataset":
+        return QCoreApplication.translate("ToolCallItem", "Queried dataset")
+    if summary == "Cancelled dataset query":
+        return QCoreApplication.translate("ToolCallItem", "Cancelled dataset query")
+    if summary == "Transforming dataset...":
+        return QCoreApplication.translate("ToolCallItem", "Transforming dataset...")
+    if summary == "Transformed dataset":
+        return QCoreApplication.translate("ToolCallItem", "Transformed dataset")
+    if summary == "Cancelled dataset transformation":
+        return QCoreApplication.translate("ToolCallItem", "Cancelled dataset transformation")
+    if summary == "Selecting features...":
+        return QCoreApplication.translate("ToolCallItem", "Selecting features...")
+    if summary == "Selected features":
+        return QCoreApplication.translate("ToolCallItem", "Selected features")
+    if summary == "Cancelled feature selection":
+        return QCoreApplication.translate("ToolCallItem", "Cancelled feature selection")
+    if summary == "Loading model metadata...":
+        return QCoreApplication.translate("ToolCallItem", "Loading model metadata...")
+    if summary == "Loaded model metadata":
+        return QCoreApplication.translate("ToolCallItem", "Loaded model metadata")
+    if summary == "Cancelled model metadata lookup":
+        return QCoreApplication.translate("ToolCallItem", "Cancelled model metadata lookup")
+    if summary == "Training model...":
+        return QCoreApplication.translate("ToolCallItem", "Training model...")
+    if summary == "Trained model":
+        return QCoreApplication.translate("ToolCallItem", "Trained model")
+    if summary == "Cancelled model training":
+        return QCoreApplication.translate("ToolCallItem", "Cancelled model training")
+    if summary == "Tuning model...":
+        return QCoreApplication.translate("ToolCallItem", "Tuning model...")
+    if summary == "Tuned model":
+        return QCoreApplication.translate("ToolCallItem", "Tuned model")
+    if summary == "Cancelled model tuning":
+        return QCoreApplication.translate("ToolCallItem", "Cancelled model tuning")
+    if summary == "Running prediction...":
+        return QCoreApplication.translate("ToolCallItem", "Running prediction...")
+    if summary == "Ran prediction":
+        return QCoreApplication.translate("ToolCallItem", "Ran prediction")
+    if summary == "Cancelled prediction run":
+        return QCoreApplication.translate("ToolCallItem", "Cancelled prediction run")
+    return summary
 
 
 class AutoHeightTextBrowser(QTextBrowser):
@@ -214,6 +322,8 @@ class ChatMessageBubble(QFrame):
 
     def __init__(self, *, author: str, blocks: list[dict[str, Any]], parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._author = author
+        self._author_label: QLabel | None = None
         self.setObjectName("chatMessageRow")
 
         card = QFrame(self)
@@ -227,7 +337,8 @@ class ChatMessageBubble(QFrame):
         card_layout.setSpacing(7)
 
         if self._shows_author(author, blocks):
-            author_label = QLabel(author)
+            author_label = QLabel(self._display_author())
+            self._author_label = author_label
             author_label.setObjectName("chatMessageAuthor")
             author_font = QFont(author_label.font())
             author_font.setBold(True)
@@ -267,6 +378,15 @@ class ChatMessageBubble(QFrame):
     def _shows_author(self, author: str, blocks: list[dict[str, Any]]) -> bool:
         return author not in {"You", "Xenix"}
 
+    def _display_author(self) -> str:
+        if self._author == "You":
+            return self.tr("You")
+        if self._author == "Tool":
+            return self.tr("Tool")
+        if self._author == "System":
+            return self.tr("System")
+        return self._author
+
     def _apply_message_palette(self, author: str, card: QFrame, browser: QTextBrowser) -> None:
         if author != "You":
             card.setAutoFillBackground(False)
@@ -302,6 +422,11 @@ class ChatMessageBubble(QFrame):
 
     def set_blocks(self, blocks: list[dict[str, Any]]) -> None:
         self._blocks = list(blocks)
+        self._browser.setMarkdown(self._render_blocks(self._blocks))
+
+    def retranslate_ui(self) -> None:
+        if self._author_label is not None:
+            self._author_label.setText(self._display_author())
         self._browser.setMarkdown(self._render_blocks(self._blocks))
 
     def _handle_link_activated(self, url) -> None:
@@ -345,7 +470,6 @@ class ToolCallItem(QFrame):
         self._chevron_button.setAutoRaise(True)
         self._chevron_button.setArrowType(Qt.NoArrow)
         self._chevron_button.setIconSize(QSize(16, 16))
-        self._chevron_button.setToolTip("Show result")
         self._chevron_button.clicked.connect(self._toggle_detail)
 
         header_layout.addWidget(self._icon_label, 0, Qt.AlignVCenter)
@@ -366,17 +490,22 @@ class ToolCallItem(QFrame):
     def set_event(self, event: ChatbotEvent) -> None:
         self._event = event
         self._icon_label.setPixmap(tool_icon(event.icon_key).pixmap(QSize(16, 16)))
-        self._summary_label.setText(event.summary or "")
+        self._summary_label.setText(_translate_tool_summary(event.summary or ""))
         has_detail = bool(event.detail_blocks)
         self._chevron_button.setVisible(has_detail)
         self._chevron_button.setEnabled(has_detail)
         if not has_detail:
             self._expanded = False
         self._chevron_button.setIcon(chevron_icon(expanded=self._expanded))
-        self._chevron_button.setToolTip("Hide result" if self._expanded else "Show result")
+        self._chevron_button.setToolTip(
+            self.tr("Hide result") if self._expanded else self.tr("Show result")
+        )
         self._detail_browser.setMarkdown(_render_content_blocks(event.detail_blocks))
         self._detail_browser.setVisible(has_detail and self._expanded)
         _propagate_geometry_change(self)
+
+    def retranslate_ui(self) -> None:
+        self.set_event(self._event)
 
     def set_available_width(self, width: int) -> None:
         self.setMaximumWidth(UNBOUNDED_WIDGET_WIDTH)
@@ -472,17 +601,16 @@ class ThreadDetailView(QWidget):
 
         self._editor = AutoGrowingTextEdit(max_lines=6)
         self._editor.setObjectName("chatComposerEditor")
-        self._editor.setPlaceholderText("Message Xenix")
         self._editor.multiline_changed.connect(self._set_composer_multiline)
         self._editor.submit_requested.connect(self._handle_button_clicked)
 
-        self._send_button = QPushButton("Send")
+        self._send_button = QPushButton()
         self._send_button.setObjectName("sendButton")
         self._send_button.setMinimumWidth(76)
         self._send_button.setFixedHeight(34)
         self._send_button.clicked.connect(self._handle_button_clicked)
 
-        self._expanded_send_button = QPushButton("Send")
+        self._expanded_send_button = QPushButton()
         self._expanded_send_button.setObjectName("sendButton")
         self._expanded_send_button.setMinimumWidth(76)
         self._expanded_send_button.setFixedHeight(34)
@@ -499,11 +627,11 @@ class ThreadDetailView(QWidget):
         self._step_confirmation_label.setObjectName("stepConfirmationLabel")
         self._step_confirmation_label.setWordWrap(True)
 
-        self._step_continue_button = QPushButton("Continue")
+        self._step_continue_button = QPushButton()
         self._step_continue_button.setObjectName("stepContinueButton")
         self._step_continue_button.clicked.connect(self.step_budget_continue_requested.emit)
 
-        self._step_stop_button = QPushButton("Stop")
+        self._step_stop_button = QPushButton()
         self._step_stop_button.setObjectName("stepStopButton")
         self._step_stop_button.clicked.connect(self.step_budget_stop_requested.emit)
 
@@ -558,14 +686,14 @@ class ThreadDetailView(QWidget):
         composer_drop_layout.setSpacing(3)
         composer_drop_layout.setAlignment(Qt.AlignCenter)
 
-        self._composer_drop_title = QLabel("Drop files to attach")
+        self._composer_drop_title = QLabel()
         self._composer_drop_title.setObjectName("composerDropTitle")
         self._composer_drop_title.setAlignment(Qt.AlignCenter)
         composer_drop_title_font = QFont(self._composer_drop_title.font())
         composer_drop_title_font.setBold(True)
         self._composer_drop_title.setFont(composer_drop_title_font)
 
-        self._composer_drop_hint = QLabel("Release here to add them to the next message")
+        self._composer_drop_hint = QLabel()
         self._composer_drop_hint.setObjectName("composerDropHint")
         self._composer_drop_hint.setAlignment(Qt.AlignCenter)
 
@@ -581,9 +709,31 @@ class ThreadDetailView(QWidget):
         root.addWidget(self._scroll, 1)
         root.addWidget(self._composer_shell, 0)
 
+        self.retranslate_ui()
         self._refresh_attachment_chips()
         self._set_composer_multiline(False)
         self._sync_composer_drop_overlay_geometry()
+
+    def retranslate_ui(self) -> None:
+        self._editor.setPlaceholderText(self.tr("Message Xenix"))
+        self._attach_button.setToolTip(self.tr("Attach files"))
+        self._expanded_attach_button.setToolTip(self.tr("Attach files"))
+        self._step_continue_button.setText(self.tr("Continue"))
+        self._step_stop_button.setText(self.tr("Stop"))
+        self._composer_drop_title.setText(self.tr("Drop files to attach"))
+        self._composer_drop_hint.setText(self.tr("Release here to add them to the next message"))
+        self._sync_send_button_text()
+        for index in range(self._message_layout.count()):
+            item = self._message_layout.itemAt(index)
+            widget = item.widget() if item is not None else None
+            retranslate = getattr(widget, "retranslate_ui", None)
+            if callable(retranslate):
+                retranslate()
+
+    def changeEvent(self, event: QEvent) -> None:
+        if event.type() == QEvent.LanguageChange:
+            self.retranslate_ui()
+        super().changeEvent(event)
 
     def render_snapshot(self, snapshot: ThreadSnapshot) -> None:
         self.render_events(project_chatbot_events(snapshot))
@@ -786,10 +936,13 @@ class ThreadDetailView(QWidget):
         if running:
             self._set_composer_drop_hover(False)
             self.clear_step_confirmation()
-        send_text = "Stop" if running else "Send"
+        self._sync_send_button_text()
+        self._sync_composer_controls_enabled()
+
+    def _sync_send_button_text(self) -> None:
+        send_text = self.tr("Stop") if self._running else self.tr("Send")
         self._send_button.setText(send_text)
         self._expanded_send_button.setText(send_text)
-        self._sync_composer_controls_enabled()
 
     def show_step_confirmation(self, message: str) -> None:
         self._awaiting_step_confirmation = True
@@ -805,7 +958,7 @@ class ThreadDetailView(QWidget):
         self._sync_composer_controls_enabled()
 
     def show_error(self, message: str) -> None:
-        self.add_message("System", [{"type": "markdown", "text": f"Error: {message}"}])
+        self.add_message("System", [{"type": "ui_error", "message": message}])
 
     def dragEnterEvent(self, event) -> None:  # type: ignore[override]
         if self._can_accept_file_drop(event):
@@ -837,9 +990,9 @@ class ThreadDetailView(QWidget):
     def _choose_files(self) -> None:
         paths, _selected_filter = QFileDialog.getOpenFileNames(
             self,
-            "Attach files",
+            self.tr("Attach files"),
             "",
-            "Data files (*.csv *.xlsx *.xls);;All files (*)",
+            self.tr("Data files (*.csv *.xlsx *.xls);;All files (*)"),
         )
         self._add_local_files(paths)
 
@@ -848,7 +1001,7 @@ class ThreadDetailView(QWidget):
         button.setFixedSize(34, 34)
         button.setIcon(attach_file_icon())
         button.setIconSize(QSize(16, 16))
-        button.setToolTip("Attach files")
+        button.setToolTip(self.tr("Attach files"))
 
     def _add_local_files(self, paths: list[str]) -> None:
         for raw_path in paths:

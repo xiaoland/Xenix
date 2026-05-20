@@ -15,6 +15,12 @@ from xenix.i18n import (
     translation_file_path,
     write_saved_locale,
 )
+from xenix.services.agent import (
+    ChatbotEvent,
+    ChatbotEventAuthor,
+    ChatbotEventKind,
+    ChatbotEventStatus,
+)
 
 
 @pytest.fixture()
@@ -88,6 +94,42 @@ def test_main_window_language_switch_updates_chat_shell(
         assert window._history_label.text() == "History"
         assert settings._open_logs_button.text() == "Open log directory"
         assert settings._build_commit_label.text() == "Build commit"
+        chat_view = window._thread_detail_view
+        chat_view.clear_messages()
+        chat_view.show_error("Stopped.")
+        error_bubble = chat_view._message_layout.itemAt(0).widget()
+        chat_view.show_thinking_indicator()
+        tool_item = chat_view.add_tool_event(
+            ChatbotEvent(
+                id="tool-event",
+                kind=ChatbotEventKind.TOOL,
+                author=ChatbotEventAuthor.TOOL,
+                status=ChatbotEventStatus.PENDING,
+                summary="Inspecting dataset...",
+                detail_blocks=[
+                    {
+                        "type": "tool_call_result",
+                        "tool_name": "data.peek",
+                        "status": "completed",
+                    }
+                ],
+            ),
+            auto_scroll=False,
+        )
+
+        assert chat_view._editor.placeholderText() == "Message Xenix"
+        assert chat_view._send_button.text() == "Send"
+        assert chat_view._attach_button.toolTip() == "Attach files"
+        assert chat_view._step_continue_button.text() == "Continue"
+        assert chat_view._step_stop_button.text() == "Stop"
+        assert chat_view._composer_drop_title.text() == "Drop files to attach"
+        assert chat_view._composer_drop_hint.text() == "Release here to add them to the next message"
+        assert error_bubble._browser.toPlainText() == "Error: Stopped."
+        assert chat_view._thinking_bubble._browser.toPlainText() == "Thinking..."
+        assert tool_item._summary_label.text() == "Inspecting dataset..."
+        assert tool_item._chevron_button.toolTip() == "Show result"
+        assert "data.peek" in tool_item._detail_browser.toPlainText()
+        assert "completed" in tool_item._detail_browser.toPlainText()
 
         zh_index = settings._language_selector.findData("zh_CN")
         settings._language_selector.setCurrentIndex(zh_index)
@@ -99,6 +141,19 @@ def test_main_window_language_switch_updates_chat_shell(
         assert window._history_label.text() == "历史"
         assert settings._open_logs_button.text() == "打开日志目录"
         assert settings._build_commit_label.text() == "构建提交"
+        assert chat_view._editor.placeholderText() == "给 Xenix 发消息"
+        assert chat_view._send_button.text() == "发送"
+        assert chat_view._attach_button.toolTip() == "添加文件"
+        assert chat_view._step_continue_button.text() == "继续"
+        assert chat_view._step_stop_button.text() == "停止"
+        assert chat_view._composer_drop_title.text() == "拖放文件以添加附件"
+        assert chat_view._composer_drop_hint.text() == "松开后添加到下一条消息"
+        assert error_bubble._browser.toPlainText() == "错误：Stopped."
+        assert chat_view._thinking_bubble._browser.toPlainText() == "思考中..."
+        assert tool_item._summary_label.text() == "正在检查数据集..."
+        assert tool_item._chevron_button.toolTip() == "显示结果"
+        assert "data.peek" in tool_item._detail_browser.toPlainText()
+        assert "已完成" in tool_item._detail_browser.toPlainText()
         assert read_saved_locale(paths) == "zh_CN"
 
         en_index = settings._language_selector.findData("en_US")
@@ -108,6 +163,12 @@ def test_main_window_language_switch_updates_chat_shell(
         assert window.windowTitle() == "Xenix Native"
         assert settings._open_logs_button.text() == "Open log directory"
         assert settings._build_commit_label.text() == "Build commit"
+        assert chat_view._editor.placeholderText() == "Message Xenix"
+        assert chat_view._send_button.text() == "Send"
+        assert chat_view._attach_button.toolTip() == "Attach files"
+        assert error_bubble._browser.toPlainText() == "Error: Stopped."
+        assert chat_view._thinking_bubble._browser.toPlainText() == "Thinking..."
+        assert tool_item._summary_label.text() == "Inspecting dataset..."
         assert read_saved_locale(paths) == "en_US"
     finally:
         if window._settings_dialog is not None:
