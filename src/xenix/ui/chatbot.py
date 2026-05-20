@@ -25,6 +25,7 @@ from ..services.agent import (
     ChatbotEvent,
     ChatbotEventAuthor,
     ChatbotEventKind,
+    ChatbotEventStatus,
     ThreadSnapshot,
     project_chatbot_events,
 )
@@ -630,6 +631,8 @@ class ThreadDetailView(QWidget):
         self.add_message("You", blocks, auto_scroll=auto_scroll)
 
     def add_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> QWidget:
+        if event.kind is ChatbotEventKind.THINKING:
+            return self.add_thinking_event(event, auto_scroll=auto_scroll)
         if event.kind is ChatbotEventKind.TOOL:
             return self.add_tool_event(event, auto_scroll=auto_scroll)
         return self.add_message(
@@ -650,12 +653,26 @@ class ThreadDetailView(QWidget):
             self._scroll_to_latest()
         return item
 
+    def add_thinking_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> ChatMessageBubble:
+        bubble = ChatMessageBubble(
+            author=self._event_author_label(event.author),
+            blocks=event.content_blocks,
+            parent=self,
+        )
+        bubble.link_activated.connect(self.artifact_link_activated.emit)
+        bubble.set_available_width(self._message_column.width())
+        self._message_layout.insertWidget(self._message_insert_index(), bubble)
+        self._event_widgets_by_id[event.id] = bubble
+        self._thinking_bubble = bubble
+        if auto_scroll:
+            self._scroll_to_latest()
+        return bubble
+
     def apply_message_event(self, message, *, auto_scroll: bool = True) -> None:
         if message.kind is AgentMessageKind.SYSTEM:
             return
         if message.kind in {AgentMessageKind.TOOL_CALL, AgentMessageKind.TOOL_CALL_RESULT}:
             return
-        self.hide_thinking_indicator()
         existing = self._message_bubbles_by_id.get(message.id)
         if existing is not None:
             existing.set_blocks(message.content_blocks)
@@ -670,7 +687,19 @@ class ThreadDetailView(QWidget):
         )
 
     def apply_chatbot_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> None:
-        self.hide_thinking_indicator()
+        if event.kind is ChatbotEventKind.THINKING:
+            if event.status is ChatbotEventStatus.IN_PROGRESS:
+                existing = self._event_widgets_by_id.get(event.id)
+                if isinstance(existing, ChatMessageBubble):
+                    existing.set_blocks(event.content_blocks)
+                    self._thinking_bubble = existing
+                    if auto_scroll:
+                        self._scroll_to_latest()
+                    return
+                self.add_thinking_event(event, auto_scroll=auto_scroll)
+                return
+            self._remove_event_widget(event.id)
+            return
         existing = self._event_widgets_by_id.get(event.id)
         if existing is not None:
             if isinstance(existing, ToolCallItem):
@@ -681,6 +710,15 @@ class ThreadDetailView(QWidget):
                 self._scroll_to_latest()
             return
         self.add_event(event, auto_scroll=auto_scroll)
+
+    def _remove_event_widget(self, event_id: str) -> None:
+        widget = self._event_widgets_by_id.pop(event_id, None)
+        if widget is None:
+            return
+        if widget is self._thinking_bubble:
+            self._thinking_bubble = None
+        self._message_layout.removeWidget(widget)
+        widget.deleteLater()
 
     def show_thinking_indicator(self) -> None:
         if self._thinking_bubble is not None:

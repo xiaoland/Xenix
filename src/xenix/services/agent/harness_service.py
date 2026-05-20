@@ -31,6 +31,8 @@ from .conversation_store import (
 )
 from .chatbot_events import (
     ChatbotEvent,
+    ChatbotEventStatus,
+    build_thinking_chatbot_event,
     build_tool_result_content_blocks,
     project_chatbot_events,
     project_text_message_event,
@@ -483,9 +485,24 @@ class AgentHarnessService:
             provider_response: ProviderResponse | None = None
             assistant_message: AgentMessageRow | None = None
             assistant_text = ""
+            thinking_in_progress = True
+            yield self._thinking_event(
+                thread_id=thread_id,
+                turn_id=turn_id,
+                run_id=run_id,
+                status=ChatbotEventStatus.IN_PROGRESS,
+            )
             try:
                 for stream_event in self._provider_stream(snapshot.provider_messages(), self._tool_registry.list_specs()):
                     self._raise_if_cancelled(run_id)
+                    if thinking_in_progress:
+                        thinking_in_progress = False
+                        yield self._thinking_event(
+                            thread_id=thread_id,
+                            turn_id=turn_id,
+                            run_id=run_id,
+                            status=ChatbotEventStatus.COMPLETED,
+                        )
                     if stream_event.delta_text:
                         assistant_text += stream_event.delta_text
                         assistant_blocks = [{"type": "markdown", "text": assistant_text}]
@@ -514,6 +531,13 @@ class AgentHarnessService:
                         provider_response = stream_event.response
                 self._raise_if_cancelled(run_id)
             except AgentRunCancelled:
+                if thinking_in_progress:
+                    yield self._thinking_event(
+                        thread_id=thread_id,
+                        turn_id=turn_id,
+                        run_id=run_id,
+                        status=ChatbotEventStatus.CANCELLED,
+                    )
                 if assistant_message is not None:
                     assistant_message = self._conversation_store.update_message(
                         UpdateAgentMessageInput(
@@ -524,6 +548,13 @@ class AgentHarnessService:
                     yield self._message_event("message_finalized", assistant_message, run_id)
                 raise
             except Exception:
+                if thinking_in_progress:
+                    yield self._thinking_event(
+                        thread_id=thread_id,
+                        turn_id=turn_id,
+                        run_id=run_id,
+                        status=ChatbotEventStatus.FAILED,
+                    )
                 if assistant_message is not None:
                     assistant_message = self._conversation_store.update_message(
                         UpdateAgentMessageInput(
@@ -533,6 +564,14 @@ class AgentHarnessService:
                     )
                     yield self._message_event("message_finalized", assistant_message, run_id)
                 raise
+            if thinking_in_progress:
+                thinking_in_progress = False
+                yield self._thinking_event(
+                    thread_id=thread_id,
+                    turn_id=turn_id,
+                    run_id=run_id,
+                    status=ChatbotEventStatus.COMPLETED,
+                )
 
             if provider_response is None:
                 if assistant_message is not None:
@@ -756,6 +795,26 @@ class AgentHarnessService:
             message_id=message.id,
             message=message,
             chatbot_event=chatbot_event,
+        )
+
+    def _thinking_event(
+        self,
+        *,
+        thread_id: str,
+        turn_id: str,
+        run_id: str,
+        status: ChatbotEventStatus,
+    ) -> AgentHarnessStreamEvent:
+        return AgentHarnessStreamEvent(
+            kind="chatbot_event",
+            thread_id=thread_id,
+            turn_id=turn_id,
+            run_id=run_id,
+            chatbot_event=build_thinking_chatbot_event(
+                run_id=run_id,
+                turn_id=turn_id,
+                status=status,
+            ),
         )
 
     def _tool_event(

@@ -295,8 +295,23 @@ def test_agent_harness_streams_assistant_as_message_events(monkeypatch, tmp_path
         for event in message_events
         if event.message is not None and event.message.kind is AgentMessageKind.ASSISTANT
     ]
+    thinking_events = [
+        event.chatbot_event
+        for event in events
+        if event.kind == "chatbot_event"
+        and event.chatbot_event is not None
+        and event.chatbot_event.kind is ChatbotEventKind.THINKING
+    ]
     snapshot = events[-1].snapshot
 
+    assert [event.status for event in thinking_events] == [
+        ChatbotEventStatus.IN_PROGRESS,
+        ChatbotEventStatus.COMPLETED,
+    ]
+    assert thinking_events[0].content_blocks == [{"type": "thinking", "text": "Thinking..."}]
+    assert events.index(next(event for event in events if event.chatbot_event is thinking_events[-1])) < events.index(
+        assistant_events[0]
+    )
     assert [event.kind for event in assistant_events][0] == "message_created"
     assert [event.kind for event in assistant_events][-1] == "message_finalized"
     assert len({event.message.id for event in assistant_events if event.message is not None}) == 1

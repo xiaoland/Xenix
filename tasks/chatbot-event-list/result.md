@@ -31,11 +31,13 @@
 - Chatbot UI renders:
   - user/assistant text events as existing bubbles
   - tool events as `ToolCallItem` rows with icon, summary, chevron, and expandable detail
+  - transient thinking events as temporary assistant-style thinking bubbles
 - Tool events now occupy the full EventList column width.
 - Tool icons and chevrons use QtAwesome icons rather than text glyphs, Qt filled arrows, or custom painter drawing.
 - Legacy chat-surface naming has been unified to Chatbot/chatbot, while the selected-thread container remains `ThreadDetailView`.
 - Auto-height message text browsers ignore wheel events so message content does not become an internal scroll target.
 - Chatbot UI no longer inserts turn dividers.
+- Thinking indicator lifetime is driven by Harness-emitted `ChatbotEventKind.THINKING` events and is defined as the interval from provider request send to the first provider stream event.
 
 ## Verification
 
@@ -63,6 +65,8 @@
   - Result: 24 passed.
 - `pdm run pytest` after Chatbot naming unification
   - Result: 89 passed.
+- `pdm run pytest tests/test_agent_harness_streaming.py tests/test_main.py` after moving thinking into `ChatbotEventKind.THINKING`
+  - Result: 32 passed.
 - Note: pytest completed successfully, then Windows reported a cleanup-time `PermissionError` while removing `pytest-current` under the temp directory. This happened after test completion and did not change the pass result.
 
 ## Remaining Notes

@@ -79,7 +79,7 @@ Agent Harness exposes Chatbot timeline changes as ChatbotEvent-shaped stream eve
 - `message_finalized`: a persisted in-progress `Message` reached a terminal lifecycle state and may carry the corresponding Chatbot Event.
 - `step_confirmation_required`: control state for user approval after the step budget is exhausted; the corresponding system Message is still persisted and emitted as a message event.
 
-The Harness converts provider text chunks into updates on one assistant Message and one assistant Chatbot Event. Tool-call and tool-result records are one-shot persisted Messages, but project to one logical tool Chatbot Event. `AgentToolCallRow` remains execution metadata.
+The Harness emits `THINKING` Chatbot Events around each provider request. The start event is emitted when the provider request boundary is entered; the completed event is emitted when the first provider stream event arrives, before rendering the first assistant delta or tool response. If the request fails or is cancelled before any provider event arrives, the failed or cancelled event clears the same transient thinking item. The Harness converts provider text chunks into updates on one assistant Message and one assistant Chatbot Event. Tool-call and tool-result records are one-shot persisted Messages, but project to one logical tool Chatbot Event. `AgentToolCallRow` remains execution metadata.
 
 ## System Prompt
 

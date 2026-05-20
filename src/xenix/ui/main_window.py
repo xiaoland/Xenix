@@ -231,11 +231,13 @@ class MainWindow(QMainWindow):
             )
             self._refresh_history_sidebar(selected_thread_id=event.snapshot.thread.id)
             return
+        if event.kind == "chatbot_event" and event.chatbot_event is not None:
+            self._thread_detail_view.apply_chatbot_event(event.chatbot_event)
+            return
         if event.kind == "step_confirmation_required":
             self._render_step_confirmation(event)
             return
         if event.kind in {"message_created", "message_updated", "message_finalized"}:
-            self._thread_detail_view.hide_thinking_indicator()
             if event.chatbot_event is not None:
                 self._thread_detail_view.apply_chatbot_event(event.chatbot_event)
             elif event.message is not None:

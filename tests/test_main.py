@@ -487,7 +487,7 @@ def test_thread_detail_view_enter_submits_and_shift_enter_inserts_newline(monkey
         window.close()
 
 
-def test_thread_detail_view_thinking_indicator_is_bottom_temporary_message(monkeypatch, tmp_path: Path) -> None:
+def test_thread_detail_view_thinking_event_is_bottom_temporary_message(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
@@ -497,7 +497,16 @@ def test_thread_detail_view_thinking_indicator_is_bottom_temporary_message(monke
         view = window._thread_detail_view
         view.clear_messages()
         view.add_message("You", [{"type": "text", "text": "Analyze this."}])
-        view.show_thinking_indicator()
+        view.apply_chatbot_event(
+            ChatbotEvent(
+                id="thinking-event",
+                kind=ChatbotEventKind.THINKING,
+                turn_id="turn",
+                author=ChatbotEventAuthor.ASSISTANT,
+                status=ChatbotEventStatus.IN_PROGRESS,
+                content_blocks=[{"type": "thinking", "text": "Thinking..."}],
+            )
+        )
         app.processEvents()
 
         thinking = view._thinking_bubble
@@ -505,22 +514,80 @@ def test_thread_detail_view_thinking_indicator_is_bottom_temporary_message(monke
         assert thinking._blocks == [{"type": "thinking", "text": "Thinking..."}]
         assert view._message_layout.itemAt(view._message_layout.count() - 2).widget() is thinking
 
-        view.apply_message_event(
-            AgentMessageRow(
-                id="assistant-thinking-replacement",
-                thread_id="thread",
+        view.apply_chatbot_event(
+            ChatbotEvent(
+                id="thinking-event",
+                kind=ChatbotEventKind.THINKING,
                 turn_id="turn",
-                sequence_index=1,
-                kind=AgentMessageKind.ASSISTANT,
-                ui_author=AgentMessageAuthor.ASSISTANT,
-                content_blocks=[{"type": "markdown", "text": "Working"}],
-                status=AgentMessageStatus.IN_PROGRESS,
+                author=ChatbotEventAuthor.ASSISTANT,
+                status=ChatbotEventStatus.COMPLETED,
             )
         )
         app.processEvents()
 
         assert view._thinking_bubble is None
     finally:
+        window.close()
+
+
+def test_main_window_keeps_thinking_indicator_during_non_final_snapshot(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=True)
+    release_stream = False
+    try:
+        window._new_thread_button.click()
+        app.processEvents()
+        thread_id = window._agent_thread_id
+        assert thread_id is not None
+        snapshot = window._agent_harness_service.get_thread_snapshot(thread_id)
+
+        def fake_submit(_input_data):
+            nonlocal release_stream
+            yield AgentHarnessStreamEvent(
+                kind="snapshot",
+                thread_id=thread_id,
+                run_id="run-thinking",
+                snapshot=snapshot,
+                chatbot_events=[],
+                is_final=False,
+            )
+            yield AgentHarnessStreamEvent(
+                kind="chatbot_event",
+                thread_id=thread_id,
+                run_id="run-thinking",
+                chatbot_event=ChatbotEvent(
+                    id="run-thinking:thinking",
+                    kind=ChatbotEventKind.THINKING,
+                    turn_id="turn-thinking",
+                    author=ChatbotEventAuthor.ASSISTANT,
+                    status=ChatbotEventStatus.IN_PROGRESS,
+                    content_blocks=[{"type": "thinking", "text": "Thinking..."}],
+                ),
+            )
+            while not release_stream:
+                time.sleep(0.01)
+
+        monkeypatch.setattr(window._agent_harness_service, "submit_user_turn_stream", fake_submit)
+        window._submit_chat_message("Analyze this.", [])
+
+        for _ in range(40):
+            app.processEvents()
+            thinking = window._thread_detail_view._thinking_bubble
+            if thinking is not None:
+                break
+            time.sleep(0.01)
+
+        thinking = window._thread_detail_view._thinking_bubble
+        assert thinking is not None
+        assert thinking._blocks == [{"type": "thinking", "text": "Thinking..."}]
+    finally:
+        release_stream = True
+        for _ in range(5):
+            app.processEvents()
+            time.sleep(0.01)
         window.close()
 
 

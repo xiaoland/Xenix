@@ -21,6 +21,7 @@ from .tools import ToolPresentation, tool_presentation_for_name
 class ChatbotEventKind(StrEnum):
     TEXT = "text"
     TOOL = "tool"
+    THINKING = "thinking"
 
 
 class ChatbotEventStatus(StrEnum):
@@ -54,6 +55,29 @@ class ChatbotEvent(SQLModel):
 
 
 ToolPresentationLookup = Callable[[str], ToolPresentation]
+
+
+def thinking_chatbot_event_id(run_id: str) -> str:
+    return f"{run_id}:thinking"
+
+
+def build_thinking_chatbot_event(
+    *,
+    run_id: str,
+    turn_id: str | None,
+    status: ChatbotEventStatus,
+) -> ChatbotEvent:
+    return ChatbotEvent(
+        id=thinking_chatbot_event_id(run_id),
+        kind=ChatbotEventKind.THINKING,
+        turn_id=turn_id,
+        author=ChatbotEventAuthor.ASSISTANT,
+        status=status,
+        content_blocks=[{"type": "thinking", "text": "Thinking..."}]
+        if status is ChatbotEventStatus.IN_PROGRESS
+        else [],
+        summary="Thinking..." if status is ChatbotEventStatus.IN_PROGRESS else None,
+    )
 
 
 def project_chatbot_events(

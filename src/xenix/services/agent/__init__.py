@@ -16,8 +16,10 @@ from .chatbot_events import (
     ChatbotEventAuthor,
     ChatbotEventKind,
     ChatbotEventStatus,
+    build_thinking_chatbot_event,
     build_tool_result_content_blocks,
     project_chatbot_events,
+    thinking_chatbot_event_id,
 )
 from .harness_service import AgentHarnessService, AgentHarnessStreamEvent, ContinueStepBudgetInput, SubmitUserTurnInput
 from .providers import (
@@ -62,7 +64,9 @@ __all__ = [
     "ThreadSnapshot",
     "ToolPresentation",
     "UpdateAgentMessageInput",
+    "build_thinking_chatbot_event",
     "build_tool_result_content_blocks",
     "project_chatbot_events",
+    "thinking_chatbot_event_id",
     "tool_presentation_for_name",
 ]

@@ -28,6 +28,7 @@ The central thread detail view stretches to consume remaining horizontal space. 
 - step-budget confirmation controls
 
 The ThreadDetailView EventList renders projected Chatbot Events emitted by Agent Harness. System messages are hidden from the normal EventList unless Agent Harness exposes a dedicated control event.
+Transient thinking state is also driven by Chatbot Events: `THINKING` with `IN_PROGRESS` inserts or updates the temporary thinking item, while a terminal `THINKING` event with the same id removes it. Thinking represents the interval from provider request send to the first provider stream event. MainWindow and ThreadDetailView must not infer thinking lifetime from snapshots or assistant message arrival.
 
 ## Event Rendering
 
