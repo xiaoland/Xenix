@@ -448,13 +448,16 @@ class MLService:
             raise ValidationError("The selected trained model does not contain a train role-binding contract.")
 
         dataset = self._dataset_service.get_dataset(trained_model.dataset_id)
-        feature_columns = self._normalize_columns(_role_columns(metadata.train_role_bindings, "feature"), "feature")
+        apply_columns = self._normalize_columns(
+            self._apply_columns_from_metadata(metadata),
+            "apply",
+        )
         if not Path(dataset.source_path).exists():
             raise DatasetSourceMissingError("Dataset source file is missing.")
         return _ApplyContext(
             project_id=dataset.project_id,
             dataset=dataset,
-            feature_columns=feature_columns,
+            feature_columns=apply_columns,
             trained_model=trained_model,
         )
 
@@ -524,7 +527,7 @@ class MLService:
             )
             available = {column.name for column in inspection.columns}
             if not set(feature_columns).issubset(available):
-                raise ValidationError("Apply input file does not contain the required feature columns.")
+                raise ValidationError("Apply input file does not contain the required apply columns.")
             absolute_path = Path(inspection.source_path).resolve()
             source_kind = "manual_csv" if manual_root in absolute_path.parents else "user_file"
             files.append(
@@ -546,7 +549,7 @@ class MLService:
 
         header_index_map = self._normalize_inline_header_index_map(input_rows.header_index_map)
         if set(header_index_map) != set(feature_columns):
-            raise ValidationError("Inline apply columns must match the trained model feature columns exactly.")
+            raise ValidationError("Inline apply columns must match the trained model apply columns exactly.")
         if not input_rows.data:
             raise ValidationError("Inline apply rows require at least one data row.")
 
@@ -682,10 +685,24 @@ class MLService:
         if set(feature_columns) & set(target_columns):
             raise ValidationError("Feature and target columns cannot overlap.")
 
+    def _apply_columns_from_metadata(self, metadata: Any) -> list[str]:
+        schema_roles = metadata.apply_role_schema.get("roles") if isinstance(metadata.apply_role_schema, dict) else None
+        role_names = [
+            str(role.get("name"))
+            for role in schema_roles or []
+            if isinstance(role, dict) and role.get("required", True)
+        ]
+        if not role_names:
+            role_names = ["feature"]
+        columns: list[str] = []
+        for role_name in role_names:
+            columns.extend(_role_columns(metadata.train_role_bindings, role_name))
+        return columns
+
     def _normalize_columns(self, columns: list[str], label: str) -> list[str]:
         normalized = [column.strip() for column in columns if column.strip()]
-        if not normalized and label == "feature":
-            raise ValidationError("At least one feature column must be selected.")
+        if not normalized:
+            raise ValidationError(f"At least one {label} column must be selected.")
         if len(set(normalized)) != len(normalized):
             raise ValidationError(f"Duplicate {label} columns are not allowed.")
         return normalized

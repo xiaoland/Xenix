@@ -224,13 +224,13 @@ def _create_message_rendering_fixture(store: ConversationStore) -> None:
             tool_call_id=apply_call.id,
             status=AgentToolCallStatus.SUCCEEDED,
             result_payload={
-                "artifact_link": "[prediction-results.csv](artifact://mock-predictions?view=preview)",
+                "artifact_link": "[apply-results.csv](artifact://mock-apply-results?view=preview)",
                 "row_count": 12,
             },
             content_blocks=[
                 {
                     "type": "markdown",
-                    "text": "预测结果已生成：[prediction-results.csv](artifact://mock-predictions?view=preview)",
+                    "text": "应用结果已生成：[apply-results.csv](artifact://mock-apply-results?view=preview)",
                 }
             ],
         )

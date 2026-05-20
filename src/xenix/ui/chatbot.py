@@ -165,12 +165,12 @@ def _translate_tool_summary(summary: str) -> str:
         return QCoreApplication.translate("ToolCallItem", "Tuned model")
     if summary == "Cancelled model tuning":
         return QCoreApplication.translate("ToolCallItem", "Cancelled model tuning")
-    if summary == "Running prediction...":
-        return QCoreApplication.translate("ToolCallItem", "Running prediction...")
-    if summary == "Ran prediction":
-        return QCoreApplication.translate("ToolCallItem", "Ran prediction")
-    if summary == "Cancelled prediction run":
-        return QCoreApplication.translate("ToolCallItem", "Cancelled prediction run")
+    if summary == "Applying model...":
+        return QCoreApplication.translate("ToolCallItem", "Applying model...")
+    if summary == "Applied model":
+        return QCoreApplication.translate("ToolCallItem", "Applied model")
+    if summary == "Cancelled model apply":
+        return QCoreApplication.translate("ToolCallItem", "Cancelled model apply")
     return summary
 
 

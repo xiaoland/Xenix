@@ -555,7 +555,7 @@ class MLTaskService:
             raise NotFoundError(f"Dataset '{row.dataset_id}' was not found.")
         dataset_row = DatasetRow(
             project_id=row.project_id,
-            name=f"{dataset.name} predictions",
+            name=f"{dataset.name} apply results",
             source_path=str(canonical_path),
             source_format=DatasetSourceFormat.CSV,
             copied_from=None,
@@ -645,7 +645,7 @@ class MLTaskService:
         else:
             destination_dir = task_output_dir(self._paths, row.id)
         destination_dir.mkdir(parents=True, exist_ok=True)
-        destination_path = destination_dir / f"{row.id}-predictions.csv"
+        destination_path = destination_dir / f"{row.id}-apply-results.csv"
         shutil.copy2(source_path, destination_path)
         return destination_path
 

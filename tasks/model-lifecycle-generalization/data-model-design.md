@@ -55,7 +55,7 @@ Examples:
 | `classification.random_forest` | `supervised` | `predictor` | Also predicts a target, with classification metrics. |
 | `clustering.kmeans` | `clustering` | `segmenter` | Produces segment labels, not target predictions. |
 | `anomaly.isolation_forest` | `anomaly_detection` | `anomaly_scorer` | Produces anomaly labels/scores. |
-| `association.mlxtend_apriori` | `association_rules` | `rule_miner` | Produces reusable rules and applies baskets to rules. |
+| `association.apriori_mlxtend` | `association_rules` | `rule_miner` | Produces reusable rules and applies baskets to rules. |
 | `recommendation.item_similarity` | `recommendation` | `recommender` | Produces top-N recommendations from item/user evidence. |
 
 Reason for keeping both:
@@ -71,6 +71,7 @@ Reason for keeping both:
 - Stop adding new semantic load to `ProblemKind` beyond places that already require it.
 - Add nullable or parallel `model_family` / `model_task_kind` fields to catalog and trained-model metadata first.
 - Later decide whether storage rows need explicit columns or whether metadata payload is enough.
+- Use generic `ProblemKind.ANALYSIS` for current association-rule and recommendation analyzers. The specific analyzer semantics live in `ModelFamily` and `ModelTaskKind`.
 
 ## Role Binding Contract
 
@@ -201,15 +202,15 @@ Examples:
   - `target: single_column`
 - Clustering/anomaly:
   - `feature: many_columns`
-- Association rules, long transaction table:
+- Association rules, current wide basket table:
+  - `item: many_columns`
+- Association rules, possible future long transaction table:
   - `transaction_id: single_column`
   - `item: single_column`
-- Association rules, wide basket table:
-  - `item_columns: many_columns`
 - Item similarity recommendation:
   - `user: single_column`
   - `item: single_column`
-  - `rating: single_column`, optional
+  - `rating: single_column`
 
 ### ApplyRoleSchema
 
@@ -217,13 +218,10 @@ Candidate examples:
 
 - Supervised predictor:
   - `feature: many_columns`, usually derived from trained metadata.
-- Association rules:
-  - `basket_items`, inline list or file columns.
-  - optional `top_n`.
+- Association rules, current wide basket apply:
+  - `item: many_columns`, derived from the trained role binding.
 - Item similarity recommendation:
-  - `seed_item`, inline value or item column.
-  - `user_history`, inline list or file columns.
-  - optional `top_n`.
+  - `item: single_column`, derived from the trained role binding.
 
 ## Agent Tool Shape
 
@@ -234,10 +232,9 @@ Candidate schema:
 ```json
 {
   "dataset_id": "dataset-id",
-  "model_key": "association.mlxtend_apriori",
+  "model_key": "association.apriori_mlxtend",
   "role_bindings": [
-    {"role": "transaction_id", "columns": ["OrderID"]},
-    {"role": "item", "columns": ["SKU"]}
+    {"role": "item", "columns": ["Item_1", "Item_2", "Item_3"]}
   ]
 }
 ```
@@ -274,9 +271,9 @@ Candidate schema change:
 ```json
 {
   "binding_id": "binding-id",
-  "models": ["association.mlxtend_apriori"],
+  "models": ["association.apriori_mlxtend"],
   "params_by_model": {
-    "association.mlxtend_apriori": {
+    "association.apriori_mlxtend": {
       "min_support": 0.02,
       "min_confidence": 0.3
     }

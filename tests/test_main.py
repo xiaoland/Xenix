@@ -192,7 +192,7 @@ def test_main_window_renders_tool_calls(monkeypatch, tmp_path: Path) -> None:
         summaries = [item._summary_label.text() for item in tool_items]
         assert "Inspected dataset" in summaries
         assert "Trained model" in summaries
-        assert "Ran prediction" in summaries
+        assert "Applied model" in summaries
     finally:
         window.close()
 

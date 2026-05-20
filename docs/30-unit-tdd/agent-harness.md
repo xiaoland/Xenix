@@ -162,4 +162,4 @@ Contract tests should cover:
 - step-budget pause, resume, stop, and maximum total limit
 - cancellation during provider and tool execution
 - model metadata schema and model key normalization
-- artifact link production for dataset, training, and prediction outputs
+- artifact link production for dataset, training, and apply outputs

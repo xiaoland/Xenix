@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+import numpy as np
 from pydantic import BaseModel, Field
+from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.ensemble import AdaBoostClassifier, GradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import LabelEncoder
 from sklearn.tree import DecisionTreeClassifier
 
 from ...storage.models import ProblemKind
@@ -113,6 +116,104 @@ class AdaBoostClassificationParamGrid(BaseModel):
     n_estimators: list[int] = Field(default=[50, 100, 200], min_length=1)
     learning_rate: list[float] = Field(default=[0.01, 0.1, 0.5, 1.0], min_length=1)
     estimator_max_depth: list[int] = Field(default=[1, 2, 3], min_length=1)
+
+
+class XGBoostClassificationParams(BaseModel):
+    n_estimators: int = Field(default=200, ge=10, le=1000)
+    learning_rate: float = Field(default=0.1, gt=0.0, le=1.0)
+    max_depth: int = Field(default=3, ge=1, le=20)
+    min_child_weight: float = Field(default=1.0, ge=0.0)
+    subsample: float = Field(default=1.0, gt=0.0, le=1.0)
+    colsample_bytree: float = Field(default=1.0, gt=0.0, le=1.0)
+    reg_lambda: float = Field(default=1.0, ge=0.0)
+
+
+class XGBoostClassificationParamGrid(BaseModel):
+    n_estimators: list[int] = Field(default=[100, 200], min_length=1)
+    learning_rate: list[float] = Field(default=[0.05, 0.1], min_length=1)
+    max_depth: list[int] = Field(default=[3, 5], min_length=1)
+    min_child_weight: list[float] = Field(default=[1.0, 3.0], min_length=1)
+    subsample: list[float] = Field(default=[0.8, 1.0], min_length=1)
+    colsample_bytree: list[float] = Field(default=[0.8, 1.0], min_length=1)
+    reg_lambda: list[float] = Field(default=[1.0, 2.0], min_length=1)
+
+
+class LightGBMClassificationParams(BaseModel):
+    n_estimators: int = Field(default=200, ge=10, le=1000)
+    learning_rate: float = Field(default=0.1, gt=0.0, le=1.0)
+    max_depth: int = Field(default=-1, ge=-1, le=20)
+    num_leaves: int = Field(default=31, ge=2, le=255)
+    min_child_samples: int = Field(default=20, ge=1, le=200)
+    subsample: float = Field(default=1.0, gt=0.0, le=1.0)
+    colsample_bytree: float = Field(default=1.0, gt=0.0, le=1.0)
+
+
+class LightGBMClassificationParamGrid(BaseModel):
+    n_estimators: list[int] = Field(default=[100, 200], min_length=1)
+    learning_rate: list[float] = Field(default=[0.05, 0.1], min_length=1)
+    max_depth: list[int] = Field(default=[-1, 5, 10], min_length=1)
+    num_leaves: list[int] = Field(default=[31, 63], min_length=1)
+    min_child_samples: list[int] = Field(default=[20, 40], min_length=1)
+    subsample: list[float] = Field(default=[0.8, 1.0], min_length=1)
+    colsample_bytree: list[float] = Field(default=[0.8, 1.0], min_length=1)
+
+
+class LabelEncodedXGBClassifier(BaseEstimator, ClassifierMixin):
+    def __init__(
+        self,
+        n_estimators: int = 200,
+        learning_rate: float = 0.1,
+        max_depth: int = 3,
+        min_child_weight: float = 1.0,
+        subsample: float = 1.0,
+        colsample_bytree: float = 1.0,
+        reg_lambda: float = 1.0,
+        eval_metric: str = "logloss",
+        random_state: int = 42,
+        n_jobs: int = 1,
+    ) -> None:
+        self.n_estimators = n_estimators
+        self.learning_rate = learning_rate
+        self.max_depth = max_depth
+        self.min_child_weight = min_child_weight
+        self.subsample = subsample
+        self.colsample_bytree = colsample_bytree
+        self.reg_lambda = reg_lambda
+        self.eval_metric = eval_metric
+        self.random_state = random_state
+        self.n_jobs = n_jobs
+
+    def fit(self, X: Any, y: Any) -> "LabelEncodedXGBClassifier":
+        from xgboost import XGBClassifier
+
+        self.label_encoder_ = LabelEncoder()
+        encoded_y = self.label_encoder_.fit_transform(y)
+        self.classes_ = self.label_encoder_.classes_
+        self.estimator_ = XGBClassifier(
+            n_estimators=self.n_estimators,
+            learning_rate=self.learning_rate,
+            max_depth=self.max_depth,
+            min_child_weight=self.min_child_weight,
+            subsample=self.subsample,
+            colsample_bytree=self.colsample_bytree,
+            reg_lambda=self.reg_lambda,
+            eval_metric=self.eval_metric,
+            random_state=self.random_state,
+            n_jobs=self.n_jobs,
+        )
+        self.estimator_.fit(X, encoded_y)
+        return self
+
+    def predict(self, X: Any) -> np.ndarray:
+        encoded = np.asarray(self.estimator_.predict(X), dtype=int)
+        return self.label_encoder_.inverse_transform(encoded)
+
+    def predict_proba(self, X: Any) -> np.ndarray:
+        return self.estimator_.predict_proba(X)
+
+    @property
+    def feature_importances_(self) -> np.ndarray:
+        return np.asarray(self.estimator_.feature_importances_, dtype=float)
 
 
 class LogisticRegressionService(NumericAndCategoricalModelService):
@@ -260,3 +361,44 @@ class AdaBoostClassificationService(NumericAndCategoricalModelService):
             else:
                 grid[f"model__{key}"] = list(values)
         return grid
+
+
+class XGBoostClassificationService(NumericAndCategoricalModelService):
+    key = "classification.xgboost"
+    display_name = "XGBoost Classifier"
+    problem_kind = ProblemKind.CLASSIFICATION
+    family = "Boosted trees"
+    guidance = "High-capacity boosted tree classifier for nonlinear churn and conversion patterns."
+    recommendation_tier = 28
+    params_model = XGBoostClassificationParams
+    param_grid_model = XGBoostClassificationParamGrid
+
+    @classmethod
+    def _build_estimator(cls, **estimator_kwargs: object) -> Any:
+        kwargs = dict(estimator_kwargs)
+        kwargs.setdefault("eval_metric", "logloss")
+        kwargs.setdefault("random_state", 42)
+        kwargs.setdefault("n_jobs", 1)
+        return LabelEncodedXGBClassifier(**kwargs)
+
+
+class LightGBMClassificationService(NumericAndCategoricalModelService):
+    key = "classification.lightgbm"
+    display_name = "LightGBM Classifier"
+    problem_kind = ProblemKind.CLASSIFICATION
+    family = "Boosted trees"
+    guidance = "Fast boosted tree classifier for larger tabular classification datasets."
+    recommendation_tier = 27
+    params_model = LightGBMClassificationParams
+    param_grid_model = LightGBMClassificationParamGrid
+
+    @classmethod
+    def _build_estimator(cls, **estimator_kwargs: object) -> Any:
+        from lightgbm import LGBMClassifier
+
+        kwargs = dict(estimator_kwargs)
+        kwargs.setdefault("random_state", 42)
+        kwargs.setdefault("n_jobs", 1)
+        kwargs.setdefault("verbose", -1)
+        kwargs.setdefault("verbosity", -1)
+        return LGBMClassifier(**kwargs)

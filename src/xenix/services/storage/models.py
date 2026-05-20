@@ -53,6 +53,7 @@ class ProblemKind(StrEnum):
     CLASSIFICATION = "classification"
     CLUSTERING = "clustering"
     ANOMALY_DETECTION = "anomaly_detection"
+    ANALYSIS = "analysis"
 
 
 class MLTaskArtifactKind(StrEnum):

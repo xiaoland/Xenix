@@ -63,6 +63,17 @@ _POLICIES: dict[ProblemKind, EvaluationPolicySnapshot] = {
         cv_folds=None,
         random_state=42,
     ),
+    ProblemKind.ANALYSIS: EvaluationPolicySnapshot(
+        policy_key="analysis.default.v1",
+        problem_kind=ProblemKind.ANALYSIS,
+        primary_metric_name="result_count",
+        primary_metric_direction=MetricDirection.MAX,
+        tie_breaker_metrics=[],
+        split_strategy="none",
+        test_size=0.0,
+        cv_folds=None,
+        random_state=42,
+    ),
 }
 
 

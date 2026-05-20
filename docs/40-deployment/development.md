@@ -30,7 +30,7 @@ The delivered workflow includes:
 - conversation plus file drag-and-drop
 - Agent Harness tool calls for data inspection, integration, cleaning, read-only querying, transformation, role binding, training, hyperparameter training, and model apply
 - markdown summaries with `artifact://...` links
-- Chatbot previews for generated datasets, reports, metrics, models, images, and prediction files
+- Chatbot previews for generated datasets, reports, metrics, models, images, and apply result files
 - local persistence for conversations, messages, tool calls, tool results, artifacts, ML task metadata, and logs
 
 LLM provider settings are stored through the Settings dialog in `config/agent_settings.json`. `XENIX_ENV=development` exposes development-only mock controls in Settings. AIMock uses the same OpenAI-compatible provider HTTP boundary as the live provider.

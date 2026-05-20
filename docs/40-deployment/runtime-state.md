@@ -29,7 +29,8 @@ Current runtime files and subdirectories:
 - `artifacts/datasets/transformed/`
 - `artifacts/models/`
 - `artifacts/reports/`
-- `artifacts/predictions/`
+- `artifacts/apply/`
+- `artifacts/apply/datasets/`
 - `artifacts/ml-tasks/<ml-task-id>/`
 
 ## Inspect
@@ -79,5 +80,5 @@ Canonical trained models are registered as artifacts under:
 
 ## Backup Guidance
 
-- Back up `state/xenix.db` together with any app-managed dataset artifacts, model artifacts, prediction outputs, reports, or ML task working directories you need to preserve.
+- Back up `state/xenix.db` together with any app-managed dataset artifacts, model artifacts, apply outputs, reports, or ML task working directories you need to preserve.
 - User-managed source datasets should be backed up by normal user filesystem practices, not by app reset flows.

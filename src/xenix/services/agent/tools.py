@@ -1008,8 +1008,8 @@ class AgentToolRegistry:
                 thread_id=context.thread_id,
                 turn_id=context.turn_id,
                 tool_call_id=context.tool_call_id,
-                kind=ArtifactKind.PREDICTION,
-                title="Prediction results",
+                kind=ArtifactKind.FILE,
+                title="Apply results",
                 absolute_path=output_artifact.absolute_path,
                 mime_type="text/csv",
                 metadata_payload={"ml_task_id": task.id, "dataset_id": task.dataset_id},
@@ -1025,7 +1025,7 @@ class AgentToolRegistry:
                 "artifact_link": link,
                 "row_count": details.task.result_payload.get("row_count") if details.task.result_payload else None,
             },
-            content_blocks=[{"type": "markdown", "text": f"Prediction results are ready: {link}"}],
+            content_blocks=[{"type": "markdown", "text": f"Apply results are ready: {link}"}],
         )
 
     def _resolve_sql_bindings(self, arguments: dict[str, Any], *, tool_name: str) -> list[DatasetSqlBinding]:
@@ -1401,6 +1401,7 @@ class AgentToolRegistry:
             ProblemKind.CLASSIFICATION: 1,
             ProblemKind.CLUSTERING: 2,
             ProblemKind.ANOMALY_DETECTION: 3,
+            ProblemKind.ANALYSIS: 4,
         }
         return order[problem_kind]
 

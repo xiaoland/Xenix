@@ -19,4 +19,6 @@ This glossary defines product-facing terms used by Xenix Native.
 - Dataset registration: a metadata pointer to a user-managed source dataset.
 - Model: a reusable analyzer, not only a supervised estimator. It is a service-owned artifact that can be trained from declared input roles and later applied to compatible input roles.
 - Trained model: a canonical reusable analyzer artifact tracked by metadata and stored on the filesystem.
+- Model family: the product taxonomy for a reusable analyzer, such as supervised, clustering, anomaly detection, association rules, or recommendation.
+- Model task kind: the operational contract for what a reusable analyzer does when applied, such as predictor, segmenter, anomaly scorer, rule miner, or recommender.
 - Legacy work item: the previous persisted unit of ML work and selection state, removed from the target AI-first service topology.

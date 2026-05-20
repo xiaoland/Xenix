@@ -91,7 +91,7 @@ class FirstSliceProvider:
                     )
                 ],
             )
-        if artifact_link is None or "Prediction results" not in self._rendered_text(messages):
+        if artifact_link is None or "Apply results" not in self._rendered_text(messages):
             apply_arguments = {"trained_model_id": trained_model_id}
             if self._apply_rows is not None:
                 apply_arguments["input_rows"] = self._apply_rows
@@ -100,7 +100,7 @@ class FirstSliceProvider:
                     raise AssertionError("FirstSliceProvider requires apply input data.")
                 apply_arguments["input_files"] = [str(self._apply_path.resolve())]
             return ProviderResponse(
-                assistant_content_blocks=[{"type": "markdown", "text": "I will run prediction with the trained model."}],
+                assistant_content_blocks=[{"type": "markdown", "text": "I will apply the trained model."}],
                 tool_calls=[
                     ProviderToolCall(
                         provider_call_id="call-apply",
@@ -240,8 +240,8 @@ def test_agent_harness_model_metadata_exposes_catalog_without_train_enums(monkey
         registry.execute("model.metadata", {"model_family": "unknown"}, _tool_context())
     with pytest.raises(ValidationError, match="Unknown model_task_kind"):
         registry.execute("model.metadata", {"model_task_kind": "unknown"}, _tool_context())
-    with pytest.raises(ValidationError, match="xgboost"):
-        registry.execute("model.metadata", {"model_keys": ["xgboost"]}, _tool_context())
+    xgboost_result = registry.execute("model.metadata", {"model_keys": ["xgboost"]}, _tool_context())
+    assert xgboost_result.payload["model_keys"] == ["regression.xgboost"]
 
 
 def test_agent_tool_registry_owns_tool_presentation(monkeypatch, tmp_path: Path) -> None:
@@ -270,7 +270,7 @@ def test_agent_harness_hyper_train_validates_tuning_capability_before_execution(
         )
 
 
-def test_agent_harness_first_slice_runs_from_file_to_prediction(monkeypatch, tmp_path: Path) -> None:
+def test_agent_harness_first_slice_runs_from_file_to_apply_result(monkeypatch, tmp_path: Path) -> None:
     context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
 
     training_file = tmp_path / "demand.csv"
@@ -288,11 +288,11 @@ def test_agent_harness_first_slice_runs_from_file_to_prediction(monkeypatch, tmp
         "10,8,28\n",
         encoding="utf-8",
     )
-    inference_file = tmp_path / "predict.csv"
-    inference_file.write_text("feature_a,feature_b\n11,9\n12,10\n", encoding="utf-8")
+    apply_file = tmp_path / "apply.csv"
+    apply_file.write_text("feature_a,feature_b\n11,9\n12,10\n", encoding="utf-8")
     harness = AgentHarnessService(
         session_factory=context.session_factory,
-        provider=FirstSliceProvider(inference_file),
+        provider=FirstSliceProvider(apply_file),
         tool_registry=registry,
         conversation_store=ConversationStore(context.session_factory),
     )
@@ -312,12 +312,12 @@ def test_agent_harness_first_slice_runs_from_file_to_prediction(monkeypatch, tmp
         "model.train",
         "model.apply",
     ]
-    prediction_artifacts = [artifact for artifact in snapshot.artifacts if artifact.kind.value == "prediction"]
-    assert len(prediction_artifacts) == 1
-    assert Path(prediction_artifacts[0].absolute_path).read_text(encoding="utf-8").splitlines()[0].endswith("prediction")
+    apply_artifacts = [artifact for artifact in snapshot.artifacts if artifact.kind.value == "file"]
+    assert len(apply_artifacts) == 1
+    assert Path(apply_artifacts[0].absolute_path).read_text(encoding="utf-8").splitlines()[0].endswith("prediction")
 
 
-def test_agent_harness_first_slice_runs_inline_rows_to_prediction(monkeypatch, tmp_path: Path) -> None:
+def test_agent_harness_first_slice_runs_inline_rows_to_apply_result(monkeypatch, tmp_path: Path) -> None:
     context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
 
     training_file = tmp_path / "demand.csv"
@@ -362,8 +362,8 @@ def test_agent_harness_first_slice_runs_inline_rows_to_prediction(monkeypatch, t
         "model.train",
         "model.apply",
     ]
-    prediction_artifacts = [artifact for artifact in snapshot.artifacts if artifact.kind.value == "prediction"]
-    assert len(prediction_artifacts) == 1
-    prediction_lines = Path(prediction_artifacts[0].absolute_path).read_text(encoding="utf-8").splitlines()
+    apply_artifacts = [artifact for artifact in snapshot.artifacts if artifact.kind.value == "file"]
+    assert len(apply_artifacts) == 1
+    prediction_lines = Path(apply_artifacts[0].absolute_path).read_text(encoding="utf-8").splitlines()
     assert prediction_lines[0].endswith("prediction")
     assert prediction_lines[1].startswith("11,9,")

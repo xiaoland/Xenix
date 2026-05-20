@@ -136,7 +136,7 @@ Clarification:
 - Kept `ColumnSelection` as a runtime projection property for existing model adapters only.
 - Updated trained-model metadata to schema v2 with `model_family`, `model_task_kind`, `train_role_bindings`, `apply_role_schema`, and `result_contract`.
 - Removed persisted trained-model metadata `feature_columns` and `target_columns`.
-- Verified current train/evaluate/inference behavior with `pdm run pytest tests/test_ml_execution.py tests/test_agent_harness_first_slice.py -q`.
+- Verified current train/evaluate/apply behavior with `pdm run pytest tests/test_ml_execution.py tests/test_agent_harness_first_slice.py -q`.
 
 ## Slice 4: Generalized Apply Contract And Result Artifacts
 
@@ -189,9 +189,9 @@ Clarification:
   - `lightgbm`
 - Add supervised model services:
   - `regression.xgboost`
-  - `regression.light_gbm`
+  - `regression.lightgbm`
   - `classification.xgboost`
-  - `classification.light_gbm`
+  - `classification.lightgbm`
 - Keep them inside the supervised compatibility path.
 
 ### Files Likely Touched
@@ -210,6 +210,14 @@ Clarification:
 - `pdm run pytest tests/test_ml_registry.py tests/test_ml_execution.py -q`
 - `pdm run python -m compileall src tests scripts`
 
+### Status
+
+- Completed on 2026-05-20.
+- Added `xgboost` and `lightgbm` to runtime dependencies.
+- Added XGBoost and LightGBM regression/classification services to the native registry.
+- Added a label-encoding wrapper for XGBoost classification so business labels such as `stay` / `leave` remain valid external labels.
+- Verified through catalog tests and targeted ML execution regression tests.
+
 ## Slice 6: Association Rule Models
 
 ### Scope
@@ -217,11 +225,10 @@ Clarification:
 - Add model family:
   - `association_rules`
 - Add model keys:
-  - `association.apriori`
-  - `association.mlxtend_apriori`
+  - `association.apriori_apyori`
+  - `association.apriori_mlxtend`
 - Train from role bindings:
-  - long format: `transaction_id`, `item`
-  - wide basket format: `item_columns`
+  - wide basket format: `item`
 - Persist reusable rule artifact.
 - Apply uses rule artifacts with basket input and produces recommendations with support/confidence/lift.
 
@@ -242,6 +249,15 @@ Clarification:
 - Association apply writes recommendation artifact.
 - Agent tool result returns artifact links.
 
+### Status
+
+- Completed for wide basket input on 2026-05-20.
+- Added both legacy algorithm backends as model services:
+  - `association.apriori_apyori`
+  - `association.apriori_mlxtend`
+- Both train through `model.train` from `item` role bindings and apply through `model.apply` using persisted rules.
+- Long transaction-table input remains a future extension; it is not silently supported.
+
 ## Slice 7: Recommendation Models
 
 ### Scope
@@ -253,9 +269,9 @@ Clarification:
 - Train from role bindings:
   - `user`
   - `item`
-  - optional `rating`
+  - `rating`
 - Persist reusable similarity artifact.
-- Apply supports seed item, user id, or inline user history.
+- Apply supports seed item files or inline seed item rows through the trained `item` role.
 
 ### Files Likely Touched
 
@@ -272,6 +288,14 @@ Clarification:
 - Recommendation train writes similarity artifact.
 - Recommendation apply writes top-N recommendation artifact.
 - Agent tool result returns artifact links.
+
+### Status
+
+- Completed for item-to-item similarity on 2026-05-20.
+- Added `recommendation.item_similarity`.
+- Training uses `user`, `item`, and `rating` role bindings.
+- Apply accepts the trained item column and writes top-N recommendation rows.
+- User-history apply remains a future extension; it is not silently supported.
 
 ## Slice 8: Scenario-Centric Cleanup
 

@@ -158,6 +158,42 @@ class AdaBoostRegressionParamGrid(BaseModel):
     estimator_max_depth: list[int] = Field(default=[2, 3, 4], min_length=1)
 
 
+class XGBoostRegressionParams(BaseModel):
+    n_estimators: int = Field(default=200, ge=10, le=1000)
+    learning_rate: float = Field(default=0.1, gt=0.0, le=1.0)
+    max_depth: int = Field(default=3, ge=1, le=20)
+    subsample: float = Field(default=1.0, gt=0.0, le=1.0)
+    colsample_bytree: float = Field(default=1.0, gt=0.0, le=1.0)
+    reg_lambda: float = Field(default=1.0, ge=0.0)
+
+
+class XGBoostRegressionParamGrid(BaseModel):
+    n_estimators: list[int] = Field(default=[100, 200, 300], min_length=1)
+    learning_rate: list[float] = Field(default=[0.01, 0.05, 0.1, 0.2], min_length=1)
+    max_depth: list[int] = Field(default=[3, 4, 5], min_length=1)
+    subsample: list[float] = Field(default=[0.8, 1.0], min_length=1)
+    colsample_bytree: list[float] = Field(default=[0.8, 1.0], min_length=1)
+    reg_lambda: list[float] = Field(default=[1.0, 5.0, 10.0], min_length=1)
+
+
+class LightGBMRegressionParams(BaseModel):
+    n_estimators: int = Field(default=200, ge=10, le=1000)
+    learning_rate: float = Field(default=0.1, gt=0.0, le=1.0)
+    max_depth: int = Field(default=-1, ge=-1, le=20)
+    num_leaves: int = Field(default=31, ge=2, le=255)
+    subsample: float = Field(default=1.0, gt=0.0, le=1.0)
+    colsample_bytree: float = Field(default=1.0, gt=0.0, le=1.0)
+
+
+class LightGBMRegressionParamGrid(BaseModel):
+    n_estimators: list[int] = Field(default=[100, 200, 300], min_length=1)
+    learning_rate: list[float] = Field(default=[0.01, 0.05, 0.1], min_length=1)
+    max_depth: list[int] = Field(default=[-1, 3, 5, 7], min_length=1)
+    num_leaves: list[int] = Field(default=[15, 31, 63], min_length=1)
+    subsample: list[float] = Field(default=[0.8, 1.0], min_length=1)
+    colsample_bytree: list[float] = Field(default=[0.8, 1.0], min_length=1)
+
+
 class PolynomialRegressionParams(BaseModel):
     degree: int = Field(default=2, ge=1, le=4)
     fit_intercept: bool = Field(default=True, description="Whether to calculate the intercept.")
@@ -344,6 +380,50 @@ class AdaBoostRegressionService(NumericAndCategoricalModelService):
             else:
                 grid[f"model__{key}"] = list(values)
         return grid
+
+
+class XGBoostRegressionService(NumericAndCategoricalModelService):
+    key = "regression.xgboost"
+    display_name = "XGBoost Regressor"
+    problem_kind = ProblemKind.REGRESSION
+    family = "Boosted trees"
+    guidance = "High-capacity boosted tree model for nonlinear tabular regression."
+    recommendation_tier = 28
+    params_model = XGBoostRegressionParams
+    param_grid_model = XGBoostRegressionParamGrid
+
+    @classmethod
+    def _build_estimator(cls, **estimator_kwargs: object) -> Any:
+        from xgboost import XGBRegressor
+
+        kwargs = dict(estimator_kwargs)
+        kwargs.setdefault("objective", "reg:squarederror")
+        kwargs.setdefault("random_state", 42)
+        kwargs.setdefault("n_jobs", 1)
+        return XGBRegressor(**kwargs)
+
+
+class LightGBMRegressionService(NumericAndCategoricalModelService):
+    key = "regression.lightgbm"
+    display_name = "LightGBM Regressor"
+    problem_kind = ProblemKind.REGRESSION
+    family = "Boosted trees"
+    guidance = "Fast boosted tree model for larger tabular regression datasets."
+    recommendation_tier = 27
+    params_model = LightGBMRegressionParams
+    param_grid_model = LightGBMRegressionParamGrid
+
+    @classmethod
+    def _build_estimator(cls, **estimator_kwargs: object) -> Any:
+        from lightgbm import LGBMRegressor
+
+        kwargs = dict(estimator_kwargs)
+        kwargs.setdefault("objective", "regression")
+        kwargs.setdefault("random_state", 42)
+        kwargs.setdefault("n_jobs", 1)
+        kwargs.setdefault("verbose", -1)
+        kwargs.setdefault("verbosity", -1)
+        return LGBMRegressor(**kwargs)
 
 
 class PolynomialRegressionService(NumericAndCategoricalModelService):

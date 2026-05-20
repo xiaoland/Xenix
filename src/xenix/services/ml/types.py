@@ -216,6 +216,18 @@ class ModelServiceBase(ABC):
                 apply_result_kinds=["table"],
                 preview_kinds=["model", "table", "file"],
             )
+        if model_task_kind is ModelTaskKind.RULE_MINER:
+            return ModelResultContract(
+                train_result_kinds=["model", "table"],
+                apply_result_kinds=["table"],
+                preview_kinds=["model", "table", "file"],
+            )
+        if model_task_kind is ModelTaskKind.RECOMMENDER:
+            return ModelResultContract(
+                train_result_kinds=["model", "table"],
+                apply_result_kinds=["table"],
+                preview_kinds=["model", "table", "file"],
+            )
         return ModelResultContract()
 
     @classmethod

@@ -100,21 +100,21 @@
 ### New Families
 
 - Association rules:
-  - `association.apriori`
-  - `association.mlxtend_apriori`
-  - training roles may include `transaction_id_column`, `item_column`, or wide `item_columns`
-  - apply input may be basket items
+  - `association.apriori_apyori`
+  - `association.apriori_mlxtend`
+  - current training role is wide basket `item` columns
+  - apply input uses the trained basket item columns
   - output may include antecedents, consequents, support, confidence, lift, and recommendation rows
 - Recommendation:
   - `recommendation.item_similarity`
-  - training roles may include `user_column`, `item_column`, and optional `rating_column`
-  - apply input may be a seed item, a user id, or inline user history
+  - training roles include `user`, `item`, and `rating`
+  - current apply input uses the trained item column as a seed item column
   - output may include top-N recommended items and similarity/evidence fields
 - Dependency-heavy supervised models:
   - `regression.xgboost`
-  - `regression.light_gbm`
+  - `regression.lightgbm`
   - `classification.xgboost`
-  - `classification.light_gbm`
+  - `classification.lightgbm`
 
 ## Contract Direction
 

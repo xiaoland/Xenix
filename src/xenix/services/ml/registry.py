@@ -1,17 +1,21 @@
 from __future__ import annotations
 
 from ...exceptions import NotFoundError
+from .models.association import ApyoriAssociationRulesService, MlxtendAssociationRulesService
 from .models.anomaly import IsolationForestAnomalyService, LocalOutlierFactorAnomalyService
 from .models.classification import (
     AdaBoostClassificationService,
     DecisionTreeClassificationService,
     GradientBoostingClassificationService,
     KNeighborsClassificationService,
+    LightGBMClassificationService,
     LogisticRegressionService,
     NaiveBayesClassificationService,
     RandomForestClassificationService,
+    XGBoostClassificationService,
 )
 from .models.clustering import DBSCANClusteringService, KMeansClusteringService
+from .models.recommendation import ItemSimilarityRecommendationService
 from .models.regression import (
     AdaBoostRegressionService,
     BayesianRidgeRegressionService,
@@ -19,10 +23,12 @@ from .models.regression import (
     GradientBoostingRegressionService,
     KNeighborsRegressionService,
     LassoRegressionService,
+    LightGBMRegressionService,
     LinearRegressionService,
     PolynomialRegressionService,
     RandomForestRegressionService,
     RidgeRegressionService,
+    XGBoostRegressionService,
 )
 from .types import ModelCatalogEntry, ModelServiceBase
 
@@ -37,6 +43,8 @@ _MODEL_SERVICES: dict[str, type[ModelServiceBase]] = {
         DecisionTreeRegressionService,
         GradientBoostingRegressionService,
         AdaBoostRegressionService,
+        XGBoostRegressionService,
+        LightGBMRegressionService,
         PolynomialRegressionService,
         RandomForestRegressionService,
         LogisticRegressionService,
@@ -45,11 +53,16 @@ _MODEL_SERVICES: dict[str, type[ModelServiceBase]] = {
         DecisionTreeClassificationService,
         GradientBoostingClassificationService,
         AdaBoostClassificationService,
+        XGBoostClassificationService,
+        LightGBMClassificationService,
         RandomForestClassificationService,
         KMeansClusteringService,
         DBSCANClusteringService,
         IsolationForestAnomalyService,
         LocalOutlierFactorAnomalyService,
+        ApyoriAssociationRulesService,
+        MlxtendAssociationRulesService,
+        ItemSimilarityRecommendationService,
     )
 }
 

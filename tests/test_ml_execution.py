@@ -79,6 +79,21 @@ def _create_binding(
     )
 
 
+def _create_role_binding(
+    ml_service: MLService,
+    dataset_id: str,
+    model_key: str,
+    role_bindings: list[dict[str, object]],
+) -> object:
+    return ml_service.create_column_binding(
+        CreateColumnBindingInput(
+            dataset_id=dataset_id,
+            model_key=model_key,
+            role_bindings=role_bindings,
+        )
+    )
+
+
 def _wait_for_terminal_dataset_tasks(
     ml_service: MLService,
     dataset_id: str,
@@ -156,20 +171,20 @@ def test_dataset_scoped_fit_evaluate_and_apply_run(monkeypatch, tmp_path: Path) 
     )
     fit_details = ml_service.get_task_details(fit_task.id)
 
-    inference_input = tmp_path / "direct-infer.csv"
-    inference_input.write_text("feature_a,feature_b\n11,9\n12,10\n", encoding="utf-8")
-    inference_task = ml_service.apply(
+    apply_input = tmp_path / "direct-apply.csv"
+    apply_input.write_text("feature_a,feature_b\n11,9\n12,10\n", encoding="utf-8")
+    apply_task = ml_service.apply(
         ApplyWithFilesInput(
             trained_model_id=trained_models[0].id,
-            input_files=[str(inference_input.resolve())],
+            input_files=[str(apply_input.resolve())],
         )
     )
-    tasks_after_inference = _wait_for_terminal_dataset_tasks(ml_service, dataset.id, expected_count=3)
-    inference_details = ml_service.get_task_details(inference_task.id)
-    result_dataset = dataset_service.get_dataset_by_ml_task(inference_task.id)
+    tasks_after_apply = _wait_for_terminal_dataset_tasks(ml_service, dataset.id, expected_count=3)
+    apply_details = ml_service.get_task_details(apply_task.id)
+    result_dataset = dataset_service.get_dataset_by_ml_task(apply_task.id)
     metadata = parse_trained_model_metadata(trained_models[0].metadata_payload)
 
-    inline_inference_task = ml_service.apply(
+    inline_apply_task = ml_service.apply(
         ApplyWithFilesInput(
             trained_model_id=trained_models[0].id,
             input_rows={
@@ -178,19 +193,19 @@ def test_dataset_scoped_fit_evaluate_and_apply_run(monkeypatch, tmp_path: Path) 
             },
         )
     )
-    tasks_after_inline_inference = _wait_for_terminal_dataset_tasks(
+    tasks_after_inline_apply = _wait_for_terminal_dataset_tasks(
         ml_service,
         dataset.id,
         expected_count=4,
     )
-    inline_inference_details = ml_service.get_task_details(inline_inference_task.id)
-    inline_input_payload = inline_inference_details.task.request_payload["input_files"][0]
-    inline_result_dataset = dataset_service.get_dataset_by_ml_task(inline_inference_task.id)
+    inline_apply_details = ml_service.get_task_details(inline_apply_task.id)
+    inline_input_payload = inline_apply_details.task.request_payload["input_files"][0]
+    inline_result_dataset = dataset_service.get_dataset_by_ml_task(inline_apply_task.id)
     inline_input_lines = Path(inline_input_payload["absolute_path"]).read_text(encoding="utf-8").splitlines()
 
     assert {task.task_type for task in tasks} == {MLTaskType.FIT, MLTaskType.EVALUATE}
-    assert all(task.status is MLTaskStatus.SUCCEEDED for task in tasks_after_inference)
-    assert all(task.status is MLTaskStatus.SUCCEEDED for task in tasks_after_inline_inference)
+    assert all(task.status is MLTaskStatus.SUCCEEDED for task in tasks_after_apply)
+    assert all(task.status is MLTaskStatus.SUCCEEDED for task in tasks_after_inline_apply)
     assert len(trained_models) == 1
     assert fit_details.task.result_payload is not None
     assert fit_details.task.result_payload["trained_model_id"] == trained_models[0].id
@@ -217,15 +232,15 @@ def test_dataset_scoped_fit_evaluate_and_apply_run(monkeypatch, tmp_path: Path) 
     assert metadata.train_role_bindings == fit_details.task.request_payload["train_role_bindings"]
     assert metadata.source_run_name == "Direct demand analysis"
     assert metadata.evaluation_primary_metric_name == "r2"
-    assert inference_details.task.task_type is MLTaskType.APPLY
+    assert apply_details.task.task_type is MLTaskType.APPLY
     assert result_dataset is not None
     assert "prediction" in Path(result_dataset.source_path).read_text(encoding="utf-8").splitlines()[0]
-    assert inline_inference_details.task.task_type is MLTaskType.APPLY
+    assert inline_apply_details.task.task_type is MLTaskType.APPLY
     assert inline_input_payload["source_kind"] == "manual_csv"
     assert inline_input_lines == ["feature_a,feature_b", "11,9", "12,10"]
     assert inline_result_dataset is not None
     assert "prediction" in Path(inline_result_dataset.source_path).read_text(encoding="utf-8").splitlines()[0]
-    assert [artifact.artifact_kind for artifact in inference_details.artifacts] == [MLTaskArtifactKind.APPLY_RESULT]
+    assert [artifact.artifact_kind for artifact in apply_details.artifacts] == [MLTaskArtifactKind.APPLY_RESULT]
 
 
 def test_clustering_fit_runs_without_follow_up_evaluate_and_persists_export_artifact(
@@ -288,6 +303,147 @@ def test_clustering_fit_runs_without_follow_up_evaluate_and_persists_export_arti
         }
     ]
     assert [role["name"] for role in metadata.apply_role_schema["roles"]] == ["feature"]
+
+
+def test_association_rules_train_and_apply_run(monkeypatch, tmp_path: Path) -> None:
+    project_service, dataset_service, _ml_task_service, ml_service = _build_services(monkeypatch, tmp_path)
+    project = project_service.create_project(CreateProjectInput(name="Retail"))
+    dataset_file = tmp_path / "baskets.csv"
+    dataset_file.write_text(
+        "Item_1,Item_2,Item_3\n"
+        "Bread,Milk,\n"
+        "Bread,Butter,\n"
+        "Bread,Milk,Butter\n"
+        "Milk,Butter,\n"
+        "Bread,Milk,\n",
+        encoding="utf-8",
+    )
+    dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Baskets")
+    binding = _create_role_binding(
+        ml_service,
+        dataset.id,
+        "association.apriori_apyori",
+        [
+            {
+                "role": "item",
+                "columns": ["Item_1", "Item_2", "Item_3"],
+                "role_kind": "many_columns",
+            }
+        ],
+    )
+
+    fit_task = ml_service.fit_with_evaluate(
+        FitWithEvaluateInput(
+            binding_id=binding.id,
+            run_name="Basket rules",
+            model_key="association.apriori_apyori",
+            params={
+                "min_support": 0.2,
+                "min_confidence": 0.1,
+                "min_lift": 0.0,
+                "top_k_per_input": 3,
+            },
+        )
+    )
+
+    tasks = _wait_for_terminal_dataset_tasks(ml_service, dataset.id, expected_count=1)
+    trained_models = ml_service.list_dataset_trained_models(dataset.id)
+    fit_details = ml_service.get_task_details(fit_task.id)
+    apply_input = tmp_path / "basket-apply.csv"
+    apply_input.write_text("Item_1,Item_2,Item_3\nBread,,\nMilk,,\n", encoding="utf-8")
+    apply_task = ml_service.apply(
+        ApplyWithFilesInput(
+            trained_model_id=trained_models[0].id,
+            input_files=[str(apply_input.resolve())],
+        )
+    )
+    tasks_after_apply = _wait_for_terminal_dataset_tasks(ml_service, dataset.id, expected_count=2)
+    apply_result_dataset = dataset_service.get_dataset_by_ml_task(apply_task.id)
+    metadata = parse_trained_model_metadata(trained_models[0].metadata_payload)
+
+    assert len(tasks) == 1
+    assert tasks[0].task_type is MLTaskType.FIT
+    assert all(task.status is MLTaskStatus.SUCCEEDED for task in tasks_after_apply)
+    assert len(trained_models) == 1
+    assert fit_details.task.result_payload["result_summary"]["rule_count"] > 0
+    assert metadata is not None
+    assert metadata.model_family == "association_rules"
+    assert metadata.model_task_kind == "rule_miner"
+    assert [role["name"] for role in metadata.apply_role_schema["roles"]] == ["item"]
+    assert apply_result_dataset is not None
+    result_lines = Path(apply_result_dataset.source_path).read_text(encoding="utf-8").splitlines()
+    assert result_lines[0].split(",")[:4] == ["source_file", "input_row_number", "input_items", "rank"]
+    assert "recommended_items" in result_lines[0]
+
+
+def test_recommendation_train_and_apply_run(monkeypatch, tmp_path: Path) -> None:
+    project_service, dataset_service, _ml_task_service, ml_service = _build_services(monkeypatch, tmp_path)
+    project = project_service.create_project(CreateProjectInput(name="Media"))
+    dataset_file = tmp_path / "ratings.csv"
+    dataset_file.write_text(
+        "UserID,Title,Rating\n"
+        "u1,A,5\n"
+        "u1,B,4\n"
+        "u2,A,4\n"
+        "u2,B,5\n"
+        "u3,A,5\n"
+        "u3,C,2\n"
+        "u4,B,4\n"
+        "u4,C,5\n",
+        encoding="utf-8",
+    )
+    dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Ratings")
+    binding = _create_role_binding(
+        ml_service,
+        dataset.id,
+        "recommendation.item_similarity",
+        [
+            {"role": "user", "columns": ["UserID"], "role_kind": "single_column"},
+            {"role": "item", "columns": ["Title"], "role_kind": "single_column"},
+            {"role": "rating", "columns": ["Rating"], "role_kind": "single_column"},
+        ],
+    )
+
+    ml_service.fit_with_evaluate(
+        FitWithEvaluateInput(
+            binding_id=binding.id,
+            run_name="Item recommendations",
+            model_key="recommendation.item_similarity",
+            params={
+                "min_ratings_base": 1,
+                "min_ratings_candidate": 1,
+                "similarity_threshold": 0.0,
+                "top_k": 2,
+            },
+        )
+    )
+
+    tasks = _wait_for_terminal_dataset_tasks(ml_service, dataset.id, expected_count=1)
+    trained_models = ml_service.list_dataset_trained_models(dataset.id)
+    apply_input = tmp_path / "items-to-recommend.csv"
+    apply_input.write_text("Title\nA\n", encoding="utf-8")
+    apply_task = ml_service.apply(
+        ApplyWithFilesInput(
+            trained_model_id=trained_models[0].id,
+            input_files=[str(apply_input.resolve())],
+        )
+    )
+    tasks_after_apply = _wait_for_terminal_dataset_tasks(ml_service, dataset.id, expected_count=2)
+    apply_result_dataset = dataset_service.get_dataset_by_ml_task(apply_task.id)
+    metadata = parse_trained_model_metadata(trained_models[0].metadata_payload)
+
+    assert len(tasks) == 1
+    assert tasks[0].task_type is MLTaskType.FIT
+    assert all(task.status is MLTaskStatus.SUCCEEDED for task in tasks_after_apply)
+    assert len(trained_models) == 1
+    assert metadata is not None
+    assert metadata.model_family == "recommendation"
+    assert metadata.model_task_kind == "recommender"
+    assert [role["name"] for role in metadata.apply_role_schema["roles"]] == ["item"]
+    assert apply_result_dataset is not None
+    result_lines = Path(apply_result_dataset.source_path).read_text(encoding="utf-8").splitlines()
+    assert result_lines[0].split(",")[:4] == ["source_file", "input_row_number", "base_item", "rank"]
+    assert "recommended_item" in result_lines[0]
 
 
 def test_bulk_tuning_creates_one_tuning_task_per_model_and_follow_up_evaluations(
@@ -465,7 +621,7 @@ def test_apply_rejects_input_files_missing_required_features(monkeypatch, tmp_pa
                 trained_model_id=trained_models[0].id,
             )
         )
-    with pytest.raises(ValidationError, match="match the trained model feature columns"):
+    with pytest.raises(ValidationError, match="match the trained model apply columns"):
         ml_service.apply(
             ApplyWithFilesInput(
                 trained_model_id=trained_models[0].id,

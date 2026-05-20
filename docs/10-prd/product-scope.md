@@ -19,6 +19,7 @@ Record which product concepts remain in the native edition and which are intenti
 - Dataset transformation as an LLM-driven capability that produces derived datasets from registered inputs
 - Models as reusable analyzers, not only supervised estimators
 - Model training, evaluation where applicable, and apply operations through service-backed tool calls
+- Association-rule mining and item-similarity recommendation as reusable analyzer families available through the model lifecycle
 - Artifact-backed result viewing inside Chatbot messages
 - Local artifacts for datasets, models, metrics, reports, and model apply outputs
 - Local runtime logs and metadata
