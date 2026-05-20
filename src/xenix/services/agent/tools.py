@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError as PydanticValidationError
 
 from ...config import AppPaths
 from ...exceptions import ValidationError
@@ -587,14 +587,34 @@ class AgentToolRegistry:
             spec=AgentToolSpec(
                 name="model.inference",
                 provider_name="model_inference",
-                description="Run inference with a trained model and one or more input files.",
+                description="Run inference with a trained model and one or more input files or inline rows.",
                 parameters_schema={
                     "type": "object",
                     "properties": {
                         "trained_model_id": {"type": "string"},
                         "input_files": {"type": "array", "items": {"type": "string"}},
+                        "input_rows": {
+                            "type": "object",
+                            "properties": {
+                                "header_index_map": {
+                                    "type": "object",
+                                    "additionalProperties": {"type": "integer", "minimum": 0},
+                                },
+                                "data": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": ["string", "number", "boolean", "null"],
+                                        },
+                                    },
+                                },
+                            },
+                            "required": ["header_index_map", "data"],
+                            "additionalProperties": False,
+                        },
                     },
-                    "required": ["trained_model_id", "input_files"],
+                    "required": ["trained_model_id"],
                     "additionalProperties": False,
                 },
             ),
@@ -907,13 +927,21 @@ class AgentToolRegistry:
     def _model_inference(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
         trained_model_id = self._require_string(arguments, "trained_model_id")
-        input_files = self._require_string_list(arguments, "input_files")
-        task = self._ml_service.infer(
-            InferWithFilesInput(
+        input_files = self._optional_string_list(arguments, "input_files")
+        input_rows = arguments.get("input_rows")
+        if input_rows is not None and not isinstance(input_rows, dict):
+            raise ValidationError("input_rows must be an object.")
+        if not input_files and input_rows is None:
+            raise ValidationError("model.inference requires input_files or input_rows.")
+        try:
+            inference_input = InferWithFilesInput(
                 trained_model_id=trained_model_id,
                 input_files=input_files,
+                input_rows=input_rows,
             )
-        )
+        except PydanticValidationError as exc:
+            raise ValidationError("input_rows must contain header_index_map and data.") from exc
+        task = self._ml_service.infer(inference_input)
         task = self._wait_for_task(task.id, context=context)
         details = self._ml_service.get_task_details(task.id)
         output_artifact = next(

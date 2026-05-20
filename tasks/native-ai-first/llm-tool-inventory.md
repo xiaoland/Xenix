@@ -274,11 +274,15 @@ Purpose: run inference with a selected trained model and produce prediction resu
 Inputs:
 
 ```text
-model_artifact_id
-input_dataset_id?
-input_file_refs?
-output_name?
+trained_model_id
+input_files?
+input_rows?: {
+  header_index_map: { [feature_column: string]: zero_based_column_index }
+  data: scalar[][]
+}
 ```
+
+At least one of `input_files` or `input_rows` is required. `input_rows` must match the trained model feature-column contract exactly.
 
 Output:
 

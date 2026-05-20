@@ -155,8 +155,28 @@ def test_dataset_scoped_fit_evaluate_and_inference_run(monkeypatch, tmp_path: Pa
     result_dataset = dataset_service.get_dataset_by_ml_task(inference_task.id)
     metadata = parse_trained_model_metadata(trained_models[0].metadata_payload)
 
+    inline_inference_task = ml_service.infer(
+        InferWithFilesInput(
+            trained_model_id=trained_models[0].id,
+            input_rows={
+                "header_index_map": {"feature_b": 0, "feature_a": 1},
+                "data": [[9, 11], [10, 12]],
+            },
+        )
+    )
+    tasks_after_inline_inference = _wait_for_terminal_dataset_tasks(
+        ml_service,
+        dataset.id,
+        expected_count=4,
+    )
+    inline_inference_details = ml_service.get_task_details(inline_inference_task.id)
+    inline_input_payload = inline_inference_details.task.request_payload["input_files"][0]
+    inline_result_dataset = dataset_service.get_dataset_by_ml_task(inline_inference_task.id)
+    inline_input_lines = Path(inline_input_payload["absolute_path"]).read_text(encoding="utf-8").splitlines()
+
     assert {task.task_type for task in tasks} == {MLTaskType.FIT, MLTaskType.EVALUATE}
     assert all(task.status is MLTaskStatus.SUCCEEDED for task in tasks_after_inference)
+    assert all(task.status is MLTaskStatus.SUCCEEDED for task in tasks_after_inline_inference)
     assert len(trained_models) == 1
     assert fit_details.task.result_payload is not None
     assert fit_details.task.result_payload["trained_model_id"] == trained_models[0].id
@@ -166,6 +186,11 @@ def test_dataset_scoped_fit_evaluate_and_inference_run(monkeypatch, tmp_path: Pa
     assert inference_details.task.task_type is MLTaskType.INFERENCE
     assert result_dataset is not None
     assert "prediction" in Path(result_dataset.source_path).read_text(encoding="utf-8").splitlines()[0]
+    assert inline_inference_details.task.task_type is MLTaskType.INFERENCE
+    assert inline_input_payload["source_kind"] == "manual_csv"
+    assert inline_input_lines == ["feature_a,feature_b", "11,9", "12,10"]
+    assert inline_result_dataset is not None
+    assert "prediction" in Path(inline_result_dataset.source_path).read_text(encoding="utf-8").splitlines()[0]
     assert [artifact.artifact_kind for artifact in inference_details.artifacts] == [MLTaskArtifactKind.INFERENCE_RESULT]
 
 
@@ -376,5 +401,21 @@ def test_inference_rejects_input_files_missing_required_features(monkeypatch, tm
             InferWithFilesInput(
                 trained_model_id=trained_models[0].id,
                 input_files=[str(invalid_input.resolve())],
+            )
+        )
+    with pytest.raises(ValidationError, match="input file or provide inline"):
+        ml_service.infer(
+            InferWithFilesInput(
+                trained_model_id=trained_models[0].id,
+            )
+        )
+    with pytest.raises(ValidationError, match="match the trained model feature columns"):
+        ml_service.infer(
+            InferWithFilesInput(
+                trained_model_id=trained_models[0].id,
+                input_rows={
+                    "header_index_map": {"feature_a": 0, "unexpected": 1},
+                    "data": [[11, 9]],
+                },
             )
         )

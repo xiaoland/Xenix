@@ -25,8 +25,13 @@ from xenix.services.storage import StorageBootstrapService
 
 
 class FirstSliceProvider:
-    def __init__(self, inference_path: Path) -> None:
+    def __init__(
+        self,
+        inference_path: Path | None = None,
+        inference_rows: dict[str, Any] | None = None,
+    ) -> None:
         self._inference_path = inference_path
+        self._inference_rows = inference_rows
 
     def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
         dataset_id = self._find_payload_value(messages, "dataset_id")
@@ -76,16 +81,20 @@ class FirstSliceProvider:
                 ],
             )
         if artifact_link is None or "Prediction results" not in self._rendered_text(messages):
+            inference_arguments = {"trained_model_id": trained_model_id}
+            if self._inference_rows is not None:
+                inference_arguments["input_rows"] = self._inference_rows
+            else:
+                if self._inference_path is None:
+                    raise AssertionError("FirstSliceProvider requires inference input data.")
+                inference_arguments["input_files"] = [str(self._inference_path.resolve())]
             return ProviderResponse(
                 assistant_content_blocks=[{"type": "markdown", "text": "I will run prediction with the trained model."}],
                 tool_calls=[
                     ProviderToolCall(
                         provider_call_id="call-infer",
                         tool_name="model.inference",
-                        arguments={
-                            "trained_model_id": trained_model_id,
-                            "input_files": [str(self._inference_path.resolve())],
-                        },
+                        arguments=inference_arguments,
                     )
                 ],
             )
@@ -182,6 +191,10 @@ def test_agent_harness_model_metadata_exposes_catalog_without_train_enums(monkey
     metadata_key_enum = specs["model.metadata"].parameters_schema["properties"]["model_keys"]["items"]["enum"]
     assert "regression.linear" in metadata_key_enum
     assert "enum" not in specs["model.train"].parameters_schema["properties"]["models"]["items"]
+    inference_schema = specs["model.inference"].parameters_schema
+    assert inference_schema["required"] == ["trained_model_id"]
+    assert "input_rows" in inference_schema["properties"]
+    assert set(inference_schema["properties"]["input_rows"]["required"]) == {"header_index_map", "data"}
     assert result.payload["model_keys"] == [
         "regression.linear",
         "regression.gradient_boosting",
@@ -266,3 +279,55 @@ def test_agent_harness_first_slice_runs_from_file_to_prediction(monkeypatch, tmp
     prediction_artifacts = [artifact for artifact in snapshot.artifacts if artifact.kind.value == "prediction"]
     assert len(prediction_artifacts) == 1
     assert Path(prediction_artifacts[0].absolute_path).read_text(encoding="utf-8").splitlines()[0].endswith("prediction")
+
+
+def test_agent_harness_first_slice_runs_inline_rows_to_prediction(monkeypatch, tmp_path: Path) -> None:
+    context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
+
+    training_file = tmp_path / "demand.csv"
+    training_file.write_text(
+        "feature_a,feature_b,target\n"
+        "1,2,5\n"
+        "2,1,5\n"
+        "3,5,11\n"
+        "4,2,10\n"
+        "5,3,13\n"
+        "6,6,18\n"
+        "7,5,19\n"
+        "8,4,20\n"
+        "9,7,25\n"
+        "10,8,28\n",
+        encoding="utf-8",
+    )
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=FirstSliceProvider(
+            inference_rows={
+                "header_index_map": {"feature_b": 0, "feature_a": 1},
+                "data": [[9, 11], [10, 12]],
+            },
+        ),
+        tool_registry=registry,
+        conversation_store=ConversationStore(context.session_factory),
+    )
+
+    snapshot = harness.submit_user_turn(
+        SubmitUserTurnInput(
+            text="Analyze this dataset, train a model, and predict the inline future rows.",
+            file_paths=[str(training_file.resolve())],
+        )
+    )
+
+    assert len(snapshot.turns) == 1
+    assert snapshot.turns[0].status.value == "ended"
+    assert [tool.tool_name for tool in snapshot.tool_calls] == [
+        "data.peek",
+        "data.feature.select",
+        "model.train",
+        "model.inference",
+    ]
+    prediction_artifacts = [artifact for artifact in snapshot.artifacts if artifact.kind.value == "prediction"]
+    assert len(prediction_artifacts) == 1
+    prediction_lines = Path(prediction_artifacts[0].absolute_path).read_text(encoding="utf-8").splitlines()
+    assert prediction_lines[0].endswith("prediction")
+    assert prediction_lines[1].startswith("11,9,")

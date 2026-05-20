@@ -108,7 +108,7 @@ Tool boundaries:
 - The tool registry is static for the current application capability set.
 - Runtime thread, turn, file, dataset, model, and artifact context is passed through validated tool arguments and `ToolExecutionContext`.
 - Current tool names are `data.peek`, `data.integrate`, `data.clean`, `data.query`, `data.transform`, `data.feature.select`, `model.metadata`, `model.train`, `model.hyper_train`, and `model.inference`.
-- `data.feature.select` creates an immutable column-selection snapshot. `model.train` and `model.hyper_train` accept `selection_id`. `model.inference` accepts a trained model and input files, then uses trained model metadata to determine required feature columns.
+- `data.feature.select` creates an immutable column-selection snapshot. `model.train` and `model.hyper_train` accept `selection_id`. `model.inference` accepts a trained model plus `input_files` or inline `input_rows` shaped as `{header_index_map, data}`, then uses trained model metadata to determine required feature columns.
 
 Storage provides persistence interfaces for Agent Harness records. Agent Harness semantics stay in the Agent Harness service.
 

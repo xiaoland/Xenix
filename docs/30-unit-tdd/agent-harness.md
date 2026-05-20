@@ -132,7 +132,7 @@ The first-slice tool registry is static for the current application capability s
 - `model.hyper_train`
 - `model.inference`
 
-Each registered tool carries `ToolPresentation` metadata for Chatbot projection: semantic icon key, pending summary, success summary, failure action, and cancellation summary. `data.feature.select` creates an immutable column-selection snapshot and returns `selection_id`. `model.metadata` exposes canonical model keys, model capabilities, and optional parameter schemas. `model.train` and `model.hyper_train` accept `selection_id`, keep schemas lightweight, and validate model keys through the model catalog at execution time. `model.inference` accepts a trained model and input files, using trained model metadata for required features.
+Each registered tool carries `ToolPresentation` metadata for Chatbot projection: semantic icon key, pending summary, success summary, failure action, and cancellation summary. `data.feature.select` creates an immutable column-selection snapshot and returns `selection_id`. `model.metadata` exposes canonical model keys, model capabilities, and optional parameter schemas. `model.train` and `model.hyper_train` accept `selection_id`, keep schemas lightweight, and validate model keys through the model catalog at execution time. `model.inference` accepts a trained model plus at least one input source: `input_files` or inline `input_rows` shaped as `{header_index_map, data}`. Trained model metadata remains the required-feature contract.
 
 ## Provider Boundary
 

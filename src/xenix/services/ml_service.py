@@ -13,7 +13,7 @@ from sqlmodel import SQLModel
 from ..config import AppPaths
 from ..exceptions import DatasetSourceMissingError, ValidationError
 from .dataset_inspection import InspectDatasetInput
-from .dataset_service import DatasetService
+from .dataset_service import DatasetService, MaterializeManualInferenceCsvInput
 from .ml.contracts import (
     CandidateMetrics,
     ColumnSelection,
@@ -90,9 +90,15 @@ class BulkTuneWithEvaluateInput(SQLModel):
     selections: list[BulkTuningSelection] = Field(default_factory=list)
 
 
+class InlineInferenceRowsInput(SQLModel):
+    header_index_map: dict[str, int] = Field(default_factory=dict)
+    data: list[list[Any]] = Field(default_factory=list)
+
+
 class InferWithFilesInput(SQLModel):
     trained_model_id: str
     input_files: list[str] = Field(default_factory=list)
+    input_rows: InlineInferenceRowsInput | None = None
 
 
 @dataclass(frozen=True)
@@ -262,7 +268,14 @@ class MLService:
 
     def infer(self, input_data: InferWithFilesInput) -> MLTaskRow:
         inference_context = self._build_inference_context(input_data)
-        input_files = self._build_inference_input_files(inference_context.feature_columns, input_data.input_files)
+        input_paths = list(input_data.input_files)
+        inline_path = self._materialize_inline_inference_rows(
+            inference_context.feature_columns,
+            input_data.input_rows,
+        )
+        if inline_path is not None:
+            input_paths.append(str(inline_path))
+        input_files = self._build_inference_input_files(inference_context.feature_columns, input_paths)
         request = InferenceTaskRequest(
             task_id="",
             project_id=inference_context.project_id,
@@ -485,7 +498,7 @@ class MLService:
         input_paths: list[str],
     ) -> list[InferenceInputFile]:
         if not input_paths:
-            raise ValidationError("Select at least one inference input file.")
+            raise ValidationError("Select at least one inference input file or provide inline inference rows.")
         manual_root = (self._paths.temp / "manual-inference").resolve()
         files: list[InferenceInputFile] = []
         for raw_path in input_paths:
@@ -505,6 +518,68 @@ class MLService:
                 )
             )
         return files
+
+    def _materialize_inline_inference_rows(
+        self,
+        feature_columns: list[str],
+        input_rows: InlineInferenceRowsInput | None,
+    ) -> Path | None:
+        if input_rows is None:
+            return None
+
+        header_index_map = self._normalize_inline_header_index_map(input_rows.header_index_map)
+        if set(header_index_map) != set(feature_columns):
+            raise ValidationError("Inline inference columns must match the trained model feature columns exactly.")
+        if not input_rows.data:
+            raise ValidationError("Inline inference rows require at least one data row.")
+
+        row_width = len(header_index_map)
+        rows: list[dict[str, str | None]] = []
+        for row in input_rows.data:
+            if len(row) != row_width:
+                raise ValidationError("Inline inference data rows must match the header index map width.")
+            rows.append(
+                {
+                    column: self._normalize_inline_cell(row[header_index_map[column]])
+                    for column in feature_columns
+                }
+            )
+
+        return self._dataset_service.materialize_manual_inference_csv(
+            MaterializeManualInferenceCsvInput(
+                feature_columns=feature_columns,
+                rows=rows,
+            )
+        )
+
+    def _normalize_inline_header_index_map(self, header_index_map: dict[str, int]) -> dict[str, int]:
+        if not header_index_map:
+            raise ValidationError("Inline inference rows require a header_index_map.")
+
+        normalized: dict[str, int] = {}
+        for raw_column, raw_index in header_index_map.items():
+            column = str(raw_column).strip()
+            if not column:
+                raise ValidationError("Inline inference column names cannot be empty.")
+            if column in normalized:
+                raise ValidationError("Inline inference column names cannot be duplicated.")
+            if not isinstance(raw_index, int) or isinstance(raw_index, bool) or raw_index < 0:
+                raise ValidationError("Inline inference header indexes must be non-negative integers.")
+            normalized[column] = raw_index
+
+        indexes = list(normalized.values())
+        if len(set(indexes)) != len(indexes):
+            raise ValidationError("Inline inference header indexes cannot be duplicated.")
+        if sorted(indexes) != list(range(len(indexes))):
+            raise ValidationError("Inline inference header indexes must be contiguous and start at 0.")
+        return normalized
+
+    def _normalize_inline_cell(self, value: Any) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, (str, int, float, bool)):
+            return str(value)
+        raise ValidationError("Inline inference row values must be scalar JSON values.")
 
     def _normalize_columns(self, columns: list[str], label: str) -> list[str]:
         normalized = [column.strip() for column in columns if column.strip()]
