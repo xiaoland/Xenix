@@ -2729,6 +2729,11 @@ Prediction target: {targets}</source>
         <translation>当前日志文件</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.py" line="189"/>
+        <source>Build commit</source>
+        <translation>构建提交</translation>
+    </message>
+    <message>
         <location filename="../ui/settings_dialog.py" line="97"/>
         <source>Open log directory</source>
         <translation>打开日志目录</translation>

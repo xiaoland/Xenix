@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ..build_info import BUILD_COMMIT, BUILD_COMMIT_DISPLAY
 from ..config import AppPaths
 from ..i18n import TranslationManager
 from ..services.agent import AgentSettings, AgentSettingsService, AimockSettings
@@ -68,6 +69,7 @@ class SettingsDialog(QDialog):
         self._artifacts_label = QLabel()
         self._database_label = QLabel()
         self._current_log_file_label = QLabel()
+        self._build_commit_label = QLabel()
         self._llm_title_label = QLabel()
         self._llm_base_url_label = QLabel()
         self._llm_api_key_label = QLabel()
@@ -85,6 +87,9 @@ class SettingsDialog(QDialog):
         self._artifacts_value = QLabel(str(self._paths.artifacts))
         self._database_value = QLabel(str(self._db_path))
         self._current_log_file_value = QLabel(str(self._log_path))
+        self._build_commit_value = QLabel(BUILD_COMMIT_DISPLAY)
+        if BUILD_COMMIT_DISPLAY != BUILD_COMMIT:
+            self._build_commit_value.setToolTip(BUILD_COMMIT)
         self._llm_base_url_input = QLineEdit()
         self._llm_api_key_input = QLineEdit()
         self._llm_model_input = QLineEdit()
@@ -119,6 +124,7 @@ class SettingsDialog(QDialog):
             self._artifacts_value,
             self._database_value,
             self._current_log_file_value,
+            self._build_commit_value,
         ):
             value_label.setWordWrap(True)
 
@@ -127,6 +133,7 @@ class SettingsDialog(QDialog):
         self._runtime_card_layout.addRow(self._artifacts_label, self._artifacts_value)
         self._runtime_card_layout.addRow(self._database_label, self._database_value)
         self._runtime_card_layout.addRow(self._current_log_file_label, self._current_log_file_value)
+        self._runtime_card_layout.addRow(self._build_commit_label, self._build_commit_value)
 
         self._llm_api_key_input.setEchoMode(QLineEdit.Password)
         self._aimock_api_key_input.setEchoMode(QLineEdit.Password)
@@ -181,6 +188,7 @@ class SettingsDialog(QDialog):
         self._artifacts_label.setText(self.tr("Artifacts"))
         self._database_label.setText(self.tr("Database"))
         self._current_log_file_label.setText(self.tr("Current log file"))
+        self._build_commit_label.setText(self.tr("Build commit"))
         self._open_logs_button.setText(self.tr("Open log directory"))
         self._save_button.setText(self.tr("Save"))
         self._reload_language_options()

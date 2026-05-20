@@ -87,6 +87,7 @@ def test_main_window_language_switch_updates_chat_shell(
         assert window._settings_button.text() == "Settings"
         assert window._history_label.text() == "History"
         assert settings._open_logs_button.text() == "Open log directory"
+        assert settings._build_commit_label.text() == "Build commit"
 
         zh_index = settings._language_selector.findData("zh_CN")
         settings._language_selector.setCurrentIndex(zh_index)
@@ -97,6 +98,7 @@ def test_main_window_language_switch_updates_chat_shell(
         assert window._settings_button.text() == "设置"
         assert window._history_label.text() == "历史"
         assert settings._open_logs_button.text() == "打开日志目录"
+        assert settings._build_commit_label.text() == "构建提交"
         assert read_saved_locale(paths) == "zh_CN"
 
         en_index = settings._language_selector.findData("en_US")
@@ -105,6 +107,7 @@ def test_main_window_language_switch_updates_chat_shell(
 
         assert window.windowTitle() == "Xenix Native"
         assert settings._open_logs_button.text() == "Open log directory"
+        assert settings._build_commit_label.text() == "Build commit"
         assert read_saved_locale(paths) == "en_US"
     finally:
         if window._settings_dialog is not None:

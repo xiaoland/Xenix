@@ -2467,6 +2467,11 @@ Prediction target: {targets}</source>
         <translation type="unfinished">Current log file</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.py" line="189"/>
+        <source>Build commit</source>
+        <translation type="unfinished">Build commit</translation>
+    </message>
+    <message>
         <location filename="../ui/settings_dialog.py" line="97"/>
         <source>Open log directory</source>
         <translation type="unfinished">Open log directory</translation>

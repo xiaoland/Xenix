@@ -8,6 +8,7 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QFrame, QMessageBox, QTextBrowser, QWidget
 
 from xenix.app import build_main_window
+from xenix.build_info import BUILD_COMMIT_DISPLAY
 from xenix.main import main
 from xenix.services.agent import (
     AgentHarnessStreamEvent,
@@ -93,6 +94,7 @@ def test_main_window_keeps_settings_entry_on_thread_detail_view_shell(monkeypatc
         assert window._settings_dialog is not None
         assert window._settings_dialog.isVisible()
         assert window._settings_dialog._aimock_card.isHidden() is True
+        assert window._settings_dialog._build_commit_value.text() == BUILD_COMMIT_DISPLAY
     finally:
         if window._settings_dialog is not None:
             window._settings_dialog.close()

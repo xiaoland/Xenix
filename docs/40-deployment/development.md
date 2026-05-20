@@ -68,6 +68,7 @@ Expected result:
 - packaged executable path is `dist/xenix/xenix.exe`
 - package resources are available under the bundled `xenix/resources/` path
 - compiled translations are available under the bundled `xenix/translations/` path
+- build commit is embedded into the bundle and shown in Settings; `XENIX_BUILD_COMMIT` can override git discovery for non-checkout build environments
 - DuckDB Python runtime imports successfully and can run an in-memory query inside the packaged app
 
 ## Packaged Smoke Verification
