@@ -72,6 +72,7 @@ class SettingsDialog(QDialog):
         self._llm_base_url_label = QLabel()
         self._llm_api_key_label = QLabel()
         self._llm_model_label = QLabel()
+        self._llm_guard_model_label = QLabel()
         self._llm_timeout_label = QLabel()
         self._llm_streaming_label = QLabel()
         self._aimock_title_label = QLabel()
@@ -87,6 +88,7 @@ class SettingsDialog(QDialog):
         self._llm_base_url_input = QLineEdit()
         self._llm_api_key_input = QLineEdit()
         self._llm_model_input = QLineEdit()
+        self._llm_guard_model_input = QLineEdit()
         self._llm_timeout_input = QSpinBox()
         self._llm_streaming_checkbox = QCheckBox()
         self._aimock_enabled_checkbox = QCheckBox()
@@ -134,6 +136,7 @@ class SettingsDialog(QDialog):
         self._llm_card_layout.addRow(self._llm_base_url_label, self._llm_base_url_input)
         self._llm_card_layout.addRow(self._llm_api_key_label, self._llm_api_key_input)
         self._llm_card_layout.addRow(self._llm_model_label, self._llm_model_input)
+        self._llm_card_layout.addRow(self._llm_guard_model_label, self._llm_guard_model_input)
         self._llm_card_layout.addRow(self._llm_timeout_label, self._llm_timeout_input)
         self._llm_card_layout.addRow(self._llm_streaming_label, self._llm_streaming_checkbox)
 
@@ -166,6 +169,7 @@ class SettingsDialog(QDialog):
         self._llm_base_url_label.setText(self.tr("Base URL"))
         self._llm_api_key_label.setText(self.tr("API key"))
         self._llm_model_label.setText(self.tr("Model"))
+        self._llm_guard_model_label.setText(self.tr("Turn guard model"))
         self._llm_timeout_label.setText(self.tr("Timeout"))
         self._llm_streaming_label.setText(self.tr("Streaming"))
         self._aimock_title_label.setText(self.tr("AIMock"))
@@ -224,6 +228,7 @@ class SettingsDialog(QDialog):
         self._llm_base_url_input.setText(settings.base_url)
         self._llm_api_key_input.setText(settings.api_key)
         self._llm_model_input.setText(settings.model)
+        self._llm_guard_model_input.setText(settings.turn_completion_guard_model)
         self._llm_timeout_input.setValue(settings.timeout_seconds)
         self._llm_streaming_checkbox.setChecked(settings.streaming_enabled)
         self._aimock_enabled_checkbox.setChecked(settings.aimock.enabled)
@@ -235,6 +240,7 @@ class SettingsDialog(QDialog):
             base_url=self._llm_base_url_input.text().strip(),
             api_key=self._llm_api_key_input.text(),
             model=self._llm_model_input.text().strip(),
+            turn_completion_guard_model=self._llm_guard_model_input.text().strip(),
             timeout_seconds=self._llm_timeout_input.value(),
             streaming_enabled=self._llm_streaming_checkbox.isChecked(),
             aimock=AimockSettings(

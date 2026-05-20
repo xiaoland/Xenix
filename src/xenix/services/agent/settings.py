@@ -27,6 +27,7 @@ class AgentSettings(BaseModel):
     base_url: str = "https://api.openai.com"
     api_key: str = ""
     model: str = "gpt-4o-mini"
+    turn_completion_guard_model: str = ""
     timeout_seconds: int = Field(default=120, ge=1, le=3600)
     streaming_enabled: bool = True
     aimock: AimockSettings = Field(default_factory=AimockSettings)
@@ -63,18 +64,33 @@ class AgentSettingsService:
 
     def build_provider(self) -> OpenAICompatibleChatProvider:
         settings = self.load()
+        return self._build_openai_compatible_provider(settings, model=settings.model)
+
+    def build_turn_completion_guard_provider(self) -> OpenAICompatibleChatProvider | None:
+        settings = self.load()
+        guard_model = settings.turn_completion_guard_model.strip()
+        if not guard_model:
+            return None
+        return self._build_openai_compatible_provider(settings, model=guard_model)
+
+    def _build_openai_compatible_provider(
+        self,
+        settings: AgentSettings,
+        *,
+        model: str,
+    ) -> OpenAICompatibleChatProvider:
         if self.is_development() and settings.aimock.enabled:
             return OpenAICompatibleChatProvider(
                 base_url=settings.aimock.base_url,
                 api_key=settings.aimock.api_key,
-                model=settings.model,
+                model=model,
                 timeout_seconds=settings.timeout_seconds,
                 streaming_enabled=settings.streaming_enabled,
             )
         return OpenAICompatibleChatProvider(
             base_url=settings.base_url,
             api_key=settings.api_key,
-            model=settings.model,
+            model=model,
             timeout_seconds=settings.timeout_seconds,
             streaming_enabled=settings.streaming_enabled,
         )

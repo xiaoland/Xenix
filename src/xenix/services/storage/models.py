@@ -292,6 +292,23 @@ class AgentToolCallRow(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class AgentTurnCompletionGuardRow(SQLModel, table=True):
+    __tablename__ = "agent_turn_completion_guard"
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    turn_id: str = Field(foreign_key="agent_turn.id", index=True)
+    attempt_index: int
+    input: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    output: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=utc_now)
+
+
 class ArtifactRow(SQLModel, table=True):
     __tablename__ = "artifact"
 

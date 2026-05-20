@@ -1,6 +1,7 @@
 from .conversation_store import (
     AppendAgentMessageInput,
     CompleteToolCallInput,
+    CreateTurnCompletionGuardInput,
     CreateAgentThreadInput,
     CreateToolCallInput,
     FinishAgentRunInput,
@@ -48,6 +49,7 @@ __all__ = [
     "CompleteToolCallInput",
     "ConversationStore",
     "CreateAgentThreadInput",
+    "CreateTurnCompletionGuardInput",
     "CreateToolCallInput",
     "FinishAgentRunInput",
     "ContinueStepBudgetInput",

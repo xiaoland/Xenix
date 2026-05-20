@@ -6,7 +6,7 @@ from sqlmodel import SQLModel
 from ...exceptions import ValidationError
 from . import models  # noqa: F401
 
-CURRENT_SCHEMA_VERSION = 5
+CURRENT_SCHEMA_VERSION = 6
 
 
 def get_user_version(engine: Engine) -> int:
@@ -136,6 +136,29 @@ def migrate_v4_to_v5(engine: Engine) -> int:
     return 5
 
 
+def migrate_v5_to_v6(engine: Engine) -> int:
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE IF NOT EXISTS agent_turn_completion_guard (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                turn_id VARCHAR NOT NULL,
+                attempt_index INTEGER NOT NULL,
+                input JSON NOT NULL,
+                output JSON NOT NULL,
+                created_at DATETIME NOT NULL,
+                FOREIGN KEY(turn_id) REFERENCES agent_turn (id)
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_turn_completion_guard_turn_id "
+            "ON agent_turn_completion_guard (turn_id)"
+        )
+        connection.exec_driver_sql("PRAGMA user_version=6")
+    return 6
+
+
 def run_migrations(engine: Engine) -> int:
     current_version = get_user_version(engine)
     if current_version == 0:
@@ -148,6 +171,8 @@ def run_migrations(engine: Engine) -> int:
         current_version = migrate_v3_to_v4(engine)
     if current_version == 4:
         current_version = migrate_v4_to_v5(engine)
+    if current_version == 5:
+        current_version = migrate_v5_to_v6(engine)
     if current_version == CURRENT_SCHEMA_VERSION:
         return current_version
     raise ValidationError(

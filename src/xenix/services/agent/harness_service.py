@@ -21,6 +21,7 @@ from .conversation_store import (
     CompleteToolCallInput,
     ConversationStore,
     CreateAgentThreadInput,
+    CreateTurnCompletionGuardInput,
     CreateToolCallInput,
     FinishAgentRunInput,
     RenameAgentThreadInput,
@@ -28,6 +29,11 @@ from .conversation_store import (
     StartTurnInput,
     ThreadSnapshot,
     UpdateAgentMessageInput,
+)
+from .completion_guard import (
+    TURN_COMPLETION_GUARD_REMINDER,
+    TurnCompletionGuard,
+    TurnCompletionGuardVerdict,
 )
 from .chatbot_events import (
     ChatbotEvent,
@@ -94,6 +100,7 @@ class AgentHarnessService:
         *,
         session_factory: sessionmaker,
         provider: AgentProvider,
+        turn_completion_guard_provider: AgentProvider | None = None,
         tool_registry: AgentToolRegistry,
         conversation_store: ConversationStore | None = None,
         initial_step_limit: int = 16,
@@ -102,6 +109,11 @@ class AgentHarnessService:
     ) -> None:
         self._session_factory = session_factory
         self._provider = provider
+        self._turn_completion_guard = (
+            TurnCompletionGuard(turn_completion_guard_provider)
+            if turn_completion_guard_provider is not None
+            else None
+        )
         self._tool_registry = tool_registry
         self._conversation_store = conversation_store or ConversationStore(session_factory)
         self._initial_step_limit = max(1, initial_step_limit)
@@ -141,6 +153,9 @@ class AgentHarnessService:
 
     def set_provider(self, provider: AgentProvider) -> None:
         self._provider = provider
+
+    def set_turn_completion_guard_provider(self, provider: AgentProvider | None) -> None:
+        self._turn_completion_guard = TurnCompletionGuard(provider) if provider is not None else None
 
     def cancel_run(self, run_id: str) -> None:
         with self._cancel_lock:
@@ -405,6 +420,13 @@ class AgentHarnessService:
                 )
 
             if not provider_response.tool_calls:
+                guard_action = self._guard_turn_completion(
+                    thread_id=thread_id,
+                    turn_id=turn_id,
+                    provider_response=provider_response,
+                )
+                if guard_action is not None:
+                    continue
                 self._conversation_store.end_turn(thread_id, turn_id)
                 return self._conversation_store.get_thread_snapshot(thread_id)
 
@@ -612,6 +634,14 @@ class AgentHarnessService:
                     yield self._message_event("message_finalized", assistant_message, run_id)
 
             if not provider_response.tool_calls:
+                guard_action = self._guard_turn_completion(
+                    thread_id=thread_id,
+                    turn_id=turn_id,
+                    provider_response=provider_response,
+                )
+                if guard_action is not None:
+                    yield self._message_event("message_created", guard_action, run_id)
+                    continue
                 self._conversation_store.end_turn(thread_id, turn_id)
                 return self._conversation_store.get_thread_snapshot(thread_id)
 
@@ -842,6 +872,55 @@ class AgentHarnessService:
             ),
         )
 
+    def _guard_turn_completion(
+        self,
+        *,
+        thread_id: str,
+        turn_id: str,
+        provider_response: ProviderResponse,
+    ) -> AgentMessageRow | None:
+        if self._turn_completion_guard is None:
+            return None
+
+        last_assistant_text = _assistant_text(provider_response.assistant_content_blocks)
+        if not last_assistant_text:
+            return None
+
+        guard_rows = self._conversation_store.list_turn_completion_guards(turn_id)
+        continue_attempts = [
+            row
+            for row in guard_rows
+            if isinstance(row.output, dict) and row.output.get("verdict") == TurnCompletionGuardVerdict.CONTINUE.value
+        ]
+        if len(continue_attempts) >= 2:
+            return None
+        attempt_index = len(guard_rows)
+
+        result = self._turn_completion_guard.evaluate(last_assistant_text)
+        self._conversation_store.create_turn_completion_guard(
+            CreateTurnCompletionGuardInput(
+                turn_id=turn_id,
+                attempt_index=attempt_index,
+                input={"last_assistant_text": last_assistant_text},
+                output={
+                    "verdict": result.verdict.value,
+                    "reason": result.reason,
+                },
+            )
+        )
+        if result.verdict is not TurnCompletionGuardVerdict.CONTINUE:
+            return None
+
+        return self._conversation_store.append_message(
+            AppendAgentMessageInput(
+                thread_id=thread_id,
+                turn_id=turn_id,
+                kind=AgentMessageKind.SYSTEM,
+                ui_author=AgentMessageAuthor.SYSTEM,
+                content_blocks=[{"type": "markdown", "text": TURN_COMPLETION_GUARD_REMINDER}],
+            )
+        )
+
     def _tool_result_content_blocks(
         self,
         *,
@@ -956,3 +1035,13 @@ class AgentHarnessService:
         if not text:
             return "New analysis"
         return text[:80]
+
+
+def _assistant_text(blocks: list[dict[str, Any]]) -> str:
+    lines: list[str] = []
+    for block in blocks:
+        if block.get("type") in {"text", "markdown"}:
+            text = str(block.get("text") or "").strip()
+            if text:
+                lines.append(text)
+    return "\n".join(lines).strip()

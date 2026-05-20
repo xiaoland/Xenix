@@ -14,6 +14,7 @@ def test_agent_settings_persist_llm_provider_config(monkeypatch, tmp_path: Path)
             base_url="https://llm.example.test",
             api_key="secret",
             model="deepseek-chat",
+            turn_completion_guard_model="qwen-lite",
             timeout_seconds=45,
             streaming_enabled=False,
         )
@@ -21,16 +22,23 @@ def test_agent_settings_persist_llm_provider_config(monkeypatch, tmp_path: Path)
 
     loaded = service.load()
     provider = service.build_provider()
+    guard_provider = service.build_turn_completion_guard_provider()
 
     assert loaded.base_url == "https://llm.example.test"
     assert loaded.api_key == "secret"
     assert loaded.model == "deepseek-chat"
+    assert loaded.turn_completion_guard_model == "qwen-lite"
     assert loaded.timeout_seconds == 45
     assert loaded.streaming_enabled is False
     assert provider._base_url == "https://llm.example.test"
     assert provider._api_key == "secret"
     assert provider._model == "deepseek-chat"
     assert provider._streaming_enabled is False
+    assert guard_provider is not None
+    assert guard_provider._base_url == "https://llm.example.test"
+    assert guard_provider._api_key == "secret"
+    assert guard_provider._model == "qwen-lite"
+    assert guard_provider._streaming_enabled is False
 
 
 def test_agent_settings_ignore_llm_environment_variables(monkeypatch, tmp_path: Path) -> None:
@@ -46,6 +54,7 @@ def test_agent_settings_ignore_llm_environment_variables(monkeypatch, tmp_path: 
     assert provider._base_url == "https://api.openai.com"
     assert provider._api_key == ""
     assert provider._model == "gpt-4o-mini"
+    assert service.build_turn_completion_guard_provider() is None
 
 
 def test_agent_settings_use_aimock_only_in_development(monkeypatch, tmp_path: Path) -> None:
@@ -58,6 +67,7 @@ def test_agent_settings_use_aimock_only_in_development(monkeypatch, tmp_path: Pa
             base_url="https://llm.example.test",
             api_key="secret",
             model="gpt-test",
+            turn_completion_guard_model="guard-test",
             aimock=AimockSettings(
                 enabled=True,
                 base_url="http://127.0.0.1:4010",
@@ -67,8 +77,13 @@ def test_agent_settings_use_aimock_only_in_development(monkeypatch, tmp_path: Pa
     )
 
     provider = service.build_provider()
+    guard_provider = service.build_turn_completion_guard_provider()
 
     assert service.is_development() is True
     assert provider._base_url == "http://127.0.0.1:4010"
     assert provider._api_key == "test"
     assert provider._model == "gpt-test"
+    assert guard_provider is not None
+    assert guard_provider._base_url == "http://127.0.0.1:4010"
+    assert guard_provider._api_key == "test"
+    assert guard_provider._model == "guard-test"

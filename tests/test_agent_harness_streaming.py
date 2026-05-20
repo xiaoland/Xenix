@@ -70,6 +70,36 @@ class EmptyProviderFixture:
         return ProviderResponse()
 
 
+class SequencedProviderFixture:
+    def __init__(self, responses: list[ProviderResponse]) -> None:
+        self._responses = list(responses)
+        self.messages_by_call: list[list[ProviderMessage]] = []
+
+    def complete(self, messages: list[ProviderMessage], tools: list[Any]) -> ProviderResponse:
+        self.messages_by_call.append(list(messages))
+        if not self._responses:
+            raise AssertionError("No provider responses left.")
+        return self._responses.pop(0)
+
+
+class GuardProviderFixture:
+    def __init__(self, verdicts: list[tuple[str, str]]) -> None:
+        self._verdicts = list(verdicts)
+        self.messages_by_call: list[list[ProviderMessage]] = []
+
+    def complete(self, messages: list[ProviderMessage], tools: list[Any]) -> ProviderResponse:
+        self.messages_by_call.append(list(messages))
+        if not self._verdicts:
+            raise AssertionError("No guard verdicts left.")
+        verdict, reason = self._verdicts.pop(0)
+        return ProviderResponse(
+            assistant_content_blocks=[
+                {"type": "markdown", "text": json.dumps({"verdict": verdict, "reason": reason})}
+            ],
+            tool_calls=[],
+        )
+
+
 class EmptyToolRegistry:
     def list_specs(self) -> list[AgentToolSpec]:
         return []
@@ -130,6 +160,35 @@ class BudgetedRegistry:
         if tool_name == "dummy.step":
             return ToolExecutionResult(
                 payload={"dummy_step": True},
+                content_blocks=[{"type": "markdown", "text": "Dummy step completed."}],
+            )
+        raise AssertionError(f"Unexpected tool execution: {tool_name}")
+
+
+class DummyToolRegistry:
+    def list_specs(self) -> list[AgentToolSpec]:
+        return [
+            AgentToolSpec(
+                name="dummy.step",
+                provider_name="dummy_step",
+                description="Run a dummy step.",
+                parameters_schema={
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False,
+                },
+            ),
+        ]
+
+    def execute(
+        self,
+        tool_name: str,
+        arguments: dict[str, Any],
+        context: ToolExecutionContext,
+    ) -> ToolExecutionResult:
+        if tool_name == "dummy.step":
+            return ToolExecutionResult(
+                payload={"ok": True},
                 content_blocks=[{"type": "markdown", "text": "Dummy step completed."}],
             )
         raise AssertionError(f"Unexpected tool execution: {tool_name}")
@@ -273,6 +332,33 @@ def test_openai_compatible_provider_streams_sse_text_and_tool_calls(monkeypatch)
     assert final_response.tool_calls[0].arguments == {"name": "sample"}
 
 
+def test_openai_compatible_provider_omits_tool_choice_without_tools(monkeypatch) -> None:
+    captured_payload: dict[str, Any] = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def read(self):
+            return json.dumps({"choices": [{"message": {"content": "complete"}}]}).encode("utf-8")
+
+    def fake_urlopen(http_request, timeout):
+        captured_payload.update(json.loads(http_request.data.decode("utf-8")))
+        return FakeResponse()
+
+    monkeypatch.setattr("xenix.services.agent.providers.request.urlopen", fake_urlopen)
+    provider = OpenAICompatibleChatProvider(base_url="http://aimock.local", api_key="test", model="mock-model")
+
+    response = provider.complete([ProviderMessage(role="user", content="classify")], [])
+
+    assert response.assistant_content_blocks == [{"type": "markdown", "text": "complete"}]
+    assert "tools" not in captured_payload
+    assert "tool_choice" not in captured_payload
+
+
 def test_agent_harness_streams_assistant_as_message_events(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
@@ -374,6 +460,127 @@ def test_agent_harness_ends_turn_on_empty_provider_response(monkeypatch, tmp_pat
 
     assert snapshot.turns[0].status is AgentTurnStatus.ENDED
     assert [message.kind for message in snapshot.messages] == [AgentMessageKind.USER]
+    assert snapshot.tool_calls == []
+
+
+def test_turn_completion_guard_persists_system_message_and_retries(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    provider = SequencedProviderFixture(
+        [
+            ProviderResponse(
+                assistant_content_blocks=[
+                    {
+                        "type": "markdown",
+                        "text": "Now let me check which classification models are available for training.",
+                    }
+                ],
+                tool_calls=[],
+            ),
+            ProviderResponse(
+                tool_calls=[
+                    ProviderToolCall(
+                        provider_call_id="call-dummy",
+                        tool_name="dummy.step",
+                        arguments={},
+                    )
+                ],
+            ),
+            ProviderResponse(
+                assistant_content_blocks=[{"type": "markdown", "text": "Done."}],
+                tool_calls=[],
+            ),
+        ]
+    )
+    guard_provider = GuardProviderFixture(
+        [
+            ("continue", "The assistant stated a next action."),
+            ("complete", "The assistant provided a final answer."),
+        ]
+    )
+    conversations = ConversationStore(context.session_factory)
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=provider,
+        turn_completion_guard_provider=guard_provider,
+        tool_registry=DummyToolRegistry(),
+        conversation_store=conversations,
+    )
+
+    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="predict churn"))
+
+    assert snapshot.turns[0].status is AgentTurnStatus.ENDED
+    assert [message.kind for message in snapshot.messages] == [
+        AgentMessageKind.USER,
+        AgentMessageKind.ASSISTANT,
+        AgentMessageKind.SYSTEM,
+        AgentMessageKind.TOOL_CALL,
+        AgentMessageKind.TOOL_CALL_RESULT,
+        AgentMessageKind.ASSISTANT,
+    ]
+    assert "did not complete it" in snapshot.messages[2].content_blocks[0]["text"]
+    assert provider.messages_by_call[1][-1].role == "system"
+    assert "did not complete it" in provider.messages_by_call[1][-1].content
+    guard_rows = conversations.list_turn_completion_guards(snapshot.turns[0].id)
+    assert [row.attempt_index for row in guard_rows] == [0, 1]
+    assert guard_rows[0].input == {
+        "last_assistant_text": "Now let me check which classification models are available for training."
+    }
+    assert guard_rows[0].output["verdict"] == "continue"
+    assert guard_rows[1].output["verdict"] == "complete"
+    assert [tool.tool_name for tool in snapshot.tool_calls] == ["dummy.step"]
+
+
+def test_turn_completion_guard_stops_after_two_continue_retries(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    provider = SequencedProviderFixture(
+        [
+            ProviderResponse(
+                assistant_content_blocks=[{"type": "markdown", "text": "Now I will inspect the data."}],
+                tool_calls=[],
+            ),
+            ProviderResponse(
+                assistant_content_blocks=[{"type": "markdown", "text": "Now I will inspect the data."}],
+                tool_calls=[],
+            ),
+            ProviderResponse(
+                assistant_content_blocks=[{"type": "markdown", "text": "Now I will inspect the data."}],
+                tool_calls=[],
+            ),
+        ]
+    )
+    guard_provider = GuardProviderFixture(
+        [
+            ("continue", "Still promises action."),
+            ("continue", "Still promises action."),
+        ]
+    )
+    conversations = ConversationStore(context.session_factory)
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=provider,
+        turn_completion_guard_provider=guard_provider,
+        tool_registry=EmptyToolRegistry(),
+        conversation_store=conversations,
+    )
+
+    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="inspect data"))
+
+    assert snapshot.turns[0].status is AgentTurnStatus.ENDED
+    assert [message.kind for message in snapshot.messages] == [
+        AgentMessageKind.USER,
+        AgentMessageKind.ASSISTANT,
+        AgentMessageKind.SYSTEM,
+        AgentMessageKind.ASSISTANT,
+        AgentMessageKind.SYSTEM,
+        AgentMessageKind.ASSISTANT,
+    ]
+    assert len(provider.messages_by_call) == 3
+    guard_rows = conversations.list_turn_completion_guards(snapshot.turns[0].id)
+    assert [row.output["verdict"] for row in guard_rows] == ["continue", "continue"]
     assert snapshot.tool_calls == []
 
 

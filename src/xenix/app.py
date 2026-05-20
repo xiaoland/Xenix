@@ -75,6 +75,7 @@ def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
     agent_harness_service = AgentHarnessService(
         session_factory=context.session_factory,
         provider=agent_settings_service.build_provider(),
+        turn_completion_guard_provider=agent_settings_service.build_turn_completion_guard_provider(),
         tool_registry=agent_tool_registry,
         conversation_store=conversation_store,
     )

@@ -38,7 +38,7 @@ Current runtime files and subdirectories:
 2. Read the resolved paths from the main window.
 3. Open the log directory from the UI or inspect files directly on disk.
 4. Inspect `config/locale.json` for the persisted UI language preference when debugging localization behavior.
-5. Inspect `config/agent_settings.json` for the persisted LLM provider and development AIMock settings.
+5. Inspect `config/agent_settings.json` for the persisted LLM provider, turn completion guard model, and development AIMock settings.
 6. Inspect `state/xenix.db` for metadata, `artifacts/datasets/` for app-managed dataset artifacts, `artifacts/ml-tasks/` for per-ML-task working directories, and `artifacts/models/` for canonical trained-model files.
 
 ## Reset
@@ -51,7 +51,7 @@ Keep canonical source datasets outside the runtime directory. Dataset registrati
 
 Dataset import and dataset inspection read the user-managed source file directly. Agent Harness and data services register app-managed dataset artifacts when data tools produce derived files. `data.query` returns bounded tool-result payloads by default; `data.transform` writes transformed CSV artifacts under `artifacts/datasets/transformed/`.
 
-Current SQLite development baseline is `user_version=5`. Application startup runs forward migrations from supported earlier baselines. If a local development database belongs to an obsolete schema baseline, delete `state/xenix.db` under the active runtime home and restart the app so bootstrap recreates the current AI-first schema.
+Current SQLite development baseline is `user_version=6`. Application startup runs forward migrations from supported earlier baselines. If a local development database belongs to an obsolete schema baseline, delete `state/xenix.db` under the active runtime home and restart the app so bootstrap recreates the current AI-first schema.
 
 When a migration fails during development:
 
@@ -62,6 +62,8 @@ When a migration fails during development:
 5. Re-run bootstrap or `pdm run smoke` against the same runtime home.
 
 Agent Message lifecycle status is stored as lowercase enum values in SQLite, for example `in_progress`, `completed`, `failed`, and `cancelled`.
+
+Turn completion guard audit decisions are stored in `agent_turn_completion_guard`. The corresponding retry reminder is stored as a normal system row in `agent_message`, because it is part of provider-facing conversation history.
 
 Issue `#72` adds ML task working directories with this shape:
 

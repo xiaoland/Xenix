@@ -357,6 +357,9 @@ class MainWindow(QMainWindow):
 
     def _reload_agent_provider(self) -> None:
         self._agent_harness_service.set_provider(self._agent_settings_service.build_provider())
+        self._agent_harness_service.set_turn_completion_guard_provider(
+            self._agent_settings_service.build_turn_completion_guard_provider()
+        )
 
     def _create_agent_thread(self) -> None:
         self._pending_step_confirmation = None

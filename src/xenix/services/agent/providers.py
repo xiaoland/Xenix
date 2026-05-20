@@ -147,7 +147,9 @@ class OpenAICompatibleChatProvider:
         payload = {
             "model": self._model,
             "messages": self._build_messages(messages),
-            "tools": [
+        }
+        if tools:
+            payload["tools"] = [
                 {
                     "type": "function",
                     "function": {
@@ -157,9 +159,8 @@ class OpenAICompatibleChatProvider:
                     },
                 }
                 for tool in tools
-            ],
-            "tool_choice": "auto",
-        }
+            ]
+            payload["tool_choice"] = "auto"
         if stream:
             payload["stream"] = True
         return payload

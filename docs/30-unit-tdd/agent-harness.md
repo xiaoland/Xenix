@@ -26,6 +26,7 @@ Storage owns persistence mechanics. Data, artifact, project, and ML services own
 - `Message`: chronological content-block record with Harness kind, UI author, lifecycle status, and content blocks.
 - `ToolCall`: execution record linking a tool-call Message to its result Message.
 - `AgentRun`: one provider/tool orchestration attempt for a turn.
+- `TurnCompletionGuard`: diagnostic audit record for a guard model decision made before ending a turn.
 - `ChatbotEvent`: Harness-owned projection record consumed by Chatbot UI. One Chatbot Event may represent one Message or a paired tool-call Message and tool-result Message.
 
 ## Provider Loop
@@ -40,7 +41,8 @@ submit_user_turn
   -> build provider messages from ThreadSnapshot
   -> call provider complete/stream
   -> create/update/finalize assistant Message as stream content arrives or final content is known
-  -> end turn when provider returns zero tool calls
+  -> before ending a zero-tool turn, optionally run the turn completion guard
+  -> end turn when provider returns zero tool calls and guard allows completion
   -> for each tool call:
        persist tool-call Message and ToolCall row
        execute registered tool with ToolExecutionContext
@@ -49,6 +51,28 @@ submit_user_turn
 ```
 
 A provider response with empty assistant content and zero tool calls ends the turn. A turn-end tool is outside the current contract.
+
+## Turn Completion Guard
+
+The turn completion guard is a minimal Harness-owned safeguard at the zero-tool turn-end boundary. It is enabled only when a guard model is configured. When no guard model is configured, the Harness keeps the normal zero-tool turn-end behavior.
+
+The guard input is only the latest assistant text from the provider response that is about to end the turn. It does not inspect the full conversation, tool history, artifacts, or task state. The guard provider returns JSON with:
+
+```json
+{"verdict":"continue","reason":"short reason"}
+```
+
+or:
+
+```json
+{"verdict":"complete","reason":"short reason"}
+```
+
+`complete` lets the Harness end the turn normally. `continue` means the assistant appears to have stated an in-turn next action without completing it. For `continue`, the Harness persists a system Message in the active turn and retries the primary provider. The system Message is ordinary conversation history and is included in future provider message projection.
+
+The guard persists each decision to `agent_turn_completion_guard` with `turn_id`, `attempt_index`, `input`, `output`, and `created_at`. The audit row is diagnostic state; it is not a Chatbot Event and is not user-visible assistant content.
+
+The Harness allows at most two `continue` retries per turn. If the primary provider still returns zero tool calls after the retry limit is exhausted, the Harness ends the turn normally. Invalid guard output or guard provider failure fails closed as `complete`.
 
 ## Chatbot Timeline Projection
 

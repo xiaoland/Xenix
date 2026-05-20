@@ -13,6 +13,7 @@ from ..models import (
     AgentThreadRow,
     AgentToolCallRow,
     AgentToolCallStatus,
+    AgentTurnCompletionGuardRow,
     AgentTurnRow,
     AgentTurnStatus,
     ArtifactRow,
@@ -76,6 +77,17 @@ class AgentConversationRepository:
         for tool_call in tool_calls:
             session.delete(tool_call)
         session.flush()
+
+        turn_ids = [turn.id for turn in turns]
+        if turn_ids:
+            guard_rows = session.exec(
+                select(AgentTurnCompletionGuardRow).where(
+                    col(AgentTurnCompletionGuardRow.turn_id).in_(turn_ids)
+                )
+            ).all()
+            for guard_row in guard_rows:
+                session.delete(guard_row)
+            session.flush()
 
         messages = session.exec(select(AgentMessageRow).where(AgentMessageRow.thread_id == thread_id)).all()
         for message in messages:
@@ -306,3 +318,25 @@ class AgentConversationRepository:
         session.flush()
         session.refresh(row)
         return row
+
+    def create_turn_completion_guard(
+        self,
+        session: Session,
+        row: AgentTurnCompletionGuardRow,
+    ) -> AgentTurnCompletionGuardRow:
+        session.add(row)
+        session.flush()
+        session.refresh(row)
+        return row
+
+    def list_turn_completion_guards(
+        self,
+        session: Session,
+        turn_id: str,
+    ) -> list[AgentTurnCompletionGuardRow]:
+        statement = (
+            select(AgentTurnCompletionGuardRow)
+            .where(AgentTurnCompletionGuardRow.turn_id == turn_id)
+            .order_by(AgentTurnCompletionGuardRow.attempt_index)
+        )
+        return list(session.exec(statement))

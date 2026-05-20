@@ -18,6 +18,7 @@ from ..storage.models import (
     AgentThreadRow,
     AgentToolCallRow,
     AgentToolCallStatus,
+    AgentTurnCompletionGuardRow,
     AgentTurnRow,
     AgentTurnStatus,
     ArtifactRow,
@@ -94,6 +95,13 @@ class FinishAgentRunInput(SQLModel):
     status: AgentRunStatus
     error_summary: str | None = None
     usage_payload: dict[str, Any] | None = None
+
+
+class CreateTurnCompletionGuardInput(SQLModel):
+    turn_id: str
+    attempt_index: int
+    input: dict[str, Any] = Field(default_factory=dict)
+    output: dict[str, Any] = Field(default_factory=dict)
 
 
 class ThreadSnapshot(SQLModel):
@@ -459,6 +467,30 @@ class ConversationStore:
                 raise NotFoundError(f"Agent run '{input_data.run_id}' was not found.")
             session.commit()
             return updated
+
+    def create_turn_completion_guard(
+        self,
+        input_data: CreateTurnCompletionGuardInput,
+    ) -> AgentTurnCompletionGuardRow:
+        now = _utc_now()
+        with self._session_factory() as session:
+            turn = self._conversations.get_turn(session, input_data.turn_id)
+            if turn is None:
+                raise NotFoundError(f"Turn '{input_data.turn_id}' was not found.")
+            row = AgentTurnCompletionGuardRow(
+                turn_id=turn.id,
+                attempt_index=input_data.attempt_index,
+                input=dict(input_data.input),
+                output=dict(input_data.output),
+                created_at=now,
+            )
+            self._conversations.create_turn_completion_guard(session, row)
+            session.commit()
+            return row
+
+    def list_turn_completion_guards(self, turn_id: str) -> list[AgentTurnCompletionGuardRow]:
+        with self._session_factory() as session:
+            return self._conversations.list_turn_completion_guards(session, turn_id)
 
     def _require_thread(self, session, thread_id: str) -> AgentThreadRow:
         thread = self._conversations.get_thread(session, thread_id)

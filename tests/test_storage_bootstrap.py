@@ -312,6 +312,69 @@ def test_storage_bootstrap_migrates_v4_column_selection_schema(monkeypatch, tmp_
     assert "ix_dataset_column_selection_dataset_id" in indexes
 
 
+def test_storage_bootstrap_migrates_v5_turn_completion_guard_schema(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    db_path = database_path(paths)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    import sqlite3
+
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE agent_turn (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                thread_id VARCHAR NOT NULL,
+                sequence_index INTEGER NOT NULL,
+                status VARCHAR NOT NULL,
+                user_message_id VARCHAR,
+                created_at DATETIME NOT NULL,
+                ended_at DATETIME,
+                updated_at DATETIME NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO agent_turn (
+                id,
+                thread_id,
+                sequence_index,
+                status,
+                user_message_id,
+                created_at,
+                ended_at,
+                updated_at
+            )
+            VALUES (
+                'turn-1',
+                'thread-1',
+                0,
+                'open',
+                NULL,
+                '2026-05-20T00:00:00Z',
+                NULL,
+                '2026-05-20T00:00:00Z'
+            )
+            """
+        )
+        connection.execute("PRAGMA user_version=5")
+
+    context = StorageBootstrapService().initialize(paths)
+
+    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
+    assert {"turn_id", "attempt_index", "input", "output", "created_at"}.issubset(
+        _table_columns(context, "agent_turn_completion_guard")
+    )
+    with context.engine.connect() as connection:
+        indexes = {
+            str(row[1])
+            for row in connection.exec_driver_sql("PRAGMA index_list(agent_turn_completion_guard)").all()
+        }
+    assert "ix_agent_turn_completion_guard_turn_id" in indexes
+
+
 def test_storage_bootstrap_uses_ai_first_baseline_without_work_item_schema(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
@@ -343,12 +406,18 @@ def test_storage_bootstrap_uses_ai_first_baseline_without_work_item_schema(monke
             str(row[1])
             for row in connection.exec_driver_sql("PRAGMA table_info(dataset_column_selection)").all()
         }
+        guard_columns = {
+            str(row[1])
+            for row in connection.exec_driver_sql("PRAGMA table_info(agent_turn_completion_guard)").all()
+        }
 
-    assert CURRENT_SCHEMA_VERSION == 5
+    assert CURRENT_SCHEMA_VERSION == 6
     assert "work_item" not in table_names
     assert "dataset_column_selection" in table_names
+    assert "agent_turn_completion_guard" in table_names
     assert "derived_from_dataset_id" in dataset_columns
     assert {"dataset_id", "feature_columns", "target_columns", "created_at"}.issubset(column_selection_columns)
+    assert {"turn_id", "attempt_index", "input", "output", "created_at"}.issubset(guard_columns)
     assert {"status", "updated_at", "finalized_at"}.issubset(agent_message_columns)
     assert "work_item_id" not in ml_task_columns
     assert "work_item_id" not in trained_model_columns
