@@ -9,7 +9,6 @@ import pandas as pd
 from pydantic import BaseModel, Field
 
 from ....exceptions import ValidationError
-from ...storage.models import ProblemKind
 from ..contracts import (
     EvaluateTaskRequest,
     EvaluateTaskResult,
@@ -24,6 +23,7 @@ from ..contracts import (
 from ..dataset_loader import load_dataset
 from ..types import (
     ColumnRoleKind,
+    EvaluationKind,
     ModelFamily,
     ModelResultContract,
     ModelRoleDefinition,
@@ -43,7 +43,7 @@ class ItemSimilarityRecommendationParams(BaseModel):
 class ItemSimilarityRecommendationService(ModelServiceBase):
     key = "recommendation.item_similarity"
     display_name = "Item Similarity Recommender"
-    problem_kind = ProblemKind.ANALYSIS
+    evaluation_kind = EvaluationKind.SUMMARY
     model_family = ModelFamily.RECOMMENDATION
     model_task_kind = ModelTaskKind.RECOMMENDER
     family = "Collaborative filtering"
@@ -126,7 +126,7 @@ class ItemSimilarityRecommendationService(ModelServiceBase):
 
         return FitTaskResult(
             task_id=request.task_id,
-            problem_kind=request.problem_kind,
+            evaluation_kind=request.evaluation_kind,
             evaluation_policy=request.evaluation_policy,
             model_key=cls.key,
             params=params.model_dump(mode="json"),

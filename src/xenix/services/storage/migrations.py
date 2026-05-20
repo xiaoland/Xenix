@@ -8,7 +8,7 @@ from sqlmodel import SQLModel
 from ...exceptions import ValidationError
 from . import models  # noqa: F401
 
-CURRENT_SCHEMA_VERSION = 8
+CURRENT_SCHEMA_VERSION = 9
 
 
 def get_user_version(engine: Engine) -> int:
@@ -279,6 +279,121 @@ def migrate_v7_to_v8(engine: Engine) -> int:
     return 8
 
 
+def migrate_v8_to_v9(engine: Engine) -> int:
+    with engine.begin() as connection:
+        table_names = {
+            str(row[0])
+            for row in connection.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'").all()
+        }
+        if "ml_task" in table_names:
+            task_rows = connection.exec_driver_sql(
+                "SELECT id, request_payload, result_payload FROM ml_task"
+            ).all()
+            for row in task_rows:
+                request_payload = _migrate_evaluation_payload(_json_object(row[1]))
+                result_payload = _migrate_evaluation_payload(_json_object(row[2]))
+                connection.exec_driver_sql(
+                    """
+                    UPDATE ml_task
+                    SET request_payload=?, result_payload=?
+                    WHERE id=?
+                    """,
+                    (
+                        json.dumps(request_payload),
+                        json.dumps(result_payload) if row[2] is not None else None,
+                        row[0],
+                    ),
+                )
+
+        if "trained_model" in table_names:
+            rows = connection.exec_driver_sql(
+                """
+                SELECT
+                    id,
+                    dataset_id,
+                    ml_task_id,
+                    model_key,
+                    problem_kind,
+                    artifact_path,
+                    metadata_payload,
+                    created_at,
+                    updated_at
+                FROM trained_model
+                """
+            ).all()
+            connection.exec_driver_sql("DROP TABLE trained_model")
+            connection.exec_driver_sql(
+                """
+                CREATE TABLE trained_model (
+                    id VARCHAR NOT NULL PRIMARY KEY,
+                    dataset_id VARCHAR,
+                    ml_task_id VARCHAR NOT NULL,
+                    model_key VARCHAR NOT NULL,
+                    problem_kind VARCHAR,
+                    artifact_path VARCHAR NOT NULL,
+                    metadata_payload JSON NOT NULL,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL,
+                    FOREIGN KEY(dataset_id) REFERENCES dataset (id),
+                    FOREIGN KEY(ml_task_id) REFERENCES ml_task (id)
+                )
+                """
+            )
+            for row in rows:
+                problem_kind = str(row[4]) if row[4] is not None else ""
+                normalized_problem_kind = None if problem_kind == "analysis" else (problem_kind or None)
+                metadata_payload = _json_object(row[6])
+                metadata_payload.setdefault(
+                    "evaluation_kind",
+                    _evaluation_kind_for_problem_kind(problem_kind),
+                )
+                connection.exec_driver_sql(
+                    """
+                    INSERT INTO trained_model (
+                        id,
+                        dataset_id,
+                        ml_task_id,
+                        model_key,
+                        problem_kind,
+                        artifact_path,
+                        metadata_payload,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        row[0],
+                        row[1],
+                        row[2],
+                        row[3],
+                        normalized_problem_kind,
+                        row[5],
+                        json.dumps(metadata_payload),
+                        row[7],
+                        row[8],
+                    ),
+                )
+            connection.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_trained_model_dataset_id "
+                "ON trained_model (dataset_id)"
+            )
+            connection.exec_driver_sql(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_trained_model_ml_task_id "
+                "ON trained_model (ml_task_id)"
+            )
+            connection.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_trained_model_model_key "
+                "ON trained_model (model_key)"
+            )
+            connection.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_trained_model_problem_kind "
+                "ON trained_model (problem_kind)"
+            )
+        connection.exec_driver_sql("PRAGMA user_version=9")
+    return 9
+
+
 def run_migrations(engine: Engine) -> int:
     current_version = get_user_version(engine)
     if current_version == 0:
@@ -297,6 +412,8 @@ def run_migrations(engine: Engine) -> int:
         current_version = migrate_v6_to_v7(engine)
     if current_version == 7:
         current_version = migrate_v7_to_v8(engine)
+    if current_version == 8:
+        current_version = migrate_v8_to_v9(engine)
     if current_version == CURRENT_SCHEMA_VERSION:
         return current_version
     raise ValidationError(
@@ -316,3 +433,47 @@ def _json_list(value: object) -> list[str]:
     if not isinstance(parsed, list):
         return []
     return [str(item) for item in parsed if str(item)]
+
+
+def _json_object(value: object) -> dict[str, object]:
+    if value is None:
+        return {}
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return {}
+    else:
+        parsed = value
+    if not isinstance(parsed, dict):
+        return {}
+    return dict(parsed)
+
+
+def _evaluation_kind_for_problem_kind(problem_kind: object) -> str:
+    if problem_kind == "regression":
+        return "regression"
+    if problem_kind == "classification":
+        return "classification"
+    if problem_kind in {"clustering", "anomaly_detection", "analysis"}:
+        return "summary"
+    return "none"
+
+
+def _migrate_evaluation_payload(payload: dict[str, object]) -> dict[str, object]:
+    problem_kind = payload.pop("problem_kind", None)
+    evaluation_policy = payload.get("evaluation_policy")
+    has_evaluation_contract = (
+        problem_kind is not None
+        or "evaluation_kind" in payload
+        or isinstance(evaluation_policy, dict)
+    )
+    if not has_evaluation_contract:
+        return payload
+    if "evaluation_kind" not in payload:
+        payload["evaluation_kind"] = _evaluation_kind_for_problem_kind(problem_kind)
+    if isinstance(evaluation_policy, dict):
+        policy_problem_kind = evaluation_policy.pop("problem_kind", problem_kind)
+        if "evaluation_kind" not in evaluation_policy:
+            evaluation_policy["evaluation_kind"] = _evaluation_kind_for_problem_kind(policy_problem_kind)
+    return payload

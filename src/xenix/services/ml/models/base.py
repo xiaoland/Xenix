@@ -15,7 +15,6 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from ....exceptions import ValidationError
-from ...storage.models import ProblemKind
 from ..contracts import (
     EvaluateTaskRequest,
     EvaluateTaskResult,
@@ -30,7 +29,7 @@ from ..contracts import (
 )
 from ..dataset_loader import load_dataset, load_holdout_frame
 from ..evaluation import build_metric_snapshot, scoring_name_for_policy
-from ..types import ModelServiceBase
+from ..types import EvaluationKind, ModelServiceBase
 
 
 class NumericAndCategoricalModelService(ModelServiceBase):
@@ -56,7 +55,7 @@ class NumericAndCategoricalModelService(ModelServiceBase):
 
         return FitTaskResult(
             task_id=request.task_id,
-            problem_kind=request.problem_kind,
+            evaluation_kind=request.evaluation_kind,
             evaluation_policy=request.evaluation_policy,
             model_key=cls.key,
             params=params_model.model_dump(mode="json"),
@@ -92,7 +91,7 @@ class NumericAndCategoricalModelService(ModelServiceBase):
 
         return HyperparameterTuningTaskResult(
             task_id=request.task_id,
-            problem_kind=request.problem_kind,
+            evaluation_kind=request.evaluation_kind,
             evaluation_policy=request.evaluation_policy,
             model_key=cls.key,
             best_params={str(key): value for key, value in search.best_params_.items()},
@@ -115,11 +114,11 @@ class NumericAndCategoricalModelService(ModelServiceBase):
         holdout = load_holdout_frame(Path(request.evaluate_model.holdout_artifact_path))
         X_eval, y_eval = cls._split_frame(holdout, request.column_selection.feature_columns, request.column_selection.target_columns)
         y_pred = estimator.predict(X_eval)
-        metrics = build_metric_snapshot(request.problem_kind, y_eval, y_pred)
+        metrics = build_metric_snapshot(request.evaluation_kind, y_eval, y_pred)
 
         return EvaluateTaskResult(
             task_id=request.task_id,
-            problem_kind=request.problem_kind,
+            evaluation_kind=request.evaluation_kind,
             evaluation_policy=request.evaluation_policy,
             trained_model_id=request.evaluate_model.trained_model_id,
             model_key=cls.key,
@@ -172,7 +171,7 @@ class NumericAndCategoricalModelService(ModelServiceBase):
             request.column_selection.feature_columns,
             request.column_selection.target_columns,
         )
-        stratify = y if request.problem_kind is ProblemKind.CLASSIFICATION else None
+        stratify = y if request.evaluation_kind is EvaluationKind.CLASSIFICATION else None
         try:
             return train_test_split(
                 X,
@@ -453,7 +452,7 @@ class UnsupervisedClusteringModelService(ModelServiceBase):
 
         return FitTaskResult(
             task_id=request.task_id,
-            problem_kind=request.problem_kind,
+            evaluation_kind=request.evaluation_kind,
             evaluation_policy=request.evaluation_policy,
             model_key=cls.key,
             params=params_model.model_dump(mode="json", by_alias=True),
@@ -579,7 +578,7 @@ class UnsupervisedAnomalyModelService(ModelServiceBase):
         anomaly_rate = float(anomaly_count / row_count) if row_count else 0.0
         return FitTaskResult(
             task_id=request.task_id,
-            problem_kind=request.problem_kind,
+            evaluation_kind=request.evaluation_kind,
             evaluation_policy=request.evaluation_policy,
             model_key=cls.key,
             params=params_model.model_dump(mode="json", by_alias=True),

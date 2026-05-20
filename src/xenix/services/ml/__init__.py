@@ -7,6 +7,7 @@ from .registry import (
 from .types import (
     ColumnRoleKind,
     ColumnRoleBinding,
+    EvaluationKind,
     ModelCatalogEntry,
     ModelFamily,
     ModelResultContract,
@@ -19,6 +20,7 @@ from .types import (
 __all__ = [
     "ColumnRoleKind",
     "ColumnRoleBinding",
+    "EvaluationKind",
     "ModelCatalogEntry",
     "ModelFamily",
     "ModelResultContract",

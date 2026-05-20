@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from xenix.config import ensure_app_dirs, get_app_paths
@@ -613,6 +614,186 @@ def test_storage_bootstrap_migrates_v7_inference_values_to_apply(
     assert artifact_kind == "apply_result"
 
 
+def test_storage_bootstrap_migrates_v8_evaluation_kind_and_nullable_problem_kind(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    db_path = database_path(paths)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    import sqlite3
+
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE dataset (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                project_id VARCHAR NOT NULL,
+                name VARCHAR NOT NULL,
+                source_path VARCHAR NOT NULL,
+                source_format VARCHAR,
+                copied_from VARCHAR,
+                copied_at DATETIME,
+                derived_from_dataset_id VARCHAR,
+                ml_task_id VARCHAR,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE ml_task (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                project_id VARCHAR NOT NULL,
+                dataset_id VARCHAR,
+                task_type VARCHAR NOT NULL,
+                status VARCHAR NOT NULL,
+                request_payload JSON NOT NULL,
+                result_payload JSON,
+                error_summary VARCHAR,
+                created_at DATETIME NOT NULL,
+                started_at DATETIME,
+                finished_at DATETIME,
+                updated_at DATETIME NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE trained_model (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                dataset_id VARCHAR,
+                ml_task_id VARCHAR NOT NULL,
+                model_key VARCHAR NOT NULL,
+                problem_kind VARCHAR NOT NULL,
+                artifact_path VARCHAR NOT NULL,
+                metadata_payload JSON NOT NULL,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO dataset (
+                id,
+                project_id,
+                name,
+                source_path,
+                source_format,
+                copied_from,
+                copied_at,
+                derived_from_dataset_id,
+                ml_task_id,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                'dataset-1',
+                'project-1',
+                'Baskets',
+                'C:/data/baskets.csv',
+                'csv',
+                NULL,
+                NULL,
+                NULL,
+                NULL,
+                '2026-05-20T00:00:00Z',
+                '2026-05-20T00:00:00Z'
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO ml_task (
+                id,
+                project_id,
+                dataset_id,
+                task_type,
+                status,
+                request_payload,
+                result_payload,
+                error_summary,
+                created_at,
+                started_at,
+                finished_at,
+                updated_at
+            )
+            VALUES (
+                'task-1',
+                'project-1',
+                'dataset-1',
+                'fit',
+                'succeeded',
+                '{"problem_kind":"analysis","evaluation_policy":{"problem_kind":"analysis","primary_metric_name":"result_count"}}',
+                '{"problem_kind":"analysis","evaluation_policy":{"problem_kind":"analysis","primary_metric_name":"result_count"}}',
+                NULL,
+                '2026-05-20T00:00:00Z',
+                NULL,
+                '2026-05-20T00:00:00Z',
+                '2026-05-20T00:00:00Z'
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO trained_model (
+                id,
+                dataset_id,
+                ml_task_id,
+                model_key,
+                problem_kind,
+                artifact_path,
+                metadata_payload,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                'model-1',
+                'dataset-1',
+                'task-1',
+                'association.apriori_apyori',
+                'analysis',
+                'C:/models/rules.joblib',
+                '{"model_key":"association.apriori_apyori"}',
+                '2026-05-20T00:00:00Z',
+                '2026-05-20T00:00:00Z'
+            )
+            """
+        )
+        connection.execute("PRAGMA user_version=8")
+
+    context = StorageBootstrapService().initialize(paths)
+
+    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
+    with context.engine.connect() as connection:
+        model_row = connection.exec_driver_sql(
+            "SELECT problem_kind, metadata_payload FROM trained_model WHERE id='model-1'"
+        ).first()
+        task_row = connection.exec_driver_sql(
+            "SELECT request_payload, result_payload FROM ml_task WHERE id='task-1'"
+        ).first()
+        trained_model_info = {
+            str(row[1]): row
+            for row in connection.exec_driver_sql("PRAGMA table_info(trained_model)").all()
+        }
+    assert model_row is not None
+    assert model_row[0] is None
+    assert json.loads(model_row[1])["evaluation_kind"] == "summary"
+    assert task_row is not None
+    migrated_request = json.loads(task_row[0])
+    migrated_result = json.loads(task_row[1])
+    assert "problem_kind" not in migrated_request
+    assert migrated_request["evaluation_kind"] == "summary"
+    assert migrated_request["evaluation_policy"]["evaluation_kind"] == "summary"
+    assert "problem_kind" not in migrated_request["evaluation_policy"]
+    assert migrated_result["evaluation_kind"] == "summary"
+    assert trained_model_info["problem_kind"][3] == 0
+
+
 def test_storage_bootstrap_uses_ai_first_baseline_without_work_item_schema(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
@@ -649,7 +830,7 @@ def test_storage_bootstrap_uses_ai_first_baseline_without_work_item_schema(monke
             for row in connection.exec_driver_sql("PRAGMA table_info(agent_turn_completion_guard)").all()
         }
 
-    assert CURRENT_SCHEMA_VERSION == 8
+    assert CURRENT_SCHEMA_VERSION == 9
     assert "work_item" not in table_names
     assert "dataset_column_selection" not in table_names
     assert "dataset_column_binding" in table_names

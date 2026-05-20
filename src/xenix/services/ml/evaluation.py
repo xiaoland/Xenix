@@ -15,13 +15,13 @@ from sklearn.metrics import (
     recall_score,
 )
 
-from ..storage.models import ProblemKind
 from .contracts import CandidateMetrics, EvaluationPolicySnapshot, MetricDirection
+from .types import EvaluationKind
 
-_POLICIES: dict[ProblemKind, EvaluationPolicySnapshot] = {
-    ProblemKind.REGRESSION: EvaluationPolicySnapshot(
+_POLICIES: dict[EvaluationKind, EvaluationPolicySnapshot] = {
+    EvaluationKind.REGRESSION: EvaluationPolicySnapshot(
         policy_key="regression.default.v1",
-        problem_kind=ProblemKind.REGRESSION,
+        evaluation_kind=EvaluationKind.REGRESSION,
         primary_metric_name="r2",
         primary_metric_direction=MetricDirection.MAX,
         tie_breaker_metrics=["rmse", "mae"],
@@ -30,9 +30,9 @@ _POLICIES: dict[ProblemKind, EvaluationPolicySnapshot] = {
         cv_folds=5,
         random_state=42,
     ),
-    ProblemKind.CLASSIFICATION: EvaluationPolicySnapshot(
+    EvaluationKind.CLASSIFICATION: EvaluationPolicySnapshot(
         policy_key="classification.default.v1",
-        problem_kind=ProblemKind.CLASSIFICATION,
+        evaluation_kind=EvaluationKind.CLASSIFICATION,
         primary_metric_name="f1_weighted",
         primary_metric_direction=MetricDirection.MAX,
         tie_breaker_metrics=["accuracy", "precision_weighted", "recall_weighted"],
@@ -41,32 +41,10 @@ _POLICIES: dict[ProblemKind, EvaluationPolicySnapshot] = {
         cv_folds=5,
         random_state=42,
     ),
-    ProblemKind.CLUSTERING: EvaluationPolicySnapshot(
-        policy_key="clustering.default.v1",
-        problem_kind=ProblemKind.CLUSTERING,
-        primary_metric_name="cluster_count",
-        primary_metric_direction=MetricDirection.MAX,
-        tie_breaker_metrics=[],
-        split_strategy="none",
-        test_size=0.0,
-        cv_folds=None,
-        random_state=42,
-    ),
-    ProblemKind.ANOMALY_DETECTION: EvaluationPolicySnapshot(
-        policy_key="anomaly_detection.default.v1",
-        problem_kind=ProblemKind.ANOMALY_DETECTION,
-        primary_metric_name="anomaly_count",
-        primary_metric_direction=MetricDirection.MAX,
-        tie_breaker_metrics=[],
-        split_strategy="none",
-        test_size=0.0,
-        cv_folds=None,
-        random_state=42,
-    ),
-    ProblemKind.ANALYSIS: EvaluationPolicySnapshot(
-        policy_key="analysis.default.v1",
-        problem_kind=ProblemKind.ANALYSIS,
-        primary_metric_name="result_count",
+    EvaluationKind.NONE: EvaluationPolicySnapshot(
+        policy_key="none.default.v1",
+        evaluation_kind=EvaluationKind.NONE,
+        primary_metric_name="none",
         primary_metric_direction=MetricDirection.MAX,
         tie_breaker_metrics=[],
         split_strategy="none",
@@ -77,8 +55,25 @@ _POLICIES: dict[ProblemKind, EvaluationPolicySnapshot] = {
 }
 
 
-def get_default_policy(problem_kind: ProblemKind) -> EvaluationPolicySnapshot:
-    return _POLICIES[problem_kind]
+def get_default_policy(
+    evaluation_kind: EvaluationKind,
+    *,
+    summary_metric_name: str | None = None,
+) -> EvaluationPolicySnapshot:
+    if evaluation_kind is EvaluationKind.SUMMARY:
+        metric_name = summary_metric_name or "result_count"
+        return EvaluationPolicySnapshot(
+            policy_key=f"summary.{metric_name}.v1",
+            evaluation_kind=EvaluationKind.SUMMARY,
+            primary_metric_name=metric_name,
+            primary_metric_direction=MetricDirection.MAX,
+            tie_breaker_metrics=[],
+            split_strategy="none",
+            test_size=0.0,
+            cv_folds=None,
+            random_state=42,
+        )
+    return _POLICIES[evaluation_kind].model_copy(deep=True)
 
 
 def build_regression_metrics(y_true: pd.Series, y_pred: np.ndarray) -> CandidateMetrics:
@@ -158,15 +153,15 @@ def _direction_for_metric(metric_name: str) -> MetricDirection:
 
 
 def build_metric_snapshot(
-    problem_kind: ProblemKind,
+    evaluation_kind: EvaluationKind,
     y_true: pd.Series,
     y_pred: np.ndarray,
 ) -> CandidateMetrics:
-    if problem_kind is ProblemKind.REGRESSION:
+    if evaluation_kind is EvaluationKind.REGRESSION:
         return build_regression_metrics(y_true, y_pred)
-    if problem_kind is ProblemKind.CLASSIFICATION:
+    if evaluation_kind is EvaluationKind.CLASSIFICATION:
         return build_classification_metrics(y_true, y_pred)
-    raise ValueError(f"Metric snapshots are not supported for problem kind '{problem_kind.value}'.")
+    raise ValueError(f"Metric snapshots are not supported for evaluation kind '{evaluation_kind.value}'.")
 
 
 def scoring_name_for_policy(policy: EvaluationPolicySnapshot) -> str:

@@ -16,6 +16,7 @@ class TrainedModelContextPayload(BaseModel):
     run_name: str
     dataset_name: str
     dataset_file_name: str
+    evaluation_kind: str | None = None
     model_family: str | None = None
     model_task_kind: str | None = None
     train_role_bindings: list[dict[str, Any]] = Field(default_factory=list)
@@ -30,6 +31,7 @@ class TrainedModelContextPayload(BaseModel):
 class TrainedModelMetadata(BaseModel):
     schema_version: int = 2
     model_key: str
+    evaluation_kind: str | None = None
     model_family: str | None = None
     model_task_kind: str | None = None
     model_display_name: str

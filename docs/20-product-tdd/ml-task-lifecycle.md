@@ -22,7 +22,7 @@ Current AI-first service contracts are dataset-scoped and analyzer-scoped. A mod
 
 Column-role binding is first persisted as an immutable binding snapshot. Training and hyperparameter training tools pass `binding_id`; ML task requests expand that reference into explicit dataset id, role bindings, model selection, parameters, and run name inputs before execution. Supervised feature/target labels are derived from role bindings when needed for display or adapter compatibility, but they are not a second persistent contract.
 
-`ProblemKind` is still retained for evaluation-policy compatibility. Analyzer-specific semantics are owned by `ModelFamily` and `ModelTaskKind`; current association-rule and recommendation analyzers use the generic `analysis` problem kind while exposing `association_rules` / `recommendation` families and `rule_miner` / `recommender` task kinds.
+`ProblemKind` is retained only as nullable legacy compatibility metadata for existing regression, classification, clustering, and anomaly rows. Evaluation-policy behavior is owned by `EvaluationKind`; analyzer product grouping is owned by `ModelFamily`; apply behavior is owned by `ModelTaskKind`. Association-rule and recommendation analyzers do not receive a synthetic problem kind.
 
 Apply tasks use the trained model metadata as the apply-role contract. New service and Agent contracts use `apply`, not `inference`. Legacy persisted task rows or tests that use `inference` are migration inputs only.
 

@@ -6,8 +6,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ..storage.models import ProblemKind
 from ..trained_model_metadata import TrainedModelContextPayload
+from .types import EvaluationKind
 
 
 def utc_now_iso() -> str:
@@ -39,7 +39,7 @@ def _role_columns(role_bindings: list[dict[str, Any]], role: str) -> list[str]:
 
 class EvaluationPolicySnapshot(BaseModel):
     policy_key: str
-    problem_kind: ProblemKind
+    evaluation_kind: EvaluationKind
     primary_metric_name: str
     primary_metric_direction: MetricDirection
     tie_breaker_metrics: list[str]
@@ -54,7 +54,7 @@ class TaskRequestBase(BaseModel):
     project_id: str
     dataset_id: str
     dataset_source_path: str
-    problem_kind: ProblemKind
+    evaluation_kind: EvaluationKind
     train_role_bindings: list[dict[str, Any]]
     evaluation_policy: EvaluationPolicySnapshot
 
@@ -135,7 +135,7 @@ class TuningSummary(BaseModel):
 
 class TaskResultBase(BaseModel):
     task_id: str
-    problem_kind: ProblemKind
+    evaluation_kind: EvaluationKind
     evaluation_policy: EvaluationPolicySnapshot
     error_summary: str | None = None
 

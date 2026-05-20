@@ -4,22 +4,24 @@ from xenix.services.ml.contracts import CandidateMetrics
 from xenix.services.ml.evaluation import compare_metric_snapshots, get_default_policy
 from xenix.services.ml.models.classification import XGBoostClassificationService
 from xenix.services.ml.registry import get_model_catalog_entry, list_model_catalog
-from xenix.services.ml.types import ColumnRoleKind, ModelCatalogEntry, ModelFamily, ModelTaskKind
+from xenix.services.ml.types import ColumnRoleKind, EvaluationKind, ModelCatalogEntry, ModelFamily, ModelTaskKind
 from xenix.services.storage.models import ProblemKind
 
 
-def test_model_catalog_exposes_json_schema_and_problem_kinds() -> None:
+def test_model_catalog_exposes_json_schema_and_model_axes() -> None:
     catalog = list_model_catalog()
 
     assert len(catalog) == 28
     assert all(isinstance(entry, ModelCatalogEntry) for entry in catalog)
     assert all(entry.model_family for entry in catalog)
     assert all(entry.model_task_kind for entry in catalog)
+    assert all(entry.evaluation_kind for entry in catalog)
     assert all(entry.train_role_schema.roles for entry in catalog)
     assert all(entry.apply_role_schema.roles for entry in catalog)
     assert all(entry.result_contract.preview_kinds for entry in catalog)
     ridge = get_model_catalog_entry("regression.ridge")
     assert ridge.problem_kind is ProblemKind.REGRESSION
+    assert ridge.evaluation_kind is EvaluationKind.REGRESSION
     assert ridge.model_family is ModelFamily.SUPERVISED
     assert ridge.model_task_kind is ModelTaskKind.PREDICTOR
     assert [role.name for role in ridge.train_role_schema.roles] == ["feature", "target"]
@@ -63,6 +65,8 @@ def test_model_catalog_exposes_json_schema_and_problem_kinds() -> None:
     assert knn.param_grid_schema["properties"]["n_neighbors"]["default"] == [3, 5, 7]
     clustering = get_model_catalog_entry("clustering.kmeans")
     assert clustering.problem_kind is ProblemKind.CLUSTERING
+    assert clustering.evaluation_kind is EvaluationKind.SUMMARY
+    assert clustering.summary_metric_name == "cluster_count"
     assert clustering.model_family is ModelFamily.CLUSTERING
     assert clustering.model_task_kind is ModelTaskKind.SEGMENTER
     assert clustering.requires_target is False
@@ -74,6 +78,8 @@ def test_model_catalog_exposes_json_schema_and_problem_kinds() -> None:
     assert clustering.param_grid_schema is None
     anomaly = get_model_catalog_entry("anomaly.isolation_forest")
     assert anomaly.problem_kind is ProblemKind.ANOMALY_DETECTION
+    assert anomaly.evaluation_kind is EvaluationKind.SUMMARY
+    assert anomaly.summary_metric_name == "anomaly_count"
     assert anomaly.model_family is ModelFamily.ANOMALY_DETECTION
     assert anomaly.model_task_kind is ModelTaskKind.ANOMALY_SCORER
     assert anomaly.requires_target is False
@@ -83,7 +89,9 @@ def test_model_catalog_exposes_json_schema_and_problem_kinds() -> None:
     assert anomaly.supports_hyperparameter_tuning is False
     assert anomaly.param_grid_schema is None
     association = get_model_catalog_entry("association.apriori_mlxtend")
-    assert association.problem_kind is ProblemKind.ANALYSIS
+    assert association.problem_kind is None
+    assert association.evaluation_kind is EvaluationKind.SUMMARY
+    assert association.summary_metric_name == "rule_count"
     assert association.model_family is ModelFamily.ASSOCIATION_RULES
     assert association.model_task_kind is ModelTaskKind.RULE_MINER
     assert association.requires_target is False
@@ -91,7 +99,9 @@ def test_model_catalog_exposes_json_schema_and_problem_kinds() -> None:
     assert [role.name for role in association.train_role_schema.roles] == ["item"]
     assert [role.name for role in association.apply_role_schema.roles] == ["item"]
     recommender = get_model_catalog_entry("recommendation.item_similarity")
-    assert recommender.problem_kind is ProblemKind.ANALYSIS
+    assert recommender.problem_kind is None
+    assert recommender.evaluation_kind is EvaluationKind.SUMMARY
+    assert recommender.summary_metric_name == "recommendation_count"
     assert recommender.model_family is ModelFamily.RECOMMENDATION
     assert recommender.model_task_kind is ModelTaskKind.RECOMMENDER
     assert [role.name for role in recommender.train_role_schema.roles] == ["user", "item", "rating"]
@@ -99,8 +109,9 @@ def test_model_catalog_exposes_json_schema_and_problem_kinds() -> None:
 
 
 def test_clustering_policy_uses_non_split_metric_defaults() -> None:
-    policy = get_default_policy(ProblemKind.CLUSTERING)
+    policy = get_default_policy(EvaluationKind.SUMMARY, summary_metric_name="cluster_count")
 
+    assert policy.evaluation_kind is EvaluationKind.SUMMARY
     assert policy.primary_metric_name == "cluster_count"
     assert policy.split_strategy == "none"
     assert policy.test_size == 0.0
@@ -108,18 +119,20 @@ def test_clustering_policy_uses_non_split_metric_defaults() -> None:
 
 
 def test_anomaly_policy_uses_non_split_metric_defaults() -> None:
-    policy = get_default_policy(ProblemKind.ANOMALY_DETECTION)
+    policy = get_default_policy(EvaluationKind.SUMMARY, summary_metric_name="anomaly_count")
 
+    assert policy.evaluation_kind is EvaluationKind.SUMMARY
     assert policy.primary_metric_name == "anomaly_count"
     assert policy.split_strategy == "none"
     assert policy.test_size == 0.0
     assert policy.cv_folds is None
 
 
-def test_analysis_policy_uses_non_split_metric_defaults() -> None:
-    policy = get_default_policy(ProblemKind.ANALYSIS)
+def test_summary_policy_uses_task_specific_metric_defaults() -> None:
+    policy = get_default_policy(EvaluationKind.SUMMARY, summary_metric_name="rule_count")
 
-    assert policy.primary_metric_name == "result_count"
+    assert policy.evaluation_kind is EvaluationKind.SUMMARY
+    assert policy.primary_metric_name == "rule_count"
     assert policy.split_strategy == "none"
     assert policy.test_size == 0.0
     assert policy.cv_folds is None
@@ -146,7 +159,7 @@ def test_xgboost_classifier_preserves_string_labels() -> None:
 
 
 def test_compare_metric_snapshots_prefers_higher_primary_metric_then_tie_breakers() -> None:
-    policy = get_default_policy(ProblemKind.REGRESSION)
+    policy = get_default_policy(EvaluationKind.REGRESSION)
     left = CandidateMetrics(
         primary_metric_name="r2",
         primary_metric_value=0.91,

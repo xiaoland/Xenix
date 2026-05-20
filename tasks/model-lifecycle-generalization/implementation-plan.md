@@ -297,7 +297,92 @@ Clarification:
 - Apply accepts the trained item column and writes top-N recommendation rows.
 - User-history apply remains a future extension; it is not silently supported.
 
-## Slice 8: Scenario-Centric Cleanup
+## Slice 8: EvaluationKind Extraction
+
+### Objective
+
+Prevent `ProblemKind` from becoming the catch-all enum for every future model family. Move evaluation policy semantics to `EvaluationKind` while keeping `ModelFamily` and `ModelTaskKind` as the product and apply-behavior axes.
+
+### Scope
+
+- Add `EvaluationKind`.
+- Add `evaluation_kind` to `ModelCatalogEntry`.
+- Add `evaluation_kind` to trained-model metadata.
+- Replace `get_default_policy(problem_kind)` with an API based on `EvaluationKind` plus task-specific summary metric metadata.
+- Remove the transitional `ProblemKind.ANALYSIS` value added during association/recommendation integration.
+- Make `TrainedModelRow.problem_kind` nullable legacy metadata, or otherwise stop requiring it for new non-legacy analyzers.
+- Preserve regression/classification metrics and stratified split behavior.
+- Preserve clustering/anomaly/association/recommendation training and apply behavior.
+- Keep `ProblemKind` only where existing storage compatibility requires it.
+
+### Proposed EvaluationKind Values
+
+- `regression`: regression metric policy (`r2`, `rmse`, `mae`) and regression CV scoring.
+- `classification`: classification metric policy (`f1_weighted`, `accuracy`, precision/recall) and stratified split.
+- `summary`: no holdout evaluation; task-specific primary summary metric such as `cluster_count`, `anomaly_count`, `rule_count`, or `recommendation_count`.
+- `none`: no evaluation policy and no automatic follow-up evaluation.
+
+### Data Model Direction
+
+- `EvaluationPolicySnapshot` should carry `evaluation_kind`, not `problem_kind`.
+- `TaskRequestBase` / `TaskResultBase` should stop requiring `problem_kind`.
+- `TrainedModelMetadata` should persist `evaluation_kind`.
+- `TrainedModelRow.problem_kind` becomes nullable legacy compatibility data.
+- A schema migration is required if the SQLite `trained_model.problem_kind` column is currently `NOT NULL`.
+
+### Files Likely Touched
+
+- `src/xenix/services/ml/types.py`
+- `src/xenix/services/ml/evaluation.py`
+- `src/xenix/services/ml/contracts.py`
+- `src/xenix/services/ml/models/*.py`
+- `src/xenix/services/ml_service.py`
+- `src/xenix/services/ml_task_service.py`
+- `src/xenix/services/trained_model_metadata.py`
+- `src/xenix/services/storage/models.py`
+- `src/xenix/services/storage/migrations.py`
+- `src/xenix/services/agent/tools.py`
+- `tests/test_ml_registry.py`
+- `tests/test_ml_execution.py`
+- `tests/test_storage_bootstrap.py`
+- `tests/test_repositories.py`
+- `tests/test_agent_harness_first_slice.py`
+
+### Implementation Plan
+
+1. Add `EvaluationKind` and expose it through model catalog metadata.
+2. Assign evaluation kinds in model services:
+   - regression services -> `regression`
+   - classification services -> `classification`
+   - clustering/anomaly/association/recommendation services -> `summary`
+3. Add task-specific summary metric metadata to catalog defaults or service class attributes.
+4. Change evaluation policy creation to use catalog evaluation metadata instead of `ProblemKind`.
+5. Replace task request/result `problem_kind` payloads with `evaluation_kind`.
+6. Persist `evaluation_kind` in trained-model metadata.
+7. Add storage migration to relax or deprecate `trained_model.problem_kind`.
+8. Remove `ProblemKind.ANALYSIS` and update association/recommendation services.
+9. Update Agent `model.metadata` to expose/filter by `evaluation_kind`; keep or deprecate `problem_kind` filter only if required by existing tests.
+10. Update tests and run full regression.
+
+### Verification
+
+- `pdm run pytest tests/test_ml_registry.py tests/test_ml_execution.py tests/test_storage_bootstrap.py tests/test_repositories.py tests/test_agent_harness_first_slice.py -q`
+- `pdm run pytest -q`
+- Residual scan confirms no `ProblemKind.ANALYSIS` remains in `src` or tests.
+
+### Status
+
+- Completed on 2026-05-20.
+- Added `EvaluationKind` to catalog, evaluation policy snapshots, task requests/results, Agent metadata, and trained-model metadata.
+- Removed `ProblemKind.ANALYSIS`; association and recommendation catalog entries now expose `problem_kind = null`, `evaluation_kind = summary`, and task-specific summary metric names.
+- Added v8 -> v9 schema/data migration:
+  - `trained_model.problem_kind` becomes nullable.
+  - persisted `analysis` problem-kind rows migrate to `NULL`.
+  - trained-model metadata receives `evaluation_kind`.
+  - old ML task request/result payloads move `problem_kind` into `evaluation_kind` and policy snapshots.
+- Verified targeted registry, storage bootstrap, repository, ML execution, and Agent harness tests; full `pdm run pytest -q` passed with 109 tests.
+
+## Slice 9: Scenario-Centric Cleanup
 
 ### Scope
 
@@ -320,7 +405,7 @@ Clarification:
 
 ## Open Sequencing Question
 
-- Whether Slice 8 should run before association/recommendation implementation to avoid carrying old UI assumptions into new model families.
+- Whether Scenario-Centric Cleanup should run immediately after EvaluationKind extraction or after the lower-level internal `inference` naming cleanup.
 
 ## Accepted Decisions
 
@@ -328,6 +413,7 @@ Clarification:
 - Replace the table with `dataset_column_binding`; no runtime backward-compatible table alias is required.
 - Database migration must cover both schema and data.
 - Introduce `ModelFamily` and `ModelTaskKind`.
+- Introduce `EvaluationKind` so `ProblemKind` does not expand with future model families.
 - `ModelCatalogEntry` role schemas and result contracts are in scope for this task packet.
 - New Agent/service contracts should use `binding_id`, not `selection_id`.
 
@@ -338,4 +424,5 @@ Clarification:
 - Carrying `selection_id` into the generalized contract would leak old feature-selection semantics; the new contract uses `binding_id`.
 - New contracts should use `apply` rather than `inference`; this includes Agent tool naming, service request/result types, metadata fields, and stored task type values where applicable.
 - Persisted `feature_columns` / `target_columns` metadata would create a second supervised-only contract; they should be removed and replaced by `train_role_bindings` / `apply_role_schema`.
+- `ProblemKind.ANALYSIS` was removed by Slice 8; future analyzer additions must use `EvaluationKind`, `ModelFamily`, and `ModelTaskKind` rather than expanding `ProblemKind`.
 - Scenario cleanup remains a sequencing risk. New association/recommendation work must not depend on scenario services or UI.

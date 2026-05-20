@@ -65,13 +65,42 @@ Reason for keeping both:
 - Agent presentation should not drive execution routing.
 - Execution routing should not decide product taxonomy.
 
+### EvaluationKind
+
+`EvaluationKind` answers: "What evaluation and metric policy should this analyzer use?"
+
+It is neither product taxonomy nor apply behavior. It owns metric policy, split strategy, scoring name, and whether follow-up evaluation is meaningful.
+
+Candidate values:
+
+- `regression`
+- `classification`
+- `summary`
+- `none`
+
+Initial mapping:
+
+| model/task shape | EvaluationKind | Policy notes |
+| --- | --- | --- |
+| regression predictors | `regression` | Holdout/CV policy with `r2`, `rmse`, and `mae`. |
+| classification predictors | `classification` | Stratified holdout/CV policy with weighted classification metrics. |
+| segmenters | `summary` | No holdout; primary summary metric comes from task kind, currently `cluster_count`. |
+| anomaly scorers | `summary` | No holdout; primary summary metric comes from task kind, currently `anomaly_count`. |
+| rule miners | `summary` | No holdout; primary summary metric is rule/result count. |
+| recommenders | `summary` | No holdout; primary summary metric is recommendation/result count. |
+| future analyzers with no meaningful evaluation | `none` | No follow-up evaluation task and no comparable metric policy. |
+
+For `summary`, `EvaluationKind` defines the evaluation class. `ModelTaskKind` or explicit catalog metadata supplies the primary summary metric name so `EvaluationKind` does not become a second model-family enum.
+
 ### ProblemKind Compatibility
 
-- Keep `ProblemKind` for existing metric/evaluation compatibility in the short term.
-- Stop adding new semantic load to `ProblemKind` beyond places that already require it.
-- Add nullable or parallel `model_family` / `model_task_kind` fields to catalog and trained-model metadata first.
-- Later decide whether storage rows need explicit columns or whether metadata payload is enough.
-- Use generic `ProblemKind.ANALYSIS` for current association-rule and recommendation analyzers. The specific analyzer semantics live in `ModelFamily` and `ModelTaskKind`.
+- `ProblemKind` is now a legacy compatibility field, not the durable owner of model semantics.
+- Do not add new `ProblemKind` values for new model families.
+- Transitional `ProblemKind.ANALYSIS` was removed in Slice 8.
+- New evaluation behavior belongs to `EvaluationKind`.
+- Product grouping belongs to `ModelFamily`.
+- Apply behavior belongs to `ModelTaskKind`.
+- Storage no longer requires `TrainedModelRow.problem_kind`; it is nullable legacy metadata for rows that still map cleanly to the old enum.
 
 ## Role Binding Contract
 
@@ -324,6 +353,7 @@ Each trained model should persist:
 - `model_key`
 - `model_family`
 - `model_task_kind`
+- `evaluation_kind`
 - `train_role_bindings`
 - `apply_role_schema`
 - `training_params`
@@ -372,3 +402,4 @@ Chosen path:
 - Use `binding_id` in Agent and service contracts.
 - Store generalized trained-model data in `TrainedModelRow.metadata_payload` first.
 - Consider physical trained-model columns for `model_family` and `model_task_kind` only after query needs are proven.
+- `TrainedModelRow.problem_kind` is a nullable legacy column after Slice 8; `evaluation_kind` is the service-owned evaluation policy contract.

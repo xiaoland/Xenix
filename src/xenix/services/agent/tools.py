@@ -22,7 +22,7 @@ from ..data_transform import (
 from ..dataset_inspection import InspectDatasetInput, detect_source_format, load_dataframe
 from ..dataset_service import DatasetService, RegisterDatasetInput
 from ..ml.registry import get_model_catalog_entry, list_model_catalog, list_model_keys
-from ..ml.types import ModelFamily, ModelTaskKind
+from ..ml.types import EvaluationKind, ModelFamily, ModelTaskKind
 from ..ml_service import (
     ApplyWithFilesInput,
     CreateColumnBindingInput,
@@ -535,6 +535,10 @@ class AgentToolRegistry:
                             "type": "string",
                             "enum": [kind.value for kind in ProblemKind],
                         },
+                        "evaluation_kind": {
+                            "type": "string",
+                            "enum": [kind.value for kind in EvaluationKind],
+                        },
                         "model_family": {
                             "type": "string",
                             "enum": [family.value for family in ModelFamily],
@@ -843,6 +847,16 @@ class AgentToolRegistry:
                 entry for entry in catalog_entries if entry.problem_kind == selected_problem_kind
             ]
 
+        evaluation_kind = str(arguments.get("evaluation_kind") or "").strip()
+        if evaluation_kind:
+            try:
+                selected_evaluation_kind = EvaluationKind(evaluation_kind)
+            except ValueError as exc:
+                raise ValidationError(f"Unknown evaluation_kind '{evaluation_kind}'.") from exc
+            catalog_entries = [
+                entry for entry in catalog_entries if entry.evaluation_kind == selected_evaluation_kind
+            ]
+
         model_family = str(arguments.get("model_family") or "").strip()
         if model_family:
             try:
@@ -878,7 +892,8 @@ class AgentToolRegistry:
             key=lambda entry: (
                 entry.model_family.value,
                 entry.model_task_kind.value,
-                entry.problem_kind.value,
+                entry.evaluation_kind.value,
+                entry.problem_kind.value if entry.problem_kind is not None else "",
                 entry.recommendation_tier,
                 entry.model_key,
             ),
@@ -1258,7 +1273,9 @@ class AgentToolRegistry:
         payload: dict[str, Any] = {
             "model_key": entry.model_key,
             "display_name": entry.display_name,
-            "problem_kind": entry.problem_kind.value,
+            "problem_kind": entry.problem_kind.value if entry.problem_kind is not None else None,
+            "evaluation_kind": entry.evaluation_kind.value,
+            "summary_metric_name": entry.summary_metric_name,
             "model_family": entry.model_family.value,
             "model_task_kind": entry.model_task_kind.value,
             "family": entry.family,
@@ -1285,9 +1302,11 @@ class AgentToolRegistry:
             capabilities = ["fit"] if model["supports_fit"] else []
             if model["supports_hyperparameter_tuning"]:
                 capabilities.append("hyperparameter_tuning")
+            legacy_problem = f", {model['problem_kind']}" if model["problem_kind"] else ""
             lines.append(
                 "- "
-                f"`{model['model_key']}` ({model['display_name']}, {model['problem_kind']}); "
+                f"`{model['model_key']}` ({model['display_name']}{legacy_problem}); "
+                f"evaluation: {model['evaluation_kind']}; "
                 f"task: {model['model_task_kind']}; "
                 f"capabilities: {', '.join(capabilities)}"
             )
@@ -1369,7 +1388,7 @@ class AgentToolRegistry:
         aliases: dict[str, str] = {}
         priorities: dict[str, int] = {}
         for entry in list_model_catalog():
-            priority = self._model_alias_priority(entry.problem_kind)
+            priority = self._model_alias_priority(entry)
             for token in self._model_entry_alias_tokens(entry):
                 if priority < priorities.get(token, 100):
                     aliases[token] = entry.model_key
@@ -1384,8 +1403,12 @@ class AgentToolRegistry:
             entry.model_key.replace(".", "_"),
             leaf_key,
             entry.display_name,
-            f"{entry.problem_kind.value}_{leaf_key}",
+            f"{entry.evaluation_kind.value}_{leaf_key}",
+            f"{entry.model_family.value}_{leaf_key}",
+            f"{entry.model_task_kind.value}_{leaf_key}",
         }
+        if entry.problem_kind is not None:
+            values.add(f"{entry.problem_kind.value}_{leaf_key}")
         tokens: set[str] = set()
         for value in values:
             for token in self._model_key_alias_tokens(value):
@@ -1395,15 +1418,18 @@ class AgentToolRegistry:
                     tokens.update(self._model_key_alias_tokens(stripped))
         return tokens
 
-    def _model_alias_priority(self, problem_kind: ProblemKind) -> int:
-        order = {
-            ProblemKind.REGRESSION: 0,
-            ProblemKind.CLASSIFICATION: 1,
-            ProblemKind.CLUSTERING: 2,
-            ProblemKind.ANOMALY_DETECTION: 3,
-            ProblemKind.ANALYSIS: 4,
+    def _model_alias_priority(self, entry) -> int:
+        if entry.evaluation_kind is EvaluationKind.REGRESSION:
+            return 0
+        if entry.evaluation_kind is EvaluationKind.CLASSIFICATION:
+            return 1
+        task_order = {
+            ModelTaskKind.SEGMENTER: 2,
+            ModelTaskKind.ANOMALY_SCORER: 3,
+            ModelTaskKind.RULE_MINER: 4,
+            ModelTaskKind.RECOMMENDER: 5,
         }
-        return order[problem_kind]
+        return task_order.get(entry.model_task_kind, 100)
 
     def _model_key_alias_tokens(self, value: str) -> list[str]:
         token = "".join(char.lower() if char.isalnum() else "_" for char in value).strip("_")

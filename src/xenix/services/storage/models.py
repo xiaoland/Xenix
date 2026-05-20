@@ -53,7 +53,6 @@ class ProblemKind(StrEnum):
     CLASSIFICATION = "classification"
     CLUSTERING = "clustering"
     ANOMALY_DETECTION = "anomaly_detection"
-    ANALYSIS = "analysis"
 
 
 class MLTaskArtifactKind(StrEnum):
@@ -342,7 +341,7 @@ class TrainedModelRow(SQLModel, table=True):
     dataset_id: str | None = Field(default=None, foreign_key="dataset.id", index=True)
     ml_task_id: str = Field(foreign_key="ml_task.id", index=True, unique=True)
     model_key: str = Field(index=True)
-    problem_kind: ProblemKind = Field(index=True)
+    problem_kind: ProblemKind | None = Field(default=None, index=True)
     artifact_path: str
     metadata_payload: dict[str, Any] = Field(
         default_factory=dict,

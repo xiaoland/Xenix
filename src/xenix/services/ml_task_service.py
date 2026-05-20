@@ -377,6 +377,7 @@ class MLTaskService:
         canonical_path = self._copy_canonical_model(row, artifact_file_name, model_path)
         metadata = TrainedModelMetadata(
             model_key=result.model_key,
+            evaluation_kind=trained_model_context.evaluation_kind or catalog_entry.evaluation_kind.value,
             model_family=trained_model_context.model_family or catalog_entry.model_family.value,
             model_task_kind=trained_model_context.model_task_kind or catalog_entry.model_task_kind.value,
             model_display_name=model_display_name,
@@ -407,7 +408,7 @@ class MLTaskService:
                 dataset_id=row.dataset_id,
                 ml_task_id=row.id,
                 model_key=result.model_key,
-                problem_kind=result.problem_kind,
+                problem_kind=catalog_entry.problem_kind,
                 artifact_path=str(canonical_path),
                 metadata_payload=metadata.model_dump(mode="json"),
             ),
@@ -466,6 +467,7 @@ class MLTaskService:
         canonical_path = self._copy_canonical_model(row, artifact_file_name, model_path)
         metadata = TrainedModelMetadata(
             model_key=result.model_key,
+            evaluation_kind=trained_model_context.evaluation_kind or catalog_entry.evaluation_kind.value,
             model_family=trained_model_context.model_family or catalog_entry.model_family.value,
             model_task_kind=trained_model_context.model_task_kind or catalog_entry.model_task_kind.value,
             model_display_name=model_display_name,
@@ -500,7 +502,7 @@ class MLTaskService:
                 dataset_id=row.dataset_id,
                 ml_task_id=row.id,
                 model_key=result.model_key,
-                problem_kind=result.problem_kind,
+                problem_kind=catalog_entry.problem_kind,
                 artifact_path=str(canonical_path),
                 metadata_payload=metadata.model_dump(mode="json"),
             ),

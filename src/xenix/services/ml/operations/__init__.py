@@ -30,7 +30,7 @@ def run_fit_task(task_dir_str: str) -> None:
             task_dir,
             {
                 "task_id": request.task_id,
-                "problem_kind": request.problem_kind.value,
+                "evaluation_kind": request.evaluation_kind.value,
                 "evaluation_policy": request.evaluation_policy.model_dump(mode="json"),
                 "error_summary": str(exc),
                 "traceback": traceback.format_exc(),
@@ -57,7 +57,7 @@ def run_hyperparameter_tuning_task(task_dir_str: str) -> None:
             task_dir,
             {
                 "task_id": request.task_id,
-                "problem_kind": request.problem_kind.value,
+                "evaluation_kind": request.evaluation_kind.value,
                 "evaluation_policy": request.evaluation_policy.model_dump(mode="json"),
                 "error_summary": str(exc),
                 "traceback": traceback.format_exc(),
@@ -84,7 +84,7 @@ def run_evaluate_task(task_dir_str: str) -> None:
             task_dir,
             {
                 "task_id": request.task_id,
-                "problem_kind": request.problem_kind.value,
+                "evaluation_kind": request.evaluation_kind.value,
                 "evaluation_policy": request.evaluation_policy.model_dump(mode="json"),
                 "error_summary": str(exc),
                 "traceback": traceback.format_exc(),

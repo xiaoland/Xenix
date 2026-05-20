@@ -210,6 +210,8 @@ def test_dataset_scoped_fit_evaluate_and_apply_run(monkeypatch, tmp_path: Path) 
     assert fit_details.task.result_payload is not None
     assert fit_details.task.result_payload["trained_model_id"] == trained_models[0].id
     assert "column_selection" not in fit_details.task.request_payload
+    assert fit_details.task.request_payload["evaluation_kind"] == "regression"
+    assert fit_details.task.request_payload["evaluation_policy"]["evaluation_kind"] == "regression"
     assert fit_details.task.request_payload["train_role_bindings"] == [
         {
             "role": "feature",
@@ -231,6 +233,7 @@ def test_dataset_scoped_fit_evaluate_and_apply_run(monkeypatch, tmp_path: Path) 
     assert "target_columns" not in trained_models[0].metadata_payload
     assert metadata.train_role_bindings == fit_details.task.request_payload["train_role_bindings"]
     assert metadata.source_run_name == "Direct demand analysis"
+    assert metadata.evaluation_kind == "regression"
     assert metadata.evaluation_primary_metric_name == "r2"
     assert apply_details.task.task_type is MLTaskType.APPLY
     assert result_dataset is not None
@@ -289,6 +292,7 @@ def test_clustering_fit_runs_without_follow_up_evaluate_and_persists_export_arti
     assert fit_details.task.result_payload["result_summary"]["cluster_count"] == 2
     metadata = parse_trained_model_metadata(trained_models[0].metadata_payload)
     assert metadata is not None
+    assert metadata.evaluation_kind == "summary"
     assert "feature_columns" not in trained_models[0].metadata_payload
     assert "target_columns" not in trained_models[0].metadata_payload
     assert metadata.model_family == "clustering"
@@ -366,7 +370,9 @@ def test_association_rules_train_and_apply_run(monkeypatch, tmp_path: Path) -> N
     assert all(task.status is MLTaskStatus.SUCCEEDED for task in tasks_after_apply)
     assert len(trained_models) == 1
     assert fit_details.task.result_payload["result_summary"]["rule_count"] > 0
+    assert trained_models[0].problem_kind is None
     assert metadata is not None
+    assert metadata.evaluation_kind == "summary"
     assert metadata.model_family == "association_rules"
     assert metadata.model_task_kind == "rule_miner"
     assert [role["name"] for role in metadata.apply_role_schema["roles"]] == ["item"]
@@ -436,7 +442,9 @@ def test_recommendation_train_and_apply_run(monkeypatch, tmp_path: Path) -> None
     assert tasks[0].task_type is MLTaskType.FIT
     assert all(task.status is MLTaskStatus.SUCCEEDED for task in tasks_after_apply)
     assert len(trained_models) == 1
+    assert trained_models[0].problem_kind is None
     assert metadata is not None
+    assert metadata.evaluation_kind == "summary"
     assert metadata.model_family == "recommendation"
     assert metadata.model_task_kind == "recommender"
     assert [role["name"] for role in metadata.apply_role_schema["roles"]] == ["item"]

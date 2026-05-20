@@ -3,21 +3,23 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import BaseModel, Field
 
 from ..storage.models import ProblemKind
-from .contracts import (
-    EvaluateTaskRequest,
-    EvaluateTaskResult,
-    FitTaskRequest,
-    FitTaskResult,
-    HyperparameterTuningTaskRequest,
-    HyperparameterTuningTaskResult,
-    InferenceTaskRequest,
-    InferenceTaskResult,
-)
+
+if TYPE_CHECKING:
+    from .contracts import (
+        EvaluateTaskRequest,
+        EvaluateTaskResult,
+        FitTaskRequest,
+        FitTaskResult,
+        HyperparameterTuningTaskRequest,
+        HyperparameterTuningTaskResult,
+        InferenceTaskRequest,
+        InferenceTaskResult,
+    )
 
 
 class ModelFamily(StrEnum):
@@ -34,6 +36,13 @@ class ModelTaskKind(StrEnum):
     ANOMALY_SCORER = "anomaly_scorer"
     RULE_MINER = "rule_miner"
     RECOMMENDER = "recommender"
+
+
+class EvaluationKind(StrEnum):
+    REGRESSION = "regression"
+    CLASSIFICATION = "classification"
+    SUMMARY = "summary"
+    NONE = "none"
 
 
 class ColumnRoleKind(StrEnum):
@@ -70,7 +79,9 @@ class ModelResultContract(BaseModel):
 class ModelCatalogEntry(BaseModel):
     model_key: str
     display_name: str
-    problem_kind: ProblemKind
+    problem_kind: ProblemKind | None = None
+    evaluation_kind: EvaluationKind
+    summary_metric_name: str | None = None
     model_family: ModelFamily
     model_task_kind: ModelTaskKind
     family: str = "General"
@@ -89,7 +100,9 @@ class ModelCatalogEntry(BaseModel):
 class ModelServiceBase(ABC):
     key: ClassVar[str]
     display_name: ClassVar[str]
-    problem_kind: ClassVar[ProblemKind]
+    problem_kind: ClassVar[ProblemKind | None] = None
+    evaluation_kind: ClassVar[EvaluationKind | None] = None
+    summary_metric_name: ClassVar[str | None] = None
     family: ClassVar[str] = "General"
     guidance: ClassVar[str] = ""
     recommendation_tier: ClassVar[int] = 100
@@ -108,10 +121,13 @@ class ModelServiceBase(ABC):
     def catalog_entry(cls) -> ModelCatalogEntry:
         model_family = cls.model_family or cls._default_model_family()
         model_task_kind = cls.model_task_kind or cls._default_model_task_kind()
+        evaluation_kind = cls.evaluation_kind or cls._default_evaluation_kind()
         return ModelCatalogEntry(
             model_key=cls.key,
             display_name=cls.display_name,
             problem_kind=cls.problem_kind,
+            evaluation_kind=evaluation_kind,
+            summary_metric_name=cls.summary_metric_name or cls._default_summary_metric_name(model_task_kind),
             model_family=model_family,
             model_task_kind=model_task_kind,
             family=cls.family,
@@ -143,23 +159,46 @@ class ModelServiceBase(ABC):
 
     @classmethod
     def _default_model_family(cls) -> ModelFamily:
-        if cls.problem_kind in {ProblemKind.REGRESSION, ProblemKind.CLASSIFICATION}:
+        problem_kind = cls.problem_kind
+        if problem_kind in {ProblemKind.REGRESSION, ProblemKind.CLASSIFICATION}:
             return ModelFamily.SUPERVISED
-        if cls.problem_kind is ProblemKind.CLUSTERING:
+        if problem_kind is ProblemKind.CLUSTERING:
             return ModelFamily.CLUSTERING
-        if cls.problem_kind is ProblemKind.ANOMALY_DETECTION:
+        if problem_kind is ProblemKind.ANOMALY_DETECTION:
             return ModelFamily.ANOMALY_DETECTION
-        raise ValueError(f"Problem kind '{cls.problem_kind}' has no default model family.")
+        raise ValueError(f"Model '{cls.key}' has no default model family.")
 
     @classmethod
     def _default_model_task_kind(cls) -> ModelTaskKind:
-        if cls.problem_kind in {ProblemKind.REGRESSION, ProblemKind.CLASSIFICATION}:
+        problem_kind = cls.problem_kind
+        if problem_kind in {ProblemKind.REGRESSION, ProblemKind.CLASSIFICATION}:
             return ModelTaskKind.PREDICTOR
-        if cls.problem_kind is ProblemKind.CLUSTERING:
+        if problem_kind is ProblemKind.CLUSTERING:
             return ModelTaskKind.SEGMENTER
-        if cls.problem_kind is ProblemKind.ANOMALY_DETECTION:
+        if problem_kind is ProblemKind.ANOMALY_DETECTION:
             return ModelTaskKind.ANOMALY_SCORER
-        raise ValueError(f"Problem kind '{cls.problem_kind}' has no default model task kind.")
+        raise ValueError(f"Model '{cls.key}' has no default model task kind.")
+
+    @classmethod
+    def _default_evaluation_kind(cls) -> EvaluationKind:
+        problem_kind = cls.problem_kind
+        if problem_kind is ProblemKind.REGRESSION:
+            return EvaluationKind.REGRESSION
+        if problem_kind is ProblemKind.CLASSIFICATION:
+            return EvaluationKind.CLASSIFICATION
+        if problem_kind in {ProblemKind.CLUSTERING, ProblemKind.ANOMALY_DETECTION}:
+            return EvaluationKind.SUMMARY
+        raise ValueError(f"Model '{cls.key}' has no default evaluation kind.")
+
+    @classmethod
+    def _default_summary_metric_name(cls, model_task_kind: ModelTaskKind) -> str | None:
+        metric_names = {
+            ModelTaskKind.SEGMENTER: "cluster_count",
+            ModelTaskKind.ANOMALY_SCORER: "anomaly_count",
+            ModelTaskKind.RULE_MINER: "rule_count",
+            ModelTaskKind.RECOMMENDER: "recommendation_count",
+        }
+        return metric_names.get(model_task_kind)
 
     @classmethod
     def _default_train_role_schema(cls) -> ModelRoleSchema:

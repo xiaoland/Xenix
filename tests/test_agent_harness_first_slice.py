@@ -203,6 +203,7 @@ def test_agent_harness_model_metadata_exposes_catalog_without_train_enums(monkey
     assert "regression.linear" in metadata_key_enum
     assert "model_family" in specs["model.metadata"].parameters_schema["properties"]
     assert "model_task_kind" in specs["model.metadata"].parameters_schema["properties"]
+    assert "evaluation_kind" in specs["model.metadata"].parameters_schema["properties"]
     assert "enum" not in specs["model.train"].parameters_schema["properties"]["models"]["items"]
     apply_schema = specs["model.apply"].parameters_schema
     assert apply_schema["required"] == ["trained_model_id"]
@@ -215,6 +216,7 @@ def test_agent_harness_model_metadata_exposes_catalog_without_train_enums(monkey
         "regression.decision_tree",
     ]
     assert result.payload["models"][0]["supports_hyperparameter_tuning"] is True
+    assert result.payload["models"][0]["evaluation_kind"] == "regression"
     assert result.payload["models"][0]["model_family"] == "supervised"
     assert result.payload["models"][0]["model_task_kind"] == "predictor"
     assert [role["name"] for role in result.payload["models"][0]["train_role_schema"]["roles"]] == ["feature", "target"]
@@ -236,10 +238,19 @@ def test_agent_harness_model_metadata_exposes_catalog_without_train_enums(monkey
     assert "regression.linear" in predictor_result.payload["model_keys"]
     assert "classification.logistic_regression" in predictor_result.payload["model_keys"]
     assert "clustering.kmeans" not in predictor_result.payload["model_keys"]
+    summary_result = registry.execute(
+        "model.metadata",
+        {"evaluation_kind": "summary"},
+        _tool_context(),
+    )
+    assert "association.apriori_apyori" in summary_result.payload["model_keys"]
+    assert "recommendation.item_similarity" in summary_result.payload["model_keys"]
     with pytest.raises(ValidationError, match="Unknown model_family"):
         registry.execute("model.metadata", {"model_family": "unknown"}, _tool_context())
     with pytest.raises(ValidationError, match="Unknown model_task_kind"):
         registry.execute("model.metadata", {"model_task_kind": "unknown"}, _tool_context())
+    with pytest.raises(ValidationError, match="Unknown evaluation_kind"):
+        registry.execute("model.metadata", {"evaluation_kind": "unknown"}, _tool_context())
     xgboost_result = registry.execute("model.metadata", {"model_keys": ["xgboost"]}, _tool_context())
     assert xgboost_result.payload["model_keys"] == ["regression.xgboost"]
 

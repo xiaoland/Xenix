@@ -198,7 +198,7 @@ class MLService:
             project_id=context.project_id,
             dataset_id=context.dataset.id,
             dataset_source_path=context.dataset.source_path,
-            problem_kind=context.catalog.problem_kind,
+            evaluation_kind=context.catalog.evaluation_kind,
             train_role_bindings=[binding.model_dump(mode="json") for binding in context.train_role_bindings],
             evaluation_policy=context.evaluation_policy,
             continuation_plan=(
@@ -227,7 +227,7 @@ class MLService:
             project_id=context.project_id,
             dataset_id=context.dataset.id,
             dataset_source_path=context.dataset.source_path,
-            problem_kind=context.catalog.problem_kind,
+            evaluation_kind=context.catalog.evaluation_kind,
             train_role_bindings=[binding.model_dump(mode="json") for binding in context.train_role_bindings],
             evaluation_policy=context.evaluation_policy,
             continuation_plan=(
@@ -328,7 +328,7 @@ class MLService:
             project_id=request_payload["project_id"],
             dataset_id=request_payload["dataset_id"],
             dataset_source_path=request_payload["dataset_source_path"],
-            problem_kind=request_payload["problem_kind"],
+            evaluation_kind=request_payload["evaluation_kind"],
             train_role_bindings=request_payload["train_role_bindings"],
             evaluation_policy=request_payload["evaluation_policy"],
             evaluate_model=EvaluateModelPayload(
@@ -377,7 +377,10 @@ class MLService:
                 feature_columns=feature_columns,
                 target_columns=target_columns,
             ),
-            evaluation_policy=get_default_policy(catalog.problem_kind),
+            evaluation_policy=get_default_policy(
+                catalog.evaluation_kind,
+                summary_metric_name=catalog.summary_metric_name,
+            ),
             inspection=binding.inspection,
         )
 
@@ -386,6 +389,7 @@ class MLService:
             run_name=context.run_name,
             dataset_name=context.dataset.name,
             dataset_file_name=context.inspection.file_name,
+            evaluation_kind=context.catalog.evaluation_kind.value,
             model_family=context.catalog.model_family.value,
             model_task_kind=context.catalog.model_task_kind.value,
             train_role_bindings=[binding.model_dump(mode="json") for binding in context.train_role_bindings],
