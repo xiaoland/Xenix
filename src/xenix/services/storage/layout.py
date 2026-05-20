@@ -23,8 +23,8 @@ def artifact_training_root(paths: AppPaths) -> Path:
     return paths.artifacts / "training"
 
 
-def artifact_inference_root(paths: AppPaths) -> Path:
-    return paths.artifacts / "inference"
+def artifact_apply_root(paths: AppPaths) -> Path:
+    return paths.artifacts / "apply"
 
 
 def ml_task_parent_root(paths: AppPaths) -> Path:
@@ -63,8 +63,8 @@ def dataset_model_dir(paths: AppPaths, dataset_id: str) -> Path:
     return artifact_models_root(paths) / "datasets" / dataset_id
 
 
-def dataset_inference_dir(paths: AppPaths, dataset_id: str) -> Path:
-    return artifact_inference_root(paths) / "datasets" / dataset_id
+def dataset_apply_dir(paths: AppPaths, dataset_id: str) -> Path:
+    return artifact_apply_root(paths) / "datasets" / dataset_id
 
 
 def ensure_storage_layout(paths: AppPaths) -> None:
@@ -72,7 +72,7 @@ def ensure_storage_layout(paths: AppPaths) -> None:
         artifact_datasets_root(paths),
         artifact_models_root(paths),
         artifact_training_root(paths),
-        artifact_inference_root(paths),
+        artifact_apply_root(paths),
         ml_task_parent_root(paths),
     ):
         directory.mkdir(parents=True, exist_ok=True)

@@ -28,6 +28,15 @@ class ColumnSelection(BaseModel):
     target_columns: list[str]
 
 
+def _role_columns(role_bindings: list[dict[str, Any]], role: str) -> list[str]:
+    for binding in role_bindings:
+        if binding.get("role") == role:
+            raw_columns = binding.get("columns")
+            if isinstance(raw_columns, list):
+                return [str(column) for column in raw_columns]
+    return []
+
+
 class EvaluationPolicySnapshot(BaseModel):
     policy_key: str
     problem_kind: ProblemKind
@@ -46,8 +55,15 @@ class TaskRequestBase(BaseModel):
     dataset_id: str
     dataset_source_path: str
     problem_kind: ProblemKind
-    column_selection: ColumnSelection
+    train_role_bindings: list[dict[str, Any]]
     evaluation_policy: EvaluationPolicySnapshot
+
+    @property
+    def column_selection(self) -> ColumnSelection:
+        return ColumnSelection(
+            feature_columns=_role_columns(self.train_role_bindings, "feature"),
+            target_columns=_role_columns(self.train_role_bindings, "target"),
+        )
 
 
 class ManualTrainingPayload(BaseModel):

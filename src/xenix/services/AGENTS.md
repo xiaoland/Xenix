@@ -12,9 +12,9 @@ This guidance applies to AI-first service boundaries under `src/xenix/services/`
 - Keep source dataset registrations pointed at user-managed source files.
 - Data services may register app-managed dataset artifacts under runtime artifacts.
 - Persist both source-dataset metadata and app-managed dataset-artifact metadata through service-owned records.
-- Feature/target selection in the first AI-first slice is represented by immutable dataset column-selection records.
+- The target generalized ML lifecycle represents dataset inputs as immutable column role-binding records. The older feature/target column-selection records are migration inputs only.
 - Keep dataset inspection metadata ephemeral and runtime-derived.
-- Validate column selections through service code, not UI-only checks.
+- Validate column role bindings through service code, not UI-only checks.
 - Do not let UI code parse `.csv` or `.xlsx` files for business decisions.
 - Before changing storage models, repositories, or migrations, read `docs/40-deployment/local-state-evolution.md`.
 - Fix app-owned bad SQLite data through forward-only data migrations; do not use tolerant ORM reads to hide known invalid persisted values.
@@ -24,5 +24,5 @@ This guidance applies to AI-first service boundaries under `src/xenix/services/`
 
 - `DatasetService` owns source dataset registration, source-file inspection, and dataset export helpers.
 - Artifact service owns artifact registration and artifact link resolution.
-- ML service training APIs should accept immutable column-selection ids, model selections, and artifact output owner inputs. ML task payloads should still expand to explicit dataset id and column snapshots before execution.
+- ML service training APIs should accept immutable role-binding ids, model selections, and artifact output owner inputs. ML task payloads should expand to explicit dataset id and role-binding snapshots before execution.
 - `WorkItemService` exits the target AI-first service topology.

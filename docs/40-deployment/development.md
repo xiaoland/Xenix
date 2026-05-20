@@ -28,7 +28,7 @@ Expected result: the app opens the native desktop shell on the Chatbot-first sur
 The delivered workflow includes:
 
 - conversation plus file drag-and-drop
-- Agent Harness tool calls for data inspection, integration, cleaning, read-only querying, transformation, feature selection, training, hyperparameter training, and inference
+- Agent Harness tool calls for data inspection, integration, cleaning, read-only querying, transformation, role binding, training, hyperparameter training, and model apply
 - markdown summaries with `artifact://...` links
 - Chatbot previews for generated datasets, reports, metrics, models, images, and prediction files
 - local persistence for conversations, messages, tool calls, tool results, artifacts, ML task metadata, and logs

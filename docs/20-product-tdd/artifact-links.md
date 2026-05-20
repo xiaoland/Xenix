@@ -18,7 +18,7 @@ Examples:
 
 ```markdown
 [Cleaned dataset](artifact://954b713407184267a9444a79e5150779?view=preview)
-[Prediction results](artifact://ab9c1f9e0d2a4f4ba80d6cf7c143a809?view=preview)
+[Model apply results](artifact://ab9c1f9e0d2a4f4ba80d6cf7c143a809?view=preview)
 ```
 
 ## Ownership

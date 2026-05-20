@@ -27,15 +27,15 @@ from xenix.services.storage import StorageBootstrapService
 class FirstSliceProvider:
     def __init__(
         self,
-        inference_path: Path | None = None,
-        inference_rows: dict[str, Any] | None = None,
+        apply_path: Path | None = None,
+        apply_rows: dict[str, Any] | None = None,
     ) -> None:
-        self._inference_path = inference_path
-        self._inference_rows = inference_rows
+        self._apply_path = apply_path
+        self._apply_rows = apply_rows
 
     def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
         dataset_id = self._find_payload_value(messages, "dataset_id")
-        selection_id = self._find_payload_value(messages, "selection_id")
+        binding_id = self._find_payload_value(messages, "binding_id")
         trained_model_id = self._find_trained_model_id(messages)
         artifact_link = self._find_payload_value(messages, "artifact_link")
         if dataset_id is None:
@@ -49,17 +49,28 @@ class FirstSliceProvider:
                     )
                 ],
             )
-        if selection_id is None:
+        if binding_id is None:
             return ProviderResponse(
-                assistant_content_blocks=[{"type": "markdown", "text": "I will lock the feature selection."}],
+                assistant_content_blocks=[{"type": "markdown", "text": "I will bind the training columns."}],
                 tool_calls=[
                     ProviderToolCall(
                         provider_call_id="call-select",
                         tool_name="data.feature.select",
                         arguments={
                             "dataset_id": dataset_id,
-                            "feature_columns": ["feature_a", "feature_b"],
-                            "target_columns": ["target"],
+                            "model_key": "regression.linear",
+                            "role_bindings": [
+                                {
+                                    "role": "feature",
+                                    "columns": ["feature_a", "feature_b"],
+                                    "role_kind": "many_columns",
+                                },
+                                {
+                                    "role": "target",
+                                    "columns": ["target"],
+                                    "role_kind": "single_column",
+                                },
+                            ],
                         },
                     )
                 ],
@@ -72,7 +83,7 @@ class FirstSliceProvider:
                         provider_call_id="call-train",
                         tool_name="model.train",
                         arguments={
-                            "selection_id": selection_id,
+                            "binding_id": binding_id,
                             "models": ["linear_regression"],
                             "params_by_model": {"linear_regression": {"fit_intercept": True}},
                             "run_name": "Harness demand analysis",
@@ -81,20 +92,20 @@ class FirstSliceProvider:
                 ],
             )
         if artifact_link is None or "Prediction results" not in self._rendered_text(messages):
-            inference_arguments = {"trained_model_id": trained_model_id}
-            if self._inference_rows is not None:
-                inference_arguments["input_rows"] = self._inference_rows
+            apply_arguments = {"trained_model_id": trained_model_id}
+            if self._apply_rows is not None:
+                apply_arguments["input_rows"] = self._apply_rows
             else:
-                if self._inference_path is None:
-                    raise AssertionError("FirstSliceProvider requires inference input data.")
-                inference_arguments["input_files"] = [str(self._inference_path.resolve())]
+                if self._apply_path is None:
+                    raise AssertionError("FirstSliceProvider requires apply input data.")
+                apply_arguments["input_files"] = [str(self._apply_path.resolve())]
             return ProviderResponse(
                 assistant_content_blocks=[{"type": "markdown", "text": "I will run prediction with the trained model."}],
                 tool_calls=[
                     ProviderToolCall(
-                        provider_call_id="call-infer",
-                        tool_name="model.inference",
-                        arguments=inference_arguments,
+                        provider_call_id="call-apply",
+                        tool_name="model.apply",
+                        arguments=apply_arguments,
                     )
                 ],
             )
@@ -190,11 +201,13 @@ def test_agent_harness_model_metadata_exposes_catalog_without_train_enums(monkey
     assert "model.metadata" in specs
     metadata_key_enum = specs["model.metadata"].parameters_schema["properties"]["model_keys"]["items"]["enum"]
     assert "regression.linear" in metadata_key_enum
+    assert "model_family" in specs["model.metadata"].parameters_schema["properties"]
+    assert "model_task_kind" in specs["model.metadata"].parameters_schema["properties"]
     assert "enum" not in specs["model.train"].parameters_schema["properties"]["models"]["items"]
-    inference_schema = specs["model.inference"].parameters_schema
-    assert inference_schema["required"] == ["trained_model_id"]
-    assert "input_rows" in inference_schema["properties"]
-    assert set(inference_schema["properties"]["input_rows"]["required"]) == {"header_index_map", "data"}
+    apply_schema = specs["model.apply"].parameters_schema
+    assert apply_schema["required"] == ["trained_model_id"]
+    assert "input_rows" in apply_schema["properties"]
+    assert set(apply_schema["properties"]["input_rows"]["required"]) == {"header_index_map", "data"}
     assert result.payload["model_keys"] == [
         "regression.linear",
         "regression.gradient_boosting",
@@ -202,8 +215,31 @@ def test_agent_harness_model_metadata_exposes_catalog_without_train_enums(monkey
         "regression.decision_tree",
     ]
     assert result.payload["models"][0]["supports_hyperparameter_tuning"] is True
+    assert result.payload["models"][0]["model_family"] == "supervised"
+    assert result.payload["models"][0]["model_task_kind"] == "predictor"
+    assert [role["name"] for role in result.payload["models"][0]["train_role_schema"]["roles"]] == ["feature", "target"]
+    assert [role["name"] for role in result.payload["models"][0]["apply_role_schema"]["roles"]] == ["feature"]
+    assert result.payload["models"][0]["result_contract"]["apply_result_kinds"] == ["table"]
     assert "param_schema" in result.payload["models"][0]
     assert "param_grid_schema" in result.payload["models"][0]
+    clustering_result = registry.execute(
+        "model.metadata",
+        {"model_family": "clustering"},
+        _tool_context(),
+    )
+    assert clustering_result.payload["model_keys"] == ["clustering.kmeans", "clustering.dbscan"]
+    predictor_result = registry.execute(
+        "model.metadata",
+        {"model_task_kind": "predictor"},
+        _tool_context(),
+    )
+    assert "regression.linear" in predictor_result.payload["model_keys"]
+    assert "classification.logistic_regression" in predictor_result.payload["model_keys"]
+    assert "clustering.kmeans" not in predictor_result.payload["model_keys"]
+    with pytest.raises(ValidationError, match="Unknown model_family"):
+        registry.execute("model.metadata", {"model_family": "unknown"}, _tool_context())
+    with pytest.raises(ValidationError, match="Unknown model_task_kind"):
+        registry.execute("model.metadata", {"model_task_kind": "unknown"}, _tool_context())
     with pytest.raises(ValidationError, match="xgboost"):
         registry.execute("model.metadata", {"model_keys": ["xgboost"]}, _tool_context())
 
@@ -227,7 +263,7 @@ def test_agent_harness_hyper_train_validates_tuning_capability_before_execution(
         registry.execute(
             "model.hyper_train",
             {
-                "selection_id": "missing-selection",
+                "binding_id": "missing-binding",
                 "param_grids_by_model": {"kmeans": {}},
             },
             _tool_context(),
@@ -274,7 +310,7 @@ def test_agent_harness_first_slice_runs_from_file_to_prediction(monkeypatch, tmp
         "data.peek",
         "data.feature.select",
         "model.train",
-        "model.inference",
+        "model.apply",
     ]
     prediction_artifacts = [artifact for artifact in snapshot.artifacts if artifact.kind.value == "prediction"]
     assert len(prediction_artifacts) == 1
@@ -302,7 +338,7 @@ def test_agent_harness_first_slice_runs_inline_rows_to_prediction(monkeypatch, t
     harness = AgentHarnessService(
         session_factory=context.session_factory,
         provider=FirstSliceProvider(
-            inference_rows={
+            apply_rows={
                 "header_index_map": {"feature_b": 0, "feature_a": 1},
                 "data": [[9, 11], [10, 12]],
             },
@@ -324,7 +360,7 @@ def test_agent_harness_first_slice_runs_inline_rows_to_prediction(monkeypatch, t
         "data.peek",
         "data.feature.select",
         "model.train",
-        "model.inference",
+        "model.apply",
     ]
     prediction_artifacts = [artifact for artifact in snapshot.artifacts if artifact.kind.value == "prediction"]
     assert len(prediction_artifacts) == 1

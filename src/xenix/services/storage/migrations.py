@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import json
+
 from sqlalchemy.engine import Engine
 from sqlmodel import SQLModel
 
 from ...exceptions import ValidationError
 from . import models  # noqa: F401
 
-CURRENT_SCHEMA_VERSION = 6
+CURRENT_SCHEMA_VERSION = 8
 
 
 def get_user_version(engine: Engine) -> int:
@@ -159,6 +161,124 @@ def migrate_v5_to_v6(engine: Engine) -> int:
     return 6
 
 
+def migrate_v6_to_v7(engine: Engine) -> int:
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE IF NOT EXISTS dataset_column_binding (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                dataset_id VARCHAR NOT NULL,
+                role_bindings JSON NOT NULL,
+                model_key VARCHAR,
+                model_family VARCHAR,
+                model_task_kind VARCHAR,
+                schema_version INTEGER NOT NULL,
+                created_at DATETIME NOT NULL,
+                FOREIGN KEY(dataset_id) REFERENCES dataset (id)
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_dataset_column_binding_dataset_id "
+            "ON dataset_column_binding (dataset_id)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_dataset_column_binding_model_key "
+            "ON dataset_column_binding (model_key)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_dataset_column_binding_model_family "
+            "ON dataset_column_binding (model_family)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_dataset_column_binding_model_task_kind "
+            "ON dataset_column_binding (model_task_kind)"
+        )
+
+        table_names = {
+            str(row[0])
+            for row in connection.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'").all()
+        }
+        if "dataset_column_selection" in table_names:
+            rows = connection.exec_driver_sql(
+                """
+                SELECT id, dataset_id, feature_columns, target_columns, created_at
+                FROM dataset_column_selection
+                """
+            ).all()
+            for row in rows:
+                feature_columns = _json_list(row[2])
+                target_columns = _json_list(row[3])
+                role_bindings: list[dict[str, object]] = []
+                if feature_columns:
+                    role_bindings.append(
+                        {
+                            "role": "feature",
+                            "columns": feature_columns,
+                            "role_kind": "many_columns",
+                            "required": True,
+                            "metadata": {},
+                        }
+                    )
+                if len(target_columns) == 1:
+                    role_bindings.append(
+                        {
+                            "role": "target",
+                            "columns": target_columns,
+                            "role_kind": "single_column",
+                            "required": True,
+                            "metadata": {},
+                        }
+                    )
+                elif target_columns:
+                    role_bindings.append(
+                        {
+                            "role": "target",
+                            "columns": target_columns,
+                            "role_kind": "many_columns",
+                            "required": True,
+                            "metadata": {},
+                        }
+                    )
+                connection.exec_driver_sql(
+                    """
+                    INSERT OR REPLACE INTO dataset_column_binding (
+                        id,
+                        dataset_id,
+                        role_bindings,
+                        model_key,
+                        model_family,
+                        model_task_kind,
+                        schema_version,
+                        created_at
+                    )
+                    VALUES (?, ?, ?, NULL, NULL, NULL, 1, ?)
+                    """,
+                    (row[0], row[1], json.dumps(role_bindings), row[4]),
+                )
+            connection.exec_driver_sql("DROP TABLE dataset_column_selection")
+        connection.exec_driver_sql("PRAGMA user_version=7")
+    return 7
+
+
+def migrate_v7_to_v8(engine: Engine) -> int:
+    with engine.begin() as connection:
+        table_names = {
+            str(row[0])
+            for row in connection.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'").all()
+        }
+        if "ml_task" in table_names:
+            connection.exec_driver_sql(
+                "UPDATE ml_task SET task_type='apply' WHERE task_type='inference'"
+            )
+        if "ml_task_artifact" in table_names:
+            connection.exec_driver_sql(
+                "UPDATE ml_task_artifact SET artifact_kind='apply_result' WHERE artifact_kind='inference_result'"
+            )
+        connection.exec_driver_sql("PRAGMA user_version=8")
+    return 8
+
+
 def run_migrations(engine: Engine) -> int:
     current_version = get_user_version(engine)
     if current_version == 0:
@@ -173,9 +293,26 @@ def run_migrations(engine: Engine) -> int:
         current_version = migrate_v4_to_v5(engine)
     if current_version == 5:
         current_version = migrate_v5_to_v6(engine)
+    if current_version == 6:
+        current_version = migrate_v6_to_v7(engine)
+    if current_version == 7:
+        current_version = migrate_v7_to_v8(engine)
     if current_version == CURRENT_SCHEMA_VERSION:
         return current_version
     raise ValidationError(
         f"Local schema version {current_version} belongs to an obsolete development baseline. "
         f"Delete the local database and restart the app to bootstrap schema v{CURRENT_SCHEMA_VERSION}."
     )
+
+
+def _json_list(value: object) -> list[str]:
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            parsed = []
+    else:
+        parsed = value
+    if not isinstance(parsed, list):
+        return []
+    return [str(item) for item in parsed if str(item)]

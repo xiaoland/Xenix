@@ -130,8 +130,19 @@ def _create_message_rendering_fixture(store: ConversationStore) -> None:
             tool_name="data.feature.select",
             arguments_payload={
                 "dataset_id": "mock_dataset_sales",
-                "feature_columns": ["price", "traffic"],
-                "target_columns": ["sales"],
+                "model_key": "regression.linear",
+                "role_bindings": [
+                    {
+                        "role": "feature",
+                        "columns": ["price", "traffic"],
+                        "role_kind": "many_columns",
+                    },
+                    {
+                        "role": "target",
+                        "columns": ["sales"],
+                        "role_kind": "single_column",
+                    },
+                ],
             },
         )
     )
@@ -140,15 +151,28 @@ def _create_message_rendering_fixture(store: ConversationStore) -> None:
             tool_call_id=selection_call.id,
             status=AgentToolCallStatus.SUCCEEDED,
             result_payload={
-                "selection_id": "mock_selection_sales",
+                "binding_id": "mock_binding_sales",
                 "dataset_id": "mock_dataset_sales",
-                "feature_columns": ["price", "traffic"],
-                "target_columns": ["sales"],
+                "model_key": "regression.linear",
+                "model_family": "supervised",
+                "model_task_kind": "predictor",
+                "role_bindings": [
+                    {
+                        "role": "feature",
+                        "columns": ["price", "traffic"],
+                        "role_kind": "many_columns",
+                    },
+                    {
+                        "role": "target",
+                        "columns": ["sales"],
+                        "role_kind": "single_column",
+                    },
+                ],
             },
             content_blocks=[
                 {
                     "type": "markdown",
-                    "text": "Selection id: `mock_selection_sales`\n\nSelected features: price, traffic\n\nSelected targets: sales",
+                    "text": "Binding id: `mock_binding_sales`\n\nBound roles: feature, target",
                 }
             ],
         )
@@ -159,7 +183,7 @@ def _create_message_rendering_fixture(store: ConversationStore) -> None:
             turn_id=second_turn.id,
             tool_name="model.train",
             arguments_payload={
-                "selection_id": "mock_selection_sales",
+                "binding_id": "mock_binding_sales",
                 "models": ["regression.linear"],
             },
         )
@@ -184,11 +208,11 @@ def _create_message_rendering_fixture(store: ConversationStore) -> None:
             ],
         )
     )
-    _inference_message, inference_call = store.create_tool_call(
+    _apply_message, apply_call = store.create_tool_call(
         CreateToolCallInput(
             thread_id=thread.id,
             turn_id=second_turn.id,
-            tool_name="model.inference",
+            tool_name="model.apply",
             arguments_payload={
                 "trained_model_id": "mock_linear_model",
                 "input_files": ["C:/mock-data/future-plan.csv"],
@@ -197,7 +221,7 @@ def _create_message_rendering_fixture(store: ConversationStore) -> None:
     )
     store.complete_tool_call(
         CompleteToolCallInput(
-            tool_call_id=inference_call.id,
+            tool_call_id=apply_call.id,
             status=AgentToolCallStatus.SUCCEEDED,
             result_payload={
                 "artifact_link": "[prediction-results.csv](artifact://mock-predictions?view=preview)",

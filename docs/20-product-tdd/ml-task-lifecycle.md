@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define the minimum contract for persisted ML task execution such as dataset inspection, training, evaluation, and inference.
+Define the minimum contract for persisted ML task execution such as dataset inspection, training, evaluation, and model apply.
 
 This document governs `MLTask` lifecycle semantics. It does not govern task packets under `tasks/<task-slug>/`.
 
@@ -11,14 +11,43 @@ This document governs `MLTask` lifecycle semantics. It does not govern task pack
 Each persisted ML task must have:
 
 - A stable ML task id
-- An ML task type such as `inspect_dataset`, `fit`, `hyperparameter_tuning`, or `inference`
+- An ML task type such as `inspect_dataset`, `fit`, `hyperparameter_tuning`, or `apply`
 - A created timestamp
 - A current status
 - A finished timestamp once the ML task reaches a terminal state
 
 SQLite is the default store for ML task metadata.
 
-Current AI-first service contracts are dataset-scoped. Feature/target selection is first persisted as an immutable column-selection snapshot. Training and hyperparameter training tools pass `selection_id`; ML task requests expand that reference into explicit dataset id, feature columns, target columns, model selection, and run name inputs before execution. Inference uses the trained model metadata as the feature-column contract.
+Current AI-first service contracts are dataset-scoped and analyzer-scoped. A model is a reusable analyzer: a service-owned artifact trained from declared input roles and later applied to compatible input roles.
+
+Column-role binding is first persisted as an immutable binding snapshot. Training and hyperparameter training tools pass `binding_id`; ML task requests expand that reference into explicit dataset id, role bindings, model selection, parameters, and run name inputs before execution. Supervised feature/target labels are derived from role bindings when needed for display or adapter compatibility, but they are not a second persistent contract.
+
+Apply tasks use the trained model metadata as the apply-role contract. New service and Agent contracts use `apply`, not `inference`. Legacy persisted task rows or tests that use `inference` are migration inputs only.
+
+## Role Binding Contract
+
+Dataset column role bindings must be persisted as service-owned records before training starts.
+
+Each binding record must include:
+
+- A stable binding id
+- Dataset id
+- Role binding payload
+- Optional model key
+- Optional model family
+- Optional model task kind
+- Schema version
+- Created timestamp
+
+The canonical storage table is `dataset_column_binding`. The old `dataset_column_selection` table is a migration source and must not be used as the forward contract.
+
+Role binding rules:
+
+- Every bound column must exist in the registered dataset inspection.
+- Required roles must be present before a model can train.
+- Single-column roles bind exactly one column.
+- Many-column roles bind one or more columns unless the role schema marks them optional.
+- Model catalog metadata owns the train-role schema and apply-role schema used for validation.
 
 ## Status Contract
 
@@ -54,20 +83,22 @@ Detailed per-ML-task logs may later use separate files, but the canonical locati
 
 When ML task subprocess execution exists, each ML task may also write detailed process logs under `artifacts/ml-tasks/<ml-task-id>/`. Those per-ML-task logs are supplementary. The canonical application log remains under `paths.logs`.
 
-## Result File Contract
+## Result Artifact Contract
 
 ML tasks that produce artifacts must return result metadata that includes:
 
 - Result kind
-- Absolute filesystem path
+- Artifact kind
+- Absolute filesystem path when the artifact is file-backed
+- Preview kind when the artifact can be previewed in Chatbot
 - Whether the file or directory is ready to open
 
-ML tasks surfaced after the original dialog closes, such as inference results shown in history, must preserve enough terminal metadata for later review and export.
+ML tasks surfaced after the originating Chatbot turn closes, such as apply results shown in history, must preserve enough terminal metadata for later review and export.
 
 Result ownership rules:
 
 - Source dataset registrations may point to user-managed files.
-- ML task requests carry expanded dataset, feature column, target column, model selection, and artifact output owner inputs from service contracts.
+- ML task requests carry expanded dataset, role binding, model selection, parameters, and artifact output owner inputs from service contracts.
 - App-managed dataset artifacts used by ML tasks are registered through service-owned artifact metadata.
 - Generated models, exports, and reports live in service-managed directories on the local filesystem.
 - ML task working directories live under `artifacts/ml-tasks/<ml-task-id>/`.

@@ -28,7 +28,7 @@ from .ml.registry import get_model_catalog_entry
 from .ml.execution import MLWorkerRunner
 from .ml.operations import run_evaluate_task, run_fit_task, run_hyperparameter_tuning_task, run_inference_task
 from .storage.layout import (
-    dataset_inference_dir,
+    dataset_apply_dir,
     dataset_model_dir,
     ml_task_root,
     task_input_dir,
@@ -324,7 +324,7 @@ class MLTaskService:
             return run_hyperparameter_tuning_task
         if task_type is MLTaskType.EVALUATE:
             return run_evaluate_task
-        if task_type is MLTaskType.INFERENCE:
+        if task_type is MLTaskType.APPLY:
             return run_inference_task
         raise ValidationError(f"ML task type '{task_type.value}' is not executable in this workflow.")
 
@@ -339,8 +339,8 @@ class MLTaskService:
                 result_payload, artifacts = self._finalize_tuning_task(session, row)
             elif row.task_type is MLTaskType.EVALUATE:
                 result_payload, artifacts = self._finalize_evaluate_task(row)
-            elif row.task_type is MLTaskType.INFERENCE:
-                result_payload, artifacts = self._finalize_inference_task(session, row)
+            elif row.task_type is MLTaskType.APPLY:
+                result_payload, artifacts = self._finalize_apply_task(session, row)
             else:
                 raise ValidationError(f"ML task type '{row.task_type.value}' cannot be finalized.")
 
@@ -366,7 +366,8 @@ class MLTaskService:
             self._require_existing_path(holdout_path)
         if export_path is not None:
             self._require_existing_path(export_path)
-        model_display_name = get_model_catalog_entry(result.model_key).display_name
+        catalog_entry = get_model_catalog_entry(result.model_key)
+        model_display_name = catalog_entry.display_name
         artifact_file_name = build_artifact_file_name(
             trained_model_context.run_name,
             model_display_name,
@@ -376,6 +377,8 @@ class MLTaskService:
         canonical_path = self._copy_canonical_model(row, artifact_file_name, model_path)
         metadata = TrainedModelMetadata(
             model_key=result.model_key,
+            model_family=trained_model_context.model_family or catalog_entry.model_family.value,
+            model_task_kind=trained_model_context.model_task_kind or catalog_entry.model_task_kind.value,
             model_display_name=model_display_name,
             display_name=model_display_name,
             saved_name=build_saved_name(
@@ -389,8 +392,9 @@ class MLTaskService:
             source_run_name=trained_model_context.run_name,
             source_dataset_name=trained_model_context.dataset_name,
             source_dataset_file_name=trained_model_context.dataset_file_name,
-            feature_columns=list(trained_model_context.feature_columns),
-            target_columns=list(trained_model_context.target_columns),
+            train_role_bindings=[dict(binding) for binding in trained_model_context.train_role_bindings],
+            apply_role_schema=dict(trained_model_context.apply_role_schema),
+            result_contract=dict(trained_model_context.result_contract),
             dataset_row_count=trained_model_context.dataset_row_count,
             dataset_column_count=trained_model_context.dataset_column_count,
             preview_columns=list(trained_model_context.preview_columns),
@@ -451,7 +455,8 @@ class MLTaskService:
             self._require_existing_path(holdout_path)
         if export_path is not None:
             self._require_existing_path(export_path)
-        model_display_name = get_model_catalog_entry(result.model_key).display_name
+        catalog_entry = get_model_catalog_entry(result.model_key)
+        model_display_name = catalog_entry.display_name
         artifact_file_name = build_artifact_file_name(
             trained_model_context.run_name,
             model_display_name,
@@ -461,6 +466,8 @@ class MLTaskService:
         canonical_path = self._copy_canonical_model(row, artifact_file_name, model_path)
         metadata = TrainedModelMetadata(
             model_key=result.model_key,
+            model_family=trained_model_context.model_family or catalog_entry.model_family.value,
+            model_task_kind=trained_model_context.model_task_kind or catalog_entry.model_task_kind.value,
             model_display_name=model_display_name,
             display_name=model_display_name,
             saved_name=build_saved_name(
@@ -474,8 +481,9 @@ class MLTaskService:
             source_run_name=trained_model_context.run_name,
             source_dataset_name=trained_model_context.dataset_name,
             source_dataset_file_name=trained_model_context.dataset_file_name,
-            feature_columns=list(trained_model_context.feature_columns),
-            target_columns=list(trained_model_context.target_columns),
+            train_role_bindings=[dict(binding) for binding in trained_model_context.train_role_bindings],
+            apply_role_schema=dict(trained_model_context.apply_role_schema),
+            result_contract=dict(trained_model_context.result_contract),
             dataset_row_count=trained_model_context.dataset_row_count,
             dataset_column_count=trained_model_context.dataset_column_count,
             preview_columns=list(trained_model_context.preview_columns),
@@ -528,7 +536,7 @@ class MLTaskService:
             raise ValidationError(result.error_summary)
         return result.model_dump(mode="json"), []
 
-    def _finalize_inference_task(
+    def _finalize_apply_task(
         self,
         session: Any,
         row: MLTaskRow,
@@ -541,7 +549,7 @@ class MLTaskService:
 
         output_path = Path(result.output_file_path)
         self._require_existing_path(output_path)
-        canonical_path = self._copy_canonical_inference_output(row, output_path)
+        canonical_path = self._copy_canonical_apply_output(row, output_path)
         dataset = self._datasets.get(session, row.dataset_id) if row.dataset_id is not None else None
         if dataset is None:
             raise NotFoundError(f"Dataset '{row.dataset_id}' was not found.")
@@ -564,7 +572,7 @@ class MLTaskService:
         payload["prediction_column_name"] = result.summary.prediction_column_name
         artifacts = [
             MLTaskArtifactInput(
-                artifact_kind=MLTaskArtifactKind.INFERENCE_RESULT,
+                artifact_kind=MLTaskArtifactKind.APPLY_RESULT,
                 absolute_path=str(canonical_path),
                 ready_to_open=True,
             )
@@ -627,13 +635,13 @@ class MLTaskService:
         shutil.copy2(source_path, destination_path)
         return destination_path
 
-    def _copy_canonical_inference_output(
+    def _copy_canonical_apply_output(
         self,
         row: MLTaskRow,
         source_path: Path,
     ) -> Path:
         if row.dataset_id is not None:
-            destination_dir = dataset_inference_dir(self._paths, row.dataset_id)
+            destination_dir = dataset_apply_dir(self._paths, row.dataset_id)
         else:
             destination_dir = task_output_dir(self._paths, row.id)
         destination_dir.mkdir(parents=True, exist_ok=True)
@@ -657,8 +665,9 @@ class MLTaskService:
             run_name=context_name,
             dataset_name=dataset_name,
             dataset_file_name=dataset_file_name,
-            feature_columns=[],
-            target_columns=[],
+            train_role_bindings=[],
+            apply_role_schema={},
+            result_contract={},
             dataset_row_count=0,
             dataset_column_count=0,
             preview_columns=[],

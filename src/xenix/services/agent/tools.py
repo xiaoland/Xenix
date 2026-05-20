@@ -22,10 +22,11 @@ from ..data_transform import (
 from ..dataset_inspection import InspectDatasetInput, detect_source_format, load_dataframe
 from ..dataset_service import DatasetService, RegisterDatasetInput
 from ..ml.registry import get_model_catalog_entry, list_model_catalog, list_model_keys
+from ..ml.types import ModelFamily, ModelTaskKind
 from ..ml_service import (
-    CreateColumnSelectionInput,
+    ApplyWithFilesInput,
+    CreateColumnBindingInput,
     FitWithEvaluateInput,
-    InferWithFilesInput,
     MLService,
     TuneWithEvaluateInput,
 )
@@ -130,10 +131,10 @@ TOOL_PRESENTATIONS: dict[str, ToolPresentation] = {
     ),
     "data.feature.select": ToolPresentation(
         icon_key="columns",
-        pending_summary="Selecting features...",
-        success_summary="Selected features",
-        failure_action="select features",
-        cancellation_summary="Cancelled feature selection",
+        pending_summary="Binding dataset columns...",
+        success_summary="Bound dataset columns",
+        failure_action="bind dataset columns",
+        cancellation_summary="Cancelled column binding",
     ),
     "model.metadata": ToolPresentation(
         icon_key="list-tree",
@@ -156,12 +157,12 @@ TOOL_PRESENTATIONS: dict[str, ToolPresentation] = {
         failure_action="tune model",
         cancellation_summary="Cancelled model tuning",
     ),
-    "model.inference": ToolPresentation(
+    "model.apply": ToolPresentation(
         icon_key="prediction",
-        pending_summary="Running prediction...",
-        success_summary="Ran prediction",
-        failure_action="run prediction",
-        cancellation_summary="Cancelled prediction run",
+        pending_summary="Applying model...",
+        success_summary="Applied model",
+        failure_action="apply model",
+        cancellation_summary="Cancelled model apply",
     ),
 }
 
@@ -210,7 +211,7 @@ class AgentToolRegistry:
                 self._build_model_metadata_tool(),
                 self._build_model_train_tool(),
                 self._build_model_hyper_train_tool(),
-                self._build_model_inference_tool(),
+                self._build_model_apply_tool(),
             )
         }
 
@@ -479,19 +480,34 @@ class AgentToolRegistry:
         )
 
     def _build_data_feature_select_tool(self) -> AgentTool:
+        role_binding_schema = {
+            "type": "object",
+            "properties": {
+                "role": {"type": "string"},
+                "columns": {"type": "array", "items": {"type": "string"}},
+                "role_kind": {
+                    "type": "string",
+                    "enum": ["single_column", "many_columns"],
+                },
+                "required": {"type": "boolean"},
+                "metadata": {"type": "object"},
+            },
+            "required": ["role", "columns"],
+            "additionalProperties": False,
+        }
         return AgentTool(
             spec=AgentToolSpec(
                 name="data.feature.select",
                 provider_name="data_feature_select",
-                description="Validate and return a feature/target column selection for a dataset.",
+                description="Bind registered dataset columns to semantic roles required by a model/analyzer.",
                 parameters_schema={
                     "type": "object",
                     "properties": {
                         "dataset_id": {"type": "string"},
-                        "feature_columns": {"type": "array", "items": {"type": "string"}},
-                        "target_columns": {"type": "array", "items": {"type": "string"}},
+                        "model_key": {"type": "string", "enum": list_model_keys()},
+                        "role_bindings": {"type": "array", "items": role_binding_schema},
                     },
-                    "required": ["dataset_id", "feature_columns"],
+                    "required": ["dataset_id", "role_bindings"],
                     "additionalProperties": False,
                 },
             ),
@@ -519,6 +535,14 @@ class AgentToolRegistry:
                             "type": "string",
                             "enum": [kind.value for kind in ProblemKind],
                         },
+                        "model_family": {
+                            "type": "string",
+                            "enum": [family.value for family in ModelFamily],
+                        },
+                        "model_task_kind": {
+                            "type": "string",
+                            "enum": [task_kind.value for task_kind in ModelTaskKind],
+                        },
                         "capability": {
                             "type": "string",
                             "enum": ["fit", "hyperparameter_tuning"],
@@ -539,18 +563,18 @@ class AgentToolRegistry:
                 name="model.train",
                 provider_name="model_train",
                 description=(
-                    "Train and evaluate one or more models for a persisted column selection. "
+                    "Train and evaluate one or more models for a persisted dataset column role binding. "
                     "Use model.metadata to inspect available canonical model keys and parameter schemas."
                 ),
                 parameters_schema={
                     "type": "object",
                     "properties": {
-                        "selection_id": {"type": "string"},
+                        "binding_id": {"type": "string"},
                         "models": {"type": "array", "items": {"type": "string"}},
                         "params_by_model": {"type": "object"},
                         "run_name": {"type": "string"},
                     },
-                    "required": ["selection_id", "models"],
+                    "required": ["binding_id", "models"],
                     "additionalProperties": False,
                 },
             ),
@@ -570,11 +594,11 @@ class AgentToolRegistry:
                 parameters_schema={
                     "type": "object",
                     "properties": {
-                        "selection_id": {"type": "string"},
+                        "binding_id": {"type": "string"},
                         "param_grids_by_model": {"type": "object"},
                         "run_name": {"type": "string"},
                     },
-                    "required": ["selection_id", "param_grids_by_model"],
+                    "required": ["binding_id", "param_grids_by_model"],
                     "additionalProperties": False,
                 },
             ),
@@ -582,12 +606,12 @@ class AgentToolRegistry:
             presentation=tool_presentation_for_name("model.hyper_train"),
         )
 
-    def _build_model_inference_tool(self) -> AgentTool:
+    def _build_model_apply_tool(self) -> AgentTool:
         return AgentTool(
             spec=AgentToolSpec(
-                name="model.inference",
-                provider_name="model_inference",
-                description="Run inference with a trained model and one or more input files or inline rows.",
+                name="model.apply",
+                provider_name="model_apply",
+                description="Apply a trained model to one or more input files or inline rows.",
                 parameters_schema={
                     "type": "object",
                     "properties": {
@@ -618,8 +642,8 @@ class AgentToolRegistry:
                     "additionalProperties": False,
                 },
             ),
-            handler=self._model_inference,
-            presentation=tool_presentation_for_name("model.inference"),
+            handler=self._model_apply,
+            presentation=tool_presentation_for_name("model.apply"),
         )
 
     def _data_peek(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
@@ -768,29 +792,33 @@ class AgentToolRegistry:
     def _data_feature_select(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
         dataset_id = self._require_string(arguments, "dataset_id")
-        feature_columns = self._require_string_list(arguments, "feature_columns")
-        target_columns = self._optional_string_list(arguments, "target_columns")
-        selection = self._ml_service.create_column_selection(
-            CreateColumnSelectionInput(
+        role_bindings = arguments.get("role_bindings")
+        if not isinstance(role_bindings, list):
+            raise ValidationError("data.feature.select requires role_bindings.")
+        if not all(isinstance(item, dict) for item in role_bindings):
+            raise ValidationError("data.feature.select role_bindings must contain objects.")
+        binding = self._ml_service.create_column_binding(
+            CreateColumnBindingInput(
                 dataset_id=dataset_id,
-                feature_columns=feature_columns,
-                target_columns=target_columns,
+                model_key=str(arguments.get("model_key") or "").strip() or None,
+                role_bindings=[dict(item) for item in role_bindings],
             )
         )
         return ToolExecutionResult(
             payload={
-                "selection_id": selection.id,
-                "dataset_id": selection.dataset_id,
-                "feature_columns": list(selection.feature_columns),
-                "target_columns": list(selection.target_columns),
+                "binding_id": binding.id,
+                "dataset_id": binding.dataset_id,
+                "role_bindings": list(binding.role_bindings),
+                "model_key": binding.model_key,
+                "model_family": binding.model_family,
+                "model_task_kind": binding.model_task_kind,
             },
             content_blocks=[
                 {
                     "type": "markdown",
                     "text": (
-                        f"Selection id: `{selection.id}`\n\n"
-                        f"Selected features: {', '.join(selection.feature_columns)}\n\n"
-                        f"Selected targets: {', '.join(selection.target_columns) if selection.target_columns else 'none'}"
+                        f"Binding id: `{binding.id}`\n\n"
+                        f"Bound roles: {', '.join(str(item.get('role')) for item in binding.role_bindings)}"
                     ),
                 }
             ],
@@ -815,6 +843,26 @@ class AgentToolRegistry:
                 entry for entry in catalog_entries if entry.problem_kind == selected_problem_kind
             ]
 
+        model_family = str(arguments.get("model_family") or "").strip()
+        if model_family:
+            try:
+                selected_model_family = ModelFamily(model_family)
+            except ValueError as exc:
+                raise ValidationError(f"Unknown model_family '{model_family}'.") from exc
+            catalog_entries = [
+                entry for entry in catalog_entries if entry.model_family == selected_model_family
+            ]
+
+        model_task_kind = str(arguments.get("model_task_kind") or "").strip()
+        if model_task_kind:
+            try:
+                selected_model_task_kind = ModelTaskKind(model_task_kind)
+            except ValueError as exc:
+                raise ValidationError(f"Unknown model_task_kind '{model_task_kind}'.") from exc
+            catalog_entries = [
+                entry for entry in catalog_entries if entry.model_task_kind == selected_model_task_kind
+            ]
+
         capability = str(arguments.get("capability") or "").strip()
         if capability == "fit":
             catalog_entries = [entry for entry in catalog_entries if entry.supports_fit]
@@ -827,7 +875,13 @@ class AgentToolRegistry:
 
         catalog_entries = sorted(
             catalog_entries,
-            key=lambda entry: (entry.problem_kind.value, entry.recommendation_tier, entry.model_key),
+            key=lambda entry: (
+                entry.model_family.value,
+                entry.model_task_kind.value,
+                entry.problem_kind.value,
+                entry.recommendation_tier,
+                entry.model_key,
+            ),
         )
         include_param_schema = bool(arguments.get("include_param_schema"))
         include_param_grid_schema = bool(arguments.get("include_param_grid_schema"))
@@ -850,7 +904,7 @@ class AgentToolRegistry:
 
     def _model_train(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
-        selection_id = self._require_string(arguments, "selection_id")
+        binding_id = self._require_string(arguments, "binding_id")
         models = self._normalize_model_keys(
             self._require_string_list(arguments, "models"),
             field_name="models",
@@ -859,15 +913,15 @@ class AgentToolRegistry:
             arguments.get("params_by_model"),
             field_name="params_by_model",
         )
-        selection = self._ml_service.get_column_selection(selection_id)
-        dataset_id = selection.dataset_id
+        binding = self._ml_service.get_column_binding(binding_id)
+        dataset_id = binding.dataset_id
         before_ids = {task.id for task in self._ml_service.list_dataset_tasks(dataset_id)}
         created_task_ids: list[str] = []
         for model_key in models:
             self._raise_if_cancelled(context)
             created = self._ml_service.fit_with_evaluate(
                 FitWithEvaluateInput(
-                    selection_id=selection_id,
+                    binding_id=binding_id,
                     run_name=str(arguments.get("run_name") or ""),
                     model_key=model_key,
                     params=dict(params_by_model.get(model_key) or {}),
@@ -888,7 +942,7 @@ class AgentToolRegistry:
 
     def _model_hyper_train(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
-        selection_id = self._require_string(arguments, "selection_id")
+        binding_id = self._require_string(arguments, "binding_id")
         grids = arguments.get("param_grids_by_model")
         if not isinstance(grids, dict) or not grids:
             raise ValidationError("model.hyper_train requires param_grids_by_model.")
@@ -897,15 +951,15 @@ class AgentToolRegistry:
             field_name="param_grids_by_model",
             require_hyperparameter_tuning=True,
         )
-        selection = self._ml_service.get_column_selection(selection_id)
-        dataset_id = selection.dataset_id
+        binding = self._ml_service.get_column_binding(binding_id)
+        dataset_id = binding.dataset_id
         before_ids = {task.id for task in self._ml_service.list_dataset_tasks(dataset_id)}
         created_task_ids: list[str] = []
         for model_key, grid in normalized_grids.items():
             self._raise_if_cancelled(context)
             created = self._ml_service.tune_with_evaluate(
                 TuneWithEvaluateInput(
-                    selection_id=selection_id,
+                    binding_id=binding_id,
                     run_name=str(arguments.get("run_name") or ""),
                     model_key=model_key,
                     param_grid=dict(grid),
@@ -924,7 +978,7 @@ class AgentToolRegistry:
             content_blocks=[{"type": "markdown", "text": self._training_summary_markdown(payload)}],
         )
 
-    def _model_inference(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+    def _model_apply(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
         trained_model_id = self._require_string(arguments, "trained_model_id")
         input_files = self._optional_string_list(arguments, "input_files")
@@ -932,22 +986,22 @@ class AgentToolRegistry:
         if input_rows is not None and not isinstance(input_rows, dict):
             raise ValidationError("input_rows must be an object.")
         if not input_files and input_rows is None:
-            raise ValidationError("model.inference requires input_files or input_rows.")
+            raise ValidationError("model.apply requires input_files or input_rows.")
         try:
-            inference_input = InferWithFilesInput(
+            apply_input = ApplyWithFilesInput(
                 trained_model_id=trained_model_id,
                 input_files=input_files,
                 input_rows=input_rows,
             )
         except PydanticValidationError as exc:
             raise ValidationError("input_rows must contain header_index_map and data.") from exc
-        task = self._ml_service.infer(inference_input)
+        task = self._ml_service.apply(apply_input)
         task = self._wait_for_task(task.id, context=context)
         details = self._ml_service.get_task_details(task.id)
         output_artifact = next(
             artifact
             for artifact in details.artifacts
-            if artifact.artifact_kind is MLTaskArtifactKind.INFERENCE_RESULT
+            if artifact.artifact_kind is MLTaskArtifactKind.APPLY_RESULT
         )
         generic_artifact = self._artifact_service.register_artifact(
             RegisterArtifactInput(
@@ -1205,12 +1259,17 @@ class AgentToolRegistry:
             "model_key": entry.model_key,
             "display_name": entry.display_name,
             "problem_kind": entry.problem_kind.value,
+            "model_family": entry.model_family.value,
+            "model_task_kind": entry.model_task_kind.value,
             "family": entry.family,
             "guidance": entry.guidance,
             "recommendation_tier": entry.recommendation_tier,
             "requires_target": entry.requires_target,
             "supports_fit": entry.supports_fit,
             "supports_hyperparameter_tuning": entry.supports_hyperparameter_tuning,
+            "train_role_schema": entry.train_role_schema.model_dump(mode="json"),
+            "apply_role_schema": entry.apply_role_schema.model_dump(mode="json"),
+            "result_contract": entry.result_contract.model_dump(mode="json"),
         }
         if include_param_schema:
             payload["param_schema"] = entry.param_schema
@@ -1229,6 +1288,7 @@ class AgentToolRegistry:
             lines.append(
                 "- "
                 f"`{model['model_key']}` ({model['display_name']}, {model['problem_kind']}); "
+                f"task: {model['model_task_kind']}; "
                 f"capabilities: {', '.join(capabilities)}"
             )
         return "\n".join(lines)

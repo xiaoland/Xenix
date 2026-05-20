@@ -6,7 +6,7 @@ from sqlmodel import Session
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import (
-    DatasetColumnSelectionRow,
+    DatasetColumnBindingRow,
     DatasetRow,
     DatasetSourceFormat,
     MLTaskArtifactKind,
@@ -19,7 +19,7 @@ from xenix.services.storage.models import (
     TrainedModelRow,
 )
 from xenix.services.storage.repositories import (
-    DatasetColumnSelectionRepository,
+    DatasetColumnBindingRepository,
     DatasetRepository,
     MLTaskRepository,
     ProjectRepository,
@@ -86,7 +86,7 @@ def test_dataset_repository_provenance_queries(monkeypatch, tmp_path: Path) -> N
         task = MLTaskRow(
             project_id=project.id,
             dataset_id=source_dataset.id,
-            task_type=MLTaskType.INFERENCE,
+            task_type=MLTaskType.APPLY,
             status=MLTaskStatus.SUCCEEDED,
         )
         MLTaskRepository().create(session, task)
@@ -138,28 +138,51 @@ def test_dataset_repository_provenance_queries(monkeypatch, tmp_path: Path) -> N
     assert by_task.id == generated_dataset.id
 
 
-def test_dataset_column_selection_repository_creates_immutable_snapshot(monkeypatch, tmp_path: Path) -> None:
-    selections = DatasetColumnSelectionRepository()
+def test_dataset_column_binding_repository_creates_immutable_snapshot(monkeypatch, tmp_path: Path) -> None:
+    bindings = DatasetColumnBindingRepository()
 
     with _build_session(monkeypatch, tmp_path) as session:
         project = _create_project(session)
         dataset = _create_source_dataset(session, project, tmp_path)
-        row = selections.create(
+        row = bindings.create(
             session,
-            DatasetColumnSelectionRow(
+            DatasetColumnBindingRow(
                 dataset_id=dataset.id,
-                feature_columns=["age", "income"],
-                target_columns=["label"],
+                role_bindings=[
+                    {
+                        "role": "feature",
+                        "columns": ["age", "income"],
+                        "role_kind": "many_columns",
+                        "required": True,
+                        "metadata": {},
+                    },
+                    {
+                        "role": "target",
+                        "columns": ["label"],
+                        "role_kind": "single_column",
+                        "required": True,
+                        "metadata": {},
+                    },
+                ],
+                model_key="classification.logistic_regression",
+                model_family="supervised",
+                model_task_kind="predictor",
+                schema_version=1,
             ),
         )
         session.commit()
 
-        loaded = selections.get(session, row.id)
+        loaded = bindings.get(session, row.id)
 
     assert loaded is not None
     assert loaded.dataset_id == dataset.id
-    assert loaded.feature_columns == ["age", "income"]
-    assert loaded.target_columns == ["label"]
+    assert loaded.role_bindings[0]["role"] == "feature"
+    assert loaded.role_bindings[0]["columns"] == ["age", "income"]
+    assert loaded.role_bindings[1]["role"] == "target"
+    assert loaded.role_bindings[1]["columns"] == ["label"]
+    assert loaded.model_key == "classification.logistic_regression"
+    assert loaded.model_family == "supervised"
+    assert loaded.model_task_kind == "predictor"
 
 
 def test_ml_task_repository_round_trip_by_dataset(monkeypatch, tmp_path: Path) -> None:

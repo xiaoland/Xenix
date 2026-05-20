@@ -38,6 +38,6 @@ Define the minimum policy for changing local persistence once SQLite and additio
 
 ## Current Development Baseline
 
-Current AI-first development schema baseline: SQLite `user_version=6`.
+Current AI-first development schema baseline: SQLite `user_version=8`.
 
 Older development databases from previous native UI or WorkItem-centered schemas are obsolete. Delete `state/xenix.db` under the selected runtime home and restart the app to bootstrap the current schema.

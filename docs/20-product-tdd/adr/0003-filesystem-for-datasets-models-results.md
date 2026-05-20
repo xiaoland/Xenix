@@ -5,7 +5,7 @@
 
 ## Context
 
-Native workflows center on user-selected local data and user-openable outputs. Datasets, trained models, and inference results can be large, binary, and easier to manage as files than as database blobs.
+Native workflows center on user-selected local data and user-openable outputs. Datasets, trained models, and model apply results can be large, binary, and easier to manage as files than as database blobs.
 
 ## Decision
 

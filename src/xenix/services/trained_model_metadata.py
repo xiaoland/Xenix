@@ -16,8 +16,11 @@ class TrainedModelContextPayload(BaseModel):
     run_name: str
     dataset_name: str
     dataset_file_name: str
-    feature_columns: list[str] = Field(default_factory=list)
-    target_columns: list[str] = Field(default_factory=list)
+    model_family: str | None = None
+    model_task_kind: str | None = None
+    train_role_bindings: list[dict[str, Any]] = Field(default_factory=list)
+    apply_role_schema: dict[str, Any] = Field(default_factory=dict)
+    result_contract: dict[str, Any] = Field(default_factory=dict)
     dataset_row_count: int
     dataset_column_count: int
     preview_columns: list[str] = Field(default_factory=list)
@@ -25,8 +28,10 @@ class TrainedModelContextPayload(BaseModel):
 
 
 class TrainedModelMetadata(BaseModel):
-    schema_version: int = 1
+    schema_version: int = 2
     model_key: str
+    model_family: str | None = None
+    model_task_kind: str | None = None
     model_display_name: str
     display_name: str
     saved_name: str
@@ -36,8 +41,9 @@ class TrainedModelMetadata(BaseModel):
     source_run_name: str
     source_dataset_name: str
     source_dataset_file_name: str
-    feature_columns: list[str] = Field(default_factory=list)
-    target_columns: list[str] = Field(default_factory=list)
+    train_role_bindings: list[dict[str, Any]] = Field(default_factory=list)
+    apply_role_schema: dict[str, Any] = Field(default_factory=dict)
+    result_contract: dict[str, Any] = Field(default_factory=dict)
     dataset_row_count: int = 0
     dataset_column_count: int = 0
     preview_columns: list[str] = Field(default_factory=list)
@@ -84,7 +90,7 @@ def build_artifact_file_name(
 def build_save_note(model_display_name: str) -> str:
     return (
         f"The saved {model_display_name} model remains available for comparison, "
-        "inference reuse, and later review."
+        "apply reuse, and later review."
     )
 
 

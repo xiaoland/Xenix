@@ -13,13 +13,14 @@ Record which product concepts remain in the native edition and which are intenti
 - Conversation plus file drag-and-drop as the primary operator path
 - Local dataset intake from user-selected CSV/XLSX files
 - Agent Harness service exposing Xenix data and model capabilities as LLM tools
-- Basic data analysis from data intake through prediction
+- Basic data analysis from data intake through reusable model application
 - Basic data cleaning as an LLM-driven capability that produces derived datasets
 - Read-only dataset querying as an LLM-driven capability for inspection, validation, and analysis summaries
 - Dataset transformation as an LLM-driven capability that produces derived datasets from registered inputs
-- Model training, evaluation, and inference through service-backed tool calls
+- Models as reusable analyzers, not only supervised estimators
+- Model training, evaluation where applicable, and apply operations through service-backed tool calls
 - Artifact-backed result viewing inside Chatbot messages
-- Local artifacts for datasets, models, metrics, reports, and predictions
+- Local artifacts for datasets, models, metrics, reports, and model apply outputs
 - Local runtime logs and metadata
 - Settings as the supporting entry for LLM provider and development mock configuration
 
@@ -43,7 +44,7 @@ Record which product concepts remain in the native edition and which are intenti
 - Agent Harness owns Thread, Turn, Message, tool-call, and tool-result semantics.
 - The LLM receives atomic tools and keeps planning freedom inside service and tool constraints.
 - Storage provides persistence interfaces for service-owned records.
-- Prediction outputs must remain reviewable through artifact links after the originating turn closes.
+- Model apply outputs must remain reviewable through artifact links after the originating turn closes.
 - First-slice working context is represented by Thread messages, tool-call records, tool-result records, and artifact metadata.
 - Data cleaning tools operate on registered datasets and create new derived datasets; source datasets remain intact.
 - Query tools read registered datasets and return bounded results without creating dataset artifacts by default.

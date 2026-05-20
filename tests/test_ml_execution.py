@@ -9,9 +9,9 @@ from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
 from xenix.services.ml_service import (
     BulkTuneWithEvaluateInput,
     BulkTuningSelection,
-    CreateColumnSelectionInput,
+    ApplyWithFilesInput,
+    CreateColumnBindingInput,
     FitWithEvaluateInput,
-    InferWithFilesInput,
     MLService,
     TuneWithEvaluateInput,
 )
@@ -50,17 +50,31 @@ def _register_dataset(
     )
 
 
-def _create_selection(
+def _create_binding(
     ml_service: MLService,
     dataset_id: str,
     feature_columns: list[str],
     target_columns: list[str] | None = None,
 ) -> object:
-    return ml_service.create_column_selection(
-        CreateColumnSelectionInput(
+    role_bindings = [
+        {
+            "role": "feature",
+            "columns": feature_columns,
+            "role_kind": "many_columns",
+        }
+    ]
+    if target_columns:
+        role_bindings.append(
+            {
+                "role": "target",
+                "columns": target_columns,
+                "role_kind": "single_column" if len(target_columns) == 1 else "many_columns",
+            }
+        )
+    return ml_service.create_column_binding(
+        CreateColumnBindingInput(
             dataset_id=dataset_id,
-            feature_columns=feature_columns,
-            target_columns=target_columns or [],
+            role_bindings=role_bindings,
         )
     )
 
@@ -104,7 +118,7 @@ def _wait_for_dataset_trained_models(
     raise AssertionError("Timed out waiting for dataset-scoped trained models.")
 
 
-def test_dataset_scoped_fit_evaluate_and_inference_run(monkeypatch, tmp_path: Path) -> None:
+def test_dataset_scoped_fit_evaluate_and_apply_run(monkeypatch, tmp_path: Path) -> None:
     project_service, dataset_service, _ml_task_service, ml_service = _build_services(monkeypatch, tmp_path)
     project = project_service.create_project(CreateProjectInput(name="Retail"))
     dataset_file = tmp_path / "direct-demand.csv"
@@ -123,11 +137,11 @@ def test_dataset_scoped_fit_evaluate_and_inference_run(monkeypatch, tmp_path: Pa
         encoding="utf-8",
     )
     dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Direct Demand")
-    selection = _create_selection(ml_service, dataset.id, ["feature_a", "feature_b"], ["target"])
+    binding = _create_binding(ml_service, dataset.id, ["feature_a", "feature_b"], ["target"])
 
     fit_task = ml_service.fit_with_evaluate(
         FitWithEvaluateInput(
-            selection_id=selection.id,
+            binding_id=binding.id,
             run_name="Direct demand analysis",
             model_key="regression.linear",
             params={"fit_intercept": True},
@@ -144,8 +158,8 @@ def test_dataset_scoped_fit_evaluate_and_inference_run(monkeypatch, tmp_path: Pa
 
     inference_input = tmp_path / "direct-infer.csv"
     inference_input.write_text("feature_a,feature_b\n11,9\n12,10\n", encoding="utf-8")
-    inference_task = ml_service.infer(
-        InferWithFilesInput(
+    inference_task = ml_service.apply(
+        ApplyWithFilesInput(
             trained_model_id=trained_models[0].id,
             input_files=[str(inference_input.resolve())],
         )
@@ -155,8 +169,8 @@ def test_dataset_scoped_fit_evaluate_and_inference_run(monkeypatch, tmp_path: Pa
     result_dataset = dataset_service.get_dataset_by_ml_task(inference_task.id)
     metadata = parse_trained_model_metadata(trained_models[0].metadata_payload)
 
-    inline_inference_task = ml_service.infer(
-        InferWithFilesInput(
+    inline_inference_task = ml_service.apply(
+        ApplyWithFilesInput(
             trained_model_id=trained_models[0].id,
             input_rows={
                 "header_index_map": {"feature_b": 0, "feature_a": 1},
@@ -180,18 +194,38 @@ def test_dataset_scoped_fit_evaluate_and_inference_run(monkeypatch, tmp_path: Pa
     assert len(trained_models) == 1
     assert fit_details.task.result_payload is not None
     assert fit_details.task.result_payload["trained_model_id"] == trained_models[0].id
+    assert "column_selection" not in fit_details.task.request_payload
+    assert fit_details.task.request_payload["train_role_bindings"] == [
+        {
+            "role": "feature",
+            "columns": ["feature_a", "feature_b"],
+            "role_kind": "many_columns",
+            "required": True,
+            "metadata": {},
+        },
+        {
+            "role": "target",
+            "columns": ["target"],
+            "role_kind": "single_column",
+            "required": True,
+            "metadata": {},
+        },
+    ]
     assert metadata is not None
+    assert "feature_columns" not in trained_models[0].metadata_payload
+    assert "target_columns" not in trained_models[0].metadata_payload
+    assert metadata.train_role_bindings == fit_details.task.request_payload["train_role_bindings"]
     assert metadata.source_run_name == "Direct demand analysis"
     assert metadata.evaluation_primary_metric_name == "r2"
-    assert inference_details.task.task_type is MLTaskType.INFERENCE
+    assert inference_details.task.task_type is MLTaskType.APPLY
     assert result_dataset is not None
     assert "prediction" in Path(result_dataset.source_path).read_text(encoding="utf-8").splitlines()[0]
-    assert inline_inference_details.task.task_type is MLTaskType.INFERENCE
+    assert inline_inference_details.task.task_type is MLTaskType.APPLY
     assert inline_input_payload["source_kind"] == "manual_csv"
     assert inline_input_lines == ["feature_a,feature_b", "11,9", "12,10"]
     assert inline_result_dataset is not None
     assert "prediction" in Path(inline_result_dataset.source_path).read_text(encoding="utf-8").splitlines()[0]
-    assert [artifact.artifact_kind for artifact in inference_details.artifacts] == [MLTaskArtifactKind.INFERENCE_RESULT]
+    assert [artifact.artifact_kind for artifact in inference_details.artifacts] == [MLTaskArtifactKind.APPLY_RESULT]
 
 
 def test_clustering_fit_runs_without_follow_up_evaluate_and_persists_export_artifact(
@@ -212,11 +246,11 @@ def test_clustering_fit_runs_without_follow_up_evaluate_and_persists_export_arti
         encoding="utf-8",
     )
     dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Segments")
-    selection = _create_selection(ml_service, dataset.id, ["spend", "visits", "segment"])
+    binding = _create_binding(ml_service, dataset.id, ["spend", "visits", "segment"])
 
     fit_task = ml_service.fit_with_evaluate(
         FitWithEvaluateInput(
-            selection_id=selection.id,
+            binding_id=binding.id,
             run_name="Segments",
             model_key="clustering.kmeans",
             params={"n_clusters": 2, "n_init": 10, "max_iter": 200},
@@ -240,8 +274,20 @@ def test_clustering_fit_runs_without_follow_up_evaluate_and_persists_export_arti
     assert fit_details.task.result_payload["result_summary"]["cluster_count"] == 2
     metadata = parse_trained_model_metadata(trained_models[0].metadata_payload)
     assert metadata is not None
-    assert metadata.target_columns == []
-    assert metadata.feature_columns == ["spend", "visits", "segment"]
+    assert "feature_columns" not in trained_models[0].metadata_payload
+    assert "target_columns" not in trained_models[0].metadata_payload
+    assert metadata.model_family == "clustering"
+    assert metadata.model_task_kind == "segmenter"
+    assert metadata.train_role_bindings == [
+        {
+            "role": "feature",
+            "columns": ["spend", "visits", "segment"],
+            "role_kind": "many_columns",
+            "required": True,
+            "metadata": {},
+        }
+    ]
+    assert [role["name"] for role in metadata.apply_role_schema["roles"]] == ["feature"]
 
 
 def test_bulk_tuning_creates_one_tuning_task_per_model_and_follow_up_evaluations(
@@ -268,11 +314,11 @@ def test_bulk_tuning_creates_one_tuning_task_per_model_and_follow_up_evaluations
         encoding="utf-8",
     )
     dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Churn")
-    selection = _create_selection(ml_service, dataset.id, ["age", "tenure", "segment"], ["label"])
+    binding = _create_binding(ml_service, dataset.id, ["age", "tenure", "segment"], ["label"])
 
     created = ml_service.bulk_tune_with_evaluate(
         BulkTuneWithEvaluateInput(
-            selection_id=selection.id,
+            binding_id=binding.id,
             run_name="Churn",
             selections=[
                 BulkTuningSelection(
@@ -316,19 +362,19 @@ def test_tuning_rejects_empty_param_grid_sequences_before_worker(monkeypatch, tm
         encoding="utf-8",
     )
     dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Churn")
-    selection = _create_selection(ml_service, dataset.id, ["age", "tenure", "segment"], ["label"])
+    binding = _create_binding(ml_service, dataset.id, ["age", "tenure", "segment"], ["label"])
 
     with pytest.raises(ValidationError):
         ml_service.tune_with_evaluate(
             TuneWithEvaluateInput(
-                selection_id=selection.id,
+                binding_id=binding.id,
                 model_key="classification.random_forest",
                 param_grid={"n_estimators": [], "max_depth": [3], "max_features": ["sqrt"]},
             )
         )
 
 
-def test_column_selection_error_names_missing_columns_and_suggestions(monkeypatch, tmp_path: Path) -> None:
+def test_column_binding_error_names_missing_columns_and_suggestions(monkeypatch, tmp_path: Path) -> None:
     project_service, dataset_service, _ml_task_service, ml_service = _build_services(monkeypatch, tmp_path)
     project = project_service.create_project(CreateProjectInput(name="Retail"))
     dataset_file = tmp_path / "churn.csv"
@@ -340,25 +386,35 @@ def test_column_selection_error_names_missing_columns_and_suggestions(monkeypatc
     dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Churn")
 
     with pytest.raises(ValidationError) as exc_info:
-        ml_service.create_column_selection(
-            CreateColumnSelectionInput(
+        ml_service.create_column_binding(
+            CreateColumnBindingInput(
                 dataset_id=dataset.id,
-                feature_columns=[
-                    "Account Balance (Yuan)",
-                    "Last Month's Trading Commission (Yuan)",
+                role_bindings=[
+                    {
+                        "role": "feature",
+                        "columns": [
+                            "Account Balance (Yuan)",
+                            "Last Month's Trading Commission (Yuan)",
+                        ],
+                        "role_kind": "many_columns",
+                    },
+                    {
+                        "role": "target",
+                        "columns": ["Customer Churn (Yes/No)"],
+                        "role_kind": "single_column",
+                    },
                 ],
-                target_columns=["Customer Churn (Yes/No)"],
             )
         )
 
     message = str(exc_info.value)
-    assert "Missing feature columns: `Last Month's Trading Commission (Yuan)`." in message
+    assert "Missing columns for role 'feature': `Last Month's Trading Commission (Yuan)`." in message
     assert "`Last Month's Trading Commission (Yuan)` -> `Last Month’s Trading Commission (Yuan)`" in message
     assert "Available columns:" in message
     assert "Use the exact column names returned by data.peek" in message
 
 
-def test_inference_rejects_input_files_missing_required_features(monkeypatch, tmp_path: Path) -> None:
+def test_apply_rejects_input_files_missing_required_features(monkeypatch, tmp_path: Path) -> None:
     project_service, dataset_service, _ml_task_service, ml_service = _build_services(monkeypatch, tmp_path)
     project = project_service.create_project(CreateProjectInput(name="Retail"))
     dataset_file = tmp_path / "demand.csv"
@@ -377,10 +433,10 @@ def test_inference_rejects_input_files_missing_required_features(monkeypatch, tm
         encoding="utf-8",
     )
     dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Demand")
-    selection = _create_selection(ml_service, dataset.id, ["feature_a", "feature_b"], ["target"])
+    binding = _create_binding(ml_service, dataset.id, ["feature_a", "feature_b"], ["target"])
     ml_service.fit_with_evaluate(
         FitWithEvaluateInput(
-            selection_id=selection.id,
+            binding_id=binding.id,
             run_name="Demand",
             model_key="regression.linear",
             params={"fit_intercept": True},
@@ -397,21 +453,21 @@ def test_inference_rejects_input_files_missing_required_features(monkeypatch, tm
     invalid_input.write_text("feature_a\n11\n12\n", encoding="utf-8")
 
     with pytest.raises(ValidationError):
-        ml_service.infer(
-            InferWithFilesInput(
+        ml_service.apply(
+            ApplyWithFilesInput(
                 trained_model_id=trained_models[0].id,
                 input_files=[str(invalid_input.resolve())],
             )
         )
     with pytest.raises(ValidationError, match="input file or provide inline"):
-        ml_service.infer(
-            InferWithFilesInput(
+        ml_service.apply(
+            ApplyWithFilesInput(
                 trained_model_id=trained_models[0].id,
             )
         )
     with pytest.raises(ValidationError, match="match the trained model feature columns"):
-        ml_service.infer(
-            InferWithFilesInput(
+        ml_service.apply(
+            ApplyWithFilesInput(
                 trained_model_id=trained_models[0].id,
                 input_rows={
                     "header_index_map": {"feature_a": 0, "unexpected": 1},

@@ -57,7 +57,7 @@ Services are responsible for:
 - Resolving runtime paths
 - Coordinating ML adapters and export paths
 - Registering and resolving artifacts used by Chatbot markdown links
-- Accepting explicit column-selection, model, and artifact owner inputs for ML work while expanding ML task payloads into dataset and column snapshots before execution
+- Accepting explicit role-binding, model, and artifact owner inputs for ML work while expanding ML task payloads into dataset and role snapshots before execution
 
 Service APIs should be designed around explicit request/result objects or narrow methods. They should return structured outcomes so the UI receives explicit success, failure, and output metadata.
 
@@ -107,8 +107,9 @@ Tool boundaries:
 
 - The tool registry is static for the current application capability set.
 - Runtime thread, turn, file, dataset, model, and artifact context is passed through validated tool arguments and `ToolExecutionContext`.
-- Current tool names are `data.peek`, `data.integrate`, `data.clean`, `data.query`, `data.transform`, `data.feature.select`, `model.metadata`, `model.train`, `model.hyper_train`, and `model.inference`.
-- `data.feature.select` creates an immutable column-selection snapshot. `model.train` and `model.hyper_train` accept `selection_id`. `model.inference` accepts a trained model plus `input_files` or inline `input_rows` shaped as `{header_index_map, data}`, then uses trained model metadata to determine required feature columns.
+- Target tool names are `data.peek`, `data.integrate`, `data.clean`, `data.query`, `data.transform`, `data.feature.select`, `model.metadata`, `model.train`, `model.hyper_train`, and `model.apply`.
+- `data.feature.select` creates an immutable dataset column role-binding snapshot. `model.train` and `model.hyper_train` accept `binding_id`. `model.apply` accepts a trained model plus file-backed, tabular, or role-shaped inline inputs, then uses trained model metadata to validate the apply role schema.
+- Forward-looking tool contracts use `apply`, not `inference`; legacy `inference` names are migration inputs only.
 
 Storage provides persistence interfaces for Agent Harness records. Agent Harness semantics stay in the Agent Harness service.
 
@@ -130,7 +131,7 @@ ML adapters must assume:
 
 The first-slice acceptance scenario validates end-to-end capability. Prompts describe Xenix identity, tool semantics, and service boundaries. Planning and tool ordering remain model-owned within tool validation, step-budget, and cancellation boundaries.
 
-Acceptance scenarios should prove that a user can complete basic analysis from file intake through prediction with conversation, file drag-and-drop, service-backed tools, and artifact previews.
+Acceptance scenarios should prove that a user can complete basic analysis from file intake through reusable model application with conversation, file drag-and-drop, service-backed tools, and artifact previews.
 
 ## Boundary Tests Required
 

@@ -10,9 +10,9 @@ from sqlmodel import Field, SQLModel
 
 DEFAULT_AGENT_THREAD_SYSTEM_PROMPT = """You are Xenix, a data analysis agent for non-technical users.
 
-Your job is to help users complete practical data analysis tasks through conversation, including inspecting data, cleaning data, selecting features, training models, evaluating models, and running predictions through the tools provided by Xenix.
+Your job is to help users complete practical data analysis tasks through conversation, including inspecting data, cleaning data, binding dataset roles, training models, evaluating models, and applying trained models through the tools provided by Xenix.
 
-Communicate in the user's language. Prefer clear explanations, concrete next steps, and artifact links when tool results produce files, tables, charts, models, or prediction outputs.
+Communicate in the user's language. Prefer clear explanations, concrete next steps, and artifact links when tool results produce files, tables, charts, models, or apply outputs.
 
 Ask concise follow-up questions when you need further user input to continue."""
 
@@ -30,7 +30,7 @@ class MLTaskType(StrEnum):
     FIT = "fit"
     HYPERPARAMETER_TUNING = "hyperparameter_tuning"
     EVALUATE = "evaluate"
-    INFERENCE = "inference"
+    APPLY = "apply"
 
 
 class MLTaskStatus(StrEnum):
@@ -60,7 +60,7 @@ class MLTaskArtifactKind(StrEnum):
     HOLDOUT_DATA = "holdout_data"
     TRAINING_REPORT = "training_report"
     EVALUATION_REPORT = "evaluation_report"
-    INFERENCE_RESULT = "inference_result"
+    APPLY_RESULT = "apply_result"
     EXPORT_FILE = "export_file"
     OTHER = "other"
 
@@ -146,19 +146,19 @@ class DatasetRow(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
-class DatasetColumnSelectionRow(SQLModel, table=True):
-    __tablename__ = "dataset_column_selection"
+class DatasetColumnBindingRow(SQLModel, table=True):
+    __tablename__ = "dataset_column_binding"
 
     id: str = Field(default_factory=generate_id, primary_key=True)
     dataset_id: str = Field(foreign_key="dataset.id", index=True)
-    feature_columns: list[str] = Field(
+    role_bindings: list[dict[str, Any]] = Field(
         default_factory=list,
         sa_column=Column(JSON, nullable=False),
     )
-    target_columns: list[str] = Field(
-        default_factory=list,
-        sa_column=Column(JSON, nullable=False),
-    )
+    model_key: str | None = Field(default=None, index=True)
+    model_family: str | None = Field(default=None, index=True)
+    model_task_kind: str | None = Field(default=None, index=True)
+    schema_version: int = Field(default=1)
     created_at: datetime = Field(default_factory=utc_now)
 
 
