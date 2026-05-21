@@ -157,6 +157,58 @@ def test_chatbot_event_projection_pairs_tool_call_messages(monkeypatch, tmp_path
     assert final_tool_events[0].source_message_ids == [request_message.id, result_message.id]
 
 
+def test_chatbot_event_projection_exposes_tool_task_actions(monkeypatch, tmp_path: Path) -> None:
+    conversations, _artifacts = _build_services(monkeypatch, tmp_path)
+
+    thread = conversations.create_thread(CreateAgentThreadInput(title="Task actions"))
+    turn, _user_message = conversations.start_turn(
+        StartTurnInput(
+            thread_id=thread.id,
+            user_content_blocks=[{"type": "text", "text": "Train a model"}],
+        )
+    )
+    _request_message, tool_call = conversations.create_tool_call(
+        CreateToolCallInput(
+            thread_id=thread.id,
+            turn_id=turn.id,
+            tool_name="model.train",
+            arguments_payload={"binding_id": "binding-1", "models": ["regression.linear"]},
+        )
+    )
+    conversations.complete_tool_call(
+        CompleteToolCallInput(
+            tool_call_id=tool_call.id,
+            status=AgentToolCallStatus.SUCCEEDED,
+            result_payload={
+                "async_state": "running_background",
+                "task_ids": ["task-1"],
+                "can_cancel_task_ids": ["task-1"],
+            },
+            content_blocks=[
+                {"type": "tool_event_summary", "text": "Model training running in background"},
+                {"type": "markdown", "text": "Task id: `task-1`"},
+                {
+                    "type": "tool_result_payload",
+                    "payload": {
+                        "async_state": "running_background",
+                        "task_ids": ["task-1"],
+                        "can_cancel_task_ids": ["task-1"],
+                    },
+                },
+            ],
+        )
+    )
+
+    events = project_chatbot_events(conversations.get_thread_snapshot(thread.id))
+    tool_event = next(event for event in events if event.kind is ChatbotEventKind.TOOL)
+
+    assert tool_event.summary == "Model training running in background"
+    assert tool_event.actions == [
+        {"type": "open_tool_call_detail", "task_ids": ["task-1"]},
+        {"type": "cancel_ml_tasks", "task_ids": ["task-1"]},
+    ]
+
+
 def test_conversation_store_renames_and_deletes_thread_records(monkeypatch, tmp_path: Path) -> None:
     conversations, artifacts = _build_services(monkeypatch, tmp_path)
 

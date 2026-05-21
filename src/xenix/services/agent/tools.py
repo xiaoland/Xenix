@@ -30,7 +30,7 @@ from ..ml_service import (
     MLService,
     TuneWithEvaluateInput,
 )
-from ..storage.models import ArtifactKind, MLTaskArtifactKind, MLTaskStatus, ProblemKind, TrainedModelRow
+from ..storage.models import ArtifactKind, MLTaskArtifactKind, MLTaskRow, MLTaskStatus, ProblemKind, TrainedModelRow
 from .providers import AgentToolSpec
 
 
@@ -49,6 +49,9 @@ _MODEL_KEY_ALIAS_OVERRIDES = {
     "k_neighbors_regressor": "regression.knn",
     "kneighborsregressor": "regression.knn",
 }
+MODEL_APPLY_GRACE_SECONDS = 30.0
+MODEL_TRAIN_GRACE_SECONDS = 60.0
+MODEL_HYPER_TRAIN_GRACE_SECONDS = 60.0
 
 
 @dataclass(frozen=True)
@@ -164,6 +167,13 @@ TOOL_PRESENTATIONS: dict[str, ToolPresentation] = {
         failure_action="apply model",
         cancellation_summary="Cancelled model apply",
     ),
+    "model.task.query": ToolPresentation(
+        icon_key="list-tree",
+        pending_summary="Checking model task...",
+        success_summary="Checked model task",
+        failure_action="check model task",
+        cancellation_summary="Cancelled model task check",
+    ),
 }
 
 
@@ -212,6 +222,7 @@ class AgentToolRegistry:
                 self._build_model_train_tool(),
                 self._build_model_hyper_train_tool(),
                 self._build_model_apply_tool(),
+                self._build_model_task_query_tool(),
             )
         }
 
@@ -650,6 +661,35 @@ class AgentToolRegistry:
             presentation=tool_presentation_for_name("model.apply"),
         )
 
+    def _build_model_task_query_tool(self) -> AgentTool:
+        return AgentTool(
+            spec=AgentToolSpec(
+                name="model.task.query",
+                provider_name="model_task_query",
+                description="Query ML task status, metadata, artifacts, errors, and logs by explicit task ids.",
+                parameters_schema={
+                    "type": "object",
+                    "properties": {
+                        "task_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "minItems": 1,
+                        },
+                        "include_logs": {"type": "boolean"},
+                        "max_log_entries": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1000,
+                        },
+                    },
+                    "required": ["task_ids"],
+                    "additionalProperties": False,
+                },
+            ),
+            handler=self._model_task_query,
+            presentation=tool_presentation_for_name("model.task.query"),
+        )
+
     def _data_peek(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
         source_path = self._resolve_source_path(arguments.get("source_path"), context)
@@ -943,11 +983,28 @@ class AgentToolRegistry:
                 )
             )
             created_task_ids.append(created.id)
-        tasks = self._wait_for_new_dataset_tasks(dataset_id, before_ids, created_task_ids, context=context)
+        tasks = self._wait_for_new_dataset_tasks_or_none(
+            dataset_id,
+            before_ids,
+            created_task_ids,
+            context=context,
+            timeout_seconds=MODEL_TRAIN_GRACE_SECONDS,
+        )
+        if tasks is None:
+            return self._training_task_receipt(
+                tool_name="model.train",
+                dataset_id=dataset_id,
+                before_ids=before_ids,
+                root_task_ids=created_task_ids,
+                operation="fit",
+            )
         trained_models = self._ml_service.list_dataset_trained_models(dataset_id)
         payload = {
+            "async_state": "completed",
             "dataset_id": dataset_id,
             "task_ids": [task.id for task in tasks],
+            "can_cancel_task_ids": [],
+            "ml_tasks": [self._ml_task_payload(task) for task in tasks],
             "trained_models": [self._trained_model_payload(model) for model in trained_models],
         }
         return ToolExecutionResult(
@@ -981,11 +1038,28 @@ class AgentToolRegistry:
                 )
             )
             created_task_ids.append(created.id)
-        tasks = self._wait_for_new_dataset_tasks(dataset_id, before_ids, created_task_ids, context=context)
+        tasks = self._wait_for_new_dataset_tasks_or_none(
+            dataset_id,
+            before_ids,
+            created_task_ids,
+            context=context,
+            timeout_seconds=MODEL_HYPER_TRAIN_GRACE_SECONDS,
+        )
+        if tasks is None:
+            return self._training_task_receipt(
+                tool_name="model.hyper_train",
+                dataset_id=dataset_id,
+                before_ids=before_ids,
+                root_task_ids=created_task_ids,
+                operation="hyperparameter_tuning",
+            )
         trained_models = self._ml_service.list_dataset_trained_models(dataset_id)
         payload = {
+            "async_state": "completed",
             "dataset_id": dataset_id,
             "task_ids": [task.id for task in tasks],
+            "can_cancel_task_ids": [],
+            "ml_tasks": [self._ml_task_payload(task) for task in tasks],
             "trained_models": [self._trained_model_payload(model) for model in trained_models],
         }
         return ToolExecutionResult(
@@ -1011,7 +1085,18 @@ class AgentToolRegistry:
         except PydanticValidationError as exc:
             raise ValidationError("input_rows must contain header_index_map and data.") from exc
         task = self._ml_service.apply(apply_input)
-        task = self._wait_for_task(task.id, context=context)
+        completed_task = self._wait_for_task_or_none(
+            task.id,
+            context=context,
+            timeout_seconds=MODEL_APPLY_GRACE_SECONDS,
+        )
+        if completed_task is None:
+            return self._single_task_receipt(
+                tool_name="model.apply",
+                task_id=task.id,
+                operation="apply",
+            )
+        task = completed_task
         details = self._ml_service.get_task_details(task.id)
         output_artifact = next(
             artifact
@@ -1033,7 +1118,11 @@ class AgentToolRegistry:
         link = build_artifact_markdown_link(generic_artifact)
         return ToolExecutionResult(
             payload={
+                "async_state": "completed",
                 "ml_task_id": task.id,
+                "task_ids": [task.id],
+                "can_cancel_task_ids": [],
+                "ml_tasks": [self._ml_task_payload(task)],
                 "dataset_id": task.dataset_id,
                 "result_dataset_id": details.task.result_payload.get("result_dataset_id") if details.task.result_payload else None,
                 "artifact_id": generic_artifact.id,
@@ -1041,6 +1130,38 @@ class AgentToolRegistry:
                 "row_count": details.task.result_payload.get("row_count") if details.task.result_payload else None,
             },
             content_blocks=[{"type": "markdown", "text": f"Apply results are ready: {link}"}],
+        )
+
+    def _model_task_query(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+        self._raise_if_cancelled(context)
+        task_ids = self._require_string_list(arguments, "task_ids")
+        include_logs = bool(arguments.get("include_logs"))
+        try:
+            max_log_entries = int(
+                arguments.get("max_log_entries") if arguments.get("max_log_entries") is not None else 200
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValidationError("max_log_entries must be an integer.") from exc
+        if max_log_entries < 0:
+            raise ValidationError("max_log_entries must be greater than or equal to 0.")
+        if max_log_entries > 1000:
+            raise ValidationError("max_log_entries must be less than or equal to 1000.")
+
+        tasks = [
+            self._ml_task_details_payload(
+                task_id,
+                include_logs=include_logs,
+                max_log_entries=max_log_entries,
+            )
+            for task_id in task_ids
+        ]
+        payload = {
+            "task_ids": task_ids,
+            "tasks": tasks,
+        }
+        return ToolExecutionResult(
+            payload=payload,
+            content_blocks=[{"type": "markdown", "text": self._model_task_query_markdown(tasks)}],
         )
 
     def _resolve_sql_bindings(self, arguments: dict[str, Any], *, tool_name: str) -> list[DatasetSqlBinding]:
@@ -1204,24 +1325,59 @@ class AgentToolRegistry:
         context: ToolExecutionContext,
         timeout_seconds: float = 120.0,
     ) -> list:
+        tasks = self._wait_for_new_dataset_tasks_or_none(
+            dataset_id,
+            before_ids,
+            created_task_ids,
+            context=context,
+            timeout_seconds=timeout_seconds,
+        )
+        if tasks is None:
+            raise ValidationError("Timed out waiting for ML training tasks.")
+        return tasks
+
+    def _wait_for_new_dataset_tasks_or_none(
+        self,
+        dataset_id: str,
+        before_ids: set[str],
+        created_task_ids: list[str],
+        *,
+        context: ToolExecutionContext,
+        timeout_seconds: float,
+    ) -> list[MLTaskRow] | None:
         expected_count = 0
         for task_id in created_task_ids:
             details = self._ml_service.get_task_details(task_id)
-            catalog = get_model_catalog_entry(details.task.request_payload.get("manual_training", {}).get("model_key") or details.task.request_payload.get("hyperparameter_tuning", {}).get("model_key"))
+            catalog = get_model_catalog_entry(
+                details.task.request_payload.get("manual_training", {}).get("model_key")
+                or details.task.request_payload.get("hyperparameter_tuning", {}).get("model_key")
+            )
             expected_count += 2 if catalog.requires_target else 1
         deadline = time.time() + timeout_seconds
         while time.time() < deadline:
             self._raise_if_cancelled(context, ml_task_ids=created_task_ids)
-            new_tasks = [task for task in self._ml_service.list_dataset_tasks(dataset_id) if task.id not in before_ids]
+            new_tasks = self._new_dataset_tasks(dataset_id, before_ids, root_task_ids=created_task_ids)
+            failed = [task for task in new_tasks if task.status in {MLTaskStatus.FAILED, MLTaskStatus.CANCELLED}]
+            if failed:
+                raise ValidationError(f"ML task '{failed[0].id}' finished with status '{failed[0].status.value}'.")
             if len(new_tasks) >= expected_count and all(task.status in self._terminal_statuses() for task in new_tasks):
-                failed = [task for task in new_tasks if task.status is not MLTaskStatus.SUCCEEDED]
-                if failed:
-                    raise ValidationError(f"ML task '{failed[0].id}' finished with status '{failed[0].status.value}'.")
                 return new_tasks
             time.sleep(0.1)
-        raise ValidationError("Timed out waiting for ML training tasks.")
+        return None
 
     def _wait_for_task(self, task_id: str, *, context: ToolExecutionContext, timeout_seconds: float = 120.0):
+        task = self._wait_for_task_or_none(task_id, context=context, timeout_seconds=timeout_seconds)
+        if task is None:
+            raise ValidationError(f"Timed out waiting for ML task '{task_id}'.")
+        return task
+
+    def _wait_for_task_or_none(
+        self,
+        task_id: str,
+        *,
+        context: ToolExecutionContext,
+        timeout_seconds: float,
+    ) -> MLTaskRow | None:
         deadline = time.time() + timeout_seconds
         while time.time() < deadline:
             self._raise_if_cancelled(context, ml_task_ids=[task_id])
@@ -1231,7 +1387,25 @@ class AgentToolRegistry:
                     raise ValidationError(f"ML task '{task.id}' finished with status '{task.status.value}'.")
                 return task
             time.sleep(0.1)
-        raise ValidationError(f"Timed out waiting for ML task '{task_id}'.")
+        return None
+
+    def _new_dataset_tasks(
+        self,
+        dataset_id: str,
+        before_ids: set[str],
+        *,
+        root_task_ids: list[str] | None = None,
+    ) -> list[MLTaskRow]:
+        tasks = [task for task in self._ml_service.list_dataset_tasks(dataset_id) if task.id not in before_ids]
+        root_id_set = set(root_task_ids or [])
+        if not root_id_set:
+            return tasks
+        return [
+            task
+            for task in tasks
+            if task.id in root_id_set
+            or task.request_payload.get("evaluate_model", {}).get("source_ml_task_id") in root_id_set
+        ]
 
     def _raise_if_cancelled(self, context: ToolExecutionContext, *, ml_task_ids: list[str] | None = None) -> None:
         if not context.cancel_requested():
@@ -1247,6 +1421,157 @@ class AgentToolRegistry:
     def _terminal_statuses(self) -> set[MLTaskStatus]:
         return {MLTaskStatus.SUCCEEDED, MLTaskStatus.FAILED, MLTaskStatus.CANCELLED}
 
+    def _training_task_receipt(
+        self,
+        *,
+        tool_name: str,
+        dataset_id: str,
+        before_ids: set[str],
+        root_task_ids: list[str],
+        operation: str,
+    ) -> ToolExecutionResult:
+        tasks = self._new_dataset_tasks(dataset_id, before_ids, root_task_ids=root_task_ids)
+        task_ids = [task.id for task in tasks] or list(root_task_ids)
+        can_cancel_task_ids = [
+            task.id for task in tasks if task.status in {MLTaskStatus.PENDING, MLTaskStatus.RUNNING}
+        ]
+        payload = {
+            "async_state": "running_background",
+            "dataset_id": dataset_id,
+            "operation": operation,
+            "task_ids": task_ids,
+            "root_task_ids": list(root_task_ids),
+            "can_cancel_task_ids": can_cancel_task_ids,
+            "ml_tasks": [self._ml_task_payload(task) for task in tasks],
+            "trained_models": [self._trained_model_payload(model) for model in self._ml_service.list_dataset_trained_models(dataset_id)],
+        }
+        summary = (
+            "Model tuning running in background"
+            if tool_name == "model.hyper_train"
+            else "Model training running in background"
+        )
+        return ToolExecutionResult(
+            payload=payload,
+            content_blocks=[
+                {"type": "tool_event_summary", "text": summary},
+                {"type": "markdown", "text": self._task_receipt_markdown(payload)},
+            ],
+        )
+
+    def _single_task_receipt(
+        self,
+        *,
+        tool_name: str,
+        task_id: str,
+        operation: str,
+    ) -> ToolExecutionResult:
+        task = self._ml_service.get_task_details(task_id).task
+        can_cancel_task_ids = [task.id] if task.status in {MLTaskStatus.PENDING, MLTaskStatus.RUNNING} else []
+        payload = {
+            "async_state": "running_background",
+            "operation": operation,
+            "ml_task_id": task.id,
+            "task_ids": [task.id],
+            "root_task_ids": [task.id],
+            "can_cancel_task_ids": can_cancel_task_ids,
+            "dataset_id": task.dataset_id,
+            "ml_tasks": [self._ml_task_payload(task)],
+        }
+        summary = "Model apply running in background" if tool_name == "model.apply" else "ML task running in background"
+        return ToolExecutionResult(
+            payload=payload,
+            content_blocks=[
+                {"type": "tool_event_summary", "text": summary},
+                {"type": "markdown", "text": self._task_receipt_markdown(payload)},
+            ],
+        )
+
+    def _task_receipt_markdown(self, payload: dict[str, Any]) -> str:
+        task_ids = [str(task_id) for task_id in payload.get("task_ids", [])]
+        lines = ["The ML work is still running in the background."]
+        if task_ids:
+            lines.append("")
+            lines.append("Task ids:")
+            lines.extend(f"- `{task_id}`" for task_id in task_ids)
+        lines.append("")
+        lines.append("Use `model.task.query` with these task ids to inspect status and logs.")
+        return "\n".join(lines)
+
+    def _ml_task_payload(self, task: MLTaskRow) -> dict[str, Any]:
+        return {
+            "task_id": task.id,
+            "dataset_id": task.dataset_id,
+            "task_type": task.task_type.value,
+            "status": task.status.value,
+            "model_key": self._model_key_from_task_payload(task.request_payload),
+            "error_summary": task.error_summary,
+            "created_at": task.created_at.isoformat() if task.created_at else None,
+            "started_at": task.started_at.isoformat() if task.started_at else None,
+            "finished_at": task.finished_at.isoformat() if task.finished_at else None,
+            "updated_at": task.updated_at.isoformat() if task.updated_at else None,
+            "follow_up_task_ids": self._follow_up_task_ids(task),
+        }
+
+    def _ml_task_details_payload(
+        self,
+        task_id: str,
+        *,
+        include_logs: bool,
+        max_log_entries: int,
+    ) -> dict[str, Any]:
+        details = self._ml_service.get_task_details(task_id)
+        task_payload = self._ml_task_payload(details.task)
+        logs = [log.model_dump(mode="json") for log in details.logs[-max_log_entries:]] if include_logs and max_log_entries else []
+        task_payload.update(
+            {
+                "request": self._task_request_summary(details.task.request_payload),
+                "result": dict(details.task.result_payload or {}),
+                "artifacts": [
+                    {
+                        "artifact_id": artifact.id,
+                        "artifact_kind": artifact.artifact_kind.value,
+                        "absolute_path": artifact.absolute_path,
+                        "ready_to_open": artifact.ready_to_open,
+                        "created_at": artifact.created_at.isoformat() if artifact.created_at else None,
+                    }
+                    for artifact in details.artifacts
+                ],
+                "logs": logs,
+            }
+        )
+        return task_payload
+
+    def _task_request_summary(self, request_payload: dict[str, Any]) -> dict[str, Any]:
+        keys = [
+            "project_id",
+            "dataset_id",
+            "evaluation_kind",
+            "feature_columns",
+            "manual_training",
+            "hyperparameter_tuning",
+            "evaluate_model",
+            "inference_model",
+            "input_files",
+        ]
+        return {key: request_payload[key] for key in keys if key in request_payload}
+
+    def _model_key_from_task_payload(self, request_payload: dict[str, Any]) -> str | None:
+        for key in ("manual_training", "hyperparameter_tuning", "evaluate_model", "inference_model"):
+            value = request_payload.get(key)
+            if isinstance(value, dict) and isinstance(value.get("model_key"), str):
+                return value["model_key"]
+        return None
+
+    def _follow_up_task_ids(self, task: MLTaskRow) -> list[str]:
+        if task.dataset_id is None:
+            return []
+        follow_ups: list[str] = []
+        for candidate in self._ml_service.list_dataset_tasks(task.dataset_id):
+            source_id = candidate.request_payload.get("evaluate_model", {}).get("source_ml_task_id")
+            if source_id == task.id:
+                follow_ups.append(candidate.id)
+        return follow_ups
+
     def _trained_model_payload(self, model: TrainedModelRow) -> dict[str, Any]:
         return {
             "trained_model_id": model.id,
@@ -1261,6 +1586,25 @@ class AgentToolRegistry:
         lines = ["Training completed."]
         for model in models:
             lines.append(f"- `{model['model_key']}` trained model id: `{model['trained_model_id']}`")
+        return "\n".join(lines)
+
+    def _model_task_query_markdown(self, tasks: list[dict[str, Any]]) -> str:
+        if not tasks:
+            return "No ML tasks were found."
+        lines = ["ML task status:"]
+        for task in tasks:
+            task_id = task.get("task_id")
+            task_type = task.get("task_type")
+            status = task.get("status")
+            model_key = task.get("model_key") or "unknown model"
+            lines.append(f"- `{task_id}` {task_type} for `{model_key}`: `{status}`")
+            error_summary = str(task.get("error_summary") or "").strip()
+            if error_summary:
+                lines.append(f"  Error: {error_summary}")
+            follow_up_task_ids = task.get("follow_up_task_ids")
+            if isinstance(follow_up_task_ids, list) and follow_up_task_ids:
+                joined_ids = ", ".join(f"`{task_id}`" for task_id in follow_up_task_ids)
+                lines.append(f"  Follow-up task ids: {joined_ids}")
         return "\n".join(lines)
 
     def _model_catalog_payload(

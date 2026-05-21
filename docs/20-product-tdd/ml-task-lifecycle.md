@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define the minimum contract for persisted ML task execution such as dataset inspection, training, evaluation, and model apply.
+Define the minimum contract for persisted ML task execution such as training, hyperparameter tuning, evaluation, and model apply.
 
 This document governs `MLTask` lifecycle semantics. It does not govern task packets under `tasks/<task-slug>/`.
 
@@ -11,12 +11,16 @@ This document governs `MLTask` lifecycle semantics. It does not govern task pack
 Each persisted ML task must have:
 
 - A stable ML task id
-- An ML task type such as `inspect_dataset`, `fit`, `hyperparameter_tuning`, or `apply`
+- An ML task type: `fit`, `hyperparameter_tuning`, `evaluate`, or `apply`
 - A created timestamp
 - A current status
 - A finished timestamp once the ML task reaches a terminal state
 
 SQLite is the default store for ML task metadata.
+
+ML tasks remain individually addressed records. User-facing tool-call details and Agent follow-up use explicit task ids and existing request/result payload references; the lifecycle contract does not introduce a `task_group_id`.
+
+Dataset inspection is not an ML task. It belongs to DatasetService and data-facing Agent tools such as `data.peek`.
 
 Current AI-first service contracts are dataset-scoped and analyzer-scoped. A model is a reusable analyzer: a service-owned artifact trained from declared input roles and later applied to compatible input roles.
 

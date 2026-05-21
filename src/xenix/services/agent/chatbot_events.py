@@ -52,6 +52,7 @@ class ChatbotEvent(SQLModel):
     icon_key: str | None = None
     summary: str | None = None
     detail_blocks: list[dict[str, Any]] = Field(default_factory=list)
+    actions: list[dict[str, Any]] = Field(default_factory=list)
 
 
 ToolPresentationLookup = Callable[[str], ToolPresentation]
@@ -145,6 +146,7 @@ def project_tool_chatbot_event(
     presentation = tool_presentation(tool_call.tool_name, tool_presentation_lookup=tool_presentation_lookup)
     detail_blocks = _tool_detail_blocks(result_message, error_summary=tool_call.error_summary)
     summary = _tool_summary_from_blocks(result_message) or presentation.summary_for(status)
+    actions = _tool_actions(result_message)
     source_message_ids = [request_message.id]
     if result_message is not None:
         source_message_ids.append(result_message.id)
@@ -162,6 +164,7 @@ def project_tool_chatbot_event(
         icon_key=presentation.icon_key,
         summary=summary,
         detail_blocks=detail_blocks,
+        actions=actions,
     )
 
 
@@ -173,7 +176,12 @@ def build_tool_result_content_blocks(
     error_summary: str | None = None,
     tool_presentation_lookup: ToolPresentationLookup | None = None,
 ) -> list[dict[str, Any]]:
-    summary = tool_presentation(tool_name, tool_presentation_lookup=tool_presentation_lookup).summary_for(status)
+    custom_summary = _first_tool_summary_block(detail_blocks)
+    summary = (
+        str(custom_summary.get("text") or "").strip()
+        if custom_summary is not None
+        else tool_presentation(tool_name, tool_presentation_lookup=tool_presentation_lookup).summary_for(status)
+    )
     blocks: list[dict[str, Any]] = [
         {
             "type": "tool_event_summary",
@@ -182,7 +190,7 @@ def build_tool_result_content_blocks(
             "text": summary,
         }
     ]
-    blocks.extend(detail_blocks)
+    blocks.extend(block for block in detail_blocks if block.get("type") != "tool_event_summary")
     if error_summary and not _has_human_detail(detail_blocks):
         blocks.append({"type": "markdown", "text": error_summary})
     return blocks
@@ -234,6 +242,54 @@ def _tool_summary_from_blocks(message: AgentMessageRow | None) -> str | None:
             text = str(block.get("text") or "").strip()
             if text:
                 return text
+    return None
+
+
+def _first_tool_summary_block(blocks: list[dict[str, Any]]) -> dict[str, Any] | None:
+    for block in blocks:
+        if block.get("type") == "tool_event_summary":
+            return block
+    return None
+
+
+def _tool_actions(message: AgentMessageRow | None) -> list[dict[str, Any]]:
+    payload = _tool_result_payload(message)
+    if payload is None:
+        return []
+    raw_task_ids = payload.get("task_ids")
+    if not isinstance(raw_task_ids, list):
+        raw_task_ids = [payload.get("ml_task_id")] if isinstance(payload.get("ml_task_id"), str) else []
+    task_ids = [str(task_id) for task_id in raw_task_ids if str(task_id).strip()]
+    if not task_ids:
+        return []
+
+    actions: list[dict[str, Any]] = [
+        {
+            "type": "open_tool_call_detail",
+            "task_ids": task_ids,
+        }
+    ]
+    raw_cancel_task_ids = payload.get("can_cancel_task_ids")
+    if isinstance(raw_cancel_task_ids, list):
+        cancel_task_ids = [str(task_id) for task_id in raw_cancel_task_ids if str(task_id).strip()]
+        if cancel_task_ids:
+            actions.append(
+                {
+                    "type": "cancel_ml_tasks",
+                    "task_ids": cancel_task_ids,
+                }
+            )
+    return actions
+
+
+def _tool_result_payload(message: AgentMessageRow | None) -> dict[str, Any] | None:
+    if message is None:
+        return None
+    for block in message.content_blocks:
+        if block.get("type") == "tool_result_payload":
+            payload = block.get("payload")
+            if isinstance(payload, dict):
+                return payload
     return None
 
 

@@ -1,4 +1,5 @@
 from pathlib import Path
+import time
 from typing import Any
 
 import pytest
@@ -9,8 +10,11 @@ from xenix.services.agent import (
     AgentHarnessService,
     AgentToolRegistry,
     ConversationStore,
+    CreateAgentThreadInput,
+    CreateToolCallInput,
     ProviderResponse,
     ProviderToolCall,
+    StartTurnInput,
     SubmitUserTurnInput,
 )
 from xenix.services.agent.providers import AgentProvider
@@ -144,14 +148,24 @@ class FirstSliceProvider:
         )
 
 
-def _build_first_slice_runtime(monkeypatch, tmp_path: Path):
+class SlowWorkerRunner:
+    def run(self, entrypoint, task_dir: Path, *, cancel_requested=None) -> int:
+        deadline = time.time() + 0.2
+        while time.time() < deadline:
+            if cancel_requested is not None and cancel_requested():
+                return -15
+            time.sleep(0.01)
+        return 1
+
+
+def _build_first_slice_runtime(monkeypatch, tmp_path: Path, *, worker_runner=None):
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
     dataset_service = DatasetService(context.session_factory, paths)
     data_cleaning_service = DataCleaningService(paths)
     data_transform_service = DataQueryTransformService(paths)
-    ml_task_service = MLTaskService(context.session_factory, paths)
+    ml_task_service = MLTaskService(context.session_factory, paths, worker_runner=worker_runner)
     ml_service = MLService(
         paths,
         context.session_factory,
@@ -175,6 +189,31 @@ def _tool_context() -> ToolExecutionContext:
         thread_id="thread-id",
         turn_id="turn-id",
         tool_call_id="tool-call-id",
+        attached_files=[],
+    )
+
+
+def _persisted_tool_context(context) -> ToolExecutionContext:
+    conversations = ConversationStore(context.session_factory)
+    thread = conversations.create_thread(CreateAgentThreadInput(title="Tool context"))
+    turn, _user_message = conversations.start_turn(
+        StartTurnInput(
+            thread_id=thread.id,
+            user_content_blocks=[{"type": "text", "text": "Run a tool"}],
+        )
+    )
+    _request_message, tool_call = conversations.create_tool_call(
+        CreateToolCallInput(
+            thread_id=thread.id,
+            turn_id=turn.id,
+            tool_name="data.peek",
+            arguments_payload={},
+        )
+    )
+    return ToolExecutionContext(
+        thread_id=thread.id,
+        turn_id=turn.id,
+        tool_call_id=tool_call.id,
         attached_files=[],
     )
 
@@ -279,6 +318,74 @@ def test_agent_harness_hyper_train_validates_tuning_capability_before_execution(
             },
             _tool_context(),
         )
+
+
+def test_agent_harness_model_tools_expose_task_query_tool(monkeypatch, tmp_path: Path) -> None:
+    _context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
+
+    task_query_spec = next(spec for spec in registry.list_specs() if spec.name == "model.task.query")
+
+    assert task_query_spec.provider_name == "model_task_query"
+    assert task_query_spec.parameters_schema["required"] == ["task_ids"]
+    assert "include_related" not in task_query_spec.parameters_schema["properties"]
+
+
+def test_agent_harness_train_returns_background_receipt_after_grace(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr("xenix.services.agent.tools.MODEL_TRAIN_GRACE_SECONDS", 0.01)
+    context, registry = _build_first_slice_runtime(monkeypatch, tmp_path, worker_runner=SlowWorkerRunner())
+    tool_context = _persisted_tool_context(context)
+    training_file = tmp_path / "slow-demand.csv"
+    training_file.write_text(
+        "feature_a,feature_b,target\n"
+        "1,2,5\n"
+        "2,1,5\n"
+        "3,5,11\n"
+        "4,2,10\n"
+        "5,3,13\n",
+        encoding="utf-8",
+    )
+    dataset_result = registry.execute(
+        "data.peek",
+        {"source_path": str(training_file.resolve()), "name": "Slow demand"},
+        tool_context,
+    )
+    binding_result = registry.execute(
+        "data.feature.select",
+        {
+            "dataset_id": dataset_result.payload["dataset_id"],
+            "model_key": "regression.linear",
+            "role_bindings": [
+                {"role": "feature", "columns": ["feature_a", "feature_b"], "role_kind": "many_columns"},
+                {"role": "target", "columns": ["target"], "role_kind": "single_column"},
+            ],
+        },
+        tool_context,
+    )
+
+    result = registry.execute(
+        "model.train",
+        {
+            "binding_id": binding_result.payload["binding_id"],
+            "models": ["linear_regression"],
+        },
+        tool_context,
+    )
+    query_result = registry.execute(
+        "model.task.query",
+        {
+            "task_ids": result.payload["task_ids"],
+            "include_logs": True,
+            "max_log_entries": 5,
+        },
+        tool_context,
+    )
+
+    assert result.payload["async_state"] == "running_background"
+    assert result.payload["task_ids"]
+    assert result.payload["can_cancel_task_ids"]
+    assert result.content_blocks[0]["text"] == "Model training running in background"
+    assert query_result.payload["tasks"][0]["task_id"] == result.payload["task_ids"][0]
+    assert "logs" in query_result.payload["tasks"][0]
 
 
 def test_agent_harness_first_slice_runs_from_file_to_apply_result(monkeypatch, tmp_path: Path) -> None:

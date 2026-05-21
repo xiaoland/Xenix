@@ -31,10 +31,13 @@ from ..services.agent import (
     ThreadSnapshot,
 )
 from ..services.artifact_service import ArtifactService
+from ..services.ml_service import MLService
+from ..services.storage.models import MLTaskStatus
 from .chatbot import ThreadDetailView
 from .layout_debug import dump_layout_if_enabled
 from .native_widgets import emphasize_label
 from .settings_dialog import SettingsDialog
+from .tool_call_detail_view import ToolCallDetailView
 
 
 class MainWindow(QMainWindow):
@@ -50,6 +53,7 @@ class MainWindow(QMainWindow):
         agent_harness_service: AgentHarnessService,
         agent_settings_service: AgentSettingsService,
         artifact_service: ArtifactService,
+        ml_service: MLService,
     ) -> None:
         super().__init__()
         self._paths = paths
@@ -59,11 +63,13 @@ class MainWindow(QMainWindow):
         self._agent_harness_service = agent_harness_service
         self._agent_settings_service = agent_settings_service
         self._artifact_service = artifact_service
+        self._ml_service = ml_service
         self._agent_thread_id: str | None = None
         self._active_agent_run_id: str | None = None
         self._pending_step_confirmation: AgentHarnessStreamEvent | None = None
         self._cancelled_agent_run_ids: set[str] = set()
         self._settings_dialog: SettingsDialog | None = None
+        self._tool_call_detail_views: list[ToolCallDetailView] = []
 
         self._title_label = QLabel(parent=self)
         self._settings_button = QPushButton(parent=self)
@@ -86,6 +92,7 @@ class MainWindow(QMainWindow):
         self._thread_detail_view = ThreadDetailView(parent=self)
         self._thread_detail_view.message_submitted.connect(self._submit_chat_message)
         self._thread_detail_view.artifact_link_activated.connect(self._open_artifact_link)
+        self._thread_detail_view.tool_action_requested.connect(self._handle_tool_action)
         self._thread_detail_view.stop_requested.connect(self._request_harness_stop)
         self._thread_detail_view.step_budget_continue_requested.connect(self._continue_step_budget)
         self._thread_detail_view.step_budget_stop_requested.connect(self._stop_step_budget)
@@ -273,6 +280,50 @@ class MainWindow(QMainWindow):
         opened = QDesktopServices.openUrl(QUrl.fromLocalFile(artifact.absolute_path))
         if not opened:
             self._thread_detail_view.show_error(self.tr("Could not open artifact: {path}").format(path=artifact.absolute_path))
+
+    def _handle_tool_action(self, action: object) -> None:
+        if not isinstance(action, dict):
+            return
+        action_type = str(action.get("type") or "")
+        raw_task_ids = action.get("task_ids")
+        if not isinstance(raw_task_ids, list):
+            return
+        task_ids = [str(task_id) for task_id in raw_task_ids if str(task_id).strip()]
+        if not task_ids:
+            return
+        if action_type == "open_tool_call_detail":
+            self._open_tool_call_detail(task_ids)
+            return
+        if action_type == "cancel_ml_tasks":
+            self._cancel_ml_tasks(task_ids)
+
+    def _open_tool_call_detail(self, task_ids: list[str]) -> None:
+        view = ToolCallDetailView(
+            ml_service=self._ml_service,
+            task_ids=task_ids,
+            parent=self,
+        )
+        view.destroyed.connect(lambda _obj=None, view=view: self._forget_tool_call_detail_view(view))
+        self._tool_call_detail_views.append(view)
+        view.show()
+        view.raise_()
+        view.activateWindow()
+
+    def _forget_tool_call_detail_view(self, view: ToolCallDetailView) -> None:
+        if view in self._tool_call_detail_views:
+            self._tool_call_detail_views.remove(view)
+
+    def _cancel_ml_tasks(self, task_ids: list[str]) -> None:
+        errors: list[str] = []
+        for task_id in task_ids:
+            try:
+                task = self._ml_service.get_task_details(task_id).task
+                if task.status in {MLTaskStatus.PENDING, MLTaskStatus.RUNNING}:
+                    self._ml_service.cancel_task(task_id)
+            except Exception as exc:
+                errors.append(str(exc))
+        if errors:
+            self._thread_detail_view.show_error("\n".join(errors))
 
     def _request_harness_stop(self) -> None:
         if self._active_agent_run_id is not None:

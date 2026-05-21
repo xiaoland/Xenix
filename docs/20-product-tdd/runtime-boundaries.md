@@ -107,8 +107,8 @@ Tool boundaries:
 
 - The tool registry is static for the current application capability set.
 - Runtime thread, turn, file, dataset, model, and artifact context is passed through validated tool arguments and `ToolExecutionContext`.
-- Target tool names are `data.peek`, `data.integrate`, `data.clean`, `data.query`, `data.transform`, `data.feature.select`, `model.metadata`, `model.train`, `model.hyper_train`, and `model.apply`.
-- `data.feature.select` creates an immutable dataset column role-binding snapshot. `model.train` and `model.hyper_train` accept `binding_id`. `model.apply` accepts a trained model plus file-backed, tabular, or role-shaped inline inputs, then uses trained model metadata to validate the apply role schema.
+- Target tool names are `data.peek`, `data.integrate`, `data.clean`, `data.query`, `data.transform`, `data.feature.select`, `model.metadata`, `model.train`, `model.hyper_train`, `model.apply`, and `model.task.query`.
+- `data.feature.select` creates an immutable dataset column role-binding snapshot. `model.train` and `model.hyper_train` accept `binding_id`. `model.apply` accepts a trained model plus file-backed, tabular, or role-shaped inline inputs, then uses trained model metadata to validate the apply role schema. `model.train`, `model.hyper_train`, and `model.apply` wait for a bounded grace period and return either the completed result or explicit ML task ids for background follow-up. `model.task.query` accepts explicit task ids and returns ML task metadata, status, artifacts, errors, and bounded logs.
 - Forward-looking tool contracts use `apply`, not `inference`; legacy `inference` names are migration inputs only.
 
 Storage provides persistence interfaces for Agent Harness records. Agent Harness semantics stay in the Agent Harness service.

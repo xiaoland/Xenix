@@ -163,12 +163,24 @@ def _translate_tool_summary(summary: str) -> str:
         return QCoreApplication.translate("ToolCallItem", "Tuning model...")
     if summary == "Tuned model":
         return QCoreApplication.translate("ToolCallItem", "Tuned model")
+    if summary == "Model tuning running in background":
+        return QCoreApplication.translate("ToolCallItem", "Model tuning running in background")
     if summary == "Cancelled model tuning":
         return QCoreApplication.translate("ToolCallItem", "Cancelled model tuning")
     if summary == "Applying model...":
         return QCoreApplication.translate("ToolCallItem", "Applying model...")
     if summary == "Applied model":
         return QCoreApplication.translate("ToolCallItem", "Applied model")
+    if summary == "Model training running in background":
+        return QCoreApplication.translate("ToolCallItem", "Model training running in background")
+    if summary == "Model apply running in background":
+        return QCoreApplication.translate("ToolCallItem", "Model apply running in background")
+    if summary == "Checking model task...":
+        return QCoreApplication.translate("ToolCallItem", "Checking model task...")
+    if summary == "Checked model task":
+        return QCoreApplication.translate("ToolCallItem", "Checked model task")
+    if summary == "Cancelled model task check":
+        return QCoreApplication.translate("ToolCallItem", "Cancelled model task check")
     if summary == "Cancelled model apply":
         return QCoreApplication.translate("ToolCallItem", "Cancelled model apply")
     return summary
@@ -435,6 +447,7 @@ class ChatMessageBubble(QFrame):
 
 class ToolCallItem(QFrame):
     link_activated = Signal(str)
+    action_requested = Signal(object)
 
     def __init__(self, event: ChatbotEvent, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -472,8 +485,20 @@ class ToolCallItem(QFrame):
         self._chevron_button.setIconSize(QSize(16, 16))
         self._chevron_button.clicked.connect(self._toggle_detail)
 
+        self._details_button = QPushButton()
+        self._details_button.setObjectName("chatToolCallActionButton")
+        self._details_button.setFixedHeight(24)
+        self._details_button.clicked.connect(self._request_details)
+
+        self._cancel_button = QPushButton()
+        self._cancel_button.setObjectName("chatToolCallCancelButton")
+        self._cancel_button.setFixedHeight(24)
+        self._cancel_button.clicked.connect(self._request_cancel)
+
         header_layout.addWidget(self._icon_label, 0, Qt.AlignVCenter)
         header_layout.addWidget(self._summary_label, 1, Qt.AlignVCenter)
+        header_layout.addWidget(self._details_button, 0, Qt.AlignVCenter)
+        header_layout.addWidget(self._cancel_button, 0, Qt.AlignVCenter)
         header_layout.addWidget(self._chevron_button, 0, Qt.AlignVCenter)
         layout.addWidget(header)
 
@@ -491,6 +516,16 @@ class ToolCallItem(QFrame):
         self._event = event
         self._icon_label.setPixmap(tool_icon(event.icon_key).pixmap(QSize(16, 16)))
         self._summary_label.setText(_translate_tool_summary(event.summary or ""))
+        details_action = self._action_by_type("open_tool_call_detail")
+        cancel_action = self._action_by_type("cancel_ml_tasks")
+        self._details_button.setVisible(details_action is not None)
+        self._details_button.setEnabled(details_action is not None)
+        self._details_button.setText(self.tr("Details"))
+        self._details_button.setToolTip(self.tr("Open tool call details"))
+        self._cancel_button.setVisible(cancel_action is not None)
+        self._cancel_button.setEnabled(cancel_action is not None)
+        self._cancel_button.setText(self.tr("Cancel"))
+        self._cancel_button.setToolTip(self.tr("Cancel running ML tasks"))
         has_detail = bool(event.detail_blocks)
         self._chevron_button.setVisible(has_detail)
         self._chevron_button.setEnabled(has_detail)
@@ -519,6 +554,22 @@ class ToolCallItem(QFrame):
     def _handle_link_activated(self, url) -> None:
         self.link_activated.emit(url.toString())
 
+    def _action_by_type(self, action_type: str) -> dict[str, Any] | None:
+        for action in self._event.actions:
+            if action.get("type") == action_type:
+                return dict(action)
+        return None
+
+    def _request_details(self) -> None:
+        action = self._action_by_type("open_tool_call_detail")
+        if action is not None:
+            self.action_requested.emit(action)
+
+    def _request_cancel(self) -> None:
+        action = self._action_by_type("cancel_ml_tasks")
+        if action is not None:
+            self.action_requested.emit(action)
+
 
 class AttachmentChip(QFrame):
     def __init__(self, path: str, parent: QWidget | None = None) -> None:
@@ -537,6 +588,7 @@ class AttachmentChip(QFrame):
 class ThreadDetailView(QWidget):
     message_submitted = Signal(str, list)
     artifact_link_activated = Signal(str)
+    tool_action_requested = Signal(object)
     stop_requested = Signal()
     step_budget_continue_requested = Signal()
     step_budget_stop_requested = Signal()
@@ -796,6 +848,7 @@ class ThreadDetailView(QWidget):
     def add_tool_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> ToolCallItem:
         item = ToolCallItem(event, parent=self)
         item.link_activated.connect(self.artifact_link_activated.emit)
+        item.action_requested.connect(self.tool_action_requested.emit)
         item.set_available_width(self._message_column.width())
         self._message_layout.insertWidget(self._message_insert_index(), item)
         self._event_widgets_by_id[event.id] = item

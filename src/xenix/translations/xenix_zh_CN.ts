@@ -4,25 +4,24 @@
 <context>
     <name>ChatMessageBubble</name>
     <message>
-        <location filename="../ui/chatbot.py" line="383"/>
+        <location filename="../ui/chatbot.py" line="395"/>
         <source>You</source>
         <translation>你</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="385"/>
+        <location filename="../ui/chatbot.py" line="397"/>
         <source>Tool</source>
         <translation>工具</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="387"/>
+        <location filename="../ui/chatbot.py" line="399"/>
         <source>System</source>
         <translation>系统</translation>
     </message>
 </context>
 <context>
     <name>ColumnSelectionWidget</name>
-
-<message>
+    <message>
         <source>Choose Trained Model</source>
         <translation type="vanished">选择已训练模型</translation>
     </message>
@@ -68,8 +67,214 @@ This route will stay available after model selection is connected.</source>
         <source>Close</source>
         <translation type="vanished">关闭</translation>
     </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="84"/>
+        <source>Select one or more input columns. No prediction target is required.</source>
+        <translation>选择一个或多个输入列。不需要预测目标。</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="85"/>
+        <location filename="../ui/widgets/column_selection.py" line="91"/>
+        <source>Prediction Target</source>
+        <translation>预测目标</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="89"/>
+        <source>Choose one prediction target, then select one or more input columns.</source>
+        <translation>选择一个预测目标，然后选择一个或多个输入列。</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="94"/>
+        <source>Select target columns and one or more input columns.</source>
+        <translation>选择目标列和一个或多个输入列。</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="95"/>
+        <source>Target Columns</source>
+        <translation>目标列</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/column_selection.py" line="97"/>
+        <source>Input Columns</source>
+        <translation>输入列</translation>
+    </message>
 </context>
-
+<context>
+    <name>DatasetSummaryWidget</name>
+    <message>
+        <location filename="../ui/widgets/dataset_summary.py" line="54"/>
+        <source>File</source>
+        <translation>文件</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/dataset_summary.py" line="55"/>
+        <source>Path</source>
+        <translation>路径</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/dataset_summary.py" line="56"/>
+        <source>Format</source>
+        <translation>格式</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/dataset_summary.py" line="57"/>
+        <source>Rows</source>
+        <translation>行数</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/dataset_summary.py" line="58"/>
+        <source>Columns</source>
+        <translation>列数</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/dataset_summary.py" line="59"/>
+        <source>Preview</source>
+        <translation>预览</translation>
+    </message>
+</context>
+<context>
+    <name>Exceptions</name>
+    <message>
+        <location filename="../exceptions.py" line="57"/>
+        <source>Xenix</source>
+        <translation>Xenix</translation>
+    </message>
+    <message>
+        <location filename="../exceptions.py" line="59"/>
+        <source>An unexpected error occurred. Check the log file for details.</source>
+        <translation>发生意外错误。请查看日志文件了解详情。</translation>
+    </message>
+</context>
+<context>
+    <name>FileDropZone</name>
+    <message>
+        <location filename="../ui/widgets/file_drop_zone.py" line="37"/>
+        <source>Drop a dataset file here</source>
+        <translation>将数据集文件拖放到这里</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/file_drop_zone.py" line="38"/>
+        <source>Supports .csv, .xlsx, and .xls</source>
+        <translation>支持 .csv、.xlsx 和 .xls</translation>
+    </message>
+</context>
+<context>
+    <name>InferenceRowEditorWidget</name>
+    <message>
+        <location filename="../ui/widgets/inference_row_editor.py" line="48"/>
+        <source>Add Row</source>
+        <translation>添加行</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/inference_row_editor.py" line="49"/>
+        <source>Remove Row</source>
+        <translation>移除行</translation>
+    </message>
+</context>
+<context>
+    <name>JsonSchemaFormWidget</name>
+    <message>
+        <location filename="../ui/widgets/json_schema_form.py" line="117"/>
+        <location filename="../ui/widgets/json_schema_form.py" line="220"/>
+        <source>One value per line</source>
+        <translation>每行一个值</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/json_schema_form.py" line="211"/>
+        <location filename="../ui/widgets/json_schema_form.py" line="217"/>
+        <source>No parameters to configure.</source>
+        <translation>没有可配置的参数。</translation>
+    </message>
+</context>
+<context>
+    <name>MainWindow</name>
+    <message>
+        <location filename="../ui/main_window.py" line="158"/>
+        <source>Xenix Native</source>
+        <translation>Xenix 原生版</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="159"/>
+        <source>Xenix</source>
+        <translation>Xenix</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="160"/>
+        <source>Settings</source>
+        <translation>设置</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="161"/>
+        <source>History</source>
+        <translation>历史</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="163"/>
+        <source>New thread</source>
+        <translation>新建线程</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="267"/>
+        <source>Could not open link: {uri}</source>
+        <translation>无法打开链接：{uri}</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="275"/>
+        <source>Artifact is not ready to open.</source>
+        <translation>产物尚未准备好打开。</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="278"/>
+        <source>Artifact file is missing: {path}</source>
+        <translation>产物文件缺失：{path}</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="282"/>
+        <source>Could not open artifact: {path}</source>
+        <translation>无法打开产物：{path}</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="352"/>
+        <source>Step budget used: {used}/{max}. Continue with up to {steps} more steps?</source>
+        <translation>步骤预算已使用：{used}/{max}。是否继续最多 {steps} 个步骤？</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="464"/>
+        <source>Rename</source>
+        <translation>重命名</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="465"/>
+        <source>Delete</source>
+        <translation>删除</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="480"/>
+        <source>Rename Thread</source>
+        <translation>重命名线程</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="481"/>
+        <source>Thread name</source>
+        <translation>线程名称</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="498"/>
+        <location filename="../ui/main_window.py" line="506"/>
+        <source>Delete Thread</source>
+        <translation>删除线程</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="499"/>
+        <source>Stop the current run before deleting this thread.</source>
+        <translation>删除此线程前请先停止当前运行。</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="507"/>
+        <source>Delete &quot;{title}&quot;? This action cannot be undone.</source>
+        <translation>删除“{title}”？此操作无法撤销。</translation>
+    </message>
+</context>
 <context>
     <name>SettingsDialog</name>
     <message>
@@ -203,6 +408,48 @@ This route will stay available after model selection is connected.</source>
     </message>
 </context>
 <context>
+    <name>StartupSplash</name>
+    <message>
+        <source>Xenix</source>
+        <translation type="vanished">Xenix</translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="382"/>
+        <source>Business ML Workbench</source>
+        <translation>业务机器学习工作台</translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="398"/>
+        <source>Starting Xenix...</source>
+        <translation>正在启动 Xenix...</translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="399"/>
+        <source>Preparing application data...</source>
+        <translation>正在准备应用数据...</translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="400"/>
+        <source>Initializing runtime logging...</source>
+        <translation>正在初始化运行日志...</translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="401"/>
+        <source>Initializing local database...</source>
+        <translation>正在初始化本地数据库...</translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="402"/>
+        <source>Loading workbench...</source>
+        <translation>正在加载工作台...</translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="403"/>
+        <source>Ready.</source>
+        <translation>准备就绪。</translation>
+    </message>
+</context>
+<context>
     <name>TaskLogView</name>
     <message>
         <location filename="../ui/widgets/task_log_view.py" line="21"/>
@@ -264,48 +511,137 @@ This route will stay available after model selection is connected.</source>
         <translation>已请求</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="718"/>
+        <location filename="../ui/chatbot.py" line="770"/>
         <source>Message Xenix</source>
         <translation>给 Xenix 发消息</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="719"/>
-        <location filename="../ui/chatbot.py" line="720"/>
-        <location filename="../ui/chatbot.py" line="993"/>
-        <location filename="../ui/chatbot.py" line="1004"/>
+        <location filename="../ui/chatbot.py" line="771"/>
+        <location filename="../ui/chatbot.py" line="772"/>
+        <location filename="../ui/chatbot.py" line="1046"/>
+        <location filename="../ui/chatbot.py" line="1057"/>
         <source>Attach files</source>
         <translation>添加文件</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="721"/>
+        <location filename="../ui/chatbot.py" line="773"/>
         <source>Continue</source>
         <translation>继续</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="722"/>
-        <location filename="../ui/chatbot.py" line="943"/>
+        <location filename="../ui/chatbot.py" line="774"/>
+        <location filename="../ui/chatbot.py" line="996"/>
         <source>Stop</source>
         <translation>停止</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="723"/>
+        <location filename="../ui/chatbot.py" line="775"/>
         <source>Drop files to attach</source>
         <translation>拖放文件以添加附件</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="724"/>
+        <location filename="../ui/chatbot.py" line="776"/>
         <source>Release here to add them to the next message</source>
         <translation>松开后添加到下一条消息</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="943"/>
+        <location filename="../ui/chatbot.py" line="996"/>
         <source>Send</source>
         <translation>发送</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="995"/>
+        <location filename="../ui/chatbot.py" line="1048"/>
         <source>Data files (*.csv *.xlsx *.xls);;All files (*)</source>
         <translation>数据文件 (*.csv *.xlsx *.xls);;所有文件 (*)</translation>
+    </message>
+</context>
+<context>
+    <name>ToolCallDetailView</name>
+    <message>
+        <location filename="../ui/tool_call_detail_view.py" line="89"/>
+        <location filename="../ui/tool_call_detail_view.py" line="90"/>
+        <source>Tool Call Details</source>
+        <translation>工具调用详情</translation>
+    </message>
+    <message>
+        <location filename="../ui/tool_call_detail_view.py" line="93"/>
+        <source>Item</source>
+        <translation>项目</translation>
+    </message>
+    <message>
+        <location filename="../ui/tool_call_detail_view.py" line="94"/>
+        <source>Status</source>
+        <translation>状态</translation>
+    </message>
+    <message>
+        <location filename="../ui/tool_call_detail_view.py" line="95"/>
+        <source>Model</source>
+        <translation>模型</translation>
+    </message>
+    <message>
+        <location filename="../ui/tool_call_detail_view.py" line="96"/>
+        <source>Started</source>
+        <translation>开始时间</translation>
+    </message>
+    <message>
+        <location filename="../ui/tool_call_detail_view.py" line="97"/>
+        <source>Finished</source>
+        <translation>完成时间</translation>
+    </message>
+    <message>
+        <location filename="../ui/tool_call_detail_view.py" line="100"/>
+        <source>Refresh</source>
+        <translation>刷新</translation>
+    </message>
+    <message>
+        <location filename="../ui/tool_call_detail_view.py" line="101"/>
+        <source>Cancel</source>
+        <translation>取消</translation>
+    </message>
+    <message>
+        <location filename="../ui/tool_call_detail_view.py" line="102"/>
+        <source>Open</source>
+        <translation>打开</translation>
+    </message>
+    <message>
+        <location filename="../ui/tool_call_detail_view.py" line="126"/>
+        <source>Error</source>
+        <translation>错误</translation>
+    </message>
+    <message>
+        <location filename="../ui/tool_call_detail_view.py" line="155"/>
+        <source>Ready</source>
+        <translation>就绪</translation>
+    </message>
+    <message>
+        <location filename="../ui/tool_call_detail_view.py" line="155"/>
+        <source>Not ready</source>
+        <translation>未就绪</translation>
+    </message>
+    <message>
+        <location filename="../ui/tool_call_detail_view.py" line="178"/>
+        <source>{count} task(s) still running.</source>
+        <translation>仍有 {count} 个任务在运行。</translation>
+    </message>
+    <message>
+        <location filename="../ui/tool_call_detail_view.py" line="182"/>
+        <source>All tracked tasks are terminal.</source>
+        <translation>所有跟踪的任务都已结束。</translation>
+    </message>
+    <message>
+        <location filename="../ui/tool_call_detail_view.py" line="216"/>
+        <source>Cancel Failed</source>
+        <translation>取消失败</translation>
+    </message>
+    <message>
+        <location filename="../ui/tool_call_detail_view.py" line="225"/>
+        <source>Open Failed</source>
+        <translation>打开失败</translation>
+    </message>
+    <message>
+        <location filename="../ui/tool_call_detail_view.py" line="226"/>
+        <source>Could not open artifact: {path}</source>
+        <translation>无法打开产物：{path}</translation>
     </message>
 </context>
 <context>
@@ -457,72 +793,95 @@ This route will stay available after model selection is connected.</source>
     </message>
     <message>
         <location filename="../ui/chatbot.py" line="167"/>
+        <source>Model tuning running in background</source>
+        <translation>模型调优正在后台运行</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="169"/>
         <source>Cancelled model tuning</source>
         <translation>模型调优已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="169"/>
-        <source>Running prediction...</source>
-        <translation>正在运行预测...</translation>
-    </message>
-    <message>
         <location filename="../ui/chatbot.py" line="171"/>
-        <source>Ran prediction</source>
-        <translation>预测已运行</translation>
+        <source>Applying model...</source>
+        <translation>正在应用模型...</translation>
     </message>
     <message>
         <location filename="../ui/chatbot.py" line="173"/>
-        <source>Cancelled prediction run</source>
-        <translation>预测运行已取消</translation>
+        <source>Applied model</source>
+        <translation>模型已应用</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="501"/>
+        <location filename="../ui/chatbot.py" line="175"/>
+        <source>Model training running in background</source>
+        <translation>模型训练正在后台运行</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="177"/>
+        <source>Model apply running in background</source>
+        <translation>模型应用正在后台运行</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="179"/>
+        <source>Checking model task...</source>
+        <translation>正在检查模型任务...</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="181"/>
+        <source>Checked model task</source>
+        <translation>模型任务已检查</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="183"/>
+        <source>Cancelled model task check</source>
+        <translation>模型任务检查已取消</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="185"/>
+        <source>Cancelled model apply</source>
+        <translation>模型应用已取消</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="523"/>
+        <source>Details</source>
+        <translation>详情</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="524"/>
+        <source>Open tool call details</source>
+        <translation>打开工具调用详情</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="527"/>
+        <source>Cancel</source>
+        <translation>取消</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="528"/>
+        <source>Cancel running ML tasks</source>
+        <translation>取消正在运行的 ML 任务</translation>
+    </message>
+    <message>
+        <source>Running prediction...</source>
+        <translation type="vanished">正在运行预测...</translation>
+    </message>
+    <message>
+        <source>Ran prediction</source>
+        <translation type="vanished">预测已运行</translation>
+    </message>
+    <message>
+        <source>Cancelled prediction run</source>
+        <translation type="vanished">预测运行已取消</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="536"/>
         <source>Hide result</source>
         <translation>隐藏结果</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="501"/>
+        <location filename="../ui/chatbot.py" line="536"/>
         <source>Show result</source>
         <translation>显示结果</translation>
-    </message>
-</context>
-
-<context>
-    <name>StartupSplash</name>
-    <message>
-        <location filename="../ui/startup_splash.py" line="382"/>
-        <source>Business ML Workbench</source>
-        <translation>业务机器学习工作台</translation>
-    </message>
-    <message>
-        <location filename="../ui/startup_splash.py" line="398"/>
-        <source>Starting Xenix...</source>
-        <translation>正在启动 Xenix...</translation>
-    </message>
-    <message>
-        <location filename="../ui/startup_splash.py" line="399"/>
-        <source>Preparing application data...</source>
-        <translation>正在准备应用数据...</translation>
-    </message>
-    <message>
-        <location filename="../ui/startup_splash.py" line="400"/>
-        <source>Initializing runtime logging...</source>
-        <translation>正在初始化运行日志...</translation>
-    </message>
-    <message>
-        <location filename="../ui/startup_splash.py" line="401"/>
-        <source>Initializing local database...</source>
-        <translation>正在初始化本地数据库...</translation>
-    </message>
-    <message>
-        <location filename="../ui/startup_splash.py" line="402"/>
-        <source>Loading workbench...</source>
-        <translation>正在加载工作台...</translation>
-    </message>
-    <message>
-        <location filename="../ui/startup_splash.py" line="403"/>
-        <source>Ready.</source>
-        <translation>准备就绪。</translation>
     </message>
 </context>
 <context>
@@ -533,7 +892,7 @@ This route will stay available after model selection is connected.</source>
         <translation>无法启动 Xenix</translation>
     </message>
     <message>
-        <location filename="../app.py" line="198"/>
+        <location filename="../app.py" line="196"/>
         <source>Xenix could not finish startup.
 
 {error}</source>
