@@ -26,7 +26,6 @@ def utc_now() -> datetime:
 
 
 class MLTaskType(StrEnum):
-    INSPECT_DATASET = "inspect_dataset"
     FIT = "fit"
     HYPERPARAMETER_TUNING = "hyperparameter_tuning"
     EVALUATE = "evaluate"
@@ -168,8 +167,26 @@ class MLTaskRow(SQLModel, table=True):
     id: str = Field(default_factory=generate_id, primary_key=True)
     project_id: str = Field(foreign_key="project.id", index=True)
     dataset_id: str | None = Field(default=None, foreign_key="dataset.id", index=True)
-    task_type: MLTaskType = Field(index=True)
-    status: MLTaskStatus = Field(index=True)
+    task_type: MLTaskType = Field(
+        sa_column=Column(
+            SQLAlchemyEnum(
+                MLTaskType,
+                values_callable=lambda enum_class: [member.value for member in enum_class],
+            ),
+            nullable=False,
+            index=True,
+        ),
+    )
+    status: MLTaskStatus = Field(
+        sa_column=Column(
+            SQLAlchemyEnum(
+                MLTaskStatus,
+                values_callable=lambda enum_class: [member.value for member in enum_class],
+            ),
+            nullable=False,
+            index=True,
+        ),
+    )
     request_payload: dict[str, Any] = Field(
         default_factory=dict,
         sa_column=Column(JSON, nullable=False),
@@ -190,7 +207,16 @@ class MLTaskArtifactRow(SQLModel, table=True):
 
     id: str = Field(default_factory=generate_id, primary_key=True)
     ml_task_id: str = Field(foreign_key="ml_task.id", index=True)
-    artifact_kind: MLTaskArtifactKind = Field(index=True)
+    artifact_kind: MLTaskArtifactKind = Field(
+        sa_column=Column(
+            SQLAlchemyEnum(
+                MLTaskArtifactKind,
+                values_callable=lambda enum_class: [member.value for member in enum_class],
+            ),
+            nullable=False,
+            index=True,
+        ),
+    )
     absolute_path: str
     ready_to_open: bool = True
     created_at: datetime = Field(default_factory=utc_now)

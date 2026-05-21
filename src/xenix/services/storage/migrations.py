@@ -8,7 +8,7 @@ from sqlmodel import SQLModel
 from ...exceptions import ValidationError
 from . import models  # noqa: F401
 
-CURRENT_SCHEMA_VERSION = 9
+CURRENT_SCHEMA_VERSION = 10
 
 
 def get_user_version(engine: Engine) -> int:
@@ -394,6 +394,88 @@ def migrate_v8_to_v9(engine: Engine) -> int:
     return 9
 
 
+def migrate_v9_to_v10(engine: Engine) -> int:
+    with engine.begin() as connection:
+        table_names = {
+            str(row[0])
+            for row in connection.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'").all()
+        }
+        if "ml_task" in table_names:
+            inspect_task_ids = [
+                str(row[0])
+                for row in connection.exec_driver_sql(
+                    "SELECT id FROM ml_task WHERE task_type IN ('INSPECT_DATASET', 'inspect_dataset')"
+                ).all()
+            ]
+            if inspect_task_ids and "dataset" in table_names:
+                dataset_columns = {
+                    str(row[1])
+                    for row in connection.exec_driver_sql("PRAGMA table_info(dataset)").all()
+                }
+                if "ml_task_id" in dataset_columns:
+                    for task_id in inspect_task_ids:
+                        connection.exec_driver_sql(
+                            "UPDATE dataset SET ml_task_id=NULL WHERE ml_task_id=?",
+                            (task_id,),
+                        )
+            if inspect_task_ids and "ml_task_artifact" in table_names:
+                for task_id in inspect_task_ids:
+                    connection.exec_driver_sql(
+                        "DELETE FROM ml_task_artifact WHERE ml_task_id=?",
+                        (task_id,),
+                    )
+            for task_id in inspect_task_ids:
+                connection.exec_driver_sql("DELETE FROM ml_task WHERE id=?", (task_id,))
+
+            task_type_pairs = {
+                "FIT": "fit",
+                "HYPERPARAMETER_TUNING": "hyperparameter_tuning",
+                "EVALUATE": "evaluate",
+                "APPLY": "apply",
+                "INFERENCE": "apply",
+                "inference": "apply",
+            }
+            for old_value, new_value in task_type_pairs.items():
+                connection.exec_driver_sql(
+                    "UPDATE ml_task SET task_type=? WHERE task_type=?",
+                    (new_value, old_value),
+                )
+
+            status_pairs = {
+                "PENDING": "pending",
+                "RUNNING": "running",
+                "SUCCEEDED": "succeeded",
+                "FAILED": "failed",
+                "CANCELLED": "cancelled",
+            }
+            for old_value, new_value in status_pairs.items():
+                connection.exec_driver_sql(
+                    "UPDATE ml_task SET status=? WHERE status=?",
+                    (new_value, old_value),
+                )
+
+        if "ml_task_artifact" in table_names:
+            artifact_kind_pairs = {
+                "MODEL": "model",
+                "HOLDOUT_DATA": "holdout_data",
+                "TRAINING_REPORT": "training_report",
+                "EVALUATION_REPORT": "evaluation_report",
+                "APPLY_RESULT": "apply_result",
+                "INFERENCE_RESULT": "apply_result",
+                "inference_result": "apply_result",
+                "EXPORT_FILE": "export_file",
+                "OTHER": "other",
+            }
+            for old_value, new_value in artifact_kind_pairs.items():
+                connection.exec_driver_sql(
+                    "UPDATE ml_task_artifact SET artifact_kind=? WHERE artifact_kind=?",
+                    (new_value, old_value),
+                )
+
+        connection.exec_driver_sql("PRAGMA user_version=10")
+    return 10
+
+
 def run_migrations(engine: Engine) -> int:
     current_version = get_user_version(engine)
     if current_version == 0:
@@ -414,6 +496,8 @@ def run_migrations(engine: Engine) -> int:
         current_version = migrate_v7_to_v8(engine)
     if current_version == 8:
         current_version = migrate_v8_to_v9(engine)
+    if current_version == 9:
+        current_version = migrate_v9_to_v10(engine)
     if current_version == CURRENT_SCHEMA_VERSION:
         return current_version
     raise ValidationError(

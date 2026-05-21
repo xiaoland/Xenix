@@ -12,7 +12,15 @@ from xenix.services.storage.layout import (
     ml_task_parent_root,
 )
 from xenix.services.storage.migrations import CURRENT_SCHEMA_VERSION, get_user_version
-from xenix.services.storage.models import AgentMessageRow, AgentMessageStatus
+from xenix.services.storage.models import (
+    AgentMessageRow,
+    AgentMessageStatus,
+    MLTaskArtifactKind,
+    MLTaskArtifactRow,
+    MLTaskRow,
+    MLTaskStatus,
+    MLTaskType,
+)
 
 
 def _table_columns(context, table_name: str) -> set[str]:
@@ -794,6 +802,200 @@ def test_storage_bootstrap_migrates_v8_evaluation_kind_and_nullable_problem_kind
     assert trained_model_info["problem_kind"][3] == 0
 
 
+def test_storage_bootstrap_migrates_v9_ml_task_enum_values(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    db_path = database_path(paths)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    import sqlite3
+
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE dataset (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                project_id VARCHAR NOT NULL,
+                name VARCHAR NOT NULL,
+                source_path VARCHAR NOT NULL,
+                source_format VARCHAR,
+                copied_from VARCHAR,
+                copied_at DATETIME,
+                derived_from_dataset_id VARCHAR,
+                ml_task_id VARCHAR,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE ml_task (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                project_id VARCHAR NOT NULL,
+                dataset_id VARCHAR,
+                task_type VARCHAR NOT NULL,
+                status VARCHAR NOT NULL,
+                request_payload JSON NOT NULL,
+                result_payload JSON,
+                error_summary VARCHAR,
+                created_at DATETIME NOT NULL,
+                started_at DATETIME,
+                finished_at DATETIME,
+                updated_at DATETIME NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE ml_task_artifact (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                ml_task_id VARCHAR NOT NULL,
+                artifact_kind VARCHAR NOT NULL,
+                absolute_path VARCHAR NOT NULL,
+                ready_to_open BOOLEAN NOT NULL,
+                created_at DATETIME NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO dataset (
+                id,
+                project_id,
+                name,
+                source_path,
+                source_format,
+                copied_from,
+                copied_at,
+                derived_from_dataset_id,
+                ml_task_id,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                'dataset-1',
+                'project-1',
+                'Customers',
+                'C:/data/customers.csv',
+                'csv',
+                NULL,
+                NULL,
+                NULL,
+                'inspect-task',
+                '2026-05-20T00:00:00Z',
+                '2026-05-20T00:00:00Z'
+            )
+            """
+        )
+        connection.executemany(
+            """
+            INSERT INTO ml_task (
+                id,
+                project_id,
+                dataset_id,
+                task_type,
+                status,
+                request_payload,
+                result_payload,
+                error_summary,
+                created_at,
+                started_at,
+                finished_at,
+                updated_at
+            )
+            VALUES (?, 'project-1', 'dataset-1', ?, ?, '{}', '{}', NULL, ?, NULL, ?, ?)
+            """,
+            [
+                (
+                    "task-1",
+                    "INFERENCE",
+                    "PENDING",
+                    "2026-05-20T00:00:00Z",
+                    "2026-05-20T00:00:00Z",
+                    "2026-05-20T00:00:00Z",
+                ),
+                (
+                    "task-2",
+                    "HYPERPARAMETER_TUNING",
+                    "SUCCEEDED",
+                    "2026-05-20T00:00:00Z",
+                    "2026-05-20T00:00:00Z",
+                    "2026-05-20T00:00:00Z",
+                ),
+                (
+                    "inspect-task",
+                    "INSPECT_DATASET",
+                    "SUCCEEDED",
+                    "2026-05-20T00:00:00Z",
+                    "2026-05-20T00:00:00Z",
+                    "2026-05-20T00:00:00Z",
+                ),
+            ],
+        )
+        connection.executemany(
+            """
+            INSERT INTO ml_task_artifact (
+                id,
+                ml_task_id,
+                artifact_kind,
+                absolute_path,
+                ready_to_open,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, 1, '2026-05-20T00:00:00Z')
+            """,
+            [
+                ("artifact-1", "task-1", "INFERENCE_RESULT", "C:/data/predictions.csv"),
+                ("artifact-2", "task-2", "TRAINING_REPORT", "C:/reports/training.json"),
+                ("artifact-3", "inspect-task", "OTHER", "C:/reports/inspect.json"),
+            ],
+        )
+        connection.execute("PRAGMA user_version=9")
+
+    context = StorageBootstrapService().initialize(paths)
+
+    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
+    with context.engine.connect() as connection:
+        task_rows = {
+            str(row[0]): (str(row[1]), str(row[2]))
+            for row in connection.exec_driver_sql(
+                "SELECT id, task_type, status FROM ml_task ORDER BY id"
+            ).all()
+        }
+        artifact_rows = {
+            str(row[0]): str(row[1])
+            for row in connection.exec_driver_sql(
+                "SELECT id, artifact_kind FROM ml_task_artifact ORDER BY id"
+            ).all()
+        }
+        dataset_task_id = connection.exec_driver_sql(
+            "SELECT ml_task_id FROM dataset WHERE id='dataset-1'"
+        ).scalar_one()
+
+    with context.session_factory() as session:
+        task = session.get(MLTaskRow, "task-1")
+        artifact = session.get(MLTaskArtifactRow, "artifact-1")
+
+    assert task_rows == {
+        "task-1": ("apply", "pending"),
+        "task-2": ("hyperparameter_tuning", "succeeded"),
+    }
+    assert artifact_rows == {
+        "artifact-1": "apply_result",
+        "artifact-2": "training_report",
+    }
+    assert dataset_task_id is None
+    assert task is not None
+    assert task.task_type is MLTaskType.APPLY
+    assert task.status is MLTaskStatus.PENDING
+    assert artifact is not None
+    assert artifact.artifact_kind is MLTaskArtifactKind.APPLY_RESULT
+
+
 def test_storage_bootstrap_uses_ai_first_baseline_without_work_item_schema(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
@@ -830,7 +1032,7 @@ def test_storage_bootstrap_uses_ai_first_baseline_without_work_item_schema(monke
             for row in connection.exec_driver_sql("PRAGMA table_info(agent_turn_completion_guard)").all()
         }
 
-    assert CURRENT_SCHEMA_VERSION == 9
+    assert CURRENT_SCHEMA_VERSION == 10
     assert "work_item" not in table_names
     assert "dataset_column_selection" not in table_names
     assert "dataset_column_binding" in table_names

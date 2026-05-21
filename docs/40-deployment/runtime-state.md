@@ -52,7 +52,7 @@ Keep canonical source datasets outside the runtime directory. Dataset registrati
 
 Dataset import and dataset inspection read the user-managed source file directly. Agent Harness and data services register app-managed dataset artifacts when data tools produce derived files. `data.query` returns bounded tool-result payloads by default; `data.transform` writes transformed CSV artifacts under `artifacts/datasets/transformed/`.
 
-Current SQLite development baseline is `user_version=9`. Application startup runs forward migrations from supported earlier baselines. If a local development database belongs to an obsolete schema baseline, delete `state/xenix.db` under the active runtime home and restart the app so bootstrap recreates the current AI-first schema.
+Current SQLite development baseline is `user_version=10`. Application startup runs forward migrations from supported earlier baselines. If a local development database belongs to an obsolete schema baseline, delete `state/xenix.db` under the active runtime home and restart the app so bootstrap recreates the current AI-first schema.
 
 When a migration fails during development:
 
@@ -63,6 +63,8 @@ When a migration fails during development:
 5. Re-run bootstrap or `pdm run smoke` against the same runtime home.
 
 Agent Message lifecycle status is stored as lowercase enum values in SQLite, for example `in_progress`, `completed`, `failed`, and `cancelled`.
+
+ML task type, ML task status, and ML task artifact kind are stored as lowercase enum values in SQLite, for example `fit`, `hyperparameter_tuning`, `apply`, `pending`, `succeeded`, and `apply_result`. Historical `INFERENCE` task values are migrated to `apply`; historical inspect-dataset task rows are removed because dataset inspection is runtime-derived and is not an ML task.
 
 Turn completion guard audit decisions are stored in `agent_turn_completion_guard`. The corresponding retry reminder is stored as a normal system row in `agent_message`, because it is part of provider-facing conversation history.
 
