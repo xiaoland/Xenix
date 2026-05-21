@@ -490,15 +490,9 @@ class ToolCallItem(QFrame):
         self._details_button.setFixedHeight(24)
         self._details_button.clicked.connect(self._request_details)
 
-        self._cancel_button = QPushButton()
-        self._cancel_button.setObjectName("chatToolCallCancelButton")
-        self._cancel_button.setFixedHeight(24)
-        self._cancel_button.clicked.connect(self._request_cancel)
-
         header_layout.addWidget(self._icon_label, 0, Qt.AlignVCenter)
         header_layout.addWidget(self._summary_label, 1, Qt.AlignVCenter)
         header_layout.addWidget(self._details_button, 0, Qt.AlignVCenter)
-        header_layout.addWidget(self._cancel_button, 0, Qt.AlignVCenter)
         header_layout.addWidget(self._chevron_button, 0, Qt.AlignVCenter)
         layout.addWidget(header)
 
@@ -517,15 +511,10 @@ class ToolCallItem(QFrame):
         self._icon_label.setPixmap(tool_icon(event.icon_key).pixmap(QSize(16, 16)))
         self._summary_label.setText(_translate_tool_summary(event.summary or ""))
         details_action = self._action_by_type("open_tool_call_detail")
-        cancel_action = self._action_by_type("cancel_ml_tasks")
         self._details_button.setVisible(details_action is not None)
         self._details_button.setEnabled(details_action is not None)
         self._details_button.setText(self.tr("Details"))
         self._details_button.setToolTip(self.tr("Open tool call details"))
-        self._cancel_button.setVisible(cancel_action is not None)
-        self._cancel_button.setEnabled(cancel_action is not None)
-        self._cancel_button.setText(self.tr("Cancel"))
-        self._cancel_button.setToolTip(self.tr("Cancel running ML tasks"))
         has_detail = bool(event.detail_blocks)
         self._chevron_button.setVisible(has_detail)
         self._chevron_button.setEnabled(has_detail)
@@ -562,11 +551,6 @@ class ToolCallItem(QFrame):
 
     def _request_details(self) -> None:
         action = self._action_by_type("open_tool_call_detail")
-        if action is not None:
-            self.action_requested.emit(action)
-
-    def _request_cancel(self) -> None:
-        action = self._action_by_type("cancel_ml_tasks")
         if action is not None:
             self.action_requested.emit(action)
 

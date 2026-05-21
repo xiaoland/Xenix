@@ -382,7 +382,7 @@ def test_agent_harness_train_returns_background_receipt_after_grace(monkeypatch,
 
     assert result.payload["async_state"] == "running_background"
     assert result.payload["task_ids"]
-    assert result.payload["can_cancel_task_ids"]
+    assert "can_cancel_task_ids" not in result.payload
     assert result.content_blocks[0]["text"] == "Model training running in background"
     assert query_result.payload["tasks"][0]["task_id"] == result.payload["task_ids"][0]
     assert "logs" in query_result.payload["tasks"][0]

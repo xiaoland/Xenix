@@ -2,15 +2,15 @@
 
 ## Objective & Hypothesis
 
-- Objective: Implement grace-period async behavior for `model.train`, `model.hyper_train`, and `model.apply`; expose task details/cancellation from Chatbot Tool Call Items; add `model.task.query` for Agent-visible ML task diagnosis.
+- Objective: Implement grace-period async behavior for `model.train`, `model.hyper_train`, and `model.apply`; expose task details from Chatbot Tool Call Items; add `model.task.query` for Agent-visible ML task diagnosis.
 - Hypothesis: Returning completed results for fast tasks and task receipts for long tasks will remove ML timeout failures while keeping short workflows ergonomic.
 
 ## Pre-Execution Restatement
 
 - Target: Agent ML tools, Chatbot tool-call projection/rendering, and task detail UI.
 - Current state and context: ML tools block up to 120 seconds and fail on timeout; Tool Call Items only expand/collapse details; ML tasks already persist status/logs/artifacts and support cancellation.
-- Operation: Replace fixed blocking waits with grace-period waits; add task receipt payloads; add explicit task query tool; add Tool Call Item Details/Cancel actions and standalone Tool Call Detail View.
-- Scope included: `model.train`, `model.hyper_train`, `model.apply`, `model.task.query`, task action metadata/projection, UI action wiring, task detail/cancel service use.
+- Operation: Replace fixed blocking waits with grace-period waits; add task receipt payloads; add explicit task query tool; add Tool Call Item Details action and standalone Tool Call Detail View.
+- Scope included: `model.train`, `model.hyper_train`, `model.apply`, `model.task.query`, task detail action metadata/projection, UI action wiring, task detail service use.
 - Scope excluded: global ML task list, `task_group_id`, implicit related-task querying in Agent tool schema, storage migrations.
 - Invariants: UI must not query SQLite directly; Agent Harness remains owner of tool-call records/projection; MLTask lifecycle states remain unchanged; Composer Stop cancels only active run/tool.
 - Likely affected files: `src/xenix/services/agent/tools.py`, `src/xenix/services/agent/chatbot_events.py`, `src/xenix/ui/chatbot.py`, `src/xenix/ui/main_window.py`, `src/xenix/app.py`, tests.
@@ -29,9 +29,16 @@
 ## Plan
 
 1. Add Agent tool grace-period helpers and `model.task.query`.
-2. Add task action metadata to Chatbot Event projection and render Details/Cancel buttons in Tool Call Item.
-3. Add standalone Tool Call Detail View and wire MainWindow to query/cancel task details through services.
+2. Add task action metadata to Chatbot Event projection and render a Details button in Tool Call Item.
+3. Add standalone Tool Call Detail View and wire MainWindow to query task details through services.
 4. Add focused tests for async receipt/query/projection and run target tests.
+
+## Cancel Action Rollback Addendum
+
+- Objective: Remove per-task cancellation UI from Tool Call Item and Tool Call Detail View, and omit the redundant Tool Call Detail action from `model.task.query`, until the product has an explicit exit and state synchronization model.
+- Hypothesis: Keeping cancellation under Composer Stop preserves one cancellation boundary and avoids stale task/action state across background ML work. `model.task.query` should not reopen Tool Call Detail because its result already is the task detail surface.
+- Guardrails Touched: `docs/30-unit-tdd/agent-harness.md`, `docs/30-unit-tdd/chatbot-ui.md`.
+- Verification: `pdm run check` passed; `pdm run pytest tests\test_agent_harness_foundation.py tests\test_agent_harness_first_slice.py tests\test_main.py tests\test_i18n.py` passed with 45 tests; `pdm run test` passed with 118 tests. Pytest emitted the existing Windows temp symlink cleanup `PermissionError` after completion.
 
 ## ML Task Enum Storage Fix Addendum
 

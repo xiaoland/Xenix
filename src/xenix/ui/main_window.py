@@ -32,7 +32,6 @@ from ..services.agent import (
 )
 from ..services.artifact_service import ArtifactService
 from ..services.ml_service import MLService
-from ..services.storage.models import MLTaskStatus
 from .chatbot import ThreadDetailView
 from .layout_debug import dump_layout_if_enabled
 from .native_widgets import emphasize_label
@@ -293,9 +292,6 @@ class MainWindow(QMainWindow):
             return
         if action_type == "open_tool_call_detail":
             self._open_tool_call_detail(task_ids)
-            return
-        if action_type == "cancel_ml_tasks":
-            self._cancel_ml_tasks(task_ids)
 
     def _open_tool_call_detail(self, task_ids: list[str]) -> None:
         view = ToolCallDetailView(
@@ -312,18 +308,6 @@ class MainWindow(QMainWindow):
     def _forget_tool_call_detail_view(self, view: ToolCallDetailView) -> None:
         if view in self._tool_call_detail_views:
             self._tool_call_detail_views.remove(view)
-
-    def _cancel_ml_tasks(self, task_ids: list[str]) -> None:
-        errors: list[str] = []
-        for task_id in task_ids:
-            try:
-                task = self._ml_service.get_task_details(task_id).task
-                if task.status in {MLTaskStatus.PENDING, MLTaskStatus.RUNNING}:
-                    self._ml_service.cancel_task(task_id)
-            except Exception as exc:
-                errors.append(str(exc))
-        if errors:
-            self._thread_detail_view.show_error("\n".join(errors))
 
     def _request_harness_stop(self) -> None:
         if self._active_agent_run_id is not None:

@@ -41,10 +41,10 @@ Transient thinking state is also driven by Chatbot Events: `THINKING` with `IN_P
 - Sender names are hidden for user and assistant text events.
 - Text event content is rendered from content blocks such as text, markdown, file attachment, and thinking.
 - Tool event summary, status wording, icon key, and result detail come from Agent Harness projection.
-- Tool event actions such as opening Tool Call Details or cancelling background ML tasks come from Agent Harness projection; Tool Call Item renders those actions and emits UI signals without parsing tool result payloads.
+- Tool event actions such as opening Tool Call Details come from Agent Harness projection; Tool Call Item renders those actions and emits UI signals without parsing tool result payloads. Tool Call Item does not expose per-task cancellation; active run cancellation is owned by the Composer stop control.
 - Tool icons and chevrons use QtAwesome icons resolved in the Qt UI layer. The UI maps semantic `icon_key` values to concrete icon names; tool definitions and Harness projection do not depend on QtAwesome names.
 - Artifact links inside markdown emit `artifact_link_activated` and are resolved by services.
-- Tool Call Detail View is a standalone task-scoped window opened from a Tool Call Item. It may query service-owned ML task details, logs, and artifacts for the explicit task ids attached to that tool call. It is not a global ML task list.
+- Tool Call Detail View is a standalone task-scoped window opened from a Tool Call Item. It may query service-owned ML task details, logs, and artifacts for the explicit task ids attached to task-producing tool calls. It is not a global ML task list. `model.task.query` Tool Call Items do not expose this action because their result is already the task detail surface.
 
 ## Composer Contract
 
@@ -81,7 +81,7 @@ Qt boundary tests should cover:
 - request-only tool event rendering
 - paired tool-call and tool-result rendering as one item
 - tool event expand/collapse behavior
-- Tool Call Item action rendering and signal propagation for task details and cancellation
+- Tool Call Item action rendering and signal propagation for task details
 - Tool Call Detail View task refresh, log display, artifact opening, and timer shutdown
 - artifact link activation and resolution
 - composer auto-grow layout switch

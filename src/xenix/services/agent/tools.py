@@ -1007,7 +1007,6 @@ class AgentToolRegistry:
             "async_state": "completed",
             "dataset_id": dataset_id,
             "task_ids": [task.id for task in tasks],
-            "can_cancel_task_ids": [],
             "ml_tasks": [self._ml_task_payload(task) for task in tasks],
             "trained_models": [self._trained_model_payload(model) for model in trained_models],
         }
@@ -1058,7 +1057,6 @@ class AgentToolRegistry:
             "async_state": "completed",
             "dataset_id": dataset_id,
             "task_ids": [task.id for task in tasks],
-            "can_cancel_task_ids": [],
             "ml_tasks": [self._ml_task_payload(task) for task in tasks],
             "trained_models": [self._trained_model_payload(model) for model in trained_models],
         }
@@ -1121,7 +1119,6 @@ class AgentToolRegistry:
                 "async_state": "completed",
                 "ml_task_id": task.id,
                 "task_ids": [task.id],
-                "can_cancel_task_ids": [],
                 "ml_tasks": [self._ml_task_payload(task)],
                 "dataset_id": task.dataset_id,
                 "result_dataset_id": details.task.result_payload.get("result_dataset_id") if details.task.result_payload else None,
@@ -1452,16 +1449,12 @@ class AgentToolRegistry:
         trained_models = self._trained_models_for_root_tasks(root_task_ids)
         tasks = self._related_training_tasks(root_tasks, trained_models)
         task_ids = [task.id for task in tasks] or list(root_task_ids)
-        can_cancel_task_ids = [
-            task.id for task in tasks if task.status in {MLTaskStatus.PENDING, MLTaskStatus.RUNNING}
-        ]
         payload = {
             "async_state": "running_background",
             "dataset_id": dataset_id,
             "operation": operation,
             "task_ids": task_ids,
             "root_task_ids": list(root_task_ids),
-            "can_cancel_task_ids": can_cancel_task_ids,
             "ml_tasks": [self._ml_task_payload(task) for task in tasks],
             "trained_models": [self._trained_model_payload(model) for model in trained_models],
         }
@@ -1486,14 +1479,12 @@ class AgentToolRegistry:
         operation: str,
     ) -> ToolExecutionResult:
         task = self._ml_service.get_task_details(task_id).task
-        can_cancel_task_ids = [task.id] if task.status in {MLTaskStatus.PENDING, MLTaskStatus.RUNNING} else []
         payload = {
             "async_state": "running_background",
             "operation": operation,
             "ml_task_id": task.id,
             "task_ids": [task.id],
             "root_task_ids": [task.id],
-            "can_cancel_task_ids": can_cancel_task_ids,
             "dataset_id": task.dataset_id,
             "ml_tasks": [self._ml_task_payload(task)],
         }

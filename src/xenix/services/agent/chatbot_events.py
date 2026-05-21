@@ -146,7 +146,7 @@ def project_tool_chatbot_event(
     presentation = tool_presentation(tool_call.tool_name, tool_presentation_lookup=tool_presentation_lookup)
     detail_blocks = _tool_detail_blocks(result_message, error_summary=tool_call.error_summary)
     summary = _tool_summary_from_blocks(result_message) or presentation.summary_for(status)
-    actions = _tool_actions(result_message)
+    actions = _tool_actions(result_message, tool_name=tool_call.tool_name)
     source_message_ids = [request_message.id]
     if result_message is not None:
         source_message_ids.append(result_message.id)
@@ -252,7 +252,9 @@ def _first_tool_summary_block(blocks: list[dict[str, Any]]) -> dict[str, Any] | 
     return None
 
 
-def _tool_actions(message: AgentMessageRow | None) -> list[dict[str, Any]]:
+def _tool_actions(message: AgentMessageRow | None, *, tool_name: str) -> list[dict[str, Any]]:
+    if tool_name == "model.task.query":
+        return []
     payload = _tool_result_payload(message)
     if payload is None:
         return []
@@ -269,16 +271,6 @@ def _tool_actions(message: AgentMessageRow | None) -> list[dict[str, Any]]:
             "task_ids": task_ids,
         }
     ]
-    raw_cancel_task_ids = payload.get("can_cancel_task_ids")
-    if isinstance(raw_cancel_task_ids, list):
-        cancel_task_ids = [str(task_id) for task_id in raw_cancel_task_ids if str(task_id).strip()]
-        if cancel_task_ids:
-            actions.append(
-                {
-                    "type": "cancel_ml_tasks",
-                    "task_ids": cancel_task_ids,
-                }
-            )
     return actions
 
 

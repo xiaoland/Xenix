@@ -40,7 +40,6 @@ class ToolCallDetailView(QDialog):
         self._status_label = QLabel(self)
         self._task_tree = QTreeWidget(self)
         self._refresh_button = QPushButton(self)
-        self._cancel_button = QPushButton(self)
         self._open_button = QPushButton(self)
         self._log_view = TaskLogView(self)
         self._refresh_timer = QTimer(self)
@@ -77,12 +76,10 @@ class ToolCallDetailView(QDialog):
         actions_layout = QHBoxLayout()
         actions_layout.addStretch(1)
         actions_layout.addWidget(self._refresh_button)
-        actions_layout.addWidget(self._cancel_button)
         actions_layout.addWidget(self._open_button)
         layout.addLayout(actions_layout)
 
         self._refresh_button.clicked.connect(self.refresh)
-        self._cancel_button.clicked.connect(self._cancel_running_tasks)
         self._open_button.clicked.connect(self._open_selected_artifact)
 
     def retranslate_ui(self) -> None:
@@ -98,7 +95,6 @@ class ToolCallDetailView(QDialog):
             ]
         )
         self._refresh_button.setText(self.tr("Refresh"))
-        self._cancel_button.setText(self.tr("Cancel"))
         self._open_button.setText(self.tr("Open"))
         self._log_view.retranslate_ui()
         self._sync_selection()
@@ -170,7 +166,6 @@ class ToolCallDetailView(QDialog):
             selected_item = first_task_item
         if selected_item is not None:
             self._task_tree.setCurrentItem(selected_item)
-        self._cancel_button.setEnabled(bool(running_task_ids))
         if running_task_ids:
             if not self._refresh_timer.isActive():
                 self._refresh_timer.start()
@@ -201,19 +196,6 @@ class ToolCallDetailView(QDialog):
             self._log_view.set_logs(self._ml_service.get_task_details(self._selected_task_id).logs)
         except Exception:
             self._log_view.clear()
-
-    def _cancel_running_tasks(self) -> None:
-        errors: list[str] = []
-        for task_id in self._task_ids:
-            try:
-                task = self._ml_service.get_task_details(task_id).task
-                if task.status in {MLTaskStatus.PENDING, MLTaskStatus.RUNNING}:
-                    self._ml_service.cancel_task(task_id)
-            except Exception as exc:
-                errors.append(str(exc))
-        self.refresh()
-        if errors:
-            QMessageBox.warning(self, self.tr("Cancel Failed"), "\n".join(errors))
 
     def _open_selected_artifact(self, *_args) -> None:
         if not self._selected_artifact_path:

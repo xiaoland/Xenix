@@ -182,7 +182,6 @@ def test_chatbot_event_projection_exposes_tool_task_actions(monkeypatch, tmp_pat
             result_payload={
                 "async_state": "running_background",
                 "task_ids": ["task-1"],
-                "can_cancel_task_ids": ["task-1"],
             },
             content_blocks=[
                 {"type": "tool_event_summary", "text": "Model training running in background"},
@@ -192,7 +191,6 @@ def test_chatbot_event_projection_exposes_tool_task_actions(monkeypatch, tmp_pat
                     "payload": {
                         "async_state": "running_background",
                         "task_ids": ["task-1"],
-                        "can_cancel_task_ids": ["task-1"],
                     },
                 },
             ],
@@ -205,8 +203,45 @@ def test_chatbot_event_projection_exposes_tool_task_actions(monkeypatch, tmp_pat
     assert tool_event.summary == "Model training running in background"
     assert tool_event.actions == [
         {"type": "open_tool_call_detail", "task_ids": ["task-1"]},
-        {"type": "cancel_ml_tasks", "task_ids": ["task-1"]},
     ]
+
+
+def test_chatbot_event_projection_omits_task_query_detail_action(monkeypatch, tmp_path: Path) -> None:
+    conversations, _artifacts = _build_services(monkeypatch, tmp_path)
+
+    thread = conversations.create_thread(CreateAgentThreadInput(title="Task query"))
+    turn, _user_message = conversations.start_turn(
+        StartTurnInput(
+            thread_id=thread.id,
+            user_content_blocks=[{"type": "text", "text": "Check task status"}],
+        )
+    )
+    _request_message, tool_call = conversations.create_tool_call(
+        CreateToolCallInput(
+            thread_id=thread.id,
+            turn_id=turn.id,
+            tool_name="model.task.query",
+            arguments_payload={"task_ids": ["task-1"]},
+        )
+    )
+    conversations.complete_tool_call(
+        CompleteToolCallInput(
+            tool_call_id=tool_call.id,
+            status=AgentToolCallStatus.SUCCEEDED,
+            result_payload={"task_ids": ["task-1"]},
+            content_blocks=[
+                {"type": "tool_event_summary", "text": "Checked model task"},
+                {"type": "markdown", "text": "Task `task-1` succeeded."},
+                {"type": "tool_result_payload", "payload": {"task_ids": ["task-1"]}},
+            ],
+        )
+    )
+
+    events = project_chatbot_events(conversations.get_thread_snapshot(thread.id))
+    tool_event = next(event for event in events if event.kind is ChatbotEventKind.TOOL)
+
+    assert tool_event.summary == "Checked model task"
+    assert tool_event.actions == []
 
 
 def test_conversation_store_renames_and_deletes_thread_records(monkeypatch, tmp_path: Path) -> None:
