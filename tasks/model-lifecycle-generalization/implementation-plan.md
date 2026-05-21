@@ -2,7 +2,7 @@
 
 ## Objective
 
-Implement the generalized model lifecycle in slices that avoid strengthening the old scenario-first path.
+Implement the generalized model lifecycle in slices that avoid strengthening the old predefined-workflow path.
 
 ## Slice 0: Durable Contract Solidification
 
@@ -382,30 +382,42 @@ Prevent `ProblemKind` from becoming the catch-all enum for every future model fa
   - old ML task request/result payloads move `problem_kind` into `evaluation_kind` and policy snapshots.
 - Verified targeted registry, storage bootstrap, repository, ML execution, and Agent harness tests; full `pdm run pytest -q` passed with 109 tests.
 
-## Slice 9: Scenario-Centric Cleanup
+## Slice 9: Legacy Workflow Cleanup
 
 ### Scope
 
-- Remove, quarantine, or stop routing through scenario-first UI/services where they conflict with Chatbot-first product truth.
+- Remove, quarantine, or stop routing through legacy predefined-workflow UI/services where they conflict with Chatbot-first product truth.
 - Migrate useful defaults or copy into Agent/service contracts if still needed.
-- Update tests to stop treating scenario home as the acceptance path for new capabilities.
+- Update durable docs and resources so they do not preserve the old product center of gravity.
+
+### Findings
+
+- Python UI, service, and test sources no longer contain legacy predefined-workflow modules or runtime references after the previous Chatbot-first cleanup work.
+- Remaining runtime-adjacent residue was in Qt translation catalogs, where vanished/obsolete legacy workflow contexts could keep old copy visible to localization tooling.
 
 ### Files Likely Touched
 
-- `src/xenix/ui/*scenario*`
-- `src/xenix/services/*scenario*`
-- `tests/test_scenario_ui.py`
-- `tests/test_scenario_workflow.py`
-- docs and translations
+- `src/xenix/translations/*.ts`
+- durable docs and task packet status notes
 
 ### Verification
 
 - Chatbot/Agent workflow tests remain green.
-- Removed scenario paths do not break app startup.
+- Removed legacy workflow paths do not break app startup.
+- Translation catalogs parse as valid Qt `.ts` XML after cleanup.
+- Residual scan confirms no legacy predefined-workflow runtime source or translation catalog entries remain.
 
-## Open Sequencing Question
+### Status
 
-- Whether Scenario-Centric Cleanup should run immediately after EvaluationKind extraction or after the lower-level internal `inference` naming cleanup.
+- Completed on 2026-05-20.
+- Removed stale legacy-workflow translation contexts from `xenix_en_US.ts` and `xenix_zh_CN.ts`.
+- Removed stale durable-doc references that described the product through the old predefined-workflow center.
+- No tests are added for this cleanup slice; verification is by resource parsing, residual scan, and existing Chatbot/Agent smoke coverage.
+- Verified translation catalogs parse as XML, residual scan is clean for runtime/durable-doc paths, and `pdm run pytest tests/test_i18n.py tests/test_main.py tests/test_agent_harness_first_slice.py -q` passed with 32 tests.
+
+## Sequencing Resolution
+
+- Legacy workflow cleanup runs immediately after EvaluationKind extraction so later association/recommendation work does not inherit stale product framing.
 
 ## Accepted Decisions
 
@@ -425,4 +437,4 @@ Prevent `ProblemKind` from becoming the catch-all enum for every future model fa
 - New contracts should use `apply` rather than `inference`; this includes Agent tool naming, service request/result types, metadata fields, and stored task type values where applicable.
 - Persisted `feature_columns` / `target_columns` metadata would create a second supervised-only contract; they should be removed and replaced by `train_role_bindings` / `apply_role_schema`.
 - `ProblemKind.ANALYSIS` was removed by Slice 8; future analyzer additions must use `EvaluationKind`, `ModelFamily`, and `ModelTaskKind` rather than expanding `ProblemKind`.
-- Scenario cleanup remains a sequencing risk. New association/recommendation work must not depend on scenario services or UI.
+- Legacy workflow cleanup remains a sequencing risk. New association/recommendation work must not depend on old predefined-workflow services or UI.

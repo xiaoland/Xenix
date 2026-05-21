@@ -129,9 +129,9 @@ ML adapters must assume:
 
 ## Agent Autonomy Contract
 
-The first-slice acceptance scenario validates end-to-end capability. Prompts describe Xenix identity, tool semantics, and service boundaries. Planning and tool ordering remain model-owned within tool validation, step-budget, and cancellation boundaries.
+The first-slice acceptance path validates end-to-end capability. Prompts describe Xenix identity, tool semantics, and service boundaries. Planning and tool ordering remain model-owned within tool validation, step-budget, and cancellation boundaries.
 
-Acceptance scenarios should prove that a user can complete basic analysis from file intake through reusable model application with conversation, file drag-and-drop, service-backed tools, and artifact previews.
+Acceptance coverage should prove that a user can complete basic analysis from file intake through reusable model application with conversation, file drag-and-drop, service-backed tools, and artifact previews.
 
 ## Boundary Tests Required
 

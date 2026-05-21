@@ -32,7 +32,7 @@ Record which product concepts remain in the native edition and which are intenti
 - Browser-first routing or API boundary concerns from the web app
 - Server-managed tenancy, sessions, and permissions
 - Always-on online access assumptions
-- Scenario-first screens as the product operator path
+- Predefined workflow screens as the product operator path
 - Work item as the target workspace owner
 
 ## Design Implications
