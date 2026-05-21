@@ -18,6 +18,7 @@ This guidance applies to AI-first service boundaries under `src/xenix/services/`
 - Do not let UI code parse `.csv` or `.xlsx` files for business decisions.
 - Before changing storage models, repositories, or migrations, read `docs/40-deployment/local-state-evolution.md`.
 - Fix app-owned bad SQLite data through forward-only data migrations; do not use tolerant ORM reads to hide known invalid persisted values.
+- For SQLAlchemy-backed Python `Enum` columns, verify the exact persisted representation before writing migrations. `SQLAlchemyEnum(SomeEnum)` stores enum member names by default, while `values_callable=lambda enum_class: [member.value for member in enum_class]` stores enum values. Raw SQL inserts/updates and data migrations must write the representation configured on the model, then prove ORM readability in tests.
 - Any SQLite schema or data migration change must update the schema version, cover fresh bootstrap and upgrade/data-migration tests, and update durable storage/runtime docs.
 
 ## Boundaries

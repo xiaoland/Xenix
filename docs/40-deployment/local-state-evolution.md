@@ -16,6 +16,7 @@ Define the minimum policy for changing local persistence once SQLite and additio
 - Data shape fixes are migrations. If persisted values are wrong, add a forward-only data migration that rewrites those values instead of adding tolerant reads to the model layer.
 - ORM model definitions must match the post-migration canonical database representation. Migrations must leave rows readable by the current strict ORM mapping.
 - Enum columns must have an explicit persisted representation. For new enum-backed fields, prefer the enum value stored in SQLite, not the Python enum member name, unless an existing column already has a documented representation.
+- SQLAlchemy enum columns are representation-sensitive. `SQLAlchemyEnum(SomeEnum)` persists Python enum member names such as `SYSTEM`; adding `values_callable=lambda enum_class: [member.value for member in enum_class]` persists enum values such as `system`. Raw SQL migrations must inspect the model mapping and write the configured representation exactly.
 
 ## SQLite Migration Development Rules
 
@@ -34,10 +35,11 @@ Define the minimum policy for changing local persistence once SQLite and additio
 - Test at least one upgrade path for every released baseline migration.
 - Test data migrations with raw legacy rows and then read the migrated rows through the current ORM model.
 - Test enum-backed columns against the canonical persisted representation, including any data migration from earlier accidental representations.
+- For SQLAlchemy enum changes, include an ORM-read assertion after migration so a row with the migrated value is loaded as the expected Python enum member.
 - Document any manual recovery step in `docs/40-deployment/`.
 
 ## Current Development Baseline
 
-Current AI-first development schema baseline: SQLite `user_version=10`.
+Current AI-first development schema baseline: SQLite `user_version=12`.
 
 Older development databases from previous native UI or WorkItem-centered schemas are obsolete. Delete `state/xenix.db` under the selected runtime home and restart the app to bootstrap the current schema.

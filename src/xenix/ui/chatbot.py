@@ -186,6 +186,43 @@ def _translate_tool_summary(summary: str) -> str:
     return summary
 
 
+def _format_token_count(value: int) -> str:
+    if value <= 999:
+        return str(max(0, value))
+    rounded_tenths = (value + 50) // 100
+    return f"{rounded_tenths / 10:.1f}k"
+
+
+def _usage_overview_text(payload: dict[str, Any] | None) -> str:
+    payload = payload or {}
+    input_tokens = _payload_int(payload, "input_tokens")
+    cached_input_tokens = _payload_int(payload, "cached_input_tokens")
+    output_tokens = _payload_int(payload, "output_tokens")
+    input_text = _format_token_count(input_tokens)
+    if cached_input_tokens > 0:
+        input_text += QCoreApplication.translate(
+            "UsageOverviewItem",
+            " ({cached} cached)",
+        ).format(cached=_format_token_count(cached_input_tokens))
+    text = QCoreApplication.translate(
+        "UsageOverviewItem",
+        "↑ {input} · ↓ {output}",
+    ).format(
+        input=input_text,
+        output=_format_token_count(output_tokens),
+    )
+    return text
+
+
+def _payload_int(payload: dict[str, Any], key: str) -> int:
+    value = payload.get(key)
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int):
+        return max(0, value)
+    return 0
+
+
 class AutoHeightTextBrowser(QTextBrowser):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -555,6 +592,53 @@ class ToolCallItem(QFrame):
             self.action_requested.emit(action)
 
 
+class UsageOverviewItem(QFrame):
+    def __init__(self, event: ChatbotEvent, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("chatUsageOverviewItem")
+        self._event = event
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        layout = QHBoxLayout(self)
+        layout.setObjectName("chatUsageOverviewLayout")
+        layout.setContentsMargins(0, 2, 0, 2)
+        layout.setSpacing(0)
+
+        label = QLabel(self)
+        self._label = label
+        label.setObjectName("chatUsageOverviewLabel")
+        label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        label.setWordWrap(True)
+        label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        label_font = QFont(label.font())
+        if label_font.pointSize() > 0:
+            label_font.setPointSize(max(1, label_font.pointSize() - 1))
+        elif label_font.pixelSize() > 0:
+            label_font.setPixelSize(max(1, label_font.pixelSize() - 2))
+        label.setFont(label_font)
+        label_palette = QPalette(label.palette())
+        label_palette.setColor(
+            QPalette.ColorRole.WindowText,
+            label_palette.color(QPalette.ColorRole.PlaceholderText),
+        )
+        label.setPalette(label_palette)
+
+        layout.addWidget(label, 1)
+        self.set_event(event)
+
+    def set_event(self, event: ChatbotEvent) -> None:
+        self._event = event
+        self._label.setText(_usage_overview_text(event.usage_payload))
+        _propagate_geometry_change(self)
+
+    def retranslate_ui(self) -> None:
+        self.set_event(self._event)
+
+    def set_available_width(self, width: int) -> None:
+        self.setMaximumWidth(UNBOUNDED_WIDGET_WIDTH)
+        self._label.setMaximumWidth(max(280, width))
+
+
 class AttachmentChip(QFrame):
     def __init__(self, path: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -821,6 +905,8 @@ class ThreadDetailView(QWidget):
             return self.add_thinking_event(event, auto_scroll=auto_scroll)
         if event.kind is ChatbotEventKind.TOOL:
             return self.add_tool_event(event, auto_scroll=auto_scroll)
+        if event.kind is ChatbotEventKind.USAGE:
+            return self.add_usage_event(event, auto_scroll=auto_scroll)
         return self.add_message(
             self._event_author_label(event.author),
             event.content_blocks,
@@ -833,6 +919,15 @@ class ThreadDetailView(QWidget):
         item = ToolCallItem(event, parent=self)
         item.link_activated.connect(self.artifact_link_activated.emit)
         item.action_requested.connect(self.tool_action_requested.emit)
+        item.set_available_width(self._message_column.width())
+        self._message_layout.insertWidget(self._message_insert_index(), item)
+        self._event_widgets_by_id[event.id] = item
+        if auto_scroll:
+            self._scroll_to_latest()
+        return item
+
+    def add_usage_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> UsageOverviewItem:
+        item = UsageOverviewItem(event, parent=self)
         item.set_available_width(self._message_column.width())
         self._message_layout.insertWidget(self._message_insert_index(), item)
         self._event_widgets_by_id[event.id] = item
@@ -890,6 +985,8 @@ class ThreadDetailView(QWidget):
         existing = self._event_widgets_by_id.get(event.id)
         if existing is not None:
             if isinstance(existing, ToolCallItem):
+                existing.set_event(event)
+            elif isinstance(existing, UsageOverviewItem):
                 existing.set_event(event)
             elif isinstance(existing, ChatMessageBubble):
                 existing.set_blocks(event.content_blocks)
@@ -1174,7 +1271,7 @@ class ThreadDetailView(QWidget):
         for index in range(self._message_layout.count()):
             item = self._message_layout.itemAt(index)
             widget = item.widget()
-            if isinstance(widget, (ChatMessageBubble, ToolCallItem)):
+            if isinstance(widget, (ChatMessageBubble, ToolCallItem, UsageOverviewItem)):
                 widget.set_available_width(width)
 
     def _scroll_to_latest(self, *, settle_ticks: int = 4) -> None:

@@ -13,6 +13,9 @@ from ..storage.models import (
     AgentMessageKind,
     AgentMessageRow,
     AgentMessageStatus,
+    AgentProviderRequestKind,
+    AgentProviderRequestRow,
+    AgentProviderRequestStatus,
     AgentRunRow,
     AgentRunStatus,
     AgentThreadRow,
@@ -97,6 +100,23 @@ class FinishAgentRunInput(SQLModel):
     usage_payload: dict[str, Any] | None = None
 
 
+class CreateProviderRequestInput(SQLModel):
+    thread_id: str
+    turn_id: str
+    run_id: str | None = None
+    provider_name: str | None = None
+    model: str | None = None
+    request_kind: AgentProviderRequestKind = AgentProviderRequestKind.PRIMARY
+    input_message_ids: list[str] = Field(default_factory=list)
+
+
+class CompleteProviderRequestInput(SQLModel):
+    provider_request_id: str
+    status: AgentProviderRequestStatus
+    output_message_ids: list[str] = Field(default_factory=list)
+    usage_payload: dict[str, Any] | None = None
+
+
 class CreateTurnCompletionGuardInput(SQLModel):
     turn_id: str
     attempt_index: int
@@ -109,16 +129,11 @@ class ThreadSnapshot(SQLModel):
     turns: list[AgentTurnRow] = Field(default_factory=list)
     messages: list[AgentMessageRow] = Field(default_factory=list)
     tool_calls: list[AgentToolCallRow] = Field(default_factory=list)
+    provider_requests: list[AgentProviderRequestRow] = Field(default_factory=list)
     artifacts: list[ArtifactRow] = Field(default_factory=list)
 
     def provider_messages(self) -> list[ProviderMessage]:
-        rows = [
-            ProviderMessage(
-                role="system",
-                content=self.thread.system_prompt,
-                content_blocks=[{"type": "text", "text": self.thread.system_prompt}],
-            )
-        ]
+        rows: list[ProviderMessage] = []
         for message in self.messages:
             role = _provider_role_for_message(message)
             if role is None:
@@ -129,6 +144,7 @@ class ThreadSnapshot(SQLModel):
                     content=_content_blocks_to_text(message.content_blocks),
                     content_blocks=list(message.content_blocks),
                     provider_payload=dict(message.provider_payload),
+                    source_message_id=message.id,
                 )
             )
         return rows
@@ -192,6 +208,7 @@ class ConversationStore:
                 turns=turns,
                 messages=messages,
                 tool_calls=tool_calls,
+                provider_requests=self._conversations.list_provider_requests(session, thread_id),
                 artifacts=artifacts,
             )
 
@@ -210,6 +227,20 @@ class ConversationStore:
                 updated_at=now,
             )
             self._conversations.create_turn(session, turn)
+            if self._thread_system_message(session, thread.id) is None:
+                system_message = AgentMessageRow(
+                    thread_id=thread.id,
+                    turn_id=turn.id,
+                    sequence_index=self._conversations.next_message_sequence(session, thread.id),
+                    kind=AgentMessageKind.SYSTEM,
+                    ui_author=AgentMessageAuthor.SYSTEM,
+                    content_blocks=[{"type": "text", "text": thread.system_prompt}],
+                    status=AgentMessageStatus.COMPLETED,
+                    created_at=now,
+                    updated_at=now,
+                    finalized_at=now,
+                )
+                self._conversations.append_message(session, system_message)
             message = AgentMessageRow(
                 thread_id=thread.id,
                 turn_id=turn.id,
@@ -468,6 +499,50 @@ class ConversationStore:
             session.commit()
             return updated
 
+    def create_provider_request(self, input_data: CreateProviderRequestInput) -> AgentProviderRequestRow:
+        now = _utc_now()
+        with self._session_factory() as session:
+            thread = self._require_thread(session, input_data.thread_id)
+            self._require_open_turn(session, thread.id, input_data.turn_id)
+            row = AgentProviderRequestRow(
+                thread_id=thread.id,
+                turn_id=input_data.turn_id,
+                run_id=input_data.run_id,
+                provider_name=input_data.provider_name,
+                model=input_data.model,
+                request_kind=input_data.request_kind,
+                status=AgentProviderRequestStatus.RUNNING,
+                input_message_ids=list(input_data.input_message_ids),
+                output_message_ids=[],
+                created_at=now,
+            )
+            self._conversations.create_provider_request(session, row)
+            session.commit()
+            return row
+
+    def complete_provider_request(self, input_data: CompleteProviderRequestInput) -> AgentProviderRequestRow:
+        now = _utc_now()
+        with self._session_factory() as session:
+            row = self._conversations.get_provider_request(session, input_data.provider_request_id)
+            if row is None:
+                raise NotFoundError(f"Provider request '{input_data.provider_request_id}' was not found.")
+            updated = self._conversations.complete_provider_request(
+                session,
+                row.id,
+                input_data.status,
+                now,
+                output_message_ids=list(input_data.output_message_ids),
+                usage_payload=dict(input_data.usage_payload) if input_data.usage_payload is not None else None,
+            )
+            if updated is None:
+                raise NotFoundError(f"Provider request '{row.id}' was not found.")
+            session.commit()
+            return updated
+
+    def list_provider_requests_by_turn(self, turn_id: str) -> list[AgentProviderRequestRow]:
+        with self._session_factory() as session:
+            return self._conversations.list_provider_requests_by_turn(session, turn_id)
+
     def create_turn_completion_guard(
         self,
         input_data: CreateTurnCompletionGuardInput,
@@ -511,6 +586,12 @@ class ConversationStore:
     def _touch_thread(self, session, thread: AgentThreadRow, now: datetime) -> None:
         thread.updated_at = now
         session.add(thread)
+
+    def _thread_system_message(self, session, thread_id: str) -> AgentMessageRow | None:
+        for message in self._conversations.list_messages(session, thread_id):
+            if message.kind is AgentMessageKind.SYSTEM:
+                return message
+        return None
 
 
 def _provider_role_for_message(message: AgentMessageRow) -> str | None:

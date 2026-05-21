@@ -10,6 +10,12 @@ from sqlmodel import Field, SQLModel
 from ...exceptions import ValidationError
 
 
+def _dict_get(value: Any, key: str, default: Any = None) -> Any:
+    if isinstance(value, dict):
+        return value.get(key, default)
+    return default
+
+
 class AgentToolSpec(SQLModel):
     name: str
     provider_name: str
@@ -22,6 +28,7 @@ class ProviderMessage(SQLModel):
     content: str
     content_blocks: list[dict[str, Any]] = Field(default_factory=list)
     provider_payload: dict[str, Any] = Field(default_factory=dict)
+    source_message_id: str | None = None
 
 
 class ProviderToolCall(SQLModel):
@@ -33,6 +40,7 @@ class ProviderToolCall(SQLModel):
 class ProviderResponse(SQLModel):
     assistant_content_blocks: list[dict[str, Any]] = Field(default_factory=list)
     tool_calls: list[ProviderToolCall] = Field(default_factory=list)
+    usage_payload: dict[str, Any] | None = None
     raw_payload: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -90,6 +98,10 @@ class OpenAICompatibleChatProvider:
         self._timeout_seconds = timeout_seconds
         self._streaming_enabled = streaming_enabled
 
+    @property
+    def model(self) -> str:
+        return self._model
+
     def complete(
         self,
         messages: list[ProviderMessage],
@@ -117,8 +129,12 @@ class OpenAICompatibleChatProvider:
         text_parts: list[str] = []
         raw_chunks: list[dict[str, Any]] = []
         tool_call_accumulator: dict[int, dict[str, Any]] = {}
+        usage_payload: dict[str, Any] | None = None
         for chunk in self._post_stream(payload):
             raw_chunks.append(chunk)
+            chunk_usage = self._normalize_usage_payload(chunk.get("usage"))
+            if chunk_usage is not None:
+                usage_payload = chunk_usage
             for choice in chunk.get("choices") or []:
                 delta = choice.get("delta") or {}
                 content = delta.get("content")
@@ -133,6 +149,7 @@ class OpenAICompatibleChatProvider:
             response=ProviderResponse(
                 assistant_content_blocks=[{"type": "markdown", "text": text}] if text else [],
                 tool_calls=tool_calls,
+                usage_payload=usage_payload,
                 raw_payload={"chunks": raw_chunks},
             )
         )
@@ -163,6 +180,7 @@ class OpenAICompatibleChatProvider:
             payload["tool_choice"] = "auto"
         if stream:
             payload["stream"] = True
+            payload["stream_options"] = {"include_usage": True}
         return payload
 
     def _post_json(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -256,8 +274,49 @@ class OpenAICompatibleChatProvider:
         return ProviderResponse(
             assistant_content_blocks=content_blocks,
             tool_calls=tool_calls,
+            usage_payload=self._normalize_usage_payload(raw.get("usage")),
             raw_payload=raw,
         )
+
+    def _normalize_usage_payload(self, raw_usage: Any) -> dict[str, Any] | None:
+        if not isinstance(raw_usage, dict):
+            return None
+
+        input_tokens = self._int_or_none(
+            raw_usage.get("prompt_tokens", raw_usage.get("input_tokens"))
+        )
+        output_tokens = self._int_or_none(
+            raw_usage.get("completion_tokens", raw_usage.get("output_tokens"))
+        )
+        total_tokens = self._int_or_none(raw_usage.get("total_tokens"))
+        prompt_details = raw_usage.get("prompt_tokens_details")
+        input_details = raw_usage.get("input_tokens_details")
+        cached_input_tokens = self._int_or_none(
+            _dict_get(prompt_details, "cached_tokens", _dict_get(input_details, "cached_tokens"))
+        )
+
+        if total_tokens is None and input_tokens is not None and output_tokens is not None:
+            total_tokens = input_tokens + output_tokens
+
+        if all(value is None for value in (input_tokens, output_tokens, total_tokens, cached_input_tokens)):
+            return {"provider_usage": dict(raw_usage)}
+
+        return {
+            "input_tokens": input_tokens or 0,
+            "cached_input_tokens": cached_input_tokens or 0,
+            "output_tokens": output_tokens or 0,
+            "total_tokens": total_tokens or 0,
+            "provider_usage": dict(raw_usage),
+        }
+
+    def _int_or_none(self, value: Any) -> int | None:
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float) and value.is_integer():
+            return int(value)
+        return None
 
     def _accumulate_tool_call_deltas(
         self,

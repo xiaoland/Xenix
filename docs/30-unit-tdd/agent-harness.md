@@ -9,9 +9,10 @@ Preserve the local invariants for `src/xenix/services/agent/`. Agent Harness is 
 Agent Harness owns:
 
 - Thread creation, rename, delete, listing, and snapshot loading
-- Thread system prompt projection into provider messages
+- Hidden system Message creation and projection into provider messages
 - Turn start, end, cancellation, and step-budget pause/resume
 - Message persistence for user, assistant, system, tool-call, and tool-call-result records
+- Provider request persistence and token usage aggregation
 - Chatbot timeline projection from persisted records into user-visible Chatbot Events
 - Provider boundary calls through a canonical provider contract
 - Static tool registry exposure and tool execution
@@ -24,10 +25,11 @@ Storage owns persistence mechanics. Data, artifact, project, and ML services own
 - `Thread`: persisted conversation workspace with title and system prompt.
 - `Turn`: ordered group of messages started by one user Message.
 - `Message`: chronological content-block record with Harness kind, UI author, lifecycle status, and content blocks.
+- `ProviderRequest`: one LLM provider call with persisted input Message ids, output Message ids, request kind, status, and token usage when reported by the provider.
 - `ToolCall`: execution record linking a tool-call Message to its result Message.
 - `AgentRun`: one provider/tool orchestration attempt for a turn.
 - `TurnCompletionGuard`: diagnostic audit record for a guard model decision made before ending a turn.
-- `ChatbotEvent`: Harness-owned projection record consumed by Chatbot UI. One Chatbot Event may represent one Message or a paired tool-call Message and tool-result Message.
+- `ChatbotEvent`: Harness-owned projection record consumed by Chatbot UI. One Chatbot Event may represent one Message, a paired tool-call Message and tool-result Message, or a turn-level usage overview.
 
 ## Provider Loop
 
@@ -36,11 +38,14 @@ One user submission follows this service flow:
 ```text
 submit_user_turn
   -> create thread when needed
-  -> start turn and persist user Message
+  -> start turn and persist hidden system Message when this is the first turn
+  -> persist user Message
   -> start AgentRun
   -> build provider messages from ThreadSnapshot
+  -> persist ProviderRequest as the provider boundary is entered
   -> call provider complete/stream
   -> create/update/finalize assistant Message as stream content arrives or final content is known
+  -> finalize ProviderRequest with output Message ids and token usage
   -> before ending a zero-tool turn, optionally run the turn completion guard
   -> end turn when provider returns zero tool calls and guard allows completion
   -> for each tool call:
@@ -84,6 +89,8 @@ Projection rules:
 - System Messages stay hidden from the normal Chatbot EventList unless a later control-event contract explicitly exposes them.
 - A tool-call Message and its corresponding tool-call-result Message project to one tool Chatbot Event.
 - A tool-call Message with no result yet still projects to a pending tool Chatbot Event.
+- Ended turns with provider-reported token usage project to one usage Chatbot Event after the turn's visible content.
+- Usage Chatbot Events are UI observability chrome and must not be persisted as provider-facing Messages.
 - `AgentToolCallRow.request_message_id` and `AgentToolCallRow.result_message_id` are the authoritative pairing source for snapshots.
 - During a running turn, a tool-call result is emitted after the corresponding tool-call request and completes the same logical tool event.
 - Tool-event summary text, failure language, cancellation language, result detail blocks, and icon keys are Harness projection data.
@@ -107,9 +114,23 @@ The Harness emits `THINKING` Chatbot Events around each provider request. The st
 
 ## System Prompt
 
-The system prompt is stored on `AgentThreadRow.system_prompt`.
+`AgentThreadRow.system_prompt` stores the default text used to seed the first hidden system Message.
 
-`ThreadSnapshot.provider_messages()` prepends it as the first provider message with role `system`. It is metadata for provider calls and hidden from the Chatbot timeline.
+The first user turn persists that hidden system Message before the user Message, with role `system` when projected to provider messages. Empty threads do not send provider requests. Chatbot timeline projection hides system Messages unless a later control-event contract explicitly exposes them.
+
+## Provider Request Usage
+
+`agent_provider_request` is the authority for token usage. Each row records one primary or guard provider request, the persisted input Message ids, any persisted output Message ids created because of the provider response, provider/model metadata, lifecycle status, and normalized usage payload.
+
+The normalized usage payload uses:
+
+- `input_tokens`
+- `cached_input_tokens`
+- `output_tokens`
+- `total_tokens`
+- `provider_usage`
+
+Cached input tokens are a subset of input tokens and are not added to totals again. OpenAI-compatible streaming requests include `stream_options.include_usage=true`; if a compatible provider does not return usage, the row remains useful as a request record and Chatbot omits the token overview for that usage-missing slice.
 
 ## Step Budget And Cancellation
 
@@ -144,7 +165,7 @@ complete(messages: list[ProviderMessage], tools: list[AgentToolSpec]) -> Provide
 stream(messages: list[ProviderMessage], tools: list[AgentToolSpec]) -> ProviderStreamEvent*
 ```
 
-`ProviderResponse` carries assistant content blocks, normalized tool calls, and raw provider payload. Provider adapters own OpenAI-compatible request assembly, streaming accumulation, provider tool-name mapping, and response parsing.
+`ProviderResponse` carries assistant content blocks, normalized tool calls, normalized token usage when available, and raw provider payload. Provider adapters own OpenAI-compatible request assembly, streaming accumulation, provider tool-name mapping, usage parsing, and response parsing.
 
 CopilotKit AIMock connects through the same OpenAI-compatible HTTP boundary during development testing.
 
@@ -152,8 +173,10 @@ CopilotKit AIMock connects through the same OpenAI-compatible HTTP boundary duri
 
 Contract tests should cover:
 
-- thread creation with default system prompt
-- provider message projection with system prompt first
+- thread creation with default system prompt seed text
+- first-turn hidden system Message creation
+- provider message projection with the persisted system Message first
+- provider request persistence and usage aggregation
 - user turn persistence and turn ending on zero tool calls
 - empty-text zero-tool provider response ending a turn
 - assistant streaming as message create/update/finalize events on a single persisted assistant Message

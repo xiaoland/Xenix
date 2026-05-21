@@ -118,6 +118,21 @@ def test_main_window_language_switch_updates_chat_shell(
             ),
             auto_scroll=False,
         )
+        usage_item = chat_view.add_usage_event(
+            ChatbotEvent(
+                id="usage-event",
+                kind=ChatbotEventKind.USAGE,
+                author=ChatbotEventAuthor.ASSISTANT,
+                usage_payload={
+                    "request_count": 3,
+                    "input_tokens": 9800,
+                    "cached_input_tokens": 1900,
+                    "output_tokens": 2630,
+                    "total_tokens": 12430,
+                },
+            ),
+            auto_scroll=False,
+        )
 
         assert chat_view._editor.placeholderText() == "Message Xenix"
         assert chat_view._send_button.text() == "Send"
@@ -132,6 +147,7 @@ def test_main_window_language_switch_updates_chat_shell(
         assert tool_item._chevron_button.toolTip() == "Show result"
         assert "data.peek" in tool_item._detail_browser.toPlainText()
         assert "completed" in tool_item._detail_browser.toPlainText()
+        assert usage_item._label.text() == "↑ 9.8k (1.9k cached) · ↓ 2.6k"
 
         zh_index = settings._language_selector.findData("zh_CN")
         settings._language_selector.setCurrentIndex(zh_index)
@@ -156,6 +172,7 @@ def test_main_window_language_switch_updates_chat_shell(
         assert tool_item._chevron_button.toolTip() == "显示结果"
         assert "data.peek" in tool_item._detail_browser.toPlainText()
         assert "已完成" in tool_item._detail_browser.toPlainText()
+        assert usage_item._label.text() == "↑ 9.8k（1.9k 缓存命中） · ↓ 2.6k"
         assert read_saved_locale(paths) == "zh_CN"
 
         en_index = settings._language_selector.findData("en_US")
@@ -171,6 +188,7 @@ def test_main_window_language_switch_updates_chat_shell(
         assert error_bubble._browser.toPlainText() == "Error: Stopped."
         assert chat_view._thinking_bubble._browser.toPlainText() == "Thinking..."
         assert tool_item._summary_label.text() == "Inspecting dataset..."
+        assert usage_item._label.text() == "↑ 9.8k (1.9k cached) · ↓ 2.6k"
         assert read_saved_locale(paths) == "en_US"
     finally:
         if window._settings_dialog is not None:

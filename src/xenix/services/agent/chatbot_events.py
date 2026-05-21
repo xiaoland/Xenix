@@ -11,8 +11,10 @@ from ..storage.models import (
     AgentMessageKind,
     AgentMessageRow,
     AgentMessageStatus,
+    AgentProviderRequestRow,
     AgentToolCallRow,
     AgentToolCallStatus,
+    AgentTurnStatus,
 )
 from .conversation_store import ThreadSnapshot
 from .tools import ToolPresentation, tool_presentation_for_name
@@ -22,6 +24,7 @@ class ChatbotEventKind(StrEnum):
     TEXT = "text"
     TOOL = "tool"
     THINKING = "thinking"
+    USAGE = "usage"
 
 
 class ChatbotEventStatus(StrEnum):
@@ -51,6 +54,7 @@ class ChatbotEvent(SQLModel):
     tool_name: str | None = None
     icon_key: str | None = None
     summary: str | None = None
+    usage_payload: dict[str, Any] | None = None
     detail_blocks: list[dict[str, Any]] = Field(default_factory=list)
     actions: list[dict[str, Any]] = Field(default_factory=list)
 
@@ -88,35 +92,43 @@ def project_chatbot_events(
 ) -> list[ChatbotEvent]:
     messages_by_id = {message.id: message for message in snapshot.messages}
     tool_calls_by_request_id = {tool_call.request_message_id: tool_call for tool_call in snapshot.tool_calls}
-    paired_result_message_ids = {
-        tool_call.result_message_id for tool_call in snapshot.tool_calls if tool_call.result_message_id is not None
-    }
+
+    turns_by_id = {turn.id: turn for turn in snapshot.turns}
+    provider_requests_by_turn: dict[str, list[AgentProviderRequestRow]] = {}
+    for provider_request in snapshot.provider_requests:
+        provider_requests_by_turn.setdefault(provider_request.turn_id, []).append(provider_request)
 
     events: list[ChatbotEvent] = []
-    for message in snapshot.messages:
+    for index, message in enumerate(snapshot.messages):
         if message.kind in {AgentMessageKind.USER, AgentMessageKind.ASSISTANT}:
             events.append(project_text_message_event(message))
-            continue
-        if message.kind is AgentMessageKind.TOOL_CALL:
+        elif message.kind is AgentMessageKind.TOOL_CALL:
             tool_call = tool_calls_by_request_id.get(message.id)
-            if tool_call is None:
-                continue
-            result_message = (
-                messages_by_id.get(tool_call.result_message_id)
-                if tool_call.result_message_id is not None
-                else None
-            )
-            events.append(
-                project_tool_chatbot_event(
-                    tool_call,
-                    request_message=message,
-                    result_message=result_message,
-                    tool_presentation_lookup=tool_presentation_lookup,
+            if tool_call is not None:
+                result_message = (
+                    messages_by_id.get(tool_call.result_message_id)
+                    if tool_call.result_message_id is not None
+                    else None
                 )
-            )
-            continue
-        if message.kind is AgentMessageKind.TOOL_CALL_RESULT and message.id in paired_result_message_ids:
-            continue
+                events.append(
+                    project_tool_chatbot_event(
+                        tool_call,
+                        request_message=message,
+                        result_message=result_message,
+                        tool_presentation_lookup=tool_presentation_lookup,
+                    )
+                )
+        next_turn_id = snapshot.messages[index + 1].turn_id if index + 1 < len(snapshot.messages) else None
+        if message.turn_id is not None and message.turn_id != next_turn_id:
+            turn = turns_by_id.get(message.turn_id)
+            if turn is not None and turn.status is AgentTurnStatus.ENDED:
+                usage_event = project_turn_usage_event(
+                    turn_id=message.turn_id,
+                    sequence_index=message.sequence_index + 1,
+                    provider_requests=provider_requests_by_turn.get(message.turn_id, []),
+                )
+                if usage_event is not None:
+                    events.append(usage_event)
     return events
 
 
@@ -165,6 +177,46 @@ def project_tool_chatbot_event(
         summary=summary,
         detail_blocks=detail_blocks,
         actions=actions,
+    )
+
+
+def project_turn_usage_event(
+    *,
+    turn_id: str,
+    sequence_index: int,
+    provider_requests: list[AgentProviderRequestRow],
+) -> ChatbotEvent | None:
+    usage_rows = [
+        row
+        for row in provider_requests
+        if isinstance(row.usage_payload, dict)
+    ]
+    if not usage_rows:
+        return None
+
+    input_tokens = sum(_usage_int(row.usage_payload, "input_tokens") for row in usage_rows)
+    cached_input_tokens = sum(_usage_int(row.usage_payload, "cached_input_tokens") for row in usage_rows)
+    output_tokens = sum(_usage_int(row.usage_payload, "output_tokens") for row in usage_rows)
+    total_tokens = sum(_usage_int(row.usage_payload, "total_tokens") for row in usage_rows)
+    if total_tokens <= 0 and input_tokens <= 0 and output_tokens <= 0 and cached_input_tokens <= 0:
+        return None
+
+    usage_payload = {
+        "request_count": len(usage_rows),
+        "input_tokens": input_tokens,
+        "cached_input_tokens": cached_input_tokens,
+        "output_tokens": output_tokens,
+        "total_tokens": total_tokens or input_tokens + output_tokens,
+    }
+    return ChatbotEvent(
+        id=f"{turn_id}:usage",
+        kind=ChatbotEventKind.USAGE,
+        turn_id=turn_id,
+        sequence_index=sequence_index,
+        author=ChatbotEventAuthor.ASSISTANT,
+        status=ChatbotEventStatus.COMPLETED,
+        usage_payload=usage_payload,
+        source_message_ids=[],
     )
 
 
@@ -232,6 +284,17 @@ def _chatbot_status_for_tool(status: AgentToolCallStatus) -> ChatbotEventStatus:
     if status in {AgentToolCallStatus.REQUESTED, AgentToolCallStatus.RUNNING}:
         return ChatbotEventStatus.PENDING
     return ChatbotEventStatus.COMPLETED
+
+
+def _usage_int(payload: dict[str, Any] | None, key: str) -> int:
+    if not isinstance(payload, dict):
+        return 0
+    value = payload.get(key)
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int):
+        return max(0, value)
+    return 0
 
 
 def _tool_summary_from_blocks(message: AgentMessageRow | None) -> str | None:

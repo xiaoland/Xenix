@@ -25,6 +25,7 @@ from xenix.exceptions import ValidationError
 from xenix.services.storage.models import (
     AgentMessageKind,
     AgentMessageStatus,
+    AgentProviderRequestStatus,
     AgentRunStatus,
     AgentToolCallStatus,
     AgentTurnStatus,
@@ -32,14 +33,16 @@ from xenix.services.storage.models import (
 
 
 class StreamingProviderFixture:
-    def __init__(self, text: str, chunk_size: int = 6) -> None:
+    def __init__(self, text: str, chunk_size: int = 6, usage_payload: dict[str, Any] | None = None) -> None:
         self._text = text
         self._chunk_size = chunk_size
+        self._usage_payload = usage_payload
 
     def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
         return ProviderResponse(
             assistant_content_blocks=[{"type": "markdown", "text": self._text}],
             tool_calls=[],
+            usage_payload=self._usage_payload,
         )
 
     def stream(self, messages: list[Any], tools: list[Any]):
@@ -49,6 +52,7 @@ class StreamingProviderFixture:
             response=ProviderResponse(
                 assistant_content_blocks=[{"type": "markdown", "text": self._text}],
                 tool_calls=[],
+                usage_payload=self._usage_payload,
             )
         )
 
@@ -287,6 +291,15 @@ def test_openai_compatible_provider_streams_sse_text_and_tool_calls(monkeypatch)
                         }
                     ]
                 },
+                {
+                    "choices": [],
+                    "usage": {
+                        "prompt_tokens": 1240,
+                        "completion_tokens": 260,
+                        "total_tokens": 1500,
+                        "prompt_tokens_details": {"cached_tokens": 400},
+                    },
+                },
             ]
             for chunk in chunks:
                 yield f"data: {json.dumps(chunk)}\n\n".encode("utf-8")
@@ -320,6 +333,7 @@ def test_openai_compatible_provider_streams_sse_text_and_tool_calls(monkeypatch)
     )
 
     assert captured_payload["stream"] is True
+    assert captured_payload["stream_options"] == {"include_usage": True}
     assert captured_payload["messages"][:2] == [
         {"role": "system", "content": "You are Xenix."},
         {"role": "user", "content": "Hello"},
@@ -330,6 +344,18 @@ def test_openai_compatible_provider_streams_sse_text_and_tool_calls(monkeypatch)
     assert final_response.assistant_content_blocks == [{"type": "markdown", "text": "Hello"}]
     assert final_response.tool_calls[0].tool_name == "data.peek"
     assert final_response.tool_calls[0].arguments == {"name": "sample"}
+    assert final_response.usage_payload == {
+        "input_tokens": 1240,
+        "cached_input_tokens": 400,
+        "output_tokens": 260,
+        "total_tokens": 1500,
+        "provider_usage": {
+            "prompt_tokens": 1240,
+            "completion_tokens": 260,
+            "total_tokens": 1500,
+            "prompt_tokens_details": {"cached_tokens": 400},
+        },
+    }
 
 
 def test_openai_compatible_provider_omits_tool_choice_without_tools(monkeypatch) -> None:
@@ -343,7 +369,17 @@ def test_openai_compatible_provider_omits_tool_choice_without_tools(monkeypatch)
             return None
 
         def read(self):
-            return json.dumps({"choices": [{"message": {"content": "complete"}}]}).encode("utf-8")
+            return json.dumps(
+                {
+                    "choices": [{"message": {"content": "complete"}}],
+                    "usage": {
+                        "prompt_tokens": 12,
+                        "completion_tokens": 5,
+                        "total_tokens": 17,
+                        "prompt_tokens_details": {"cached_tokens": 3},
+                    },
+                }
+            ).encode("utf-8")
 
     def fake_urlopen(http_request, timeout):
         captured_payload.update(json.loads(http_request.data.decode("utf-8")))
@@ -355,6 +391,18 @@ def test_openai_compatible_provider_omits_tool_choice_without_tools(monkeypatch)
     response = provider.complete([ProviderMessage(role="user", content="classify")], [])
 
     assert response.assistant_content_blocks == [{"type": "markdown", "text": "complete"}]
+    assert response.usage_payload == {
+        "input_tokens": 12,
+        "cached_input_tokens": 3,
+        "output_tokens": 5,
+        "total_tokens": 17,
+        "provider_usage": {
+            "prompt_tokens": 12,
+            "completion_tokens": 5,
+            "total_tokens": 17,
+            "prompt_tokens_details": {"cached_tokens": 3},
+        },
+    }
     assert "tools" not in captured_payload
     assert "tool_choice" not in captured_payload
 
@@ -363,9 +411,15 @@ def test_agent_harness_streams_assistant_as_message_events(monkeypatch, tmp_path
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
+    usage_payload = {
+        "input_tokens": 12430,
+        "cached_input_tokens": 9800,
+        "output_tokens": 2630,
+        "total_tokens": 15060,
+    }
     harness = AgentHarnessService(
         session_factory=context.session_factory,
-        provider=StreamingProviderFixture("streamed assistant text", chunk_size=6),
+        provider=StreamingProviderFixture("streamed assistant text", chunk_size=6, usage_payload=usage_payload),
         tool_registry=EmptyToolRegistry(),
         conversation_store=ConversationStore(context.session_factory),
     )
@@ -417,11 +471,18 @@ def test_agent_harness_streams_assistant_as_message_events(monkeypatch, tmp_path
     assert events[-1].is_final is True
     assert snapshot.turns[0].status is AgentTurnStatus.ENDED
     assert [message.kind for message in snapshot.messages] == [
+        AgentMessageKind.SYSTEM,
         AgentMessageKind.USER,
         AgentMessageKind.ASSISTANT,
     ]
-    assert snapshot.messages[1].content_blocks == [{"type": "markdown", "text": "streamed assistant text"}]
+    assert snapshot.messages[2].content_blocks == [{"type": "markdown", "text": "streamed assistant text"}]
     assert snapshot.tool_calls == []
+    assert len(snapshot.provider_requests) == 1
+    provider_request = snapshot.provider_requests[0]
+    assert provider_request.status is AgentProviderRequestStatus.SUCCEEDED
+    assert provider_request.input_message_ids == [snapshot.messages[0].id, snapshot.messages[1].id]
+    assert provider_request.output_message_ids == [snapshot.messages[2].id]
+    assert provider_request.usage_payload == usage_payload
 
 
 def test_agent_harness_projects_thread_system_prompt_as_first_provider_message(monkeypatch, tmp_path: Path) -> None:
@@ -438,9 +499,11 @@ def test_agent_harness_projects_thread_system_prompt_as_first_provider_message(m
 
     snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="show me the data"))
 
-    assert snapshot.messages[0].kind is AgentMessageKind.USER
+    assert snapshot.messages[0].kind is AgentMessageKind.SYSTEM
+    assert snapshot.messages[1].kind is AgentMessageKind.USER
     assert provider.messages[0].role == "system"
     assert provider.messages[0].content == snapshot.thread.system_prompt
+    assert provider.messages[0].source_message_id == snapshot.messages[0].id
     assert provider.messages[1].role == "user"
     assert provider.messages[1].content == "show me the data"
 
@@ -459,7 +522,7 @@ def test_agent_harness_ends_turn_on_empty_provider_response(monkeypatch, tmp_pat
     snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="wait for next input"))
 
     assert snapshot.turns[0].status is AgentTurnStatus.ENDED
-    assert [message.kind for message in snapshot.messages] == [AgentMessageKind.USER]
+    assert [message.kind for message in snapshot.messages] == [AgentMessageKind.SYSTEM, AgentMessageKind.USER]
     assert snapshot.tool_calls == []
 
 
@@ -512,6 +575,7 @@ def test_turn_completion_guard_persists_system_message_and_retries(monkeypatch, 
 
     assert snapshot.turns[0].status is AgentTurnStatus.ENDED
     assert [message.kind for message in snapshot.messages] == [
+        AgentMessageKind.SYSTEM,
         AgentMessageKind.USER,
         AgentMessageKind.ASSISTANT,
         AgentMessageKind.SYSTEM,
@@ -519,7 +583,7 @@ def test_turn_completion_guard_persists_system_message_and_retries(monkeypatch, 
         AgentMessageKind.TOOL_CALL_RESULT,
         AgentMessageKind.ASSISTANT,
     ]
-    assert "did not complete it" in snapshot.messages[2].content_blocks[0]["text"]
+    assert "did not complete it" in snapshot.messages[3].content_blocks[0]["text"]
     assert provider.messages_by_call[1][-1].role == "system"
     assert "did not complete it" in provider.messages_by_call[1][-1].content
     guard_rows = conversations.list_turn_completion_guards(snapshot.turns[0].id)
@@ -571,6 +635,7 @@ def test_turn_completion_guard_stops_after_two_continue_retries(monkeypatch, tmp
 
     assert snapshot.turns[0].status is AgentTurnStatus.ENDED
     assert [message.kind for message in snapshot.messages] == [
+        AgentMessageKind.SYSTEM,
         AgentMessageKind.USER,
         AgentMessageKind.ASSISTANT,
         AgentMessageKind.SYSTEM,

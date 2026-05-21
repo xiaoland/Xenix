@@ -37,11 +37,17 @@ class TurnCompletionGuardVerdict(StrEnum):
 class TurnCompletionGuardResult(BaseModel):
     verdict: TurnCompletionGuardVerdict
     reason: str = ""
+    usage_payload: dict[str, Any] | None = None
+    provider_failed: bool = False
 
 
 class TurnCompletionGuard:
     def __init__(self, provider: AgentProvider) -> None:
         self._provider = provider
+
+    @property
+    def provider(self) -> AgentProvider:
+        return self._provider
 
     def evaluate(self, last_assistant_text: str) -> TurnCompletionGuardResult:
         if not last_assistant_text.strip():
@@ -64,11 +70,14 @@ class TurnCompletionGuard:
                 ],
                 [],
             )
-            return _parse_guard_output(_content_blocks_to_text(response.assistant_content_blocks))
+            result = _parse_guard_output(_content_blocks_to_text(response.assistant_content_blocks))
+            result.usage_payload = response.usage_payload
+            return result
         except Exception as exc:
             return TurnCompletionGuardResult(
                 verdict=TurnCompletionGuardVerdict.COMPLETE,
                 reason=f"Guard failed closed: {exc}",
+                provider_failed=True,
             )
 
 
@@ -107,4 +116,3 @@ def _content_blocks_to_text(blocks: list[dict[str, Any]]) -> str:
         else:
             lines.append(json.dumps(block, ensure_ascii=False))
     return "\n".join(line for line in lines if line).strip()
-

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from uuid import uuid4
 
 from sqlalchemy.engine import Engine
 from sqlmodel import SQLModel
@@ -8,7 +9,7 @@ from sqlmodel import SQLModel
 from ...exceptions import ValidationError
 from . import models  # noqa: F401
 
-CURRENT_SCHEMA_VERSION = 10
+CURRENT_SCHEMA_VERSION = 12
 
 
 def get_user_version(engine: Engine) -> int:
@@ -476,6 +477,168 @@ def migrate_v9_to_v10(engine: Engine) -> int:
     return 10
 
 
+def migrate_v10_to_v11(engine: Engine) -> int:
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE IF NOT EXISTS agent_provider_request (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                thread_id VARCHAR NOT NULL,
+                turn_id VARCHAR NOT NULL,
+                run_id VARCHAR,
+                provider_name VARCHAR,
+                model VARCHAR,
+                request_kind VARCHAR NOT NULL,
+                status VARCHAR NOT NULL,
+                input_message_ids JSON NOT NULL,
+                output_message_ids JSON NOT NULL,
+                usage_payload JSON,
+                created_at DATETIME NOT NULL,
+                completed_at DATETIME,
+                FOREIGN KEY(thread_id) REFERENCES agent_thread (id),
+                FOREIGN KEY(turn_id) REFERENCES agent_turn (id),
+                FOREIGN KEY(run_id) REFERENCES agent_run (id)
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_provider_request_thread_id "
+            "ON agent_provider_request (thread_id)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_provider_request_turn_id "
+            "ON agent_provider_request (turn_id)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_provider_request_run_id "
+            "ON agent_provider_request (run_id)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_provider_request_provider_name "
+            "ON agent_provider_request (provider_name)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_provider_request_model "
+            "ON agent_provider_request (model)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_provider_request_request_kind "
+            "ON agent_provider_request (request_kind)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_provider_request_status "
+            "ON agent_provider_request (status)"
+        )
+        table_names = {
+            str(row[0])
+            for row in connection.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'").all()
+        }
+        if {"agent_thread", "agent_turn", "agent_message"}.issubset(table_names):
+            thread_rows = connection.exec_driver_sql(
+                """
+                SELECT id, system_prompt, created_at
+                FROM agent_thread
+                """
+            ).all()
+            for thread_row in thread_rows:
+                thread_id = str(thread_row[0])
+                has_system_message = connection.exec_driver_sql(
+                    """
+                    SELECT 1
+                    FROM agent_message
+                    WHERE thread_id=? AND kind IN ('SYSTEM', 'system')
+                    LIMIT 1
+                    """,
+                    (thread_id,),
+                ).first()
+                if has_system_message is not None:
+                    continue
+                first_turn = connection.exec_driver_sql(
+                    """
+                    SELECT id, created_at
+                    FROM agent_turn
+                    WHERE thread_id=?
+                    ORDER BY sequence_index
+                    LIMIT 1
+                    """,
+                    (thread_id,),
+                ).first()
+                if first_turn is None:
+                    continue
+                timestamp = first_turn[1] or thread_row[2]
+                system_prompt = str(thread_row[1] or models.DEFAULT_AGENT_THREAD_SYSTEM_PROMPT)
+                connection.exec_driver_sql(
+                    "UPDATE agent_message SET sequence_index=sequence_index + 1 WHERE thread_id=?",
+                    (thread_id,),
+                )
+                connection.exec_driver_sql(
+                    """
+                    INSERT INTO agent_message (
+                        id,
+                        thread_id,
+                        turn_id,
+                        sequence_index,
+                        kind,
+                        ui_author,
+                        content_blocks,
+                        provider_payload,
+                        status,
+                        created_at,
+                        updated_at,
+                        finalized_at
+                    )
+                    VALUES (?, ?, ?, 0, 'SYSTEM', 'SYSTEM', ?, '{}', 'completed', ?, ?, ?)
+                    """,
+                    (
+                        uuid4().hex,
+                        thread_id,
+                        first_turn[0],
+                        json.dumps([{"type": "text", "text": system_prompt}]),
+                        timestamp,
+                        timestamp,
+                        timestamp,
+                    ),
+                )
+        connection.exec_driver_sql("PRAGMA user_version=11")
+    return 11
+
+
+def migrate_v11_to_v12(engine: Engine) -> int:
+    with engine.begin() as connection:
+        table_names = {
+            str(row[0])
+            for row in connection.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'").all()
+        }
+        if "agent_message" in table_names:
+            kind_pairs = {
+                "system": "SYSTEM",
+                "user": "USER",
+                "assistant": "ASSISTANT",
+                "tool_call": "TOOL_CALL",
+                "tool_call_result": "TOOL_CALL_RESULT",
+            }
+            for old_value, new_value in kind_pairs.items():
+                connection.exec_driver_sql(
+                    "UPDATE agent_message SET kind=? WHERE kind=?",
+                    (new_value, old_value),
+                )
+
+            author_pairs = {
+                "system": "SYSTEM",
+                "user": "USER",
+                "assistant": "ASSISTANT",
+                "tool": "TOOL",
+            }
+            for old_value, new_value in author_pairs.items():
+                connection.exec_driver_sql(
+                    "UPDATE agent_message SET ui_author=? WHERE ui_author=?",
+                    (new_value, old_value),
+                )
+
+        connection.exec_driver_sql("PRAGMA user_version=12")
+    return 12
+
+
 def run_migrations(engine: Engine) -> int:
     current_version = get_user_version(engine)
     if current_version == 0:
@@ -498,6 +661,10 @@ def run_migrations(engine: Engine) -> int:
         current_version = migrate_v8_to_v9(engine)
     if current_version == 9:
         current_version = migrate_v9_to_v10(engine)
+    if current_version == 10:
+        current_version = migrate_v10_to_v11(engine)
+    if current_version == 11:
+        current_version = migrate_v11_to_v12(engine)
     if current_version == CURRENT_SCHEMA_VERSION:
         return current_version
     raise ValidationError(

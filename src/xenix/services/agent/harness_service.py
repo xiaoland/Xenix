@@ -13,14 +13,19 @@ from ..storage.models import (
     AgentMessageKind,
     AgentMessageRow,
     AgentMessageStatus,
+    AgentProviderRequestKind,
+    AgentProviderRequestRow,
+    AgentProviderRequestStatus,
     AgentRunStatus,
     AgentToolCallStatus,
 )
 from .conversation_store import (
     AppendAgentMessageInput,
     CompleteToolCallInput,
+    CompleteProviderRequestInput,
     ConversationStore,
     CreateAgentThreadInput,
+    CreateProviderRequestInput,
     CreateTurnCompletionGuardInput,
     CreateToolCallInput,
     FinishAgentRunInput,
@@ -405,10 +410,40 @@ class AgentHarnessService:
             step_state["used_steps"] += 1
             self._raise_if_cancelled(run_id)
             snapshot = self._conversation_store.get_thread_snapshot(thread_id)
-            provider_response = self._provider.complete(snapshot.provider_messages(), self._tool_registry.list_specs())
-            self._raise_if_cancelled(run_id)
+            provider_messages = snapshot.provider_messages()
+            provider_request = self._create_provider_request(
+                thread_id=thread_id,
+                turn_id=turn_id,
+                run_id=run_id,
+                provider=self._provider,
+                request_kind=AgentProviderRequestKind.PRIMARY,
+                input_message_ids=self._provider_input_message_ids(provider_messages),
+            )
+            try:
+                provider_response = self._provider.complete(provider_messages, self._tool_registry.list_specs())
+            except AgentRunCancelled:
+                self._complete_provider_request(
+                    provider_request,
+                    status=AgentProviderRequestStatus.CANCELLED,
+                )
+                raise
+            except Exception:
+                self._complete_provider_request(
+                    provider_request,
+                    status=AgentProviderRequestStatus.FAILED,
+                )
+                raise
+            try:
+                self._raise_if_cancelled(run_id)
+            except AgentRunCancelled:
+                self._complete_provider_request(
+                    provider_request,
+                    status=AgentProviderRequestStatus.CANCELLED,
+                )
+                raise
+            provider_output_message_ids: list[str] = []
             if provider_response.assistant_content_blocks:
-                self._conversation_store.append_message(
+                assistant_message = self._conversation_store.append_message(
                     AppendAgentMessageInput(
                         thread_id=thread_id,
                         turn_id=turn_id,
@@ -418,22 +453,13 @@ class AgentHarnessService:
                         provider_payload=provider_response.raw_payload,
                     )
                 )
+                provider_output_message_ids.append(assistant_message.id)
 
-            if not provider_response.tool_calls:
-                guard_action = self._guard_turn_completion(
-                    thread_id=thread_id,
-                    turn_id=turn_id,
-                    provider_response=provider_response,
-                )
-                if guard_action is not None:
-                    continue
-                self._conversation_store.end_turn(thread_id, turn_id)
-                return self._conversation_store.get_thread_snapshot(thread_id)
-
+            persisted_tool_calls = []
             for tool_call in provider_response.tool_calls:
                 self._raise_if_cancelled(run_id)
                 arguments = self._tool_call_arguments(tool_call.tool_name, tool_call.arguments)
-                _request_message, persisted_tool_call = self._conversation_store.create_tool_call(
+                request_message, persisted_tool_call = self._conversation_store.create_tool_call(
                     CreateToolCallInput(
                         thread_id=thread_id,
                         turn_id=turn_id,
@@ -442,6 +468,31 @@ class AgentHarnessService:
                         provider_payload={"tool_call_id": tool_call.provider_call_id},
                     )
                 )
+                provider_output_message_ids.append(request_message.id)
+                persisted_tool_calls.append((tool_call, arguments, persisted_tool_call))
+
+            self._complete_provider_request(
+                provider_request,
+                status=AgentProviderRequestStatus.SUCCEEDED,
+                output_message_ids=provider_output_message_ids,
+                usage_payload=provider_response.usage_payload,
+            )
+
+            if not provider_response.tool_calls:
+                guard_action = self._guard_turn_completion(
+                    thread_id=thread_id,
+                    turn_id=turn_id,
+                    provider_response=provider_response,
+                    source_message_ids=provider_output_message_ids,
+                    run_id=run_id,
+                )
+                if guard_action is not None:
+                    continue
+                self._conversation_store.end_turn(thread_id, turn_id)
+                return self._conversation_store.get_thread_snapshot(thread_id)
+
+            for tool_call, arguments, persisted_tool_call in persisted_tool_calls:
+                self._raise_if_cancelled(run_id)
                 try:
                     result = self._tool_registry.execute(
                         tool_call.tool_name,
@@ -504,9 +555,19 @@ class AgentHarnessService:
             step_state["used_steps"] += 1
             self._raise_if_cancelled(run_id)
             snapshot = self._conversation_store.get_thread_snapshot(thread_id)
+            provider_messages = snapshot.provider_messages()
+            provider_request = self._create_provider_request(
+                thread_id=thread_id,
+                turn_id=turn_id,
+                run_id=run_id,
+                provider=self._provider,
+                request_kind=AgentProviderRequestKind.PRIMARY,
+                input_message_ids=self._provider_input_message_ids(provider_messages),
+            )
             provider_response: ProviderResponse | None = None
             assistant_message: AgentMessageRow | None = None
             assistant_text = ""
+            provider_output_message_ids: list[str] = []
             thinking_in_progress = True
             yield self._thinking_event(
                 thread_id=thread_id,
@@ -515,7 +576,7 @@ class AgentHarnessService:
                 status=ChatbotEventStatus.IN_PROGRESS,
             )
             try:
-                for stream_event in self._provider_stream(snapshot.provider_messages(), self._tool_registry.list_specs()):
+                for stream_event in self._provider_stream(provider_messages, self._tool_registry.list_specs()):
                     self._raise_if_cancelled(run_id)
                     if thinking_in_progress:
                         thinking_in_progress = False
@@ -553,6 +614,10 @@ class AgentHarnessService:
                         provider_response = stream_event.response
                 self._raise_if_cancelled(run_id)
             except AgentRunCancelled:
+                self._complete_provider_request(
+                    provider_request,
+                    status=AgentProviderRequestStatus.CANCELLED,
+                )
                 if thinking_in_progress:
                     yield self._thinking_event(
                         thread_id=thread_id,
@@ -570,6 +635,10 @@ class AgentHarnessService:
                     yield self._message_event("message_finalized", assistant_message, run_id)
                 raise
             except Exception:
+                self._complete_provider_request(
+                    provider_request,
+                    status=AgentProviderRequestStatus.FAILED,
+                )
                 if thinking_in_progress:
                     yield self._thinking_event(
                         thread_id=thread_id,
@@ -604,6 +673,10 @@ class AgentHarnessService:
                         )
                     )
                     yield self._message_event("message_finalized", assistant_message, run_id)
+                self._complete_provider_request(
+                    provider_request,
+                    status=AgentProviderRequestStatus.FAILED,
+                )
                 raise ValidationError("Provider stream ended without a completed response.")
 
             final_assistant_blocks = provider_response.assistant_content_blocks
@@ -632,19 +705,10 @@ class AgentHarnessService:
                         )
                     )
                     yield self._message_event("message_finalized", assistant_message, run_id)
+                if assistant_message.id not in provider_output_message_ids:
+                    provider_output_message_ids.append(assistant_message.id)
 
-            if not provider_response.tool_calls:
-                guard_action = self._guard_turn_completion(
-                    thread_id=thread_id,
-                    turn_id=turn_id,
-                    provider_response=provider_response,
-                )
-                if guard_action is not None:
-                    yield self._message_event("message_created", guard_action, run_id)
-                    continue
-                self._conversation_store.end_turn(thread_id, turn_id)
-                return self._conversation_store.get_thread_snapshot(thread_id)
-
+            persisted_tool_calls = []
             for tool_call in provider_response.tool_calls:
                 self._raise_if_cancelled(run_id)
                 arguments = self._tool_call_arguments(tool_call.tool_name, tool_call.arguments)
@@ -657,6 +721,8 @@ class AgentHarnessService:
                         provider_payload={"tool_call_id": tool_call.provider_call_id},
                     )
                 )
+                provider_output_message_ids.append(request_message.id)
+                persisted_tool_calls.append((tool_call, arguments, request_message, persisted_tool_call))
                 yield self._tool_event(
                     "message_created",
                     request_message,
@@ -664,6 +730,30 @@ class AgentHarnessService:
                     tool_call=persisted_tool_call,
                     request_message=request_message,
                 )
+
+            self._complete_provider_request(
+                provider_request,
+                status=AgentProviderRequestStatus.SUCCEEDED,
+                output_message_ids=provider_output_message_ids,
+                usage_payload=provider_response.usage_payload,
+            )
+
+            if not provider_response.tool_calls:
+                guard_action = self._guard_turn_completion(
+                    thread_id=thread_id,
+                    turn_id=turn_id,
+                    provider_response=provider_response,
+                    source_message_ids=provider_output_message_ids,
+                    run_id=run_id,
+                )
+                if guard_action is not None:
+                    yield self._message_event("message_created", guard_action, run_id)
+                    continue
+                self._conversation_store.end_turn(thread_id, turn_id)
+                return self._conversation_store.get_thread_snapshot(thread_id)
+
+            for tool_call, arguments, request_message, persisted_tool_call in persisted_tool_calls:
+                self._raise_if_cancelled(run_id)
                 try:
                     result = self._tool_registry.execute(
                         tool_call.tool_name,
@@ -730,6 +820,62 @@ class AgentHarnessService:
             "extension_step_limit": self._step_extension_limit,
             "max_total_steps": self._max_total_steps,
         }
+
+    def _create_provider_request(
+        self,
+        *,
+        thread_id: str,
+        turn_id: str,
+        run_id: str | None,
+        provider: AgentProvider,
+        request_kind: AgentProviderRequestKind,
+        input_message_ids: list[str],
+    ) -> AgentProviderRequestRow:
+        return self._conversation_store.create_provider_request(
+            CreateProviderRequestInput(
+                thread_id=thread_id,
+                turn_id=turn_id,
+                run_id=run_id,
+                provider_name=type(provider).__name__,
+                model=self._provider_model(provider),
+                request_kind=request_kind,
+                input_message_ids=input_message_ids,
+            )
+        )
+
+    def _complete_provider_request(
+        self,
+        provider_request: AgentProviderRequestRow,
+        *,
+        status: AgentProviderRequestStatus,
+        output_message_ids: list[str] | None = None,
+        usage_payload: dict[str, Any] | None = None,
+    ) -> AgentProviderRequestRow:
+        return self._conversation_store.complete_provider_request(
+            CompleteProviderRequestInput(
+                provider_request_id=provider_request.id,
+                status=status,
+                output_message_ids=list(output_message_ids or []),
+                usage_payload=usage_payload,
+            )
+        )
+
+    def _provider_model(self, provider: AgentProvider) -> str | None:
+        model = getattr(provider, "model", None)
+        if isinstance(model, str) and model.strip():
+            return model
+        model = getattr(provider, "_model", None)
+        if isinstance(model, str) and model.strip():
+            return model
+        return None
+
+    def _provider_input_message_ids(self, messages) -> list[str]:
+        ids: list[str] = []
+        for message in messages:
+            source_id = getattr(message, "source_message_id", None)
+            if isinstance(source_id, str) and source_id:
+                ids.append(source_id)
+        return ids
 
     def _usage_payload(self, step_state: dict[str, int]) -> dict[str, Any]:
         return {"step_budget": dict(step_state)}
@@ -878,6 +1024,8 @@ class AgentHarnessService:
         thread_id: str,
         turn_id: str,
         provider_response: ProviderResponse,
+        source_message_ids: list[str],
+        run_id: str | None,
     ) -> AgentMessageRow | None:
         if self._turn_completion_guard is None:
             return None
@@ -896,7 +1044,36 @@ class AgentHarnessService:
             return None
         attempt_index = len(guard_rows)
 
+        provider_request = self._create_provider_request(
+            thread_id=thread_id,
+            turn_id=turn_id,
+            run_id=run_id,
+            provider=self._turn_completion_guard.provider,
+            request_kind=AgentProviderRequestKind.GUARD,
+            input_message_ids=list(source_message_ids),
+        )
         result = self._turn_completion_guard.evaluate(last_assistant_text)
+        guard_action: AgentMessageRow | None = None
+        if result.verdict is TurnCompletionGuardVerdict.CONTINUE:
+            guard_action = self._conversation_store.append_message(
+                AppendAgentMessageInput(
+                    thread_id=thread_id,
+                    turn_id=turn_id,
+                    kind=AgentMessageKind.SYSTEM,
+                    ui_author=AgentMessageAuthor.SYSTEM,
+                    content_blocks=[{"type": "markdown", "text": TURN_COMPLETION_GUARD_REMINDER}],
+                )
+            )
+        self._complete_provider_request(
+            provider_request,
+            status=(
+                AgentProviderRequestStatus.FAILED
+                if result.provider_failed
+                else AgentProviderRequestStatus.SUCCEEDED
+            ),
+            output_message_ids=[guard_action.id] if guard_action is not None else [],
+            usage_payload=result.usage_payload,
+        )
         self._conversation_store.create_turn_completion_guard(
             CreateTurnCompletionGuardInput(
                 turn_id=turn_id,
@@ -908,18 +1085,7 @@ class AgentHarnessService:
                 },
             )
         )
-        if result.verdict is not TurnCompletionGuardVerdict.CONTINUE:
-            return None
-
-        return self._conversation_store.append_message(
-            AppendAgentMessageInput(
-                thread_id=thread_id,
-                turn_id=turn_id,
-                kind=AgentMessageKind.SYSTEM,
-                ui_author=AgentMessageAuthor.SYSTEM,
-                content_blocks=[{"type": "markdown", "text": TURN_COMPLETION_GUARD_REMINDER}],
-            )
-        )
+        return guard_action
 
     def _tool_result_content_blocks(
         self,

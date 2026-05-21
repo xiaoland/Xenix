@@ -8,6 +8,8 @@ from sqlmodel import Session, col, select
 from ..models import (
     AgentMessageRow,
     AgentMessageStatus,
+    AgentProviderRequestRow,
+    AgentProviderRequestStatus,
     AgentRunRow,
     AgentRunStatus,
     AgentThreadRow,
@@ -68,14 +70,21 @@ class AgentConversationRepository:
             session.add(turn)
         session.flush()
 
-        runs = session.exec(select(AgentRunRow).where(AgentRunRow.thread_id == thread_id)).all()
-        for run in runs:
-            session.delete(run)
+        provider_requests = session.exec(
+            select(AgentProviderRequestRow).where(AgentProviderRequestRow.thread_id == thread_id)
+        ).all()
+        for provider_request in provider_requests:
+            session.delete(provider_request)
         session.flush()
 
         tool_calls = session.exec(select(AgentToolCallRow).where(AgentToolCallRow.thread_id == thread_id)).all()
         for tool_call in tool_calls:
             session.delete(tool_call)
+        session.flush()
+
+        runs = session.exec(select(AgentRunRow).where(AgentRunRow.thread_id == thread_id)).all()
+        for run in runs:
+            session.delete(run)
         session.flush()
 
         turn_ids = [turn.id for turn in turns]
@@ -314,6 +323,55 @@ class AgentConversationRepository:
         row.result_payload = result_payload
         row.error_summary = error_summary
         row.updated_at = now
+        session.add(row)
+        session.flush()
+        session.refresh(row)
+        return row
+
+    def create_provider_request(self, session: Session, row: AgentProviderRequestRow) -> AgentProviderRequestRow:
+        session.add(row)
+        session.flush()
+        session.refresh(row)
+        return row
+
+    def get_provider_request(self, session: Session, provider_request_id: str) -> AgentProviderRequestRow | None:
+        return session.get(AgentProviderRequestRow, provider_request_id)
+
+    def list_provider_requests(self, session: Session, thread_id: str) -> list[AgentProviderRequestRow]:
+        statement = (
+            select(AgentProviderRequestRow)
+            .where(AgentProviderRequestRow.thread_id == thread_id)
+            .order_by(AgentProviderRequestRow.created_at)
+        )
+        return list(session.exec(statement))
+
+    def list_provider_requests_by_turn(self, session: Session, turn_id: str) -> list[AgentProviderRequestRow]:
+        statement = (
+            select(AgentProviderRequestRow)
+            .where(AgentProviderRequestRow.turn_id == turn_id)
+            .order_by(AgentProviderRequestRow.created_at)
+        )
+        return list(session.exec(statement))
+
+    def complete_provider_request(
+        self,
+        session: Session,
+        provider_request_id: str,
+        status: AgentProviderRequestStatus,
+        completed_at: datetime,
+        *,
+        output_message_ids: list[str] | None = None,
+        usage_payload: dict | None = None,
+    ) -> AgentProviderRequestRow | None:
+        row = self.get_provider_request(session, provider_request_id)
+        if row is None:
+            return None
+
+        row.status = status
+        if output_message_ids is not None:
+            row.output_message_ids = output_message_ids
+        row.usage_payload = usage_payload
+        row.completed_at = completed_at
         session.add(row)
         session.flush()
         session.refresh(row)

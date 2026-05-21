@@ -4,17 +4,17 @@
 <context>
     <name>ChatMessageBubble</name>
     <message>
-        <location filename="../ui/chatbot.py" line="395"/>
+        <location filename="../ui/chatbot.py" line="432"/>
         <source>You</source>
         <translation>你</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="397"/>
+        <location filename="../ui/chatbot.py" line="434"/>
         <source>Tool</source>
         <translation>工具</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="399"/>
+        <location filename="../ui/chatbot.py" line="436"/>
         <source>System</source>
         <translation>系统</translation>
     </message>
@@ -511,46 +511,46 @@ This route will stay available after model selection is connected.</source>
         <translation>已请求</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="754"/>
+        <location filename="../ui/chatbot.py" line="838"/>
         <source>Message Xenix</source>
         <translation>给 Xenix 发消息</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="755"/>
-        <location filename="../ui/chatbot.py" line="756"/>
-        <location filename="../ui/chatbot.py" line="1030"/>
-        <location filename="../ui/chatbot.py" line="1041"/>
+        <location filename="../ui/chatbot.py" line="839"/>
+        <location filename="../ui/chatbot.py" line="840"/>
+        <location filename="../ui/chatbot.py" line="1127"/>
+        <location filename="../ui/chatbot.py" line="1138"/>
         <source>Attach files</source>
         <translation>添加文件</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="757"/>
+        <location filename="../ui/chatbot.py" line="841"/>
         <source>Continue</source>
         <translation>继续</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="758"/>
-        <location filename="../ui/chatbot.py" line="980"/>
+        <location filename="../ui/chatbot.py" line="842"/>
+        <location filename="../ui/chatbot.py" line="1077"/>
         <source>Stop</source>
         <translation>停止</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="759"/>
+        <location filename="../ui/chatbot.py" line="843"/>
         <source>Drop files to attach</source>
         <translation>拖放文件以添加附件</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="760"/>
+        <location filename="../ui/chatbot.py" line="844"/>
         <source>Release here to add them to the next message</source>
         <translation>松开后添加到下一条消息</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="980"/>
+        <location filename="../ui/chatbot.py" line="1077"/>
         <source>Send</source>
         <translation>发送</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1032"/>
+        <location filename="../ui/chatbot.py" line="1129"/>
         <source>Data files (*.csv *.xlsx *.xls);;All files (*)</source>
         <translation>数据文件 (*.csv *.xlsx *.xls);;所有文件 (*)</translation>
     </message>
@@ -840,12 +840,12 @@ This route will stay available after model selection is connected.</source>
         <translation>模型应用已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="516"/>
+        <location filename="../ui/chatbot.py" line="553"/>
         <source>Details</source>
         <translation>详情</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="517"/>
+        <location filename="../ui/chatbot.py" line="554"/>
         <source>Open tool call details</source>
         <translation>打开工具调用详情</translation>
     </message>
@@ -870,14 +870,27 @@ This route will stay available after model selection is connected.</source>
         <translation type="vanished">预测运行已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="525"/>
+        <location filename="../ui/chatbot.py" line="562"/>
         <source>Hide result</source>
         <translation>隐藏结果</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="525"/>
+        <location filename="../ui/chatbot.py" line="562"/>
         <source>Show result</source>
         <translation>显示结果</translation>
+    </message>
+</context>
+<context>
+    <name>UsageOverviewItem</name>
+    <message>
+        <location filename="../ui/chatbot.py" line="203"/>
+        <source> ({cached} cached)</source>
+        <translation>（{cached} 缓存命中）</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="207"/>
+        <source>↑ {input} · ↓ {output}</source>
+        <translation>↑ {input} · ↓ {output}</translation>
     </message>
 </context>
 <context>

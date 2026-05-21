@@ -52,7 +52,7 @@ Keep canonical source datasets outside the runtime directory. Dataset registrati
 
 Dataset import and dataset inspection read the user-managed source file directly. Agent Harness and data services register app-managed dataset artifacts when data tools produce derived files. `data.query` returns bounded tool-result payloads by default; `data.transform` writes transformed CSV artifacts under `artifacts/datasets/transformed/`.
 
-Current SQLite development baseline is `user_version=10`. Application startup runs forward migrations from supported earlier baselines. If a local development database belongs to an obsolete schema baseline, delete `state/xenix.db` under the active runtime home and restart the app so bootstrap recreates the current AI-first schema.
+Current SQLite development baseline is `user_version=12`. Application startup runs forward migrations from supported earlier baselines. If a local development database belongs to an obsolete schema baseline, delete `state/xenix.db` under the active runtime home and restart the app so bootstrap recreates the current AI-first schema.
 
 When a migration fails during development:
 
@@ -62,7 +62,9 @@ When a migration fails during development:
 4. Fix app-owned bad persisted values with a new forward-only data migration. Do not mask known bad SQLite rows with tolerant ORM reads.
 5. Re-run bootstrap or `pdm run smoke` against the same runtime home.
 
-Agent Message lifecycle status is stored as lowercase enum values in SQLite, for example `in_progress`, `completed`, `failed`, and `cancelled`.
+Agent Message kind and UI author are stored as SQLAlchemy enum member names in SQLite, for example `SYSTEM`, `USER`, and `ASSISTANT`. Agent Message lifecycle status is stored as lowercase enum values, for example `in_progress`, `completed`, `failed`, and `cancelled`.
+
+Provider request usage records are stored in `agent_provider_request`. Each row records one primary or guard LLM provider request, input/output Message ids, provider/model metadata, request status, and normalized token usage when the provider reports it. The first hidden system prompt is stored as a system row in `agent_message` on the first turn and remains hidden from the Chatbot timeline.
 
 ML task type, ML task status, and ML task artifact kind are stored as lowercase enum values in SQLite, for example `fit`, `hyperparameter_tuning`, `apply`, `pending`, `succeeded`, and `apply_result`. Historical `INFERENCE` task values are migrated to `apply`; historical inspect-dataset task rows are removed because dataset inspection is runtime-derived and is not an ML task.
 

@@ -81,20 +81,25 @@ Agent Harness owns:
 
 - Thread, Turn, Message, tool-call, and tool-result semantics
 - LLM provider dialect boundaries
+- Provider request recording and token usage projection
 - Static LLM-facing tool registry
 - Tool execution sequencing
 - Run recording and cancellation
 - Step budget tracking and user confirmation when a turn needs additional provider/tool steps
 
-Thread records own a system prompt. When Agent Harness constructs provider messages, it prepends that system prompt as the first provider-facing system message. The system prompt stays thread metadata and stays hidden from the Chatbot timeline.
+The first turn owns the hidden system Message used as the first provider-facing message. Empty threads do not send a provider request. When the first user message starts the first turn, Agent Harness persists the system Message before the user Message; the system Message remains hidden from the Chatbot timeline but remains part of provider-facing conversation history.
+
+Provider requests are recorded separately from Messages. A provider request row records the provider/model boundary, request kind, lifecycle status, persisted input Message ids, persisted output Message ids, and normalized token usage when the provider reports it. Token usage is aggregated from provider request rows rather than inferred from Messages.
 
 Turn progression:
 
-- A turn starts by persisting one user Message.
+- Each user submission starts a turn around one user Message.
+- The first turn also persists the hidden system Message before the first user Message.
 - A provider response with assistant content persists an assistant Message.
 - A provider response with tool calls persists tool-call Messages, executes matching tools, persists tool-result Messages, and continues the provider loop.
 - A provider response with zero tool calls ends the turn.
 - Empty assistant content with zero tool calls also ends the turn.
+- When a turn ends and provider usage is available, Chatbot may show a turn-level token usage overview inline after the turn.
 
 Provider boundaries:
 

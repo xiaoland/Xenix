@@ -4,17 +4,17 @@
 <context>
     <name>ChatMessageBubble</name>
     <message>
-        <location filename="../ui/chatbot.py" line="395"/>
+        <location filename="../ui/chatbot.py" line="432"/>
         <source>You</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="397"/>
+        <location filename="../ui/chatbot.py" line="434"/>
         <source>Tool</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="399"/>
+        <location filename="../ui/chatbot.py" line="436"/>
         <source>System</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1109,46 +1109,46 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="754"/>
+        <location filename="../ui/chatbot.py" line="838"/>
         <source>Message Xenix</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="755"/>
-        <location filename="../ui/chatbot.py" line="756"/>
-        <location filename="../ui/chatbot.py" line="1030"/>
-        <location filename="../ui/chatbot.py" line="1041"/>
+        <location filename="../ui/chatbot.py" line="839"/>
+        <location filename="../ui/chatbot.py" line="840"/>
+        <location filename="../ui/chatbot.py" line="1127"/>
+        <location filename="../ui/chatbot.py" line="1138"/>
         <source>Attach files</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="757"/>
+        <location filename="../ui/chatbot.py" line="841"/>
         <source>Continue</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="758"/>
-        <location filename="../ui/chatbot.py" line="980"/>
+        <location filename="../ui/chatbot.py" line="842"/>
+        <location filename="../ui/chatbot.py" line="1077"/>
         <source>Stop</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="759"/>
+        <location filename="../ui/chatbot.py" line="843"/>
         <source>Drop files to attach</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="760"/>
+        <location filename="../ui/chatbot.py" line="844"/>
         <source>Release here to add them to the next message</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="980"/>
+        <location filename="../ui/chatbot.py" line="1077"/>
         <source>Send</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1032"/>
+        <location filename="../ui/chatbot.py" line="1129"/>
         <source>Data files (*.csv *.xlsx *.xls);;All files (*)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1430,24 +1430,37 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="516"/>
+        <location filename="../ui/chatbot.py" line="553"/>
         <source>Details</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="517"/>
+        <location filename="../ui/chatbot.py" line="554"/>
         <source>Open tool call details</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="525"/>
+        <location filename="../ui/chatbot.py" line="562"/>
         <source>Hide result</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="525"/>
+        <location filename="../ui/chatbot.py" line="562"/>
         <source>Show result</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>UsageOverviewItem</name>
+    <message>
+        <location filename="../ui/chatbot.py" line="203"/>
+        <source> ({cached} cached)</source>
+        <translation> ({cached} cached)</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="207"/>
+        <source>↑ {input} · ↓ {output}</source>
+        <translation>↑ {input} · ↓ {output}</translation>
     </message>
 </context>
 <context>

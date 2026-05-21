@@ -9,8 +9,10 @@ from xenix.services.agent import (
     ChatbotEventKind,
     ChatbotEventStatus,
     CompleteToolCallInput,
+    CompleteProviderRequestInput,
     ConversationStore,
     CreateAgentThreadInput,
+    CreateProviderRequestInput,
     CreateToolCallInput,
     RenameAgentThreadInput,
     StartAgentRunInput,
@@ -27,6 +29,8 @@ from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import (
     AgentMessageAuthor,
     AgentMessageKind,
+    AgentProviderRequestKind,
+    AgentProviderRequestStatus,
     AgentToolCallStatus,
     AgentTurnStatus,
     ArtifactKind,
@@ -94,18 +98,22 @@ def test_conversation_store_persists_thread_turn_messages_and_tool_calls(monkeyp
     assert ended_turn.user_message_id == user_message.id
     assert completed_tool_call.result_message_id == result_message.id
     assert [message.kind for message in snapshot.messages] == [
+        AgentMessageKind.SYSTEM,
         AgentMessageKind.USER,
         AgentMessageKind.ASSISTANT,
         AgentMessageKind.TOOL_CALL,
         AgentMessageKind.TOOL_CALL_RESULT,
         AgentMessageKind.ASSISTANT,
     ]
-    assert snapshot.messages[1].id == assistant_message.id
-    assert snapshot.messages[4].id == final_assistant_message.id
+    assert snapshot.messages[0].turn_id == turn.id
+    assert snapshot.messages[0].content_blocks == [{"type": "text", "text": DEFAULT_AGENT_THREAD_SYSTEM_PROMPT}]
+    assert snapshot.messages[2].id == assistant_message.id
+    assert snapshot.messages[5].id == final_assistant_message.id
     assert snapshot.tool_calls[0].tool_name == "data.peek"
     assert snapshot.tool_calls[0].arguments_payload == {"name": "First analysis"}
     assert provider_messages[0].role == "system"
     assert provider_messages[0].content == DEFAULT_AGENT_THREAD_SYSTEM_PROMPT
+    assert provider_messages[0].source_message_id == snapshot.messages[0].id
     assert [message.role for message in provider_messages[1:]] == ["user", "assistant", "tool", "assistant"]
 
 
@@ -155,6 +163,55 @@ def test_chatbot_event_projection_pairs_tool_call_messages(monkeypatch, tmp_path
     assert final_tool_events[0].status is ChatbotEventStatus.FAILED
     assert final_tool_events[0].summary == "Failed to inspect dataset"
     assert final_tool_events[0].source_message_ids == [request_message.id, result_message.id]
+
+
+def test_chatbot_event_projection_adds_turn_usage_overview(monkeypatch, tmp_path: Path) -> None:
+    conversations, _artifacts = _build_services(monkeypatch, tmp_path)
+
+    thread = conversations.create_thread(CreateAgentThreadInput(title="Usage projection"))
+    turn, user_message = conversations.start_turn(
+        StartTurnInput(
+            thread_id=thread.id,
+            user_content_blocks=[{"type": "text", "text": "Summarize token use"}],
+        )
+    )
+    snapshot = conversations.get_thread_snapshot(thread.id)
+    system_message = next(message for message in snapshot.messages if message.kind is AgentMessageKind.SYSTEM)
+    provider_request = conversations.create_provider_request(
+        CreateProviderRequestInput(
+            thread_id=thread.id,
+            turn_id=turn.id,
+            provider_name="TestProvider",
+            model="usage-model",
+            request_kind=AgentProviderRequestKind.PRIMARY,
+            input_message_ids=[system_message.id, user_message.id],
+        )
+    )
+    conversations.complete_provider_request(
+        CompleteProviderRequestInput(
+            provider_request_id=provider_request.id,
+            status=AgentProviderRequestStatus.SUCCEEDED,
+            usage_payload={
+                "input_tokens": 9800,
+                "cached_input_tokens": 1900,
+                "output_tokens": 2630,
+                "total_tokens": 12430,
+            },
+        )
+    )
+    conversations.end_turn(thread.id, turn.id)
+
+    events = project_chatbot_events(conversations.get_thread_snapshot(thread.id))
+
+    assert [event.kind for event in events] == [ChatbotEventKind.TEXT, ChatbotEventKind.USAGE]
+    assert events[-1].id == f"{turn.id}:usage"
+    assert events[-1].usage_payload == {
+        "request_count": 1,
+        "input_tokens": 9800,
+        "cached_input_tokens": 1900,
+        "output_tokens": 2630,
+        "total_tokens": 12430,
+    }
 
 
 def test_chatbot_event_projection_exposes_tool_task_actions(monkeypatch, tmp_path: Path) -> None:

@@ -108,6 +108,18 @@ class AgentToolCallStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class AgentProviderRequestKind(StrEnum):
+    PRIMARY = "primary"
+    GUARD = "guard"
+
+
+class AgentProviderRequestStatus(StrEnum):
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 class ArtifactKind(StrEnum):
     DATASET = "dataset"
     MODEL = "model"
@@ -333,6 +345,53 @@ class AgentTurnCompletionGuardRow(SQLModel, table=True):
         sa_column=Column(JSON, nullable=False),
     )
     created_at: datetime = Field(default_factory=utc_now)
+
+
+class AgentProviderRequestRow(SQLModel, table=True):
+    __tablename__ = "agent_provider_request"
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    thread_id: str = Field(foreign_key="agent_thread.id", index=True)
+    turn_id: str = Field(foreign_key="agent_turn.id", index=True)
+    run_id: str | None = Field(default=None, foreign_key="agent_run.id", index=True)
+    provider_name: str | None = Field(default=None, index=True)
+    model: str | None = Field(default=None, index=True)
+    request_kind: AgentProviderRequestKind = Field(
+        default=AgentProviderRequestKind.PRIMARY,
+        sa_column=Column(
+            SQLAlchemyEnum(
+                AgentProviderRequestKind,
+                values_callable=lambda enum_class: [member.value for member in enum_class],
+            ),
+            nullable=False,
+            index=True,
+        ),
+    )
+    status: AgentProviderRequestStatus = Field(
+        default=AgentProviderRequestStatus.RUNNING,
+        sa_column=Column(
+            SQLAlchemyEnum(
+                AgentProviderRequestStatus,
+                values_callable=lambda enum_class: [member.value for member in enum_class],
+            ),
+            nullable=False,
+            index=True,
+        ),
+    )
+    input_message_ids: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    output_message_ids: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    usage_payload: dict[str, Any] | None = Field(
+        default=None,
+        sa_column=Column(JSON, nullable=True),
+    )
+    created_at: datetime = Field(default_factory=utc_now)
+    completed_at: datetime | None = None
 
 
 class ArtifactRow(SQLModel, table=True):

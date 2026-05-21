@@ -13,6 +13,8 @@ from xenix.services.storage.layout import (
 )
 from xenix.services.storage.migrations import CURRENT_SCHEMA_VERSION, get_user_version
 from xenix.services.storage.models import (
+    AgentMessageAuthor,
+    AgentMessageKind,
     AgentMessageRow,
     AgentMessageStatus,
     MLTaskArtifactKind,
@@ -996,6 +998,303 @@ def test_storage_bootstrap_migrates_v9_ml_task_enum_values(
     assert artifact.artifact_kind is MLTaskArtifactKind.APPLY_RESULT
 
 
+def test_storage_bootstrap_migrates_v10_provider_request_schema_and_system_message(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    db_path = database_path(paths)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    import sqlite3
+
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE agent_thread (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                title VARCHAR,
+                system_prompt VARCHAR NOT NULL,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE agent_turn (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                thread_id VARCHAR NOT NULL,
+                sequence_index INTEGER NOT NULL,
+                status VARCHAR,
+                user_message_id VARCHAR,
+                created_at DATETIME NOT NULL,
+                ended_at DATETIME,
+                updated_at DATETIME NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE agent_message (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                thread_id VARCHAR NOT NULL,
+                turn_id VARCHAR,
+                sequence_index INTEGER NOT NULL,
+                kind VARCHAR,
+                ui_author VARCHAR,
+                content_blocks JSON NOT NULL,
+                provider_payload JSON NOT NULL,
+                status VARCHAR,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                finalized_at DATETIME
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO agent_thread (
+                id,
+                title,
+                system_prompt,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                'thread-1',
+                'Analysis',
+                'You are Xenix.',
+                '2026-05-21T00:00:00Z',
+                '2026-05-21T00:00:00Z'
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO agent_turn (
+                id,
+                thread_id,
+                sequence_index,
+                status,
+                user_message_id,
+                created_at,
+                ended_at,
+                updated_at
+            )
+            VALUES (
+                'turn-1',
+                'thread-1',
+                0,
+                'ended',
+                'message-user',
+                '2026-05-21T00:01:00Z',
+                '2026-05-21T00:02:00Z',
+                '2026-05-21T00:02:00Z'
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO agent_message (
+                id,
+                thread_id,
+                turn_id,
+                sequence_index,
+                kind,
+                ui_author,
+                content_blocks,
+                provider_payload,
+                status,
+                created_at,
+                updated_at,
+                finalized_at
+            )
+            VALUES (
+                'message-user',
+                'thread-1',
+                'turn-1',
+                0,
+                'user',
+                'user',
+                '[{"type":"text","text":"Analyze this file"}]',
+                '{}',
+                'completed',
+                '2026-05-21T00:01:00Z',
+                '2026-05-21T00:01:00Z',
+                '2026-05-21T00:01:00Z'
+            )
+            """
+        )
+        connection.execute("PRAGMA user_version=10")
+
+    context = StorageBootstrapService().initialize(paths)
+
+    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
+    assert {
+        "thread_id",
+        "turn_id",
+        "run_id",
+        "provider_name",
+        "model",
+        "request_kind",
+        "status",
+        "input_message_ids",
+        "output_message_ids",
+        "usage_payload",
+        "created_at",
+        "completed_at",
+    }.issubset(_table_columns(context, "agent_provider_request"))
+    with context.engine.connect() as connection:
+        message_rows = connection.exec_driver_sql(
+            """
+            SELECT id, kind, ui_author, turn_id, sequence_index, content_blocks
+            FROM agent_message
+            WHERE thread_id='thread-1'
+            ORDER BY sequence_index
+            """
+        ).all()
+
+    assert [str(row[1]) for row in message_rows] == ["SYSTEM", "USER"]
+    assert [int(row[4]) for row in message_rows] == [0, 1]
+    assert str(message_rows[0][2]) == "SYSTEM"
+    assert str(message_rows[0][3]) == "turn-1"
+    assert json.loads(str(message_rows[0][5])) == [{"type": "text", "text": "You are Xenix."}]
+    with context.session_factory() as session:
+        system_message = session.get(AgentMessageRow, str(message_rows[0][0]))
+
+    assert system_message is not None
+    assert system_message.kind is AgentMessageKind.SYSTEM
+    assert system_message.ui_author is AgentMessageAuthor.SYSTEM
+    assert system_message.status is AgentMessageStatus.COMPLETED
+
+
+def test_storage_bootstrap_migrates_v11_message_enum_names(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    db_path = database_path(paths)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    import sqlite3
+
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE agent_message (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                thread_id VARCHAR NOT NULL,
+                turn_id VARCHAR,
+                sequence_index INTEGER NOT NULL,
+                kind VARCHAR,
+                ui_author VARCHAR,
+                content_blocks JSON NOT NULL,
+                provider_payload JSON NOT NULL,
+                status VARCHAR,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                finalized_at DATETIME
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO agent_message (
+                id,
+                thread_id,
+                turn_id,
+                sequence_index,
+                kind,
+                ui_author,
+                content_blocks,
+                provider_payload,
+                status,
+                created_at,
+                updated_at,
+                finalized_at
+            )
+            VALUES (
+                'message-system',
+                'thread-1',
+                'turn-1',
+                0,
+                'system',
+                'system',
+                '[{"type":"text","text":"You are Xenix."}]',
+                '{}',
+                'completed',
+                '2026-05-21T00:01:00Z',
+                '2026-05-21T00:01:00Z',
+                '2026-05-21T00:01:00Z'
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO agent_message (
+                id,
+                thread_id,
+                turn_id,
+                sequence_index,
+                kind,
+                ui_author,
+                content_blocks,
+                provider_payload,
+                status,
+                created_at,
+                updated_at,
+                finalized_at
+            )
+            VALUES (
+                'message-user',
+                'thread-1',
+                'turn-1',
+                1,
+                'user',
+                'user',
+                '[{"type":"text","text":"Analyze this file"}]',
+                '{}',
+                'completed',
+                '2026-05-21T00:01:00Z',
+                '2026-05-21T00:01:00Z',
+                '2026-05-21T00:01:00Z'
+            )
+            """
+        )
+        connection.execute("PRAGMA user_version=11")
+
+    context = StorageBootstrapService().initialize(paths)
+
+    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
+    with context.engine.connect() as connection:
+        rows = connection.exec_driver_sql(
+            """
+            SELECT id, kind, ui_author, status
+            FROM agent_message
+            ORDER BY sequence_index
+            """
+        ).all()
+
+    assert [(str(row[1]), str(row[2]), str(row[3])) for row in rows] == [
+        ("SYSTEM", "SYSTEM", "completed"),
+        ("USER", "USER", "completed"),
+    ]
+    with context.session_factory() as session:
+        system_message = session.get(AgentMessageRow, "message-system")
+        user_message = session.get(AgentMessageRow, "message-user")
+
+    assert system_message is not None
+    assert system_message.kind is AgentMessageKind.SYSTEM
+    assert system_message.ui_author is AgentMessageAuthor.SYSTEM
+    assert system_message.status is AgentMessageStatus.COMPLETED
+    assert user_message is not None
+    assert user_message.kind is AgentMessageKind.USER
+    assert user_message.ui_author is AgentMessageAuthor.USER
+
+
 def test_storage_bootstrap_uses_ai_first_baseline_without_work_item_schema(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
@@ -1031,12 +1330,17 @@ def test_storage_bootstrap_uses_ai_first_baseline_without_work_item_schema(monke
             str(row[1])
             for row in connection.exec_driver_sql("PRAGMA table_info(agent_turn_completion_guard)").all()
         }
+        provider_request_columns = {
+            str(row[1])
+            for row in connection.exec_driver_sql("PRAGMA table_info(agent_provider_request)").all()
+        }
 
-    assert CURRENT_SCHEMA_VERSION == 10
+    assert CURRENT_SCHEMA_VERSION == 12
     assert "work_item" not in table_names
     assert "dataset_column_selection" not in table_names
     assert "dataset_column_binding" in table_names
     assert "agent_turn_completion_guard" in table_names
+    assert "agent_provider_request" in table_names
     assert "derived_from_dataset_id" in dataset_columns
     assert {
         "dataset_id",
@@ -1048,6 +1352,20 @@ def test_storage_bootstrap_uses_ai_first_baseline_without_work_item_schema(monke
         "created_at",
     }.issubset(column_binding_columns)
     assert {"turn_id", "attempt_index", "input", "output", "created_at"}.issubset(guard_columns)
+    assert {
+        "thread_id",
+        "turn_id",
+        "run_id",
+        "provider_name",
+        "model",
+        "request_kind",
+        "status",
+        "input_message_ids",
+        "output_message_ids",
+        "usage_payload",
+        "created_at",
+        "completed_at",
+    }.issubset(provider_request_columns)
     assert {"status", "updated_at", "finalized_at"}.issubset(agent_message_columns)
     assert "work_item_id" not in ml_task_columns
     assert "work_item_id" not in trained_model_columns

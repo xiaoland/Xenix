@@ -26,6 +26,7 @@ from xenix.services.storage.models import (
     AgentMessageStatus,
     ArtifactKind,
 )
+from xenix.ui.chatbot import _format_token_count
 from xenix.ui.startup_splash import StartupStage
 
 
@@ -350,6 +351,53 @@ def test_thread_detail_view_expands_tool_event_detail(monkeypatch, tmp_path: Pat
         assert "Source file is missing." in item._detail_browser.toPlainText()
     finally:
         window.close()
+
+
+def test_thread_detail_view_renders_turn_usage_overview(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=True)
+    try:
+        view = window._thread_detail_view
+        view.clear_messages()
+        view.apply_chatbot_event(
+            ChatbotEvent(
+                id="turn-usage",
+                kind=ChatbotEventKind.USAGE,
+                turn_id="turn",
+                sequence_index=3,
+                author=ChatbotEventAuthor.ASSISTANT,
+                status=ChatbotEventStatus.COMPLETED,
+                usage_payload={
+                    "request_count": 3,
+                    "input_tokens": 9800,
+                    "cached_input_tokens": 1900,
+                    "output_tokens": 2630,
+                    "total_tokens": 12430,
+                },
+            )
+        )
+        app.processEvents()
+
+        item = view._event_widgets_by_id["turn-usage"]
+        assert item.objectName() == "chatUsageOverviewItem"
+        assert item._label.text() == "↑ 9.8k (1.9k cached) · ↓ 2.6k"
+        assert item._label.alignment() & Qt.AlignLeft
+        assert item._label.font().pointSize() < view.font().pointSize()
+        assert item._label.palette().color(QPalette.ColorRole.WindowText) == item._label.palette().color(
+            QPalette.ColorRole.PlaceholderText
+        )
+    finally:
+        window.close()
+
+
+def test_token_count_format_uses_k_after_999() -> None:
+    assert _format_token_count(999) == "999"
+    assert _format_token_count(1000) == "1.0k"
+    assert _format_token_count(1050) == "1.1k"
+    assert _format_token_count(12430) == "12.4k"
 
 
 def test_main_window_new_thread_button_creates_and_selects_empty_thread(monkeypatch, tmp_path: Path) -> None:
