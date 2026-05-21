@@ -35,3 +35,4 @@
 - Add or update unit tests when changing config resolution, logging, resource loading, ML task orchestration, or storage boundaries.
 - Add contract tests for any boundary that crosses UI, services, ML adapters, SQLite, or the filesystem.
 - Prefer executable checks over prose when a guarantee can be enforced in tests or CI.
+- Do not add tests that only restate facts already guaranteed by source definitions, type contracts, enum membership, schema definitions, or data models. Tests should cover observable behavior, boundary contracts, migrations, error handling, and integration risks rather than asserting that a constant, enum value, or field list has a particular shape.
