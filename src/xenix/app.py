@@ -4,8 +4,9 @@ import logging
 import sys
 from pathlib import Path
 
+from PySide6.QtCore import QCoreApplication, QElapsedTimer, QEventLoop, QThread
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 
 from .config import APP_NAME, APP_ORGANIZATION, ensure_app_dirs, get_app_paths
 from .exceptions import install_exception_hooks
@@ -27,8 +28,10 @@ from .services.ml_task_service import MLTaskService
 from .services.storage import StorageBootstrapService
 from .services.storage.layout import database_path
 from .ui.main_window import MainWindow
+from .ui.startup_splash import StartupSplash, StartupStage
 
 LOGGER = logging.getLogger("xenix.bootstrap")
+STARTUP_SPLASH_HOLD_MS = 2200
 
 
 def create_application() -> QApplication:
@@ -45,58 +48,115 @@ def create_application() -> QApplication:
     return app
 
 
-def build_main_window(*, show: bool = True) -> tuple[QApplication, MainWindow]:
-    paths = ensure_app_dirs(get_app_paths())
-    log_path = setup_logging(paths)
-    install_exception_hooks()
-    context = StorageBootstrapService().initialize(paths)
+def _update_startup_stage(app: QApplication, splash: StartupSplash | None, stage: StartupStage) -> None:
+    if splash is None:
+        return
+    splash.set_stage(stage)
+    app.processEvents()
 
-    dataset_service = DatasetService(context.session_factory, paths)
-    data_cleaning_service = DataCleaningService(paths)
-    data_transform_service = DataQueryTransformService(paths)
-    ml_task_service = MLTaskService(context.session_factory, paths)
-    ml_service = MLService(
-        paths,
-        context.session_factory,
-        dataset_service,
-        ml_task_service,
-    )
-    artifact_service = ArtifactService(context.session_factory)
-    conversation_store = ConversationStore(context.session_factory)
-    agent_settings_service = AgentSettingsService(paths)
-    agent_tool_registry = AgentToolRegistry(
-        paths=paths,
-        dataset_service=dataset_service,
-        data_cleaning_service=data_cleaning_service,
-        data_transform_service=data_transform_service,
-        ml_service=ml_service,
-        artifact_service=artifact_service,
-    )
-    agent_harness_service = AgentHarnessService(
-        session_factory=context.session_factory,
-        provider=agent_settings_service.build_provider(),
-        turn_completion_guard_provider=agent_settings_service.build_turn_completion_guard_provider(),
-        tool_registry=agent_tool_registry,
-        conversation_store=conversation_store,
-    )
 
+def _close_startup_splash(app: QApplication, splash: StartupSplash | None) -> None:
+    if splash is None:
+        return
+    splash.close()
+    splash.deleteLater()
+    app.processEvents()
+
+
+def _hold_startup_splash(app: QApplication, splash: StartupSplash | None, hold_ms: int) -> None:
+    if splash is None or hold_ms <= 0:
+        return
+
+    timer = QElapsedTimer()
+    timer.start()
+    while timer.elapsed() < hold_ms:
+        app.processEvents(QEventLoop.ProcessEventsFlag.AllEvents, 50)
+        QThread.msleep(16)
+
+
+def build_main_window(
+    *,
+    show: bool = True,
+    show_splash: bool | None = None,
+    splash_hold_ms: int = 0,
+) -> tuple[QApplication, MainWindow]:
     app = create_application()
-    translation_manager = TranslationManager(app, paths)
-    translation_manager.initialize()
-    window = MainWindow(
-        paths=paths,
-        log_path=log_path,
-        db_path=database_path(paths),
-        translation_manager=translation_manager,
-        agent_harness_service=agent_harness_service,
-        agent_settings_service=agent_settings_service,
-        artifact_service=artifact_service,
-    )
-    if show:
-        window.show()
+    should_show_splash = show if show_splash is None else show_splash
+    splash = StartupSplash() if should_show_splash else None
 
-    LOGGER.info("Xenix native shell started")
-    return app, window
+    if splash is not None:
+        splash.show_centered()
+        _update_startup_stage(app, splash, StartupStage.STARTING)
+
+    try:
+        _update_startup_stage(app, splash, StartupStage.PREPARING_APP_DATA)
+        paths = ensure_app_dirs(get_app_paths())
+
+        _update_startup_stage(app, splash, StartupStage.INITIALIZING_LOGGING)
+        log_path = setup_logging(paths)
+        install_exception_hooks()
+
+        translation_manager = TranslationManager(app, paths)
+        translation_manager.initialize()
+        if splash is not None:
+            splash.retranslate_ui()
+
+        _update_startup_stage(app, splash, StartupStage.INITIALIZING_STORAGE)
+        context = StorageBootstrapService().initialize(paths)
+
+        _update_startup_stage(app, splash, StartupStage.LOADING_WORKBENCH)
+        dataset_service = DatasetService(context.session_factory, paths)
+        data_cleaning_service = DataCleaningService(paths)
+        data_transform_service = DataQueryTransformService(paths)
+        ml_task_service = MLTaskService(context.session_factory, paths)
+        ml_service = MLService(
+            paths,
+            context.session_factory,
+            dataset_service,
+            ml_task_service,
+        )
+        artifact_service = ArtifactService(context.session_factory)
+        conversation_store = ConversationStore(context.session_factory)
+        agent_settings_service = AgentSettingsService(paths)
+        agent_tool_registry = AgentToolRegistry(
+            paths=paths,
+            dataset_service=dataset_service,
+            data_cleaning_service=data_cleaning_service,
+            data_transform_service=data_transform_service,
+            ml_service=ml_service,
+            artifact_service=artifact_service,
+        )
+        agent_harness_service = AgentHarnessService(
+            session_factory=context.session_factory,
+            provider=agent_settings_service.build_provider(),
+            turn_completion_guard_provider=agent_settings_service.build_turn_completion_guard_provider(),
+            tool_registry=agent_tool_registry,
+            conversation_store=conversation_store,
+        )
+
+        window = MainWindow(
+            paths=paths,
+            log_path=log_path,
+            db_path=database_path(paths),
+            translation_manager=translation_manager,
+            agent_harness_service=agent_harness_service,
+            agent_settings_service=agent_settings_service,
+            artifact_service=artifact_service,
+            ml_service=ml_service,
+        )
+
+        _update_startup_stage(app, splash, StartupStage.READY)
+        _hold_startup_splash(app, splash, splash_hold_ms)
+        _close_startup_splash(app, splash)
+        if show:
+            window.show()
+            app.processEvents()
+
+        LOGGER.info("Xenix native shell started")
+        return app, window
+    except Exception:
+        _close_startup_splash(app, splash)
+        raise
 
 
 def _run_smoke_checks(paths) -> None:
@@ -120,7 +180,26 @@ def _run_smoke_checks(paths) -> None:
 
 
 def run(*, smoke_test: bool = False) -> int:
-    app, window = build_main_window(show=not smoke_test)
+    try:
+        app, window = build_main_window(
+            show=not smoke_test,
+            show_splash=not smoke_test,
+            splash_hold_ms=0 if smoke_test else STARTUP_SPLASH_HOLD_MS,
+        )
+    except Exception as exc:
+        if smoke_test:
+            raise
+        app = QApplication.instance() or create_application()
+        QMessageBox.critical(
+            None,
+            QCoreApplication.translate("XenixStartup", "Unable to start Xenix"),
+            QCoreApplication.translate(
+                "XenixStartup",
+                "Xenix could not finish startup.\n\n{error}",
+            ).format(error=exc),
+        )
+        return 1
+
     if smoke_test:
         _run_smoke_checks(ensure_app_dirs(get_app_paths()))
         window.show()

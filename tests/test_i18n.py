@@ -9,6 +9,7 @@ from xenix.app import build_main_window
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.i18n import (
     DEFAULT_LOCALE,
+    TranslationManager,
     locale_config_path,
     read_saved_locale,
     resolve_startup_locale,
@@ -21,6 +22,7 @@ from xenix.services.agent import (
     ChatbotEventKind,
     ChatbotEventStatus,
 )
+from xenix.ui.startup_splash import StartupSplash, StartupStage
 
 
 @pytest.fixture()
@@ -174,3 +176,62 @@ def test_main_window_language_switch_updates_chat_shell(
         if window._settings_dialog is not None:
             window._settings_dialog.close()
         window.close()
+
+
+def test_startup_splash_language_switch_updates_stage_text(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    paths = ensure_app_dirs(get_app_paths())
+    translation_manager = TranslationManager(app, paths)
+    translation_manager.set_locale("en_US", persist=False)
+
+    splash = StartupSplash()
+    try:
+        splash.set_stage(StartupStage.INITIALIZING_STORAGE)
+        assert splash._stage_label.text() == "Initializing local database..."
+
+        translation_manager.set_locale("zh_CN", persist=False)
+        app.processEvents()
+
+        assert splash._stage_label.text() == "正在初始化本地数据库..."
+    finally:
+        splash.close()
+        translation_manager.set_locale("en_US", persist=False)
+
+
+def test_startup_splash_renders_nonblank_canvas_offscreen(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    splash = StartupSplash()
+    try:
+        splash.set_stage(StartupStage.LOADING_WORKBENCH)
+        splash.show()
+        app.processEvents()
+
+        pixmap = splash.grab()
+        image = pixmap.toImage()
+
+        assert not pixmap.isNull()
+        assert image.width() == splash.width()
+        assert image.height() == splash.height()
+
+        sampled_colors = set()
+        for x in range(24, image.width() - 24, max(1, image.width() // 8)):
+            for y in range(24, image.height() - 24, max(1, image.height() // 8)):
+                sampled_colors.add(image.pixelColor(x, y).rgba())
+
+        assert len(sampled_colors) > 8
+    finally:
+        splash.close()

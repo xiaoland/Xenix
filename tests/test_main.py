@@ -26,6 +26,7 @@ from xenix.services.storage.models import (
     AgentMessageStatus,
     ArtifactKind,
 )
+from xenix.ui.startup_splash import StartupStage
 
 
 class _FakeFileDropEvent:
@@ -76,6 +77,114 @@ def test_smoke_test_bootstraps_runtime_in_fresh_app_home(monkeypatch, tmp_path: 
     assert (runtime_home / "artifacts").is_dir()
     assert (runtime_home / "state" / "xenix.db").is_file()
     assert (runtime_home / "logs" / "xenix.log").is_file()
+
+
+def test_main_window_reports_startup_splash_stages_when_enabled(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+    created_splashes = []
+
+    class FakeSplash:
+        def __init__(self) -> None:
+            self.stages = []
+            self.shown = False
+            self.retranslated = False
+            self.closed = False
+            self.deleted = False
+            created_splashes.append(self)
+
+        def show_centered(self) -> None:
+            self.shown = True
+
+        def set_stage(self, stage: StartupStage) -> None:
+            self.stages.append(stage)
+
+        def retranslate_ui(self) -> None:
+            self.retranslated = True
+
+        def close(self) -> None:
+            self.closed = True
+
+        def deleteLater(self) -> None:
+            self.deleted = True
+
+    monkeypatch.setattr("xenix.app.StartupSplash", FakeSplash)
+
+    app, window = build_main_window(show=False)
+    try:
+        assert created_splashes == []
+    finally:
+        window.close()
+
+    app, window = build_main_window(show=False, show_splash=True)
+    try:
+        assert len(created_splashes) == 1
+        splash = created_splashes[0]
+        assert splash.shown is True
+        assert splash.retranslated is True
+        assert splash.closed is True
+        assert splash.deleted is True
+        assert splash.stages == [
+            StartupStage.STARTING,
+            StartupStage.PREPARING_APP_DATA,
+            StartupStage.INITIALIZING_LOGGING,
+            StartupStage.INITIALIZING_STORAGE,
+            StartupStage.LOADING_WORKBENCH,
+            StartupStage.READY,
+        ]
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_main_window_holds_ready_splash_before_showing_window(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+    events = []
+
+    class FakeSplash:
+        def __init__(self) -> None:
+            events.append("splash.create")
+
+        def show_centered(self) -> None:
+            events.append("splash.show")
+
+        def set_stage(self, stage: StartupStage) -> None:
+            events.append(f"stage:{stage.name}")
+
+        def retranslate_ui(self) -> None:
+            events.append("splash.retranslate")
+
+        def close(self) -> None:
+            events.append("splash.close")
+
+        def deleteLater(self) -> None:
+            events.append("splash.delete")
+
+    def fake_hold(_app, _splash, hold_ms: int) -> None:
+        events.append(f"splash.hold:{hold_ms}")
+
+    def fake_show(_window) -> None:
+        events.append("window.show")
+
+    monkeypatch.setattr("xenix.app.StartupSplash", FakeSplash)
+    monkeypatch.setattr("xenix.app._hold_startup_splash", fake_hold)
+    monkeypatch.setattr("xenix.app.MainWindow.show", fake_show)
+
+    app, window = build_main_window(show=True, show_splash=True, splash_hold_ms=2200)
+    try:
+        assert events[-5:] == [
+            "stage:READY",
+            "splash.hold:2200",
+            "splash.close",
+            "splash.delete",
+            "window.show",
+        ]
+    finally:
+        window.close()
+        app.processEvents()
 
 
 def test_main_window_keeps_settings_entry_on_thread_detail_view_shell(monkeypatch, tmp_path: Path) -> None:

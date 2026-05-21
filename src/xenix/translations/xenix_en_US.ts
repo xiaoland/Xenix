@@ -1290,4 +1290,57 @@
         <translation type="unfinished"></translation>
     </message>
 </context>
+<context>
+    <name>StartupSplash</name>
+    <message>
+        <location filename="../ui/startup_splash.py" line="382"/>
+        <source>Business ML Workbench</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="398"/>
+        <source>Starting Xenix...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="399"/>
+        <source>Preparing application data...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="400"/>
+        <source>Initializing runtime logging...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="401"/>
+        <source>Initializing local database...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="402"/>
+        <source>Loading workbench...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="403"/>
+        <source>Ready.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>XenixStartup</name>
+    <message>
+        <location filename="../app.py" line="195"/>
+        <source>Unable to start Xenix</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app.py" line="198"/>
+        <source>Xenix could not finish startup.
+
+{error}</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
 </TS>

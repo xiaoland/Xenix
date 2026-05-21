@@ -487,4 +487,59 @@ This route will stay available after model selection is connected.</source>
     </message>
 </context>
 
+<context>
+    <name>StartupSplash</name>
+    <message>
+        <location filename="../ui/startup_splash.py" line="382"/>
+        <source>Business ML Workbench</source>
+        <translation>业务机器学习工作台</translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="398"/>
+        <source>Starting Xenix...</source>
+        <translation>正在启动 Xenix...</translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="399"/>
+        <source>Preparing application data...</source>
+        <translation>正在准备应用数据...</translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="400"/>
+        <source>Initializing runtime logging...</source>
+        <translation>正在初始化运行日志...</translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="401"/>
+        <source>Initializing local database...</source>
+        <translation>正在初始化本地数据库...</translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="402"/>
+        <source>Loading workbench...</source>
+        <translation>正在加载工作台...</translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="403"/>
+        <source>Ready.</source>
+        <translation>准备就绪。</translation>
+    </message>
+</context>
+<context>
+    <name>XenixStartup</name>
+    <message>
+        <location filename="../app.py" line="195"/>
+        <source>Unable to start Xenix</source>
+        <translation>无法启动 Xenix</translation>
+    </message>
+    <message>
+        <location filename="../app.py" line="198"/>
+        <source>Xenix could not finish startup.
+
+{error}</source>
+        <translation>Xenix 未能完成启动。
+
+{error}</translation>
+    </message>
+</context>
 </TS>
