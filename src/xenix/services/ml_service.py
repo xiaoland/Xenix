@@ -45,7 +45,7 @@ from .storage.models import (
     TrainedModelRow,
 )
 from .storage.repositories import DatasetColumnBindingRepository, MLTaskRepository, TrainedModelRepository
-from .trained_model_metadata import parse_trained_model_metadata, with_evaluation
+from .trained_model_metadata import parse_trained_model_metadata, with_evaluation, with_evaluation_task
 
 _COLUMN_NAME_NORMALIZATION_TRANSLATION = str.maketrans(
     {
@@ -274,6 +274,20 @@ class MLService:
         with self._session_factory() as session:
             return self._trained_models.list_by_dataset(session, dataset_id)
 
+    def get_trained_model(self, trained_model_id: str) -> TrainedModelRow | None:
+        with self._session_factory() as session:
+            trained_model = self._trained_models.get(session, trained_model_id)
+            if trained_model is not None:
+                session.expunge(trained_model)
+            return trained_model
+
+    def get_trained_model_by_ml_task(self, ml_task_id: str) -> TrainedModelRow | None:
+        with self._session_factory() as session:
+            trained_model = self._trained_models.get_by_ml_task(session, ml_task_id)
+            if trained_model is not None:
+                session.expunge(trained_model)
+            return trained_model
+
     def apply(self, input_data: ApplyWithFilesInput) -> MLTaskRow:
         apply_context = self._build_apply_context(input_data)
         input_paths = list(input_data.input_files)
@@ -334,12 +348,12 @@ class MLService:
             evaluate_model=EvaluateModelPayload(
                 trained_model_id=trained_model_id,
                 model_key=model_key,
-                source_ml_task_id=task.id,
                 trained_model_artifact_path=canonical_model_path,
                 holdout_artifact_path=holdout_artifact_path,
             ),
         )
         created = self._create_task_from_request(MLTaskType.EVALUATE, evaluate_request)
+        self._attach_evaluation_task_to_trained_model(trained_model_id, created.id)
         self._ml_task_service.submit_ml_task(created.id)
 
     def _update_evaluated_trained_model(self, task: MLTaskRow) -> None:
@@ -350,7 +364,12 @@ class MLService:
             if not isinstance(evaluated_model_id, str):
                 return
             new_metrics = EvaluateTaskResult.model_validate(result_payload).evaluation
-            self._update_trained_model_metadata_with_evaluation(session, evaluated_model_id, new_metrics)
+            self._update_trained_model_metadata_with_evaluation(
+                session,
+                evaluated_model_id,
+                new_metrics,
+                evaluation_ml_task_id=task.id,
+            )
             session.commit()
 
     def _build_training_context(
@@ -739,6 +758,8 @@ class MLService:
         session: Any,
         trained_model_id: str,
         evaluation: CandidateMetrics,
+        *,
+        evaluation_ml_task_id: str | None = None,
     ) -> None:
         trained_model = self._trained_models.get(session, trained_model_id)
         if trained_model is None:
@@ -749,9 +770,33 @@ class MLService:
         self._trained_models.update_metadata(
             session,
             trained_model.id,
-            with_evaluation(metadata, evaluation).model_dump(mode="json"),
+            with_evaluation(
+                metadata,
+                evaluation,
+                evaluation_ml_task_id=evaluation_ml_task_id,
+            ).model_dump(mode="json"),
             _now(),
         )
+
+    def _attach_evaluation_task_to_trained_model(
+        self,
+        trained_model_id: str,
+        evaluation_ml_task_id: str,
+    ) -> None:
+        with self._session_factory() as session:
+            trained_model = self._trained_models.get(session, trained_model_id)
+            if trained_model is None:
+                return
+            metadata = parse_trained_model_metadata(trained_model.metadata_payload)
+            if metadata is None:
+                return
+            self._trained_models.update_metadata(
+                session,
+                trained_model.id,
+                with_evaluation_task(metadata, evaluation_ml_task_id).model_dump(mode="json"),
+                _now(),
+            )
+            session.commit()
 
 
 @dataclass(frozen=True)

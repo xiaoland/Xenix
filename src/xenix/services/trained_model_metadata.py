@@ -53,6 +53,7 @@ class TrainedModelMetadata(BaseModel):
     training_params: dict[str, Any] = Field(default_factory=dict)
     best_params: dict[str, Any] = Field(default_factory=dict)
     tuning_grid: dict[str, list[Any]] = Field(default_factory=dict)
+    evaluation_ml_task_id: str | None = None
     evaluation_primary_metric_name: str | None = None
     evaluation_primary_metric_value: float | None = None
     evaluation_metrics: dict[str, float] = Field(default_factory=dict)
@@ -99,17 +100,27 @@ def build_save_note(model_display_name: str) -> str:
 def with_evaluation(
     metadata: TrainedModelMetadata,
     evaluation: Any,
+    *,
+    evaluation_ml_task_id: str | None = None,
 ) -> TrainedModelMetadata:
-    return metadata.model_copy(
-        update={
-            "evaluation_primary_metric_name": evaluation.primary_metric_name,
-            "evaluation_primary_metric_value": float(evaluation.primary_metric_value),
-            "evaluation_metrics": {
-                str(metric_name): float(metric_value)
-                for metric_name, metric_value in evaluation.metrics.items()
-            },
-        }
-    )
+    update = {
+        "evaluation_primary_metric_name": evaluation.primary_metric_name,
+        "evaluation_primary_metric_value": float(evaluation.primary_metric_value),
+        "evaluation_metrics": {
+            str(metric_name): float(metric_value)
+            for metric_name, metric_value in evaluation.metrics.items()
+        },
+    }
+    if evaluation_ml_task_id:
+        update["evaluation_ml_task_id"] = evaluation_ml_task_id
+    return metadata.model_copy(update=update)
+
+
+def with_evaluation_task(
+    metadata: TrainedModelMetadata,
+    evaluation_ml_task_id: str,
+) -> TrainedModelMetadata:
+    return metadata.model_copy(update={"evaluation_ml_task_id": evaluation_ml_task_id})
 
 
 def artifact_file_name_from_path(artifact_path: str) -> str:

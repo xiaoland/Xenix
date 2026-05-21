@@ -79,7 +79,6 @@ class HyperparameterTuningPayload(BaseModel):
 class EvaluateModelPayload(BaseModel):
     trained_model_id: str
     model_key: str
-    source_ml_task_id: str
     trained_model_artifact_path: str
     holdout_artifact_path: str
 

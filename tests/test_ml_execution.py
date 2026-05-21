@@ -234,7 +234,13 @@ def test_dataset_scoped_fit_evaluate_and_apply_run(monkeypatch, tmp_path: Path) 
     assert metadata.train_role_bindings == fit_details.task.request_payload["train_role_bindings"]
     assert metadata.source_run_name == "Direct demand analysis"
     assert metadata.evaluation_kind == "regression"
+    assert metadata.evaluation_ml_task_id is not None
     assert metadata.evaluation_primary_metric_name == "r2"
+    evaluate_details = ml_service.get_task_details(metadata.evaluation_ml_task_id)
+    assert evaluate_details.task.task_type is MLTaskType.EVALUATE
+    assert evaluate_details.task.request_payload["evaluate_model"]["trained_model_id"] == trained_models[0].id
+    assert evaluate_details.task.result_payload is not None
+    assert evaluate_details.task.result_payload["trained_model_id"] == trained_models[0].id
     assert apply_details.task.task_type is MLTaskType.APPLY
     assert result_dataset is not None
     assert "prediction" in Path(result_dataset.source_path).read_text(encoding="utf-8").splitlines()[0]

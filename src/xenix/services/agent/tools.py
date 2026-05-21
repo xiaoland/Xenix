@@ -30,7 +30,15 @@ from ..ml_service import (
     MLService,
     TuneWithEvaluateInput,
 )
-from ..storage.models import ArtifactKind, MLTaskArtifactKind, MLTaskRow, MLTaskStatus, ProblemKind, TrainedModelRow
+from ..storage.models import (
+    ArtifactKind,
+    MLTaskArtifactKind,
+    MLTaskRow,
+    MLTaskStatus,
+    MLTaskType,
+    ProblemKind,
+    TrainedModelRow,
+)
 from .providers import AgentToolSpec
 
 
@@ -970,7 +978,6 @@ class AgentToolRegistry:
         )
         binding = self._ml_service.get_column_binding(binding_id)
         dataset_id = binding.dataset_id
-        before_ids = {task.id for task in self._ml_service.list_dataset_tasks(dataset_id)}
         created_task_ids: list[str] = []
         for model_key in models:
             self._raise_if_cancelled(context)
@@ -983,22 +990,19 @@ class AgentToolRegistry:
                 )
             )
             created_task_ids.append(created.id)
-        tasks = self._wait_for_new_dataset_tasks_or_none(
-            dataset_id,
-            before_ids,
+        training_result = self._wait_for_training_models_or_none(
             created_task_ids,
             context=context,
             timeout_seconds=MODEL_TRAIN_GRACE_SECONDS,
         )
-        if tasks is None:
+        if training_result is None:
             return self._training_task_receipt(
                 tool_name="model.train",
                 dataset_id=dataset_id,
-                before_ids=before_ids,
                 root_task_ids=created_task_ids,
                 operation="fit",
             )
-        trained_models = self._ml_service.list_dataset_trained_models(dataset_id)
+        tasks, trained_models = training_result
         payload = {
             "async_state": "completed",
             "dataset_id": dataset_id,
@@ -1025,7 +1029,6 @@ class AgentToolRegistry:
         )
         binding = self._ml_service.get_column_binding(binding_id)
         dataset_id = binding.dataset_id
-        before_ids = {task.id for task in self._ml_service.list_dataset_tasks(dataset_id)}
         created_task_ids: list[str] = []
         for model_key, grid in normalized_grids.items():
             self._raise_if_cancelled(context)
@@ -1038,22 +1041,19 @@ class AgentToolRegistry:
                 )
             )
             created_task_ids.append(created.id)
-        tasks = self._wait_for_new_dataset_tasks_or_none(
-            dataset_id,
-            before_ids,
+        training_result = self._wait_for_training_models_or_none(
             created_task_ids,
             context=context,
             timeout_seconds=MODEL_HYPER_TRAIN_GRACE_SECONDS,
         )
-        if tasks is None:
+        if training_result is None:
             return self._training_task_receipt(
                 tool_name="model.hyper_train",
                 dataset_id=dataset_id,
-                before_ids=before_ids,
                 root_task_ids=created_task_ids,
                 operation="hyperparameter_tuning",
             )
-        trained_models = self._ml_service.list_dataset_trained_models(dataset_id)
+        tasks, trained_models = training_result
         payload = {
             "async_state": "completed",
             "dataset_id": dataset_id,
@@ -1316,52 +1316,52 @@ class AgentToolRegistry:
             raise ValidationError("Only .csv, .xlsx, and .xls dataset files are supported.")
         return load_dataframe(path, source_format)
 
-    def _wait_for_new_dataset_tasks(
+    def _wait_for_training_models_or_none(
         self,
-        dataset_id: str,
-        before_ids: set[str],
-        created_task_ids: list[str],
-        *,
-        context: ToolExecutionContext,
-        timeout_seconds: float = 120.0,
-    ) -> list:
-        tasks = self._wait_for_new_dataset_tasks_or_none(
-            dataset_id,
-            before_ids,
-            created_task_ids,
-            context=context,
-            timeout_seconds=timeout_seconds,
-        )
-        if tasks is None:
-            raise ValidationError("Timed out waiting for ML training tasks.")
-        return tasks
-
-    def _wait_for_new_dataset_tasks_or_none(
-        self,
-        dataset_id: str,
-        before_ids: set[str],
-        created_task_ids: list[str],
+        root_task_ids: list[str],
         *,
         context: ToolExecutionContext,
         timeout_seconds: float,
-    ) -> list[MLTaskRow] | None:
-        expected_count = 0
-        for task_id in created_task_ids:
-            details = self._ml_service.get_task_details(task_id)
-            catalog = get_model_catalog_entry(
-                details.task.request_payload.get("manual_training", {}).get("model_key")
-                or details.task.request_payload.get("hyperparameter_tuning", {}).get("model_key")
-            )
-            expected_count += 2 if catalog.requires_target else 1
+    ) -> tuple[list[MLTaskRow], list[TrainedModelRow]] | None:
         deadline = time.time() + timeout_seconds
         while time.time() < deadline:
-            self._raise_if_cancelled(context, ml_task_ids=created_task_ids)
-            new_tasks = self._new_dataset_tasks(dataset_id, before_ids, root_task_ids=created_task_ids)
-            failed = [task for task in new_tasks if task.status in {MLTaskStatus.FAILED, MLTaskStatus.CANCELLED}]
+            root_tasks = [self._ml_service.get_task_details(task_id).task for task_id in root_task_ids]
+            trained_models = self._trained_models_for_root_tasks(root_task_ids)
+            related_tasks = self._related_training_tasks(root_tasks, trained_models)
+            self._raise_if_cancelled(
+                context,
+                ml_task_ids=[task.id for task in related_tasks] or root_task_ids,
+            )
+
+            failed = [
+                task
+                for task in related_tasks
+                if task.status in {MLTaskStatus.FAILED, MLTaskStatus.CANCELLED}
+            ]
             if failed:
                 raise ValidationError(f"ML task '{failed[0].id}' finished with status '{failed[0].status.value}'.")
-            if len(new_tasks) >= expected_count and all(task.status in self._terminal_statuses() for task in new_tasks):
-                return new_tasks
+
+            root_tasks_succeeded = all(task.status is MLTaskStatus.SUCCEEDED for task in root_tasks)
+            if root_tasks_succeeded and len(trained_models) == len(root_task_ids):
+                pending_evaluation = False
+                models_by_root_task = {model.ml_task_id: model for model in trained_models}
+                for root_task in root_tasks:
+                    model = models_by_root_task.get(root_task.id)
+                    if model is None:
+                        pending_evaluation = True
+                        break
+                    if self._training_task_requires_follow_up_evaluation(root_task):
+                        evaluation_task_id = self._evaluation_task_id_for_model(model)
+                        if not evaluation_task_id:
+                            pending_evaluation = True
+                            break
+                        evaluation_task = self._ml_service.get_task_details(evaluation_task_id).task
+                        if evaluation_task.status is not MLTaskStatus.SUCCEEDED:
+                            pending_evaluation = True
+                            break
+                if not pending_evaluation:
+                    return self._related_training_tasks(root_tasks, trained_models), trained_models
+
             time.sleep(0.1)
         return None
 
@@ -1389,24 +1389,6 @@ class AgentToolRegistry:
             time.sleep(0.1)
         return None
 
-    def _new_dataset_tasks(
-        self,
-        dataset_id: str,
-        before_ids: set[str],
-        *,
-        root_task_ids: list[str] | None = None,
-    ) -> list[MLTaskRow]:
-        tasks = [task for task in self._ml_service.list_dataset_tasks(dataset_id) if task.id not in before_ids]
-        root_id_set = set(root_task_ids or [])
-        if not root_id_set:
-            return tasks
-        return [
-            task
-            for task in tasks
-            if task.id in root_id_set
-            or task.request_payload.get("evaluate_model", {}).get("source_ml_task_id") in root_id_set
-        ]
-
     def _raise_if_cancelled(self, context: ToolExecutionContext, *, ml_task_ids: list[str] | None = None) -> None:
         if not context.cancel_requested():
             return
@@ -1421,16 +1403,54 @@ class AgentToolRegistry:
     def _terminal_statuses(self) -> set[MLTaskStatus]:
         return {MLTaskStatus.SUCCEEDED, MLTaskStatus.FAILED, MLTaskStatus.CANCELLED}
 
+    def _trained_models_for_root_tasks(self, root_task_ids: list[str]) -> list[TrainedModelRow]:
+        models_by_task_id: dict[str, TrainedModelRow] = {}
+        for task_id in root_task_ids:
+            model = self._ml_service.get_trained_model_by_ml_task(task_id)
+            if model is not None:
+                models_by_task_id[task_id] = model
+        return [models_by_task_id[task_id] for task_id in root_task_ids if task_id in models_by_task_id]
+
+    def _related_training_tasks(
+        self,
+        root_tasks: list[MLTaskRow],
+        trained_models: list[TrainedModelRow],
+    ) -> list[MLTaskRow]:
+        tasks: list[MLTaskRow] = []
+        seen_task_ids: set[str] = set()
+        for task in root_tasks:
+            tasks.append(task)
+            seen_task_ids.add(task.id)
+        for model in trained_models:
+            evaluation_task_id = self._evaluation_task_id_for_model(model)
+            if not evaluation_task_id or evaluation_task_id in seen_task_ids:
+                continue
+            task = self._ml_service.get_task_details(evaluation_task_id).task
+            tasks.append(task)
+            seen_task_ids.add(task.id)
+        return tasks
+
+    def _evaluation_task_id_for_model(self, model: TrainedModelRow) -> str | None:
+        task_id = model.metadata_payload.get("evaluation_ml_task_id")
+        if isinstance(task_id, str) and task_id.strip():
+            return task_id
+        return None
+
+    def _training_task_requires_follow_up_evaluation(self, task: MLTaskRow) -> bool:
+        continuation = task.request_payload.get("continuation_plan")
+        return isinstance(continuation, dict) and continuation.get("next_operation") == "evaluate"
+
     def _training_task_receipt(
         self,
         *,
         tool_name: str,
         dataset_id: str,
-        before_ids: set[str],
         root_task_ids: list[str],
         operation: str,
     ) -> ToolExecutionResult:
-        tasks = self._new_dataset_tasks(dataset_id, before_ids, root_task_ids=root_task_ids)
+        root_tasks = [self._ml_service.get_task_details(task_id).task for task_id in root_task_ids]
+        trained_models = self._trained_models_for_root_tasks(root_task_ids)
+        tasks = self._related_training_tasks(root_tasks, trained_models)
         task_ids = [task.id for task in tasks] or list(root_task_ids)
         can_cancel_task_ids = [
             task.id for task in tasks if task.status in {MLTaskStatus.PENDING, MLTaskStatus.RUNNING}
@@ -1443,7 +1463,7 @@ class AgentToolRegistry:
             "root_task_ids": list(root_task_ids),
             "can_cancel_task_ids": can_cancel_task_ids,
             "ml_tasks": [self._ml_task_payload(task) for task in tasks],
-            "trained_models": [self._trained_model_payload(model) for model in self._ml_service.list_dataset_trained_models(dataset_id)],
+            "trained_models": [self._trained_model_payload(model) for model in trained_models],
         }
         summary = (
             "Model tuning running in background"
@@ -1563,14 +1583,13 @@ class AgentToolRegistry:
         return None
 
     def _follow_up_task_ids(self, task: MLTaskRow) -> list[str]:
-        if task.dataset_id is None:
+        if task.task_type not in {MLTaskType.FIT, MLTaskType.HYPERPARAMETER_TUNING}:
             return []
-        follow_ups: list[str] = []
-        for candidate in self._ml_service.list_dataset_tasks(task.dataset_id):
-            source_id = candidate.request_payload.get("evaluate_model", {}).get("source_ml_task_id")
-            if source_id == task.id:
-                follow_ups.append(candidate.id)
-        return follow_ups
+        model = self._ml_service.get_trained_model_by_ml_task(task.id)
+        if model is None:
+            return []
+        evaluation_task_id = self._evaluation_task_id_for_model(model)
+        return [evaluation_task_id] if evaluation_task_id else []
 
     def _trained_model_payload(self, model: TrainedModelRow) -> dict[str, Any]:
         return {
