@@ -35,7 +35,8 @@ package = "python scripts/package_app.py"
 smoke = "python scripts/run_dev.py --smoke-test"
 smoke-package = "python scripts/verify_packaged_smoke.py"
 dist = "python scripts/build_distribution_zip.py"
-test = "pytest"
+pytest = "python scripts/run_pytest.py"
+test = "python scripts/run_pytest.py"
 check = "python -m compileall src tests scripts"
 
 [tool.pytest.ini_options]
