@@ -9,6 +9,7 @@ from xenix.exceptions import ValidationError
 from xenix.services.agent import (
     AgentHarnessService,
     AgentToolRegistry,
+    CompleteToolCallInput,
     ConversationStore,
     CreateAgentThreadInput,
     CreateToolCallInput,
@@ -184,6 +185,61 @@ def _build_first_slice_runtime(monkeypatch, tmp_path: Path, *, worker_runner=Non
     return context, registry
 
 
+class ToolCaptureProvider:
+    def __init__(self) -> None:
+        self.tools_by_call: list[list[str]] = []
+
+    def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
+        self.tools_by_call.append([tool.name for tool in tools])
+        return ProviderResponse(
+            assistant_content_blocks=[{"type": "markdown", "text": "Ready."}],
+            tool_calls=[],
+        )
+
+
+class HiddenToolCallProvider:
+    def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
+        return ProviderResponse(
+            tool_calls=[
+                ProviderToolCall(
+                    provider_call_id="call-hidden-train",
+                    tool_name="model.train",
+                    arguments={},
+                )
+            ],
+        )
+
+
+class PeekFromThreadFilesProvider:
+    def __init__(self) -> None:
+        self.tools_by_call: list[list[str]] = []
+
+    def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
+        self.tools_by_call.append([tool.name for tool in tools])
+        if self._find_payload_value(messages, "dataset_id") is not None:
+            return ProviderResponse(
+                assistant_content_blocks=[{"type": "markdown", "text": "Inspected previous file."}],
+                tool_calls=[],
+            )
+        return ProviderResponse(
+            tool_calls=[
+                ProviderToolCall(
+                    provider_call_id="call-peek-previous-file",
+                    tool_name="data.peek",
+                    arguments={"name": "previous_file_dataset"},
+                )
+            ],
+        )
+
+    def _find_payload_value(self, messages: list[Any], key: str) -> str | None:
+        for message in reversed(messages):
+            for block in reversed(message.content_blocks):
+                payload = block.get("payload")
+                if isinstance(payload, dict) and isinstance(payload.get(key), str):
+                    return payload[key]
+        return None
+
+
 def _tool_context() -> ToolExecutionContext:
     return ToolExecutionContext(
         thread_id="thread-id",
@@ -218,6 +274,185 @@ def _persisted_tool_context(context) -> ToolExecutionContext:
     )
 
 
+def _seed_tool_payload(context, tool_name: str, payload: dict[str, Any]) -> str:
+    conversations = ConversationStore(context.session_factory)
+    thread = conversations.create_thread(CreateAgentThreadInput(title="Seeded tool context"))
+    turn, _user_message = conversations.start_turn(
+        StartTurnInput(
+            thread_id=thread.id,
+            user_content_blocks=[{"type": "text", "text": "Prepare context"}],
+        )
+    )
+    _request_message, tool_call = conversations.create_tool_call(
+        CreateToolCallInput(
+            thread_id=thread.id,
+            turn_id=turn.id,
+            tool_name=tool_name,
+            arguments_payload={},
+        )
+    )
+    conversations.complete_tool_call(
+        CompleteToolCallInput(
+            tool_call_id=tool_call.id,
+            result_payload=payload,
+            content_blocks=[{"type": "tool_result_payload", "payload": payload}],
+        )
+    )
+    conversations.end_turn(thread.id, turn.id)
+    return thread.id
+
+
+def test_agent_harness_hides_data_and_training_tools_without_context(monkeypatch, tmp_path: Path) -> None:
+    context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
+    provider = ToolCaptureProvider()
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=provider,
+        tool_registry=registry,
+        conversation_store=ConversationStore(context.session_factory),
+    )
+
+    harness.submit_user_turn(SubmitUserTurnInput(text="hello"))
+
+    tool_names = provider.tools_by_call[0]
+    assert not any(name.startswith("data.") for name in tool_names)
+    assert "model.train" not in tool_names
+    assert "model.hyper_train" not in tool_names
+    assert "model.apply" not in tool_names
+    assert "model.metadata" in tool_names
+    assert "model.task.query" in tool_names
+
+
+def test_agent_harness_exposes_data_tools_when_file_is_attached(monkeypatch, tmp_path: Path) -> None:
+    context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
+    provider = ToolCaptureProvider()
+    source_file = tmp_path / "source.csv"
+    source_file.write_text("value\n1\n", encoding="utf-8")
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=provider,
+        tool_registry=registry,
+        conversation_store=ConversationStore(context.session_factory),
+    )
+
+    harness.submit_user_turn(
+        SubmitUserTurnInput(
+            text="inspect this file",
+            file_paths=[str(source_file.resolve())],
+        )
+    )
+
+    tool_names = provider.tools_by_call[0]
+    assert "data.peek" in tool_names
+    assert "data.feature.select" in tool_names
+    assert "model.train" not in tool_names
+    assert "model.hyper_train" not in tool_names
+    assert "model.apply" not in tool_names
+
+
+def test_agent_harness_exposes_and_uses_data_tools_after_prior_thread_file(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
+    source_file = tmp_path / "source.csv"
+    source_file.write_text("value\n1\n", encoding="utf-8")
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=ToolCaptureProvider(),
+        tool_registry=registry,
+        conversation_store=ConversationStore(context.session_factory),
+    )
+    first_snapshot = harness.submit_user_turn(
+        SubmitUserTurnInput(
+            text="keep this file available",
+            file_paths=[str(source_file.resolve())],
+        )
+    )
+    provider = PeekFromThreadFilesProvider()
+    harness.set_provider(provider)
+
+    second_snapshot = harness.submit_user_turn(
+        SubmitUserTurnInput(
+            thread_id=first_snapshot.thread.id,
+            text="inspect the file I already attached",
+        )
+    )
+
+    first_tool_list = provider.tools_by_call[0]
+    assert "data.peek" in first_tool_list
+    assert "data.clean" in first_tool_list
+    assert "data.transform" in first_tool_list
+    assert "data.feature.select" in first_tool_list
+    assert second_snapshot.tool_calls[-1].tool_name == "data.peek"
+    assert second_snapshot.tool_calls[-1].status.value == "succeeded"
+    assert second_snapshot.tool_calls[-1].result_payload["inspection"]["source_path"] == str(source_file.resolve())
+
+
+def test_agent_harness_exposes_training_tools_after_selection_payload(monkeypatch, tmp_path: Path) -> None:
+    context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
+    thread_id = _seed_tool_payload(context, "data.feature.select", {"binding_id": "binding-1"})
+    provider = ToolCaptureProvider()
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=provider,
+        tool_registry=registry,
+        conversation_store=ConversationStore(context.session_factory),
+    )
+
+    harness.submit_user_turn(SubmitUserTurnInput(thread_id=thread_id, text="train now"))
+
+    tool_names = provider.tools_by_call[0]
+    assert not any(name.startswith("data.") for name in tool_names)
+    assert "model.train" in tool_names
+    assert "model.hyper_train" in tool_names
+    assert "model.apply" not in tool_names
+
+
+def test_agent_harness_exposes_apply_after_trained_model_payload(monkeypatch, tmp_path: Path) -> None:
+    context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
+    thread_id = _seed_tool_payload(
+        context,
+        "model.train",
+        {"trained_models": [{"trained_model_id": "trained-model-1"}]},
+    )
+    provider = ToolCaptureProvider()
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=provider,
+        tool_registry=registry,
+        conversation_store=ConversationStore(context.session_factory),
+    )
+
+    harness.submit_user_turn(SubmitUserTurnInput(thread_id=thread_id, text="apply it"))
+
+    tool_names = provider.tools_by_call[0]
+    assert "model.apply" in tool_names
+    assert "model.train" not in tool_names
+    assert "model.hyper_train" not in tool_names
+
+
+def test_agent_harness_rejects_provider_tool_call_that_was_not_exposed(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=HiddenToolCallProvider(),
+        tool_registry=registry,
+        conversation_store=ConversationStore(context.session_factory),
+    )
+    thread = harness.create_thread("Hidden tool call")
+
+    with pytest.raises(ValidationError, match="not attached to this request"):
+        harness.submit_user_turn(SubmitUserTurnInput(thread_id=thread.thread.id, text="train now"))
+
+    snapshot = harness.get_thread_snapshot(thread.thread.id)
+    assert snapshot.provider_requests[0].status.value == "failed"
+    assert snapshot.tool_calls == []
+
+
 def test_agent_harness_model_metadata_exposes_catalog_without_train_enums(monkeypatch, tmp_path: Path) -> None:
     _context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
 
@@ -238,6 +473,11 @@ def test_agent_harness_model_metadata_exposes_catalog_without_train_enums(monkey
     )
 
     assert "model.metadata" in specs
+    assert "data.peek" in specs
+    assert "data.feature.select" in specs
+    assert "model.train" in specs
+    assert "model.hyper_train" in specs
+    assert "model.apply" in specs
     metadata_key_enum = specs["model.metadata"].parameters_schema["properties"]["model_keys"]["items"]["enum"]
     assert "regression.linear" in metadata_key_enum
     assert "model_family" in specs["model.metadata"].parameters_schema["properties"]

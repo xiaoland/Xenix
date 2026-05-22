@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import threading
-from typing import Any
+from typing import Any, Iterator
 
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import Field, SQLModel
@@ -49,8 +49,18 @@ from .chatbot_events import (
     project_text_message_event,
     project_tool_chatbot_event,
 )
-from .providers import AgentProvider, ProviderResponse, ProviderStreamEvent
-from .tools import AgentToolRegistry, ToolExecutionContext, tool_presentation_for_name
+from .providers import (
+    AgentProvider,
+    AgentToolSpec,
+    ProviderResponse,
+    ProviderStreamEvent,
+    ProviderToolCall,
+)
+from .tools import (
+    AgentToolRegistry,
+    ToolExecutionContext,
+    tool_presentation_for_name,
+)
 
 
 class SubmitUserTurnInput(SQLModel):
@@ -81,6 +91,13 @@ class AgentHarnessStreamEvent:
     used_steps: int = 0
     suggested_steps: int = 0
     max_total_steps: int = 0
+
+
+@dataclass(frozen=True)
+class _ToolAvailabilityContext:
+    attached_files: tuple[str, ...] = ()
+    has_selection: bool = False
+    has_trained_model: bool = False
 
 
 @dataclass(frozen=True)
@@ -278,7 +295,7 @@ class AgentHarnessService:
         self._conversation_store.resume_run_after_confirmation(input_data.run_id, self._usage_payload(step_state))
         self._register_cancel_event(input_data.run_id)
         snapshot = self._conversation_store.get_thread_snapshot(input_data.thread_id)
-        file_paths = self._attached_files_for_turn(snapshot, input_data.turn_id)
+        file_paths = self._attached_files_for_thread(snapshot)
         yield AgentHarnessStreamEvent(
             kind="snapshot",
             thread_id=input_data.thread_id,
@@ -411,6 +428,7 @@ class AgentHarnessService:
             self._raise_if_cancelled(run_id)
             snapshot = self._conversation_store.get_thread_snapshot(thread_id)
             provider_messages = snapshot.provider_messages()
+            attached_files = self._attached_files_for_thread(snapshot) or list(file_paths)
             provider_request = self._create_provider_request(
                 thread_id=thread_id,
                 turn_id=turn_id,
@@ -419,8 +437,15 @@ class AgentHarnessService:
                 request_kind=AgentProviderRequestKind.PRIMARY,
                 input_message_ids=self._provider_input_message_ids(provider_messages),
             )
+            tool_specs = self._tool_specs_for_context(snapshot=snapshot, attached_files=attached_files)
+            available_tool_names = {tool.name for tool in tool_specs}
             try:
-                provider_response = self._provider.complete(provider_messages, self._tool_registry.list_specs())
+                provider_response = self._provider.complete(
+                    provider_messages,
+                    tool_specs,
+                )
+                self._raise_if_cancelled(run_id)
+                self._validate_provider_tool_calls(provider_response.tool_calls, available_tool_names)
             except AgentRunCancelled:
                 self._complete_provider_request(
                     provider_request,
@@ -501,7 +526,7 @@ class AgentHarnessService:
                             thread_id=thread_id,
                             turn_id=turn_id,
                             tool_call_id=persisted_tool_call.id,
-                            attached_files=file_paths,
+                            attached_files=attached_files,
                             cancel_requested=lambda run_id=run_id: self._is_cancel_requested(run_id),
                         ),
                     )
@@ -556,6 +581,7 @@ class AgentHarnessService:
             self._raise_if_cancelled(run_id)
             snapshot = self._conversation_store.get_thread_snapshot(thread_id)
             provider_messages = snapshot.provider_messages()
+            attached_files = self._attached_files_for_thread(snapshot) or list(file_paths)
             provider_request = self._create_provider_request(
                 thread_id=thread_id,
                 turn_id=turn_id,
@@ -569,6 +595,8 @@ class AgentHarnessService:
             assistant_text = ""
             provider_output_message_ids: list[str] = []
             thinking_in_progress = True
+            tool_specs = self._tool_specs_for_context(snapshot=snapshot, attached_files=attached_files)
+            available_tool_names = {tool.name for tool in tool_specs}
             yield self._thinking_event(
                 thread_id=thread_id,
                 turn_id=turn_id,
@@ -576,7 +604,10 @@ class AgentHarnessService:
                 status=ChatbotEventStatus.IN_PROGRESS,
             )
             try:
-                for stream_event in self._provider_stream(provider_messages, self._tool_registry.list_specs()):
+                for stream_event in self._provider_stream(
+                    provider_messages,
+                    tool_specs,
+                ):
                     self._raise_if_cancelled(run_id)
                     if thinking_in_progress:
                         thinking_in_progress = False
@@ -678,6 +709,22 @@ class AgentHarnessService:
                     status=AgentProviderRequestStatus.FAILED,
                 )
                 raise ValidationError("Provider stream ended without a completed response.")
+            try:
+                self._validate_provider_tool_calls(provider_response.tool_calls, available_tool_names)
+            except Exception:
+                if assistant_message is not None:
+                    assistant_message = self._conversation_store.update_message(
+                        UpdateAgentMessageInput(
+                            message_id=assistant_message.id,
+                            status=AgentMessageStatus.FAILED,
+                        )
+                    )
+                    yield self._message_event("message_finalized", assistant_message, run_id)
+                self._complete_provider_request(
+                    provider_request,
+                    status=AgentProviderRequestStatus.FAILED,
+                )
+                raise
 
             final_assistant_blocks = provider_response.assistant_content_blocks
             if assistant_message is not None and not final_assistant_blocks:
@@ -762,7 +809,7 @@ class AgentHarnessService:
                             thread_id=thread_id,
                             turn_id=turn_id,
                             tool_call_id=persisted_tool_call.id,
-                            attached_files=file_paths,
+                            attached_files=attached_files,
                             cancel_requested=lambda run_id=run_id: self._is_cancel_requested(run_id),
                         ),
                     )
@@ -1107,16 +1154,86 @@ class AgentHarnessService:
             {"type": "tool_result_payload", "payload": result_payload},
         ]
 
-    def _attached_files_for_turn(self, snapshot: ThreadSnapshot, turn_id: str) -> list[str]:
-        paths: list[str] = []
+    def _tool_specs_for_context(self, *, snapshot: ThreadSnapshot, attached_files: list[str]) -> list[AgentToolSpec]:
+        context = _ToolAvailabilityContext(
+            attached_files=tuple(attached_files),
+            has_selection=self._snapshot_has_payload_key(snapshot, "binding_id"),
+            has_trained_model=self._snapshot_has_trained_model(snapshot),
+        )
+        return [
+            spec
+            for spec in self._tool_registry.list_specs()
+            if self._tool_available_for_context(spec.name, context)
+        ]
+
+    def _tool_available_for_context(self, tool_name: str, context: _ToolAvailabilityContext) -> bool:
+        if tool_name.startswith("data."):
+            return bool(context.attached_files)
+        if tool_name in {"model.train", "model.hyper_train"}:
+            return context.has_selection
+        if tool_name == "model.apply":
+            return context.has_trained_model
+        return True
+
+    def _validate_provider_tool_calls(
+        self,
+        tool_calls: list[ProviderToolCall],
+        available_tool_names: set[str],
+    ) -> None:
+        unavailable_tool_names = sorted({
+            tool_call.tool_name
+            for tool_call in tool_calls
+            if tool_call.tool_name not in available_tool_names
+        })
+        if unavailable_tool_names:
+            raise ValidationError(
+                "Provider requested tools that were not attached to this request: "
+                + ", ".join(unavailable_tool_names)
+            )
+
+    def _snapshot_has_payload_key(self, snapshot: ThreadSnapshot, key: str) -> bool:
+        for payload in self._snapshot_tool_payloads(snapshot):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return True
+        return False
+
+    def _snapshot_has_trained_model(self, snapshot: ThreadSnapshot) -> bool:
+        for payload in self._snapshot_tool_payloads(snapshot):
+            value = payload.get("trained_model_id")
+            if isinstance(value, str) and value.strip():
+                return True
+            trained_models = payload.get("trained_models")
+            if not isinstance(trained_models, list):
+                continue
+            for model in trained_models:
+                if isinstance(model, dict) and isinstance(model.get("trained_model_id"), str):
+                    if model["trained_model_id"].strip():
+                        return True
+        return False
+
+    def _snapshot_tool_payloads(self, snapshot: ThreadSnapshot) -> Iterator[dict[str, Any]]:
         for message in snapshot.messages:
-            if message.turn_id != turn_id or message.kind is not AgentMessageKind.USER:
+            for block in message.content_blocks:
+                if block.get("type") != "tool_result_payload":
+                    continue
+                payload = block.get("payload")
+                if isinstance(payload, dict):
+                    yield payload
+
+    def _attached_files_for_thread(self, snapshot: ThreadSnapshot) -> list[str]:
+        paths: list[str] = []
+        seen: set[str] = set()
+        for message in snapshot.messages:
+            if message.kind is not AgentMessageKind.USER:
                 continue
             for block in message.content_blocks:
-                if block.get("type") == "file":
-                    path = str(block.get("path") or "").strip()
-                    if path:
-                        paths.append(path)
+                if block.get("type") != "file":
+                    continue
+                path = str(block.get("path") or "").strip()
+                if path and path not in seen:
+                    paths.append(path)
+                    seen.add(path)
         return paths
 
     def _register_cancel_event(self, run_id: str) -> None:

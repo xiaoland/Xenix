@@ -4,6 +4,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.agent import (
     AgentHarnessService,
@@ -53,6 +55,53 @@ class StreamingProviderFixture:
                 assistant_content_blocks=[{"type": "markdown", "text": self._text}],
                 tool_calls=[],
                 usage_payload=self._usage_payload,
+            )
+        )
+
+
+class ToolCaptureStreamingProvider:
+    def __init__(self) -> None:
+        self.tools_by_call: list[list[str]] = []
+
+    def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
+        self.tools_by_call.append([tool.name for tool in tools])
+        return ProviderResponse(
+            assistant_content_blocks=[{"type": "markdown", "text": "Ready."}],
+            tool_calls=[],
+        )
+
+    def stream(self, messages: list[Any], tools: list[Any]):
+        self.tools_by_call.append([tool.name for tool in tools])
+        yield ProviderStreamEvent(
+            response=ProviderResponse(
+                assistant_content_blocks=[{"type": "markdown", "text": "Ready."}],
+                tool_calls=[],
+            )
+        )
+
+
+class HiddenToolCallStreamingProvider:
+    def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
+        return ProviderResponse(
+            tool_calls=[
+                ProviderToolCall(
+                    provider_call_id="call-hidden-train",
+                    tool_name="model.train",
+                    arguments={},
+                )
+            ],
+        )
+
+    def stream(self, messages: list[Any], tools: list[Any]):
+        yield ProviderStreamEvent(
+            response=ProviderResponse(
+                tool_calls=[
+                    ProviderToolCall(
+                        provider_call_id="call-hidden-train",
+                        tool_name="model.train",
+                        arguments={},
+                    )
+                ],
             )
         )
 
@@ -115,6 +164,46 @@ class EmptyToolRegistry:
         context: ToolExecutionContext,
     ) -> ToolExecutionResult:
         raise AssertionError(f"Unexpected tool execution: {tool_name}")
+
+
+class StaticSpecRegistry:
+    def list_specs(self) -> list[AgentToolSpec]:
+        return [
+            self._spec(tool_name)
+            for tool_name in [
+                "model.metadata",
+                "model.task.query",
+                "data.peek",
+                "data.integrate",
+                "data.clean",
+                "data.query",
+                "data.transform",
+                "data.feature.select",
+                "model.train",
+                "model.hyper_train",
+                "model.apply",
+            ]
+        ]
+
+    def execute(
+        self,
+        tool_name: str,
+        arguments: dict[str, Any],
+        context: ToolExecutionContext,
+    ) -> ToolExecutionResult:
+        raise AssertionError(f"Unexpected tool execution: {tool_name}")
+
+    def _spec(self, tool_name: str) -> AgentToolSpec:
+        return AgentToolSpec(
+            name=tool_name,
+            provider_name=tool_name.replace(".", "_"),
+            description=f"{tool_name} test tool",
+            parameters_schema={
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False,
+            },
+        )
 
 
 class BudgetedProviderFixture:
@@ -483,6 +572,99 @@ def test_agent_harness_streams_assistant_as_message_events(monkeypatch, tmp_path
     assert provider_request.input_message_ids == [snapshot.messages[0].id, snapshot.messages[1].id]
     assert provider_request.output_message_ids == [snapshot.messages[2].id]
     assert provider_request.usage_payload == usage_payload
+
+
+def test_agent_harness_stream_filters_tools_by_thread_files(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home-no-file"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    provider = ToolCaptureStreamingProvider()
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=provider,
+        tool_registry=StaticSpecRegistry(),
+        conversation_store=ConversationStore(context.session_factory),
+    )
+
+    list(harness.submit_user_turn_stream(SubmitUserTurnInput(text="hello")))
+
+    tool_names = provider.tools_by_call[0]
+    assert "model.metadata" in tool_names
+    assert "model.task.query" in tool_names
+    assert "data.peek" not in tool_names
+    assert "model.train" not in tool_names
+    assert "model.hyper_train" not in tool_names
+    assert "model.apply" not in tool_names
+
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home-with-file"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    provider = ToolCaptureStreamingProvider()
+    source_file = tmp_path / "source.csv"
+    source_file.write_text("value\n1\n", encoding="utf-8")
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=provider,
+        tool_registry=StaticSpecRegistry(),
+        conversation_store=ConversationStore(context.session_factory),
+    )
+
+    events = list(
+        harness.submit_user_turn_stream(
+            SubmitUserTurnInput(
+                text="inspect file",
+                file_paths=[str(source_file.resolve())],
+            )
+        )
+    )
+
+    tool_names = provider.tools_by_call[0]
+    assert "data.peek" in tool_names
+    assert "data.clean" in tool_names
+    assert "data.transform" in tool_names
+    assert "model.train" not in tool_names
+    assert "model.hyper_train" not in tool_names
+    assert "model.apply" not in tool_names
+
+    list(
+        harness.submit_user_turn_stream(
+            SubmitUserTurnInput(
+                thread_id=events[-1].snapshot.thread.id,
+                text="inspect the same file again",
+            )
+        )
+    )
+
+    tool_names = provider.tools_by_call[1]
+    assert "data.peek" in tool_names
+    assert "data.clean" in tool_names
+    assert "data.transform" in tool_names
+    assert "model.train" not in tool_names
+    assert "model.hyper_train" not in tool_names
+    assert "model.apply" not in tool_names
+
+
+def test_agent_harness_stream_rejects_provider_tool_call_that_was_not_exposed(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=HiddenToolCallStreamingProvider(),
+        tool_registry=StaticSpecRegistry(),
+        conversation_store=ConversationStore(context.session_factory),
+    )
+    thread = harness.create_thread("Hidden streaming tool call")
+
+    with pytest.raises(ValidationError, match="not attached to this request"):
+        list(harness.submit_user_turn_stream(SubmitUserTurnInput(thread_id=thread.thread.id, text="train now")))
+
+    snapshot = harness.get_thread_snapshot(thread.thread.id)
+    assert snapshot.provider_requests[0].status is AgentProviderRequestStatus.FAILED
+    assert snapshot.tool_calls == []
 
 
 def test_agent_harness_projects_thread_system_prompt_as_first_provider_message(monkeypatch, tmp_path: Path) -> None:
