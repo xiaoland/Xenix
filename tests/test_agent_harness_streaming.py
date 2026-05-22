@@ -123,6 +123,30 @@ class EmptyProviderFixture:
         return ProviderResponse()
 
 
+class ThreadTitleProviderFixture:
+    def __init__(self, title: str) -> None:
+        self._title = title
+        self.messages_by_call: list[list[ProviderMessage]] = []
+
+    def complete(self, messages: list[ProviderMessage], tools: list[Any]) -> ProviderResponse:
+        self.messages_by_call.append(list(messages))
+        assert tools == []
+        return ProviderResponse(
+            assistant_content_blocks=[{"type": "markdown", "text": self._title}],
+            tool_calls=[],
+        )
+
+
+class FailingThreadTitleProvider:
+    def complete(self, messages: list[ProviderMessage], tools: list[Any]) -> ProviderResponse:
+        raise ValidationError("title provider unavailable")
+
+
+class UnexpectedThreadTitleProvider:
+    def complete(self, messages: list[ProviderMessage], tools: list[Any]) -> ProviderResponse:
+        raise AssertionError("Thread title provider should not be called.")
+
+
 class SequencedProviderFixture:
     def __init__(self, responses: list[ProviderResponse]) -> None:
         self._responses = list(responses)
@@ -691,6 +715,149 @@ def test_agent_harness_projects_thread_system_prompt_as_first_provider_message(m
     assert provider.messages[0].source_message_id == snapshot.messages[0].id
     assert provider.messages[1].role == "user"
     assert provider.messages[1].content == "show me the data"
+
+
+def test_agent_harness_uses_thread_title_model_for_implicit_thread(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    title_provider = ThreadTitleProviderFixture('"Churn Risk Review."')
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=CapturingProviderFixture(),
+        thread_title_provider=title_provider,
+        tool_registry=EmptyToolRegistry(),
+        conversation_store=ConversationStore(context.session_factory),
+    )
+
+    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="Please analyze why churn increased last month."))
+
+    assert snapshot.thread.title == "Churn Risk Review"
+    assert len(title_provider.messages_by_call) == 1
+    assert title_provider.messages_by_call[0][0].role == "system"
+    assert "Please analyze why churn increased last month." in title_provider.messages_by_call[0][1].content
+    assert len(snapshot.provider_requests) == 1
+
+
+def test_agent_harness_auto_titles_precreated_empty_thread(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    title_provider = ThreadTitleProviderFixture("Customer Segmentation")
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=CapturingProviderFixture(),
+        thread_title_provider=title_provider,
+        tool_registry=EmptyToolRegistry(),
+        conversation_store=ConversationStore(context.session_factory),
+    )
+    thread = harness.create_thread()
+
+    snapshot = harness.submit_user_turn(
+        SubmitUserTurnInput(
+            thread_id=thread.thread.id,
+            text="Group customers into practical market segments.",
+        )
+    )
+
+    assert snapshot.thread.title == "Customer Segmentation"
+    assert len(title_provider.messages_by_call) == 1
+
+
+def test_agent_harness_thread_title_falls_back_when_model_is_unconfigured(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=CapturingProviderFixture(),
+        tool_registry=EmptyToolRegistry(),
+        conversation_store=ConversationStore(context.session_factory),
+    )
+
+    snapshot = harness.submit_user_turn(
+        SubmitUserTurnInput(text="  Analyze weekly revenue by region and product.  ")
+    )
+
+    assert snapshot.thread.title == "Analyze weekly revenue by region and product"
+
+
+def test_agent_harness_thread_title_falls_back_when_model_fails(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=CapturingProviderFixture(),
+        thread_title_provider=FailingThreadTitleProvider(),
+        tool_registry=EmptyToolRegistry(),
+        conversation_store=ConversationStore(context.session_factory),
+    )
+
+    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="", file_paths=[str(tmp_path / "orders.csv")]))
+
+    assert snapshot.thread.title == "orders"
+
+
+def test_agent_harness_thread_title_does_not_overwrite_existing_title(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=CapturingProviderFixture(),
+        thread_title_provider=UnexpectedThreadTitleProvider(),
+        tool_registry=EmptyToolRegistry(),
+        conversation_store=ConversationStore(context.session_factory),
+    )
+    thread = harness.create_thread("Manual title")
+
+    snapshot = harness.submit_user_turn(
+        SubmitUserTurnInput(thread_id=thread.thread.id, text="This should not rename the thread.")
+    )
+
+    assert snapshot.thread.title == "Manual title"
+
+
+def test_agent_harness_generates_manual_thread_title_from_all_messages(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=CapturingProviderFixture(),
+        tool_registry=EmptyToolRegistry(),
+        conversation_store=ConversationStore(context.session_factory),
+    )
+    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="Summarize this quarter's revenue."))
+    title_provider = ThreadTitleProviderFixture("Quarterly Revenue Review")
+    harness.set_thread_title_provider(title_provider)
+
+    proposal = harness.generate_thread_title(snapshot.thread.id)
+
+    assert proposal == "Quarterly Revenue Review"
+    assert len(title_provider.messages_by_call) == 1
+    prompt = title_provider.messages_by_call[0][1].content
+    assert '"kind": "system"' in prompt
+    assert '"kind": "user"' in prompt
+    assert '"kind": "assistant"' in prompt
+    assert "Summarize this quarter's revenue." in prompt
+    assert "Done." in prompt
+
+
+def test_agent_harness_manual_thread_title_requires_configured_model(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=CapturingProviderFixture(),
+        tool_registry=EmptyToolRegistry(),
+        conversation_store=ConversationStore(context.session_factory),
+    )
+
+    with pytest.raises(ValidationError, match="Thread title model is not configured"):
+        harness.generate_thread_title("thread-id")
 
 
 def test_agent_harness_ends_turn_on_empty_provider_response(monkeypatch, tmp_path: Path) -> None:

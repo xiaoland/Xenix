@@ -779,6 +779,11 @@
     </message>
     <message>
         <location filename="../ui/main_window.py" line="449"/>
+        <source>Generate title...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="450"/>
         <source>Delete</source>
         <translation type="unfinished"></translation>
     </message>
@@ -789,7 +794,31 @@
     </message>
     <message>
         <location filename="../ui/main_window.py" line="465"/>
+        <location filename="../ui/main_window.py" line="536"/>
         <source>Thread name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="484"/>
+        <location filename="../ui/main_window.py" line="519"/>
+        <location filename="../ui/main_window.py" line="546"/>
+        <location filename="../ui/main_window.py" line="556"/>
+        <source>Generate Thread Title</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="485"/>
+        <source>Thread title model is not configured.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="510"/>
+        <source>Generating thread title...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="535"/>
+        <source>Apply Generated Title</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -914,6 +943,11 @@
     </message>
     <message>
         <location filename="../ui/settings_dialog.py" line="180"/>
+        <source>Thread title model</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="181"/>
         <source>Timeout</source>
         <translation type="unfinished"></translation>
     </message>

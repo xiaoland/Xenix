@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
+    QProgressDialog,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -42,6 +43,8 @@ from .tool_call_detail_view import ToolCallDetailView
 class MainWindow(QMainWindow):
     _harness_failed = Signal(str)
     _harness_stream_event = Signal(object)
+    _thread_title_generated = Signal(str, str)
+    _thread_title_generation_failed = Signal(str, str)
 
     def __init__(
         self,
@@ -69,6 +72,7 @@ class MainWindow(QMainWindow):
         self._cancelled_agent_run_ids: set[str] = set()
         self._settings_dialog: SettingsDialog | None = None
         self._tool_call_detail_views: list[ToolCallDetailView] = []
+        self._thread_title_progress_dialog: QProgressDialog | None = None
 
         self._title_label = QLabel(parent=self)
         self._settings_button = QPushButton(parent=self)
@@ -97,6 +101,8 @@ class MainWindow(QMainWindow):
         self._thread_detail_view.step_budget_stop_requested.connect(self._stop_step_budget)
         self._harness_failed.connect(self._render_harness_error)
         self._harness_stream_event.connect(self._render_harness_stream_event)
+        self._thread_title_generated.connect(self._finish_generated_thread_title)
+        self._thread_title_generation_failed.connect(self._fail_generated_thread_title)
 
         self.resize(1080, 760)
         self._setup_ui()
@@ -396,6 +402,9 @@ class MainWindow(QMainWindow):
         self._agent_harness_service.set_turn_completion_guard_provider(
             self._agent_settings_service.build_turn_completion_guard_provider()
         )
+        self._agent_harness_service.set_thread_title_provider(
+            self._agent_settings_service.build_thread_title_provider()
+        )
 
     def _create_agent_thread(self) -> None:
         self._pending_step_confirmation = None
@@ -446,11 +455,14 @@ class MainWindow(QMainWindow):
 
         menu = QMenu(self)
         rename_action = menu.addAction(self.tr("Rename"))
+        generate_title_action = menu.addAction(self.tr("Generate title..."))
         delete_action = menu.addAction(self.tr("Delete"))
         selected_action = menu.exec(self._history_list.viewport().mapToGlobal(position))
 
         if selected_action is rename_action:
             self._rename_history_thread(item)
+        elif selected_action is generate_title_action:
+            self._generate_history_thread_title(item)
         elif selected_action is delete_action:
             self._delete_history_thread(item)
 
@@ -470,6 +482,88 @@ class MainWindow(QMainWindow):
 
         snapshot = self._agent_harness_service.rename_thread(thread_id, title.strip() or None)
         self._refresh_history_sidebar(selected_thread_id=snapshot.thread.id)
+
+    def _generate_history_thread_title(self, item: QListWidgetItem) -> None:
+        thread_id = self._thread_id_from_history_item(item)
+        if thread_id is None:
+            return
+        if not self._agent_harness_service.has_thread_title_provider():
+            QMessageBox.information(
+                self,
+                self.tr("Generate Thread Title"),
+                self.tr("Thread title model is not configured."),
+            )
+            return
+
+        self._show_thread_title_progress()
+
+        def run_title_generation() -> None:
+            try:
+                title = self._agent_harness_service.generate_thread_title(thread_id)
+            except Exception as exc:
+                self._thread_title_generation_failed.emit(thread_id, str(exc))
+                return
+            self._thread_title_generated.emit(thread_id, title)
+
+        threading.Thread(
+            target=run_title_generation,
+            name="xenix-thread-title-generation",
+            daemon=True,
+        ).start()
+
+    def _show_thread_title_progress(self) -> None:
+        self._close_thread_title_progress()
+        dialog = QProgressDialog(
+            self.tr("Generating thread title..."),
+            "",
+            0,
+            0,
+            self,
+        )
+        dialog.setObjectName("threadTitleProgressDialog")
+        dialog.setWindowTitle(self.tr("Generate Thread Title"))
+        dialog.setWindowModality(Qt.WindowModal)
+        dialog.setMinimumDuration(0)
+        dialog.setCancelButton(None)
+        self._thread_title_progress_dialog = dialog
+        dialog.show()
+
+    def _close_thread_title_progress(self) -> None:
+        if self._thread_title_progress_dialog is None:
+            return
+        dialog = self._thread_title_progress_dialog
+        self._thread_title_progress_dialog = None
+        dialog.close()
+        dialog.deleteLater()
+
+    def _finish_generated_thread_title(self, thread_id: str, proposal: str) -> None:
+        self._close_thread_title_progress()
+        title, accepted = QInputDialog.getText(
+            self,
+            self.tr("Apply Generated Title"),
+            self.tr("Thread name"),
+            text=proposal,
+        )
+        if not accepted:
+            return
+        try:
+            snapshot = self._agent_harness_service.rename_thread(thread_id, title.strip() or None)
+        except Exception as exc:
+            QMessageBox.warning(
+                self,
+                self.tr("Generate Thread Title"),
+                str(exc),
+            )
+            return
+        self._refresh_history_sidebar(selected_thread_id=snapshot.thread.id)
+
+    def _fail_generated_thread_title(self, _thread_id: str, message: str) -> None:
+        self._close_thread_title_progress()
+        QMessageBox.warning(
+            self,
+            self.tr("Generate Thread Title"),
+            message,
+        )
 
     def _delete_history_thread(self, item: QListWidgetItem) -> None:
         thread_id = self._thread_id_from_history_item(item)

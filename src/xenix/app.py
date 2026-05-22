@@ -130,6 +130,7 @@ def build_main_window(
             session_factory=context.session_factory,
             provider=agent_settings_service.build_provider(),
             turn_completion_guard_provider=agent_settings_service.build_turn_completion_guard_provider(),
+            thread_title_provider=agent_settings_service.build_thread_title_provider(),
             tool_registry=agent_tool_registry,
             conversation_store=conversation_store,
         )

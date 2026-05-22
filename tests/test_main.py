@@ -474,6 +474,103 @@ def test_main_window_history_item_handlers_rename_and_delete_thread(monkeypatch,
         window.close()
 
 
+def test_main_window_generate_thread_title_prompts_when_model_missing(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=False)
+    try:
+        window._new_thread_button.click()
+        app.processEvents()
+        item = window._history_list.currentItem()
+        assert item is not None
+        messages: list[tuple[str, str]] = []
+        monkeypatch.setattr(
+            "xenix.ui.main_window.QMessageBox.information",
+            lambda _parent, title, message: messages.append((title, message)),
+        )
+
+        window._generate_history_thread_title(item)
+        app.processEvents()
+
+        assert messages == [
+            ("Generate Thread Title", "Thread title model is not configured."),
+        ]
+        assert window._thread_title_progress_dialog is None
+    finally:
+        window.close()
+
+
+def test_main_window_generate_thread_title_applies_edited_proposal(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=True)
+    try:
+        window._new_thread_button.click()
+        app.processEvents()
+        thread_id = window._agent_thread_id
+        item = window._history_list.currentItem()
+        assert thread_id is not None
+        assert item is not None
+
+        monkeypatch.setattr(window._agent_harness_service, "has_thread_title_provider", lambda: True)
+
+        def fake_generate_title(requested_thread_id: str) -> str:
+            assert requested_thread_id == thread_id
+            time.sleep(0.02)
+            return "Generated title"
+
+        monkeypatch.setattr(window._agent_harness_service, "generate_thread_title", fake_generate_title)
+        monkeypatch.setattr(
+            "xenix.ui.main_window.QInputDialog.getText",
+            lambda *args, **kwargs: ("Edited generated title", True),
+        )
+
+        window._generate_history_thread_title(item)
+        app.processEvents()
+
+        assert window._thread_title_progress_dialog is not None
+
+        for _ in range(80):
+            app.processEvents()
+            if window._thread_title_progress_dialog is None:
+                break
+            time.sleep(0.01)
+
+        assert window._thread_title_progress_dialog is None
+        assert window._agent_harness_service.get_thread_snapshot(thread_id).thread.title == "Edited generated title"
+        current_item = window._history_list.currentItem()
+        assert current_item is not None
+        assert current_item.text() == "Edited generated title"
+    finally:
+        window.close()
+
+
+def test_main_window_generated_thread_title_cancel_preserves_title(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=False)
+    try:
+        snapshot = window._agent_harness_service.create_thread("Original title")
+        thread_id = snapshot.thread.id
+        monkeypatch.setattr(
+            "xenix.ui.main_window.QInputDialog.getText",
+            lambda *args, **kwargs: ("Ignored title", False),
+        )
+
+        window._finish_generated_thread_title(thread_id, "Generated title")
+        app.processEvents()
+
+        assert window._agent_harness_service.get_thread_snapshot(thread_id).thread.title == "Original title"
+    finally:
+        window.close()
+
+
 def test_main_window_step_budget_confirmation_can_continue(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")

@@ -28,6 +28,7 @@ class AgentSettings(BaseModel):
     api_key: str = ""
     model: str = "gpt-4o-mini"
     turn_completion_guard_model: str = ""
+    thread_title_model: str = ""
     timeout_seconds: int = Field(default=120, ge=1, le=3600)
     streaming_enabled: bool = True
     aimock: AimockSettings = Field(default_factory=AimockSettings)
@@ -72,6 +73,13 @@ class AgentSettingsService:
         if not guard_model:
             return None
         return self._build_openai_compatible_provider(settings, model=guard_model)
+
+    def build_thread_title_provider(self) -> OpenAICompatibleChatProvider | None:
+        settings = self.load()
+        title_model = settings.thread_title_model.strip()
+        if not title_model:
+            return None
+        return self._build_openai_compatible_provider(settings, model=title_model)
 
     def _build_openai_compatible_provider(
         self,

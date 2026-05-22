@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
+import logging
+from pathlib import Path
+import re
 import threading
 from typing import Any, Iterator
 
@@ -52,6 +56,7 @@ from .chatbot_events import (
 from .providers import (
     AgentProvider,
     AgentToolSpec,
+    ProviderMessage,
     ProviderResponse,
     ProviderStreamEvent,
     ProviderToolCall,
@@ -116,6 +121,15 @@ class AgentRunCancelled(Exception):
     pass
 
 
+LOGGER = logging.getLogger(__name__)
+THREAD_TITLE_MAX_LENGTH = 80
+THREAD_TITLE_SYSTEM_PROMPT = (
+    "You generate concise conversation titles for Xenix threads. "
+    "Return exactly one title only. Use the user's language when it is clear. "
+    "Do not include quotes, markdown, labels, or trailing punctuation."
+)
+
+
 class AgentHarnessService:
     def __init__(
         self,
@@ -123,6 +137,7 @@ class AgentHarnessService:
         session_factory: sessionmaker,
         provider: AgentProvider,
         turn_completion_guard_provider: AgentProvider | None = None,
+        thread_title_provider: AgentProvider | None = None,
         tool_registry: AgentToolRegistry,
         conversation_store: ConversationStore | None = None,
         initial_step_limit: int = 16,
@@ -136,6 +151,7 @@ class AgentHarnessService:
             if turn_completion_guard_provider is not None
             else None
         )
+        self._thread_title_provider = thread_title_provider
         self._tool_registry = tool_registry
         self._conversation_store = conversation_store or ConversationStore(session_factory)
         self._initial_step_limit = max(1, initial_step_limit)
@@ -161,6 +177,18 @@ class AgentHarnessService:
     def get_thread_snapshot(self, thread_id: str) -> ThreadSnapshot:
         return self._conversation_store.get_thread_snapshot(thread_id)
 
+    def has_thread_title_provider(self) -> bool:
+        return self._thread_title_provider is not None
+
+    def generate_thread_title(self, thread_id: str) -> str:
+        if self._thread_title_provider is None:
+            raise ValidationError("Thread title model is not configured.")
+        snapshot = self._conversation_store.get_thread_snapshot(thread_id)
+        title = self._llm_thread_title_from_snapshot(snapshot)
+        if title is None:
+            raise ValidationError("Thread title model returned an empty title.")
+        return title
+
     def project_chatbot_events(self, snapshot: ThreadSnapshot) -> list[ChatbotEvent]:
         return project_chatbot_events(
             snapshot,
@@ -178,6 +206,9 @@ class AgentHarnessService:
 
     def set_turn_completion_guard_provider(self, provider: AgentProvider | None) -> None:
         self._turn_completion_guard = TurnCompletionGuard(provider) if provider is not None else None
+
+    def set_thread_title_provider(self, provider: AgentProvider | None) -> None:
+        self._thread_title_provider = provider
 
     def cancel_run(self, run_id: str) -> None:
         with self._cancel_lock:
@@ -392,8 +423,14 @@ class AgentHarnessService:
             raise ValidationError("A turn needs a user message or at least one file.")
 
         thread_id = input_data.thread_id
+        should_auto_title_existing_thread = False
         if thread_id is None:
-            thread_id = self._conversation_store.create_thread(CreateAgentThreadInput(title=self._title_from_text(text))).id
+            thread_id = self._conversation_store.create_thread(
+                CreateAgentThreadInput(title=self._title_from_first_message(text, input_data.file_paths))
+            ).id
+        else:
+            snapshot = self._conversation_store.get_thread_snapshot(thread_id)
+            should_auto_title_existing_thread = self._should_auto_title_thread(snapshot)
 
         content_blocks = self._user_content_blocks(text, input_data.file_paths)
         turn, _user_message = self._conversation_store.start_turn(
@@ -402,6 +439,13 @@ class AgentHarnessService:
                 user_content_blocks=content_blocks,
             )
         )
+        if should_auto_title_existing_thread:
+            self._conversation_store.rename_thread(
+                RenameAgentThreadInput(
+                    thread_id=thread_id,
+                    title=self._title_from_first_message(text, input_data.file_paths),
+                )
+            )
         run = self._conversation_store.start_run(
             StartAgentRunInput(
                 thread_id=thread_id,
@@ -1315,9 +1359,85 @@ class AgentHarnessService:
         return blocks
 
     def _title_from_text(self, text: str) -> str | None:
-        if not text:
-            return "New analysis"
-        return text[:80]
+        return self._fallback_thread_title(text, [])
+
+    def _title_from_first_message(self, text: str, file_paths: list[str]) -> str:
+        if self._thread_title_provider is not None:
+            try:
+                generated = self._llm_thread_title(text, file_paths)
+                if generated is not None:
+                    return generated
+            except Exception as exc:
+                LOGGER.warning("Thread title model failed; using deterministic fallback: %s", exc)
+        return self._fallback_thread_title(text, file_paths)
+
+    def _llm_thread_title(self, text: str, file_paths: list[str]) -> str | None:
+        response = self._thread_title_provider.complete(
+            [
+                ProviderMessage(role="system", content=THREAD_TITLE_SYSTEM_PROMPT),
+                ProviderMessage(role="user", content=self._thread_title_prompt(text, file_paths)),
+            ],
+            [],
+        )
+        return _sanitize_thread_title(_assistant_text(response.assistant_content_blocks))
+
+    def _llm_thread_title_from_snapshot(self, snapshot: ThreadSnapshot) -> str | None:
+        response = self._thread_title_provider.complete(
+            [
+                ProviderMessage(role="system", content=THREAD_TITLE_SYSTEM_PROMPT),
+                ProviderMessage(role="user", content=self._thread_title_snapshot_prompt(snapshot)),
+            ],
+            [],
+        )
+        return _sanitize_thread_title(_assistant_text(response.assistant_content_blocks))
+
+    def _thread_title_prompt(self, text: str, file_paths: list[str]) -> str:
+        lines = ["Create a short title for this first user message."]
+        if text:
+            lines.extend(["", "Message:", text])
+        if file_paths:
+            file_names = ", ".join(Path(file_path).name for file_path in file_paths if str(file_path).strip())
+            if file_names:
+                lines.extend(["", "Attached files:", file_names])
+        return "\n".join(lines)
+
+    def _thread_title_snapshot_prompt(self, snapshot: ThreadSnapshot) -> str:
+        messages = [
+            {
+                "id": message.id,
+                "turn_id": message.turn_id,
+                "sequence_index": message.sequence_index,
+                "kind": message.kind.value,
+                "ui_author": message.ui_author.value,
+                "content_blocks": message.content_blocks,
+                "status": message.status.value,
+            }
+            for message in snapshot.messages
+        ]
+        payload = {
+            "thread_id": snapshot.thread.id,
+            "current_title": snapshot.thread.title,
+            "messages": messages,
+        }
+        return (
+            "Create a short title for this full conversation thread. "
+            "Use all persisted messages in the JSON payload.\n\n"
+            f"{json.dumps(payload, ensure_ascii=False)}"
+        )
+
+    def _fallback_thread_title(self, text: str, file_paths: list[str]) -> str:
+        title = _sanitize_thread_title(text)
+        if title is not None:
+            return title
+        for file_path in file_paths:
+            path = Path(file_path)
+            title = _sanitize_thread_title(path.stem or path.name)
+            if title is not None:
+                return title
+        return "New analysis"
+
+    def _should_auto_title_thread(self, snapshot: ThreadSnapshot) -> bool:
+        return _sanitize_thread_title(snapshot.thread.title or "") is None and not snapshot.turns
 
 
 def _assistant_text(blocks: list[dict[str, Any]]) -> str:
@@ -1328,3 +1448,19 @@ def _assistant_text(blocks: list[dict[str, Any]]) -> str:
             if text:
                 lines.append(text)
     return "\n".join(lines).strip()
+
+
+def _sanitize_thread_title(raw: str) -> str | None:
+    title = re.sub(r"\s+", " ", raw).strip()
+    title = title.lstrip("#-*• ").strip()
+    for prefix in ("Title:", "title:", "标题：", "标题:"):
+        if title.startswith(prefix):
+            title = title[len(prefix) :].strip()
+            break
+    title = title.strip("\"'`“”‘’")
+    title = title.rstrip(".。!！?？").strip()
+    if not title:
+        return None
+    if len(title) > THREAD_TITLE_MAX_LENGTH:
+        title = title[:THREAD_TITLE_MAX_LENGTH].rstrip()
+    return title or None

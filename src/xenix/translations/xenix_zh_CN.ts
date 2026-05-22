@@ -245,6 +245,11 @@ This route will stay available after model selection is connected.</source>
     </message>
     <message>
         <location filename="../ui/main_window.py" line="449"/>
+        <source>Generate title...</source>
+        <translation>生成标题...</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="450"/>
         <source>Delete</source>
         <translation>删除</translation>
     </message>
@@ -255,8 +260,32 @@ This route will stay available after model selection is connected.</source>
     </message>
     <message>
         <location filename="../ui/main_window.py" line="465"/>
+        <location filename="../ui/main_window.py" line="536"/>
         <source>Thread name</source>
         <translation>线程名称</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="484"/>
+        <location filename="../ui/main_window.py" line="519"/>
+        <location filename="../ui/main_window.py" line="546"/>
+        <location filename="../ui/main_window.py" line="556"/>
+        <source>Generate Thread Title</source>
+        <translation>生成线程标题</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="485"/>
+        <source>Thread title model is not configured.</source>
+        <translation>未配置线程标题模型。</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="510"/>
+        <source>Generating thread title...</source>
+        <translation>正在生成线程标题...</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="535"/>
+        <source>Apply Generated Title</source>
+        <translation>应用生成的标题</translation>
     </message>
     <message>
         <location filename="../ui/main_window.py" line="482"/>
@@ -314,6 +343,11 @@ This route will stay available after model selection is connected.</source>
     </message>
     <message>
         <location filename="../ui/settings_dialog.py" line="180"/>
+        <source>Thread title model</source>
+        <translation>线程标题模型</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="181"/>
         <source>Timeout</source>
         <translation>超时</translation>
     </message>

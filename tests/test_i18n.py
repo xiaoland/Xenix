@@ -96,6 +96,9 @@ def test_main_window_language_switch_updates_chat_shell(
         assert window._history_label.text() == "History"
         assert settings._open_logs_button.text() == "Open log directory"
         assert settings._build_commit_label.text() == "Build commit"
+        assert settings._llm_thread_title_model_label.text() == "Thread title model"
+        assert window.tr("Generate title...") == "Generate title..."
+        assert window.tr("Generating thread title...") == "Generating thread title..."
         chat_view = window._thread_detail_view
         chat_view.clear_messages()
         chat_view.show_error("Stopped.")
@@ -159,6 +162,9 @@ def test_main_window_language_switch_updates_chat_shell(
         assert window._history_label.text() == "历史"
         assert settings._open_logs_button.text() == "打开日志目录"
         assert settings._build_commit_label.text() == "构建提交"
+        assert settings._llm_thread_title_model_label.text() == "线程标题模型"
+        assert window.tr("Generate title...") == "生成标题..."
+        assert window.tr("Generating thread title...") == "正在生成线程标题..."
         assert chat_view._editor.placeholderText() == "给 Xenix 发消息"
         assert chat_view._send_button.text() == "发送"
         assert chat_view._attach_button.toolTip() == "添加文件"
@@ -182,6 +188,7 @@ def test_main_window_language_switch_updates_chat_shell(
         assert window.windowTitle() == "Xenix Native"
         assert settings._open_logs_button.text() == "Open log directory"
         assert settings._build_commit_label.text() == "Build commit"
+        assert settings._llm_thread_title_model_label.text() == "Thread title model"
         assert chat_view._editor.placeholderText() == "Message Xenix"
         assert chat_view._send_button.text() == "Send"
         assert chat_view._attach_button.toolTip() == "Attach files"
