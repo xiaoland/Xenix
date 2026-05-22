@@ -68,12 +68,10 @@ class FirstSliceProvider:
                                 {
                                     "role": "feature",
                                     "columns": ["feature_a", "feature_b"],
-                                    "role_kind": "many_columns",
                                 },
                                 {
                                     "role": "target",
                                     "columns": ["target"],
-                                    "role_kind": "single_column",
                                 },
                             ],
                         },
@@ -344,6 +342,7 @@ def test_agent_harness_exposes_data_tools_when_file_is_attached(monkeypatch, tmp
 
     tool_names = provider.tools_by_call[0]
     assert "data.peek" in tool_names
+    assert "data.clean.metadata" in tool_names
     assert "data.feature.select" in tool_names
     assert "model.train" not in tool_names
     assert "model.hyper_train" not in tool_names
@@ -382,6 +381,7 @@ def test_agent_harness_exposes_and_uses_data_tools_after_prior_thread_file(
     first_tool_list = provider.tools_by_call[0]
     assert "data.peek" in first_tool_list
     assert "data.clean" in first_tool_list
+    assert "data.clean.metadata" in first_tool_list
     assert "data.transform" in first_tool_list
     assert "data.feature.select" in first_tool_list
     assert second_snapshot.tool_calls[-1].tool_name == "data.peek"
@@ -474,12 +474,17 @@ def test_agent_harness_model_metadata_exposes_catalog_without_train_enums(monkey
 
     assert "model.metadata" in specs
     assert "data.peek" in specs
+    assert "data.clean.metadata" in specs
     assert "data.feature.select" in specs
     assert "model.train" in specs
     assert "model.hyper_train" in specs
     assert "model.apply" in specs
-    metadata_key_enum = specs["model.metadata"].parameters_schema["properties"]["model_keys"]["items"]["enum"]
-    assert "regression.linear" in metadata_key_enum
+    assert "enum" not in specs["model.metadata"].parameters_schema["properties"]["model_keys"]["items"]
+    feature_select_schema = specs["data.feature.select"].parameters_schema
+    assert "enum" not in feature_select_schema["properties"]["model_key"]
+    role_binding_schema = feature_select_schema["properties"]["role_bindings"]["items"]
+    assert set(role_binding_schema["properties"]) == {"role", "columns"}
+    assert role_binding_schema["required"] == ["role", "columns"]
     assert "model_family" in specs["model.metadata"].parameters_schema["properties"]
     assert "model_task_kind" in specs["model.metadata"].parameters_schema["properties"]
     assert "evaluation_kind" in specs["model.metadata"].parameters_schema["properties"]
@@ -595,8 +600,8 @@ def test_agent_harness_train_returns_background_receipt_after_grace(monkeypatch,
             "dataset_id": dataset_result.payload["dataset_id"],
             "model_key": "regression.linear",
             "role_bindings": [
-                {"role": "feature", "columns": ["feature_a", "feature_b"], "role_kind": "many_columns"},
-                {"role": "target", "columns": ["target"], "role_kind": "single_column"},
+                {"role": "feature", "columns": ["feature_a", "feature_b"]},
+                {"role": "target", "columns": ["target"]},
             ],
         },
         tool_context,

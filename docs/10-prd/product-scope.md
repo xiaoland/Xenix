@@ -47,7 +47,7 @@ Record which product concepts remain in the native edition and which are intenti
 - Storage provides persistence interfaces for service-owned records.
 - Model apply outputs must remain reviewable through artifact links after the originating turn closes.
 - First-slice working context is represented by Thread messages, tool-call records, tool-result records, and artifact metadata.
-- Data cleaning tools operate on registered datasets and create new derived datasets; source datasets remain intact.
+- Data cleaning tools operate on registered datasets and create new derived datasets when cleaning operations are applied; source datasets remain intact.
 - Query tools read registered datasets and return bounded results without creating dataset artifacts by default.
 - Transform tools operate on registered datasets and create new derived datasets; source datasets remain intact.
 - Project is retained only as a storage compatibility detail while the AI-first product model centers on Chatbot threads, datasets, artifacts, and dataset lineage.

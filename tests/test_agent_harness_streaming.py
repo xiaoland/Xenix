@@ -176,6 +176,7 @@ class StaticSpecRegistry:
                 "data.peek",
                 "data.integrate",
                 "data.clean",
+                "data.clean.metadata",
                 "data.query",
                 "data.transform",
                 "data.feature.select",
@@ -621,6 +622,7 @@ def test_agent_harness_stream_filters_tools_by_thread_files(monkeypatch, tmp_pat
     tool_names = provider.tools_by_call[0]
     assert "data.peek" in tool_names
     assert "data.clean" in tool_names
+    assert "data.clean.metadata" in tool_names
     assert "data.transform" in tool_names
     assert "model.train" not in tool_names
     assert "model.hyper_train" not in tool_names
@@ -638,6 +640,7 @@ def test_agent_harness_stream_filters_tools_by_thread_files(monkeypatch, tmp_pat
     tool_names = provider.tools_by_call[1]
     assert "data.peek" in tool_names
     assert "data.clean" in tool_names
+    assert "data.clean.metadata" in tool_names
     assert "data.transform" in tool_names
     assert "model.train" not in tool_names
     assert "model.hyper_train" not in tool_names

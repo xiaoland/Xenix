@@ -62,7 +62,9 @@ Services are responsible for:
 Service APIs should be designed around explicit request/result objects or narrow methods. They should return structured outcomes so the UI receives explicit success, failure, and output metadata.
 
 `DataCleaningService` owns deterministic data-cleaning execution for `data.clean`.
-`data.clean` is an LLM-facing Agent tool that applies atomic predefined cleaning operations to one registered dataset and creates a new derived dataset.
+`data.clean` is an LLM-facing Agent tool that applies explicit atomic predefined cleaning operations to one registered dataset and creates a new derived dataset when operations are provided.
+If no cleaning operations are provided, `data.clean` performs no cleaning, creates no derived dataset, and reports that nothing happened.
+`data.clean.metadata` is an LLM-facing Agent tool that returns cleaning operation groups, operation names, and operation parameter schemas without executing cleaning.
 The tool handler coordinates dataset lookup, service execution, dataset registration, and artifact registration; cleaning algorithms stay in the service layer.
 DuckDB-backed SQL execution belongs to internal data query/transform services.
 `data.query` is an LLM-facing Agent tool for read-only SELECT/CTE queries over registered dataset bindings. It returns bounded result rows and metadata and creates no dataset artifact by default.
@@ -113,7 +115,7 @@ Tool boundaries:
 - The tool registry is static for the current application capability set.
 - Agent Harness filters provider-facing tool specs per primary provider request from thread state: `data.*` requires at least one file attached anywhere in the thread, `model.train` and `model.hyper_train` require an existing selection binding in thread tool payloads, and `model.apply` requires an existing trained model in thread tool payloads. Provider tool calls must target tools attached to that request before Agent Harness persists or executes them.
 - Runtime thread, turn, file, dataset, model, and artifact context is passed through validated tool arguments and `ToolExecutionContext`.
-- Target tool names are `data.peek`, `data.integrate`, `data.clean`, `data.query`, `data.transform`, `data.feature.select`, `model.metadata`, `model.train`, `model.hyper_train`, `model.apply`, and `model.task.query`.
+- Target tool names are `data.peek`, `data.integrate`, `data.clean`, `data.clean.metadata`, `data.query`, `data.transform`, `data.feature.select`, `model.metadata`, `model.train`, `model.hyper_train`, `model.apply`, and `model.task.query`.
 - `data.feature.select` creates an immutable dataset column role-binding snapshot. `model.train` and `model.hyper_train` accept `binding_id`. `model.apply` accepts a trained model plus file-backed, tabular, or role-shaped inline inputs, then uses trained model metadata to validate the apply role schema. `model.train`, `model.hyper_train`, and `model.apply` wait for a bounded grace period and return either the completed result or explicit ML task ids for background follow-up. Training and hyperparameter training aggregate through the produced `trained_model_id`; follow-up evaluation task ids and metrics attach to trained-model metadata rather than being inferred from dataset task diffs. `model.task.query` accepts explicit task ids and returns ML task metadata, status, artifacts, errors, and bounded logs.
 - Forward-looking tool contracts use `apply`, not `inference`; legacy `inference` names are migration inputs only.
 

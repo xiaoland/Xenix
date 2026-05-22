@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import re
 from pathlib import Path
 from typing import Any
@@ -7,7 +8,7 @@ from uuid import uuid4
 
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
-from pydantic import Field
+from pydantic import ConfigDict, Field
 from sqlmodel import SQLModel
 
 from ..config import AppPaths
@@ -16,59 +17,355 @@ from .dataset_inspection import detect_source_format, load_dataframe
 from .storage.models import DatasetSourceFormat
 
 
-class DuplicatePolicy(SQLModel):
-    mode: str = "exact_rows"
-    columns: list[str] = Field(default_factory=list)
-    keep: str = "first"
+KEEP_SCHEMA = {"type": "string", "enum": ["first", "last", "false"]}
+COLUMNS_SCHEMA = {"type": "array", "items": {"type": "string"}}
+ACTION_SCHEMA = {"type": "string", "enum": ["report_only", "drop_rows"]}
 
 
-class MissingRule(SQLModel):
-    columns: list[str] = Field(default_factory=list)
-    strategy: str
-    value: Any = None
+_CLEANING_OPERATION_GROUPS: dict[str, dict[str, Any]] = {
+    "duplicates": {
+        "description": "Remove duplicate rows.",
+        "operations": [
+            {
+                "operation": "duplicate.exact_rows",
+                "description": "Remove rows that are exact duplicates across all columns.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {"keep": KEEP_SCHEMA},
+                    "additionalProperties": False,
+                },
+                "example": {"operation": "duplicate.exact_rows", "params": {"keep": "first"}},
+            },
+            {
+                "operation": "duplicate.key_columns",
+                "description": "Remove duplicate rows based on selected key columns.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {"columns": COLUMNS_SCHEMA, "keep": KEEP_SCHEMA},
+                    "required": ["columns"],
+                    "additionalProperties": False,
+                },
+                "example": {
+                    "operation": "duplicate.key_columns",
+                    "params": {"columns": ["customer_id"], "keep": "first"},
+                },
+            },
+        ],
+    },
+    "missing": {
+        "description": "Fill missing values or drop rows with missing values.",
+        "operations": [
+            {
+                "operation": "missing.fill_mean",
+                "description": "Fill missing numeric values with each column mean.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {"columns": COLUMNS_SCHEMA},
+                    "required": ["columns"],
+                    "additionalProperties": False,
+                },
+                "example": {"operation": "missing.fill_mean", "params": {"columns": ["amount"]}},
+            },
+            {
+                "operation": "missing.fill_median",
+                "description": "Fill missing numeric values with each column median.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {"columns": COLUMNS_SCHEMA},
+                    "required": ["columns"],
+                    "additionalProperties": False,
+                },
+                "example": {"operation": "missing.fill_median", "params": {"columns": ["amount"]}},
+            },
+            {
+                "operation": "missing.fill_mode",
+                "description": "Fill missing values with each column mode.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {"columns": COLUMNS_SCHEMA},
+                    "required": ["columns"],
+                    "additionalProperties": False,
+                },
+                "example": {"operation": "missing.fill_mode", "params": {"columns": ["segment"]}},
+            },
+            {
+                "operation": "missing.fill_constant",
+                "description": "Fill missing values with a constant value.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {"columns": COLUMNS_SCHEMA, "value": {}},
+                    "required": ["columns", "value"],
+                    "additionalProperties": False,
+                },
+                "example": {"operation": "missing.fill_constant", "params": {"columns": ["amount"], "value": 0}},
+            },
+            {
+                "operation": "missing.forward_fill",
+                "description": "Fill missing values from the previous non-empty row value.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {"columns": COLUMNS_SCHEMA},
+                    "required": ["columns"],
+                    "additionalProperties": False,
+                },
+                "example": {"operation": "missing.forward_fill", "params": {"columns": ["segment"]}},
+            },
+            {
+                "operation": "missing.drop_rows",
+                "description": "Drop rows where any selected column is missing.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {"columns": COLUMNS_SCHEMA},
+                    "required": ["columns"],
+                    "additionalProperties": False,
+                },
+                "example": {"operation": "missing.drop_rows", "params": {"columns": ["amount"]}},
+            },
+        ],
+    },
+    "types": {
+        "description": "Convert column types.",
+        "operations": [
+            {
+                "operation": "type.convert",
+                "description": "Convert one column to a target type.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "target_type": {
+                            "type": "string",
+                            "enum": ["numeric", "integer", "datetime", "text", "boolean"],
+                        },
+                        "date_format": {"type": "string"},
+                    },
+                    "required": ["column", "target_type"],
+                    "additionalProperties": False,
+                },
+                "example": {
+                    "operation": "type.convert",
+                    "params": {"column": "amount", "target_type": "numeric"},
+                },
+            },
+        ],
+    },
+    "text": {
+        "description": "Standardize text column values.",
+        "operations": [
+            {
+                "operation": "text.trim",
+                "description": "Strip leading and trailing whitespace.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {"columns": COLUMNS_SCHEMA},
+                    "required": ["columns"],
+                    "additionalProperties": False,
+                },
+                "example": {"operation": "text.trim", "params": {"columns": ["region"]}},
+            },
+            {
+                "operation": "text.lowercase",
+                "description": "Convert text to lowercase.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {"columns": COLUMNS_SCHEMA},
+                    "required": ["columns"],
+                    "additionalProperties": False,
+                },
+                "example": {"operation": "text.lowercase", "params": {"columns": ["region"]}},
+            },
+            {
+                "operation": "text.uppercase",
+                "description": "Convert text to uppercase.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {"columns": COLUMNS_SCHEMA},
+                    "required": ["columns"],
+                    "additionalProperties": False,
+                },
+                "example": {"operation": "text.uppercase", "params": {"columns": ["region"]}},
+            },
+            {
+                "operation": "text.collapse_whitespace",
+                "description": "Collapse repeated whitespace into one space.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {"columns": COLUMNS_SCHEMA},
+                    "required": ["columns"],
+                    "additionalProperties": False,
+                },
+                "example": {"operation": "text.collapse_whitespace", "params": {"columns": ["region"]}},
+            },
+            {
+                "operation": "text.empty_to_null",
+                "description": "Convert empty text values to null.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {"columns": COLUMNS_SCHEMA},
+                    "required": ["columns"],
+                    "additionalProperties": False,
+                },
+                "example": {"operation": "text.empty_to_null", "params": {"columns": ["region"]}},
+            },
+            {
+                "operation": "text.map_values",
+                "description": "Replace text values through an exact value map.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {"columns": COLUMNS_SCHEMA, "value_map": {"type": "object"}},
+                    "required": ["columns", "value_map"],
+                    "additionalProperties": False,
+                },
+                "example": {
+                    "operation": "text.map_values",
+                    "params": {"columns": ["region"], "value_map": {"n": "north"}},
+                },
+            },
+        ],
+    },
+    "validation": {
+        "description": "Report invalid values or drop rows that violate a rule.",
+        "operations": [
+            {
+                "operation": "validation.not_null",
+                "description": "Find rows where a column is null.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {"column": {"type": "string"}, "action": ACTION_SCHEMA, "name": {"type": "string"}},
+                    "required": ["column"],
+                    "additionalProperties": False,
+                },
+                "example": {"operation": "validation.not_null", "params": {"column": "amount"}},
+            },
+            {
+                "operation": "validation.non_negative",
+                "description": "Find rows where a numeric column is below zero.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {"column": {"type": "string"}, "action": ACTION_SCHEMA, "name": {"type": "string"}},
+                    "required": ["column"],
+                    "additionalProperties": False,
+                },
+                "example": {
+                    "operation": "validation.non_negative",
+                    "params": {"column": "amount", "action": "drop_rows"},
+                },
+            },
+            {
+                "operation": "validation.min",
+                "description": "Find rows where a numeric column is below a minimum value.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "value": {},
+                        "action": ACTION_SCHEMA,
+                        "name": {"type": "string"},
+                    },
+                    "required": ["column", "value"],
+                    "additionalProperties": False,
+                },
+                "example": {"operation": "validation.min", "params": {"column": "amount", "value": 0}},
+            },
+            {
+                "operation": "validation.max",
+                "description": "Find rows where a numeric column is above a maximum value.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "value": {},
+                        "action": ACTION_SCHEMA,
+                        "name": {"type": "string"},
+                    },
+                    "required": ["column", "value"],
+                    "additionalProperties": False,
+                },
+                "example": {"operation": "validation.max", "params": {"column": "amount", "value": 1000}},
+            },
+            {
+                "operation": "validation.allowed_values",
+                "description": "Find rows where a value is outside an allowed set.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "values": {"type": "array"},
+                        "action": ACTION_SCHEMA,
+                        "name": {"type": "string"},
+                    },
+                    "required": ["column", "values"],
+                    "additionalProperties": False,
+                },
+                "example": {
+                    "operation": "validation.allowed_values",
+                    "params": {"column": "status", "values": ["open", "closed"]},
+                },
+            },
+            {
+                "operation": "validation.regex",
+                "description": "Find rows where text does not match a regular expression.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "value": {},
+                        "action": ACTION_SCHEMA,
+                        "name": {"type": "string"},
+                    },
+                    "required": ["column", "value"],
+                    "additionalProperties": False,
+                },
+                "example": {
+                    "operation": "validation.regex",
+                    "params": {"column": "email", "value": r"^[^@]+@[^@]+$"},
+                },
+            },
+        ],
+    },
+}
 
 
-class MissingPolicy(SQLModel):
-    default_numeric: str = "median"
-    default_text: str = "mode"
-    fill_values: dict[str, Any] = Field(default_factory=dict)
-    rules: list[MissingRule] = Field(default_factory=list)
+def cleaning_operation_metadata(groups: list[str] | None = None) -> dict[str, Any]:
+    selected_groups = _normalize_groups(groups)
+    group_payloads = [copy.deepcopy({"group": group, **_CLEANING_OPERATION_GROUPS[group]}) for group in selected_groups]
+    return {
+        "groups": group_payloads,
+        "group_names": list(_CLEANING_OPERATION_GROUPS),
+        "operation_count": sum(len(group["operations"]) for group in group_payloads),
+    }
 
 
-class TypeCorrection(SQLModel):
-    column: str
-    target_type: str
-    date_format: str | None = None
+def _normalize_groups(groups: list[str] | None) -> list[str]:
+    if not groups:
+        return list(_CLEANING_OPERATION_GROUPS)
+    normalized: list[str] = []
+    for group in groups:
+        value = str(group or "").strip()
+        if not value or value in normalized:
+            continue
+        if value not in _CLEANING_OPERATION_GROUPS:
+            raise ValidationError(
+                "Unknown data.clean.metadata group "
+                f"'{value}'. Available groups: {', '.join(_CLEANING_OPERATION_GROUPS)}."
+            )
+        normalized.append(value)
+    return normalized or list(_CLEANING_OPERATION_GROUPS)
 
 
-class TextStandardization(SQLModel):
-    columns: list[str] = Field(default_factory=list)
-    trim: bool = True
-    lowercase: bool = False
-    uppercase: bool = False
-    collapse_whitespace: bool = False
-    empty_to_null: bool = False
-    value_map: dict[str, Any] = Field(default_factory=dict)
+class CleanOperation(SQLModel):
+    model_config = ConfigDict(extra="forbid")
 
-
-class ValidationRule(SQLModel):
-    name: str | None = None
-    column: str
-    rule: str
-    action: str = "report_only"
-    value: Any = None
-    values: list[Any] = Field(default_factory=list)
+    operation: str
+    params: dict[str, Any] = Field(default_factory=dict)
 
 
 class CleanDatasetInput(SQLModel):
+    model_config = ConfigDict(extra="forbid")
+
     source_path: str
     name: str
-    drop_duplicates: bool | None = None
-    duplicate_policy: DuplicatePolicy | None = None
-    missing_policy: MissingPolicy | None = None
-    type_corrections: list[TypeCorrection] = Field(default_factory=list)
-    text_standardization: list[TextStandardization] = Field(default_factory=list)
-    validation_rules: list[ValidationRule] = Field(default_factory=list)
+    operations: list[CleanOperation] = Field(default_factory=list)
 
 
 class CleanDatasetResult(SQLModel):
@@ -103,16 +400,13 @@ class DataCleaningService:
             "warnings": [],
         }
 
-        frame = self._apply_text_standardization(frame, input_data.text_standardization, report)
-        frame = self._apply_type_corrections(frame, input_data.type_corrections, report)
-        frame = self._apply_duplicate_policy(
-            frame,
-            input_data.duplicate_policy,
-            drop_duplicates=input_data.drop_duplicates,
-            report=report,
-        )
-        frame = self._apply_missing_policy(frame, input_data.missing_policy, report)
-        frame = self._apply_validation_rules(frame, input_data.validation_rules, report)
+        if not input_data.operations:
+            report["rows_removed"] = 0
+            report["no_op"] = True
+            return CleanDatasetResult(output_path=str(source_path.resolve()), report=report)
+
+        for operation in input_data.operations:
+            frame = self._apply_operation(frame, operation, report)
 
         output_dir = self._paths.artifacts / "datasets" / "cleaned"
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -121,112 +415,106 @@ class DataCleaningService:
 
         report["row_count_after"] = int(len(frame.index))
         report["rows_removed"] = int(report["row_count_before"] - report["row_count_after"])
+        report["no_op"] = False
         return CleanDatasetResult(output_path=str(output_path.resolve()), report=report)
 
-    def _apply_duplicate_policy(
+    def _apply_operation(
         self,
         frame: pd.DataFrame,
-        policy: DuplicatePolicy | None,
-        *,
-        drop_duplicates: bool | None,
+        operation: CleanOperation,
         report: dict[str, Any],
     ) -> pd.DataFrame:
-        if policy is None:
-            policy = DuplicatePolicy(mode="exact_rows" if drop_duplicates is not False else "none")
-        mode = self._one_of(policy.mode, {"none", "exact_rows", "key_columns"}, "duplicate_policy.mode")
-        if mode == "none":
-            return frame
-        keep = self._one_of(policy.keep, {"first", "last", "false"}, "duplicate_policy.keep")
-        keep_arg: str | bool = False if keep == "false" else keep
-        before = int(len(frame.index))
-        if mode == "exact_rows":
-            cleaned = frame.drop_duplicates(keep=keep_arg)
-            report["operations"].append(
-                {
-                    "operation": "duplicates",
-                    "mode": mode,
-                    "rows_removed": before - int(len(cleaned.index)),
-                }
-            )
-            return cleaned
+        operation_name = str(operation.operation or "").strip()
+        params = dict(operation.params or {})
+        if not operation_name:
+            raise ValidationError("cleaning operation cannot be empty.")
 
-        columns = self._require_columns(frame, policy.columns, "duplicate_policy.columns")
-        cleaned = frame.drop_duplicates(subset=columns, keep=keep_arg)
+        if operation_name == "duplicate.exact_rows":
+            return self._apply_duplicate_exact_rows(frame, operation_name, params, report)
+        if operation_name == "duplicate.key_columns":
+            return self._apply_duplicate_key_columns(frame, operation_name, params, report)
+        if operation_name.startswith("missing."):
+            return self._apply_missing_operation(frame, operation_name, params, report)
+        if operation_name == "type.convert":
+            return self._apply_type_convert(frame, operation_name, params, report)
+        if operation_name.startswith("text."):
+            return self._apply_text_operation(frame, operation_name, params, report)
+        if operation_name.startswith("validation."):
+            return self._apply_validation_operation(frame, operation_name, params, report)
+        raise ValidationError(f"Unsupported cleaning operation '{operation_name}'.")
+
+    def _apply_duplicate_exact_rows(
+        self,
+        frame: pd.DataFrame,
+        operation_name: str,
+        params: dict[str, Any],
+        report: dict[str, Any],
+    ) -> pd.DataFrame:
+        keep = self._keep_value(params, operation_name)
+        before = int(len(frame.index))
+        cleaned = frame.drop_duplicates(keep=keep)
         report["operations"].append(
             {
-                "operation": "duplicates",
-                "mode": mode,
+                "operation": operation_name,
+                "rows_removed": before - int(len(cleaned.index)),
+            }
+        )
+        return cleaned
+
+    def _apply_duplicate_key_columns(
+        self,
+        frame: pd.DataFrame,
+        operation_name: str,
+        params: dict[str, Any],
+        report: dict[str, Any],
+    ) -> pd.DataFrame:
+        columns = self._params_columns(frame, params, operation_name)
+        keep = self._keep_value(params, operation_name)
+        before = int(len(frame.index))
+        cleaned = frame.drop_duplicates(subset=columns, keep=keep)
+        report["operations"].append(
+            {
+                "operation": operation_name,
                 "columns": columns,
                 "rows_removed": before - int(len(cleaned.index)),
             }
         )
         return cleaned
 
-    def _apply_missing_policy(
+    def _apply_missing_operation(
         self,
         frame: pd.DataFrame,
-        policy: MissingPolicy | None,
+        operation_name: str,
+        params: dict[str, Any],
         report: dict[str, Any],
     ) -> pd.DataFrame:
-        policy = policy or MissingPolicy()
-        handled_columns: set[str] = set()
-        for rule in policy.rules:
-            columns = self._require_columns(frame, rule.columns, "missing_policy.rules.columns")
-            frame = self._apply_missing_strategy(
-                frame,
-                columns,
-                rule.strategy,
-                report,
-                value=rule.value,
-                fill_values=policy.fill_values,
-            )
-            handled_columns.update(columns)
-
-        for column in frame.columns:
-            if column in handled_columns or not frame[column].isna().any():
-                continue
-            strategy = policy.default_numeric if is_numeric_dtype(frame[column]) else policy.default_text
-            frame = self._apply_missing_strategy(
-                frame,
-                [str(column)],
-                strategy,
-                report,
-                value=None,
-                fill_values=policy.fill_values,
-            )
-        return frame
-
-    def _apply_missing_strategy(
-        self,
-        frame: pd.DataFrame,
-        columns: list[str],
-        strategy: str,
-        report: dict[str, Any],
-        *,
-        value: Any,
-        fill_values: dict[str, Any],
-    ) -> pd.DataFrame:
-        strategy = self._one_of(
-            strategy,
-            {"none", "mean", "median", "mode", "constant", "forward_fill", "drop_rows"},
-            "missing_policy.strategy",
-        )
-        if strategy == "none":
-            return frame
+        strategy_by_operation = {
+            "missing.fill_mean": "mean",
+            "missing.fill_median": "median",
+            "missing.fill_mode": "mode",
+            "missing.fill_constant": "constant",
+            "missing.forward_fill": "forward_fill",
+            "missing.drop_rows": "drop_rows",
+        }
+        strategy = strategy_by_operation.get(operation_name)
+        if strategy is None:
+            raise ValidationError(f"Unsupported cleaning operation '{operation_name}'.")
+        columns = self._params_columns(frame, params, operation_name)
         if strategy == "drop_rows":
             before = int(len(frame.index))
             mask = frame[columns].isna().any(axis=1)
             cleaned = frame.loc[~mask].copy()
             report["operations"].append(
                 {
-                    "operation": "missing_values",
-                    "strategy": strategy,
+                    "operation": operation_name,
                     "columns": columns,
                     "rows_removed": before - int(len(cleaned.index)),
                 }
             )
             return cleaned
 
+        if strategy == "constant" and "value" not in params:
+            raise ValidationError(f"{operation_name}.params.value is required.")
         for column in columns:
             missing_before = int(frame[column].isna().sum())
             if missing_before == 0:
@@ -234,12 +522,11 @@ class DataCleaningService:
             if strategy == "forward_fill":
                 frame[column] = frame[column].ffill()
             else:
-                fill_value = self._resolve_fill_value(frame[column], strategy, column, value, fill_values, report)
+                fill_value = self._resolve_fill_value(frame[column], strategy, column, params.get("value"), report)
                 frame[column] = frame[column].fillna(fill_value)
             report["operations"].append(
                 {
-                    "operation": "missing_values",
-                    "strategy": strategy,
+                    "operation": operation_name,
                     "column": column,
                     "cells_filled": missing_before - int(frame[column].isna().sum()),
                 }
@@ -252,11 +539,10 @@ class DataCleaningService:
         strategy: str,
         column: str,
         value: Any,
-        fill_values: dict[str, Any],
         report: dict[str, Any],
     ) -> Any:
         if strategy == "constant":
-            return fill_values.get(column, "" if value is None else value)
+            return "" if value is None else value
         if strategy in {"mean", "median"} and not is_numeric_dtype(series):
             raise ValidationError(f"Column '{column}' must be numeric for {strategy} fill.")
         if strategy == "mean":
@@ -275,120 +561,152 @@ class DataCleaningService:
             return ""
         return fill_value
 
-    def _apply_type_corrections(
+    def _apply_type_convert(
         self,
         frame: pd.DataFrame,
-        corrections: list[TypeCorrection],
+        operation_name: str,
+        params: dict[str, Any],
         report: dict[str, Any],
     ) -> pd.DataFrame:
-        for correction in corrections:
-            column = self._require_column(frame, correction.column, "type_corrections.column")
-            target_type = self._one_of(
-                correction.target_type,
-                {"numeric", "integer", "datetime", "text", "boolean"},
-                "type_corrections.target_type",
-            )
-            before_notna = frame[column].notna()
-            if target_type == "numeric":
-                converted = pd.to_numeric(frame[column], errors="coerce")
-            elif target_type == "integer":
-                converted = pd.to_numeric(frame[column], errors="coerce").round().astype("Int64")
-            elif target_type == "datetime":
-                converted = pd.to_datetime(frame[column], errors="coerce", format=correction.date_format)
-            elif target_type == "text":
-                converted = frame[column].astype("string")
+        column = self._params_column(frame, params, operation_name)
+        target_type = self._one_of(
+            str(params.get("target_type") or ""),
+            {"numeric", "integer", "datetime", "text", "boolean"},
+            f"{operation_name}.params.target_type",
+        )
+        before_notna = frame[column].notna()
+        if target_type == "numeric":
+            converted = pd.to_numeric(frame[column], errors="coerce")
+        elif target_type == "integer":
+            converted = pd.to_numeric(frame[column], errors="coerce").round().astype("Int64")
+        elif target_type == "datetime":
+            date_format = str(params.get("date_format") or "").strip() or None
+            converted = pd.to_datetime(frame[column], errors="coerce", format=date_format)
+        elif target_type == "text":
+            converted = frame[column].astype("string")
+        else:
+            converted = self._to_boolean(frame[column])
+        coerced_to_null = int((before_notna & converted.isna()).sum())
+        frame[column] = converted
+        report["operations"].append(
+            {
+                "operation": operation_name,
+                "column": column,
+                "target_type": target_type,
+                "coerced_to_null": coerced_to_null,
+            }
+        )
+        return frame
+
+    def _apply_text_operation(
+        self,
+        frame: pd.DataFrame,
+        operation_name: str,
+        params: dict[str, Any],
+        report: dict[str, Any],
+    ) -> pd.DataFrame:
+        columns = self._params_columns(frame, params, operation_name)
+        value_map = params.get("value_map")
+        if operation_name == "text.map_values" and not isinstance(value_map, dict):
+            raise ValidationError(f"{operation_name}.params.value_map must be an object.")
+
+        for column in columns:
+            original = frame[column].copy()
+            values = frame[column].astype("string")
+            if operation_name == "text.trim":
+                values = values.str.strip()
+            elif operation_name == "text.lowercase":
+                values = values.str.lower()
+            elif operation_name == "text.uppercase":
+                values = values.str.upper()
+            elif operation_name == "text.collapse_whitespace":
+                values = values.str.replace(r"\s+", " ", regex=True)
+            elif operation_name == "text.empty_to_null":
+                values = values.replace(r"^\s*$", pd.NA, regex=True)
+            elif operation_name == "text.map_values":
+                values = values.replace(value_map)
             else:
-                converted = self._to_boolean(frame[column])
-            coerced_to_null = int((before_notna & converted.isna()).sum())
-            frame[column] = converted
+                raise ValidationError(f"Unsupported cleaning operation '{operation_name}'.")
+            frame[column] = values
+            changed = int((original.astype("string") != frame[column].astype("string")).fillna(False).sum())
             report["operations"].append(
                 {
-                    "operation": "type_correction",
+                    "operation": operation_name,
                     "column": column,
-                    "target_type": target_type,
-                    "coerced_to_null": coerced_to_null,
+                    "cells_changed": changed,
                 }
             )
         return frame
 
-    def _apply_text_standardization(
+    def _apply_validation_operation(
         self,
         frame: pd.DataFrame,
-        rules: list[TextStandardization],
+        operation_name: str,
+        params: dict[str, Any],
         report: dict[str, Any],
     ) -> pd.DataFrame:
-        for rule in rules:
-            if rule.lowercase and rule.uppercase:
-                raise ValidationError("Text standardization cannot request both lowercase and uppercase.")
-            columns = self._require_columns(frame, rule.columns, "text_standardization.columns")
-            for column in columns:
-                original = frame[column].copy()
-                values = frame[column].astype("string")
-                if rule.trim:
-                    values = values.str.strip()
-                if rule.collapse_whitespace:
-                    values = values.str.replace(r"\s+", " ", regex=True)
-                if rule.lowercase:
-                    values = values.str.lower()
-                if rule.uppercase:
-                    values = values.str.upper()
-                if rule.value_map:
-                    values = values.replace(rule.value_map)
-                if rule.empty_to_null:
-                    values = values.replace(r"^\s*$", pd.NA, regex=True)
-                frame[column] = values
-                changed = int((original.astype("string") != frame[column].astype("string")).fillna(False).sum())
-                report["operations"].append(
-                    {
-                        "operation": "text_standardization",
-                        "column": column,
-                        "cells_changed": changed,
-                    }
-                )
-        return frame
-
-    def _apply_validation_rules(
-        self,
-        frame: pd.DataFrame,
-        rules: list[ValidationRule],
-        report: dict[str, Any],
-    ) -> pd.DataFrame:
-        for rule in rules:
-            column = self._require_column(frame, rule.column, "validation_rules.column")
-            action = self._one_of(rule.action, {"report_only", "drop_rows"}, "validation_rules.action")
-            mask = self._validation_mask(frame[column], rule)
-            violations = int(mask.sum())
-            entry = {
-                "name": rule.name or rule.rule,
-                "column": column,
-                "rule": rule.rule,
-                "action": action,
-                "violations": violations,
-            }
-            if action == "drop_rows" and violations:
-                frame = frame.loc[~mask].copy()
-                entry["rows_removed"] = violations
-            report["validation_rules"].append(entry)
-        return frame
-
-    def _validation_mask(self, series: pd.Series, rule: ValidationRule) -> pd.Series:
-        rule_name = self._one_of(
-            rule.rule,
-            {"not_null", "non_negative", "min", "max", "allowed_values", "regex"},
-            "validation_rules.rule",
+        column = self._params_column(frame, params, operation_name)
+        action = self._one_of(
+            str(params.get("action") or "report_only"),
+            {"report_only", "drop_rows"},
+            f"{operation_name}.params.action",
         )
-        if rule_name == "not_null":
+        mask = self._validation_mask(frame[column], operation_name, params)
+        violations = int(mask.sum())
+        entry = {
+            "name": str(params.get("name") or operation_name).strip() or operation_name,
+            "column": column,
+            "operation": operation_name,
+            "action": action,
+            "violations": violations,
+        }
+        if action == "drop_rows" and violations:
+            frame = frame.loc[~mask].copy()
+            entry["rows_removed"] = violations
+        report["validation_rules"].append(entry)
+        return frame
+
+    def _validation_mask(self, series: pd.Series, operation_name: str, params: dict[str, Any]) -> pd.Series:
+        if operation_name == "validation.not_null":
             return series.isna()
-        if rule_name == "non_negative":
+        if operation_name == "validation.non_negative":
             return pd.to_numeric(series, errors="coerce") < 0
-        if rule_name == "min":
-            return pd.to_numeric(series, errors="coerce") < float(rule.value)
-        if rule_name == "max":
-            return pd.to_numeric(series, errors="coerce") > float(rule.value)
-        if rule_name == "allowed_values":
-            return ~series.isin(rule.values)
-        pattern = re.compile(str(rule.value or ""))
-        return ~series.astype("string").fillna("").str.match(pattern)
+        if operation_name == "validation.min":
+            return pd.to_numeric(series, errors="coerce") < self._float_param(params, operation_name)
+        if operation_name == "validation.max":
+            return pd.to_numeric(series, errors="coerce") > self._float_param(params, operation_name)
+        if operation_name == "validation.allowed_values":
+            values = params.get("values")
+            if not isinstance(values, list):
+                raise ValidationError(f"{operation_name}.params.values must be a list.")
+            return ~series.isin(values)
+        if operation_name == "validation.regex":
+            if "value" not in params:
+                raise ValidationError(f"{operation_name}.params.value is required.")
+            pattern = re.compile(str(params.get("value") or ""))
+            return ~series.astype("string").fillna("").str.match(pattern)
+        raise ValidationError(f"Unsupported cleaning operation '{operation_name}'.")
+
+    def _float_param(self, params: dict[str, Any], operation_name: str) -> float:
+        if "value" not in params:
+            raise ValidationError(f"{operation_name}.params.value is required.")
+        try:
+            return float(params.get("value"))
+        except (TypeError, ValueError) as exc:
+            raise ValidationError(f"{operation_name}.params.value must be numeric.") from exc
+
+    def _keep_value(self, params: dict[str, Any], operation_name: str) -> str | bool:
+        keep = self._one_of(str(params.get("keep") or "first"), {"first", "last", "false"}, f"{operation_name}.params.keep")
+        return False if keep == "false" else keep
+
+    def _params_columns(self, frame: pd.DataFrame, params: dict[str, Any], operation_name: str) -> list[str]:
+        columns = params.get("columns")
+        if not isinstance(columns, list):
+            raise ValidationError(f"{operation_name}.params.columns must be a list.")
+        return self._require_columns(frame, columns, f"{operation_name}.params.columns")
+
+    def _params_column(self, frame: pd.DataFrame, params: dict[str, Any], operation_name: str) -> str:
+        return self._require_column(frame, str(params.get("column") or ""), f"{operation_name}.params.column")
 
     def _to_boolean(self, series: pd.Series) -> pd.Series:
         true_values = {"true", "t", "yes", "y", "1"}

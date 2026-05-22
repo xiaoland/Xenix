@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, ValidationError as PydanticValidationErro
 from ...config import AppPaths
 from ...exceptions import ValidationError
 from ..artifact_service import ArtifactService, RegisterArtifactInput, build_artifact_markdown_link
-from ..data_cleaning import CleanDatasetInput, DataCleaningService
+from ..data_cleaning import CleanDatasetInput, DataCleaningService, cleaning_operation_metadata
 from ..data_transform import (
     DataQueryInput,
     DataQueryTransformService,
@@ -126,6 +126,13 @@ TOOL_PRESENTATIONS: dict[str, ToolPresentation] = {
         failure_action="clean dataset",
         cancellation_summary="Cancelled dataset cleaning",
     ),
+    "data.clean.metadata": ToolPresentation(
+        icon_key="list-tree",
+        pending_summary="Loading cleaning metadata...",
+        success_summary="Loaded cleaning metadata",
+        failure_action="load cleaning metadata",
+        cancellation_summary="Cancelled cleaning metadata lookup",
+    ),
     "data.query": ToolPresentation(
         icon_key="table-search",
         pending_summary="Querying dataset...",
@@ -223,6 +230,7 @@ class AgentToolRegistry:
                 self._build_data_peek_tool(),
                 self._build_data_integrate_tool(),
                 self._build_data_clean_tool(),
+                self._build_data_clean_metadata_tool(),
                 self._build_data_query_tool(),
                 self._build_data_transform_tool(),
                 self._build_data_feature_select_tool(),
@@ -297,123 +305,29 @@ class AgentToolRegistry:
         )
 
     def _build_data_clean_tool(self) -> AgentTool:
+        cleaning_operation_schema = {
+            "type": "object",
+            "properties": {
+                "operation": {"type": "string"},
+                "params": {"type": "object"},
+            },
+            "required": ["operation"],
+            "additionalProperties": False,
+        }
         return AgentTool(
             spec=AgentToolSpec(
                 name="data.clean",
                 provider_name="data_clean",
                 description=(
                     "Create a new derived dataset by applying atomic predefined cleaning operations "
-                    "to one registered dataset."
+                    "to one registered dataset. Call data.clean.metadata for operation parameter schemas."
                 ),
                 parameters_schema={
                     "type": "object",
                     "properties": {
                         "dataset_id": {"type": "string"},
                         "name": {"type": "string"},
-                        "drop_duplicates": {"type": "boolean"},
-                        "duplicate_policy": {
-                            "type": "object",
-                            "properties": {
-                                "mode": {
-                                    "type": "string",
-                                    "enum": ["none", "exact_rows", "key_columns"],
-                                },
-                                "columns": {"type": "array", "items": {"type": "string"}},
-                                "keep": {"type": "string", "enum": ["first", "last", "false"]},
-                            },
-                            "additionalProperties": False,
-                        },
-                        "missing_policy": {
-                            "type": "object",
-                            "properties": {
-                                "default_numeric": {
-                                    "type": "string",
-                                    "enum": ["none", "mean", "median", "mode", "constant", "forward_fill", "drop_rows"],
-                                },
-                                "default_text": {
-                                    "type": "string",
-                                    "enum": ["none", "mode", "constant", "forward_fill", "drop_rows"],
-                                },
-                                "fill_values": {"type": "object"},
-                                "rules": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "columns": {"type": "array", "items": {"type": "string"}},
-                                            "strategy": {
-                                                "type": "string",
-                                                "enum": [
-                                                    "none",
-                                                    "mean",
-                                                    "median",
-                                                    "mode",
-                                                    "constant",
-                                                    "forward_fill",
-                                                    "drop_rows",
-                                                ],
-                                            },
-                                            "value": {},
-                                        },
-                                        "required": ["columns", "strategy"],
-                                        "additionalProperties": False,
-                                    },
-                                },
-                            },
-                            "additionalProperties": False,
-                        },
-                        "type_corrections": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "column": {"type": "string"},
-                                    "target_type": {
-                                        "type": "string",
-                                        "enum": ["numeric", "integer", "datetime", "text", "boolean"],
-                                    },
-                                    "date_format": {"type": "string"},
-                                },
-                                "required": ["column", "target_type"],
-                                "additionalProperties": False,
-                            },
-                        },
-                        "text_standardization": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "columns": {"type": "array", "items": {"type": "string"}},
-                                    "trim": {"type": "boolean"},
-                                    "lowercase": {"type": "boolean"},
-                                    "uppercase": {"type": "boolean"},
-                                    "collapse_whitespace": {"type": "boolean"},
-                                    "empty_to_null": {"type": "boolean"},
-                                    "value_map": {"type": "object"},
-                                },
-                                "required": ["columns"],
-                                "additionalProperties": False,
-                            },
-                        },
-                        "validation_rules": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {"type": "string"},
-                                    "column": {"type": "string"},
-                                    "rule": {
-                                        "type": "string",
-                                        "enum": ["not_null", "non_negative", "min", "max", "allowed_values", "regex"],
-                                    },
-                                    "action": {"type": "string", "enum": ["report_only", "drop_rows"]},
-                                    "value": {},
-                                    "values": {"type": "array"},
-                                },
-                                "required": ["column", "rule"],
-                                "additionalProperties": False,
-                            },
-                        },
+                        "operations": {"type": "array", "items": cleaning_operation_schema},
                     },
                     "required": ["dataset_id"],
                     "additionalProperties": False,
@@ -421,6 +335,24 @@ class AgentToolRegistry:
             ),
             handler=self._data_clean,
             presentation=tool_presentation_for_name("data.clean"),
+        )
+
+    def _build_data_clean_metadata_tool(self) -> AgentTool:
+        return AgentTool(
+            spec=AgentToolSpec(
+                name="data.clean.metadata",
+                provider_name="data_clean_metadata",
+                description="Return data.clean operation groups, operation names, and parameter schemas.",
+                parameters_schema={
+                    "type": "object",
+                    "properties": {
+                        "groups": {"type": "array", "items": {"type": "string"}},
+                    },
+                    "additionalProperties": False,
+                },
+            ),
+            handler=self._data_clean_metadata,
+            presentation=tool_presentation_for_name("data.clean.metadata"),
         )
 
     def _build_data_query_tool(self) -> AgentTool:
@@ -504,12 +436,6 @@ class AgentToolRegistry:
             "properties": {
                 "role": {"type": "string"},
                 "columns": {"type": "array", "items": {"type": "string"}},
-                "role_kind": {
-                    "type": "string",
-                    "enum": ["single_column", "many_columns"],
-                },
-                "required": {"type": "boolean"},
-                "metadata": {"type": "object"},
             },
             "required": ["role", "columns"],
             "additionalProperties": False,
@@ -523,7 +449,7 @@ class AgentToolRegistry:
                     "type": "object",
                     "properties": {
                         "dataset_id": {"type": "string"},
-                        "model_key": {"type": "string", "enum": list_model_keys()},
+                        "model_key": {"type": "string"},
                         "role_bindings": {"type": "array", "items": role_binding_schema},
                     },
                     "required": ["dataset_id", "role_bindings"],
@@ -548,7 +474,7 @@ class AgentToolRegistry:
                     "properties": {
                         "model_keys": {
                             "type": "array",
-                            "items": {"type": "string", "enum": list_model_keys()},
+                            "items": {"type": "string"},
                         },
                         "problem_kind": {
                             "type": "string",
@@ -757,21 +683,48 @@ class AgentToolRegistry:
 
     def _data_clean(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
+        unsupported_keys = sorted(set(arguments) - {"dataset_id", "name", "operations"})
+        if unsupported_keys:
+            raise ValidationError("data.clean does not accept: " + ", ".join(unsupported_keys))
         dataset_id = self._require_string(arguments, "dataset_id")
         dataset = self._dataset_service.get_dataset(dataset_id)
         name = str(arguments.get("name") or f"{dataset.name} cleaned").strip() or f"{dataset.name} cleaned"
-        clean_result = self._data_cleaning_service.clean_dataset(
-            CleanDatasetInput(
+        operations = arguments.get("operations") or []
+        if not isinstance(operations, list):
+            raise ValidationError("operations must be a list.")
+        if not operations:
+            report = {
+                "row_count_before": None,
+                "row_count_after": None,
+                "rows_removed": 0,
+                "operations": [],
+                "validation_rules": [],
+                "warnings": [],
+                "no_op": True,
+            }
+            return ToolExecutionResult(
+                payload={
+                    "dataset_id": dataset.id,
+                    "source_dataset_id": dataset.id,
+                    "cleaning_report": report,
+                    "message": "No cleaning operations were requested. Nothing happened.",
+                },
+                content_blocks=[
+                    {
+                        "type": "markdown",
+                        "text": "No cleaning operations were requested. Nothing happened; the source dataset was left unchanged.",
+                    }
+                ],
+            )
+        try:
+            clean_input = CleanDatasetInput(
                 source_path=dataset.source_path,
                 name=name,
-                drop_duplicates=arguments.get("drop_duplicates"),
-                duplicate_policy=arguments.get("duplicate_policy"),
-                missing_policy=arguments.get("missing_policy"),
-                type_corrections=arguments.get("type_corrections") or [],
-                text_standardization=arguments.get("text_standardization") or [],
-                validation_rules=arguments.get("validation_rules") or [],
+                operations=operations,
             )
-        )
+        except PydanticValidationError as exc:
+            raise ValidationError("operations must contain objects with operation and optional params.") from exc
+        clean_result = self._data_cleaning_service.clean_dataset(clean_input)
         row_count_before = int(clean_result.report.get("row_count_before", 0))
         row_count_after = int(clean_result.report.get("row_count_after", 0))
         result = self._register_generated_dataset_result(
@@ -786,6 +739,24 @@ class AgentToolRegistry:
         result.payload["row_count_after"] = row_count_after
         result.payload["cleaning_report"] = clean_result.report
         return result
+
+    def _data_clean_metadata(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+        self._raise_if_cancelled(context)
+        unsupported_keys = sorted(set(arguments) - {"groups"})
+        if unsupported_keys:
+            raise ValidationError("data.clean.metadata does not accept: " + ", ".join(unsupported_keys))
+        groups = self._optional_string_list(arguments, "groups")
+        payload = cleaning_operation_metadata(groups)
+        group_names = ", ".join(payload["group_names"])
+        return ToolExecutionResult(
+            payload=payload,
+            content_blocks=[
+                {
+                    "type": "markdown",
+                    "text": f"Available data.clean operation groups: {group_names}.",
+                }
+            ],
+        )
 
     def _data_query(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)

@@ -1,8 +1,10 @@
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from xenix.config import ensure_app_dirs, get_app_paths
+from xenix.exceptions import ValidationError
 from xenix.services.agent import ConversationStore
 from xenix.services.agent.conversation_store import CreateToolCallInput, StartTurnInput
 from xenix.services.agent.tools import AgentToolRegistry, ToolExecutionContext
@@ -42,7 +44,11 @@ def _build_runtime(monkeypatch, tmp_path: Path):
     return paths, dataset_service, data_cleaning_service, artifact_service, registry, conversation_store
 
 
-def _tool_context(conversation_store: ConversationStore, arguments: dict) -> ToolExecutionContext:
+def _tool_context(
+    conversation_store: ConversationStore,
+    tool_name: str,
+    arguments: dict,
+) -> ToolExecutionContext:
     thread = conversation_store.create_thread()
     turn, _message = conversation_store.start_turn(
         StartTurnInput(
@@ -54,7 +60,7 @@ def _tool_context(conversation_store: ConversationStore, arguments: dict) -> Too
         CreateToolCallInput(
             thread_id=thread.id,
             turn_id=turn.id,
-            tool_name="data.clean",
+            tool_name=tool_name,
             arguments_payload=arguments,
         )
     )
@@ -66,7 +72,7 @@ def _tool_context(conversation_store: ConversationStore, arguments: dict) -> Too
     )
 
 
-def test_data_cleaning_service_preserves_default_cleaning_behavior(monkeypatch, tmp_path: Path) -> None:
+def test_data_cleaning_service_no_ops_returns_source_without_cleaning(monkeypatch, tmp_path: Path) -> None:
     _paths, _dataset_service, cleaning_service, _artifact_service, _registry, _store = _build_runtime(
         monkeypatch,
         tmp_path,
@@ -88,16 +94,17 @@ def test_data_cleaning_service_preserves_default_cleaning_behavior(monkeypatch, 
         )
     )
 
-    frame = pd.read_csv(result.output_path)
-    assert frame.to_dict(orient="records") == [
-        {"customer_id": 1, "amount": 10.0, "segment": "A"},
-        {"customer_id": 2, "amount": 20.0, "segment": "B"},
-        {"customer_id": 3, "amount": 30.0, "segment": "A"},
-    ]
+    frame = pd.read_csv(source)
+    assert len(frame.index) == 4
+    assert frame.duplicated().sum() == 1
+    assert frame["amount"].isna().sum() == 1
+    assert frame["segment"].isna().sum() == 1
+    assert result.output_path == str(source.resolve())
     assert result.report["row_count_before"] == 4
-    assert result.report["row_count_after"] == 3
-    assert result.report["rows_removed"] == 1
-    assert result.report["operations"][0]["operation"] == "duplicates"
+    assert result.report["row_count_after"] == 4
+    assert result.report["rows_removed"] == 0
+    assert result.report["operations"] == []
+    assert result.report["no_op"] is True
 
 
 def test_data_cleaning_service_applies_atomic_operations(monkeypatch, tmp_path: Path) -> None:
@@ -118,31 +125,16 @@ def test_data_cleaning_service_applies_atomic_operations(monkeypatch, tmp_path: 
         CleanDatasetInput(
             source_path=str(source.resolve()),
             name="Orders cleaned",
-            duplicate_policy={"mode": "none"},
-            type_corrections=[
-                {"column": "amount", "target_type": "numeric"},
-                {"column": "active", "target_type": "boolean"},
-            ],
-            text_standardization=[
+            operations=[
+                {"operation": "type.convert", "params": {"column": "amount", "target_type": "numeric"}},
+                {"operation": "type.convert", "params": {"column": "active", "target_type": "boolean"}},
+                {"operation": "text.trim", "params": {"columns": ["region"]}},
+                {"operation": "text.lowercase", "params": {"columns": ["region"]}},
+                {"operation": "missing.fill_constant", "params": {"columns": ["amount"], "value": 0}},
                 {
-                    "columns": ["region"],
-                    "trim": True,
-                    "lowercase": True,
-                    "collapse_whitespace": True,
-                }
-            ],
-            missing_policy={
-                "default_numeric": "constant",
-                "default_text": "mode",
-                "fill_values": {"amount": 0},
-            },
-            validation_rules=[
-                {
-                    "name": "amount_non_negative",
-                    "column": "amount",
-                    "rule": "non_negative",
-                    "action": "drop_rows",
-                }
+                    "operation": "validation.non_negative",
+                    "params": {"name": "amount_non_negative", "column": "amount", "action": "drop_rows"},
+                },
             ],
         )
     )
@@ -157,11 +149,18 @@ def test_data_cleaning_service_applies_atomic_operations(monkeypatch, tmp_path: 
         {
             "name": "amount_non_negative",
             "column": "amount",
-            "rule": "non_negative",
+            "operation": "validation.non_negative",
             "action": "drop_rows",
             "violations": 1,
             "rows_removed": 1,
         }
+    ]
+    assert [operation["operation"] for operation in result.report["operations"]] == [
+        "type.convert",
+        "type.convert",
+        "text.trim",
+        "text.lowercase",
+        "missing.fill_constant",
     ]
 
 
@@ -187,9 +186,14 @@ def test_data_clean_tool_registers_derived_dataset_and_artifact(monkeypatch, tmp
     arguments = {
         "dataset_id": source_dataset.id,
         "name": "Customers cleaned",
-        "duplicate_policy": {"mode": "key_columns", "columns": ["customer_id"], "keep": "first"},
+        "operations": [
+            {
+                "operation": "duplicate.key_columns",
+                "params": {"columns": ["customer_id"], "keep": "first"},
+            }
+        ],
     }
-    context = _tool_context(store, arguments)
+    context = _tool_context(store, "data.clean", arguments)
 
     result = registry.execute("data.clean", arguments, context)
     derived_dataset = dataset_service.get_dataset(result.payload["dataset_id"])
@@ -199,10 +203,76 @@ def test_data_clean_tool_registers_derived_dataset_and_artifact(monkeypatch, tmp
     assert derived_dataset.project_id == source_dataset.project_id
     assert result.payload["row_count_before"] == 3
     assert result.payload["row_count_after"] == 2
-    assert result.payload["cleaning_report"]["operations"][0]["mode"] == "key_columns"
+    assert result.payload["cleaning_report"]["operations"][0]["operation"] == "duplicate.key_columns"
     assert resolved_artifact.metadata_payload["dataset_id"] == derived_dataset.id
     assert resolved_artifact.metadata_payload["derived_from_dataset_id"] == source_dataset.id
     assert "artifact://" in result.payload["artifact_link"]
+
+
+def test_data_clean_tool_no_ops_reports_nothing_happened(monkeypatch, tmp_path: Path) -> None:
+    _paths, dataset_service, _cleaning_service, artifact_service, registry, store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "customers.csv"
+    source.write_text("customer_id,amount\n1,10\n", encoding="utf-8")
+    source_dataset = dataset_service.register_dataset(
+        RegisterDatasetInput(
+            source_path=str(source.resolve()),
+            name="Customers",
+        )
+    )
+    arguments = {"dataset_id": source_dataset.id, "operations": []}
+    context = _tool_context(store, "data.clean", arguments)
+
+    result = registry.execute("data.clean", arguments, context)
+
+    assert result.payload["dataset_id"] == source_dataset.id
+    assert result.payload["cleaning_report"]["no_op"] is True
+    assert "artifact_id" not in result.payload
+    assert artifact_service.list_thread_artifacts(context.thread_id) == []
+    assert "Nothing happened" in result.content_blocks[0]["text"]
+
+
+def test_data_clean_tool_rejects_legacy_policy_fields(monkeypatch, tmp_path: Path) -> None:
+    _paths, dataset_service, _cleaning_service, _artifact_service, registry, store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "customers.csv"
+    source.write_text("customer_id,amount\n1,10\n", encoding="utf-8")
+    source_dataset = dataset_service.register_dataset(
+        RegisterDatasetInput(
+            source_path=str(source.resolve()),
+            name="Customers",
+        )
+    )
+    arguments = {"dataset_id": source_dataset.id, "duplicate_policy": {"mode": "exact_rows"}}
+    context = _tool_context(store, "data.clean", arguments)
+
+    with pytest.raises(ValidationError, match="duplicate_policy"):
+        registry.execute("data.clean", arguments, context)
+
+
+def test_data_clean_metadata_returns_operation_group_schemas(monkeypatch, tmp_path: Path) -> None:
+    _paths, _dataset_service, _cleaning_service, _artifact_service, registry, store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    arguments = {"groups": ["missing", "text"]}
+    context = _tool_context(store, "data.clean.metadata", arguments)
+
+    result = registry.execute("data.clean.metadata", arguments, context)
+
+    assert result.payload["group_names"] == ["duplicates", "missing", "types", "text", "validation"]
+    assert [group["group"] for group in result.payload["groups"]] == ["missing", "text"]
+    operations = [
+        operation["operation"]
+        for group in result.payload["groups"]
+        for operation in group["operations"]
+    ]
+    assert "missing.fill_constant" in operations
+    assert "text.map_values" in operations
 
 
 def test_data_clean_tool_schema_stays_compact(monkeypatch, tmp_path: Path) -> None:
@@ -215,5 +285,12 @@ def test_data_clean_tool_schema_stays_compact(monkeypatch, tmp_path: Path) -> No
     assert "project_id" not in specs["data.peek"].parameters_schema["properties"]
     assert "project_id" not in specs["data.integrate"].parameters_schema["properties"]
     assert "profile" not in specs["data.clean"].parameters_schema["properties"]
-    assert "duplicate_policy" in specs["data.clean"].parameters_schema["properties"]
-    assert "drop_duplicates" in specs["data.clean"].parameters_schema["properties"]
+    assert "duplicate_policy" not in specs["data.clean"].parameters_schema["properties"]
+    assert "drop_duplicates" not in specs["data.clean"].parameters_schema["properties"]
+    assert "missing_policy" not in specs["data.clean"].parameters_schema["properties"]
+    assert "operations" in specs["data.clean"].parameters_schema["properties"]
+    operation_schema = specs["data.clean"].parameters_schema["properties"]["operations"]["items"]
+    assert set(operation_schema["properties"]) == {"operation", "params"}
+    assert "enum" not in operation_schema["properties"]["operation"]
+    assert "data.clean.metadata" in specs
+    assert specs["data.clean.metadata"].parameters_schema["properties"]["groups"]["items"] == {"type": "string"}
