@@ -38,11 +38,17 @@ def _utc_now() -> datetime:
 class CreateAgentThreadInput(SQLModel):
     title: str | None = None
     system_prompt: str | None = None
+    selected_fq_model_key: str | None = None
 
 
 class RenameAgentThreadInput(SQLModel):
     thread_id: str
     title: str | None = None
+
+
+class UpdateAgentThreadModelInput(SQLModel):
+    thread_id: str
+    selected_fq_model_key: str | None = None
 
 
 class StartTurnInput(SQLModel):
@@ -162,8 +168,19 @@ class ConversationStore:
         system_prompt = (
             input_data.system_prompt.strip() if input_data.system_prompt else ""
         ) or DEFAULT_AGENT_THREAD_SYSTEM_PROMPT
+        selected_fq_model_key = (
+            input_data.selected_fq_model_key.strip()
+            if input_data.selected_fq_model_key
+            else None
+        )
         now = _utc_now()
-        row = AgentThreadRow(title=title, system_prompt=system_prompt, created_at=now, updated_at=now)
+        row = AgentThreadRow(
+            title=title,
+            system_prompt=system_prompt,
+            selected_fq_model_key=selected_fq_model_key,
+            created_at=now,
+            updated_at=now,
+        )
         with self._session_factory() as session:
             self._conversations.create_thread(session, row)
             session.commit()
@@ -182,6 +199,24 @@ class ConversationStore:
                 raise NotFoundError(f"Thread '{input_data.thread_id}' was not found.")
             session.commit()
             return row
+
+    def update_thread_model(self, input_data: UpdateAgentThreadModelInput) -> AgentThreadRow:
+        selected_fq_model_key = (
+            input_data.selected_fq_model_key.strip()
+            if input_data.selected_fq_model_key
+            else None
+        )
+        now = _utc_now()
+        with self._session_factory() as session:
+            thread = self._conversations.get_thread(session, input_data.thread_id)
+            if thread is None:
+                raise NotFoundError(f"Thread '{input_data.thread_id}' was not found.")
+            thread.selected_fq_model_key = selected_fq_model_key
+            thread.updated_at = now
+            session.add(thread)
+            session.commit()
+            session.refresh(thread)
+            return thread
 
     def delete_thread(self, thread_id: str) -> AgentThreadRow:
         with self._session_factory() as session:

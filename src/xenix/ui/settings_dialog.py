@@ -14,15 +14,25 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QPlainTextEdit,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QVBoxLayout,
+    QWidget,
 )
 
 from ..build_info import BUILD_COMMIT, BUILD_COMMIT_DISPLAY
 from ..config import AppPaths
 from ..i18n import TranslationManager
-from ..services.agent import AgentSettings, AgentSettingsService, AimockSettings
+from ..services.llm import (
+    AimockSettings,
+    LLMDialect,
+    LLMProviderConfig,
+    LLMService,
+    LLMSettings,
+    LLMSettingsService,
+)
 
 
 class SettingsDialog(QDialog):
@@ -34,7 +44,8 @@ class SettingsDialog(QDialog):
         log_path: Path,
         db_path: Path,
         translation_manager: TranslationManager,
-        agent_settings_service: AgentSettingsService,
+        llm_service: LLMService,
+        llm_settings_service: LLMSettingsService,
         parent: QDialog | None = None,
     ) -> None:
         super().__init__(parent)
@@ -42,7 +53,10 @@ class SettingsDialog(QDialog):
         self._log_path = log_path
         self._db_path = db_path
         self._translation_manager = translation_manager
-        self._agent_settings_service = agent_settings_service
+        self._llm_service = llm_service
+        self._llm_settings_service = llm_settings_service
+        self._provider_configs: list[LLMProviderConfig] = []
+        self._loading_provider = False
 
         self._language_label = QLabel()
         self._language_selector = QComboBox()
@@ -70,14 +84,21 @@ class SettingsDialog(QDialog):
         self._database_label = QLabel()
         self._current_log_file_label = QLabel()
         self._build_commit_label = QLabel()
+
         self._llm_title_label = QLabel()
-        self._llm_base_url_label = QLabel()
-        self._llm_api_key_label = QLabel()
-        self._llm_model_label = QLabel()
+        self._provider_selector_label = QLabel()
+        self._provider_key_label = QLabel()
+        self._provider_name_label = QLabel()
+        self._provider_dialect_label = QLabel()
+        self._provider_base_url_label = QLabel()
+        self._provider_api_key_label = QLabel()
+        self._provider_models_label = QLabel()
+        self._provider_timeout_label = QLabel()
+        self._provider_streaming_label = QLabel()
+        self._llm_default_model_label = QLabel()
         self._llm_guard_model_label = QLabel()
         self._llm_thread_title_model_label = QLabel()
-        self._llm_timeout_label = QLabel()
-        self._llm_streaming_label = QLabel()
+
         self._aimock_title_label = QLabel()
         self._aimock_enabled_label = QLabel()
         self._aimock_base_url_label = QLabel()
@@ -91,18 +112,32 @@ class SettingsDialog(QDialog):
         self._build_commit_value = QLabel(BUILD_COMMIT_DISPLAY)
         if BUILD_COMMIT_DISPLAY != BUILD_COMMIT:
             self._build_commit_value.setToolTip(BUILD_COMMIT)
-        self._llm_base_url_input = QLineEdit()
-        self._llm_api_key_input = QLineEdit()
-        self._llm_model_input = QLineEdit()
-        self._llm_guard_model_input = QLineEdit()
-        self._llm_thread_title_model_input = QLineEdit()
-        self._llm_timeout_input = QSpinBox()
-        self._llm_streaming_checkbox = QCheckBox()
+
+        self._provider_selector = QComboBox()
+        self._add_provider_button = QPushButton()
+        self._remove_provider_button = QPushButton()
+        self._provider_key_input = QLineEdit()
+        self._provider_name_input = QLineEdit()
+        self._provider_dialect_selector = QComboBox()
+        self._provider_base_url_input = QLineEdit()
+        self._provider_api_key_input = QLineEdit()
+        self._provider_api_key_input.setEchoMode(QLineEdit.Password)
+        self._provider_models_input = QPlainTextEdit()
+        self._provider_models_input.setFixedHeight(82)
+        self._provider_timeout_input = QSpinBox()
+        self._provider_timeout_input.setRange(1, 3600)
+        self._provider_timeout_input.setSuffix(" s")
+        self._provider_streaming_checkbox = QCheckBox()
+        self._llm_default_model_selector = QComboBox()
+        self._llm_guard_model_selector = QComboBox()
+        self._llm_thread_title_model_selector = QComboBox()
+
         self._aimock_enabled_checkbox = QCheckBox()
         self._aimock_base_url_input = QLineEdit()
         self._aimock_api_key_input = QLineEdit()
+        self._aimock_api_key_input.setEchoMode(QLineEdit.Password)
 
-        self.resize(760, 680)
+        self.resize(760, 760)
         self._build_ui()
         self._wire_events()
         self._load_agent_settings()
@@ -119,6 +154,15 @@ class SettingsDialog(QDialog):
         header_layout.addWidget(self._language_selector)
         header_layout.addStretch(1)
         layout.addLayout(header_layout)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setContentsMargins(0, 0, 0, 0)
+        scroll_layout.setSpacing(16)
+        scroll.setWidget(scroll_content)
 
         for value_label in (
             self._app_home_value,
@@ -137,52 +181,75 @@ class SettingsDialog(QDialog):
         self._runtime_card_layout.addRow(self._current_log_file_label, self._current_log_file_value)
         self._runtime_card_layout.addRow(self._build_commit_label, self._build_commit_value)
 
-        self._llm_api_key_input.setEchoMode(QLineEdit.Password)
-        self._aimock_api_key_input.setEchoMode(QLineEdit.Password)
-        self._llm_timeout_input.setRange(1, 3600)
-        self._llm_timeout_input.setSuffix(" s")
+        provider_selector_row = QHBoxLayout()
+        provider_selector_row.setSpacing(8)
+        provider_selector_row.addWidget(self._provider_selector, 1)
+        provider_selector_row.addWidget(self._add_provider_button)
+        provider_selector_row.addWidget(self._remove_provider_button)
+
+        self._provider_dialect_selector.addItem("OpenAI-compatible", LLMDialect.OPENAI_COMPATIBLE.value)
         self._llm_card_layout.addRow(self._llm_title_label)
-        self._llm_card_layout.addRow(self._llm_base_url_label, self._llm_base_url_input)
-        self._llm_card_layout.addRow(self._llm_api_key_label, self._llm_api_key_input)
-        self._llm_card_layout.addRow(self._llm_model_label, self._llm_model_input)
-        self._llm_card_layout.addRow(self._llm_guard_model_label, self._llm_guard_model_input)
-        self._llm_card_layout.addRow(self._llm_thread_title_model_label, self._llm_thread_title_model_input)
-        self._llm_card_layout.addRow(self._llm_timeout_label, self._llm_timeout_input)
-        self._llm_card_layout.addRow(self._llm_streaming_label, self._llm_streaming_checkbox)
+        self._llm_card_layout.addRow(self._provider_selector_label, provider_selector_row)
+        self._llm_card_layout.addRow(self._provider_key_label, self._provider_key_input)
+        self._llm_card_layout.addRow(self._provider_name_label, self._provider_name_input)
+        self._llm_card_layout.addRow(self._provider_dialect_label, self._provider_dialect_selector)
+        self._llm_card_layout.addRow(self._provider_base_url_label, self._provider_base_url_input)
+        self._llm_card_layout.addRow(self._provider_api_key_label, self._provider_api_key_input)
+        self._llm_card_layout.addRow(self._provider_models_label, self._provider_models_input)
+        self._llm_card_layout.addRow(self._provider_timeout_label, self._provider_timeout_input)
+        self._llm_card_layout.addRow(self._provider_streaming_label, self._provider_streaming_checkbox)
+        self._llm_card_layout.addRow(self._llm_default_model_label, self._llm_default_model_selector)
+        self._llm_card_layout.addRow(self._llm_guard_model_label, self._llm_guard_model_selector)
+        self._llm_card_layout.addRow(
+            self._llm_thread_title_model_label,
+            self._llm_thread_title_model_selector,
+        )
 
         self._aimock_card_layout.addRow(self._aimock_title_label)
         self._aimock_card_layout.addRow(self._aimock_enabled_label, self._aimock_enabled_checkbox)
         self._aimock_card_layout.addRow(self._aimock_base_url_label, self._aimock_base_url_input)
         self._aimock_card_layout.addRow(self._aimock_api_key_label, self._aimock_api_key_input)
-        self._aimock_card.setVisible(self._agent_settings_service.is_development())
+        self._aimock_card.setVisible(self._llm_settings_service.is_development())
+
+        scroll_layout.addWidget(self._llm_card)
+        scroll_layout.addWidget(self._aimock_card)
+        scroll_layout.addWidget(self._runtime_card)
+        scroll_layout.addStretch(1)
+        layout.addWidget(scroll, 1)
 
         actions_layout = QHBoxLayout()
         actions_layout.addWidget(self._open_logs_button)
         actions_layout.addStretch(1)
         actions_layout.addWidget(self._save_button)
-
-        layout.addWidget(self._llm_card)
-        layout.addWidget(self._aimock_card)
-        layout.addWidget(self._runtime_card)
         layout.addLayout(actions_layout)
-        layout.addStretch(1)
 
     def _wire_events(self) -> None:
         self._open_logs_button.clicked.connect(self._open_logs_dir)
         self._language_selector.currentIndexChanged.connect(self._on_language_changed)
         self._save_button.clicked.connect(self._save_agent_settings)
+        self._provider_selector.currentIndexChanged.connect(self._on_provider_changed)
+        self._add_provider_button.clicked.connect(self._add_provider)
+        self._remove_provider_button.clicked.connect(self._remove_provider)
 
     def retranslate_ui(self) -> None:
         self.setWindowTitle(self.tr("Settings"))
         self._language_label.setText(self.tr("Language"))
-        self._llm_title_label.setText(self.tr("LLM provider"))
-        self._llm_base_url_label.setText(self.tr("Base URL"))
-        self._llm_api_key_label.setText(self.tr("API key"))
-        self._llm_model_label.setText(self.tr("Model"))
+        self._llm_title_label.setText(self.tr("LLM providers"))
+        self._provider_selector_label.setText(self.tr("Provider"))
+        self._provider_key_label.setText(self.tr("Provider key"))
+        self._provider_name_label.setText(self.tr("Provider name"))
+        self._provider_dialect_label.setText(self.tr("Dialect"))
+        self._provider_base_url_label.setText(self.tr("Base URL"))
+        self._provider_api_key_label.setText(self.tr("API key"))
+        self._provider_models_label.setText(self.tr("Models"))
+        self._provider_timeout_label.setText(self.tr("Timeout"))
+        self._provider_streaming_label.setText(self.tr("Streaming"))
+        self._llm_default_model_label.setText(self.tr("Default model"))
         self._llm_guard_model_label.setText(self.tr("Turn guard model"))
         self._llm_thread_title_model_label.setText(self.tr("Thread title model"))
-        self._llm_timeout_label.setText(self.tr("Timeout"))
-        self._llm_streaming_label.setText(self.tr("Streaming"))
+        self._add_provider_button.setText(self.tr("Add"))
+        self._remove_provider_button.setText(self.tr("Remove"))
+        self._provider_dialect_selector.setItemText(0, self.tr("OpenAI-compatible"))
         self._aimock_title_label.setText(self.tr("AIMock"))
         self._aimock_enabled_label.setText(self.tr("Use AIMock"))
         self._aimock_base_url_label.setText(self.tr("AIMock base URL"))
@@ -196,6 +263,11 @@ class SettingsDialog(QDialog):
         self._open_logs_button.setText(self.tr("Open log directory"))
         self._save_button.setText(self.tr("Save"))
         self._reload_language_options()
+        self._refresh_model_selectors(
+            default_key=self._llm_default_model_selector.currentData(),
+            guard_key=self._llm_guard_model_selector.currentData(),
+            title_key=self._llm_thread_title_model_selector.currentData(),
+        )
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == QEvent.LanguageChange:
@@ -236,32 +308,184 @@ class SettingsDialog(QDialog):
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._paths.logs)))
 
     def _load_agent_settings(self) -> None:
-        settings = self._agent_settings_service.load()
-        self._llm_base_url_input.setText(settings.base_url)
-        self._llm_api_key_input.setText(settings.api_key)
-        self._llm_model_input.setText(settings.model)
-        self._llm_guard_model_input.setText(settings.turn_completion_guard_model)
-        self._llm_thread_title_model_input.setText(settings.thread_title_model)
-        self._llm_timeout_input.setValue(settings.timeout_seconds)
-        self._llm_streaming_checkbox.setChecked(settings.streaming_enabled)
+        settings = self._llm_settings_service.load()
+        self._provider_configs = [provider.model_copy(deep=True) for provider in settings.providers]
+        self._reload_provider_selector(0)
+        self._load_provider_fields(0)
+        self._refresh_model_selectors(
+            default_key=settings.default_fq_model_key,
+            guard_key=settings.turn_completion_guard_fq_model_key,
+            title_key=settings.thread_title_fq_model_key,
+        )
         self._aimock_enabled_checkbox.setChecked(settings.aimock.enabled)
         self._aimock_base_url_input.setText(settings.aimock.base_url)
         self._aimock_api_key_input.setText(settings.aimock.api_key)
 
     def _save_agent_settings(self) -> None:
-        settings = AgentSettings(
-            base_url=self._llm_base_url_input.text().strip(),
-            api_key=self._llm_api_key_input.text(),
-            model=self._llm_model_input.text().strip(),
-            turn_completion_guard_model=self._llm_guard_model_input.text().strip(),
-            thread_title_model=self._llm_thread_title_model_input.text().strip(),
-            timeout_seconds=self._llm_timeout_input.value(),
-            streaming_enabled=self._llm_streaming_checkbox.isChecked(),
-            aimock=AimockSettings(
-                enabled=self._aimock_enabled_checkbox.isChecked(),
-                base_url=self._aimock_base_url_input.text().strip(),
-                api_key=self._aimock_api_key_input.text(),
-            ),
-        )
-        self._agent_settings_service.save(settings)
+        try:
+            self._store_current_provider_fields()
+            settings = LLMSettings(
+                providers=self._provider_configs,
+                default_fq_model_key=str(self._llm_default_model_selector.currentData() or ""),
+                turn_completion_guard_fq_model_key=str(self._llm_guard_model_selector.currentData() or ""),
+                thread_title_fq_model_key=str(self._llm_thread_title_model_selector.currentData() or ""),
+                aimock=AimockSettings(
+                    enabled=self._aimock_enabled_checkbox.isChecked(),
+                    base_url=self._aimock_base_url_input.text().strip(),
+                    api_key=self._aimock_api_key_input.text(),
+                ),
+            )
+        except Exception as exc:
+            QMessageBox.warning(self, self.tr("Settings"), str(exc))
+            return
+        self._llm_settings_service.save(settings)
         self.agent_settings_saved.emit()
+
+    def _on_provider_changed(self, index: int) -> None:
+        if self._loading_provider:
+            return
+        try:
+            self._store_current_provider_fields()
+        except Exception:
+            pass
+        self._load_provider_fields(index)
+        self._refresh_model_selectors(
+            default_key=self._llm_default_model_selector.currentData(),
+            guard_key=self._llm_guard_model_selector.currentData(),
+            title_key=self._llm_thread_title_model_selector.currentData(),
+        )
+
+    def _add_provider(self) -> None:
+        try:
+            self._store_current_provider_fields()
+        except Exception as exc:
+            QMessageBox.warning(self, self.tr("Settings"), str(exc))
+            return
+        existing = {provider.key for provider in self._provider_configs}
+        index = 2
+        key = "provider2"
+        while key in existing:
+            index += 1
+            key = f"provider{index}"
+        self._provider_configs.append(
+            LLMProviderConfig(
+                key=key,
+                display_name=f"Provider {index}",
+                models=["gpt-4o-mini"],
+            )
+        )
+        self._reload_provider_selector(len(self._provider_configs) - 1)
+        self._load_provider_fields(len(self._provider_configs) - 1)
+        self._refresh_model_selectors()
+
+    def _remove_provider(self) -> None:
+        if len(self._provider_configs) <= 1:
+            return
+        index = max(0, self._provider_selector.currentIndex())
+        self._provider_configs.pop(index)
+        next_index = min(index, len(self._provider_configs) - 1)
+        self._reload_provider_selector(next_index)
+        self._load_provider_fields(next_index)
+        self._refresh_model_selectors()
+
+    def _reload_provider_selector(self, selected_index: int) -> None:
+        self._loading_provider = True
+        self._provider_selector.clear()
+        for provider in self._provider_configs:
+            label = provider.display_name or provider.key
+            self._provider_selector.addItem(label, provider.key)
+        if self._provider_configs:
+            self._provider_selector.setCurrentIndex(max(0, min(selected_index, len(self._provider_configs) - 1)))
+        self._loading_provider = False
+
+    def _load_provider_fields(self, index: int) -> None:
+        if not self._provider_configs:
+            return
+        provider = self._provider_configs[max(0, min(index, len(self._provider_configs) - 1))]
+        self._loading_provider = True
+        self._provider_key_input.setText(provider.key)
+        self._provider_name_input.setText(provider.display_name)
+        dialect_index = self._provider_dialect_selector.findData(provider.dialect.value)
+        if dialect_index >= 0:
+            self._provider_dialect_selector.setCurrentIndex(dialect_index)
+        self._provider_base_url_input.setText(provider.base_url)
+        self._provider_api_key_input.setText(provider.api_key)
+        self._provider_models_input.setPlainText("\n".join(provider.models))
+        self._provider_timeout_input.setValue(provider.timeout_seconds)
+        self._provider_streaming_checkbox.setChecked(provider.streaming_enabled)
+        self._loading_provider = False
+
+    def _store_current_provider_fields(self) -> None:
+        if self._loading_provider or not self._provider_configs:
+            return
+        index = max(0, self._provider_selector.currentIndex())
+        if index >= len(self._provider_configs):
+            return
+        self._provider_configs[index] = LLMProviderConfig(
+            key=self._provider_key_input.text().strip(),
+            display_name=self._provider_name_input.text().strip(),
+            dialect=LLMDialect(str(self._provider_dialect_selector.currentData())),
+            base_url=self._provider_base_url_input.text().strip(),
+            api_key=self._provider_api_key_input.text(),
+            models=self._model_lines(),
+            timeout_seconds=self._provider_timeout_input.value(),
+            streaming_enabled=self._provider_streaming_checkbox.isChecked(),
+        )
+        self._reload_provider_selector(index)
+
+    def _refresh_model_selectors(
+        self,
+        *,
+        default_key: object | None = None,
+        guard_key: object | None = None,
+        title_key: object | None = None,
+    ) -> None:
+        if not self._provider_configs:
+            return
+        try:
+            settings = LLMSettings(providers=self._provider_configs)
+        except Exception:
+            return
+        options = LLMService.model_options_from_settings(settings)
+        self._replace_model_selector_items(
+            self._llm_default_model_selector,
+            options,
+            selected_key=str(default_key or settings.default_fq_model_key),
+            include_blank=False,
+        )
+        self._replace_model_selector_items(
+            self._llm_guard_model_selector,
+            options,
+            selected_key=str(guard_key or ""),
+            include_blank=True,
+        )
+        self._replace_model_selector_items(
+            self._llm_thread_title_model_selector,
+            options,
+            selected_key=str(title_key or ""),
+            include_blank=True,
+        )
+
+    def _replace_model_selector_items(
+        self,
+        selector: QComboBox,
+        options,
+        *,
+        selected_key: str,
+        include_blank: bool,
+    ) -> None:
+        selector.blockSignals(True)
+        selector.clear()
+        if include_blank:
+            selector.addItem(self.tr("None"), "")
+        for option in options:
+            selector.addItem(option.label, option.fq_model_key)
+        index = selector.findData(selected_key)
+        if index < 0:
+            index = 0
+        selector.setCurrentIndex(index)
+        selector.blockSignals(False)
+
+    def _model_lines(self) -> list[str]:
+        text = self._provider_models_input.toPlainText().replace(",", "\n")
+        return [line.strip() for line in text.splitlines() if line.strip()]

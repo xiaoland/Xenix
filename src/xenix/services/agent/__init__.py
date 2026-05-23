@@ -13,6 +13,7 @@ from .conversation_store import (
     ThreadSnapshot,
     ConversationStore,
     UpdateAgentMessageInput,
+    UpdateAgentThreadModelInput,
 )
 from .chatbot_events import (
     ChatbotEvent,
@@ -34,6 +35,7 @@ from .providers import (
     ScriptedAgentProvider,
 )
 from .settings import AgentSettings, AgentSettingsService, AimockSettings
+from ..llm import LLMDialect, LLMModelOption, LLMProviderConfig, LLMService, LLMSettings, LLMSettingsService
 from .tools import AgentToolRegistry, ToolPresentation, tool_presentation_for_name
 
 __all__ = [
@@ -43,6 +45,12 @@ __all__ = [
     "AgentSettingsService",
     "AgentToolRegistry",
     "AimockSettings",
+    "LLMDialect",
+    "LLMModelOption",
+    "LLMProviderConfig",
+    "LLMService",
+    "LLMSettings",
+    "LLMSettingsService",
     "AppendAgentMessageInput",
     "ChatbotEvent",
     "ChatbotEventAuthor",
@@ -70,6 +78,7 @@ __all__ = [
     "ThreadSnapshot",
     "ToolPresentation",
     "UpdateAgentMessageInput",
+    "UpdateAgentThreadModelInput",
     "build_thinking_chatbot_event",
     "build_tool_result_content_blocks",
     "project_chatbot_events",

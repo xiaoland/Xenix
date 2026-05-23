@@ -240,6 +240,7 @@ class AgentThreadRow(SQLModel, table=True):
     id: str = Field(default_factory=generate_id, primary_key=True)
     title: str | None = Field(default=None, index=True)
     system_prompt: str = Field(default=DEFAULT_AGENT_THREAD_SYSTEM_PROMPT)
+    selected_fq_model_key: str | None = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 

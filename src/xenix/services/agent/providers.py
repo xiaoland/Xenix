@@ -86,17 +86,23 @@ class OpenAICompatibleChatProvider:
     def __init__(
         self,
         *,
+        provider_key: str | None = None,
         base_url: str | None = None,
         api_key: str | None = None,
         model: str | None = None,
         timeout_seconds: int = 120,
         streaming_enabled: bool = True,
     ) -> None:
+        self._provider_key = (provider_key or "openai").strip() or "openai"
         self._base_url = (base_url or "https://api.openai.com").rstrip("/")
         self._api_key = api_key or ""
         self._model = model or "gpt-4o-mini"
         self._timeout_seconds = timeout_seconds
         self._streaming_enabled = streaming_enabled
+
+    @property
+    def provider_key(self) -> str:
+        return self._provider_key
 
     @property
     def model(self) -> str:

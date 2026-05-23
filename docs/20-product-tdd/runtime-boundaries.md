@@ -91,6 +91,8 @@ Agent Harness owns:
 
 The first turn owns the hidden system Message used as the first provider-facing message. Empty threads do not send a provider request. When the first user message starts the first turn, Agent Harness persists the system Message before the user Message; the system Message remains hidden from the Chatbot timeline but remains part of provider-facing conversation history.
 
+LLM Service sits between Agent Harness and provider adapters. It owns persisted provider settings, configured model lists, `fq_model_key` parsing, and provider instance construction. `fq_model_key` uses `provider_key/model_key`; neither segment may contain `/`.
+
 Provider requests are recorded separately from Messages. A provider request row records the provider/model boundary, request kind, lifecycle status, persisted input Message ids, persisted output Message ids, and normalized token usage when the provider reports it. Token usage is aggregated from provider request rows rather than inferred from Messages.
 
 Turn progression:
@@ -108,6 +110,7 @@ Provider boundaries:
 - The first provider dialect is OpenAI-compatible `/v1/chat/completions`.
 - DeepSeek uses the same provider boundary where its API remains OpenAI-compatible.
 - CopilotKit AIMock attaches at the LLM provider HTTP boundary during development tests.
+- Thread model selection is per-thread next-turn state. Agent Harness locks the selected provider at turn start, so in-flight turns and step-budget resumes do not change model when the Composer picker changes.
 - Provider adapters own request assembly, response parsing, streaming chunk accumulation, and provider-specific tool-name mapping.
 
 Tool boundaries:

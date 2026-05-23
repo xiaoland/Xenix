@@ -9,7 +9,7 @@ from sqlmodel import SQLModel
 from ...exceptions import ValidationError
 from . import models  # noqa: F401
 
-CURRENT_SCHEMA_VERSION = 12
+CURRENT_SCHEMA_VERSION = 13
 
 
 def get_user_version(engine: Engine) -> int:
@@ -639,6 +639,29 @@ def migrate_v11_to_v12(engine: Engine) -> int:
     return 12
 
 
+def migrate_v12_to_v13(engine: Engine) -> int:
+    with engine.begin() as connection:
+        table_names = {
+            str(row[0])
+            for row in connection.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'").all()
+        }
+        if "agent_thread" in table_names:
+            thread_columns = {
+                str(row[1])
+                for row in connection.exec_driver_sql("PRAGMA table_info(agent_thread)").all()
+            }
+            if "selected_fq_model_key" not in thread_columns:
+                connection.exec_driver_sql(
+                    "ALTER TABLE agent_thread ADD COLUMN selected_fq_model_key VARCHAR"
+                )
+            connection.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_agent_thread_selected_fq_model_key "
+                "ON agent_thread (selected_fq_model_key)"
+            )
+        connection.exec_driver_sql("PRAGMA user_version=13")
+    return 13
+
+
 def run_migrations(engine: Engine) -> int:
     current_version = get_user_version(engine)
     if current_version == 0:
@@ -665,6 +688,8 @@ def run_migrations(engine: Engine) -> int:
         current_version = migrate_v10_to_v11(engine)
     if current_version == 11:
         current_version = migrate_v11_to_v12(engine)
+    if current_version == 12:
+        current_version = migrate_v12_to_v13(engine)
     if current_version == CURRENT_SCHEMA_VERSION:
         return current_version
     raise ValidationError(

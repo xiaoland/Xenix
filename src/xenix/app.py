@@ -15,7 +15,6 @@ from .logging import setup_logging
 from .resources import package_resource_path
 from .services.agent import (
     AgentHarnessService,
-    AgentSettingsService,
     AgentToolRegistry,
     ConversationStore,
 )
@@ -25,6 +24,7 @@ from .services.data_transform import DataQueryInput, DataQueryTransformService, 
 from .services.dataset_service import DatasetService
 from .services.ml_service import MLService
 from .services.ml_task_service import MLTaskService
+from .services.llm import LLMService, LLMSettingsService
 from .services.storage import StorageBootstrapService
 from .services.storage.layout import database_path
 from .ui.main_window import MainWindow
@@ -117,7 +117,8 @@ def build_main_window(
         )
         artifact_service = ArtifactService(context.session_factory)
         conversation_store = ConversationStore(context.session_factory)
-        agent_settings_service = AgentSettingsService(paths)
+        llm_settings_service = LLMSettingsService(paths)
+        llm_service = LLMService(llm_settings_service)
         agent_tool_registry = AgentToolRegistry(
             paths=paths,
             dataset_service=dataset_service,
@@ -128,10 +129,10 @@ def build_main_window(
         )
         agent_harness_service = AgentHarnessService(
             session_factory=context.session_factory,
-            provider=agent_settings_service.build_provider(),
-            turn_completion_guard_provider=agent_settings_service.build_turn_completion_guard_provider(),
-            thread_title_provider=agent_settings_service.build_thread_title_provider(),
             tool_registry=agent_tool_registry,
+            llm_service=llm_service,
+            turn_completion_guard_provider=llm_service.build_turn_completion_guard_provider(),
+            thread_title_provider=llm_service.build_thread_title_provider(),
             conversation_store=conversation_store,
         )
 
@@ -141,7 +142,8 @@ def build_main_window(
             db_path=database_path(paths),
             translation_manager=translation_manager,
             agent_harness_service=agent_harness_service,
-            agent_settings_service=agent_settings_service,
+            llm_service=llm_service,
+            llm_settings_service=llm_settings_service,
             artifact_service=artifact_service,
             ml_service=ml_service,
         )

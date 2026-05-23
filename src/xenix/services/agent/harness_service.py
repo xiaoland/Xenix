@@ -37,6 +37,7 @@ from .conversation_store import (
     StartAgentRunInput,
     StartTurnInput,
     ThreadSnapshot,
+    UpdateAgentThreadModelInput,
     UpdateAgentMessageInput,
 )
 from .completion_guard import (
@@ -66,12 +67,14 @@ from .tools import (
     ToolExecutionContext,
     tool_presentation_for_name,
 )
+from ..llm import LLMModelOption, LLMService
 
 
 class SubmitUserTurnInput(SQLModel):
     thread_id: str | None = None
     text: str
     file_paths: list[str] = Field(default_factory=list)
+    fq_model_key: str | None = None
 
 
 class ContinueStepBudgetInput(SQLModel):
@@ -135,17 +138,21 @@ class AgentHarnessService:
         self,
         *,
         session_factory: sessionmaker,
-        provider: AgentProvider,
+        tool_registry: AgentToolRegistry,
+        provider: AgentProvider | None = None,
+        llm_service: LLMService | None = None,
         turn_completion_guard_provider: AgentProvider | None = None,
         thread_title_provider: AgentProvider | None = None,
-        tool_registry: AgentToolRegistry,
         conversation_store: ConversationStore | None = None,
         initial_step_limit: int = 16,
         step_extension_limit: int = 16,
         max_total_steps: int = 64,
     ) -> None:
+        if provider is None and llm_service is None:
+            raise ValidationError("Agent Harness requires a provider or an LLM service.")
         self._session_factory = session_factory
         self._provider = provider
+        self._llm_service = llm_service
         self._turn_completion_guard = (
             TurnCompletionGuard(turn_completion_guard_provider)
             if turn_completion_guard_provider is not None
@@ -160,8 +167,14 @@ class AgentHarnessService:
         self._cancel_events: dict[str, threading.Event] = {}
         self._cancel_lock = threading.Lock()
 
-    def create_thread(self, title: str | None = None) -> ThreadSnapshot:
-        thread = self._conversation_store.create_thread(CreateAgentThreadInput(title=title))
+    def create_thread(self, title: str | None = None, fq_model_key: str | None = None) -> ThreadSnapshot:
+        selected_fq_model_key = self._resolve_fq_model_key(fq_model_key, None)
+        thread = self._conversation_store.create_thread(
+            CreateAgentThreadInput(
+                title=title,
+                selected_fq_model_key=selected_fq_model_key,
+            )
+        )
         return self._conversation_store.get_thread_snapshot(thread.id)
 
     def list_threads(self):
@@ -176,6 +189,26 @@ class AgentHarnessService:
 
     def get_thread_snapshot(self, thread_id: str) -> ThreadSnapshot:
         return self._conversation_store.get_thread_snapshot(thread_id)
+
+    def list_llm_model_options(self) -> list[LLMModelOption]:
+        if self._llm_service is None:
+            return []
+        return self._llm_service.model_options()
+
+    def default_fq_model_key(self) -> str | None:
+        if self._llm_service is None:
+            return None
+        return self._llm_service.default_fq_model_key()
+
+    def set_thread_model(self, thread_id: str, fq_model_key: str) -> ThreadSnapshot:
+        selected_fq_model_key = self._validate_fq_model_key(fq_model_key)
+        thread = self._conversation_store.update_thread_model(
+            UpdateAgentThreadModelInput(
+                thread_id=thread_id,
+                selected_fq_model_key=selected_fq_model_key,
+            )
+        )
+        return self._conversation_store.get_thread_snapshot(thread.id)
 
     def has_thread_title_provider(self) -> bool:
         return self._thread_title_provider is not None
@@ -216,7 +249,7 @@ class AgentHarnessService:
             cancel_event.set()
 
     def submit_user_turn(self, input_data: SubmitUserTurnInput) -> ThreadSnapshot:
-        thread_id, turn_id, run_id, file_paths = self._start_user_turn(input_data)
+        thread_id, turn_id, run_id, file_paths, provider = self._start_user_turn(input_data)
 
         try:
             outcome = self._run_provider_loop(
@@ -225,6 +258,7 @@ class AgentHarnessService:
                 run_id=run_id,
                 file_paths=file_paths,
                 step_state=self._initial_step_state(),
+                provider=provider,
             )
             if isinstance(outcome, StepBudgetPause):
                 return outcome.snapshot
@@ -251,7 +285,7 @@ class AgentHarnessService:
             self._clear_cancel_event(run_id)
 
     def submit_user_turn_stream(self, input_data: SubmitUserTurnInput):
-        thread_id, turn_id, run_id, file_paths = self._start_user_turn(input_data)
+        thread_id, turn_id, run_id, file_paths, provider = self._start_user_turn(input_data)
         snapshot = self._conversation_store.get_thread_snapshot(thread_id)
         yield AgentHarnessStreamEvent(
             kind="snapshot",
@@ -270,6 +304,7 @@ class AgentHarnessService:
                 run_id=run_id,
                 file_paths=file_paths,
                 step_state=self._initial_step_state(),
+                provider=provider,
             )
             if isinstance(outcome, StepBudgetPause):
                 yield self._step_confirmation_event(outcome)
@@ -321,9 +356,16 @@ class AgentHarnessService:
             raise ValidationError("Step confirmation does not belong to the provided thread and turn.")
 
         step_state = self._step_state_from_payload(run.usage_payload)
+        provider = self._provider_for_run(run)
         granted_steps = self._requested_step_extension(input_data.additional_steps, step_state)
         step_state["granted_steps"] += granted_steps
-        self._conversation_store.resume_run_after_confirmation(input_data.run_id, self._usage_payload(step_state))
+        self._conversation_store.resume_run_after_confirmation(
+            input_data.run_id,
+            self._usage_payload(
+                step_state,
+                fq_model_key=self._fq_model_key_from_run_payload(run.usage_payload),
+            ),
+        )
         self._register_cancel_event(input_data.run_id)
         snapshot = self._conversation_store.get_thread_snapshot(input_data.thread_id)
         file_paths = self._attached_files_for_thread(snapshot)
@@ -344,6 +386,7 @@ class AgentHarnessService:
                 run_id=input_data.run_id,
                 file_paths=file_paths,
                 step_state=step_state,
+                provider=provider,
             )
             if isinstance(outcome, StepBudgetPause):
                 yield self._step_confirmation_event(outcome)
@@ -417,7 +460,7 @@ class AgentHarnessService:
         )
         return self._conversation_store.get_thread_snapshot(input_data.thread_id)
 
-    def _start_user_turn(self, input_data: SubmitUserTurnInput) -> tuple[str, str, str, list[str]]:
+    def _start_user_turn(self, input_data: SubmitUserTurnInput) -> tuple[str, str, str, list[str], AgentProvider]:
         text = input_data.text.strip()
         if not text and not input_data.file_paths:
             raise ValidationError("A turn needs a user message or at least one file.")
@@ -425,12 +468,28 @@ class AgentHarnessService:
         thread_id = input_data.thread_id
         should_auto_title_existing_thread = False
         if thread_id is None:
+            selected_fq_model_key = self._resolve_fq_model_key(input_data.fq_model_key, None)
             thread_id = self._conversation_store.create_thread(
-                CreateAgentThreadInput(title=self._title_from_first_message(text, input_data.file_paths))
+                CreateAgentThreadInput(
+                    title=self._title_from_first_message(text, input_data.file_paths),
+                    selected_fq_model_key=selected_fq_model_key,
+                )
             ).id
         else:
             snapshot = self._conversation_store.get_thread_snapshot(thread_id)
             should_auto_title_existing_thread = self._should_auto_title_thread(snapshot)
+            selected_fq_model_key = self._resolve_fq_model_key(
+                input_data.fq_model_key,
+                snapshot.thread.selected_fq_model_key,
+            )
+            if selected_fq_model_key != snapshot.thread.selected_fq_model_key:
+                self._conversation_store.update_thread_model(
+                    UpdateAgentThreadModelInput(
+                        thread_id=thread_id,
+                        selected_fq_model_key=selected_fq_model_key,
+                    )
+                )
+        provider = self._provider_for_fq_model_key(selected_fq_model_key)
 
         content_blocks = self._user_content_blocks(text, input_data.file_paths)
         turn, _user_message = self._conversation_store.start_turn(
@@ -450,12 +509,15 @@ class AgentHarnessService:
             StartAgentRunInput(
                 thread_id=thread_id,
                 turn_id=turn.id,
-                provider_name=type(self._provider).__name__,
-                usage_payload=self._usage_payload(self._initial_step_state()),
+                provider_name=self._provider_name(provider),
+                usage_payload=self._usage_payload(
+                    self._initial_step_state(),
+                    fq_model_key=selected_fq_model_key,
+                ),
             )
         )
         self._register_cancel_event(run.id)
-        return thread_id, turn.id, run.id, list(input_data.file_paths)
+        return thread_id, turn.id, run.id, list(input_data.file_paths), provider
 
 
     def _run_provider_loop(
@@ -466,6 +528,7 @@ class AgentHarnessService:
         run_id: str,
         file_paths: list[str],
         step_state: dict[str, int],
+        provider: AgentProvider,
     ) -> ThreadSnapshot | StepBudgetPause:
         while step_state["used_steps"] < step_state["granted_steps"]:
             step_state["used_steps"] += 1
@@ -477,14 +540,14 @@ class AgentHarnessService:
                 thread_id=thread_id,
                 turn_id=turn_id,
                 run_id=run_id,
-                provider=self._provider,
+                provider=provider,
                 request_kind=AgentProviderRequestKind.PRIMARY,
                 input_message_ids=self._provider_input_message_ids(provider_messages),
             )
             tool_specs = self._tool_specs_for_context(snapshot=snapshot, attached_files=attached_files)
             available_tool_names = {tool.name for tool in tool_specs}
             try:
-                provider_response = self._provider.complete(
+                provider_response = provider.complete(
                     provider_messages,
                     tool_specs,
                 )
@@ -619,6 +682,7 @@ class AgentHarnessService:
         run_id: str,
         file_paths: list[str],
         step_state: dict[str, int],
+        provider: AgentProvider,
     ):
         while step_state["used_steps"] < step_state["granted_steps"]:
             step_state["used_steps"] += 1
@@ -630,7 +694,7 @@ class AgentHarnessService:
                 thread_id=thread_id,
                 turn_id=turn_id,
                 run_id=run_id,
-                provider=self._provider,
+                provider=provider,
                 request_kind=AgentProviderRequestKind.PRIMARY,
                 input_message_ids=self._provider_input_message_ids(provider_messages),
             )
@@ -649,6 +713,7 @@ class AgentHarnessService:
             )
             try:
                 for stream_event in self._provider_stream(
+                    provider,
                     provider_messages,
                     tool_specs,
                 ):
@@ -927,7 +992,7 @@ class AgentHarnessService:
                 thread_id=thread_id,
                 turn_id=turn_id,
                 run_id=run_id,
-                provider_name=type(provider).__name__,
+                provider_name=self._provider_name(provider),
                 model=self._provider_model(provider),
                 request_kind=request_kind,
                 input_message_ids=input_message_ids,
@@ -960,6 +1025,48 @@ class AgentHarnessService:
             return model
         return None
 
+    def _provider_name(self, provider: AgentProvider) -> str:
+        provider_key = getattr(provider, "provider_key", None)
+        if isinstance(provider_key, str) and provider_key.strip():
+            return provider_key.strip()
+        provider_key = getattr(provider, "_provider_key", None)
+        if isinstance(provider_key, str) and provider_key.strip():
+            return provider_key.strip()
+        return type(provider).__name__
+
+    def _resolve_fq_model_key(
+        self,
+        requested_fq_model_key: str | None,
+        thread_fq_model_key: str | None,
+    ) -> str | None:
+        selected = (requested_fq_model_key or thread_fq_model_key or "").strip()
+        if selected:
+            return self._validate_fq_model_key(selected)
+        if self._llm_service is None:
+            return None
+        return self._llm_service.default_fq_model_key()
+
+    def _validate_fq_model_key(self, fq_model_key: str) -> str:
+        if self._llm_service is None:
+            return fq_model_key.strip()
+        return self._llm_service.validate_fq_model_key(fq_model_key)
+
+    def _provider_for_fq_model_key(self, fq_model_key: str | None) -> AgentProvider:
+        if self._llm_service is not None:
+            return self._llm_service.build_provider(fq_model_key)
+        if self._provider is None:
+            raise ValidationError("Agent provider is not configured.")
+        return self._provider
+
+    def _provider_for_run(self, run) -> AgentProvider:
+        return self._provider_for_fq_model_key(self._fq_model_key_from_run_payload(run.usage_payload))
+
+    def _fq_model_key_from_run_payload(self, payload: dict[str, Any] | None) -> str | None:
+        value = (payload or {}).get("fq_model_key")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        return None
+
     def _provider_input_message_ids(self, messages) -> list[str]:
         ids: list[str] = []
         for message in messages:
@@ -968,8 +1075,16 @@ class AgentHarnessService:
                 ids.append(source_id)
         return ids
 
-    def _usage_payload(self, step_state: dict[str, int]) -> dict[str, Any]:
-        return {"step_budget": dict(step_state)}
+    def _usage_payload(
+        self,
+        step_state: dict[str, int],
+        *,
+        fq_model_key: str | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"step_budget": dict(step_state)}
+        if fq_model_key:
+            payload["fq_model_key"] = fq_model_key
+        return payload
 
     def _step_state_from_payload(self, payload: dict[str, Any] | None) -> dict[str, int]:
         raw_state = (payload or {}).get("step_budget")
@@ -1024,7 +1139,14 @@ class AgentHarnessService:
                 ],
             )
         )
-        self._conversation_store.pause_run_for_confirmation(run_id, self._usage_payload(step_state))
+        run = self._conversation_store.get_run(run_id)
+        self._conversation_store.pause_run_for_confirmation(
+            run_id,
+            self._usage_payload(
+                step_state,
+                fq_model_key=self._fq_model_key_from_run_payload(run.usage_payload),
+            ),
+        )
         snapshot = self._conversation_store.get_thread_snapshot(thread_id)
         return StepBudgetPause(
             thread_id=thread_id,
@@ -1325,14 +1447,15 @@ class AgentHarnessService:
 
     def _provider_stream(
         self,
+        provider: AgentProvider,
         messages: list[Any],
         tools: list[Any],
     ):
-        stream = getattr(self._provider, "stream", None)
+        stream = getattr(provider, "stream", None)
         if callable(stream):
             yield from stream(messages, tools)
             return
-        yield ProviderStreamEvent(response=self._provider.complete(messages, tools))
+        yield ProviderStreamEvent(response=provider.complete(messages, tools))
 
     def _tool_error_result(self, exc: Exception):
         from .tools import ToolExecutionResult

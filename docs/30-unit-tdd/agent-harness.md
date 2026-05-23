@@ -9,6 +9,7 @@ Preserve the local invariants for `src/xenix/services/agent/`. Agent Harness is 
 Agent Harness owns:
 
 - Thread creation, rename, delete, listing, and snapshot loading
+- Thread-level next-turn LLM model selection as a stored `fq_model_key`
 - Hidden system Message creation and projection into provider messages
 - Turn start, end, cancellation, and step-budget pause/resume
 - Message persistence for user, assistant, system, tool-call, and tool-call-result records
@@ -160,6 +161,10 @@ Provider-facing tool exposure is contextual per primary provider request. The Ha
 Each registered tool carries `ToolPresentation` metadata for Chatbot projection: semantic icon key, pending summary, success summary, failure action, and cancellation summary. `data.clean` uses an operation-centric executor schema shaped as `{dataset_id, name?, operations?}`; each operation is `{operation, params?}`. If `operations` is absent or empty, `data.clean` performs no cleaning, registers no derived artifact, and reports that nothing happened. `data.clean.metadata` returns operation groups, operation names, and operation parameter schemas; it never performs cleaning. `data.feature.select` creates an immutable dataset column role-binding snapshot and returns `binding_id`; its provider-facing role binding schema exposes only `role` and `columns`, while service logic derives or validates role kind. `model.metadata` exposes canonical model keys, model capabilities, model family/task metadata, role schemas, and optional parameter schemas. Provider-facing schemas do not enumerate model keys; model keys and aliases are validated through the model catalog at execution time. `model.train` and `model.hyper_train` accept `binding_id`, keep schemas lightweight, and validate model keys through the model catalog at execution time. `model.apply` accepts a trained model plus at least one input source: `input_files` or inline `input_rows` shaped as `{header_index_map, data}`. `model.train`, `model.hyper_train`, and `model.apply` are grace-period async tools: if the ML work completes inside the tool grace period, the tool returns the completed result; otherwise it returns explicit `task_ids`, Tool Call Detail action metadata, and a provider-facing instruction to query task status. `model.train` and `model.hyper_train` resolve completed work through the produced `trained_model_id`; follow-up evaluation task ids and metrics are read from trained-model metadata, not from dataset-wide task scans. Tool Call Item does not expose per-task cancellation; active run cancellation is owned by the Chatbot stop control. `model.task.query` accepts explicit `task_ids` and returns ML task metadata, status, artifacts, error summaries, and bounded logs; its Tool Call Item does not expose a Tool Call Detail action because the query result is already the detail surface. Trained model metadata stores role bindings and apply role schema; any supervised feature-column list is a runtime projection, not a persisted metadata field.
 
 ## Provider Boundary
+
+LLM Service owns provider configuration, configured model lists, `fq_model_key` generation/parsing, and provider construction. `fq_model_key` has the format `provider_key/model_key`; provider keys and model keys must not contain `/`.
+
+Agent Harness reads the selected Thread `fq_model_key` at turn start and asks LLM Service for a provider instance. That provider instance is locked for the whole turn, including any provider-loop retries and step-budget resume. Changing the Thread model while a turn is running affects only the next turn.
 
 The provider contract is:
 

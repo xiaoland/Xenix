@@ -17,6 +17,7 @@ from xenix.services.storage.models import (
     AgentMessageKind,
     AgentMessageRow,
     AgentMessageStatus,
+    AgentThreadRow,
     MLTaskArtifactKind,
     MLTaskArtifactRow,
     MLTaskRow,
@@ -1170,6 +1171,51 @@ def test_storage_bootstrap_migrates_v10_provider_request_schema_and_system_messa
     assert system_message.status is AgentMessageStatus.COMPLETED
 
 
+def test_storage_bootstrap_migrates_v12_thread_selected_model_schema(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    db_path = database_path(paths)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    import sqlite3
+
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE agent_thread (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                title VARCHAR,
+                system_prompt VARCHAR NOT NULL,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO agent_thread (id, title, system_prompt, created_at, updated_at)
+            VALUES ('thread-1', 'Thread', 'Prompt', '2026-01-01 00:00:00', '2026-01-01 00:00:00')
+            """
+        )
+        connection.execute("PRAGMA user_version=12")
+
+    context = StorageBootstrapService().initialize(paths)
+
+    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
+    assert "selected_fq_model_key" in _table_columns(context, "agent_thread")
+    with context.engine.connect() as connection:
+        indexes = {
+            str(row[1])
+            for row in connection.exec_driver_sql("PRAGMA index_list(agent_thread)").all()
+        }
+    assert "ix_agent_thread_selected_fq_model_key" in indexes
+    with context.session_factory() as session:
+        thread = session.get(AgentThreadRow, "thread-1")
+
+    assert thread is not None
+    assert thread.selected_fq_model_key is None
+
+
 def test_storage_bootstrap_migrates_v11_message_enum_names(
     monkeypatch,
     tmp_path: Path,
@@ -1322,6 +1368,10 @@ def test_storage_bootstrap_uses_ai_first_baseline_without_work_item_schema(monke
             str(row[1])
             for row in connection.exec_driver_sql("PRAGMA table_info(agent_message)").all()
         }
+        agent_thread_columns = {
+            str(row[1])
+            for row in connection.exec_driver_sql("PRAGMA table_info(agent_thread)").all()
+        }
         column_binding_columns = {
             str(row[1])
             for row in connection.exec_driver_sql("PRAGMA table_info(dataset_column_binding)").all()
@@ -1335,7 +1385,7 @@ def test_storage_bootstrap_uses_ai_first_baseline_without_work_item_schema(monke
             for row in connection.exec_driver_sql("PRAGMA table_info(agent_provider_request)").all()
         }
 
-    assert CURRENT_SCHEMA_VERSION == 12
+    assert CURRENT_SCHEMA_VERSION == 13
     assert "work_item" not in table_names
     assert "dataset_column_selection" not in table_names
     assert "dataset_column_binding" in table_names
@@ -1367,5 +1417,6 @@ def test_storage_bootstrap_uses_ai_first_baseline_without_work_item_schema(monke
         "completed_at",
     }.issubset(provider_request_columns)
     assert {"status", "updated_at", "finalized_at"}.issubset(agent_message_columns)
+    assert "selected_fq_model_key" in agent_thread_columns
     assert "work_item_id" not in ml_task_columns
     assert "work_item_id" not in trained_model_columns

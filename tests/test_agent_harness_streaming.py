@@ -232,8 +232,10 @@ class StaticSpecRegistry:
 
 
 class BudgetedProviderFixture:
-    def __init__(self) -> None:
+    def __init__(self, *, provider_key: str = "test", model: str = "budgeted") -> None:
         self.calls = 0
+        self.provider_key = provider_key
+        self.model = model
 
     def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
         self.calls += 1
@@ -281,6 +283,31 @@ class BudgetedRegistry:
                 content_blocks=[{"type": "markdown", "text": "Dummy step completed."}],
             )
         raise AssertionError(f"Unexpected tool execution: {tool_name}")
+
+
+class SwitchingLLMServiceFixture:
+    def __init__(self) -> None:
+        self.first_provider = BudgetedProviderFixture(provider_key="openai", model="first")
+        self.second_provider = BudgetedProviderFixture(provider_key="openai", model="second")
+        self.build_requests: list[str | None] = []
+
+    def default_fq_model_key(self) -> str:
+        return "openai/first"
+
+    def validate_fq_model_key(self, fq_model_key: str) -> str:
+        if fq_model_key not in {"openai/first", "openai/second"}:
+            raise ValidationError(f"Unknown model: {fq_model_key}")
+        return fq_model_key
+
+    def build_provider(self, fq_model_key: str | None = None):
+        selected = fq_model_key or self.default_fq_model_key()
+        self.build_requests.append(selected)
+        if selected == "openai/second":
+            return self.second_provider
+        return self.first_provider
+
+    def model_options(self) -> list[Any]:
+        return []
 
 
 class DummyToolRegistry:
@@ -1076,6 +1103,52 @@ def test_agent_harness_pauses_for_step_budget_confirmation_and_resumes(monkeypat
     assert conversations.get_run(pause_event.run_id).status is AgentRunStatus.SUCCEEDED
     assert [tool.tool_name for tool in resumed_snapshot.tool_calls] == ["dummy.step"]
     assert provider.calls == 2
+
+
+def test_agent_harness_locks_model_for_step_budget_resume(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    llm_service = SwitchingLLMServiceFixture()
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        llm_service=llm_service,
+        tool_registry=BudgetedRegistry(),
+        conversation_store=ConversationStore(context.session_factory),
+        initial_step_limit=1,
+        step_extension_limit=2,
+        max_total_steps=4,
+    )
+
+    events = list(
+        harness.submit_user_turn_stream(
+            SubmitUserTurnInput(text="run a long task", fq_model_key="openai/first")
+        )
+    )
+    pause_event = events[-1]
+    assert pause_event.thread_id is not None
+    assert pause_event.turn_id is not None
+    assert pause_event.run_id is not None
+
+    harness.set_thread_model(pause_event.thread_id, "openai/second")
+    resumed_events = list(
+        harness.continue_step_budget_stream(
+            ContinueStepBudgetInput(
+                thread_id=pause_event.thread_id,
+                turn_id=pause_event.turn_id,
+                run_id=pause_event.run_id,
+                additional_steps=pause_event.suggested_steps,
+            )
+        )
+    )
+    resumed_snapshot = resumed_events[-1].snapshot
+
+    assert resumed_snapshot is not None
+    assert resumed_snapshot.thread.selected_fq_model_key == "openai/second"
+    assert llm_service.build_requests == ["openai/first", "openai/first"]
+    assert llm_service.first_provider.calls == 2
+    assert llm_service.second_provider.calls == 0
+    assert [request.model for request in resumed_snapshot.provider_requests] == ["first", "first"]
 
 
 def test_agent_harness_cancel_run_stops_active_tool_call(monkeypatch, tmp_path: Path) -> None:

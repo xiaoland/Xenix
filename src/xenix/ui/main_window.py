@@ -26,12 +26,12 @@ from ..i18n import TranslationManager
 from ..services.agent import (
     AgentHarnessService,
     AgentHarnessStreamEvent,
-    AgentSettingsService,
     ContinueStepBudgetInput,
     SubmitUserTurnInput,
     ThreadSnapshot,
 )
 from ..services.artifact_service import ArtifactService
+from ..services.llm import LLMService, LLMSettingsService
 from ..services.ml_service import MLService
 from .chatbot import ThreadDetailView
 from .layout_debug import dump_layout_if_enabled
@@ -53,7 +53,8 @@ class MainWindow(QMainWindow):
         db_path: Path,
         translation_manager: TranslationManager,
         agent_harness_service: AgentHarnessService,
-        agent_settings_service: AgentSettingsService,
+        llm_service: LLMService,
+        llm_settings_service: LLMSettingsService,
         artifact_service: ArtifactService,
         ml_service: MLService,
     ) -> None:
@@ -63,7 +64,8 @@ class MainWindow(QMainWindow):
         self._db_path = db_path
         self._translation_manager = translation_manager
         self._agent_harness_service = agent_harness_service
-        self._agent_settings_service = agent_settings_service
+        self._llm_service = llm_service
+        self._llm_settings_service = llm_settings_service
         self._artifact_service = artifact_service
         self._ml_service = ml_service
         self._agent_thread_id: str | None = None
@@ -94,6 +96,7 @@ class MainWindow(QMainWindow):
 
         self._thread_detail_view = ThreadDetailView(parent=self)
         self._thread_detail_view.message_submitted.connect(self._submit_chat_message)
+        self._thread_detail_view.model_selected.connect(self._update_thread_model)
         self._thread_detail_view.artifact_link_activated.connect(self._open_artifact_link)
         self._thread_detail_view.tool_action_requested.connect(self._handle_tool_action)
         self._thread_detail_view.stop_requested.connect(self._request_harness_stop)
@@ -107,6 +110,7 @@ class MainWindow(QMainWindow):
         self.resize(1080, 760)
         self._setup_ui()
         self.retranslate_ui()
+        self._sync_model_picker_options()
 
     def _setup_ui(self) -> None:
         root = QWidget(self)
@@ -169,11 +173,44 @@ class MainWindow(QMainWindow):
         self._thread_detail_view.retranslate_ui()
         if self._settings_dialog is not None:
             self._settings_dialog.retranslate_ui()
+        self._sync_model_picker_options()
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == QEvent.LanguageChange:
             self.retranslate_ui()
         super().changeEvent(event)
+
+    def _sync_model_picker_options(self) -> None:
+        options = [
+            (option.fq_model_key, option.label)
+            for option in self._llm_service.model_options()
+        ]
+        selected = None
+        if self._agent_thread_id is not None:
+            try:
+                selected = self._agent_harness_service.get_thread_snapshot(
+                    self._agent_thread_id
+                ).thread.selected_fq_model_key
+            except Exception:
+                selected = None
+        self._thread_detail_view.set_model_options(
+            options,
+            selected_fq_model_key=selected or self._llm_service.default_fq_model_key(),
+        )
+
+    def _sync_thread_model_picker(self, snapshot: ThreadSnapshot) -> None:
+        selected = snapshot.thread.selected_fq_model_key or self._llm_service.default_fq_model_key()
+        self._thread_detail_view.set_selected_fq_model_key(selected)
+
+    def _update_thread_model(self, fq_model_key: str) -> None:
+        if self._agent_thread_id is None:
+            return
+        try:
+            snapshot = self._agent_harness_service.set_thread_model(self._agent_thread_id, fq_model_key)
+        except Exception as exc:
+            self._thread_detail_view.show_error(str(exc))
+            return
+        self._sync_thread_model_picker(snapshot)
 
     def _open_settings(self) -> None:
         if self._settings_dialog is None:
@@ -182,7 +219,8 @@ class MainWindow(QMainWindow):
                 log_path=self._log_path,
                 db_path=self._db_path,
                 translation_manager=self._translation_manager,
-                agent_settings_service=self._agent_settings_service,
+                llm_service=self._llm_service,
+                llm_settings_service=self._llm_settings_service,
                 parent=self,
             )
             self._settings_dialog.agent_settings_saved.connect(self._reload_agent_provider)
@@ -190,7 +228,7 @@ class MainWindow(QMainWindow):
         self._settings_dialog.raise_()
         self._settings_dialog.activateWindow()
 
-    def _submit_chat_message(self, text: str, file_paths: list[str]) -> None:
+    def _submit_chat_message(self, text: str, file_paths: list[str], fq_model_key: str) -> None:
         self._pending_step_confirmation = None
         self._thread_detail_view.clear_step_confirmation()
         user_blocks = []
@@ -208,6 +246,7 @@ class MainWindow(QMainWindow):
                         thread_id=self._agent_thread_id,
                         text=text,
                         file_paths=file_paths,
+                        fq_model_key=fq_model_key or None,
                     )
                 ):
                     self._harness_stream_event.emit(event)
@@ -220,6 +259,7 @@ class MainWindow(QMainWindow):
         self._agent_thread_id = snapshot.thread.id
         self._active_agent_run_id = None
         self._pending_step_confirmation = None
+        self._sync_thread_model_picker(snapshot)
         self._thread_detail_view.hide_thinking_indicator()
         self._thread_detail_view.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
         self._thread_detail_view.clear_step_confirmation()
@@ -237,6 +277,7 @@ class MainWindow(QMainWindow):
                 return
             self._agent_thread_id = event.snapshot.thread.id
             self._active_agent_run_id = event.run_id
+            self._sync_thread_model_picker(event.snapshot)
             self._thread_detail_view.render_events(
                 event.chatbot_events
                 if event.chatbot_events is not None
@@ -326,6 +367,7 @@ class MainWindow(QMainWindow):
     def _render_step_confirmation(self, event: AgentHarnessStreamEvent) -> None:
         if event.snapshot is not None:
             self._agent_thread_id = event.snapshot.thread.id
+            self._sync_thread_model_picker(event.snapshot)
             self._thread_detail_view.render_events(
                 event.chatbot_events
                 if event.chatbot_events is not None
@@ -398,13 +440,14 @@ class MainWindow(QMainWindow):
         self._render_harness_snapshot(snapshot)
 
     def _reload_agent_provider(self) -> None:
-        self._agent_harness_service.set_provider(self._agent_settings_service.build_provider())
+        self._agent_harness_service.set_provider(self._llm_service.build_provider())
         self._agent_harness_service.set_turn_completion_guard_provider(
-            self._agent_settings_service.build_turn_completion_guard_provider()
+            self._llm_service.build_turn_completion_guard_provider()
         )
         self._agent_harness_service.set_thread_title_provider(
-            self._agent_settings_service.build_thread_title_provider()
+            self._llm_service.build_thread_title_provider()
         )
+        self._sync_model_picker_options()
 
     def _create_agent_thread(self) -> None:
         self._pending_step_confirmation = None
@@ -412,6 +455,7 @@ class MainWindow(QMainWindow):
         self._thread_detail_view.clear_step_confirmation()
         snapshot = self._agent_harness_service.create_thread()
         self._agent_thread_id = snapshot.thread.id
+        self._sync_thread_model_picker(snapshot)
         self._thread_detail_view.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
         self._refresh_history_sidebar(selected_thread_id=snapshot.thread.id)
 
@@ -442,6 +486,7 @@ class MainWindow(QMainWindow):
             return
         snapshot = self._agent_harness_service.get_thread_snapshot(thread_id)
         self._agent_thread_id = thread_id
+        self._sync_thread_model_picker(snapshot)
         if self._pending_step_confirmation is not None and self._pending_step_confirmation.thread_id != thread_id:
             self._pending_step_confirmation = None
             self._active_agent_run_id = None

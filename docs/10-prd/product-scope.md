@@ -23,7 +23,7 @@ Record which product concepts remain in the native edition and which are intenti
 - Artifact-backed result viewing inside Chatbot messages
 - Local artifacts for datasets, models, metrics, reports, and model apply outputs
 - Local runtime logs and metadata
-- Settings as the supporting entry for LLM provider and development mock configuration
+- Settings as the supporting entry for multi-provider LLM configuration, model lists, global default model, and development mock configuration
 
 ## Removed Concepts
 
@@ -42,6 +42,7 @@ Record which product concepts remain in the native edition and which are intenti
 - "Backend" logic in the native app means same-process local services.
 - The default operator path is a persisted Chatbot thread inside a Chatbot-first shell.
 - Chatbot owns the user-facing conversation, file drop intake, message timeline, and result preview path.
+- Chatbot lets the user switch the selected LLM model per thread; the selection applies to the next turn and does not mutate the global default model.
 - Agent Harness owns Thread, Turn, Message, tool-call, and tool-result semantics.
 - The LLM receives atomic tools and keeps planning freedom inside service and tool constraints.
 - Storage provides persistence interfaces for service-owned records.

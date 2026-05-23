@@ -6,6 +6,7 @@ from typing import Any
 from PySide6.QtCore import QCoreApplication, QEvent, QPoint, QSize, QTimer, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QPalette, QTextOption
 from PySide6.QtWidgets import (
+    QComboBox,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -654,12 +655,13 @@ class AttachmentChip(QFrame):
 
 
 class ThreadDetailView(QWidget):
-    message_submitted = Signal(str, list)
+    message_submitted = Signal(str, list, str)
     artifact_link_activated = Signal(str)
     tool_action_requested = Signal(object)
     stop_requested = Signal()
     step_budget_continue_requested = Signal()
     step_budget_stop_requested = Signal()
+    model_selected = Signal(str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -671,6 +673,7 @@ class ThreadDetailView(QWidget):
         self._thinking_bubble: ChatMessageBubble | None = None
         self._event_widgets_by_id: dict[str, QWidget] = {}
         self._message_bubbles_by_id: dict[str, ChatMessageBubble] = {}
+        self._model_options: list[tuple[str, str]] = []
 
         self._message_container = QWidget()
         self._message_container.setObjectName("chatMessageContainer")
@@ -715,26 +718,21 @@ class ThreadDetailView(QWidget):
         self._configure_attach_button(self._attach_button)
         self._attach_button.clicked.connect(self._choose_files)
 
-        self._expanded_attach_button = QPushButton()
-        self._configure_attach_button(self._expanded_attach_button)
-        self._expanded_attach_button.clicked.connect(self._choose_files)
-
         self._editor = AutoGrowingTextEdit(max_lines=6)
         self._editor.setObjectName("chatComposerEditor")
-        self._editor.multiline_changed.connect(self._set_composer_multiline)
         self._editor.submit_requested.connect(self._handle_button_clicked)
+
+        self._model_picker = QComboBox()
+        self._model_picker.setObjectName("modelPicker")
+        self._model_picker.setMinimumWidth(180)
+        self._model_picker.setFixedHeight(34)
+        self._model_picker.currentIndexChanged.connect(self._handle_model_picker_changed)
 
         self._send_button = QPushButton()
         self._send_button.setObjectName("sendButton")
         self._send_button.setMinimumWidth(76)
         self._send_button.setFixedHeight(34)
         self._send_button.clicked.connect(self._handle_button_clicked)
-
-        self._expanded_send_button = QPushButton()
-        self._expanded_send_button.setObjectName("sendButton")
-        self._expanded_send_button.setMinimumWidth(76)
-        self._expanded_send_button.setFixedHeight(34)
-        self._expanded_send_button.clicked.connect(self._handle_button_clicked)
 
         self._step_confirmation_bar = QFrame()
         self._step_confirmation_bar.setObjectName("stepConfirmationBar")
@@ -760,32 +758,19 @@ class ThreadDetailView(QWidget):
         step_confirmation_layout.addWidget(self._step_stop_button, 0, Qt.AlignVCenter)
         self._step_confirmation_bar.hide()
 
-        self._compact_input_row = QHBoxLayout()
-        self._compact_input_row.setObjectName("chatComposerCompactRow")
-        self._compact_input_row.setContentsMargins(0, 0, 0, 0)
-        self._compact_input_row.setSpacing(8)
-        self._compact_input_row.addWidget(self._attach_button)
-        self._compact_input_row.addWidget(self._editor, 1, Qt.AlignVCenter)
-        self._compact_input_row.addWidget(self._send_button)
-
-        self._expanded_editor_row = QVBoxLayout()
-        self._expanded_editor_row.setObjectName("chatComposerExpandedEditorRow")
-        self._expanded_editor_row.setContentsMargins(0, 0, 0, 0)
-        self._expanded_editor_row.setSpacing(0)
-
-        self._expanded_controls_row = QHBoxLayout()
-        self._expanded_controls_row.setObjectName("chatComposerExpandedControlsRow")
-        self._expanded_controls_row.setContentsMargins(0, 0, 0, 0)
-        self._expanded_controls_row.setSpacing(8)
-        self._expanded_controls_row.addWidget(self._expanded_attach_button)
-        self._expanded_controls_row.addStretch(1)
-        self._expanded_controls_row.addWidget(self._expanded_send_button)
+        self._composer_controls_row = QHBoxLayout()
+        self._composer_controls_row.setObjectName("chatComposerControlsRow")
+        self._composer_controls_row.setContentsMargins(0, 0, 0, 0)
+        self._composer_controls_row.setSpacing(8)
+        self._composer_controls_row.addWidget(self._attach_button)
+        self._composer_controls_row.addStretch(1)
+        self._composer_controls_row.addWidget(self._model_picker)
+        self._composer_controls_row.addWidget(self._send_button)
 
         composer_layout.addWidget(self._step_confirmation_bar)
         composer_layout.addWidget(self._attachment_bar)
-        composer_layout.addLayout(self._compact_input_row)
-        composer_layout.addLayout(self._expanded_editor_row)
-        composer_layout.addLayout(self._expanded_controls_row)
+        composer_layout.addWidget(self._editor)
+        composer_layout.addLayout(self._composer_controls_row)
 
         self._composer_shell = QWidget()
         self._composer_shell.setObjectName("chatComposerShell")
@@ -831,13 +816,12 @@ class ThreadDetailView(QWidget):
 
         self.retranslate_ui()
         self._refresh_attachment_chips()
-        self._set_composer_multiline(False)
         self._sync_composer_drop_overlay_geometry()
 
     def retranslate_ui(self) -> None:
         self._editor.setPlaceholderText(self.tr("Message Xenix"))
         self._attach_button.setToolTip(self.tr("Attach files"))
-        self._expanded_attach_button.setToolTip(self.tr("Attach files"))
+        self._model_picker.setToolTip(self.tr("Model for the next turn"))
         self._step_continue_button.setText(self.tr("Continue"))
         self._step_stop_button.setText(self.tr("Stop"))
         self._composer_drop_title.setText(self.tr("Drop files to attach"))
@@ -1073,10 +1057,47 @@ class ThreadDetailView(QWidget):
         self._sync_send_button_text()
         self._sync_composer_controls_enabled()
 
+    def set_model_options(
+        self,
+        options: list[tuple[str, str]],
+        *,
+        selected_fq_model_key: str | None = None,
+    ) -> None:
+        self._model_options = list(options)
+        current_key = selected_fq_model_key or self.selected_fq_model_key()
+        self._model_picker.blockSignals(True)
+        self._model_picker.clear()
+        for fq_model_key, label in self._model_options:
+            self._model_picker.addItem(label, fq_model_key)
+        if current_key:
+            index = self._model_picker.findData(current_key)
+            if index >= 0:
+                self._model_picker.setCurrentIndex(index)
+        self._model_picker.blockSignals(False)
+        self._sync_composer_controls_enabled()
+
+    def set_selected_fq_model_key(self, fq_model_key: str | None) -> None:
+        if not fq_model_key:
+            return
+        index = self._model_picker.findData(fq_model_key)
+        if index < 0:
+            return
+        self._model_picker.blockSignals(True)
+        self._model_picker.setCurrentIndex(index)
+        self._model_picker.blockSignals(False)
+
+    def selected_fq_model_key(self) -> str:
+        value = self._model_picker.currentData()
+        return str(value or "")
+
+    def _handle_model_picker_changed(self, _index: int) -> None:
+        fq_model_key = self.selected_fq_model_key()
+        if fq_model_key:
+            self.model_selected.emit(fq_model_key)
+
     def _sync_send_button_text(self) -> None:
         send_text = self.tr("Stop") if self._running else self.tr("Send")
         self._send_button.setText(send_text)
-        self._expanded_send_button.setText(send_text)
 
     def show_step_confirmation(self, message: str) -> None:
         self._awaiting_step_confirmation = True
@@ -1150,11 +1171,10 @@ class ThreadDetailView(QWidget):
             self._composer,
             self._attachment_bar,
             self._attach_button,
-            self._expanded_attach_button,
             self._editor,
             self._editor.viewport(),
+            self._model_picker,
             self._send_button,
-            self._expanded_send_button,
         ]
         for widget in widgets:
             widget.setAcceptDrops(True)
@@ -1217,26 +1237,14 @@ class ThreadDetailView(QWidget):
         self._editor.clear()
         self._attached_files.clear()
         self._refresh_attachment_chips()
-        self.message_submitted.emit(text, files)
-
-    def _set_composer_multiline(self, multiline: bool) -> None:
-        self._attach_button.setVisible(not multiline)
-        self._send_button.setVisible(not multiline)
-        self._expanded_attach_button.setVisible(multiline)
-        self._expanded_send_button.setVisible(multiline)
-        if multiline:
-            if self._expanded_editor_row.indexOf(self._editor) == -1:
-                self._expanded_editor_row.addWidget(self._editor)
-        elif self._compact_input_row.indexOf(self._editor) == -1:
-            self._compact_input_row.insertWidget(1, self._editor, 1, Qt.AlignVCenter)
+        self.message_submitted.emit(text, files, self.selected_fq_model_key())
 
     def _sync_composer_controls_enabled(self) -> None:
         can_edit = not self._running and not self._awaiting_step_confirmation
         self._editor.setEnabled(can_edit)
         self._attach_button.setEnabled(can_edit)
-        self._expanded_attach_button.setEnabled(can_edit)
         self._send_button.setEnabled(not self._awaiting_step_confirmation)
-        self._expanded_send_button.setEnabled(not self._awaiting_step_confirmation)
+        self._model_picker.setEnabled(bool(self._model_options))
         self._step_continue_button.setEnabled(self._awaiting_step_confirmation)
         self._step_stop_button.setEnabled(self._awaiting_step_confirmation)
 

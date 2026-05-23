@@ -19,6 +19,7 @@ from xenix.services.agent import (
 )
 from xenix.services.agent.dev_fixtures import MESSAGE_RENDERING_FIXTURE_TITLE, ensure_mock_conversation_history
 from xenix.services.artifact_service import RegisterArtifactInput
+from xenix.services.llm import LLMProviderConfig, LLMSettings
 from xenix.services.storage.models import (
     AgentMessageAuthor,
     AgentMessageKind,
@@ -653,7 +654,7 @@ def test_main_window_stop_cancels_active_agent_run(monkeypatch, tmp_path: Path) 
         window.close()
 
 
-def test_thread_detail_view_composer_switches_layout_when_text_wraps(monkeypatch, tmp_path: Path) -> None:
+def test_thread_detail_view_composer_stays_two_rows_when_text_wraps(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
@@ -665,21 +666,20 @@ def test_thread_detail_view_composer_switches_layout_when_text_wraps(monkeypatch
 
         assert window._thread_detail_view._attach_button.isHidden() is False
         assert window._thread_detail_view._send_button.isHidden() is False
-        assert window._thread_detail_view._expanded_attach_button.isHidden() is True
-        assert window._thread_detail_view._expanded_send_button.isHidden() is True
+        assert window._thread_detail_view._model_picker.isHidden() is False
+        assert window._thread_detail_view._model_picker.height() == window._thread_detail_view._send_button.height()
+        assert window._thread_detail_view._model_picker.height() == window._thread_detail_view._attach_button.height()
         assert window._thread_detail_view._attach_button.text() == ""
         assert not window._thread_detail_view._attach_button.icon().isNull()
+        assert window._thread_detail_view._composer_controls_row.indexOf(window._thread_detail_view._model_picker) >= 0
 
         editor.setPlainText("line one\nline two")
         app.processEvents()
 
         assert editor.height() > compact_height
-        assert window._thread_detail_view._attach_button.isHidden() is True
-        assert window._thread_detail_view._send_button.isHidden() is True
-        assert window._thread_detail_view._expanded_attach_button.isHidden() is False
-        assert window._thread_detail_view._expanded_send_button.isHidden() is False
-        assert window._thread_detail_view._expanded_attach_button.text() == ""
-        assert not window._thread_detail_view._expanded_attach_button.icon().isNull()
+        assert window._thread_detail_view._attach_button.isHidden() is False
+        assert window._thread_detail_view._send_button.isHidden() is False
+        assert window._thread_detail_view._model_picker.isHidden() is False
     finally:
         window.close()
 
@@ -719,8 +719,10 @@ def test_thread_detail_view_enter_submits_and_shift_enter_inserts_newline(monkey
             view.message_submitted.disconnect(window._submit_chat_message)
         except RuntimeError:
             pass
-        submitted: list[tuple[str, list[str]]] = []
-        view.message_submitted.connect(lambda text, files: submitted.append((text, files)))
+        submitted: list[tuple[str, list[str], str]] = []
+        view.message_submitted.connect(
+            lambda text, files, fq_model_key: submitted.append((text, files, fq_model_key))
+        )
 
         editor = view._editor
         editor.setFocus()
@@ -728,7 +730,7 @@ def test_thread_detail_view_enter_submits_and_shift_enter_inserts_newline(monkey
         QTest.keyClick(editor, Qt.Key_Return)
         app.processEvents()
 
-        assert submitted == [("send with enter", [])]
+        assert submitted == [("send with enter", [], "openai/gpt-4o-mini")]
         assert editor.toPlainText() == ""
 
         editor.setFocus()
@@ -737,8 +739,62 @@ def test_thread_detail_view_enter_submits_and_shift_enter_inserts_newline(monkey
         QTest.keyClicks(editor, "line two")
         app.processEvents()
 
-        assert submitted == [("send with enter", [])]
+        assert submitted == [("send with enter", [], "openai/gpt-4o-mini")]
         assert editor.toPlainText() == "line one\nline two"
+    finally:
+        window.close()
+
+
+def test_thread_detail_view_model_picker_updates_current_thread_only(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=True)
+    try:
+        window._llm_settings_service.save(
+            LLMSettings(
+                providers=[
+                    LLMProviderConfig(
+                        key="openai",
+                        display_name="OpenAI",
+                        models=["gpt-4o-mini", "gpt-4o"],
+                    )
+                ],
+                default_fq_model_key="openai/gpt-4o-mini",
+            )
+        )
+        window._reload_agent_provider()
+        window._new_thread_button.click()
+        app.processEvents()
+        first_thread_id = window._agent_thread_id
+        assert first_thread_id is not None
+        picker = window._thread_detail_view._model_picker
+        picker.setCurrentIndex(picker.findData("openai/gpt-4o"))
+        app.processEvents()
+
+        first_snapshot = window._agent_harness_service.get_thread_snapshot(first_thread_id)
+        assert first_snapshot.thread.selected_fq_model_key == "openai/gpt-4o"
+
+        window._new_thread_button.click()
+        app.processEvents()
+        second_thread_id = window._agent_thread_id
+        assert second_thread_id is not None
+        assert second_thread_id != first_thread_id
+        second_snapshot = window._agent_harness_service.get_thread_snapshot(second_thread_id)
+        assert second_snapshot.thread.selected_fq_model_key == "openai/gpt-4o-mini"
+        assert window._thread_detail_view.selected_fq_model_key() == "openai/gpt-4o-mini"
+
+        for row in range(window._history_list.count()):
+            item = window._history_list.item(row)
+            if item.data(Qt.UserRole) == first_thread_id:
+                window._history_list.setCurrentItem(item)
+                window._open_history_thread(item)
+                break
+        app.processEvents()
+
+        assert window._agent_thread_id == first_thread_id
+        assert window._thread_detail_view.selected_fq_model_key() == "openai/gpt-4o"
     finally:
         window.close()
 
@@ -827,7 +883,7 @@ def test_main_window_keeps_thinking_indicator_during_non_final_snapshot(monkeypa
                 time.sleep(0.01)
 
         monkeypatch.setattr(window._agent_harness_service, "submit_user_turn_stream", fake_submit)
-        window._submit_chat_message("Analyze this.", [])
+        window._submit_chat_message("Analyze this.", [], window._thread_detail_view.selected_fq_model_key())
 
         for _ in range(40):
             app.processEvents()
@@ -899,7 +955,7 @@ def test_thread_detail_view_composer_file_drag_hover_attaches_files(monkeypatch,
         window.close()
 
 
-def test_thread_detail_view_compact_editor_text_is_centered_with_buttons(monkeypatch, tmp_path: Path) -> None:
+def test_thread_detail_view_composer_controls_stay_below_editor(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
@@ -911,16 +967,12 @@ def test_thread_detail_view_compact_editor_text_is_centered_with_buttons(monkeyp
         for _ in range(8):
             app.processEvents()
 
-        cursor_center_y = (
-            editor.geometry().y()
-            + editor.viewport().geometry().y()
-            + editor.cursorRect().center().y()
-        )
-        attach_center_y = window._thread_detail_view._attach_button.geometry().center().y()
-        send_center_y = window._thread_detail_view._send_button.geometry().center().y()
-
-        assert abs(cursor_center_y - attach_center_y) <= 1
-        assert abs(cursor_center_y - send_center_y) <= 1
+        controls_row_top = window._thread_detail_view._attach_button.geometry().top()
+        assert controls_row_top > editor.geometry().bottom()
+        assert abs(
+            window._thread_detail_view._model_picker.geometry().center().y()
+            - window._thread_detail_view._send_button.geometry().center().y()
+        ) <= 1
     finally:
         window.close()
 
@@ -1203,14 +1255,16 @@ def test_main_window_uses_aimock_settings_in_development(monkeypatch, tmp_path: 
         assert settings is not None
         assert settings._aimock_card.isVisibleTo(settings)
 
-        settings._llm_model_input.setText("mock-model")
+        settings._provider_models_input.setPlainText("mock-model")
+        settings._store_current_provider_fields()
+        settings._refresh_model_selectors(default_key="openai/mock-model")
         settings._aimock_enabled_checkbox.setChecked(True)
         settings._aimock_base_url_input.setText("http://aimock.local")
         settings._aimock_api_key_input.setText("test-aimock")
         settings._save_button.click()
         app.processEvents()
 
-        window._submit_chat_message("Use AIMock.", [])
+        window._submit_chat_message("Use AIMock.", [], window._thread_detail_view.selected_fq_model_key())
         for _ in range(100):
             app.processEvents()
             if not window._thread_detail_view._running:

@@ -52,9 +52,11 @@ Transient thinking state is also driven by Chatbot Events: `THINKING` with `IN_P
 - Enter submits the message.
 - Shift+Enter inserts a newline.
 - The textarea auto-grows up to its configured maximum line count.
-- The compact layout is attach button, textarea, send button in one row.
-- When text wraps beyond one visual line, the layout switches to textarea row plus bottom controls row.
-- The attach button and send button remain aligned with the textarea baseline in compact mode.
+- The composer stays in two rows: textarea row, then bottom controls row.
+- The bottom controls row contains attach, flexible empty space, per-thread model picker, and send/stop.
+- The model picker uses the same control height as attach and send/stop.
+- The model picker shows LLM Service `fq_model_key` options and changes the selected thread's next-turn model only.
+- Changing the model picker during a running turn must not change the provider already locked for that turn.
 - Dragging local files over any child of the composer shell keeps the hover overlay visible.
 
 ## Streaming Contract

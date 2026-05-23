@@ -33,7 +33,7 @@ The delivered workflow includes:
 - Chatbot previews for generated datasets, reports, metrics, models, images, and apply result files
 - local persistence for conversations, messages, tool calls, tool results, artifacts, ML task metadata, and logs
 
-LLM provider settings are stored through the Settings dialog in `config/agent_settings.json`. `XENIX_ENV=development` exposes development-only mock controls in Settings. AIMock uses the same OpenAI-compatible provider HTTP boundary as the live provider.
+LLM provider settings are stored through the Settings dialog in `config/agent_settings.json`. The file stores configured providers, each provider's model list, the global default model, and optional guard/title model selections. Chatbot model switching is per thread and changes only that thread's next turn. `XENIX_ENV=development` exposes development-only mock controls in Settings. AIMock uses the same OpenAI-compatible provider HTTP boundary as the live provider.
 
 ## Verify
 
