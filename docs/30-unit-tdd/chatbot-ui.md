@@ -11,6 +11,7 @@ MainWindow hosts:
 - left History sidebar with thread selection, create, rename, and delete actions
 - central `ThreadDetailView` as the selected thread detail surface
 - Settings entry for provider configuration and development AIMock controls
+- Settings entry for ML worker pool summary and SSH worker setup
 
 The central thread detail view stretches to consume remaining horizontal space. Message list and composer width come from the thread detail view parent.
 
@@ -57,6 +58,7 @@ Transient thinking state is also driven by Chatbot Events: `THINKING` with `IN_P
 - The model picker uses the same control height as attach and send/stop.
 - The model picker shows LLM Service `fq_model_key` options and changes the selected thread's next-turn model only.
 - Changing the model picker during a running turn must not change the provider already locked for that turn.
+- ML worker setup belongs in Settings, not in Agent tool messages or Composer controls. The setup wizard may show connection, environment setup, and validation state, but Chatbot tools do not expose worker selection.
 - Dragging local files over any child of the composer shell keeps the hover overlay visible.
 
 ## Streaming Contract
@@ -86,6 +88,7 @@ Qt boundary tests should cover:
 - Tool Call Item action rendering and signal propagation for task details
 - Tool Call Detail View task refresh, log display, artifact opening, and timer shutdown
 - artifact link activation and resolution
+- ML worker setup wizard validation states, language switching, and credential-boundary UI
 - composer auto-grow layout switch
 - Enter submit and Shift+Enter newline
 - file drag hover overlay across the composer shell and textarea

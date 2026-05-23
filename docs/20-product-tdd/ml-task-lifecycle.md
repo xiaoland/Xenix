@@ -24,6 +24,8 @@ Dataset inspection is not an ML task. It belongs to DatasetService and data-faci
 
 Current AI-first service contracts are dataset-scoped and analyzer-scoped. A model is a reusable analyzer: a service-owned artifact trained from declared input roles and later applied to compatible input roles.
 
+ML task placement is service-owned. A configured ML worker pool may dispatch a task to the local worker or to an SSH worker, but worker selection is not part of Agent tool inputs and does not change the persisted task identity.
+
 Column-role binding is first persisted as an immutable binding snapshot. Training and hyperparameter training tools pass `binding_id`; ML task requests expand that reference into explicit dataset id, role bindings, model selection, parameters, and run name inputs before execution. Supervised feature/target labels are derived from role bindings when needed for display or adapter compatibility, but they are not a second persistent contract.
 
 The trained model is the aggregate boundary for post-training evaluation. A successful `fit` or `hyperparameter_tuning` task creates a `trained_model` row; any follow-up `evaluate` task references that `trained_model_id`, and the trained-model metadata records the evaluation task id and final metrics. Agent and UI follow-up must use this trained-model relation rather than inferring related work by scanning dataset task history.
@@ -77,6 +79,8 @@ State transition rules:
 
 Any other transition requires an ADR or a contract update.
 
+Worker placement does not add lifecycle states. A task selected for a remote SSH worker still transitions through `pending`, `running`, and one terminal state. If the selected worker or remote command fails, the task fails normally; v1 does not automatically retry on another worker or perform failover.
+
 ## Logging Contract
 
 Each ML task must write user-relevant execution logs to the application log sink under `paths.logs`.
@@ -112,6 +116,7 @@ Result ownership rules:
 - ML task working directories live under `artifacts/ml-tasks/<ml-task-id>/`.
 - An ML task reaches `succeeded` only after every declared output path exists.
 - Chatbot result presentation flows through markdown summaries and `artifact://...` links registered by services.
+- Remote worker directories are execution/cache state only. Remote result files must be downloaded and rewritten to local task paths before normal task finalization copies them into canonical local artifact locations.
 
 ## Failure Contract
 
@@ -120,3 +125,4 @@ On failure, services must preserve enough information for local troubleshooting:
 - Final ML task status is `failed`
 - The last error summary is persisted in ML task metadata
 - The main application log contains the matching error context
+- Worker selection, SSH command failures, setup validation failures, and remote logs should be preserved in local task logs or diagnostic metadata without storing SSH credentials.

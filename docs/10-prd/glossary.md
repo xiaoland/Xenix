@@ -22,4 +22,9 @@ This glossary defines product-facing terms used by Xenix Native.
 - Trained model: a canonical reusable analyzer artifact tracked by metadata and stored on the filesystem.
 - Model family: the product taxonomy for a reusable analyzer, such as supervised, clustering, anomaly detection, association rules, or recommendation.
 - Model task kind: the operational contract for what a reusable analyzer does when applied, such as predictor, segmenter, anomaly scorer, rule miner, or recommender.
+- ML workload: a service-backed model operation such as training, hyperparameter tuning, follow-up evaluation, or model apply.
+- ML worker pool: the local service-owned set of configured execution workers that can run ML workloads. Worker selection is an internal placement decision, not a user-facing Agent tool argument.
+- Local ML worker: the built-in worker that runs ML tasks on the user's machine.
+- Remote SSH worker: a configured SSH execution worker managed by Xenix setup guidance. It provides remote compute and cache space but is not a remote backend or artifact authority.
+- Remote execution/cache state: files staged on a remote SSH worker for task execution, environment reuse, or transfer efficiency. This state can be recreated or cleaned and does not replace local metadata or local artifacts.
 - Legacy work item: the previous persisted unit of ML work and selection state, removed from the target AI-first service topology.

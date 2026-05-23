@@ -16,8 +16,10 @@ This guidance applies to the native ML workflow under `src/xenix/services/ml/`, 
 
 - Each persisted `MLTask` is one model and one operation.
 - `fit` and `hyperparameter_tuning` may request workflow-owned follow-up `evaluate` tasks through `MLService`.
-- Sequential execution is intentional in v1: only one worker process runs at a time.
+- Worker pool dispatch is intentional after issue #94. The default local-only configuration remains conservative, while configured workers may each expose a small number of execution slots. Worker selection is internal service placement, not an Agent tool argument.
+- v1 worker pool dispatch does not perform automatic retry, failover, or duplicate execution after a selected worker fails.
 - Use `multiprocessing` with `spawn`-compatible top-level entrypoints so the packaged app does not depend on an external Python CLI.
+- SSH workers use OpenSSH-style process boundaries, stage task files remotely, and must download outputs back to local task directories before `MLTaskService` finalizes artifacts.
 
 ## Storage Rules
 

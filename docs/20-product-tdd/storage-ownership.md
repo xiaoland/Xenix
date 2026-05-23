@@ -14,6 +14,7 @@ SQLite is reserved for small, queryable application metadata:
 - Dataset registration metadata for user-managed source datasets, app-managed derived datasets, and compatibility copies
 - User selections and lightweight preferences
 - References to files owned by the application
+- ML worker pool configuration remains lightweight JSON configuration under `config/`; SQLite does not own worker credentials or remote cache state.
 
 The current implemented AI-first SQLite baseline is schema version `12`. It contains Agent Harness conversation tables, provider request usage records, artifact metadata, dataset metadata, immutable dataset column role bindings, ML task metadata, trained-model metadata, and turn completion guard records. The legacy work item table, `work_item_id` columns, old dataset column-selection table, old inference task values, and old inspect-dataset task rows are outside this baseline.
 
@@ -39,6 +40,7 @@ The filesystem is the source of truth for large or user-openable artifacts:
 - Model apply outputs and exported reports
 - Application logs
 - Cache files and temporary working files
+- Remote worker caches created through SSH setup are reproducible execution state and not canonical storage.
 
 App-managed runtime directories live under `XENIX_APP_HOME` or the platform default returned by `xenix.config`.
 
@@ -68,6 +70,7 @@ Current app-managed runtime layout includes:
 - Artifact links resolve through `ArtifactService`; Chatbot receives an artifact id and view hint, while filesystem access stays behind services.
 - Trained-model registration rows are durable metadata pointers to canonical model artifacts.
 - Task working files such as `request.json`, `result.json`, `logs.jsonl`, and holdout artifacts are execution-scoped ML task files.
+- Remote staging paths may mirror task working files during execution. Services must download and normalize remote outputs to local service-owned paths before registering artifacts or trained-model rows.
 
 ## Deletion Rules
 

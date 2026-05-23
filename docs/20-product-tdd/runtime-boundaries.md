@@ -120,6 +120,7 @@ Tool boundaries:
 - Runtime thread, turn, file, dataset, model, and artifact context is passed through validated tool arguments and `ToolExecutionContext`.
 - Target tool names are `data.peek`, `data.integrate`, `data.clean`, `data.clean.metadata`, `data.query`, `data.transform`, `data.feature.select`, `model.metadata`, `model.train`, `model.hyper_train`, `model.apply`, and `model.task.query`.
 - `data.feature.select` creates an immutable dataset column role-binding snapshot. `model.train` and `model.hyper_train` accept `binding_id`. `model.apply` accepts a trained model plus file-backed, tabular, or role-shaped inline inputs, then uses trained model metadata to validate the apply role schema. `model.train`, `model.hyper_train`, and `model.apply` wait for a bounded grace period and return either the completed result or explicit ML task ids for background follow-up. Training and hyperparameter training aggregate through the produced `trained_model_id`; follow-up evaluation task ids and metrics attach to trained-model metadata rather than being inferred from dataset task diffs. `model.task.query` accepts explicit task ids and returns ML task metadata, status, artifacts, errors, and bounded logs.
+- Agent tool schemas do not expose ML worker selection. Local services choose a worker from the configured worker pool and record selected-worker diagnostics in service-owned task metadata/logs.
 - Forward-looking tool contracts use `apply`, not `inference`; legacy `inference` names are migration inputs only.
 
 Storage provides persistence interfaces for Agent Harness records. Agent Harness semantics stay in the Agent Harness service.
@@ -131,12 +132,15 @@ ML adapters are responsible for:
 - Running native model execution entrypoints under `src/xenix/services/ml/`
 - Returning typed metadata about produced artifacts
 - Emitting progress or log events through service-owned callbacks or loggers
+- Dispatching execution through the configured ML worker pool when remote workers are enabled
+- Treating SSH workers as execution/cache adapters, not API backends or artifact authorities
 
 ML adapters must assume:
 
 - They run in a single local user session
 - They do not own application navigation, dialogs, or persistence policy
 - They may evolve internally without changing UI entry points as long as service contracts stay stable
+- Remote task staging paths are temporary execution state. Generated outputs must be downloaded and finalized into local service-managed artifact locations before a task can succeed.
 
 ## Agent Autonomy Contract
 
@@ -156,3 +160,4 @@ Add contract tests when any of the following change:
 - Data query/transform tool schemas, SQL validator rules, or service request/result shapes
 - Service-to-ML adapter invocation shape
 - Storage location rules for logs, models, datasets, or results
+- ML worker pool settings, selection rules, SSH setup validation, or remote staging path rewrites

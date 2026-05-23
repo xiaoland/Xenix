@@ -24,6 +24,7 @@ Current runtime files and subdirectories:
 
 - `config/locale.json`
 - `config/agent_settings.json`
+- `config/ml_workers.json`
 - `state/xenix.db`
 - `artifacts/datasets/`
 - `artifacts/datasets/transformed/`
@@ -40,7 +41,8 @@ Current runtime files and subdirectories:
 3. Open the log directory from the UI or inspect files directly on disk.
 4. Inspect `config/locale.json` for the persisted UI language preference when debugging localization behavior.
 5. Inspect `config/agent_settings.json` for persisted LLM providers, configured model lists, default/guard/title model keys, and development AIMock settings.
-6. Inspect `state/xenix.db` for metadata, `artifacts/datasets/` for app-managed dataset artifacts, `artifacts/ml-tasks/` for per-ML-task working directories, and `artifacts/models/` for canonical trained-model files.
+6. Inspect `config/ml_workers.json` for configured local and SSH ML workers. SSH credentials are not stored there; the file stores connection metadata, remote roots, Python command paths, and last setup/validation summaries.
+7. Inspect `state/xenix.db` for metadata, `artifacts/datasets/` for app-managed dataset artifacts, `artifacts/ml-tasks/` for per-ML-task working directories, and `artifacts/models/` for canonical trained-model files.
 
 ## Reset
 
@@ -68,6 +70,8 @@ Provider request usage records are stored in `agent_provider_request`. Each row 
 
 Per-thread next-turn model selection is stored on `agent_thread.selected_fq_model_key`. The global default and configured model list live in `config/agent_settings.json`; if a thread has no selected key, runtime code falls back to the current global default.
 
+ML worker pool configuration lives in `config/ml_workers.json`. The default configuration contains a local worker. SSH workers can be added through Settings; the setup wizard may create clearly marked `Host xenix.*` entries in the user's OpenSSH config, initializes remote execution directories, and validates a key/agent-based SSH connection. Remote worker directories are execution/cache state. Local SQLite metadata and local service-managed artifacts remain the final authority.
+
 ML task type, ML task status, and ML task artifact kind are stored as lowercase enum values in SQLite, for example `fit`, `hyperparameter_tuning`, `apply`, `pending`, `succeeded`, and `apply_result`. Historical `INFERENCE` task values are migrated to `apply`; historical inspect-dataset task rows are removed because dataset inspection is runtime-derived and is not an ML task.
 
 Turn completion guard audit decisions are stored in `agent_turn_completion_guard`. The corresponding retry reminder is stored as a normal system row in `agent_message`, because it is part of provider-facing conversation history.
@@ -83,6 +87,8 @@ Issue `#72` adds ML task working directories with this shape:
 Canonical trained models are registered as artifacts under:
 
 - `artifacts/models/`
+
+Issue `#94` adds optional SSH worker execution. Remote task directories mirror local task working directories during execution, but result paths are downloaded and rewritten to local task paths before `MLTaskService` finalizes success.
 
 ## Backup Guidance
 

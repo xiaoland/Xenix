@@ -28,6 +28,7 @@ Examples:
 - Agent Harness tools return markdown summaries containing artifact links when they create or expose user-openable outputs.
 - Chatbot intercepts artifact links and asks services to resolve them before opening files or rendering previews.
 - File paths remain service-owned implementation details.
+- Remote SSH worker paths are never artifact-link authorities. Remote outputs must be downloaded into local service-managed paths and registered through `ArtifactService` before Chatbot can link or preview them.
 
 ## Result Flow
 
@@ -61,5 +62,6 @@ Unknown views should fall back to a generic artifact chip or open action after s
 - Artifact links carry artifact identity and rendering preference.
 - Local paths are resolved through `ArtifactService`.
 - Tool result payloads include `artifact_id` when a tool produces a user-facing artifact.
+- Tool result payloads must not expose `ssh:` URLs or remote filesystem paths as result links.
 - A missing artifact row is a service error with a user-actionable message.
 - A missing file behind a valid artifact row is rendered as an unavailable artifact state.

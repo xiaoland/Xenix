@@ -35,6 +35,8 @@ The delivered workflow includes:
 
 LLM provider settings are stored through the Settings dialog in `config/agent_settings.json`. The file stores configured providers, each provider's model list, the global default model, and optional guard/title model selections. Chatbot model switching is per thread and changes only that thread's next turn. `XENIX_ENV=development` exposes development-only mock controls in Settings. AIMock uses the same OpenAI-compatible provider HTTP boundary as the live provider.
 
+ML worker pool settings are stored through Settings in `config/ml_workers.json`. The default configuration uses the local worker. SSH workers require OpenSSH-family `ssh` and `scp` commands, key/agent-based authentication, a POSIX-like remote target, Python 3.12+, and a writable remote root. The SSH setup wizard can write clearly marked `Host xenix.*` blocks to the user's OpenSSH config, create a remote virtual environment, install required ML dependencies, and run upload/download and worker smoke checks.
+
 ## Verify
 
 ```bash
@@ -105,6 +107,7 @@ Smoke verification should confirm that these directories are created in a fresh 
 
 - `state/xenix.db` is created
 - `logs/xenix.log` is created
+- `config/ml_workers.json` can be created by Settings or worker settings service when ML worker configuration is saved
 
 ## Troubleshooting
 
@@ -112,4 +115,5 @@ Smoke verification should confirm that these directories are created in a fresh 
 - If resources fail to load in the packaged app, verify that `xenix.spec` still copies `src/xenix/resources` into `xenix/resources`.
 - If language switching fails in a packaged app, verify that `src/xenix/translations/*.qm` were rebuilt and copied into `xenix/translations`.
 - If DuckDB-backed tools fail only in the packaged app, rerun `pdm run smoke-package` and inspect whether PyInstaller collected DuckDB's package metadata and native library.
+- If an SSH worker setup fails, inspect `config/ml_workers.json`, the Xenix-managed `Host xenix.*` block in `~/.ssh/config`, and the remote root permissions. Do not add passwords, passphrases, or private-key material to Xenix config.
 - If you need an isolated local run, set `XENIX_APP_HOME` to an empty directory or use the VSCode workspace-home launch profile.

@@ -22,6 +22,7 @@ Record which product concepts remain in the native edition and which are intenti
 - Association-rule mining and item-similarity recommendation as reusable analyzer families available through the model lifecycle
 - Artifact-backed result viewing inside Chatbot messages
 - Local artifacts for datasets, models, metrics, reports, and model apply outputs
+- Configurable ML worker pool for local and SSH-backed remote execution, where remote workers are execution/cache locations and not product data authorities
 - Local runtime logs and metadata
 - Settings as the supporting entry for multi-provider LLM configuration, model lists, global default model, and development mock configuration
 
@@ -40,6 +41,7 @@ Record which product concepts remain in the native edition and which are intenti
 - The native app can optimize for one desktop session instead of concurrent users.
 - Authentication and authorization are out of scope unless a future issue reintroduces them with an ADR.
 - "Backend" logic in the native app means same-process local services.
+- Remote ML workers are not a remote backend deployment. The native app remains the task lifecycle, metadata, and artifact authority while SSH workers provide execution capacity.
 - The default operator path is a persisted Chatbot thread inside a Chatbot-first shell.
 - Chatbot owns the user-facing conversation, file drop intake, message timeline, and result preview path.
 - Chatbot lets the user switch the selected LLM model per thread; the selection applies to the next turn and does not mutate the global default model.
@@ -47,6 +49,7 @@ Record which product concepts remain in the native edition and which are intenti
 - The LLM receives atomic tools and keeps planning freedom inside service and tool constraints.
 - Storage provides persistence interfaces for service-owned records.
 - Model apply outputs must remain reviewable through artifact links after the originating turn closes.
+- Agent tools express ML workload intent only. Worker selection is an internal service decision and is not exposed as a tool argument.
 - First-slice working context is represented by Thread messages, tool-call records, tool-result records, and artifact metadata.
 - Data cleaning tools operate on registered datasets and create new derived datasets when cleaning operations are applied; source datasets remain intact.
 - Query tools read registered datasets and return bounded results without creating dataset artifacts by default.
