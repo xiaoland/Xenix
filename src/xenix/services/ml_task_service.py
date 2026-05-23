@@ -27,6 +27,8 @@ from .ml.contracts import InferenceTaskResult
 from .ml.registry import get_model_catalog_entry
 from .ml.execution import MLWorkerRunner
 from .ml.operations import run_evaluate_task, run_fit_task, run_hyperparameter_tuning_task, run_inference_task
+from .ml.worker_pool import MLWorkerPool
+from .ml.worker_settings import MLWorkerSettingsService
 from .storage.layout import (
     dataset_apply_dir,
     dataset_model_dir,
@@ -115,6 +117,7 @@ class MLTaskService:
         session_factory: sessionmaker,
         paths: AppPaths,
         worker_runner: MLWorkerRunner | None = None,
+        worker_settings_service: MLWorkerSettingsService | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._paths = paths
@@ -122,12 +125,17 @@ class MLTaskService:
         self._datasets = DatasetRepository()
         self._ml_tasks = MLTaskRepository()
         self._trained_models = TrainedModelRepository()
-        self._worker_runner = worker_runner or MLWorkerRunner()
+        self._worker_runner = worker_runner or MLWorkerPool(
+            worker_settings_service or MLWorkerSettingsService(paths)
+        )
         self._queue: queue.Queue[str] = queue.Queue()
         self._callbacks: list[Callable[[MLTaskRow], None]] = []
         self._dispatcher_thread: threading.Thread | None = None
         self._lock = threading.Lock()
         self._submitted_ids: set[str] = set()
+        self._dispatch_semaphore = threading.BoundedSemaphore(
+            max(1, int(getattr(self._worker_runner, "max_dispatch_threads", 1)))
+        )
 
     def register_completion_listener(self, callback: Callable[[MLTaskRow], None]) -> None:
         self._callbacks.append(callback)
@@ -282,14 +290,24 @@ class MLTaskService:
     def _dispatch_loop(self) -> None:
         while True:
             ml_task_id = self._queue.get()
-            try:
-                finished_task = self._run_task(ml_task_id)
-                if finished_task is not None:
-                    self._notify_callbacks(finished_task)
-            finally:
-                with self._lock:
-                    self._submitted_ids.discard(ml_task_id)
-                self._queue.task_done()
+            self._dispatch_semaphore.acquire()
+            threading.Thread(
+                target=self._run_queued_task,
+                args=(ml_task_id,),
+                name=f"xenix-ml-task-{ml_task_id[:8]}",
+                daemon=True,
+            ).start()
+
+    def _run_queued_task(self, ml_task_id: str) -> None:
+        try:
+            finished_task = self._run_task(ml_task_id)
+            if finished_task is not None:
+                self._notify_callbacks(finished_task)
+        finally:
+            with self._lock:
+                self._submitted_ids.discard(ml_task_id)
+            self._queue.task_done()
+            self._dispatch_semaphore.release()
 
     def _run_task(self, ml_task_id: str) -> MLTaskRow | None:
         task = self.get_ml_task(ml_task_id)

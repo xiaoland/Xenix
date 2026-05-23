@@ -33,10 +33,13 @@ from ..services.llm import (
     LLMSettings,
     LLMSettingsService,
 )
+from ..services.ml.worker_settings import MLWorkerKind, MLWorkerSettingsService
+from .ssh_worker_setup_wizard import SshWorkerSetupWizard
 
 
 class SettingsDialog(QDialog):
     agent_settings_saved = Signal()
+    ml_worker_settings_saved = Signal()
 
     def __init__(
         self,
@@ -46,6 +49,7 @@ class SettingsDialog(QDialog):
         translation_manager: TranslationManager,
         llm_service: LLMService,
         llm_settings_service: LLMSettingsService,
+        ml_worker_settings_service: MLWorkerSettingsService,
         parent: QDialog | None = None,
     ) -> None:
         super().__init__(parent)
@@ -55,8 +59,10 @@ class SettingsDialog(QDialog):
         self._translation_manager = translation_manager
         self._llm_service = llm_service
         self._llm_settings_service = llm_settings_service
+        self._ml_worker_settings_service = ml_worker_settings_service
         self._provider_configs: list[LLMProviderConfig] = []
         self._loading_provider = False
+        self._ssh_worker_wizard: SshWorkerSetupWizard | None = None
 
         self._language_label = QLabel()
         self._language_selector = QComboBox()
@@ -77,6 +83,11 @@ class SettingsDialog(QDialog):
         self._aimock_card.setFrameShape(QFrame.StyledPanel)
         self._aimock_card_layout = QFormLayout(self._aimock_card)
         self._aimock_card_layout.setContentsMargins(12, 12, 12, 12)
+
+        self._ml_workers_card = QFrame()
+        self._ml_workers_card.setFrameShape(QFrame.StyledPanel)
+        self._ml_workers_card_layout = QFormLayout(self._ml_workers_card)
+        self._ml_workers_card_layout.setContentsMargins(12, 12, 12, 12)
 
         self._app_home_label = QLabel()
         self._state_label = QLabel()
@@ -103,6 +114,10 @@ class SettingsDialog(QDialog):
         self._aimock_enabled_label = QLabel()
         self._aimock_base_url_label = QLabel()
         self._aimock_api_key_label = QLabel()
+
+        self._ml_workers_title_label = QLabel()
+        self._ml_workers_summary_label = QLabel()
+        self._ml_workers_setup_button = QPushButton()
 
         self._app_home_value = QLabel(str(self._paths.home))
         self._state_value = QLabel(str(self._paths.state))
@@ -211,8 +226,14 @@ class SettingsDialog(QDialog):
         self._aimock_card_layout.addRow(self._aimock_api_key_label, self._aimock_api_key_input)
         self._aimock_card.setVisible(self._llm_settings_service.is_development())
 
+        self._ml_workers_summary_label.setWordWrap(True)
+        self._ml_workers_card_layout.addRow(self._ml_workers_title_label)
+        self._ml_workers_card_layout.addRow(self._ml_workers_summary_label)
+        self._ml_workers_card_layout.addRow(self._ml_workers_setup_button)
+
         scroll_layout.addWidget(self._llm_card)
         scroll_layout.addWidget(self._aimock_card)
+        scroll_layout.addWidget(self._ml_workers_card)
         scroll_layout.addWidget(self._runtime_card)
         scroll_layout.addStretch(1)
         layout.addWidget(scroll, 1)
@@ -230,6 +251,7 @@ class SettingsDialog(QDialog):
         self._provider_selector.currentIndexChanged.connect(self._on_provider_changed)
         self._add_provider_button.clicked.connect(self._add_provider)
         self._remove_provider_button.clicked.connect(self._remove_provider)
+        self._ml_workers_setup_button.clicked.connect(self._open_ssh_worker_wizard)
 
     def retranslate_ui(self) -> None:
         self.setWindowTitle(self.tr("Settings"))
@@ -254,6 +276,8 @@ class SettingsDialog(QDialog):
         self._aimock_enabled_label.setText(self.tr("Use AIMock"))
         self._aimock_base_url_label.setText(self.tr("AIMock base URL"))
         self._aimock_api_key_label.setText(self.tr("AIMock API key"))
+        self._ml_workers_title_label.setText(self.tr("ML workers"))
+        self._ml_workers_setup_button.setText(self.tr("Add SSH worker..."))
         self._app_home_label.setText(self.tr("App home"))
         self._state_label.setText(self.tr("State"))
         self._artifacts_label.setText(self.tr("Artifacts"))
@@ -268,6 +292,7 @@ class SettingsDialog(QDialog):
             guard_key=self._llm_guard_model_selector.currentData(),
             title_key=self._llm_thread_title_model_selector.currentData(),
         )
+        self._refresh_ml_worker_summary()
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == QEvent.LanguageChange:
@@ -340,6 +365,32 @@ class SettingsDialog(QDialog):
             return
         self._llm_settings_service.save(settings)
         self.agent_settings_saved.emit()
+
+    def _refresh_ml_worker_summary(self) -> None:
+        settings = self._ml_worker_settings_service.load()
+        enabled = [worker for worker in settings.workers if worker.enabled]
+        local_count = sum(1 for worker in enabled if worker.kind is MLWorkerKind.LOCAL)
+        ssh_count = sum(1 for worker in enabled if worker.kind is MLWorkerKind.SSH)
+        total_slots = sum(worker.max_concurrent_tasks for worker in enabled)
+        self._ml_workers_summary_label.setText(
+            self.tr("{local_count} local, {ssh_count} SSH, {slots} execution slot(s).").format(
+                local_count=local_count,
+                ssh_count=ssh_count,
+                slots=total_slots,
+            )
+        )
+
+    def _open_ssh_worker_wizard(self) -> None:
+        wizard = SshWorkerSetupWizard(
+            self._ml_worker_settings_service,
+            parent=self,
+        )
+        wizard.worker_saved.connect(self._refresh_ml_worker_summary)
+        wizard.worker_saved.connect(self.ml_worker_settings_saved.emit)
+        self._ssh_worker_wizard = wizard
+        wizard.show()
+        wizard.raise_()
+        wizard.activateWindow()
 
     def _on_provider_changed(self, index: int) -> None:
         if self._loading_provider:

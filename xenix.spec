@@ -14,6 +14,7 @@ a = Analysis(
     datas=[
         (str(src_root / "xenix" / "resources"), "xenix/resources"),
         (str(src_root / "xenix" / "translations"), "xenix/translations"),
+        (str(src_root / "xenix"), "xenix_worker_source/xenix"),
     ],
     hiddenimports=[],
     hookspath=[],

@@ -16,6 +16,16 @@ from .types import (
     ModelServiceBase,
     ModelTaskKind,
 )
+from .worker_settings import (
+    MLWorkerConfig,
+    MLWorkerKind,
+    MLWorkerPoolConfig,
+    MLWorkerSettings,
+    MLWorkerSettingsService,
+    MLWorkerSetupState,
+    MLWorkerValidationRecord,
+    MLWorkerValidationStatus,
+)
 
 __all__ = [
     "ColumnRoleKind",
@@ -28,6 +38,14 @@ __all__ = [
     "ModelRoleSchema",
     "ModelServiceBase",
     "ModelTaskKind",
+    "MLWorkerConfig",
+    "MLWorkerKind",
+    "MLWorkerPoolConfig",
+    "MLWorkerSettings",
+    "MLWorkerSettingsService",
+    "MLWorkerSetupState",
+    "MLWorkerValidationRecord",
+    "MLWorkerValidationStatus",
     "get_model_catalog_entry",
     "get_model_service",
     "list_model_catalog",

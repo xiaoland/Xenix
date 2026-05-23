@@ -23,6 +23,7 @@ from .services.data_cleaning import DataCleaningService
 from .services.data_transform import DataQueryInput, DataQueryTransformService, DatasetSqlBinding
 from .services.dataset_service import DatasetService
 from .services.ml_service import MLService
+from .services.ml.worker_settings import MLWorkerSettingsService
 from .services.ml_task_service import MLTaskService
 from .services.llm import LLMService, LLMSettingsService
 from .services.storage import StorageBootstrapService
@@ -108,7 +109,12 @@ def build_main_window(
         dataset_service = DatasetService(context.session_factory, paths)
         data_cleaning_service = DataCleaningService(paths)
         data_transform_service = DataQueryTransformService(paths)
-        ml_task_service = MLTaskService(context.session_factory, paths)
+        ml_worker_settings_service = MLWorkerSettingsService(paths)
+        ml_task_service = MLTaskService(
+            context.session_factory,
+            paths,
+            worker_settings_service=ml_worker_settings_service,
+        )
         ml_service = MLService(
             paths,
             context.session_factory,
@@ -144,6 +150,7 @@ def build_main_window(
             agent_harness_service=agent_harness_service,
             llm_service=llm_service,
             llm_settings_service=llm_settings_service,
+            ml_worker_settings_service=ml_worker_settings_service,
             artifact_service=artifact_service,
             ml_service=ml_service,
         )

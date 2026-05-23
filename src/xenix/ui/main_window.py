@@ -33,6 +33,7 @@ from ..services.agent import (
 from ..services.artifact_service import ArtifactService
 from ..services.llm import LLMService, LLMSettingsService
 from ..services.ml_service import MLService
+from ..services.ml.worker_settings import MLWorkerSettingsService
 from .chatbot import ThreadDetailView
 from .layout_debug import dump_layout_if_enabled
 from .native_widgets import emphasize_label
@@ -55,6 +56,7 @@ class MainWindow(QMainWindow):
         agent_harness_service: AgentHarnessService,
         llm_service: LLMService,
         llm_settings_service: LLMSettingsService,
+        ml_worker_settings_service: MLWorkerSettingsService,
         artifact_service: ArtifactService,
         ml_service: MLService,
     ) -> None:
@@ -66,6 +68,7 @@ class MainWindow(QMainWindow):
         self._agent_harness_service = agent_harness_service
         self._llm_service = llm_service
         self._llm_settings_service = llm_settings_service
+        self._ml_worker_settings_service = ml_worker_settings_service
         self._artifact_service = artifact_service
         self._ml_service = ml_service
         self._agent_thread_id: str | None = None
@@ -221,6 +224,7 @@ class MainWindow(QMainWindow):
                 translation_manager=self._translation_manager,
                 llm_service=self._llm_service,
                 llm_settings_service=self._llm_settings_service,
+                ml_worker_settings_service=self._ml_worker_settings_service,
                 parent=self,
             )
             self._settings_dialog.agent_settings_saved.connect(self._reload_agent_provider)
