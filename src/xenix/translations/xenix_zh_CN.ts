@@ -4,17 +4,17 @@
 <context>
     <name>ChatMessageBubble</name>
     <message>
-        <location filename="../ui/chatbot.py" line="433"/>
+        <location filename="../ui/chatbot.py" line="437"/>
         <source>You</source>
         <translation>你</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="435"/>
+        <location filename="../ui/chatbot.py" line="439"/>
         <source>Tool</source>
         <translation>工具</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="437"/>
+        <location filename="../ui/chatbot.py" line="441"/>
         <source>System</source>
         <translation>系统</translation>
     </message>
@@ -514,102 +514,102 @@ This route will stay available after model selection is connected.</source>
 <context>
     <name>SshWorkerSetupWizard</name>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="121"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="120"/>
         <source>Set Up SSH Worker</source>
         <translation>设置 SSH 工作器</translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="122"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="121"/>
         <source>SSH worker</source>
         <translation>SSH 工作器</translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="123"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="122"/>
         <source>Configure a key-based SSH worker for ML workloads.</source>
         <translation>为 ML 工作负载配置基于密钥的 SSH 工作器。</translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="124"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="123"/>
         <source>Setup and validation</source>
         <translation>设置与验证</translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="125"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="124"/>
         <source>Create the remote environment and validate execution prerequisites.</source>
         <translation>创建远程环境并验证执行前置条件。</translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="126"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="125"/>
         <source>Worker name</source>
         <translation>工作器名称</translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="127"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="126"/>
         <source>SSH alias</source>
         <translation>SSH 别名</translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="128"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="127"/>
         <source>Host</source>
         <translation>主机</translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="129"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="128"/>
         <source>User</source>
         <translation>用户</translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="130"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="129"/>
         <source>Port</source>
         <translation>端口</translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="131"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="130"/>
         <source>Identity file</source>
         <translation>身份文件</translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="132"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="131"/>
         <source>Remote root</source>
         <translation>远程根目录</translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="133"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="132"/>
         <source>Python command</source>
         <translation>Python 命令</translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="134"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="133"/>
         <source>Write SSH config</source>
         <translation>写入 SSH 配置</translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="135"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="134"/>
         <source>Set up remote environment</source>
         <translation>设置远程环境</translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="137"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="136"/>
         <source>Xenix will use key or agent-based SSH. Password and passphrase storage is not supported.</source>
         <translation>Xenix 将使用基于密钥或 agent 的 SSH。不支持存储密码或密钥口令。</translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="139"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="138"/>
         <source>Run setup</source>
         <translation>运行设置</translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="141"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="140"/>
         <source>Setup has not run yet.</source>
         <translation>尚未运行设置。</translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="155"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="154"/>
         <source>Running setup...</source>
         <translation>正在运行设置...</translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="182"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="181"/>
         <source>Setup returned an invalid result.</source>
         <translation>设置返回了无效结果。</translation>
     </message>
@@ -625,32 +625,37 @@ This route will stay available after model selection is connected.</source>
         <translation type="vanished">业务机器学习工作台</translation>
     </message>
     <message>
-        <location filename="../ui/startup_splash.py" line="326"/>
+        <location filename="../ui/startup_splash.py" line="327"/>
         <source>Starting Xenix...</source>
         <translation>正在启动 Xenix...</translation>
     </message>
     <message>
-        <location filename="../ui/startup_splash.py" line="327"/>
+        <location filename="../ui/startup_splash.py" line="328"/>
         <source>Preparing application data...</source>
         <translation>正在准备应用数据...</translation>
     </message>
     <message>
-        <location filename="../ui/startup_splash.py" line="328"/>
+        <location filename="../ui/startup_splash.py" line="329"/>
+        <source>Loading runtime components...</source>
+        <translation>正在加载运行时组件...</translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="330"/>
         <source>Initializing runtime logging...</source>
         <translation>正在初始化运行日志...</translation>
     </message>
     <message>
-        <location filename="../ui/startup_splash.py" line="329"/>
+        <location filename="../ui/startup_splash.py" line="331"/>
         <source>Initializing local database...</source>
         <translation>正在初始化本地数据库...</translation>
     </message>
     <message>
-        <location filename="../ui/startup_splash.py" line="330"/>
+        <location filename="../ui/startup_splash.py" line="332"/>
         <source>Loading workbench...</source>
         <translation>正在加载工作台...</translation>
     </message>
     <message>
-        <location filename="../ui/startup_splash.py" line="331"/>
+        <location filename="../ui/startup_splash.py" line="333"/>
         <source>Ready.</source>
         <translation>准备就绪。</translation>
     </message>
@@ -717,50 +722,50 @@ This route will stay available after model selection is connected.</source>
         <translation>已请求</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="822"/>
+        <location filename="../ui/chatbot.py" line="826"/>
         <source>Message Xenix</source>
         <translation>给 Xenix 发消息</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="823"/>
-        <location filename="../ui/chatbot.py" line="1148"/>
-        <location filename="../ui/chatbot.py" line="1159"/>
+        <location filename="../ui/chatbot.py" line="827"/>
+        <location filename="../ui/chatbot.py" line="1152"/>
+        <location filename="../ui/chatbot.py" line="1163"/>
         <source>Attach files</source>
         <translation>添加文件</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="824"/>
+        <location filename="../ui/chatbot.py" line="828"/>
         <source>Model for the next turn</source>
         <translation>下一轮使用的模型</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="825"/>
+        <location filename="../ui/chatbot.py" line="829"/>
         <source>Continue</source>
         <translation>继续</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="826"/>
-        <location filename="../ui/chatbot.py" line="1099"/>
+        <location filename="../ui/chatbot.py" line="830"/>
+        <location filename="../ui/chatbot.py" line="1103"/>
         <source>Stop</source>
         <translation>停止</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="827"/>
+        <location filename="../ui/chatbot.py" line="831"/>
         <source>Drop files to attach</source>
         <translation>拖放文件以添加附件</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="828"/>
+        <location filename="../ui/chatbot.py" line="832"/>
         <source>Release here to add them to the next message</source>
         <translation>松开后添加到下一条消息</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1099"/>
+        <location filename="../ui/chatbot.py" line="1103"/>
         <source>Send</source>
         <translation>发送</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1150"/>
+        <location filename="../ui/chatbot.py" line="1154"/>
         <source>Data files (*.csv *.xlsx *.xls);;All files (*)</source>
         <translation>数据文件 (*.csv *.xlsx *.xls);;所有文件 (*)</translation>
     </message>
@@ -1050,12 +1055,12 @@ This route will stay available after model selection is connected.</source>
         <translation>模型应用已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="554"/>
+        <location filename="../ui/chatbot.py" line="558"/>
         <source>Details</source>
         <translation>详情</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="555"/>
+        <location filename="../ui/chatbot.py" line="559"/>
         <source>Open tool call details</source>
         <translation>打开工具调用详情</translation>
     </message>
@@ -1080,12 +1085,12 @@ This route will stay available after model selection is connected.</source>
         <translation type="vanished">预测运行已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="563"/>
+        <location filename="../ui/chatbot.py" line="567"/>
         <source>Hide result</source>
         <translation>隐藏结果</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="563"/>
+        <location filename="../ui/chatbot.py" line="567"/>
         <source>Show result</source>
         <translation>显示结果</translation>
     </message>
@@ -1106,12 +1111,12 @@ This route will stay available after model selection is connected.</source>
 <context>
     <name>XenixStartup</name>
     <message>
-        <location filename="../app.py" line="205"/>
+        <location filename="../app.py" line="284"/>
         <source>Unable to start Xenix</source>
         <translation>无法启动 Xenix</translation>
     </message>
     <message>
-        <location filename="../app.py" line="206"/>
+        <location filename="../app.py" line="285"/>
         <source>Xenix could not finish startup.
 
 {error}</source>

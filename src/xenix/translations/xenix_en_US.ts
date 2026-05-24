@@ -4,17 +4,17 @@
 <context>
     <name>ChatMessageBubble</name>
     <message>
-        <location filename="../ui/chatbot.py" line="433"/>
+        <location filename="../ui/chatbot.py" line="437"/>
         <source>You</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="435"/>
+        <location filename="../ui/chatbot.py" line="439"/>
         <source>Tool</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="437"/>
+        <location filename="../ui/chatbot.py" line="441"/>
         <source>System</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1108,102 +1108,102 @@
 <context>
     <name>SshWorkerSetupWizard</name>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="121"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="120"/>
         <source>Set Up SSH Worker</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="122"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="121"/>
         <source>SSH worker</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="123"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="122"/>
         <source>Configure a key-based SSH worker for ML workloads.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="124"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="123"/>
         <source>Setup and validation</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="125"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="124"/>
         <source>Create the remote environment and validate execution prerequisites.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="126"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="125"/>
         <source>Worker name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="127"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="126"/>
         <source>SSH alias</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="128"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="127"/>
         <source>Host</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="129"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="128"/>
         <source>User</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="130"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="129"/>
         <source>Port</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="131"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="130"/>
         <source>Identity file</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="132"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="131"/>
         <source>Remote root</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="133"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="132"/>
         <source>Python command</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="134"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="133"/>
         <source>Write SSH config</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="135"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="134"/>
         <source>Set up remote environment</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="137"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="136"/>
         <source>Xenix will use key or agent-based SSH. Password and passphrase storage is not supported.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="139"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="138"/>
         <source>Run setup</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="141"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="140"/>
         <source>Setup has not run yet.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="155"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="154"/>
         <source>Running setup...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/ssh_worker_setup_wizard.py" line="182"/>
+        <location filename="../ui/ssh_worker_setup_wizard.py" line="181"/>
         <source>Setup returned an invalid result.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1215,32 +1215,37 @@
         <translation type="obsolete">Xenix</translation>
     </message>
     <message>
-        <location filename="../ui/startup_splash.py" line="326"/>
+        <location filename="../ui/startup_splash.py" line="327"/>
         <source>Starting Xenix...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/startup_splash.py" line="327"/>
+        <location filename="../ui/startup_splash.py" line="328"/>
         <source>Preparing application data...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/startup_splash.py" line="328"/>
-        <source>Initializing runtime logging...</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../ui/startup_splash.py" line="329"/>
-        <source>Initializing local database...</source>
+        <source>Loading runtime components...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../ui/startup_splash.py" line="330"/>
-        <source>Loading workbench...</source>
+        <source>Initializing runtime logging...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../ui/startup_splash.py" line="331"/>
+        <source>Initializing local database...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="332"/>
+        <source>Loading workbench...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/startup_splash.py" line="333"/>
         <source>Ready.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1307,50 +1312,50 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="822"/>
+        <location filename="../ui/chatbot.py" line="826"/>
         <source>Message Xenix</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="823"/>
-        <location filename="../ui/chatbot.py" line="1148"/>
-        <location filename="../ui/chatbot.py" line="1159"/>
+        <location filename="../ui/chatbot.py" line="827"/>
+        <location filename="../ui/chatbot.py" line="1152"/>
+        <location filename="../ui/chatbot.py" line="1163"/>
         <source>Attach files</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="824"/>
+        <location filename="../ui/chatbot.py" line="828"/>
         <source>Model for the next turn</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="825"/>
+        <location filename="../ui/chatbot.py" line="829"/>
         <source>Continue</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="826"/>
-        <location filename="../ui/chatbot.py" line="1099"/>
+        <location filename="../ui/chatbot.py" line="830"/>
+        <location filename="../ui/chatbot.py" line="1103"/>
         <source>Stop</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="827"/>
+        <location filename="../ui/chatbot.py" line="831"/>
         <source>Drop files to attach</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="828"/>
+        <location filename="../ui/chatbot.py" line="832"/>
         <source>Release here to add them to the next message</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1099"/>
+        <location filename="../ui/chatbot.py" line="1103"/>
         <source>Send</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1150"/>
+        <location filename="../ui/chatbot.py" line="1154"/>
         <source>Data files (*.csv *.xlsx *.xls);;All files (*)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1632,22 +1637,22 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="554"/>
+        <location filename="../ui/chatbot.py" line="558"/>
         <source>Details</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="555"/>
+        <location filename="../ui/chatbot.py" line="559"/>
         <source>Open tool call details</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="563"/>
+        <location filename="../ui/chatbot.py" line="567"/>
         <source>Hide result</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="563"/>
+        <location filename="../ui/chatbot.py" line="567"/>
         <source>Show result</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1668,12 +1673,12 @@
 <context>
     <name>XenixStartup</name>
     <message>
-        <location filename="../app.py" line="205"/>
+        <location filename="../app.py" line="284"/>
         <source>Unable to start Xenix</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app.py" line="206"/>
+        <location filename="../app.py" line="285"/>
         <source>Xenix could not finish startup.
 
 {error}</source>

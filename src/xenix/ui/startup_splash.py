@@ -20,6 +20,7 @@ from PySide6.QtWidgets import QApplication, QLabel, QWidget
 class StartupStage(Enum):
     STARTING = "starting"
     PREPARING_APP_DATA = "preparing_app_data"
+    LOADING_RUNTIME = "loading_runtime"
     INITIALIZING_LOGGING = "initializing_logging"
     INITIALIZING_STORAGE = "initializing_storage"
     LOADING_WORKBENCH = "loading_workbench"
@@ -325,6 +326,7 @@ class StartupSplash(QWidget):
         stage_text = {
             StartupStage.STARTING: self.tr("Starting Xenix..."),
             StartupStage.PREPARING_APP_DATA: self.tr("Preparing application data..."),
+            StartupStage.LOADING_RUNTIME: self.tr("Loading runtime components..."),
             StartupStage.INITIALIZING_LOGGING: self.tr("Initializing runtime logging..."),
             StartupStage.INITIALIZING_STORAGE: self.tr("Initializing local database..."),
             StartupStage.LOADING_WORKBENCH: self.tr("Loading workbench..."),

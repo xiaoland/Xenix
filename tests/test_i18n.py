@@ -3,6 +3,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
+from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QApplication
 
 from xenix.app import build_main_window
@@ -245,6 +246,62 @@ def test_startup_splash_language_switch_updates_stage_text(
     finally:
         splash.close()
         translation_manager.set_locale("en_US", persist=False)
+
+
+def test_main_window_translates_startup_splash_before_first_stage(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    paths = ensure_app_dirs(get_app_paths())
+    write_saved_locale(paths, "zh_CN")
+    observed_texts = []
+
+    class FakeSplash:
+        def __init__(self) -> None:
+            observed_texts.append(
+                (
+                    "constructed",
+                    QCoreApplication.translate("StartupSplash", "Starting Xenix..."),
+                )
+            )
+
+        def show_centered(self) -> None:
+            pass
+
+        def set_stage(self, stage: StartupStage) -> None:
+            if stage is StartupStage.STARTING:
+                observed_texts.append(
+                    (
+                        "starting",
+                        QCoreApplication.translate("StartupSplash", "Starting Xenix..."),
+                    )
+                )
+
+        def retranslate_ui(self) -> None:
+            pass
+
+        def close(self) -> None:
+            pass
+
+        def deleteLater(self) -> None:
+            pass
+
+    monkeypatch.setattr("xenix.app.StartupSplash", FakeSplash)
+
+    _app, window = build_main_window(show=False, show_splash=True)
+    try:
+        assert observed_texts[:2] == [
+            ("constructed", "正在启动 Xenix..."),
+            ("starting", "正在启动 Xenix..."),
+        ]
+    finally:
+        window._translation_manager.set_locale("en_US", persist=False)
+        window.close()
 
 
 def test_startup_splash_renders_nonblank_canvas_offscreen(

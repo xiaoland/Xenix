@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import logging
 import sys
-from pathlib import Path
+import threading
+from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QCoreApplication, QElapsedTimer, QEventLoop, QThread
 from PySide6.QtGui import QIcon
@@ -13,26 +15,22 @@ from .exceptions import install_exception_hooks
 from .i18n import TranslationManager
 from .logging import setup_logging
 from .resources import package_resource_path
-from .services.agent import (
-    AgentHarnessService,
-    AgentToolRegistry,
-    ConversationStore,
-)
-from .services.artifact_service import ArtifactService
-from .services.data_cleaning import DataCleaningService
-from .services.data_transform import DataQueryInput, DataQueryTransformService, DatasetSqlBinding
-from .services.dataset_service import DatasetService
-from .services.ml_service import MLService
-from .services.ml.worker_settings import MLWorkerSettingsService
-from .services.ml_task_service import MLTaskService
-from .services.llm import LLMService, LLMSettingsService
-from .services.storage import StorageBootstrapService
-from .services.storage.layout import database_path
-from .ui.main_window import MainWindow
 from .ui.startup_splash import StartupSplash, StartupStage
+
+if TYPE_CHECKING:
+    from .ui.main_window import MainWindow
 
 LOGGER = logging.getLogger("xenix.bootstrap")
 STARTUP_SPLASH_HOLD_MS = 2200
+
+
+def __getattr__(name: str) -> object:
+    if name == "MainWindow":
+        from .ui.main_window import MainWindow
+
+        globals()[name] = MainWindow
+        return MainWindow
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def create_application() -> QApplication:
@@ -75,6 +73,76 @@ def _hold_startup_splash(app: QApplication, splash: StartupSplash | None, hold_m
         QThread.msleep(16)
 
 
+def _load_runtime_imports() -> SimpleNamespace:
+    from .services.agent import (
+        AgentHarnessService,
+        AgentToolRegistry,
+        ConversationStore,
+    )
+    from .services.artifact_service import ArtifactService
+    from .services.data_cleaning import DataCleaningService
+    from .services.data_transform import DataQueryTransformService
+    from .services.dataset_service import DatasetService
+    from .services.llm import LLMService, LLMSettingsService
+    from .services.ml.worker_settings import MLWorkerSettingsService
+    from .services.ml_service import MLService
+    from .services.ml_task_service import MLTaskService
+    from .services.storage import StorageBootstrapService
+    from .services.storage.layout import database_path
+
+    return SimpleNamespace(
+        AgentHarnessService=AgentHarnessService,
+        AgentToolRegistry=AgentToolRegistry,
+        ArtifactService=ArtifactService,
+        ConversationStore=ConversationStore,
+        DataCleaningService=DataCleaningService,
+        DataQueryTransformService=DataQueryTransformService,
+        DatasetService=DatasetService,
+        LLMService=LLMService,
+        LLMSettingsService=LLMSettingsService,
+        MLService=MLService,
+        MLTaskService=MLTaskService,
+        MLWorkerSettingsService=MLWorkerSettingsService,
+        StorageBootstrapService=StorageBootstrapService,
+        database_path=database_path,
+    )
+
+
+def _load_runtime_imports_with_events(
+    app: QApplication,
+    splash: StartupSplash | None,
+) -> SimpleNamespace:
+    if splash is None:
+        return _load_runtime_imports()
+
+    completed = threading.Event()
+    result: SimpleNamespace | None = None
+    error: BaseException | None = None
+
+    def load() -> None:
+        nonlocal error, result
+        try:
+            result = _load_runtime_imports()
+        except BaseException as exc:
+            error = exc
+        finally:
+            completed.set()
+
+    thread = threading.Thread(target=load, name="xenix-startup-imports", daemon=True)
+    thread.start()
+    while not completed.is_set():
+        app.processEvents(QEventLoop.ProcessEventsFlag.AllEvents, 50)
+        completed.wait(0.016)
+    thread.join()
+    app.processEvents()
+
+    if error is not None:
+        raise error
+    if result is None:
+        raise RuntimeError("Runtime imports did not produce a result.")
+    return result
+
+
 def build_main_window(
     *,
     show: bool = True,
@@ -82,6 +150,9 @@ def build_main_window(
     splash_hold_ms: int = 0,
 ) -> tuple[QApplication, MainWindow]:
     app = create_application()
+    paths = get_app_paths()
+    translation_manager = TranslationManager(app, paths)
+    translation_manager.initialize()
     should_show_splash = show if show_splash is None else show_splash
     splash = StartupSplash() if should_show_splash else None
 
@@ -91,41 +162,43 @@ def build_main_window(
 
     try:
         _update_startup_stage(app, splash, StartupStage.PREPARING_APP_DATA)
-        paths = ensure_app_dirs(get_app_paths())
+        paths = ensure_app_dirs(paths)
+
+        _update_startup_stage(app, splash, StartupStage.LOADING_RUNTIME)
+        runtime = _load_runtime_imports_with_events(app, splash)
+        from .ui.main_window import MainWindow
 
         _update_startup_stage(app, splash, StartupStage.INITIALIZING_LOGGING)
         log_path = setup_logging(paths)
         install_exception_hooks()
 
-        translation_manager = TranslationManager(app, paths)
-        translation_manager.initialize()
         if splash is not None:
             splash.retranslate_ui()
 
         _update_startup_stage(app, splash, StartupStage.INITIALIZING_STORAGE)
-        context = StorageBootstrapService().initialize(paths)
+        context = runtime.StorageBootstrapService().initialize(paths)
 
         _update_startup_stage(app, splash, StartupStage.LOADING_WORKBENCH)
-        dataset_service = DatasetService(context.session_factory, paths)
-        data_cleaning_service = DataCleaningService(paths)
-        data_transform_service = DataQueryTransformService(paths)
-        ml_worker_settings_service = MLWorkerSettingsService(paths)
-        ml_task_service = MLTaskService(
+        dataset_service = runtime.DatasetService(context.session_factory, paths)
+        data_cleaning_service = runtime.DataCleaningService(paths)
+        data_transform_service = runtime.DataQueryTransformService(paths)
+        ml_worker_settings_service = runtime.MLWorkerSettingsService(paths)
+        ml_task_service = runtime.MLTaskService(
             context.session_factory,
             paths,
             worker_settings_service=ml_worker_settings_service,
         )
-        ml_service = MLService(
+        ml_service = runtime.MLService(
             paths,
             context.session_factory,
             dataset_service,
             ml_task_service,
         )
-        artifact_service = ArtifactService(context.session_factory)
-        conversation_store = ConversationStore(context.session_factory)
-        llm_settings_service = LLMSettingsService(paths)
-        llm_service = LLMService(llm_settings_service)
-        agent_tool_registry = AgentToolRegistry(
+        artifact_service = runtime.ArtifactService(context.session_factory)
+        conversation_store = runtime.ConversationStore(context.session_factory)
+        llm_settings_service = runtime.LLMSettingsService(paths)
+        llm_service = runtime.LLMService(llm_settings_service)
+        agent_tool_registry = runtime.AgentToolRegistry(
             paths=paths,
             dataset_service=dataset_service,
             data_cleaning_service=data_cleaning_service,
@@ -133,7 +206,7 @@ def build_main_window(
             ml_service=ml_service,
             artifact_service=artifact_service,
         )
-        agent_harness_service = AgentHarnessService(
+        agent_harness_service = runtime.AgentHarnessService(
             session_factory=context.session_factory,
             tool_registry=agent_tool_registry,
             llm_service=llm_service,
@@ -145,7 +218,7 @@ def build_main_window(
         window = MainWindow(
             paths=paths,
             log_path=log_path,
-            db_path=database_path(paths),
+            db_path=runtime.database_path(paths),
             translation_manager=translation_manager,
             agent_harness_service=agent_harness_service,
             llm_service=llm_service,
@@ -170,6 +243,12 @@ def build_main_window(
 
 
 def _run_smoke_checks(paths) -> None:
+    from .services.data_transform import (
+        DataQueryInput,
+        DataQueryTransformService,
+        DatasetSqlBinding,
+    )
+
     duckdb_smoke_path = paths.temp / "duckdb-smoke.csv"
     duckdb_smoke_path.write_text("value\n1\n2\n", encoding="utf-8")
     result = DataQueryTransformService(paths).query(

@@ -28,7 +28,7 @@ from xenix.services.storage.models import (
     ArtifactKind,
 )
 from xenix.ui.chatbot import _format_token_count
-from xenix.ui.startup_splash import StartupStage
+from xenix.ui.startup_splash import StartupSplash, StartupStage
 
 
 class _FakeFileDropEvent:
@@ -130,6 +130,7 @@ def test_main_window_reports_startup_splash_stages_when_enabled(monkeypatch, tmp
         assert splash.stages == [
             StartupStage.STARTING,
             StartupStage.PREPARING_APP_DATA,
+            StartupStage.LOADING_RUNTIME,
             StartupStage.INITIALIZING_LOGGING,
             StartupStage.INITIALIZING_STORAGE,
             StartupStage.LOADING_WORKBENCH,
@@ -184,6 +185,42 @@ def test_main_window_holds_ready_splash_before_showing_window(monkeypatch, tmp_p
             "splash.delete",
             "window.show",
         ]
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_startup_runtime_import_wait_keeps_splash_pulse_animating(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    import xenix.app as app_module
+
+    real_load_runtime_imports = app_module._load_runtime_imports
+    captured_phases = []
+
+    class ProbeSplash(StartupSplash):
+        def show_centered(self) -> None:
+            self.show()
+
+        def close(self) -> None:
+            captured_phases.append(self._pulse_bar._phase)
+            super().close()
+
+    def slow_load_runtime_imports():
+        deadline = time.perf_counter() + 0.12
+        while time.perf_counter() < deadline:
+            time.sleep(0.01)
+        return real_load_runtime_imports()
+
+    monkeypatch.setattr(app_module, "StartupSplash", ProbeSplash)
+    monkeypatch.setattr(app_module, "_load_runtime_imports", slow_load_runtime_imports)
+
+    app, window = build_main_window(show=False, show_splash=True)
+    try:
+        assert captured_phases
+        assert captured_phases[-1] > 0.0
     finally:
         window.close()
         app.processEvents()
