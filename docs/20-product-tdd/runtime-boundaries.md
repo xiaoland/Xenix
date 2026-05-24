@@ -146,7 +146,7 @@ ML adapters must assume:
 
 The first-slice acceptance path validates end-to-end capability. Prompts describe Xenix identity, tool semantics, and service boundaries. Planning and tool ordering remain model-owned within tool validation, step-budget, and cancellation boundaries.
 
-Acceptance coverage should prove that a user can complete basic analysis from file intake through reusable model application with conversation, file drag-and-drop, service-backed tools, and artifact previews.
+Acceptance coverage should prove that a user can complete basic analysis from file intake through reusable model application with conversation, file drag-and-drop, service-backed tools, and artifact previews. Prefer integrated, E2E, smoke, or golden coverage for this layer; avoid one-off regression tests unless the failure exposes a stable boundary contract.
 
 ## Boundary Tests Required
 
@@ -161,3 +161,5 @@ Add contract tests when any of the following change:
 - Service-to-ML adapter invocation shape
 - Storage location rules for logs, models, datasets, or results
 - ML worker pool settings, selection rules, SSH setup validation, or remote staging path rewrites
+
+For deterministic cross-boundary outputs, prefer golden tests over many small assertion-heavy regression tests.

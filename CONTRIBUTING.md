@@ -32,7 +32,7 @@
 
 ## Testing Intent
 
-- Add or update unit tests when changing config resolution, logging, resource loading, ML task orchestration, or storage boundaries.
-- Add contract tests for any boundary that crosses UI, services, ML adapters, SQLite, or the filesystem.
-- Prefer executable checks over prose when a guarantee can be enforced in tests or CI.
-- Do not add tests that only restate facts already guaranteed by source definitions, type contracts, enum membership, schema definitions, or data models. Tests should cover observable behavior, boundary contracts, migrations, error handling, and integration risks rather than asserting that a constant, enum value, or field list has a particular shape.
+- Avoid adding a narrow regression test for every fixed bug. A past failure is evidence to inspect the durable contract, not by itself a reason to preserve a tiny test forever.
+- Prefer high-signal tests that protect stable behavior: golden tests for deterministic payloads, projections, migrations, and artifact shapes; integrated tests for UI/service/storage/ML adapter boundaries; and E2E or smoke tests for critical user workflows.
+- Add lower-level unit or boundary tests only when they protect a stable contract, isolate high-risk logic, shorten feedback for expensive failures, or cover config resolution, logging, resource loading, ML task orchestration, storage boundaries, migrations, or data-loss risks.
+- Do not add tests that only restate facts already guaranteed by source definitions, type contracts, enum membership, schema definitions, data models, or incidental implementation details.

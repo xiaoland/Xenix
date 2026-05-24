@@ -47,6 +47,12 @@ Transient thinking state is also driven by Chatbot Events: `THINKING` with `IN_P
 - Artifact links inside markdown emit `artifact_link_activated` and are resolved by services.
 - Tool Call Detail View is a standalone task-scoped window opened from a Tool Call Item. It may query service-owned ML task details, logs, and artifacts for the explicit task ids attached to task-producing tool calls. It is not a global ML task list. `model.task.query` Tool Call Items do not expose this action because their result is already the task detail surface.
 
+## Styling Contract
+
+Prefer native Qt Widgets styling unless the component needs an explicit product surface. When custom styling is needed, style the whole visual component rather than one isolated property. A message bubble, editor, list row, chip, or tool item includes its outer frame, layout container, text widget, viewport, document/editor area, icon labels, action buttons, and relevant interaction states.
+
+Do not customize only foreground text, icon color, or one palette role while leaving the corresponding background, viewport, selection, disabled, focus, hover, link, and visited-link roles to platform defaults. Partial styling can leak native theme colors across nested Qt widgets, especially through `QAbstractScrollArea.viewport()` and text-document `Base` roles. Either keep the component native, or define the complete foreground/background contract for every child that participates in the same visual unit.
+
 ## Composer Contract
 
 - The textarea defaults to one visual line.
@@ -76,7 +82,9 @@ During a running turn:
 
 ## Test Obligations
 
-Qt boundary tests should cover:
+Qt boundary tests describe stable behavior themes, not a requirement to add a narrow regression test for each UI defect. Prefer folding coverage into golden, integrated, E2E, or existing boundary tests when a bug exposes a durable invariant. Avoid tests for incidental palette values, widget internals, or platform-specific rendering details unless those details are the documented component contract.
+
+Qt boundary coverage should protect:
 
 - new thread creation from History
 - history selection, rename, and delete
