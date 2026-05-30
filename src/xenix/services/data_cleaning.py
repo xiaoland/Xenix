@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import copy
 import re
+import unicodedata
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 import pandas as pd
-from pandas.api.types import is_numeric_dtype
+from pandas.api.types import is_bool_dtype, is_numeric_dtype
 from pydantic import ConfigDict, Field
 from sqlmodel import SQLModel
 
@@ -20,9 +21,34 @@ from .storage.models import DatasetSourceFormat
 KEEP_SCHEMA = {"type": "string", "enum": ["first", "last", "false"]}
 COLUMNS_SCHEMA = {"type": "array", "items": {"type": "string"}}
 ACTION_SCHEMA = {"type": "string", "enum": ["report_only", "drop_rows"]}
+BOOLEAN_SCHEMA = {"type": "boolean"}
 
 
 _CLEANING_OPERATION_GROUPS: dict[str, dict[str, Any]] = {
+    "schema": {
+        "description": "Normalize dataset schema details such as column names.",
+        "operations": [
+            {
+                "operation": "schema.normalize_column_names",
+                "description": (
+                    "Normalize column names algorithmically while preserving business-readable "
+                    "Unicode letters and numbers."
+                ),
+                "params_schema": {
+                    "type": "object",
+                    "properties": {
+                        "style": {"type": "string", "enum": ["snake_case"]},
+                        "ascii_lower": BOOLEAN_SCHEMA,
+                    },
+                    "additionalProperties": False,
+                },
+                "example": {
+                    "operation": "schema.normalize_column_names",
+                    "params": {"style": "snake_case", "ascii_lower": True},
+                },
+            },
+        ],
+    },
     "duplicates": {
         "description": "Remove duplicate rows.",
         "operations": [
@@ -120,6 +146,23 @@ _CLEANING_OPERATION_GROUPS: dict[str, dict[str, Any]] = {
                     "additionalProperties": False,
                 },
                 "example": {"operation": "missing.drop_rows", "params": {"columns": ["amount"]}},
+            },
+            {
+                "operation": "missing.drop_high_missing_columns",
+                "description": "Drop columns whose missing ratio is greater than an explicit threshold.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {
+                        "columns": COLUMNS_SCHEMA,
+                        "threshold": {"type": "number", "minimum": 0, "maximum": 1},
+                    },
+                    "required": ["threshold"],
+                    "additionalProperties": False,
+                },
+                "example": {
+                    "operation": "missing.drop_high_missing_columns",
+                    "params": {"threshold": 0.5},
+                },
             },
         ],
     },
@@ -323,6 +366,89 @@ _CLEANING_OPERATION_GROUPS: dict[str, dict[str, Any]] = {
             },
         ],
     },
+    "outliers": {
+        "description": "Handle numeric outliers.",
+        "operations": [
+            {
+                "operation": "outlier.clip_iqr",
+                "description": "Clip numeric values outside IQR-derived bounds to the nearest bound.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {
+                        "columns": COLUMNS_SCHEMA,
+                        "multiplier": {"type": "number", "exclusiveMinimum": 0},
+                    },
+                    "required": ["columns"],
+                    "additionalProperties": False,
+                },
+                "example": {
+                    "operation": "outlier.clip_iqr",
+                    "params": {"columns": ["amount"], "multiplier": 1.5},
+                },
+            },
+        ],
+    },
+    "encoding": {
+        "description": "Encode categorical columns for downstream analysis or modeling.",
+        "operations": [
+            {
+                "operation": "encoding.one_hot",
+                "description": "Expand categorical columns into deterministic one-hot indicator columns.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {
+                        "columns": COLUMNS_SCHEMA,
+                        "drop_first": BOOLEAN_SCHEMA,
+                        "max_categories": {"type": "integer", "minimum": 1},
+                    },
+                    "required": ["columns"],
+                    "additionalProperties": False,
+                },
+                "example": {
+                    "operation": "encoding.one_hot",
+                    "params": {"columns": ["segment"], "drop_first": False, "max_categories": 50},
+                },
+            },
+        ],
+    },
+    "scaling": {
+        "description": "Scale numeric columns for downstream analysis or modeling.",
+        "operations": [
+            {
+                "operation": "scaling.minmax",
+                "description": "Scale numeric columns into a configured feature range.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {
+                        "columns": COLUMNS_SCHEMA,
+                        "feature_range": {
+                            "type": "array",
+                            "items": {"type": "number"},
+                            "minItems": 2,
+                            "maxItems": 2,
+                        },
+                    },
+                    "required": ["columns"],
+                    "additionalProperties": False,
+                },
+                "example": {
+                    "operation": "scaling.minmax",
+                    "params": {"columns": ["amount"], "feature_range": [0, 1]},
+                },
+            },
+            {
+                "operation": "scaling.standard",
+                "description": "Standardize numeric columns using mean and standard deviation.",
+                "params_schema": {
+                    "type": "object",
+                    "properties": {"columns": COLUMNS_SCHEMA},
+                    "required": ["columns"],
+                    "additionalProperties": False,
+                },
+                "example": {"operation": "scaling.standard", "params": {"columns": ["amount"]}},
+            },
+        ],
+    },
 }
 
 
@@ -429,6 +555,8 @@ class DataCleaningService:
         if not operation_name:
             raise ValidationError("cleaning operation cannot be empty.")
 
+        if operation_name.startswith("schema."):
+            return self._apply_schema_operation(frame, operation_name, params, report)
         if operation_name == "duplicate.exact_rows":
             return self._apply_duplicate_exact_rows(frame, operation_name, params, report)
         if operation_name == "duplicate.key_columns":
@@ -441,7 +569,56 @@ class DataCleaningService:
             return self._apply_text_operation(frame, operation_name, params, report)
         if operation_name.startswith("validation."):
             return self._apply_validation_operation(frame, operation_name, params, report)
+        if operation_name.startswith("outlier."):
+            return self._apply_outlier_operation(frame, operation_name, params, report)
+        if operation_name.startswith("encoding."):
+            return self._apply_encoding_operation(frame, operation_name, params, report)
+        if operation_name.startswith("scaling."):
+            return self._apply_scaling_operation(frame, operation_name, params, report)
         raise ValidationError(f"Unsupported cleaning operation '{operation_name}'.")
+
+    def _apply_schema_operation(
+        self,
+        frame: pd.DataFrame,
+        operation_name: str,
+        params: dict[str, Any],
+        report: dict[str, Any],
+    ) -> pd.DataFrame:
+        if operation_name != "schema.normalize_column_names":
+            raise ValidationError(f"Unsupported cleaning operation '{operation_name}'.")
+        style = self._one_of(
+            str(params.get("style") or "snake_case"),
+            {"snake_case"},
+            f"{operation_name}.params.style",
+        )
+        ascii_lower = self._bool_param(params, "ascii_lower", default=True, operation_name=operation_name)
+        original_columns = [str(column) for column in frame.columns]
+        bases: list[str] = []
+        generated_empty: list[dict[str, Any]] = []
+        for index, column in enumerate(original_columns):
+            base, was_empty = self._normalize_column_name_base(column, index, ascii_lower=ascii_lower)
+            bases.append(base)
+            if was_empty:
+                generated_empty.append({"column_index": index, "new": base})
+        new_columns, duplicate_collisions = self._dedupe_normalized_names(bases)
+        cleaned = frame.copy()
+        cleaned.columns = new_columns
+        mapping = [
+            {"old": old, "new": new}
+            for old, new in zip(original_columns, new_columns, strict=False)
+        ]
+        report["operations"].append(
+            {
+                "operation": operation_name,
+                "style": style,
+                "ascii_lower": ascii_lower,
+                "columns_changed": sum(1 for old, new in zip(original_columns, new_columns, strict=False) if old != new),
+                "mapping": mapping,
+                "generated_empty_names": generated_empty,
+                "duplicate_collisions": duplicate_collisions,
+            }
+        )
+        return cleaned
 
     def _apply_duplicate_exact_rows(
         self,
@@ -495,10 +672,14 @@ class DataCleaningService:
             "missing.fill_constant": "constant",
             "missing.forward_fill": "forward_fill",
             "missing.drop_rows": "drop_rows",
+            "missing.drop_high_missing_columns": "drop_high_missing_columns",
         }
         strategy = strategy_by_operation.get(operation_name)
         if strategy is None:
             raise ValidationError(f"Unsupported cleaning operation '{operation_name}'.")
+        if strategy == "drop_high_missing_columns":
+            return self._apply_drop_high_missing_columns(frame, operation_name, params, report)
+
         columns = self._params_columns(frame, params, operation_name)
         if strategy == "drop_rows":
             before = int(len(frame.index))
@@ -532,6 +713,30 @@ class DataCleaningService:
                 }
             )
         return frame
+
+    def _apply_drop_high_missing_columns(
+        self,
+        frame: pd.DataFrame,
+        operation_name: str,
+        params: dict[str, Any],
+        report: dict[str, Any],
+    ) -> pd.DataFrame:
+        threshold = self._ratio_param(params, "threshold", operation_name)
+        columns = self._params_optional_columns(frame, params, operation_name)
+        ratios = {column: float(frame[column].isna().mean()) for column in columns}
+        dropped_columns = [column for column, ratio in ratios.items() if ratio > threshold]
+        cleaned = frame.drop(columns=dropped_columns) if dropped_columns else frame
+        report["operations"].append(
+            {
+                "operation": operation_name,
+                "threshold": threshold,
+                "evaluated_columns": columns,
+                "missing_ratios": ratios,
+                "dropped_columns": dropped_columns,
+                "columns_removed": len(dropped_columns),
+            }
+        )
+        return cleaned
 
     def _resolve_fill_value(
         self,
@@ -687,6 +892,233 @@ class DataCleaningService:
             return ~series.astype("string").fillna("").str.match(pattern)
         raise ValidationError(f"Unsupported cleaning operation '{operation_name}'.")
 
+    def _apply_outlier_operation(
+        self,
+        frame: pd.DataFrame,
+        operation_name: str,
+        params: dict[str, Any],
+        report: dict[str, Any],
+    ) -> pd.DataFrame:
+        if operation_name != "outlier.clip_iqr":
+            raise ValidationError(f"Unsupported cleaning operation '{operation_name}'.")
+        columns = self._params_columns(frame, params, operation_name)
+        multiplier = self._positive_float_param(params, "multiplier", operation_name, default=1.5)
+        summaries: list[dict[str, Any]] = []
+        for column in columns:
+            self._require_numeric_column(frame, column, operation_name)
+            series = frame[column]
+            q1 = series.quantile(0.25)
+            q3 = series.quantile(0.75)
+            if pd.isna(q1) or pd.isna(q3):
+                report["warnings"].append(f"Column '{column}' has no numeric values for IQR clipping.")
+                summaries.append(
+                    {
+                        "column": column,
+                        "q1": None,
+                        "q3": None,
+                        "iqr": None,
+                        "lower_bound": None,
+                        "upper_bound": None,
+                        "cells_clipped": 0,
+                    }
+                )
+                continue
+            iqr = q3 - q1
+            lower_bound = q1 - multiplier * iqr
+            upper_bound = q3 + multiplier * iqr
+            clipped = series.clip(lower=lower_bound, upper=upper_bound)
+            cells_clipped = int((series.notna() & (series != clipped)).sum())
+            frame[column] = clipped
+            summaries.append(
+                {
+                    "column": column,
+                    "q1": float(q1),
+                    "q3": float(q3),
+                    "iqr": float(iqr),
+                    "lower_bound": float(lower_bound),
+                    "upper_bound": float(upper_bound),
+                    "cells_clipped": cells_clipped,
+                }
+            )
+        report["operations"].append(
+            {
+                "operation": operation_name,
+                "columns": columns,
+                "multiplier": multiplier,
+                "columns_summary": summaries,
+            }
+        )
+        return frame
+
+    def _apply_encoding_operation(
+        self,
+        frame: pd.DataFrame,
+        operation_name: str,
+        params: dict[str, Any],
+        report: dict[str, Any],
+    ) -> pd.DataFrame:
+        if operation_name != "encoding.one_hot":
+            raise ValidationError(f"Unsupported cleaning operation '{operation_name}'.")
+        columns = self._params_columns(frame, params, operation_name)
+        drop_first = self._bool_param(params, "drop_first", default=False, operation_name=operation_name)
+        max_categories = self._positive_int_param(params, "max_categories", operation_name, default=50)
+        used_columns = {str(column) for column in frame.columns if str(column) not in columns}
+        generated_frames: list[pd.DataFrame] = []
+        encoded_columns: list[str] = []
+        skipped_columns: list[dict[str, Any]] = []
+        summaries: list[dict[str, Any]] = []
+
+        for column in columns:
+            series = frame[column]
+            categories = sorted(series.dropna().unique().tolist(), key=lambda value: str(value))
+            if len(categories) > max_categories:
+                skipped_columns.append(
+                    {
+                        "column": column,
+                        "category_count": len(categories),
+                        "max_categories": max_categories,
+                        "reason": "too_many_categories",
+                    }
+                )
+                report["warnings"].append(
+                    f"Column '{column}' has {len(categories)} categories, above max_categories={max_categories}; it was not encoded."
+                )
+                continue
+            emitted_categories = categories[1:] if drop_first else categories
+            generated_data: dict[str, pd.Series] = {}
+            generated_names: list[str] = []
+            category_columns: list[dict[str, str]] = []
+            for category in emitted_categories:
+                raw_name = f"{column}_{category}"
+                generated_name = self._normalized_unique_column_name(raw_name, used_columns)
+                used_columns.add(generated_name)
+                generated_data[generated_name] = series.eq(category).fillna(False).astype(int)
+                generated_names.append(generated_name)
+                category_columns.append({"category": str(category), "column": generated_name})
+            if generated_data:
+                generated_frames.append(pd.DataFrame(generated_data, index=frame.index))
+            encoded_columns.append(column)
+            summaries.append(
+                {
+                    "column": column,
+                    "category_count": len(categories),
+                    "encoded_category_count": len(emitted_categories),
+                    "drop_first": drop_first,
+                    "generated_columns": generated_names,
+                    "category_columns": category_columns,
+                }
+            )
+
+        cleaned = frame.drop(columns=encoded_columns) if encoded_columns else frame
+        if generated_frames:
+            cleaned = pd.concat([cleaned, *generated_frames], axis=1)
+        report["operations"].append(
+            {
+                "operation": operation_name,
+                "columns": columns,
+                "drop_first": drop_first,
+                "max_categories": max_categories,
+                "encoded_columns": encoded_columns,
+                "skipped_columns": skipped_columns,
+                "columns_summary": summaries,
+            }
+        )
+        return cleaned
+
+    def _apply_scaling_operation(
+        self,
+        frame: pd.DataFrame,
+        operation_name: str,
+        params: dict[str, Any],
+        report: dict[str, Any],
+    ) -> pd.DataFrame:
+        columns = self._params_columns(frame, params, operation_name)
+        if operation_name == "scaling.minmax":
+            feature_min, feature_max = self._feature_range_param(params, operation_name)
+            summaries = []
+            for column in columns:
+                self._require_numeric_column(frame, column, operation_name)
+                series = frame[column]
+                original_min = series.min()
+                original_max = series.max()
+                if pd.isna(original_min) or pd.isna(original_max) or original_min == original_max:
+                    report["warnings"].append(
+                        f"Column '{column}' is empty or constant; minmax scaling left it unchanged."
+                    )
+                    summaries.append(
+                        {
+                            "column": column,
+                            "original_min": None if pd.isna(original_min) else float(original_min),
+                            "original_max": None if pd.isna(original_max) else float(original_max),
+                            "target_min": feature_min,
+                            "target_max": feature_max,
+                            "scaled": False,
+                        }
+                    )
+                    continue
+                frame[column] = ((series - original_min) / (original_max - original_min)) * (
+                    feature_max - feature_min
+                ) + feature_min
+                summaries.append(
+                    {
+                        "column": column,
+                        "original_min": float(original_min),
+                        "original_max": float(original_max),
+                        "target_min": feature_min,
+                        "target_max": feature_max,
+                        "scaled": True,
+                    }
+                )
+            report["operations"].append(
+                {
+                    "operation": operation_name,
+                    "columns": columns,
+                    "feature_range": [feature_min, feature_max],
+                    "columns_summary": summaries,
+                }
+            )
+            return frame
+
+        if operation_name == "scaling.standard":
+            summaries = []
+            for column in columns:
+                self._require_numeric_column(frame, column, operation_name)
+                series = frame[column]
+                mean = series.mean()
+                std = series.std(ddof=0)
+                if pd.isna(mean) or pd.isna(std) or std == 0:
+                    report["warnings"].append(
+                        f"Column '{column}' is empty or constant; standard scaling left it unchanged."
+                    )
+                    summaries.append(
+                        {
+                            "column": column,
+                            "mean": None if pd.isna(mean) else float(mean),
+                            "std": None if pd.isna(std) else float(std),
+                            "scaled": False,
+                        }
+                    )
+                    continue
+                frame[column] = (series - mean) / std
+                summaries.append(
+                    {
+                        "column": column,
+                        "mean": float(mean),
+                        "std": float(std),
+                        "scaled": True,
+                    }
+                )
+            report["operations"].append(
+                {
+                    "operation": operation_name,
+                    "columns": columns,
+                    "columns_summary": summaries,
+                }
+            )
+            return frame
+
+        raise ValidationError(f"Unsupported cleaning operation '{operation_name}'.")
+
     def _float_param(self, params: dict[str, Any], operation_name: str) -> float:
         if "value" not in params:
             raise ValidationError(f"{operation_name}.params.value is required.")
@@ -694,6 +1126,81 @@ class DataCleaningService:
             return float(params.get("value"))
         except (TypeError, ValueError) as exc:
             raise ValidationError(f"{operation_name}.params.value must be numeric.") from exc
+
+    def _ratio_param(self, params: dict[str, Any], key: str, operation_name: str) -> float:
+        if key not in params:
+            raise ValidationError(f"{operation_name}.params.{key} is required.")
+        try:
+            value = float(params.get(key))
+        except (TypeError, ValueError) as exc:
+            raise ValidationError(f"{operation_name}.params.{key} must be numeric.") from exc
+        if value < 0 or value > 1:
+            raise ValidationError(f"{operation_name}.params.{key} must be between 0 and 1.")
+        return value
+
+    def _positive_float_param(
+        self,
+        params: dict[str, Any],
+        key: str,
+        operation_name: str,
+        *,
+        default: float,
+    ) -> float:
+        raw_value = params.get(key, default)
+        try:
+            value = float(raw_value)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError(f"{operation_name}.params.{key} must be numeric.") from exc
+        if value <= 0:
+            raise ValidationError(f"{operation_name}.params.{key} must be greater than 0.")
+        return value
+
+    def _positive_int_param(
+        self,
+        params: dict[str, Any],
+        key: str,
+        operation_name: str,
+        *,
+        default: int,
+    ) -> int:
+        raw_value = params.get(key, default)
+        if isinstance(raw_value, bool):
+            raise ValidationError(f"{operation_name}.params.{key} must be an integer.")
+        try:
+            value = int(raw_value)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError(f"{operation_name}.params.{key} must be an integer.") from exc
+        if value < 1:
+            raise ValidationError(f"{operation_name}.params.{key} must be greater than 0.")
+        return value
+
+    def _bool_param(
+        self,
+        params: dict[str, Any],
+        key: str,
+        *,
+        default: bool,
+        operation_name: str,
+    ) -> bool:
+        if key not in params:
+            return default
+        value = params.get(key)
+        if not isinstance(value, bool):
+            raise ValidationError(f"{operation_name}.params.{key} must be a boolean.")
+        return value
+
+    def _feature_range_param(self, params: dict[str, Any], operation_name: str) -> tuple[float, float]:
+        raw_value = params.get("feature_range", [0, 1])
+        if not isinstance(raw_value, list) or len(raw_value) != 2:
+            raise ValidationError(f"{operation_name}.params.feature_range must be a two-number list.")
+        try:
+            feature_min = float(raw_value[0])
+            feature_max = float(raw_value[1])
+        except (TypeError, ValueError) as exc:
+            raise ValidationError(f"{operation_name}.params.feature_range values must be numeric.") from exc
+        if feature_min >= feature_max:
+            raise ValidationError(f"{operation_name}.params.feature_range first value must be less than second value.")
+        return feature_min, feature_max
 
     def _keep_value(self, params: dict[str, Any], operation_name: str) -> str | bool:
         keep = self._one_of(str(params.get("keep") or "first"), {"first", "last", "false"}, f"{operation_name}.params.keep")
@@ -705,8 +1212,75 @@ class DataCleaningService:
             raise ValidationError(f"{operation_name}.params.columns must be a list.")
         return self._require_columns(frame, columns, f"{operation_name}.params.columns")
 
+    def _params_optional_columns(self, frame: pd.DataFrame, params: dict[str, Any], operation_name: str) -> list[str]:
+        if "columns" not in params or params.get("columns") is None:
+            return [str(column) for column in frame.columns]
+        return self._params_columns(frame, params, operation_name)
+
     def _params_column(self, frame: pd.DataFrame, params: dict[str, Any], operation_name: str) -> str:
         return self._require_column(frame, str(params.get("column") or ""), f"{operation_name}.params.column")
+
+    def _require_numeric_column(self, frame: pd.DataFrame, column: str, operation_name: str) -> None:
+        if not is_numeric_dtype(frame[column]) or is_bool_dtype(frame[column]):
+            raise ValidationError(f"Column '{column}' must be numeric for {operation_name}.")
+
+    def _normalize_column_name_base(
+        self,
+        value: str,
+        index: int,
+        *,
+        ascii_lower: bool = True,
+    ) -> tuple[str, bool]:
+        normalized = unicodedata.normalize("NFKC", str(value or "").strip())
+        parts: list[str] = []
+        previous_was_separator = False
+        for char in normalized:
+            if char.isalnum():
+                if ascii_lower and "A" <= char <= "Z":
+                    char = char.lower()
+                parts.append(char)
+                previous_was_separator = False
+            elif not previous_was_separator:
+                parts.append("_")
+                previous_was_separator = True
+        candidate = "".join(parts).strip("_")
+        if not candidate:
+            return f"column_{index + 1}", True
+        return candidate, False
+
+    def _dedupe_normalized_names(self, bases: list[str]) -> tuple[list[str], list[dict[str, Any]]]:
+        used: set[str] = set()
+        seen_by_base: dict[str, int] = {}
+        names: list[str] = []
+        collisions: list[dict[str, Any]] = []
+        for index, base in enumerate(bases):
+            count = seen_by_base.get(base, 0) + 1
+            seen_by_base[base] = count
+            candidate = base if count == 1 else f"{base}_{count}"
+            while candidate in used:
+                count += 1
+                seen_by_base[base] = count
+                candidate = f"{base}_{count}"
+            if candidate != base:
+                collisions.append(
+                    {
+                        "column_index": index,
+                        "base_name": base,
+                        "resolved_name": candidate,
+                    }
+                )
+            names.append(candidate)
+            used.add(candidate)
+        return names, collisions
+
+    def _normalized_unique_column_name(self, value: str, used_names: set[str]) -> str:
+        base, _was_empty = self._normalize_column_name_base(value, len(used_names), ascii_lower=True)
+        candidate = base
+        suffix = 2
+        while candidate in used_names:
+            candidate = f"{base}_{suffix}"
+            suffix += 1
+        return candidate
 
     def _to_boolean(self, series: pd.Series) -> pd.Series:
         true_values = {"true", "t", "yes", "y", "1"}

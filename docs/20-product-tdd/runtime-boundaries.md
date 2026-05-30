@@ -63,6 +63,7 @@ Service APIs should be designed around explicit request/result objects or narrow
 
 `DataCleaningService` owns deterministic data-cleaning execution for `data.clean`.
 `data.clean` is an LLM-facing Agent tool that applies explicit atomic predefined cleaning operations to one registered dataset and creates a new derived dataset when operations are provided.
+Supported operation families include schema normalization, duplicate handling, missing-value and high-missing-column handling, type conversion, text standardization, validation, outlier clipping, categorical encoding, and numeric scaling.
 If no cleaning operations are provided, `data.clean` performs no cleaning, creates no derived dataset, and reports that nothing happened.
 `data.clean.metadata` is an LLM-facing Agent tool that returns cleaning operation groups, operation names, and operation parameter schemas without executing cleaning.
 The tool handler coordinates dataset lookup, service execution, dataset registration, and artifact registration; cleaning algorithms stay in the service layer.
