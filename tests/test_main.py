@@ -2,8 +2,8 @@ import json
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QMimeData, QPointF, Qt, QUrl
-from PySide6.QtGui import QPalette
+from PySide6.QtCore import QEvent, QMimeData, QPoint, QPointF, Qt, QUrl
+from PySide6.QtGui import QPalette, QTextDocument
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QFrame, QMessageBox, QTextBrowser, QWidget
 
@@ -387,6 +387,84 @@ def test_thread_detail_view_expands_tool_event_detail(monkeypatch, tmp_path: Pat
         assert item._chevron_button.icon().cacheKey() != collapsed_icon_key
         assert item._detail_browser.isVisible()
         assert "Source file is missing." in item._detail_browser.toPlainText()
+    finally:
+        window.close()
+
+
+def test_thread_detail_view_renders_tool_image_artifact_preview(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    artifact_path = tmp_path / "tool-chart.svg"
+    artifact_path.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="72">'
+        '<rect width="100" height="72" fill="#ffffff"/>'
+        '<circle cx="28" cy="42" r="18" fill="#2563eb"/>'
+        '<circle cx="68" cy="30" r="14" fill="#16a34a"/>'
+        "</svg>",
+        encoding="utf-8",
+    )
+    opened_urls = []
+
+    def fake_open_url(url):
+        opened_urls.append(url)
+        return True
+
+    monkeypatch.setattr("xenix.ui.main_window.QDesktopServices.openUrl", fake_open_url)
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=True)
+    try:
+        window._create_agent_thread()
+        app.processEvents()
+        thread_id = window._agent_thread_id
+        assert thread_id is not None
+        artifact = window._artifact_service.register_artifact(
+            RegisterArtifactInput(
+                thread_id=thread_id,
+                title="Tool chart",
+                absolute_path=str(artifact_path.resolve()),
+                kind=ArtifactKind.IMAGE,
+                mime_type="image/svg+xml",
+            )
+        )
+        uri = f"artifact://{artifact.id}?view=image"
+        rendered_uri = f"artifact://{artifact.id}"
+        view = window._thread_detail_view
+        view.clear_messages()
+        view.apply_chatbot_event(
+            ChatbotEvent(
+                id="tool-image-event",
+                kind=ChatbotEventKind.TOOL,
+                turn_id="turn",
+                sequence_index=0,
+                author=ChatbotEventAuthor.TOOL,
+                status=ChatbotEventStatus.COMPLETED,
+                tool_call_id="tool-call",
+                tool_name="analysis.graph",
+                icon_key="analysis",
+                summary="Drew graph",
+                detail_blocks=[{"type": "markdown", "text": f"![Tool chart]({uri})"}],
+            )
+        )
+        for _ in range(8):
+            app.processEvents()
+
+        item = view._event_widgets_by_id["tool-image-event"]
+        assert item._detail_browser.isHidden()
+        item._chevron_button.click()
+        app.processEvents()
+
+        assert item._detail_browser.isVisible()
+        assert item.findChild(QFrame, "artifactImagePreview") is None
+        detail_html = item._detail_browser.toHtml()
+        assert "<img" not in detail_html.lower()
+        assert uri not in detail_html
+        assert f'href="{rendered_uri}"' in detail_html
+
+        item._detail_browser.anchorClicked.emit(QUrl(rendered_uri))
+        app.processEvents()
+
+        assert [Path(url.toLocalFile()) for url in opened_urls] == [artifact_path.resolve()]
     finally:
         window.close()
 
@@ -1235,6 +1313,7 @@ def test_thread_detail_view_artifact_link_resolves_and_opens_file(monkeypatch, t
             )
         )
         uri = f"artifact://{artifact.id}?view=preview"
+        rendered_uri = f"artifact://{artifact.id}"
 
         window._thread_detail_view.add_message(
             "Xenix",
@@ -1244,8 +1323,76 @@ def test_thread_detail_view_artifact_link_resolves_and_opens_file(monkeypatch, t
 
         bubble = window._thread_detail_view._message_layout.itemAt(window._thread_detail_view._message_layout.count() - 2).widget()
         assert bubble._browser.openLinks() is False
+        html = bubble._browser.toHtml()
+        assert uri not in html
+        assert f'href="{rendered_uri}"' in html
 
-        bubble.link_activated.emit(uri)
+        bubble.link_activated.emit(rendered_uri)
+        app.processEvents()
+
+        assert [Path(url.toLocalFile()) for url in opened_urls] == [artifact_path.resolve()]
+    finally:
+        window.close()
+
+
+def test_thread_detail_view_renders_inline_image_artifact_preview(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    artifact_path = tmp_path / "amount.svg"
+    artifact_path.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80">'
+        '<rect width="120" height="80" fill="#ffffff"/>'
+        '<rect x="12" y="20" width="30" height="48" fill="#2563eb"/>'
+        '<rect x="54" y="12" width="30" height="56" fill="#16a34a"/>'
+        '<rect x="96" y="36" width="12" height="32" fill="#dc2626"/>'
+        "</svg>",
+        encoding="utf-8",
+    )
+    opened_urls = []
+
+    def fake_open_url(url):
+        opened_urls.append(url)
+        return True
+
+    monkeypatch.setattr("xenix.ui.main_window.QDesktopServices.openUrl", fake_open_url)
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=True)
+    try:
+        window._create_agent_thread()
+        app.processEvents()
+        thread_id = window._agent_thread_id
+        assert thread_id is not None
+        artifact = window._artifact_service.register_artifact(
+            RegisterArtifactInput(
+                thread_id=thread_id,
+                title="Amount distribution",
+                absolute_path=str(artifact_path.resolve()),
+                kind=ArtifactKind.IMAGE,
+                mime_type="image/svg+xml",
+            )
+        )
+        uri = f"artifact://{artifact.id}?view=image"
+        rendered_uri = f"artifact://{artifact.id}"
+
+        bubble = window._thread_detail_view.add_message(
+            "Xenix",
+            [{"type": "markdown", "text": f"![Amount distribution]({uri})"}],
+        )
+        for _ in range(8):
+            app.processEvents()
+
+        assert bubble.findChild(QFrame, "artifactImagePreview") is None
+        image = bubble._browser.document().resource(QTextDocument.ImageResource, QUrl(rendered_uri))
+        assert image is not None
+        assert hasattr(image, "isNull")
+        assert not image.isNull()
+        html = bubble._browser.toHtml()
+        assert uri not in html
+        assert f'href="{rendered_uri}"' in html
+        assert f'src="{rendered_uri}"' in html
+
+        QTest.mouseClick(bubble._browser.viewport(), Qt.LeftButton, Qt.NoModifier, QPoint(20, 20))
         app.processEvents()
 
         assert [Path(url.toLocalFile()) for url in opened_urls] == [artifact_path.resolve()]

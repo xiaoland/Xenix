@@ -76,24 +76,8 @@ def _create_message_rendering_fixture(store: ConversationStore) -> None:
                 "dataset_id": "mock_dataset_sales",
                 "row_count": 128,
                 "column_count": 5,
-                "artifact_link": "[sales-demand.csv](artifact://mock-sales-dataset?view=preview)",
+                "artifact_id": "mock-sales-dataset",
             },
-            content_blocks=[
-                {
-                    "type": "markdown",
-                    "text": (
-                        "数据预览已就绪：[sales-demand.csv](artifact://mock-sales-dataset?view=preview)\n\n"
-                        "Rows: 128; columns: `date`, `price`, `traffic`, `campaign`, `sales`"
-                    ),
-                },
-                {
-                    "type": "tool_result_payload",
-                    "payload": {
-                        "dataset_id": "mock_dataset_sales",
-                        "artifact_link": "[sales-demand.csv](artifact://mock-sales-dataset?view=preview)",
-                    },
-                },
-            ],
         )
     )
     store.end_turn(thread.id, first_turn.id)
@@ -224,15 +208,9 @@ def _create_message_rendering_fixture(store: ConversationStore) -> None:
             tool_call_id=apply_call.id,
             status=AgentToolCallStatus.SUCCEEDED,
             result_payload={
-                "artifact_link": "[apply-results.csv](artifact://mock-apply-results?view=preview)",
+                "artifact_id": "mock-apply-results",
                 "row_count": 12,
             },
-            content_blocks=[
-                {
-                    "type": "markdown",
-                    "text": "应用结果已生成：[apply-results.csv](artifact://mock-apply-results?view=preview)",
-                }
-            ],
         )
     )
     store.append_message(

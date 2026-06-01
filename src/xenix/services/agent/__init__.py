@@ -21,7 +21,6 @@ from .chatbot_events import (
     ChatbotEventKind,
     ChatbotEventStatus,
     build_thinking_chatbot_event,
-    build_tool_result_content_blocks,
     project_chatbot_events,
     thinking_chatbot_event_id,
 )
@@ -80,7 +79,6 @@ __all__ = [
     "UpdateAgentMessageInput",
     "UpdateAgentThreadModelInput",
     "build_thinking_chatbot_event",
-    "build_tool_result_content_blocks",
     "project_chatbot_events",
     "thinking_chatbot_event_id",
     "tool_presentation_for_name",

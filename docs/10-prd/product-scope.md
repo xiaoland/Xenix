@@ -16,6 +16,8 @@ Record which product concepts remain in the native edition and which are intenti
 - Basic data analysis from data intake through reusable model application
 - Basic data cleaning as an LLM-driven capability that produces derived datasets
 - Read-only dataset querying as an LLM-driven capability for inspection, validation, and analysis summaries
+- Common descriptive dataset profiling as an LLM-driven analysis capability that returns bounded Markdown evidence without creating an artifact by default
+- Dataset-scoped chart generation as an LLM-driven analysis capability that produces image artifacts
 - Dataset transformation as an LLM-driven capability that produces derived datasets from registered inputs
 - Models as reusable analyzers, not only supervised estimators
 - Model training, evaluation where applicable, and apply operations through service-backed tool calls
@@ -53,6 +55,8 @@ Record which product concepts remain in the native edition and which are intenti
 - First-slice working context is represented by Thread messages, tool-call records, tool-result records, and artifact metadata.
 - Data cleaning tools operate on registered datasets and create new derived datasets when cleaning operations are applied; source datasets remain intact.
 - Query tools read registered datasets and return bounded results without creating dataset artifacts by default.
+- Analysis profiling tools read registered datasets and return bounded descriptive statistics directly in the tool result without creating artifacts by default.
+- Analysis graph tools read registered datasets and produce service-managed image artifacts through explicit chart operations.
 - Transform tools operate on registered datasets and create new derived datasets; source datasets remain intact.
 - Project is retained only as a storage compatibility detail while the AI-first product model centers on Chatbot threads, datasets, artifacts, and dataset lineage.
 - Operations guidance focuses on local runtime recovery and packaging, not cloud deployment.

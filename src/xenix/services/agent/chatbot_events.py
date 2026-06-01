@@ -157,8 +157,8 @@ def project_tool_chatbot_event(
         status = AgentToolCallStatus.REQUESTED
     presentation = tool_presentation(tool_call.tool_name, tool_presentation_lookup=tool_presentation_lookup)
     detail_blocks = _tool_detail_blocks(result_message, error_summary=tool_call.error_summary)
-    summary = _tool_summary_from_blocks(result_message) or presentation.summary_for(status)
-    actions = _tool_actions(result_message, tool_name=tool_call.tool_name)
+    summary = _tool_summary_from_payload(tool_call, status) or presentation.summary_for(status)
+    actions = _tool_actions(tool_call)
     source_message_ids = [request_message.id]
     if result_message is not None:
         source_message_ids.append(result_message.id)
@@ -220,34 +220,6 @@ def project_turn_usage_event(
     )
 
 
-def build_tool_result_content_blocks(
-    *,
-    tool_name: str,
-    status: AgentToolCallStatus,
-    detail_blocks: list[dict[str, Any]],
-    error_summary: str | None = None,
-    tool_presentation_lookup: ToolPresentationLookup | None = None,
-) -> list[dict[str, Any]]:
-    custom_summary = _first_tool_summary_block(detail_blocks)
-    summary = (
-        str(custom_summary.get("text") or "").strip()
-        if custom_summary is not None
-        else tool_presentation(tool_name, tool_presentation_lookup=tool_presentation_lookup).summary_for(status)
-    )
-    blocks: list[dict[str, Any]] = [
-        {
-            "type": "tool_event_summary",
-            "tool_name": tool_name,
-            "status": status.value,
-            "text": summary,
-        }
-    ]
-    blocks.extend(block for block in detail_blocks if block.get("type") != "tool_event_summary")
-    if error_summary and not _has_human_detail(detail_blocks):
-        blocks.append({"type": "markdown", "text": error_summary})
-    return blocks
-
-
 def tool_presentation(
     tool_name: str,
     *,
@@ -297,28 +269,25 @@ def _usage_int(payload: dict[str, Any] | None, key: str) -> int:
     return 0
 
 
-def _tool_summary_from_blocks(message: AgentMessageRow | None) -> str | None:
-    if message is None:
+def _tool_summary_from_payload(tool_call: AgentToolCallRow, status: AgentToolCallStatus) -> str | None:
+    if status is not AgentToolCallStatus.SUCCEEDED:
         return None
-    for block in message.content_blocks:
-        if block.get("type") == "tool_event_summary":
-            text = str(block.get("text") or "").strip()
-            if text:
-                return text
-    return None
+    payload = tool_call.result_payload or {}
+    if payload.get("async_state") != "running_background":
+        return None
+    if tool_call.tool_name == "model.hyper_train":
+        return "Model tuning running in background"
+    if tool_call.tool_name == "model.train":
+        return "Model training running in background"
+    if tool_call.tool_name == "model.apply":
+        return "Model apply running in background"
+    return "ML task running in background"
 
 
-def _first_tool_summary_block(blocks: list[dict[str, Any]]) -> dict[str, Any] | None:
-    for block in blocks:
-        if block.get("type") == "tool_event_summary":
-            return block
-    return None
-
-
-def _tool_actions(message: AgentMessageRow | None, *, tool_name: str) -> list[dict[str, Any]]:
-    if tool_name == "model.task.query":
+def _tool_actions(tool_call: AgentToolCallRow) -> list[dict[str, Any]]:
+    if tool_call.tool_name == "model.task.query":
         return []
-    payload = _tool_result_payload(message)
+    payload = tool_call.result_payload
     if payload is None:
         return []
     raw_task_ids = payload.get("task_ids")
@@ -335,17 +304,6 @@ def _tool_actions(message: AgentMessageRow | None, *, tool_name: str) -> list[di
         }
     ]
     return actions
-
-
-def _tool_result_payload(message: AgentMessageRow | None) -> dict[str, Any] | None:
-    if message is None:
-        return None
-    for block in message.content_blocks:
-        if block.get("type") == "tool_result_payload":
-            payload = block.get("payload")
-            if isinstance(payload, dict):
-                return payload
-    return None
 
 
 def _tool_detail_blocks(
@@ -365,7 +323,3 @@ def _tool_detail_blocks(
     if error_summary:
         return [{"type": "markdown", "text": error_summary}]
     return []
-
-
-def _has_human_detail(blocks: list[dict[str, Any]]) -> bool:
-    return any(block.get("type") in {"text", "markdown", "tool_call_result"} for block in blocks)

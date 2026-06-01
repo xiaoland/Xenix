@@ -407,7 +407,7 @@ def test_data_clean_tool_registers_derived_dataset_and_artifact(monkeypatch, tmp
     assert result.payload["cleaning_report"]["operations"][0]["operation"] == "duplicate.key_columns"
     assert resolved_artifact.metadata_payload["dataset_id"] == derived_dataset.id
     assert resolved_artifact.metadata_payload["derived_from_dataset_id"] == source_dataset.id
-    assert "artifact://" in result.payload["artifact_link"]
+    assert "artifact_link" not in result.payload
 
 
 def test_data_clean_tool_no_ops_reports_nothing_happened(monkeypatch, tmp_path: Path) -> None:

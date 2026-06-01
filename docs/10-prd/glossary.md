@@ -16,7 +16,7 @@ This glossary defines product-facing terms used by Xenix Native.
 - Tool call: a persisted Agent Harness record for a single LLM-requested function call against a registered Xenix tool.
 - Tool result: a structured record produced after Agent Harness executes a service-backed tool call.
 - Artifact: a service-registered local output such as a dataset, model, metrics report, image, or model apply output, usually surfaced through an `artifact://...` link.
-- Artifact link: a markdown link whose target uses the `artifact://<artifact_id>?view=<view>` scheme so Chatbot can resolve and preview service-owned outputs.
+- Artifact link: a markdown link whose target uses the `artifact://<artifact_id>` scheme so Chatbot can resolve and preview service-owned outputs.
 - Dataset registration: a metadata pointer to a user-managed source dataset.
 - Model: a reusable analyzer, not only a supervised estimator. It is a service-owned artifact that can be trained from declared input roles and later applied to compatible input roles.
 - Trained model: a canonical reusable analyzer artifact tracked by metadata and stored on the filesystem.

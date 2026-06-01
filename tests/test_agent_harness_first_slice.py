@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import time
 from typing import Any
@@ -42,7 +43,7 @@ class FirstSliceProvider:
         dataset_id = self._find_payload_value(messages, "dataset_id")
         binding_id = self._find_payload_value(messages, "binding_id")
         trained_model_id = self._find_trained_model_id(messages)
-        artifact_link = self._find_payload_value(messages, "artifact_link")
+        apply_artifact_id = self._find_apply_artifact_id(messages)
         if dataset_id is None:
             return ProviderResponse(
                 assistant_content_blocks=[{"type": "markdown", "text": "I will inspect the uploaded dataset."}],
@@ -94,7 +95,7 @@ class FirstSliceProvider:
                     )
                 ],
             )
-        if artifact_link is None or "Apply results" not in self._rendered_text(messages):
+        if apply_artifact_id is None:
             apply_arguments = {"trained_model_id": trained_model_id}
             if self._apply_rows is not None:
                 apply_arguments["input_rows"] = self._apply_rows
@@ -113,30 +114,53 @@ class FirstSliceProvider:
                 ],
             )
         return ProviderResponse(
-            assistant_content_blocks=[{"type": "markdown", "text": f"Analysis complete. {artifact_link}"}],
+            assistant_content_blocks=[
+                {
+                    "type": "markdown",
+                    "text": f"Analysis complete. [Apply results](artifact://{apply_artifact_id})",
+                }
+            ],
             tool_calls=[],
         )
 
     def _find_payload_value(self, messages: list[Any], key: str) -> str | None:
-        for message in reversed(messages):
-            for block in reversed(message.content_blocks):
-                payload = block.get("payload")
-                if isinstance(payload, dict) and isinstance(payload.get(key), str):
-                    return payload[key]
+        for payload in self._tool_result_payloads(messages):
+            if isinstance(payload.get(key), str):
+                return payload[key]
         return None
 
     def _find_trained_model_id(self, messages: list[Any]) -> str | None:
-        for message in reversed(messages):
-            for block in reversed(message.content_blocks):
-                payload = block.get("payload")
-                if not isinstance(payload, dict):
-                    continue
-                trained_models = payload.get("trained_models")
-                if isinstance(trained_models, list) and trained_models:
-                    model = trained_models[0]
-                    if isinstance(model, dict) and isinstance(model.get("trained_model_id"), str):
-                        return model["trained_model_id"]
+        for payload in self._tool_result_payloads(messages):
+            trained_models = payload.get("trained_models")
+            if isinstance(trained_models, list) and trained_models:
+                model = trained_models[0]
+                if isinstance(model, dict) and isinstance(model.get("trained_model_id"), str):
+                    return model["trained_model_id"]
         return None
+
+    def _find_apply_artifact_id(self, messages: list[Any]) -> str | None:
+        for payload in self._tool_result_payloads(messages):
+            if payload.get("async_state") == "completed" and isinstance(payload.get("artifact_id"), str):
+                return payload["artifact_id"]
+        return None
+
+    def _tool_result_payloads(self, messages: list[Any]) -> list[dict[str, Any]]:
+        payloads: list[dict[str, Any]] = []
+        for message in reversed(messages):
+            raw_content = str(getattr(message, "content", "") or "")
+            if raw_content:
+                try:
+                    parsed = json.loads(raw_content)
+                except json.JSONDecodeError:
+                    parsed = None
+                if isinstance(parsed, dict) and isinstance(parsed.get("result"), dict):
+                    payloads.append(parsed["result"])
+                    continue
+            for block in reversed(getattr(message, "content_blocks", []) or []):
+                payload = block.get("payload") if isinstance(block, dict) else None
+                if isinstance(payload, dict):
+                    payloads.append(payload)
+        return payloads
 
     def _rendered_text(self, messages: list[Any]) -> str:
         return "\n".join(
@@ -230,12 +254,28 @@ class PeekFromThreadFilesProvider:
         )
 
     def _find_payload_value(self, messages: list[Any], key: str) -> str | None:
-        for message in reversed(messages):
-            for block in reversed(message.content_blocks):
-                payload = block.get("payload")
-                if isinstance(payload, dict) and isinstance(payload.get(key), str):
-                    return payload[key]
+        for payload in self._tool_result_payloads(messages):
+            if isinstance(payload.get(key), str):
+                return payload[key]
         return None
+
+    def _tool_result_payloads(self, messages: list[Any]) -> list[dict[str, Any]]:
+        payloads: list[dict[str, Any]] = []
+        for message in reversed(messages):
+            raw_content = str(getattr(message, "content", "") or "")
+            if raw_content:
+                try:
+                    parsed = json.loads(raw_content)
+                except json.JSONDecodeError:
+                    parsed = None
+                if isinstance(parsed, dict) and isinstance(parsed.get("result"), dict):
+                    payloads.append(parsed["result"])
+                    continue
+            for block in reversed(getattr(message, "content_blocks", []) or []):
+                payload = block.get("payload") if isinstance(block, dict) else None
+                if isinstance(payload, dict):
+                    payloads.append(payload)
+        return payloads
 
 
 def _tool_context() -> ToolExecutionContext:
@@ -293,7 +333,6 @@ def _seed_tool_payload(context, tool_name: str, payload: dict[str, Any]) -> str:
         CompleteToolCallInput(
             tool_call_id=tool_call.id,
             result_payload=payload,
-            content_blocks=[{"type": "tool_result_payload", "payload": payload}],
         )
     )
     conversations.end_turn(thread.id, turn.id)
@@ -314,6 +353,7 @@ def test_agent_harness_hides_data_and_training_tools_without_context(monkeypatch
 
     tool_names = provider.tools_by_call[0]
     assert not any(name.startswith("data.") for name in tool_names)
+    assert not any(name.startswith("analysis.") for name in tool_names)
     assert "model.train" not in tool_names
     assert "model.hyper_train" not in tool_names
     assert "model.apply" not in tool_names
@@ -342,11 +382,39 @@ def test_agent_harness_exposes_data_tools_when_file_is_attached(monkeypatch, tmp
 
     tool_names = provider.tools_by_call[0]
     assert "data.peek" in tool_names
-    assert "data.clean.metadata" in tool_names
-    assert "data.feature.select" in tool_names
+    assert "data.integrate" in tool_names
+    assert "analysis.profile" not in tool_names
+    assert "analysis.graph" not in tool_names
+    assert "data.clean.metadata" not in tool_names
+    assert "data.feature.select" not in tool_names
     assert "model.train" not in tool_names
     assert "model.hyper_train" not in tool_names
     assert "model.apply" not in tool_names
+
+
+def test_agent_harness_exposes_dataset_tools_after_dataset_payload(monkeypatch, tmp_path: Path) -> None:
+    context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
+    thread_id = _seed_tool_payload(context, "data.peek", {"dataset_id": "dataset-1"})
+    provider = ToolCaptureProvider()
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=provider,
+        tool_registry=registry,
+        conversation_store=ConversationStore(context.session_factory),
+    )
+
+    harness.submit_user_turn(SubmitUserTurnInput(thread_id=thread_id, text="analyze it"))
+
+    tool_names = provider.tools_by_call[0]
+    assert "data.peek" in tool_names
+    assert "data.integrate" not in tool_names
+    assert "data.clean" in tool_names
+    assert "data.clean.metadata" in tool_names
+    assert "data.query" in tool_names
+    assert "data.transform" in tool_names
+    assert "data.feature.select" in tool_names
+    assert "analysis.profile" in tool_names
+    assert "analysis.graph" in tool_names
 
 
 def test_agent_harness_exposes_and_uses_data_tools_after_prior_thread_file(
@@ -380,10 +448,13 @@ def test_agent_harness_exposes_and_uses_data_tools_after_prior_thread_file(
 
     first_tool_list = provider.tools_by_call[0]
     assert "data.peek" in first_tool_list
-    assert "data.clean" in first_tool_list
-    assert "data.clean.metadata" in first_tool_list
-    assert "data.transform" in first_tool_list
-    assert "data.feature.select" in first_tool_list
+    assert "data.integrate" in first_tool_list
+    assert "analysis.profile" not in first_tool_list
+    assert "analysis.graph" not in first_tool_list
+    assert "data.clean" not in first_tool_list
+    assert "data.clean.metadata" not in first_tool_list
+    assert "data.transform" not in first_tool_list
+    assert "data.feature.select" not in first_tool_list
     assert second_snapshot.tool_calls[-1].tool_name == "data.peek"
     assert second_snapshot.tool_calls[-1].status.value == "succeeded"
     assert second_snapshot.tool_calls[-1].result_payload["inspection"]["source_path"] == str(source_file.resolve())
@@ -404,6 +475,7 @@ def test_agent_harness_exposes_training_tools_after_selection_payload(monkeypatc
 
     tool_names = provider.tools_by_call[0]
     assert not any(name.startswith("data.") for name in tool_names)
+    assert not any(name.startswith("analysis.") for name in tool_names)
     assert "model.train" in tool_names
     assert "model.hyper_train" in tool_names
     assert "model.apply" not in tool_names
@@ -473,6 +545,8 @@ def test_agent_harness_model_metadata_exposes_catalog_without_train_enums(monkey
     )
 
     assert "model.metadata" in specs
+    assert "analysis.profile" in specs
+    assert "analysis.graph" in specs
     assert "data.peek" in specs
     assert "data.clean.metadata" in specs
     assert "data.feature.select" in specs

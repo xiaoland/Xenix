@@ -10,6 +10,7 @@ DEFAULT_CHEVRON_COLOR = "#374151"
 _TOOL_ICON_NAMES: dict[str, str] = {
     "table": "ph.table",
     "merge": "ph.git-merge",
+    "analysis": "ph.chart-bar",
     "sparkles": "ph.sparkle",
     "table-search": "ph.magnifying-glass",
     "table-transform": "ph.magic-wand",

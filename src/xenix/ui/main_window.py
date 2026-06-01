@@ -98,6 +98,7 @@ class MainWindow(QMainWindow):
         self._refreshing_history = False
 
         self._thread_detail_view = ThreadDetailView(parent=self)
+        self._thread_detail_view.set_artifact_resolver(self._artifact_service.resolve_uri)
         self._thread_detail_view.message_submitted.connect(self._submit_chat_message)
         self._thread_detail_view.model_selected.connect(self._update_thread_model)
         self._thread_detail_view.artifact_link_activated.connect(self._open_artifact_link)

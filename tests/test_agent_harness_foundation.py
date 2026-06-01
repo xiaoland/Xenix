@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -107,6 +108,7 @@ def test_conversation_store_persists_thread_turn_messages_and_tool_calls(monkeyp
     ]
     assert snapshot.messages[0].turn_id == turn.id
     assert snapshot.messages[0].content_blocks == [{"type": "text", "text": DEFAULT_AGENT_THREAD_SYSTEM_PROMPT}]
+    assert result_message.content_blocks == []
     assert snapshot.messages[2].id == assistant_message.id
     assert snapshot.messages[5].id == final_assistant_message.id
     assert snapshot.tool_calls[0].tool_name == "data.peek"
@@ -115,6 +117,12 @@ def test_conversation_store_persists_thread_turn_messages_and_tool_calls(monkeyp
     assert provider_messages[0].content == DEFAULT_AGENT_THREAD_SYSTEM_PROMPT
     assert provider_messages[0].source_message_id == snapshot.messages[0].id
     assert [message.role for message in provider_messages[1:]] == ["user", "assistant", "tool", "assistant"]
+    tool_result_content = json.loads(provider_messages[3].content)
+    assert tool_result_content == {
+        "tool_name": "data.peek",
+        "status": "succeeded",
+        "result": {"dataset_id": "dataset-1"},
+    }
 
 
 def test_chatbot_event_projection_pairs_tool_call_messages(monkeypatch, tmp_path: Path) -> None:
@@ -162,6 +170,9 @@ def test_chatbot_event_projection_pairs_tool_call_messages(monkeypatch, tmp_path
     assert len(final_tool_events) == 1
     assert final_tool_events[0].status is ChatbotEventStatus.FAILED
     assert final_tool_events[0].summary == "Failed to inspect dataset"
+    assert final_tool_events[0].detail_blocks == [
+        {"type": "markdown", "text": "Source file is missing."}
+    ]
     assert final_tool_events[0].source_message_ids == [request_message.id, result_message.id]
 
 
@@ -240,17 +251,6 @@ def test_chatbot_event_projection_exposes_tool_task_actions(monkeypatch, tmp_pat
                 "async_state": "running_background",
                 "task_ids": ["task-1"],
             },
-            content_blocks=[
-                {"type": "tool_event_summary", "text": "Model training running in background"},
-                {"type": "markdown", "text": "Task id: `task-1`"},
-                {
-                    "type": "tool_result_payload",
-                    "payload": {
-                        "async_state": "running_background",
-                        "task_ids": ["task-1"],
-                    },
-                },
-            ],
         )
     )
 
@@ -286,11 +286,6 @@ def test_chatbot_event_projection_omits_task_query_detail_action(monkeypatch, tm
             tool_call_id=tool_call.id,
             status=AgentToolCallStatus.SUCCEEDED,
             result_payload={"task_ids": ["task-1"]},
-            content_blocks=[
-                {"type": "tool_event_summary", "text": "Checked model task"},
-                {"type": "markdown", "text": "Task `task-1` succeeded."},
-                {"type": "tool_result_payload", "payload": {"task_ids": ["task-1"]}},
-            ],
         )
     )
 
@@ -382,7 +377,7 @@ def test_artifact_service_registers_and_resolves_artifact_links(monkeypatch, tmp
     listed = artifacts.list_thread_artifacts(thread.id)
 
     assert uri == f"artifact://{row.id}?view=preview"
-    assert markdown == f"[Cleaned dataset](artifact://{row.id}?view=preview)"
+    assert markdown == f"[Cleaned dataset](artifact://{row.id})"
     assert resolved.artifact_id == row.id
     assert resolved.exists is True
     assert resolved.preview_payload == {"columns": ["age", "label"], "rows": 1}

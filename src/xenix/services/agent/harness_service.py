@@ -49,7 +49,6 @@ from .chatbot_events import (
     ChatbotEvent,
     ChatbotEventStatus,
     build_thinking_chatbot_event,
-    build_tool_result_content_blocks,
     project_chatbot_events,
     project_text_message_event,
     project_tool_chatbot_event,
@@ -104,6 +103,7 @@ class AgentHarnessStreamEvent:
 @dataclass(frozen=True)
 class _ToolAvailabilityContext:
     attached_files: tuple[str, ...] = ()
+    has_dataset: bool = False
     has_selection: bool = False
     has_trained_model: bool = False
 
@@ -655,13 +655,6 @@ class AgentHarnessService:
                         status=status,
                         result_payload=result.payload,
                         error_summary=error_summary,
-                        content_blocks=self._tool_result_content_blocks(
-                            tool_name=tool_call.tool_name,
-                            status=status,
-                            result_blocks=result.content_blocks,
-                            result_payload=result.payload,
-                            error_summary=error_summary,
-                        ),
                         provider_payload={"tool_call_id": tool_call.provider_call_id},
                     )
                 )
@@ -940,13 +933,6 @@ class AgentHarnessService:
                         status=status,
                         result_payload=result.payload,
                         error_summary=error_summary,
-                        content_blocks=self._tool_result_content_blocks(
-                            tool_name=tool_call.tool_name,
-                            status=status,
-                            result_blocks=result.content_blocks,
-                            result_payload=result.payload,
-                            error_summary=error_summary,
-                        ),
                         provider_payload={"tool_call_id": tool_call.provider_call_id},
                     )
                 )
@@ -1300,29 +1286,10 @@ class AgentHarnessService:
         )
         return guard_action
 
-    def _tool_result_content_blocks(
-        self,
-        *,
-        tool_name: str,
-        status: AgentToolCallStatus,
-        result_blocks: list[dict[str, Any]],
-        result_payload: dict[str, Any],
-        error_summary: str | None,
-    ) -> list[dict[str, Any]]:
-        return [
-            *build_tool_result_content_blocks(
-                tool_name=tool_name,
-                status=status,
-                detail_blocks=list(result_blocks),
-                error_summary=error_summary,
-                tool_presentation_lookup=self._tool_presentation,
-            ),
-            {"type": "tool_result_payload", "payload": result_payload},
-        ]
-
     def _tool_specs_for_context(self, *, snapshot: ThreadSnapshot, attached_files: list[str]) -> list[AgentToolSpec]:
         context = _ToolAvailabilityContext(
             attached_files=tuple(attached_files),
+            has_dataset=self._snapshot_has_dataset(snapshot),
             has_selection=self._snapshot_has_payload_key(snapshot, "binding_id"),
             has_trained_model=self._snapshot_has_trained_model(snapshot),
         )
@@ -1333,13 +1300,29 @@ class AgentHarnessService:
         ]
 
     def _tool_available_for_context(self, tool_name: str, context: _ToolAvailabilityContext) -> bool:
-        if tool_name.startswith("data."):
+        if tool_name == "data.peek":
+            return bool(context.attached_files) or context.has_dataset
+        if tool_name == "data.integrate":
             return bool(context.attached_files)
+        if tool_name.startswith("data."):
+            return context.has_dataset
+        if tool_name.startswith("analysis."):
+            return context.has_dataset
         if tool_name in {"model.train", "model.hyper_train"}:
             return context.has_selection
         if tool_name == "model.apply":
             return context.has_trained_model
         return True
+
+    def _snapshot_has_dataset(self, snapshot: ThreadSnapshot) -> bool:
+        for payload in self._snapshot_tool_payloads(snapshot):
+            value = payload.get("dataset_id")
+            if isinstance(value, str) and value.strip():
+                return True
+            values = payload.get("input_dataset_ids")
+            if isinstance(values, list) and any(isinstance(item, str) and item.strip() for item in values):
+                return True
+        return False
 
     def _validate_provider_tool_calls(
         self,
@@ -1379,13 +1362,9 @@ class AgentHarnessService:
         return False
 
     def _snapshot_tool_payloads(self, snapshot: ThreadSnapshot) -> Iterator[dict[str, Any]]:
-        for message in snapshot.messages:
-            for block in message.content_blocks:
-                if block.get("type") != "tool_result_payload":
-                    continue
-                payload = block.get("payload")
-                if isinstance(payload, dict):
-                    yield payload
+        for tool_call in snapshot.tool_calls:
+            if isinstance(tool_call.result_payload, dict):
+                yield tool_call.result_payload
 
     def _attached_files_for_thread(self, snapshot: ThreadSnapshot) -> list[str]:
         paths: list[str] = []

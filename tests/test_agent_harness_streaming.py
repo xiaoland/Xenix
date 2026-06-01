@@ -197,6 +197,8 @@ class StaticSpecRegistry:
             for tool_name in [
                 "model.metadata",
                 "model.task.query",
+                "analysis.profile",
+                "analysis.graph",
                 "data.peek",
                 "data.integrate",
                 "data.clean",
@@ -643,6 +645,8 @@ def test_agent_harness_stream_filters_tools_by_thread_files(monkeypatch, tmp_pat
     tool_names = provider.tools_by_call[0]
     assert "model.metadata" in tool_names
     assert "model.task.query" in tool_names
+    assert "analysis.profile" not in tool_names
+    assert "analysis.graph" not in tool_names
     assert "data.peek" not in tool_names
     assert "model.train" not in tool_names
     assert "model.hyper_train" not in tool_names
@@ -672,9 +676,12 @@ def test_agent_harness_stream_filters_tools_by_thread_files(monkeypatch, tmp_pat
 
     tool_names = provider.tools_by_call[0]
     assert "data.peek" in tool_names
-    assert "data.clean" in tool_names
-    assert "data.clean.metadata" in tool_names
-    assert "data.transform" in tool_names
+    assert "data.integrate" in tool_names
+    assert "analysis.profile" not in tool_names
+    assert "analysis.graph" not in tool_names
+    assert "data.clean" not in tool_names
+    assert "data.clean.metadata" not in tool_names
+    assert "data.transform" not in tool_names
     assert "model.train" not in tool_names
     assert "model.hyper_train" not in tool_names
     assert "model.apply" not in tool_names
@@ -690,9 +697,12 @@ def test_agent_harness_stream_filters_tools_by_thread_files(monkeypatch, tmp_pat
 
     tool_names = provider.tools_by_call[1]
     assert "data.peek" in tool_names
-    assert "data.clean" in tool_names
-    assert "data.clean.metadata" in tool_names
-    assert "data.transform" in tool_names
+    assert "data.integrate" in tool_names
+    assert "analysis.profile" not in tool_names
+    assert "analysis.graph" not in tool_names
+    assert "data.clean" not in tool_names
+    assert "data.clean.metadata" not in tool_names
+    assert "data.transform" not in tool_names
     assert "model.train" not in tool_names
     assert "model.hyper_train" not in tool_names
     assert "model.apply" not in tool_names

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from PySide6.QtCore import QCoreApplication, QEvent, QPoint, QSize, QTimer, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QPalette, QTextOption
+from PySide6.QtGui import QColor, QFont, QPalette, QPixmap, QTextDocument, QTextOption
 from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
@@ -32,10 +32,12 @@ from ..services.agent import (
 )
 from ..services.storage.models import AgentMessageAuthor, AgentMessageKind
 from .icons import attach_file_icon, chevron_icon, tool_icon
+from .markdown_renderer import render_chat_markdown
 
 USER_MESSAGE_BACKGROUND = QColor("#000000")
 USER_MESSAGE_FOREGROUND = QColor("#ffffff")
 UNBOUNDED_WIDGET_WIDTH = 16777215
+ArtifactResolver = Callable[[str], Any]
 
 
 def _render_content_blocks(blocks: list[dict[str, Any]]) -> str:
@@ -124,6 +126,18 @@ def _translate_tool_summary(summary: str) -> str:
         return QCoreApplication.translate("ToolCallItem", "Integrated data")
     if summary == "Cancelled data integration":
         return QCoreApplication.translate("ToolCallItem", "Cancelled data integration")
+    if summary == "Profiling dataset...":
+        return QCoreApplication.translate("ToolCallItem", "Profiling dataset...")
+    if summary == "Profiled dataset":
+        return QCoreApplication.translate("ToolCallItem", "Profiled dataset")
+    if summary == "Cancelled dataset profile":
+        return QCoreApplication.translate("ToolCallItem", "Cancelled dataset profile")
+    if summary == "Drawing graph...":
+        return QCoreApplication.translate("ToolCallItem", "Drawing graph...")
+    if summary == "Drew graph":
+        return QCoreApplication.translate("ToolCallItem", "Drew graph")
+    if summary == "Cancelled graph drawing":
+        return QCoreApplication.translate("ToolCallItem", "Cancelled graph drawing")
     if summary == "Cleaning dataset...":
         return QCoreApplication.translate("ToolCallItem", "Cleaning dataset...")
     if summary == "Cleaned dataset":
@@ -225,8 +239,14 @@ def _payload_int(payload: dict[str, Any], key: str) -> int:
 
 
 class AutoHeightTextBrowser(QTextBrowser):
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        artifact_resolver: ArtifactResolver | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
+        self._artifact_resolver = artifact_resolver
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setAutoFillBackground(False)
         self.viewport().setAttribute(Qt.WA_TranslucentBackground, True)
@@ -248,6 +268,16 @@ class AutoHeightTextBrowser(QTextBrowser):
     def wheelEvent(self, event) -> None:  # type: ignore[override]
         event.ignore()
 
+    def set_artifact_resolver(self, resolver: ArtifactResolver | None) -> None:
+        self._artifact_resolver = resolver
+
+    def loadResource(self, resource_type: int, name):  # type: ignore[override]
+        if resource_type == QTextDocument.ImageResource and name.scheme() == "artifact":
+            pixmap = self._load_artifact_pixmap(name.toString())
+            if not pixmap.isNull():
+                return pixmap
+        return super().loadResource(resource_type, name)
+
     def _sync_height(self) -> None:
         self.document().setTextWidth(self.viewport().width())
         document_height = self.document().size().height()
@@ -258,6 +288,30 @@ class AutoHeightTextBrowser(QTextBrowser):
         self.horizontalScrollBar().setValue(0)
         _propagate_geometry_change(self)
 
+    def _load_artifact_pixmap(self, uri: str) -> QPixmap:
+        if self._artifact_resolver is None:
+            return QPixmap()
+        try:
+            artifact = self._artifact_resolver(uri)
+        except Exception:
+            return QPixmap()
+
+        mime_type = str(getattr(artifact, "mime_type", "") or "")
+        if mime_type and not mime_type.startswith("image/"):
+            return QPixmap()
+        if not bool(getattr(artifact, "ready_to_open", False)):
+            return QPixmap()
+        if not bool(getattr(artifact, "exists", False)):
+            return QPixmap()
+
+        pixmap = QPixmap(str(getattr(artifact, "absolute_path", "")))
+        if pixmap.isNull():
+            return pixmap
+        max_width = max(160, min(720, self.viewport().width() - 24))
+        max_height = 360
+        if pixmap.width() <= max_width and pixmap.height() <= max_height:
+            return pixmap
+        return pixmap.scaled(max_width, max_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
 
 class AutoGrowingTextEdit(QPlainTextEdit):
     multiline_changed = Signal(bool)
@@ -374,10 +428,18 @@ def _propagate_geometry_change(widget: QWidget) -> None:
 class ChatMessageBubble(QFrame):
     link_activated = Signal(str)
 
-    def __init__(self, *, author: str, blocks: list[dict[str, Any]], parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        author: str,
+        blocks: list[dict[str, Any]],
+        artifact_resolver: ArtifactResolver | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self._author = author
         self._author_label: QLabel | None = None
+        self._artifact_resolver = artifact_resolver
         self.setObjectName("chatMessageRow")
 
         card = QFrame(self)
@@ -399,7 +461,7 @@ class ChatMessageBubble(QFrame):
             author_label.setFont(author_font)
             card_layout.addWidget(author_label)
 
-        browser = AutoHeightTextBrowser()
+        browser = AutoHeightTextBrowser(artifact_resolver=artifact_resolver)
         self._browser = browser
         self._blocks = list(blocks)
         browser.setObjectName("chatMessageBody")
@@ -408,7 +470,7 @@ class ChatMessageBubble(QFrame):
         browser.setFrameShape(QFrame.NoFrame)
         browser.anchorClicked.connect(self._handle_link_activated)
         self._apply_message_palette(author, card, browser)
-        browser.setMarkdown(self._render_blocks(blocks))
+        browser.setHtml(self._render_blocks(blocks))
         card_layout.addWidget(browser)
 
         row_layout = QHBoxLayout(self)
@@ -466,7 +528,7 @@ class ChatMessageBubble(QFrame):
         browser.viewport().setPalette(text_palette)
 
     def _render_blocks(self, blocks: list[dict[str, Any]]) -> str:
-        return _render_content_blocks(blocks)
+        return render_chat_markdown(_render_content_blocks(blocks), inline_artifact_images=True)
 
     def set_available_width(self, width: int) -> None:
         if self._card.objectName() == "chatMessageUser":
@@ -476,12 +538,12 @@ class ChatMessageBubble(QFrame):
 
     def set_blocks(self, blocks: list[dict[str, Any]]) -> None:
         self._blocks = list(blocks)
-        self._browser.setMarkdown(self._render_blocks(self._blocks))
+        self._browser.setHtml(self._render_blocks(self._blocks))
 
     def retranslate_ui(self) -> None:
         if self._author_label is not None:
             self._author_label.setText(self._display_author())
-        self._browser.setMarkdown(self._render_blocks(self._blocks))
+        self._browser.setHtml(self._render_blocks(self._blocks))
 
     def _handle_link_activated(self, url) -> None:
         self.link_activated.emit(url.toString())
@@ -491,11 +553,18 @@ class ToolCallItem(QFrame):
     link_activated = Signal(str)
     action_requested = Signal(object)
 
-    def __init__(self, event: ChatbotEvent, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        event: ChatbotEvent,
+        *,
+        artifact_resolver: ArtifactResolver | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self.setObjectName("chatToolCallItem")
         self._card = self
         self._event = event
+        self._artifact_resolver = artifact_resolver
         self._expanded = False
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
@@ -538,7 +607,7 @@ class ToolCallItem(QFrame):
         header_layout.addWidget(self._chevron_button, 0, Qt.AlignVCenter)
         layout.addWidget(header)
 
-        self._detail_browser = AutoHeightTextBrowser()
+        self._detail_browser = AutoHeightTextBrowser(artifact_resolver=artifact_resolver)
         self._detail_browser.setObjectName("chatToolCallDetail")
         self._detail_browser.setOpenLinks(False)
         self._detail_browser.setOpenExternalLinks(False)
@@ -566,7 +635,9 @@ class ToolCallItem(QFrame):
         self._chevron_button.setToolTip(
             self.tr("Hide result") if self._expanded else self.tr("Show result")
         )
-        self._detail_browser.setMarkdown(_render_content_blocks(event.detail_blocks))
+        self._detail_browser.setHtml(
+            render_chat_markdown(_render_content_blocks(event.detail_blocks), inline_artifact_images=False)
+        )
         self._detail_browser.setVisible(has_detail and self._expanded)
         _propagate_geometry_change(self)
 
@@ -678,6 +749,7 @@ class ThreadDetailView(QWidget):
         self._event_widgets_by_id: dict[str, QWidget] = {}
         self._message_bubbles_by_id: dict[str, ChatMessageBubble] = {}
         self._model_options: list[tuple[str, str]] = []
+        self._artifact_resolver: ArtifactResolver | None = None
 
         self._message_container = QWidget()
         self._message_container.setObjectName("chatMessageContainer")
@@ -846,6 +918,9 @@ class ThreadDetailView(QWidget):
     def render_snapshot(self, snapshot: ThreadSnapshot) -> None:
         self.render_events(project_chatbot_events(snapshot))
 
+    def set_artifact_resolver(self, resolver: ArtifactResolver | None) -> None:
+        self._artifact_resolver = resolver
+
     def render_events(self, events: list[ChatbotEvent]) -> None:
         self.hide_thinking_indicator()
         self.clear_messages()
@@ -872,7 +947,12 @@ class ThreadDetailView(QWidget):
         event_id: str | None = None,
         auto_scroll: bool = True,
     ) -> ChatMessageBubble:
-        bubble = ChatMessageBubble(author=author, blocks=blocks, parent=self)
+        bubble = ChatMessageBubble(
+            author=author,
+            blocks=blocks,
+            artifact_resolver=self._artifact_resolver,
+            parent=self,
+        )
         bubble.link_activated.connect(self.artifact_link_activated.emit)
         bubble.set_available_width(self._message_column.width())
         self._message_layout.insertWidget(self._message_insert_index(), bubble)
@@ -904,7 +984,7 @@ class ThreadDetailView(QWidget):
         )
 
     def add_tool_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> ToolCallItem:
-        item = ToolCallItem(event, parent=self)
+        item = ToolCallItem(event, artifact_resolver=self._artifact_resolver, parent=self)
         item.link_activated.connect(self.artifact_link_activated.emit)
         item.action_requested.connect(self.tool_action_requested.emit)
         item.set_available_width(self._message_column.width())
@@ -927,6 +1007,7 @@ class ThreadDetailView(QWidget):
         bubble = ChatMessageBubble(
             author=self._event_author_label(event.author),
             blocks=event.content_blocks,
+            artifact_resolver=self._artifact_resolver,
             parent=self,
         )
         bubble.link_activated.connect(self.artifact_link_activated.emit)
@@ -999,6 +1080,7 @@ class ThreadDetailView(QWidget):
         self._thinking_bubble = ChatMessageBubble(
             author="Xenix",
             blocks=[{"type": "thinking", "text": "Thinking..."}],
+            artifact_resolver=self._artifact_resolver,
             parent=self,
         )
         self._thinking_bubble.link_activated.connect(self.artifact_link_activated.emit)

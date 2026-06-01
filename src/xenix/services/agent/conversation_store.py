@@ -140,14 +140,24 @@ class ThreadSnapshot(SQLModel):
 
     def provider_messages(self) -> list[ProviderMessage]:
         rows: list[ProviderMessage] = []
+        tool_calls_by_result_message_id = {
+            tool_call.result_message_id: tool_call
+            for tool_call in self.tool_calls
+            if tool_call.result_message_id is not None
+        }
         for message in self.messages:
             role = _provider_role_for_message(message)
             if role is None:
                 continue
+            content = _content_blocks_to_text(message.content_blocks)
+            if message.kind is AgentMessageKind.TOOL_CALL_RESULT:
+                tool_call = tool_calls_by_result_message_id.get(message.id)
+                if tool_call is not None:
+                    content = _tool_result_to_text(tool_call)
             rows.append(
                 ProviderMessage(
                     role=role,
-                    content=_content_blocks_to_text(message.content_blocks),
+                    content=content,
                     content_blocks=list(message.content_blocks),
                     provider_payload=dict(message.provider_payload),
                     source_message_id=message.id,
@@ -400,25 +410,13 @@ class ConversationStore:
                 raise NotFoundError(f"Tool call '{input_data.tool_call_id}' was not found.")
             self._require_open_turn(session, tool_call.thread_id, tool_call.turn_id)
 
-            content_blocks = input_data.content_blocks
-            if content_blocks is None:
-                content_blocks = [
-                    {
-                        "type": "tool_call_result",
-                        "tool_name": tool_call.tool_name,
-                        "status": input_data.status.value,
-                        "result": input_data.result_payload,
-                        "error_summary": input_data.error_summary,
-                    }
-                ]
-
             message = AgentMessageRow(
                 thread_id=tool_call.thread_id,
                 turn_id=tool_call.turn_id,
                 sequence_index=self._conversations.next_message_sequence(session, tool_call.thread_id),
                 kind=AgentMessageKind.TOOL_CALL_RESULT,
                 ui_author=AgentMessageAuthor.TOOL,
-                content_blocks=content_blocks,
+                content_blocks=[],
                 provider_payload=dict(input_data.provider_payload),
                 status=AgentMessageStatus.COMPLETED,
                 created_at=now,
@@ -656,6 +654,17 @@ def _content_blocks_to_text(blocks: list[dict[str, Any]]) -> str:
         else:
             lines.append(json.dumps(block, ensure_ascii=False))
     return "\n".join(line for line in lines if line)
+
+
+def _tool_result_to_text(tool_call: AgentToolCallRow) -> str:
+    payload = {
+        "tool_name": tool_call.tool_name,
+        "status": tool_call.status.value,
+        "result": dict(tool_call.result_payload or {}),
+    }
+    if tool_call.error_summary:
+        payload["error_summary"] = tool_call.error_summary
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def _finalized_at_for_status(status: AgentMessageStatus | None, now: datetime) -> datetime | None:

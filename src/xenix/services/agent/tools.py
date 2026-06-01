@@ -11,7 +11,13 @@ from pydantic import BaseModel, Field, ValidationError as PydanticValidationErro
 
 from ...config import AppPaths
 from ...exceptions import ValidationError
-from ..artifact_service import ArtifactService, RegisterArtifactInput, build_artifact_markdown_link
+from ..analysis_graph import AnalysisGraphService, GraphDatasetInput
+from ..analysis_profile import AnalysisProfileService, ProfileDatasetInput
+from ..artifact_service import (
+    ArtifactService,
+    RegisterArtifactInput,
+    build_artifact_markdown_link,
+)
 from ..data_cleaning import CleanDatasetInput, DataCleaningService, cleaning_operation_metadata
 from ..data_transform import (
     DataQueryInput,
@@ -119,6 +125,20 @@ TOOL_PRESENTATIONS: dict[str, ToolPresentation] = {
         failure_action="integrate data",
         cancellation_summary="Cancelled data integration",
     ),
+    "analysis.profile": ToolPresentation(
+        icon_key="analysis",
+        pending_summary="Profiling dataset...",
+        success_summary="Profiled dataset",
+        failure_action="profile dataset",
+        cancellation_summary="Cancelled dataset profile",
+    ),
+    "analysis.graph": ToolPresentation(
+        icon_key="analysis",
+        pending_summary="Drawing graph...",
+        success_summary="Drew graph",
+        failure_action="draw graph",
+        cancellation_summary="Cancelled graph drawing",
+    ),
     "data.clean": ToolPresentation(
         icon_key="sparkles",
         pending_summary="Cleaning dataset...",
@@ -216,11 +236,15 @@ class AgentToolRegistry:
         data_transform_service: DataQueryTransformService,
         ml_service: MLService,
         artifact_service: ArtifactService,
+        analysis_profile_service: AnalysisProfileService | None = None,
+        analysis_graph_service: AnalysisGraphService | None = None,
     ) -> None:
         self._paths = paths
         self._dataset_service = dataset_service
         self._data_cleaning_service = data_cleaning_service
         self._data_transform_service = data_transform_service
+        self._analysis_profile_service = analysis_profile_service or AnalysisProfileService()
+        self._analysis_graph_service = analysis_graph_service or AnalysisGraphService(paths)
         self._ml_service = ml_service
         self._artifact_service = artifact_service
         self._model_key_aliases = self._build_model_key_aliases()
@@ -229,6 +253,8 @@ class AgentToolRegistry:
             for tool in (
                 self._build_data_peek_tool(),
                 self._build_data_integrate_tool(),
+                self._build_analysis_profile_tool(),
+                self._build_analysis_graph_tool(),
                 self._build_data_clean_tool(),
                 self._build_data_clean_metadata_tool(),
                 self._build_data_query_tool(),
@@ -302,6 +328,55 @@ class AgentToolRegistry:
             ),
             handler=self._data_integrate,
             presentation=tool_presentation_for_name("data.integrate"),
+        )
+
+    def _build_analysis_profile_tool(self) -> AgentTool:
+        return AgentTool(
+            spec=AgentToolSpec(
+                name="analysis.profile",
+                provider_name="analysis_profile",
+                description=(
+                    "Run bounded common descriptive analysis for one registered dataset. "
+                    "Returns Markdown directly and does not create an artifact."
+                ),
+                parameters_schema={
+                    "type": "object",
+                    "properties": {
+                        "dataset_id": {"type": "string"},
+                        "target_columns": {"type": "array", "items": {"type": "string"}},
+                        "top_n": {"type": "integer", "minimum": 1, "maximum": 20},
+                        "correlation_column_limit": {"type": "integer", "minimum": 2, "maximum": 12},
+                    },
+                    "required": ["dataset_id"],
+                    "additionalProperties": False,
+                },
+            ),
+            handler=self._analysis_profile,
+            presentation=tool_presentation_for_name("analysis.profile"),
+        )
+
+    def _build_analysis_graph_tool(self) -> AgentTool:
+        return AgentTool(
+            spec=AgentToolSpec(
+                name="analysis.graph",
+                provider_name="analysis_graph",
+                description=(
+                    "Draw one bounded chart for a registered dataset and return an image artifact. "
+                    "Supported operations: bar_count, histogram, scatter, line, correlation_heatmap."
+                ),
+                parameters_schema={
+                    "type": "object",
+                    "properties": {
+                        "dataset_id": {"type": "string"},
+                        "operation": {"type": "string"},
+                        "params": {"type": "object"},
+                    },
+                    "required": ["dataset_id", "operation"],
+                    "additionalProperties": False,
+                },
+            ),
+            handler=self._analysis_graph,
+            presentation=tool_presentation_for_name("analysis.graph"),
         )
 
     def _build_data_clean_tool(self) -> AgentTool:
@@ -649,7 +724,6 @@ class AgentToolRegistry:
             payload={
                 "dataset_id": dataset.id,
                 "artifact_id": artifact.id,
-                "artifact_link": link,
                 "inspection": inspection.model_dump(mode="json"),
             },
             content_blocks=[
@@ -680,6 +754,79 @@ class AgentToolRegistry:
             name=name,
             summary="Integrated dataset created.",
         )
+
+    def _analysis_profile(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+        self._raise_if_cancelled(context)
+        unsupported_keys = sorted(set(arguments) - {"dataset_id", "target_columns", "top_n", "correlation_column_limit"})
+        if unsupported_keys:
+            raise ValidationError("analysis.profile does not accept: " + ", ".join(unsupported_keys))
+        dataset_id = self._require_string(arguments, "dataset_id")
+        dataset = self._dataset_service.get_dataset(dataset_id)
+        result = self._analysis_profile_service.profile_dataset(
+            ProfileDatasetInput(
+                source_path=dataset.source_path,
+                dataset_name=dataset.name,
+                target_columns=self._optional_string_list(arguments, "target_columns"),
+                top_n=self._optional_integer(arguments, "top_n", default=10),
+                correlation_column_limit=self._optional_integer(
+                    arguments,
+                    "correlation_column_limit",
+                    default=8,
+                ),
+            )
+        )
+        payload = dict(result.profile)
+        payload["dataset_id"] = dataset.id
+        payload["markdown"] = result.markdown
+        return ToolExecutionResult(
+            payload=payload,
+            content_blocks=[{"type": "markdown", "text": result.markdown}],
+        )
+
+    def _analysis_graph(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+        self._raise_if_cancelled(context)
+        unsupported_keys = sorted(set(arguments) - {"dataset_id", "operation", "params"})
+        if unsupported_keys:
+            raise ValidationError("analysis.graph does not accept: " + ", ".join(unsupported_keys))
+        dataset_id = self._require_string(arguments, "dataset_id")
+        dataset = self._dataset_service.get_dataset(dataset_id)
+        raw_params = arguments.get("params") or {}
+        if not isinstance(raw_params, dict):
+            raise ValidationError("analysis.graph params must be an object.")
+        graph_result = self._analysis_graph_service.graph_dataset(
+            GraphDatasetInput(
+                source_path=dataset.source_path,
+                dataset_name=dataset.name,
+                operation=self._require_string(arguments, "operation"),
+                params=raw_params,
+            )
+        )
+        graph_metadata = graph_result.graph_metadata
+        default_title = f"{dataset.name} {graph_metadata['operation']}"
+        title = str(raw_params.get("title") or default_title).strip() or default_title
+        artifact = self._artifact_service.register_artifact(
+            RegisterArtifactInput(
+                thread_id=context.thread_id,
+                turn_id=context.turn_id,
+                tool_call_id=context.tool_call_id,
+                kind=ArtifactKind.IMAGE,
+                title=title,
+                absolute_path=graph_result.output_path,
+                mime_type="image/svg+xml",
+                summary=f"Graph generated by analysis.graph using {graph_metadata['operation']}.",
+                preview_payload=graph_metadata,
+                metadata_payload={
+                    "dataset_id": dataset.id,
+                    "analysis_graph": graph_metadata,
+                },
+            )
+        )
+        payload = {
+            "dataset_id": dataset.id,
+            "artifact_id": artifact.id,
+            "graph": graph_metadata,
+        }
+        return ToolExecutionResult(payload=payload)
 
     def _data_clean(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
@@ -1094,7 +1241,6 @@ class AgentToolRegistry:
                 "dataset_id": task.dataset_id,
                 "result_dataset_id": details.task.result_payload.get("result_dataset_id") if details.task.result_payload else None,
                 "artifact_id": generic_artifact.id,
-                "artifact_link": link,
                 "row_count": details.task.result_payload.get("row_count") if details.task.result_payload else None,
             },
             content_blocks=[{"type": "markdown", "text": f"Apply results are ready: {link}"}],
@@ -1237,7 +1383,6 @@ class AgentToolRegistry:
             payload={
                 "dataset_id": dataset.id,
                 "artifact_id": artifact.id,
-                "artifact_link": link,
                 "inspection": inspection.model_dump(mode="json"),
             },
             content_blocks=[{"type": "markdown", "text": f"{summary} {link}"}],

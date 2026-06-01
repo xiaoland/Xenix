@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:37adc67ae19b4f0a6668f7058dae26d6f0dfee506192c12f7e261da730d3d9d8"
+content_hash = "sha256:7f28826b88780c813df444eb39629e67b1391d8af61f0137f7f0a7570ad6a2cc"
 
 [[metadata.targets]]
 requires_python = ">=3.12,<3.15"
@@ -402,6 +402,17 @@ dependencies = [
 files = [
     {file = "macholib-1.16.4-py2.py3-none-any.whl", hash = "sha256:da1a3fa8266e30f0ce7e97c6a54eefaae8edd1e5f86f3eb8b95457cae90265ea"},
     {file = "macholib-1.16.4.tar.gz", hash = "sha256:f408c93ab2e995cd2c46e34fe328b130404be143469e41bc366c807448979362"},
+]
+
+[[package]]
+name = "marko"
+version = "2.2.3"
+requires_python = ">=3.9"
+summary = "A markdown parser with high extensibility."
+groups = ["default"]
+files = [
+    {file = "marko-2.2.3-py3-none-any.whl", hash = "sha256:8e1d7a0387281e59dfbc52a381b58c570156970e36b2bbe047f8a3a2f368cacc"},
+    {file = "marko-2.2.3.tar.gz", hash = "sha256:e31ec2875383bc62f9093d16babed5a2c2cde601c00d834ea935a2222120ec19"},
 ]
 
 [[package]]
