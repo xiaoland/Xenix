@@ -3,11 +3,14 @@ from __future__ import annotations
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from marko import HTMLRenderer, Markdown
+from marko.ext.gfm import GFM
+from marko.ext.gfm.renderer import GFMRendererMixin
+from marko.helpers import MarkoExtension
 
 
 def render_chat_markdown(markdown: str, *, inline_artifact_images: bool) -> str:
     renderer = _InlineArtifactRenderer if inline_artifact_images else _LinkOnlyArtifactRenderer
-    return Markdown(renderer=renderer).convert(markdown).rstrip()
+    return Markdown(renderer=renderer, extensions=[_SAFE_GFM_EXTENSION]).convert(markdown).rstrip()
 
 
 def normalize_artifact_uri(uri: str) -> str:
@@ -72,3 +75,46 @@ class _InlineArtifactRenderer(_BaseChatRenderer):
 
 class _LinkOnlyArtifactRenderer(_BaseChatRenderer):
     inline_artifact_images = False
+
+
+class _SafeGFMRendererMixin(GFMRendererMixin):
+    def render_html_block(self, element) -> str:  # type: ignore[override]
+        return self.escape_html(element.body)
+
+    def render_inline_html(self, element) -> str:  # type: ignore[override]
+        return self.escape_html(str(element.children))
+
+    def render_table(self, element) -> str:  # type: ignore[override]
+        head, *body = element.children
+        theader = f"<thead>\n{self.render(head)}</thead>"
+        tbody = ""
+        if body:
+            tbody = "\n<tbody>\n{}</tbody>".format(
+                "".join(self.render(row) for row in body)
+            )
+        return (
+            '<table border="1" cellspacing="0" cellpadding="4" '
+            'style="border-collapse: collapse; border: 1px solid #c7cdd4;">\n'
+            f"{theader}{tbody}</table>"
+        )
+
+    def render_table_cell(self, element) -> str:  # type: ignore[override]
+        tag = "th" if element.header else "td"
+        declarations = ["border: 1px solid #c7cdd4", "padding: 4px 6px"]
+        if element.header:
+            declarations.append("font-weight: bold")
+        if element.align:
+            declarations.append(f"text-align: {self.escape_html(element.align)}")
+        style = "; ".join(declarations)
+        return '<{tag} style="{style}">{children}</{tag}>\n'.format(
+            tag=tag,
+            style=style,
+            children=self.render_children(element),
+        )
+
+
+_SAFE_GFM_EXTENSION = MarkoExtension(
+    parser_mixins=list(GFM.parser_mixins),
+    renderer_mixins=[_SafeGFMRendererMixin],
+    elements=list(GFM.elements),
+)

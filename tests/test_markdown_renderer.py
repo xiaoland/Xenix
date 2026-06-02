@@ -30,3 +30,18 @@ def test_markdown_renderer_escapes_raw_html() -> None:
 
     assert "<script>" not in html
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+
+
+def test_markdown_renderer_supports_gfm_tables() -> None:
+    html = render_chat_markdown(
+        "| A | B |\n|---|:---:|\n| 1 | 2 |",
+        inline_artifact_images=True,
+    )
+
+    assert '<table border="1" cellspacing="0" cellpadding="4"' in html
+    assert "<thead>" in html
+    assert "<tbody>" in html
+    assert 'style="border-collapse: collapse; border: 1px solid #c7cdd4;"' in html
+    assert '<th style="border: 1px solid #c7cdd4; padding: 4px 6px; font-weight: bold">A</th>' in html
+    assert '<th style="border: 1px solid #c7cdd4; padding: 4px 6px; font-weight: bold; text-align: center">B</th>' in html
+    assert '<td style="border: 1px solid #c7cdd4; padding: 4px 6px">1</td>' in html
