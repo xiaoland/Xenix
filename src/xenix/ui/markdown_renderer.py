@@ -10,7 +10,8 @@ from marko.helpers import MarkoExtension
 
 def render_chat_markdown(markdown: str, *, inline_artifact_images: bool) -> str:
     renderer = _InlineArtifactRenderer if inline_artifact_images else _LinkOnlyArtifactRenderer
-    return Markdown(renderer=renderer, extensions=[_SAFE_GFM_EXTENSION]).convert(markdown).rstrip()
+    html = Markdown(renderer=renderer, extensions=[_SAFE_GFM_EXTENSION]).convert(markdown).rstrip()
+    return _wrap_code_blocks(html)
 
 
 def normalize_artifact_uri(uri: str) -> str:
@@ -26,6 +27,12 @@ def normalize_artifact_uri(uri: str) -> str:
         ]
     )
     return urlunsplit((parts.scheme, parts.netloc, parts.path, query, parts.fragment))
+
+
+def _wrap_code_blocks(html: str) -> str:
+    pre_style = ' style="white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere;"'
+    code_style = ' style="white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere;"'
+    return html.replace("<pre><code", f"<pre{pre_style}><code{code_style}")
 
 
 class _BaseChatRenderer(HTMLRenderer):

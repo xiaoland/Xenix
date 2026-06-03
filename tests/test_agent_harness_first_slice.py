@@ -385,6 +385,7 @@ def test_agent_harness_exposes_data_tools_when_file_is_attached(monkeypatch, tmp
     assert "data.integrate" in tool_names
     assert "analysis.profile" not in tool_names
     assert "analysis.graph" not in tool_names
+    assert "analysis.lambda" not in tool_names
     assert "data.clean.metadata" not in tool_names
     assert "data.feature.select" not in tool_names
     assert "model.train" not in tool_names
@@ -415,6 +416,7 @@ def test_agent_harness_exposes_dataset_tools_after_dataset_payload(monkeypatch, 
     assert "data.feature.select" in tool_names
     assert "analysis.profile" in tool_names
     assert "analysis.graph" in tool_names
+    assert "analysis.lambda" in tool_names
 
 
 def test_agent_harness_exposes_and_uses_data_tools_after_prior_thread_file(
@@ -451,6 +453,7 @@ def test_agent_harness_exposes_and_uses_data_tools_after_prior_thread_file(
     assert "data.integrate" in first_tool_list
     assert "analysis.profile" not in first_tool_list
     assert "analysis.graph" not in first_tool_list
+    assert "analysis.lambda" not in first_tool_list
     assert "data.clean" not in first_tool_list
     assert "data.clean.metadata" not in first_tool_list
     assert "data.transform" not in first_tool_list
@@ -547,6 +550,7 @@ def test_agent_harness_model_metadata_exposes_catalog_without_train_enums(monkey
     assert "model.metadata" in specs
     assert "analysis.profile" in specs
     assert "analysis.graph" in specs
+    assert "analysis.lambda" in specs
     assert "data.peek" in specs
     assert "data.clean.metadata" in specs
     assert "data.feature.select" in specs

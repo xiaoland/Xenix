@@ -199,6 +199,7 @@ class StaticSpecRegistry:
                 "model.task.query",
                 "analysis.profile",
                 "analysis.graph",
+                "analysis.lambda",
                 "data.peek",
                 "data.integrate",
                 "data.clean",
@@ -647,6 +648,7 @@ def test_agent_harness_stream_filters_tools_by_thread_files(monkeypatch, tmp_pat
     assert "model.task.query" in tool_names
     assert "analysis.profile" not in tool_names
     assert "analysis.graph" not in tool_names
+    assert "analysis.lambda" not in tool_names
     assert "data.peek" not in tool_names
     assert "model.train" not in tool_names
     assert "model.hyper_train" not in tool_names
@@ -679,6 +681,7 @@ def test_agent_harness_stream_filters_tools_by_thread_files(monkeypatch, tmp_pat
     assert "data.integrate" in tool_names
     assert "analysis.profile" not in tool_names
     assert "analysis.graph" not in tool_names
+    assert "analysis.lambda" not in tool_names
     assert "data.clean" not in tool_names
     assert "data.clean.metadata" not in tool_names
     assert "data.transform" not in tool_names
@@ -700,6 +703,7 @@ def test_agent_harness_stream_filters_tools_by_thread_files(monkeypatch, tmp_pat
     assert "data.integrate" in tool_names
     assert "analysis.profile" not in tool_names
     assert "analysis.graph" not in tool_names
+    assert "analysis.lambda" not in tool_names
     assert "data.clean" not in tool_names
     assert "data.clean.metadata" not in tool_names
     assert "data.transform" not in tool_names

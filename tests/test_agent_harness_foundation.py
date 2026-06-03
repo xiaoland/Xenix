@@ -170,9 +170,12 @@ def test_chatbot_event_projection_pairs_tool_call_messages(monkeypatch, tmp_path
     assert len(final_tool_events) == 1
     assert final_tool_events[0].status is ChatbotEventStatus.FAILED
     assert final_tool_events[0].summary == "Failed to inspect dataset"
-    assert final_tool_events[0].detail_blocks == [
-        {"type": "markdown", "text": "Source file is missing."}
-    ]
+    assert final_tool_events[0].detail_blocks
+    detail_text = final_tool_events[0].detail_blocks[0]["text"]
+    assert "Status: `failed`" in detail_text
+    assert "Source file is missing." in detail_text
+    assert '"source_path": "sample.csv"' in detail_text
+    assert '"error": "Source file is missing."' in detail_text
     assert final_tool_events[0].source_message_ids == [request_message.id, result_message.id]
 
 
@@ -261,6 +264,56 @@ def test_chatbot_event_projection_exposes_tool_task_actions(monkeypatch, tmp_pat
     assert tool_event.actions == [
         {"type": "open_tool_call_detail", "task_ids": ["task-1"]},
     ]
+
+
+def test_chatbot_event_projection_builds_analysis_lambda_detail_from_payload(monkeypatch, tmp_path: Path) -> None:
+    conversations, _artifacts = _build_services(monkeypatch, tmp_path)
+
+    thread = conversations.create_thread(CreateAgentThreadInput(title="Lambda detail"))
+    turn, _user_message = conversations.start_turn(
+        StartTurnInput(
+            thread_id=thread.id,
+            user_content_blocks=[{"type": "text", "text": "Run custom analysis"}],
+        )
+    )
+    _request_message, tool_call = conversations.create_tool_call(
+        CreateToolCallInput(
+            thread_id=thread.id,
+            turn_id=turn.id,
+            tool_name="analysis.lambda",
+            arguments_payload={"code": "def analyze(ctx, inputs, params): return {}", "datasets": {"data": "dataset-1"}},
+        )
+    )
+    conversations.complete_tool_call(
+        CompleteToolCallInput(
+            tool_call_id=tool_call.id,
+            status=AgentToolCallStatus.SUCCEEDED,
+            result_payload={
+                "result": {
+                    "output": {
+                        "report": "Custom analysis finished.",
+                        "metric": 42,
+                    }
+                },
+                "artifacts": [
+                    {
+                        "title": "Predictions",
+                        "uri": "artifact://artifact-1",
+                        "kind": "file",
+                    }
+                ],
+            },
+        )
+    )
+
+    events = project_chatbot_events(conversations.get_thread_snapshot(thread.id))
+    tool_event = next(event for event in events if event.kind is ChatbotEventKind.TOOL)
+
+    assert tool_event.detail_blocks
+    detail_text = tool_event.detail_blocks[0]["text"]
+    assert "Custom analysis finished." in detail_text
+    assert '"metric": 42' in detail_text
+    assert "[Predictions](artifact://artifact-1)" in detail_text
 
 
 def test_chatbot_event_projection_omits_task_query_detail_action(monkeypatch, tmp_path: Path) -> None:

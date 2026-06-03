@@ -12,10 +12,12 @@ from pydantic import BaseModel, Field, ValidationError as PydanticValidationErro
 from ...config import AppPaths
 from ...exceptions import ValidationError
 from ..analysis_graph import AnalysisGraphService, GraphDatasetInput
+from ..analysis_lambda import AnalysisLambdaDataset, AnalysisLambdaInput, AnalysisLambdaService
 from ..analysis_profile import AnalysisProfileService, ProfileDatasetInput
 from ..artifact_service import (
     ArtifactService,
     RegisterArtifactInput,
+    build_artifact_uri,
     build_artifact_markdown_link,
 )
 from ..data_cleaning import CleanDatasetInput, DataCleaningService, cleaning_operation_metadata
@@ -139,6 +141,13 @@ TOOL_PRESENTATIONS: dict[str, ToolPresentation] = {
         failure_action="draw graph",
         cancellation_summary="Cancelled graph drawing",
     ),
+    "analysis.lambda": ToolPresentation(
+        icon_key="analysis",
+        pending_summary="Running analysis function...",
+        success_summary="Ran analysis function",
+        failure_action="run analysis function",
+        cancellation_summary="Cancelled analysis function",
+    ),
     "data.clean": ToolPresentation(
         icon_key="sparkles",
         pending_summary="Cleaning dataset...",
@@ -238,6 +247,7 @@ class AgentToolRegistry:
         artifact_service: ArtifactService,
         analysis_profile_service: AnalysisProfileService | None = None,
         analysis_graph_service: AnalysisGraphService | None = None,
+        analysis_lambda_service: AnalysisLambdaService | None = None,
     ) -> None:
         self._paths = paths
         self._dataset_service = dataset_service
@@ -245,6 +255,7 @@ class AgentToolRegistry:
         self._data_transform_service = data_transform_service
         self._analysis_profile_service = analysis_profile_service or AnalysisProfileService()
         self._analysis_graph_service = analysis_graph_service or AnalysisGraphService(paths)
+        self._analysis_lambda_service = analysis_lambda_service or AnalysisLambdaService(paths)
         self._ml_service = ml_service
         self._artifact_service = artifact_service
         self._model_key_aliases = self._build_model_key_aliases()
@@ -255,6 +266,7 @@ class AgentToolRegistry:
                 self._build_data_integrate_tool(),
                 self._build_analysis_profile_tool(),
                 self._build_analysis_graph_tool(),
+                self._build_analysis_lambda_tool(),
                 self._build_data_clean_tool(),
                 self._build_data_clean_metadata_tool(),
                 self._build_data_query_tool(),
@@ -377,6 +389,42 @@ class AgentToolRegistry:
             ),
             handler=self._analysis_graph,
             presentation=tool_presentation_for_name("analysis.graph"),
+        )
+
+    def _build_analysis_lambda_tool(self) -> AgentTool:
+        return AgentTool(
+            spec=AgentToolSpec(
+                name="analysis.lambda",
+                provider_name="analysis_lambda",
+                description=(
+                    "Run a one-off Python analysis function over registered datasets. "
+                    "The code must define analyze(ctx, inputs, params) and return any JSON-serializable dict. "
+                    "inputs is a mapping from dataset alias to pandas DataFrame; inputs[alias].read() also returns "
+                    "that DataFrame. Supported imports: pandas/pd, numpy/np, matplotlib/plt, scipy, statsmodels, "
+                    "sklearn, xgboost, lightgbm, math, statistics, datetime, json, io, collections, itertools, "
+                    "functools, and typing. Do not import seaborn or arbitrary packages. Use ctx.artifact.create(...) "
+                    "for generated artifacts: ctx.artifact.create(name, content), ctx.artifact.create(content, name=...), "
+                    "or ctx.artifact.create(name=..., content=...); content may be a pandas DataFrame, SVG/text string, "
+                    "bytes/io.BytesIO, or matplotlib Figure. value=... is accepted as an alias for content=...."
+                ),
+                parameters_schema={
+                    "type": "object",
+                    "properties": {
+                        "code": {"type": "string"},
+                        "datasets": {
+                            "type": "object",
+                            "additionalProperties": {"type": "string"},
+                            "description": "Mapping from dataset alias to registered dataset_id.",
+                        },
+                        "params": {"type": "object"},
+                        "manifest": {"type": "object"},
+                    },
+                    "required": ["code", "datasets"],
+                    "additionalProperties": False,
+                },
+            ),
+            handler=self._analysis_lambda,
+            presentation=tool_presentation_for_name("analysis.lambda"),
         )
 
     def _build_data_clean_tool(self) -> AgentTool:
@@ -827,6 +875,97 @@ class AgentToolRegistry:
             "graph": graph_metadata,
         }
         return ToolExecutionResult(payload=payload)
+
+    def _analysis_lambda(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+        self._raise_if_cancelled(context)
+        unsupported_keys = sorted(set(arguments) - {"code", "datasets", "params", "manifest"})
+        if unsupported_keys:
+            raise ValidationError("analysis.lambda does not accept: " + ", ".join(unsupported_keys))
+        raw_datasets = arguments.get("datasets")
+        if not isinstance(raw_datasets, dict) or not raw_datasets:
+            raise ValidationError("analysis.lambda datasets must be a non-empty object.")
+        params = arguments.get("params") or {}
+        if not isinstance(params, dict):
+            raise ValidationError("analysis.lambda params must be an object.")
+        manifest = arguments.get("manifest") or {}
+        if not isinstance(manifest, dict):
+            raise ValidationError("analysis.lambda manifest must be an object.")
+
+        datasets: list[AnalysisLambdaDataset] = []
+        for raw_alias, raw_dataset_id in raw_datasets.items():
+            alias = str(raw_alias or "").strip()
+            dataset_id = str(raw_dataset_id or "").strip()
+            if not alias or not dataset_id:
+                raise ValidationError("analysis.lambda datasets must map non-empty aliases to dataset ids.")
+            dataset = self._dataset_service.get_dataset(dataset_id)
+            datasets.append(
+                AnalysisLambdaDataset(
+                    alias=alias,
+                    dataset_id=dataset.id,
+                    dataset_name=dataset.name,
+                    source_path=dataset.source_path,
+                )
+            )
+
+        lambda_result = self._analysis_lambda_service.run_lambda(
+            AnalysisLambdaInput(
+                code=self._require_string(arguments, "code"),
+                datasets=datasets,
+                params=params,
+                manifest=manifest,
+            ),
+            cancel_requested=context.cancel_requested,
+        )
+        artifact_map: dict[str, str] = {}
+        artifact_payloads: list[dict[str, Any]] = []
+        for descriptor in lambda_result.artifacts:
+            kind = self._lambda_artifact_kind(descriptor.kind)
+            metadata_payload = {
+                "analysis_lambda": {
+                    "placeholder_id": descriptor.placeholder_id,
+                    "kind": descriptor.kind,
+                    "metadata": descriptor.metadata_payload,
+                }
+            }
+            artifact = self._artifact_service.register_artifact(
+                RegisterArtifactInput(
+                    thread_id=context.thread_id,
+                    turn_id=context.turn_id,
+                    tool_call_id=context.tool_call_id,
+                    kind=kind,
+                    title=descriptor.title,
+                    absolute_path=descriptor.absolute_path,
+                    mime_type=descriptor.mime_type,
+                    summary=descriptor.summary,
+                    metadata_payload=metadata_payload,
+                )
+            )
+            uri = build_artifact_uri(artifact.id)
+            artifact_map[descriptor.placeholder_id] = artifact.id
+            artifact_payloads.append(
+                {
+                    "artifact_id": artifact.id,
+                    "uri": uri,
+                    "title": artifact.title,
+                    "kind": artifact.kind.value,
+                    "mime_type": artifact.mime_type,
+                    "placeholder_id": descriptor.placeholder_id,
+                }
+            )
+
+        output = self._rewrite_lambda_artifact_uris(lambda_result.output, artifact_map)
+        payload = {
+            "result": {
+                "output": output,
+            },
+            "artifacts": artifact_payloads,
+            "dataset_ids": [dataset.dataset_id for dataset in datasets],
+        }
+        content_blocks = []
+        markdown = output.get("markdown")
+        if isinstance(markdown, str) and markdown.strip():
+            content_blocks.append({"type": "markdown", "text": markdown})
+        return ToolExecutionResult(payload=payload, content_blocks=content_blocks)
 
     def _data_clean(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
@@ -1411,6 +1550,34 @@ class AgentToolRegistry:
                 metadata_payload={"dataset_id": dataset_id, **(metadata_payload or {})},
             )
         )
+
+    def _lambda_artifact_kind(self, raw_kind: str) -> ArtifactKind:
+        value = str(raw_kind or "").strip()
+        if value == "image":
+            return ArtifactKind.IMAGE
+        if value == "report":
+            return ArtifactKind.REPORT
+        if value in {"dataset", "file", "table"}:
+            return ArtifactKind.FILE
+        try:
+            return ArtifactKind(value)
+        except ValueError:
+            return ArtifactKind.OTHER
+
+    def _rewrite_lambda_artifact_uris(self, value: Any, artifact_map: dict[str, str]) -> Any:
+        if isinstance(value, str):
+            rewritten = value
+            for placeholder_id, artifact_id in artifact_map.items():
+                rewritten = rewritten.replace(f"artifact://{placeholder_id}", build_artifact_uri(artifact_id))
+            return rewritten
+        if isinstance(value, list):
+            return [self._rewrite_lambda_artifact_uris(item, artifact_map) for item in value]
+        if isinstance(value, dict):
+            return {
+                key: self._rewrite_lambda_artifact_uris(item, artifact_map)
+                for key, item in value.items()
+            }
+        return value
 
     def _resolve_source_path(self, raw_path: Any, context: ToolExecutionContext) -> Path:
         value = str(raw_path or "").strip()

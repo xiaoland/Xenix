@@ -258,6 +258,9 @@ class AutoHeightTextBrowser(QTextBrowser):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        text_option = self.document().defaultTextOption()
+        text_option.setWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
+        self.document().setDefaultTextOption(text_option)
         self.document().contentsChanged.connect(self._sync_height)
 
     def resizeEvent(self, event) -> None:  # type: ignore[override]

@@ -45,3 +45,13 @@ def test_markdown_renderer_supports_gfm_tables() -> None:
     assert '<th style="border: 1px solid #c7cdd4; padding: 4px 6px; font-weight: bold">A</th>' in html
     assert '<th style="border: 1px solid #c7cdd4; padding: 4px 6px; font-weight: bold; text-align: center">B</th>' in html
     assert '<td style="border: 1px solid #c7cdd4; padding: 4px 6px">1</td>' in html
+
+
+def test_markdown_renderer_wraps_fenced_code_blocks() -> None:
+    html = render_chat_markdown(
+        '```json\n{"very_long_key_without_breaks": "very_long_value_without_breaks"}\n```',
+        inline_artifact_images=False,
+    )
+
+    assert '<pre style="white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere;">' in html
+    assert '<code style="white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere;" class="language-json">' in html

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from enum import StrEnum
 from collections.abc import Callable
 from typing import Any
@@ -156,7 +157,7 @@ def project_tool_chatbot_event(
     if result_message is None or tool_call.result_message_id is None:
         status = AgentToolCallStatus.REQUESTED
     presentation = tool_presentation(tool_call.tool_name, tool_presentation_lookup=tool_presentation_lookup)
-    detail_blocks = _tool_detail_blocks(result_message, error_summary=tool_call.error_summary)
+    detail_blocks = _tool_detail_blocks(tool_call)
     summary = _tool_summary_from_payload(tool_call, status) or presentation.summary_for(status)
     actions = _tool_actions(tool_call)
     source_message_ids = [request_message.id]
@@ -307,19 +308,71 @@ def _tool_actions(tool_call: AgentToolCallRow) -> list[dict[str, Any]]:
 
 
 def _tool_detail_blocks(
-    message: AgentMessageRow | None,
-    *,
-    error_summary: str | None,
+    tool_call: AgentToolCallRow,
 ) -> list[dict[str, Any]]:
-    if message is None:
-        return []
-    detail_blocks = [
-        dict(block)
-        for block in message.content_blocks
-        if block.get("type") not in {"tool_event_summary", "tool_result_payload"}
-    ]
-    if detail_blocks:
-        return detail_blocks
-    if error_summary:
-        return [{"type": "markdown", "text": error_summary}]
-    return []
+    if tool_call.tool_name == "analysis.lambda":
+        return _analysis_lambda_detail_blocks(tool_call)
+
+    lines = [f"### {tool_call.tool_name}"]
+    lines.append("")
+    lines.append(f"Status: `{tool_call.status.value}`")
+    if tool_call.error_summary:
+        lines.extend(["", "#### Error", tool_call.error_summary])
+    lines.extend(["", "#### Arguments", "```json", _json_dump(tool_call.arguments_payload or {}), "```"])
+    if tool_call.result_payload is not None:
+        lines.extend(["", "#### Result", "```json", _json_dump(tool_call.result_payload), "```"])
+    return [{"type": "markdown", "text": "\n".join(lines)}]
+
+
+def _analysis_lambda_detail_blocks(tool_call: AgentToolCallRow) -> list[dict[str, Any]]:
+    payload = tool_call.result_payload or {}
+    result = payload.get("result")
+    output = result.get("output") if isinstance(result, dict) else None
+    if not isinstance(output, dict):
+        return _tool_detail_blocks_for_payload(tool_call)
+
+    lines = ["### analysis.lambda result"]
+    lines.extend(["", "Status: `" + tool_call.status.value + "`"])
+    if tool_call.error_summary:
+        lines.extend(["", "#### Error", tool_call.error_summary])
+    lines.extend(["", "#### Arguments", "```json", _json_dump(tool_call.arguments_payload or {}), "```"])
+    for key in ("markdown", "report", "message", "summary"):
+        value = output.get(key)
+        if isinstance(value, str) and value.strip():
+            lines.extend(["", value.strip()])
+            break
+
+    lines.extend(["", "#### Output", "```json", _json_dump(output), "```"])
+
+    artifacts = payload.get("artifacts")
+    if isinstance(artifacts, list) and artifacts:
+        lines.extend(["", "#### Artifacts"])
+        for artifact in artifacts:
+            if not isinstance(artifact, dict):
+                continue
+            title = str(artifact.get("title") or artifact.get("artifact_id") or "Artifact")
+            uri = str(artifact.get("uri") or "")
+            kind = str(artifact.get("kind") or "artifact")
+            if uri:
+                lines.append(f"- [{title}]({uri}) ({kind})")
+            else:
+                lines.append(f"- {title} ({kind})")
+    return [{"type": "markdown", "text": "\n".join(lines)}]
+
+
+def _tool_detail_blocks_for_payload(tool_call: AgentToolCallRow) -> list[dict[str, Any]]:
+    lines = [f"### {tool_call.tool_name}", "", f"Status: `{tool_call.status.value}`"]
+    if tool_call.error_summary:
+        lines.extend(["", "#### Error", tool_call.error_summary])
+    lines.extend(["", "#### Arguments", "```json", _json_dump(tool_call.arguments_payload or {}), "```"])
+    if tool_call.result_payload is not None:
+        lines.extend(["", "#### Result", "```json", _json_dump(tool_call.result_payload), "```"])
+    return [{"type": "markdown", "text": "\n".join(lines)}]
+
+
+def _json_dump(value: Any) -> str:
+    dumped = json.dumps(value, ensure_ascii=False, indent=2, default=str)
+    max_length = 12000
+    if len(dumped) <= max_length:
+        return dumped
+    return dumped[:max_length] + f"\n... <truncated {len(dumped) - max_length} chars>"
