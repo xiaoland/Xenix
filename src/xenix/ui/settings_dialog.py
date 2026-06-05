@@ -32,6 +32,7 @@ from ..services.llm import (
     LLMService,
     LLMSettings,
     LLMSettingsService,
+    PACKAGED_TRIAL_SECRET_SOURCE,
 )
 from ..services.ml.worker_settings import MLWorkerKind, MLWorkerSettingsService
 from .ssh_worker_setup_wizard import SshWorkerSetupWizard
@@ -272,6 +273,7 @@ class SettingsDialog(QDialog):
         self._add_provider_button.setText(self.tr("Add"))
         self._remove_provider_button.setText(self.tr("Remove"))
         self._provider_dialect_selector.setItemText(0, self.tr("OpenAI-compatible"))
+        self._refresh_provider_field_state()
         self._aimock_title_label.setText(self.tr("AIMock"))
         self._aimock_enabled_label.setText(self.tr("Use AIMock"))
         self._aimock_base_url_label.setText(self.tr("AIMock base URL"))
@@ -464,6 +466,7 @@ class SettingsDialog(QDialog):
         self._provider_models_input.setPlainText("\n".join(provider.models))
         self._provider_timeout_input.setValue(provider.timeout_seconds)
         self._provider_streaming_checkbox.setChecked(provider.streaming_enabled)
+        self._apply_provider_field_state(provider)
         self._loading_provider = False
 
     def _store_current_provider_fields(self) -> None:
@@ -472,17 +475,38 @@ class SettingsDialog(QDialog):
         index = max(0, self._provider_selector.currentIndex())
         if index >= len(self._provider_configs):
             return
+        current = self._provider_configs[index]
+        packaged_trial = self._is_packaged_trial_provider(current)
         self._provider_configs[index] = LLMProviderConfig(
             key=self._provider_key_input.text().strip(),
             display_name=self._provider_name_input.text().strip(),
             dialect=LLMDialect(str(self._provider_dialect_selector.currentData())),
-            base_url=self._provider_base_url_input.text().strip(),
-            api_key=self._provider_api_key_input.text(),
+            base_url=current.base_url if packaged_trial else self._provider_base_url_input.text().strip(),
+            api_key="" if packaged_trial else self._provider_api_key_input.text(),
             models=self._model_lines(),
             timeout_seconds=self._provider_timeout_input.value(),
             streaming_enabled=self._provider_streaming_checkbox.isChecked(),
+            dialect_config=current.dialect_config,
         )
         self._reload_provider_selector(index)
+        self._apply_provider_field_state(self._provider_configs[index])
+
+    def _refresh_provider_field_state(self) -> None:
+        index = self._provider_selector.currentIndex()
+        if 0 <= index < len(self._provider_configs):
+            self._apply_provider_field_state(self._provider_configs[index])
+
+    def _apply_provider_field_state(self, provider: LLMProviderConfig) -> None:
+        packaged_trial = self._is_packaged_trial_provider(provider)
+        self._provider_base_url_input.setReadOnly(packaged_trial)
+        self._provider_api_key_input.setReadOnly(packaged_trial)
+        if packaged_trial:
+            self._provider_api_key_input.setPlaceholderText(self.tr("Built into packaged app"))
+        else:
+            self._provider_api_key_input.setPlaceholderText("")
+
+    def _is_packaged_trial_provider(self, provider: LLMProviderConfig) -> bool:
+        return provider.dialect_config.get("secret_source") == PACKAGED_TRIAL_SECRET_SOURCE
 
     def _refresh_model_selectors(
         self,

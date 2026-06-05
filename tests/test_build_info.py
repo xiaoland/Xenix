@@ -48,3 +48,33 @@ def test_package_build_info_file_embeds_commit_and_is_removable(tmp_path: Path) 
     package_app._remove_generated_build_info(tmp_path)
 
     assert not build_info_path.exists()
+
+
+def test_package_trial_llm_file_embeds_environment_values_and_is_removable(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XENIX_TRIAL_LLM_BASE_URL", "https://trial.example.test")
+    monkeypatch.setenv("XENIX_TRIAL_LLM_API_KEY", "trial-secret")
+    monkeypatch.setenv("XENIX_TRIAL_LLM_MODEL", "vendor-real-model")
+
+    trial_llm_path = package_app._write_generated_trial_llm(tmp_path)
+
+    assert trial_llm_path == tmp_path / "src" / "xenix" / "_generated_trial_llm.py"
+    content = trial_llm_path.read_text(encoding="utf-8")
+    assert "TRIAL_LLM_BASE_URL = 'https://trial.example.test'" in content
+    assert "TRIAL_LLM_API_KEY = 'trial-secret'" in content
+    assert "TRIAL_LLM_MODEL = 'vendor-real-model'" in content
+
+    package_app._remove_generated_trial_llm(tmp_path)
+
+    assert not trial_llm_path.exists()
+
+
+def test_package_trial_llm_file_allows_missing_api_key(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("XENIX_TRIAL_LLM_API_KEY", raising=False)
+
+    trial_llm_path = package_app._write_generated_trial_llm(tmp_path)
+    content = trial_llm_path.read_text(encoding="utf-8")
+
+    assert "TRIAL_LLM_API_KEY = ''" in content

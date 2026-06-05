@@ -10,7 +10,14 @@ from .service import (
     LLMService,
     LLMSettings,
     LLMSettingsService,
+    PACKAGED_TRIAL_SECRET_SOURCE,
+    PackagedTrialLLMConfig,
+    TRIAL_PROVIDER_DISPLAY_NAME,
+    TRIAL_PROVIDER_KEY,
     XenixEnvironment,
+    default_llm_settings,
+    load_packaged_trial_llm_config,
+    sanitize_settings_for_save,
 )
 
 __all__ = [
@@ -25,5 +32,12 @@ __all__ = [
     "LLMService",
     "LLMSettings",
     "LLMSettingsService",
+    "PACKAGED_TRIAL_SECRET_SOURCE",
+    "PackagedTrialLLMConfig",
+    "TRIAL_PROVIDER_DISPLAY_NAME",
+    "TRIAL_PROVIDER_KEY",
     "XenixEnvironment",
+    "default_llm_settings",
+    "load_packaged_trial_llm_config",
+    "sanitize_settings_for_save",
 ]

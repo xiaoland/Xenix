@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+import xenix.services.llm.service as llm_service_module
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import ValidationError
 from xenix.services.llm import (
@@ -11,6 +12,8 @@ from xenix.services.llm import (
     LLMService,
     LLMSettings,
     LLMSettingsService,
+    PACKAGED_TRIAL_SECRET_SOURCE,
+    PackagedTrialLLMConfig,
 )
 
 
@@ -121,6 +124,60 @@ def test_llm_settings_ignore_llm_environment_variables(monkeypatch, tmp_path: Pa
     assert provider._model == "gpt-4o-mini"
     assert llm_service.build_turn_completion_guard_provider() is None
     assert llm_service.build_thread_title_provider() is None
+
+
+def test_llm_settings_seed_packaged_trial_provider_when_available(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    monkeypatch.setattr(
+        llm_service_module,
+        "load_packaged_trial_llm_config",
+        lambda: PackagedTrialLLMConfig(
+            base_url="https://trial.example.test",
+            api_key="trial-secret",
+            model="vendor-real-model",
+        ),
+    )
+    paths = ensure_app_dirs(get_app_paths())
+    settings_service = LLMSettingsService(paths)
+    llm_service = LLMService(settings_service)
+
+    loaded = settings_service.load()
+    provider_config = loaded.providers[0]
+    provider = llm_service.build_provider()
+
+    assert provider_config.key == "trial"
+    assert provider_config.display_name == "Trial"
+    assert provider_config.base_url == "https://trial.example.test"
+    assert provider_config.api_key == ""
+    assert provider_config.models == ["vendor-real-model"]
+    assert provider_config.dialect_config["secret_source"] == PACKAGED_TRIAL_SECRET_SOURCE
+    assert loaded.default_fq_model_key == "trial/vendor-real-model"
+    assert provider._base_url == "https://trial.example.test"
+    assert provider._api_key == "trial-secret"
+    assert provider._model == "vendor-real-model"
+
+
+def test_llm_settings_save_does_not_persist_packaged_trial_secret(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    monkeypatch.setattr(
+        llm_service_module,
+        "load_packaged_trial_llm_config",
+        lambda: PackagedTrialLLMConfig(
+            base_url="https://trial.example.test",
+            api_key="trial-secret",
+            model="vendor-real-model",
+        ),
+    )
+    paths = ensure_app_dirs(get_app_paths())
+    settings_service = LLMSettingsService(paths)
+    loaded = settings_service.load()
+    loaded.providers[0].api_key = "trial-secret"
+
+    settings_service.save(loaded)
+
+    saved = settings_service.settings_path.read_text(encoding="utf-8")
+    assert "trial-secret" not in saved
+    assert '"api_key": ""' in saved
 
 
 def test_llm_settings_use_aimock_only_in_development(monkeypatch, tmp_path: Path) -> None:

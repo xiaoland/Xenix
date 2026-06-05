@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from importlib import import_module
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -18,6 +19,11 @@ SETTINGS_FILE_NAME = "agent_settings.json"
 DEFAULT_PROVIDER_KEY = "openai"
 DEFAULT_MODEL_KEY = "gpt-4o-mini"
 DEFAULT_FQ_MODEL_KEY = f"{DEFAULT_PROVIDER_KEY}/{DEFAULT_MODEL_KEY}"
+TRIAL_PROVIDER_KEY = "trial"
+TRIAL_PROVIDER_DISPLAY_NAME = "Trial"
+PACKAGED_TRIAL_SECRET_SOURCE = "packaged_trial"
+TRIAL_LLM_BASE_URL_FALLBACK = "https://api.openai.com"
+TRIAL_LLM_MODEL_FALLBACK = DEFAULT_MODEL_KEY
 
 
 class XenixEnvironment(StrEnum):
@@ -80,6 +86,16 @@ class LLMProviderConfig(BaseModel):
         return models
 
 
+class PackagedTrialLLMConfig(BaseModel):
+    base_url: str
+    api_key: str
+    model: str
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self.api_key.strip())
+
+
 class LLMModelRef(BaseModel):
     provider_key: str
     model_key: str
@@ -90,6 +106,29 @@ class LLMModelOption(BaseModel):
     provider_key: str
     model_key: str
     label: str
+
+
+def default_llm_settings() -> "LLMSettings":
+    trial_config = load_packaged_trial_llm_config()
+    if trial_config.enabled:
+        return LLMSettings(
+            providers=[
+                LLMProviderConfig(
+                    key=TRIAL_PROVIDER_KEY,
+                    display_name=TRIAL_PROVIDER_DISPLAY_NAME,
+                    dialect=LLMDialect.OPENAI_COMPATIBLE,
+                    base_url=trial_config.base_url,
+                    api_key="",
+                    models=[trial_config.model],
+                    dialect_config={"secret_source": PACKAGED_TRIAL_SECRET_SOURCE},
+                )
+            ],
+            default_fq_model_key=LLMService.fq_model_key(TRIAL_PROVIDER_KEY, trial_config.model),
+        )
+    return LLMSettings(
+        providers=[LLMProviderConfig()],
+        default_fq_model_key=DEFAULT_FQ_MODEL_KEY,
+    )
 
 
 class LLMSettings(BaseModel):
@@ -159,14 +198,15 @@ class LLMSettingsService:
 
     def load(self) -> LLMSettings:
         if not self._settings_path.exists():
-            return LLMSettings()
+            return default_llm_settings()
         payload = json.loads(self._settings_path.read_text(encoding="utf-8"))
         return LLMSettings.model_validate(payload)
 
     def save(self, settings: LLMSettings) -> None:
         self._settings_path.parent.mkdir(parents=True, exist_ok=True)
+        sanitized = sanitize_settings_for_save(settings)
         self._settings_path.write_text(
-            settings.model_dump_json(indent=2),
+            sanitized.model_dump_json(indent=2),
             encoding="utf-8",
         )
 
@@ -209,6 +249,18 @@ class LLMService:
                 provider_key=provider_config.key,
                 base_url=settings.aimock.base_url,
                 api_key=settings.aimock.api_key,
+                model=ref.model_key,
+                timeout_seconds=provider_config.timeout_seconds,
+                streaming_enabled=provider_config.streaming_enabled,
+            )
+        trial_config = load_packaged_trial_llm_config()
+        if provider_config.dialect_config.get("secret_source") == PACKAGED_TRIAL_SECRET_SOURCE:
+            if not trial_config.enabled:
+                raise ValidationError("Packaged trial LLM provider is not available in this build.")
+            return OpenAICompatibleChatProvider(
+                provider_key=provider_config.key,
+                base_url=trial_config.base_url,
+                api_key=trial_config.api_key,
                 model=ref.model_key,
                 timeout_seconds=provider_config.timeout_seconds,
                 streaming_enabled=provider_config.streaming_enabled,
@@ -297,6 +349,41 @@ def _read_environment() -> XenixEnvironment:
     if raw == XenixEnvironment.DEVELOPMENT.value:
         return XenixEnvironment.DEVELOPMENT
     return XenixEnvironment.PRODUCTION
+
+
+def load_packaged_trial_llm_config() -> PackagedTrialLLMConfig:
+    try:
+        generated_trial_llm = import_module("xenix._generated_trial_llm")
+    except ModuleNotFoundError as exc:
+        if exc.name != "xenix._generated_trial_llm":
+            raise
+        return PackagedTrialLLMConfig(
+            base_url=TRIAL_LLM_BASE_URL_FALLBACK,
+            api_key="",
+            model=TRIAL_LLM_MODEL_FALLBACK,
+        )
+    return PackagedTrialLLMConfig(
+        base_url=str(
+            getattr(generated_trial_llm, "TRIAL_LLM_BASE_URL", TRIAL_LLM_BASE_URL_FALLBACK)
+            or TRIAL_LLM_BASE_URL_FALLBACK
+        ).rstrip("/"),
+        api_key=str(getattr(generated_trial_llm, "TRIAL_LLM_API_KEY", "") or ""),
+        model=str(
+            getattr(generated_trial_llm, "TRIAL_LLM_MODEL", TRIAL_LLM_MODEL_FALLBACK)
+            or TRIAL_LLM_MODEL_FALLBACK
+        ).strip()
+        or TRIAL_LLM_MODEL_FALLBACK,
+    )
+
+
+def sanitize_settings_for_save(settings: LLMSettings) -> LLMSettings:
+    providers: list[LLMProviderConfig] = []
+    for provider in settings.providers:
+        if provider.dialect_config.get("secret_source") == PACKAGED_TRIAL_SECRET_SOURCE:
+            providers.append(provider.model_copy(update={"api_key": ""}))
+            continue
+        providers.append(provider)
+    return settings.model_copy(update={"providers": providers}, deep=True)
 
 
 def _legacy_payload_to_settings(payload: dict[str, Any]) -> dict[str, Any]:

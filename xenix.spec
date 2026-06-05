@@ -16,7 +16,7 @@ a = Analysis(
         (str(src_root / "xenix" / "translations"), "xenix/translations"),
         (str(src_root / "xenix"), "xenix_worker_source/xenix"),
     ],
-    hiddenimports=[],
+    hiddenimports=["xenix._generated_trial_llm"],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

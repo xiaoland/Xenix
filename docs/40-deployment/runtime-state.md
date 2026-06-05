@@ -41,6 +41,7 @@ Current runtime files and subdirectories:
 3. Open the log directory from the UI or inspect files directly on disk.
 4. Inspect `config/locale.json` for the persisted UI language preference when debugging localization behavior.
 5. Inspect `config/agent_settings.json` for persisted LLM providers, configured model lists, default/guard/title model keys, and development AIMock settings.
+   Packaged trial LLM providers are marked with `dialect_config.secret_source=packaged_trial`; the real trial API key is embedded in the packaged application and is not written to this file.
 6. Inspect `config/ml_workers.json` for configured local and SSH ML workers. SSH credentials are not stored there; the file stores connection metadata, remote roots, Python command paths, and last setup/validation summaries.
 7. Inspect `state/xenix.db` for metadata, `artifacts/datasets/` for app-managed dataset artifacts, `artifacts/ml-tasks/` for per-ML-task working directories, and `artifacts/models/` for canonical trained-model files.
 
@@ -69,6 +70,8 @@ Agent Message kind and UI author are stored as SQLAlchemy enum member names in S
 Provider request usage records are stored in `agent_provider_request`. Each row records one primary or guard LLM provider request, input/output Message ids, provider/model metadata, request status, and normalized token usage when the provider reports it. The first hidden system prompt is stored as a system row in `agent_message` on the first turn and remains hidden from the Chatbot timeline.
 
 Per-thread next-turn model selection is stored on `agent_thread.selected_fq_model_key`. The global default and configured model list live in `config/agent_settings.json`; if a thread has no selected key, runtime code falls back to the current global default.
+
+Packaged builds may embed a first-run trial LLM provider from `XENIX_TRIAL_LLM_BASE_URL`, `XENIX_TRIAL_LLM_API_KEY`, and `XENIX_TRIAL_LLM_MODEL` during `scripts/package_app.py`. If `XENIX_TRIAL_LLM_API_KEY` is missing, packaging still succeeds and the build keeps the normal manual-provider default. Generated trial secrets are removed from the source tree after packaging.
 
 ML worker pool configuration lives in `config/ml_workers.json`. The default configuration contains a local worker. SSH workers can be added through Settings; the setup wizard may create clearly marked `Host xenix.*` entries in the user's OpenSSH config, initializes remote execution directories, and validates a key/agent-based SSH connection. Remote worker directories are execution/cache state. Local SQLite metadata and local service-managed artifacts remain the final authority.
 

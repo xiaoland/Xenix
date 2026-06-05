@@ -21,7 +21,7 @@ from xenix.services.agent import (
 )
 from xenix.services.agent.dev_fixtures import MESSAGE_RENDERING_FIXTURE_TITLE, ensure_mock_conversation_history
 from xenix.services.artifact_service import RegisterArtifactInput
-from xenix.services.llm import LLMProviderConfig, LLMSettings
+from xenix.services.llm import LLMProviderConfig, LLMSettings, PACKAGED_TRIAL_SECRET_SOURCE
 from xenix.services.storage.migrations import CURRENT_SCHEMA_VERSION
 from xenix.services.storage.models import (
     AgentMessageAuthor,
@@ -304,6 +304,51 @@ def test_main_window_keeps_settings_entry_on_thread_detail_view_shell(monkeypatc
         assert window._settings_dialog.isVisible()
         assert window._settings_dialog._aimock_card.isHidden() is True
         assert window._settings_dialog._build_commit_value.text() == BUILD_COMMIT_DISPLAY
+    finally:
+        if window._settings_dialog is not None:
+            window._settings_dialog.close()
+        window.close()
+
+
+def test_settings_dialog_marks_packaged_trial_provider_secret_fields_read_only(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=False)
+    try:
+        window._llm_settings_service.save(
+            LLMSettings(
+                providers=[
+                    LLMProviderConfig(
+                        key="trial",
+                        display_name="Trial",
+                        base_url="https://trial.example.test",
+                        api_key="",
+                        models=["vendor-real-model"],
+                        dialect_config={"secret_source": PACKAGED_TRIAL_SECRET_SOURCE},
+                    )
+                ],
+                default_fq_model_key="trial/vendor-real-model",
+            )
+        )
+
+        window._settings_button.click()
+        app.processEvents()
+
+        assert window._settings_dialog is not None
+        settings = window._settings_dialog
+        assert settings._provider_base_url_input.isReadOnly() is True
+        assert settings._provider_api_key_input.isReadOnly() is True
+        assert settings._provider_api_key_input.placeholderText() == "Built into packaged app"
+
+        settings._store_current_provider_fields()
+
+        assert settings._provider_configs[0].api_key == ""
+        assert settings._provider_configs[0].dialect_config["secret_source"] == PACKAGED_TRIAL_SECRET_SOURCE
     finally:
         if window._settings_dialog is not None:
             window._settings_dialog.close()
