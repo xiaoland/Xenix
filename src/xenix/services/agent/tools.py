@@ -266,7 +266,9 @@ class AgentToolRegistry:
                 self._build_data_integrate_tool(),
                 self._build_analysis_profile_tool(),
                 self._build_analysis_graph_tool(),
-                self._build_analysis_lambda_tool(),
+                # analysis.lambda is intentionally retained in code but not registered
+                # in the Agent-facing tool set.
+                # self._build_analysis_lambda_tool(),
                 self._build_data_clean_tool(),
                 self._build_data_clean_metadata_tool(),
                 self._build_data_query_tool(),

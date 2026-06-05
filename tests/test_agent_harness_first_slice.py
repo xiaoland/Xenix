@@ -416,7 +416,7 @@ def test_agent_harness_exposes_dataset_tools_after_dataset_payload(monkeypatch, 
     assert "data.feature.select" in tool_names
     assert "analysis.profile" in tool_names
     assert "analysis.graph" in tool_names
-    assert "analysis.lambda" in tool_names
+    assert "analysis.lambda" not in tool_names
 
 
 def test_agent_harness_exposes_and_uses_data_tools_after_prior_thread_file(
@@ -550,7 +550,7 @@ def test_agent_harness_model_metadata_exposes_catalog_without_train_enums(monkey
     assert "model.metadata" in specs
     assert "analysis.profile" in specs
     assert "analysis.graph" in specs
-    assert "analysis.lambda" in specs
+    assert "analysis.lambda" not in specs
     assert "data.peek" in specs
     assert "data.clean.metadata" in specs
     assert "data.feature.select" in specs

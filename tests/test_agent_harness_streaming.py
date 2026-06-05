@@ -199,7 +199,6 @@ class StaticSpecRegistry:
                 "model.task.query",
                 "analysis.profile",
                 "analysis.graph",
-                "analysis.lambda",
                 "data.peek",
                 "data.integrate",
                 "data.clean",

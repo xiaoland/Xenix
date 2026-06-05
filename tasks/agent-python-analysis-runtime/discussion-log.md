@@ -163,3 +163,14 @@ Additional fixes:
 - Inputs now support `.read()` by returning the underlying DataFrame.
 - `ctx.artifact.create(...)` supports `value=` as an alias for `content=`.
 - `kind="table"` artifacts are registered as ordinary file artifacts backed by CSV.
+
+## 2026-06-05 Registry Disable
+
+Decision:
+
+- Retain the `AnalysisLambdaService` and worker code for now, but short-circuit `analysis.lambda` out of `AgentToolRegistry`.
+- `analysis.lambda` must not appear in provider-facing tool specs and direct registry execution should fail as an unregistered tool.
+
+Reason:
+
+- The current product decision is to stop exposing one-off generated Python execution to the Agent while preserving the implementation for follow-up inspection or reactivation.

@@ -7,7 +7,7 @@ from xenix.exceptions import ValidationError
 from xenix.services.agent import ConversationStore
 from xenix.services.agent.conversation_store import CreateToolCallInput, StartTurnInput
 from xenix.services.agent.tools import AgentToolRegistry, ToolExecutionContext
-from xenix.services.analysis_lambda import AnalysisLambdaService
+from xenix.services.analysis_lambda import AnalysisLambdaDataset, AnalysisLambdaInput, AnalysisLambdaService
 from xenix.services.artifact_service import ArtifactService
 from xenix.services.data_cleaning import DataCleaningService
 from xenix.services.data_transform import DataQueryTransformService
@@ -15,7 +15,6 @@ from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
 from xenix.services.ml_service import MLService
 from xenix.services.ml_task_service import MLTaskService
 from xenix.services.storage import StorageBootstrapService
-from xenix.services.storage.models import ArtifactKind
 
 
 def _build_runtime(monkeypatch, tmp_path: Path, *, lambda_limits: dict | None = None):
@@ -33,6 +32,7 @@ def _build_runtime(monkeypatch, tmp_path: Path, *, lambda_limits: dict | None = 
         ml_task_service,
     )
     artifact_service = ArtifactService(context.session_factory)
+    analysis_lambda_service = AnalysisLambdaService(paths, limits=lambda_limits)
     registry = AgentToolRegistry(
         paths=paths,
         dataset_service=dataset_service,
@@ -40,10 +40,10 @@ def _build_runtime(monkeypatch, tmp_path: Path, *, lambda_limits: dict | None = 
         data_transform_service=data_transform_service,
         ml_service=ml_service,
         artifact_service=artifact_service,
-        analysis_lambda_service=AnalysisLambdaService(paths, limits=lambda_limits),
+        analysis_lambda_service=analysis_lambda_service,
     )
     conversation_store = ConversationStore(context.session_factory)
-    return dataset_service, artifact_service, registry, conversation_store
+    return dataset_service, registry, conversation_store, analysis_lambda_service
 
 
 def _tool_context(conversation_store: ConversationStore, tool_name: str, arguments: dict) -> ToolExecutionContext:
@@ -87,11 +87,31 @@ def _write_sales_csv(tmp_path: Path) -> Path:
     return source
 
 
-def test_analysis_lambda_returns_dict_and_registers_supported_artifacts(monkeypatch, tmp_path: Path) -> None:
-    dataset_service, artifact_service, registry, conversation_store = _build_runtime(monkeypatch, tmp_path)
-    dataset = dataset_service.register_dataset(
+def _register_sales_dataset(dataset_service: DatasetService, tmp_path: Path):
+    return dataset_service.register_dataset(
         RegisterDatasetInput(source_path=str(_write_sales_csv(tmp_path).resolve()), name="Sales")
     )
+
+
+def _lambda_input(dataset, code: str) -> AnalysisLambdaInput:
+    return AnalysisLambdaInput(
+        code=code,
+        datasets=[
+            AnalysisLambdaDataset(
+                alias="sales",
+                dataset_id=dataset.id,
+                dataset_name=dataset.name,
+                source_path=dataset.source_path,
+            )
+        ],
+        params={},
+        manifest={"objective": "summarize sales"},
+    )
+
+
+def test_analysis_lambda_service_returns_dict_and_supported_artifacts(monkeypatch, tmp_path: Path) -> None:
+    dataset_service, _registry, _conversation_store, lambda_service = _build_runtime(monkeypatch, tmp_path)
+    dataset = _register_sales_dataset(dataset_service, tmp_path)
     code = '''
 import numpy as np
 from scipy import stats
@@ -118,41 +138,23 @@ def analyze(ctx, inputs, params):
         "figure_uri": figure_artifact.uri,
     }
 '''
-    arguments = {
-        "code": code,
-        "datasets": {"sales": dataset.id},
-        "params": {},
-        "manifest": {"objective": "summarize sales by region"},
-    }
-    context = _tool_context(conversation_store, "analysis.lambda", arguments)
 
-    result = registry.execute("analysis.lambda", arguments, context)
+    result = lambda_service.run_lambda(_lambda_input(dataset, code))
 
-    output = result.payload["result"]["output"]
-    assert output["metrics"]["total"] == 45.0
-    assert output["mean"] == 15.0
-    assert "lambda_artifact_" not in output["markdown"]
-    assert "artifact://" in output["markdown"]
-    assert "lambda_artifact_" not in output["bytes_uri"]
-    assert "lambda_artifact_" not in output["figure_uri"]
-    assert result.content_blocks == [{"type": "markdown", "text": output["markdown"]}]
-    assert len(result.payload["artifacts"]) == 4
-
-    artifacts = artifact_service.list_thread_artifacts(context.thread_id)
-    assert len(artifacts) == 4
-    kinds = {artifact.kind for artifact in artifacts}
-    assert ArtifactKind.IMAGE in kinds
-    assert ArtifactKind.FILE in kinds
-    for artifact in artifacts:
+    assert result.output["metrics"]["total"] == 45.0
+    assert result.output["mean"] == 15.0
+    assert "artifact://lambda_artifact_" in result.output["markdown"]
+    assert result.output["bytes_uri"].startswith("artifact://lambda_artifact_")
+    assert result.output["figure_uri"].startswith("artifact://lambda_artifact_")
+    assert len(result.artifacts) == 4
+    for artifact in result.artifacts:
         assert Path(artifact.absolute_path).exists()
-        assert artifact.metadata_payload["analysis_lambda"]["placeholder_id"].startswith("lambda_artifact_")
+        assert artifact.placeholder_id.startswith("lambda_artifact_")
 
 
-def test_analysis_lambda_accepts_bytesio_artifact_and_ref_output(monkeypatch, tmp_path: Path) -> None:
-    dataset_service, artifact_service, registry, conversation_store = _build_runtime(monkeypatch, tmp_path)
-    dataset = dataset_service.register_dataset(
-        RegisterDatasetInput(source_path=str(_write_sales_csv(tmp_path).resolve()), name="Sales")
-    )
+def test_analysis_lambda_service_accepts_bytesio_artifact_and_ref_output(monkeypatch, tmp_path: Path) -> None:
+    dataset_service, _registry, _conversation_store, lambda_service = _build_runtime(monkeypatch, tmp_path)
+    dataset = _register_sales_dataset(dataset_service, tmp_path)
     code = '''
 import io
 
@@ -163,28 +165,20 @@ def analyze(ctx, inputs, params):
     artifact = ctx.artifact.create(buf, name="analysis_note.txt")
     return {"artifact": artifact, "markdown": f"[note]({artifact.uri})"}
 '''
-    arguments = {
-        "code": code,
-        "datasets": {"sales": dataset.id},
-    }
-    context = _tool_context(conversation_store, "analysis.lambda", arguments)
 
-    result = registry.execute("analysis.lambda", arguments, context)
+    result = lambda_service.run_lambda(_lambda_input(dataset, code))
 
-    output = result.payload["result"]["output"]
-    assert output["artifact"]["kind"] == "file"
-    assert "lambda_artifact_" not in output["artifact"]["uri"]
-    assert "lambda_artifact_" not in output["markdown"]
-    [artifact] = artifact_service.list_thread_artifacts(context.thread_id)
+    assert result.output["artifact"]["kind"] == "file"
+    assert result.output["artifact"]["uri"].startswith("artifact://lambda_artifact_")
+    assert result.output["markdown"].startswith("[note](artifact://lambda_artifact_")
+    [artifact] = result.artifacts
     assert artifact.mime_type == "text/plain"
     assert Path(artifact.absolute_path).read_bytes() == b"note"
 
 
-def test_analysis_lambda_accepts_read_handle_and_value_artifact(monkeypatch, tmp_path: Path) -> None:
-    dataset_service, artifact_service, registry, conversation_store = _build_runtime(monkeypatch, tmp_path)
-    dataset = dataset_service.register_dataset(
-        RegisterDatasetInput(source_path=str(_write_sales_csv(tmp_path).resolve()), name="Sales")
-    )
+def test_analysis_lambda_service_accepts_read_handle_and_value_artifact(monkeypatch, tmp_path: Path) -> None:
+    dataset_service, _registry, _conversation_store, lambda_service = _build_runtime(monkeypatch, tmp_path)
+    dataset = _register_sales_dataset(dataset_service, tmp_path)
     code = '''
 def analyze(ctx, inputs, params):
     sales = inputs["sales"].read()
@@ -192,77 +186,51 @@ def analyze(ctx, inputs, params):
     artifact = ctx.artifact.create(name="region_summary", kind="table", value=summary)
     return {"artifact": artifact, "rows": len(summary)}
 '''
-    arguments = {
-        "code": code,
-        "datasets": {"sales": dataset.id},
-    }
-    context = _tool_context(conversation_store, "analysis.lambda", arguments)
 
-    result = registry.execute("analysis.lambda", arguments, context)
+    result = lambda_service.run_lambda(_lambda_input(dataset, code))
 
-    output = result.payload["result"]["output"]
-    assert output["rows"] == 2
-    assert output["artifact"]["kind"] == "table"
-    assert output["artifact"]["uri"].startswith("artifact://")
-    [artifact] = artifact_service.list_thread_artifacts(context.thread_id)
-    assert artifact.kind is ArtifactKind.FILE
+    assert result.output["rows"] == 2
+    assert result.output["artifact"]["kind"] == "table"
+    assert result.output["artifact"]["uri"].startswith("artifact://lambda_artifact_")
+    [artifact] = result.artifacts
+    assert artifact.kind == "table"
     assert artifact.mime_type == "text/csv"
 
 
-def test_analysis_lambda_rejects_non_dict_output(monkeypatch, tmp_path: Path) -> None:
-    dataset_service, _artifact_service, registry, conversation_store = _build_runtime(monkeypatch, tmp_path)
-    dataset = dataset_service.register_dataset(
-        RegisterDatasetInput(source_path=str(_write_sales_csv(tmp_path).resolve()), name="Sales")
-    )
-    arguments = {
-        "code": "def analyze(ctx, inputs, params):\n    return ['not', 'a', 'dict']\n",
-        "datasets": {"sales": dataset.id},
-    }
+def test_analysis_lambda_service_rejects_non_dict_output(monkeypatch, tmp_path: Path) -> None:
+    dataset_service, _registry, _conversation_store, lambda_service = _build_runtime(monkeypatch, tmp_path)
+    dataset = _register_sales_dataset(dataset_service, tmp_path)
+    input_data = _lambda_input(dataset, "def analyze(ctx, inputs, params):\n    return ['not', 'a', 'dict']\n")
 
     with pytest.raises(ValidationError, match="must return a dict"):
-        registry.execute(
-            "analysis.lambda",
-            arguments,
-            _tool_context(conversation_store, "analysis.lambda", arguments),
-        )
+        lambda_service.run_lambda(input_data)
 
 
-def test_analysis_lambda_times_out_bad_code(monkeypatch, tmp_path: Path) -> None:
-    dataset_service, _artifact_service, registry, conversation_store = _build_runtime(
+def test_analysis_lambda_service_times_out_bad_code(monkeypatch, tmp_path: Path) -> None:
+    dataset_service, _registry, _conversation_store, lambda_service = _build_runtime(
         monkeypatch,
         tmp_path,
         lambda_limits={"timeout_seconds": 1},
     )
-    dataset = dataset_service.register_dataset(
-        RegisterDatasetInput(source_path=str(_write_sales_csv(tmp_path).resolve()), name="Sales")
-    )
-    arguments = {
-        "code": "def analyze(ctx, inputs, params):\n    while True:\n        pass\n",
-        "datasets": {"sales": dataset.id},
-    }
+    dataset = _register_sales_dataset(dataset_service, tmp_path)
+    input_data = _lambda_input(dataset, "def analyze(ctx, inputs, params):\n    while True:\n        pass\n")
 
     with pytest.raises(ValidationError, match="timed out"):
+        lambda_service.run_lambda(input_data)
+
+
+def test_analysis_lambda_tool_is_not_registered(monkeypatch, tmp_path: Path) -> None:
+    _dataset_service, registry, conversation_store, _lambda_service = _build_runtime(monkeypatch, tmp_path)
+    specs = {spec.name: spec for spec in registry.list_specs()}
+    arguments = {
+        "code": "def analyze(ctx, inputs, params):\n    return {}\n",
+        "datasets": {"sales": "dataset-1"},
+    }
+
+    assert "analysis.lambda" not in specs
+    with pytest.raises(ValidationError, match="not registered"):
         registry.execute(
             "analysis.lambda",
             arguments,
             _tool_context(conversation_store, "analysis.lambda", arguments),
         )
-
-
-def test_analysis_lambda_tool_schema_is_dataset_scoped(monkeypatch, tmp_path: Path) -> None:
-    _dataset_service, _artifact_service, registry, _conversation_store = _build_runtime(monkeypatch, tmp_path)
-    specs = {spec.name: spec for spec in registry.list_specs()}
-
-    assert "analysis.lambda" in specs
-    schema = specs["analysis.lambda"].parameters_schema
-    assert schema["required"] == ["code", "datasets"]
-    assert "code" in schema["properties"]
-    assert "datasets" in schema["properties"]
-    assert "source_path" not in schema["properties"]
-    assert "reusable" not in schema["properties"]
-    description = specs["analysis.lambda"].description
-    assert "Supported imports" in description
-    assert "seaborn" in description
-    assert "xgboost" in description
-    assert "inputs[alias].read()" in description
-    assert "value=..." in description
