@@ -1,5 +1,7 @@
 import json
+import sqlite3
 import time
+from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QMimeData, QPoint, QPointF, Qt, QUrl
@@ -7,7 +9,7 @@ from PySide6.QtGui import QPalette, QTextDocument
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QFrame, QMessageBox, QTextBrowser, QWidget
 
-from xenix.app import build_main_window
+from xenix.app import build_main_window, quarantine_database
 from xenix.build_info import BUILD_COMMIT_DISPLAY
 from xenix.main import main
 from xenix.services.agent import (
@@ -20,6 +22,7 @@ from xenix.services.agent import (
 from xenix.services.agent.dev_fixtures import MESSAGE_RENDERING_FIXTURE_TITLE, ensure_mock_conversation_history
 from xenix.services.artifact_service import RegisterArtifactInput
 from xenix.services.llm import LLMProviderConfig, LLMSettings
+from xenix.services.storage.migrations import CURRENT_SCHEMA_VERSION
 from xenix.services.storage.models import (
     AgentMessageAuthor,
     AgentMessageKind,
@@ -61,6 +64,64 @@ def _seed_mock_history(window) -> None:
     current_item = window._history_list.currentItem()
     if current_item is not None:
         window._open_history_thread(current_item)
+
+
+def _sqlite_user_version(db_path: Path) -> int:
+    with sqlite3.connect(db_path) as connection:
+        return int(connection.execute("PRAGMA user_version").fetchone()[0])
+
+
+def test_quarantine_database_renames_with_timestamp_and_collision_suffix(tmp_path: Path) -> None:
+    db_path = tmp_path / "xenix.db"
+    db_path.write_text("failed database", encoding="utf-8")
+    existing_backup = tmp_path / "xenix.corrupt-20260605-201500.db"
+    existing_backup.write_text("older backup", encoding="utf-8")
+
+    quarantined_path = quarantine_database(
+        db_path,
+        timestamp=datetime(2026, 6, 5, 20, 15, 0),
+    )
+
+    assert quarantined_path == tmp_path / "xenix.corrupt-20260605-201500-1.db"
+    assert quarantined_path.read_text(encoding="utf-8") == "failed database"
+    assert existing_backup.read_text(encoding="utf-8") == "older backup"
+    assert not db_path.exists()
+
+
+def test_main_window_can_quarantine_failed_startup_database_and_rebuild(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    db_path = runtime_home / "state" / "xenix.db"
+    db_path.parent.mkdir(parents=True)
+    connection = sqlite3.connect(db_path)
+    try:
+        connection.execute("PRAGMA user_version=99")
+        connection.commit()
+    finally:
+        connection.close()
+
+    recovery_prompts = []
+
+    def fake_prompt_storage_recovery(*, db_path: Path, exc: BaseException):
+        recovery_prompts.append((db_path, exc))
+        return "quarantine"
+
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+    monkeypatch.setattr("xenix.app._prompt_storage_recovery", fake_prompt_storage_recovery)
+
+    app, window = build_main_window(show=True)
+    try:
+        assert len(recovery_prompts) == 1
+        assert _sqlite_user_version(db_path) == CURRENT_SCHEMA_VERSION
+        quarantined_paths = list(db_path.parent.glob("xenix.corrupt-*.db"))
+        assert len(quarantined_paths) == 1
+        assert _sqlite_user_version(quarantined_paths[0]) == 99
+    finally:
+        window.close()
+        app.processEvents()
 
 
 def test_smoke_test_bootstraps_runtime_in_fresh_app_home(monkeypatch, tmp_path: Path) -> None:

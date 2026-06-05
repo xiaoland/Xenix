@@ -1703,12 +1703,51 @@
 <context>
     <name>XenixStartup</name>
     <message>
-        <location filename="../app.py" line="284"/>
+        <location filename="../app.py" line="107"/>
+        <source>Local database recovery</source>
+        <translation>Local database recovery</translation>
+    </message>
+    <message>
+        <location filename="../app.py" line="110"/>
+        <source>Xenix could not initialize the local database.</source>
+        <translation>Xenix could not initialize the local database.</translation>
+    </message>
+    <message>
+        <location filename="../app.py" line="116"/>
+        <source>The database may belong to an unsupported development build or may be damaged. You can back it up and rebuild a fresh database now.</source>
+        <translation>The database may belong to an unsupported development build or may be damaged. You can back it up and rebuild a fresh database now.</translation>
+    </message>
+    <message>
+        <location filename="../app.py" line="123"/>
+        <source>Database: {path}
+
+Reason: {reason}</source>
+        <translation>Database: {path}
+
+Reason: {reason}</translation>
+    </message>
+    <message>
+        <location filename="../app.py" line="129"/>
+        <source>Back up and rebuild</source>
+        <translation>Back up and rebuild</translation>
+    </message>
+    <message>
+        <location filename="../app.py" line="133"/>
+        <source>Open data folder</source>
+        <translation>Open data folder</translation>
+    </message>
+    <message>
+        <location filename="../app.py" line="137"/>
+        <source>Exit</source>
+        <translation>Exit</translation>
+    </message>
+    <message>
+        <location filename="../app.py" line="406"/>
         <source>Unable to start Xenix</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app.py" line="285"/>
+        <location filename="../app.py" line="407"/>
         <source>Xenix could not finish startup.
 
 {error}</source>

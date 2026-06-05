@@ -22,12 +22,15 @@ class StorageContext:
 
 class StorageBootstrapService:
     def initialize(self, paths: AppPaths) -> StorageContext:
+        engine: Engine | None = None
         try:
             ensure_storage_layout(paths)
             engine = create_engine_for_path(database_path(paths))
             schema_version = run_migrations(engine)
             session_factory = create_session_factory(engine)
         except Exception as exc:  # pragma: no cover - exercised through failure surface
+            if engine is not None:
+                engine.dispose()
             raise StorageBootstrapError("Unable to initialize local storage.") from exc
 
         return StorageContext(

@@ -3,15 +3,17 @@ from __future__ import annotations
 import logging
 import sys
 import threading
+from datetime import datetime
+from pathlib import Path
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
-from PySide6.QtCore import QCoreApplication, QElapsedTimer, QEventLoop, QThread
-from PySide6.QtGui import QIcon
+from PySide6.QtCore import QCoreApplication, QElapsedTimer, QEventLoop, QThread, QUrl
+from PySide6.QtGui import QDesktopServices, QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from .config import APP_NAME, APP_ORGANIZATION, ensure_app_dirs, get_app_paths
-from .exceptions import install_exception_hooks
+from .exceptions import StorageBootstrapError, install_exception_hooks
 from .i18n import TranslationManager
 from .logging import setup_logging
 from .resources import package_resource_path
@@ -22,6 +24,7 @@ if TYPE_CHECKING:
 
 LOGGER = logging.getLogger("xenix.bootstrap")
 STARTUP_SPLASH_HOLD_MS = 2200
+StorageRecoveryAction = Literal["quarantine", "open", "exit"]
 
 
 def __getattr__(name: str) -> object:
@@ -71,6 +74,113 @@ def _hold_startup_splash(app: QApplication, splash: StartupSplash | None, hold_m
     while timer.elapsed() < hold_ms:
         app.processEvents(QEventLoop.ProcessEventsFlag.AllEvents, 50)
         QThread.msleep(16)
+
+
+def quarantine_database(db_path: Path, *, timestamp: datetime | None = None) -> Path:
+    if not db_path.exists():
+        raise FileNotFoundError(db_path)
+
+    resolved_timestamp = timestamp or datetime.now()
+    stamp = resolved_timestamp.strftime("%Y%m%d-%H%M%S")
+    candidate = db_path.with_name(f"{db_path.stem}.corrupt-{stamp}{db_path.suffix}")
+    suffix = 1
+    while candidate.exists():
+        candidate = db_path.with_name(f"{db_path.stem}.corrupt-{stamp}-{suffix}{db_path.suffix}")
+        suffix += 1
+    db_path.replace(candidate)
+    return candidate
+
+
+def _storage_recovery_detail(exc: BaseException) -> str:
+    cause = exc.__cause__ or exc
+    return str(cause) or cause.__class__.__name__
+
+
+def _prompt_storage_recovery(
+    *,
+    db_path: Path,
+    exc: BaseException,
+) -> StorageRecoveryAction:
+    message_box = QMessageBox()
+    message_box.setIcon(QMessageBox.Critical)
+    message_box.setWindowTitle(
+        QCoreApplication.translate("XenixStartup", "Local database recovery")
+    )
+    message_box.setText(
+        QCoreApplication.translate(
+            "XenixStartup",
+            "Xenix could not initialize the local database.",
+        )
+    )
+    message_box.setInformativeText(
+        QCoreApplication.translate(
+            "XenixStartup",
+            "The database may belong to an unsupported development build or may be damaged. "
+            "You can back it up and rebuild a fresh database now.",
+        )
+    )
+    message_box.setDetailedText(
+        QCoreApplication.translate(
+            "XenixStartup",
+            "Database: {path}\n\nReason: {reason}",
+        ).format(path=db_path, reason=_storage_recovery_detail(exc))
+    )
+    rebuild_button = message_box.addButton(
+        QCoreApplication.translate("XenixStartup", "Back up and rebuild"),
+        QMessageBox.AcceptRole,
+    )
+    open_button = message_box.addButton(
+        QCoreApplication.translate("XenixStartup", "Open data folder"),
+        QMessageBox.ActionRole,
+    )
+    exit_button = message_box.addButton(
+        QCoreApplication.translate("XenixStartup", "Exit"),
+        QMessageBox.RejectRole,
+    )
+    message_box.setDefaultButton(rebuild_button)
+    message_box.exec()
+
+    clicked_button = message_box.clickedButton()
+    if clicked_button is rebuild_button:
+        return "quarantine"
+    if clicked_button is open_button:
+        return "open"
+    if clicked_button is exit_button:
+        return "exit"
+    return "exit"
+
+
+def _recover_storage_bootstrap(
+    *,
+    app: QApplication,
+    runtime: SimpleNamespace,
+    paths,
+    initial_error: StorageBootstrapError,
+):
+    db_path = runtime.database_path(paths)
+    error: StorageBootstrapError = initial_error
+    while db_path.exists():
+        action = _prompt_storage_recovery(db_path=db_path, exc=error)
+        if action == "exit":
+            raise error
+        if action == "open":
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(db_path.parent)))
+            app.processEvents()
+            continue
+
+        quarantined_path = quarantine_database(db_path)
+        LOGGER.warning(
+            "Quarantined local database after startup storage failure: %s -> %s",
+            db_path,
+            quarantined_path,
+        )
+        try:
+            return runtime.StorageBootstrapService().initialize(paths)
+        except StorageBootstrapError as exc:
+            error = exc
+            LOGGER.exception("Storage bootstrap retry failed after database quarantine")
+
+    raise error
 
 
 def _load_runtime_imports() -> SimpleNamespace:
@@ -176,7 +286,19 @@ def build_main_window(
             splash.retranslate_ui()
 
         _update_startup_stage(app, splash, StartupStage.INITIALIZING_STORAGE)
-        context = runtime.StorageBootstrapService().initialize(paths)
+        try:
+            context = runtime.StorageBootstrapService().initialize(paths)
+        except StorageBootstrapError as exc:
+            if not show or not runtime.database_path(paths).exists():
+                raise
+            _close_startup_splash(app, splash)
+            splash = None
+            context = _recover_storage_bootstrap(
+                app=app,
+                runtime=runtime,
+                paths=paths,
+                initial_error=exc,
+            )
 
         _update_startup_stage(app, splash, StartupStage.LOADING_WORKBENCH)
         dataset_service = runtime.DatasetService(context.session_factory, paths)

@@ -1172,12 +1172,51 @@ This route will stay available after model selection is connected.</source>
 <context>
     <name>XenixStartup</name>
     <message>
-        <location filename="../app.py" line="284"/>
+        <location filename="../app.py" line="107"/>
+        <source>Local database recovery</source>
+        <translation>本地数据库恢复</translation>
+    </message>
+    <message>
+        <location filename="../app.py" line="110"/>
+        <source>Xenix could not initialize the local database.</source>
+        <translation>Xenix 无法初始化本地数据库。</translation>
+    </message>
+    <message>
+        <location filename="../app.py" line="116"/>
+        <source>The database may belong to an unsupported development build or may be damaged. You can back it up and rebuild a fresh database now.</source>
+        <translation>该数据库可能来自不受支持的开发版本，或已经损坏。你可以现在备份它并重建一个新的数据库。</translation>
+    </message>
+    <message>
+        <location filename="../app.py" line="123"/>
+        <source>Database: {path}
+
+Reason: {reason}</source>
+        <translation>数据库：{path}
+
+原因：{reason}</translation>
+    </message>
+    <message>
+        <location filename="../app.py" line="129"/>
+        <source>Back up and rebuild</source>
+        <translation>备份并重建</translation>
+    </message>
+    <message>
+        <location filename="../app.py" line="133"/>
+        <source>Open data folder</source>
+        <translation>打开数据目录</translation>
+    </message>
+    <message>
+        <location filename="../app.py" line="137"/>
+        <source>Exit</source>
+        <translation>退出</translation>
+    </message>
+    <message>
+        <location filename="../app.py" line="406"/>
         <source>Unable to start Xenix</source>
         <translation>无法启动 Xenix</translation>
     </message>
     <message>
-        <location filename="../app.py" line="285"/>
+        <location filename="../app.py" line="407"/>
         <source>Xenix could not finish startup.
 
 {error}</source>
