@@ -1,6 +1,10 @@
 from pathlib import Path
 
+import pytest
+
+import xenix.services.analysis_graph as analysis_graph_module
 from xenix.config import ensure_app_dirs, get_app_paths
+from xenix.exceptions import ValidationError
 from xenix.services.agent import ConversationStore
 from xenix.services.agent.conversation_store import CreateToolCallInput, StartTurnInput
 from xenix.services.agent.tools import AgentToolRegistry, ToolExecutionContext
@@ -84,7 +88,19 @@ def _write_sales_csv(tmp_path: Path) -> Path:
     return source
 
 
-def test_analysis_graph_service_writes_svg_bar_count(monkeypatch, tmp_path: Path) -> None:
+def _bar_spec() -> dict:
+    return {
+        "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+        "mark": "bar",
+        "encoding": {
+            "x": {"field": "region", "type": "nominal"},
+            "y": {"aggregate": "sum", "field": "amount", "type": "quantitative"},
+        },
+        "title": "Revenue by region",
+    }
+
+
+def test_analysis_graph_service_writes_svg_from_vega_lite_spec(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     source = _write_sales_csv(tmp_path)
@@ -93,75 +109,114 @@ def test_analysis_graph_service_writes_svg_bar_count(monkeypatch, tmp_path: Path
         GraphDatasetInput(
             source_path=str(source.resolve()),
             dataset_name="Sales",
-            operation="bar_count",
-            params={"column": "region", "top_n": 2},
+            spec=_bar_spec(),
         )
     )
 
     output_path = Path(result.output_path)
     assert output_path.exists()
     assert output_path.suffix == ".svg"
-    assert result.graph_metadata["operation"] == "bar_count"
-    assert result.graph_metadata["columns"] == ["region"]
+    assert result.graph_metadata["renderer"] == "vl-convert-python"
+    assert result.graph_metadata["spec_format"] == "vega-lite"
+    assert result.graph_metadata["title"] == "Revenue by region"
+    assert result.graph_metadata["referenced_fields"] == ["amount", "region"]
+    assert result.graph_metadata["row_count"] == 4
+    assert result.graph_metadata["truncated"] is False
     assert "<svg" in output_path.read_text(encoding="utf-8")
 
 
-def test_analysis_graph_service_supports_core_graph_operations(monkeypatch, tmp_path: Path) -> None:
+def test_analysis_graph_service_supports_vega_lite_transform(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     source = _write_sales_csv(tmp_path)
-    service = AnalysisGraphService(paths)
-
-    cases = [
-        ("scatter", {"x": "amount", "y": "score"}, ["amount", "score"]),
-        ("line", {"x": "date", "y": "amount"}, ["date", "amount"]),
-        ("correlation_heatmap", {"columns": ["amount", "score"]}, ["amount", "score"]),
-    ]
-    for operation, params, columns in cases:
-        result = service.graph_dataset(
-            GraphDatasetInput(
-                source_path=str(source.resolve()),
-                dataset_name="Sales",
-                operation=operation,
-                params=params,
-            )
-        )
-
-        output_path = Path(result.output_path)
-        assert output_path.exists()
-        assert "<svg" in output_path.read_text(encoding="utf-8")
-        assert result.graph_metadata["operation"] == operation
-        assert result.graph_metadata["columns"] == columns
-
-
-def test_analysis_graph_line_drops_invalid_datetime_values(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    source = tmp_path / "line.csv"
-    source.write_text(
-        "\n".join(
-            [
-                "date,amount",
-                "not-a-date,10",
-                "2026-01-02,20",
-                "2026-01-03,30",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
+    spec = {
+        "transform": [{"filter": "datum.amount >= 15"}],
+        "mark": "line",
+        "encoding": {
+            "x": {"field": "date", "type": "temporal"},
+            "y": {"aggregate": "sum", "field": "amount", "type": "quantitative"},
+            "color": {"field": "region", "type": "nominal"},
+        },
+    }
 
     result = AnalysisGraphService(paths).graph_dataset(
-        GraphDatasetInput(
-            source_path=str(source.resolve()),
-            dataset_name="Line",
-            operation="line",
-            params={"x": "date", "y": "amount"},
-        )
+        GraphDatasetInput(source_path=str(source.resolve()), dataset_name="Sales", spec=spec)
     )
 
-    assert result.graph_metadata["point_count"] == 2
     assert Path(result.output_path).exists()
+    assert result.graph_metadata["referenced_fields"] == ["amount", "date", "region"]
+    assert result.graph_metadata["warnings"] == []
+
+
+def test_analysis_graph_rejects_spec_owned_data_sources(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    source = _write_sales_csv(tmp_path)
+    spec = {
+        "data": {"url": "https://example.invalid/sales.csv"},
+        "mark": "bar",
+        "encoding": {"x": {"field": "region"}, "y": {"field": "amount"}},
+    }
+
+    with pytest.raises(ValidationError, match="Xenix injects the registered dataset"):
+        AnalysisGraphService(paths).graph_dataset(
+            GraphDatasetInput(source_path=str(source.resolve()), dataset_name="Sales", spec=spec)
+        )
+
+
+def test_analysis_graph_rejects_unknown_fields_with_available_columns(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    source = _write_sales_csv(tmp_path)
+    spec = {
+        "mark": "point",
+        "encoding": {
+            "x": {"field": "missing_amount", "type": "quantitative"},
+            "y": {"field": "score", "type": "quantitative"},
+        },
+    }
+
+    with pytest.raises(ValidationError, match="missing_amount.*Available columns: region, amount, score, date"):
+        AnalysisGraphService(paths).graph_dataset(
+            GraphDatasetInput(source_path=str(source.resolve()), dataset_name="Sales", spec=spec)
+        )
+
+
+def test_analysis_graph_rejects_large_aggregate_chart_without_preaggregation(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    monkeypatch.setattr(analysis_graph_module, "_MAX_RENDER_ROWS", 3)
+    paths = ensure_app_dirs(get_app_paths())
+    source = _write_sales_csv(tmp_path)
+
+    with pytest.raises(ValidationError, match="Use data.query or data.transform to pre-aggregate"):
+        AnalysisGraphService(paths).graph_dataset(
+            GraphDatasetInput(source_path=str(source.resolve()), dataset_name="Sales", spec=_bar_spec())
+        )
+
+
+def test_analysis_graph_truncates_large_row_level_chart(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    monkeypatch.setattr(analysis_graph_module, "_MAX_RENDER_ROWS", 3)
+    paths = ensure_app_dirs(get_app_paths())
+    source = _write_sales_csv(tmp_path)
+    spec = {
+        "mark": "point",
+        "encoding": {
+            "x": {"field": "amount", "type": "quantitative"},
+            "y": {"field": "score", "type": "quantitative"},
+        },
+    }
+
+    result = AnalysisGraphService(paths).graph_dataset(
+        GraphDatasetInput(source_path=str(source.resolve()), dataset_name="Sales", spec=spec)
+    )
+
+    assert result.graph_metadata["truncated"] is True
+    assert result.graph_metadata["rendered_row_count"] == 3
+    assert "Rendered the first 3 rows" in result.graph_metadata["warnings"][0]
 
 
 def test_analysis_graph_tool_registers_image_artifact(monkeypatch, tmp_path: Path) -> None:
@@ -172,8 +227,7 @@ def test_analysis_graph_tool_registers_image_artifact(monkeypatch, tmp_path: Pat
     )
     arguments = {
         "dataset_id": dataset.id,
-        "operation": "histogram",
-        "params": {"column": "amount", "bins": 4, "title": "Amount distribution"},
+        "spec": _bar_spec(),
     }
 
     result = registry.execute(
@@ -188,32 +242,10 @@ def test_analysis_graph_tool_registers_image_artifact(monkeypatch, tmp_path: Pat
     assert result.content_blocks == []
     assert resolved.kind is ArtifactKind.IMAGE
     assert resolved.mime_type == "image/svg+xml"
+    assert resolved.title == "Revenue by region"
     assert Path(resolved.absolute_path).exists()
     assert resolved.metadata_payload["dataset_id"] == dataset.id
-    assert resolved.metadata_payload["analysis_graph"]["operation"] == "histogram"
-
-
-def test_analysis_graph_tool_uses_default_title_for_blank_title(monkeypatch, tmp_path: Path) -> None:
-    _paths, dataset_service, artifact_service, registry, conversation_store = _build_runtime(monkeypatch, tmp_path)
-    source = _write_sales_csv(tmp_path)
-    dataset = dataset_service.register_dataset(
-        RegisterDatasetInput(source_path=str(source.resolve()), name="Sales")
-    )
-    arguments = {
-        "dataset_id": dataset.id,
-        "operation": "bar_count",
-        "params": {"column": "region", "title": "   "},
-    }
-
-    result = registry.execute(
-        "analysis.graph",
-        arguments,
-        _tool_context(conversation_store, "analysis.graph", arguments),
-    )
-    resolved = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}?view=image")
-
-    assert resolved.title == "Sales bar_count"
-    assert "artifact_link" not in result.payload
+    assert resolved.metadata_payload["analysis_graph"]["renderer"] == "vl-convert-python"
 
 
 def test_analysis_graph_tool_schema_is_dataset_scoped(monkeypatch, tmp_path: Path) -> None:
@@ -222,9 +254,10 @@ def test_analysis_graph_tool_schema_is_dataset_scoped(monkeypatch, tmp_path: Pat
 
     assert "analysis.graph" in specs
     schema = specs["analysis.graph"].parameters_schema
-    assert schema["required"] == ["dataset_id", "operation"]
+    assert schema["required"] == ["dataset_id", "spec"]
     assert "dataset_id" in schema["properties"]
-    assert "operation" in schema["properties"]
-    assert "params" in schema["properties"]
+    assert "spec" in schema["properties"]
+    assert "operation" not in schema["properties"]
+    assert "params" not in schema["properties"]
     assert "source_path" not in schema["properties"]
     assert "rows" not in schema["properties"]

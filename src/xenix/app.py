@@ -365,6 +365,7 @@ def build_main_window(
 
 
 def _run_smoke_checks(paths) -> None:
+    from .services.analysis_graph import AnalysisGraphService, GraphDatasetInput
     from .services.data_transform import (
         DataQueryInput,
         DataQueryTransformService,
@@ -389,6 +390,26 @@ def _run_smoke_checks(paths) -> None:
     if not result.rows or result.rows[0].get("total") != 3:
         raise RuntimeError("DuckDB smoke query failed.")
 
+    graph_smoke_path = paths.temp / "graph-smoke.csv"
+    graph_smoke_path.write_text("label,value\nA,1\nB,2\n", encoding="utf-8")
+    graph_result = AnalysisGraphService(paths).graph_dataset(
+        GraphDatasetInput(
+            source_path=str(graph_smoke_path.resolve()),
+            dataset_name="Graph smoke",
+            spec={
+                "mark": "bar",
+                "encoding": {
+                    "x": {"field": "label", "type": "nominal"},
+                    "y": {"field": "value", "type": "quantitative"},
+                },
+                "title": "Graph smoke",
+            },
+        )
+    )
+    graph_output = Path(graph_result.output_path)
+    if not graph_output.is_file() or not graph_output.read_text(encoding="utf-8").lstrip().startswith("<svg"):
+        raise RuntimeError("Vega-Lite graph smoke render failed.")
+
 
 def run(*, smoke_test: bool = False) -> int:
     try:
@@ -412,10 +433,15 @@ def run(*, smoke_test: bool = False) -> int:
         return 1
 
     if smoke_test:
-        _run_smoke_checks(ensure_app_dirs(get_app_paths()))
-        window.show()
-        app.processEvents()
-        window.close()
-        LOGGER.info("Xenix smoke test completed")
-        return 0
+        try:
+            _run_smoke_checks(ensure_app_dirs(get_app_paths()))
+            window.show()
+            app.processEvents()
+            window.close()
+            LOGGER.info("Xenix smoke test completed")
+            return 0
+        except Exception:
+            LOGGER.exception("Xenix smoke test failed")
+            window.close()
+            return 1
     return app.exec()

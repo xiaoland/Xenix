@@ -57,7 +57,7 @@ Record which product concepts remain in the native edition and which are intenti
 - Data cleaning tools operate on registered datasets and create new derived datasets when cleaning operations are applied; source datasets remain intact.
 - Query tools read registered datasets and return bounded results without creating dataset artifacts by default.
 - Analysis profiling tools read registered datasets and return bounded descriptive statistics directly in the tool result without creating artifacts by default.
-- Analysis graph tools read registered datasets and produce service-managed image artifacts through explicit chart operations.
+- Analysis graph tools read registered datasets and produce service-managed image artifacts from Vega-Lite chart specifications.
 - Analysis lambda tools run one-off Python analysis functions over registered datasets in a local subprocess, return any JSON-serializable dictionary through `result.output`, and may create service-managed artifacts through a constrained artifact API.
 - Transform tools operate on registered datasets and create new derived datasets; source datasets remain intact.
 - Project is retained only as a storage compatibility detail while the AI-first product model centers on Chatbot threads, datasets, artifacts, and dataset lineage.

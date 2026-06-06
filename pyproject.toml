@@ -21,6 +21,7 @@ dependencies = [
     "apyori>=1.1.2",
     "marko>=2.2.0",
     "statsmodels>=0.14.0",
+    "vl-convert-python>=1.9.0.post1",
 ]
 
 [dependency-groups]

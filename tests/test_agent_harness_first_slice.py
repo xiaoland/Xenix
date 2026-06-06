@@ -557,6 +557,11 @@ def test_agent_harness_model_metadata_exposes_catalog_without_train_enums(monkey
     assert "model.train" in specs
     assert "model.hyper_train" in specs
     assert "model.apply" in specs
+    graph_schema = specs["analysis.graph"].parameters_schema
+    assert graph_schema["required"] == ["dataset_id", "spec"]
+    assert "spec" in graph_schema["properties"]
+    assert "operation" not in graph_schema["properties"]
+    assert "params" not in graph_schema["properties"]
     assert "enum" not in specs["model.metadata"].parameters_schema["properties"]["model_keys"]["items"]
     feature_select_schema = specs["data.feature.select"].parameters_schema
     assert "enum" not in feature_select_schema["properties"]["model_key"]
