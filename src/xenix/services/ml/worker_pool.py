@@ -5,6 +5,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
+from ...observability import record_counter, record_histogram, start_span
 from .contracts import TaskLogEntry
 from .execution import LocalMLWorkerRunner, SshMLWorkerRunner
 from .worker_settings import (
@@ -46,17 +47,32 @@ class MLWorkerPool:
         *,
         cancel_requested: Callable[[], bool] | None = None,
     ) -> int:
-        worker = self._acquire_worker()
+        dispatch_started_at = time.perf_counter()
+        worker: MLWorkerConfig | None = None
         try:
+            worker = self._acquire_worker()
             self._append_log(task_dir, "INFO", f"ML worker selected: {worker.display_name} ({worker.kind.value}).")
-            if worker.kind is MLWorkerKind.LOCAL:
-                return self._local_runner.run(entrypoint, task_dir, cancel_requested=cancel_requested)
-            if worker.kind is MLWorkerKind.SSH:
-                return SshMLWorkerRunner(worker).run(entrypoint, task_dir, cancel_requested=cancel_requested)
-            self._append_log(task_dir, "ERROR", f"Unsupported ML worker kind '{worker.kind.value}'.")
-            return 1
+            attributes = {"ml.worker.kind": worker.kind.value}
+            with start_span("ml.worker_dispatch", attributes):
+                if worker.kind is MLWorkerKind.LOCAL:
+                    return_code = self._local_runner.run(entrypoint, task_dir, cancel_requested=cancel_requested)
+                elif worker.kind is MLWorkerKind.SSH:
+                    return_code = SshMLWorkerRunner(worker).run(entrypoint, task_dir, cancel_requested=cancel_requested)
+                else:
+                    self._append_log(task_dir, "ERROR", f"Unsupported ML worker kind '{worker.kind.value}'.")
+                    return_code = 1
+            status = "succeeded" if return_code == 0 else "failed"
+            record_counter("xenix.ml.worker_dispatch.count", attributes={**attributes, "status": status})
+            record_histogram(
+                "xenix.ml.worker_dispatch.duration",
+                (time.perf_counter() - dispatch_started_at) * 1000,
+                attributes={**attributes, "status": status},
+                unit="ms",
+            )
+            return return_code
         finally:
-            self._release_worker(worker.id)
+            if worker is not None:
+                self._release_worker(worker.id)
 
     def _acquire_worker(self) -> MLWorkerConfig:
         while True:

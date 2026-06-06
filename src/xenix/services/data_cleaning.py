@@ -4,6 +4,7 @@ import copy
 import re
 import unicodedata
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
@@ -14,6 +15,7 @@ from sqlmodel import SQLModel
 
 from ..config import AppPaths
 from ..exceptions import ValidationError
+from ..observability import record_counter, record_histogram, start_span
 from .dataset_inspection import detect_source_format, load_dataframe
 from .storage.models import DatasetSourceFormat
 
@@ -504,45 +506,59 @@ class DataCleaningService:
         self._paths = paths
 
     def clean_dataset(self, input_data: CleanDatasetInput) -> CleanDatasetResult:
-        source_path = Path(input_data.source_path).expanduser()
-        if not source_path.is_absolute():
-            raise ValidationError("Dataset source path must be absolute.")
-        if not source_path.exists() or not source_path.is_file():
-            raise ValidationError("Dataset source path must point to an existing file.")
+        started_at = perf_counter()
+        with start_span("data.clean"):
+            source_path = Path(input_data.source_path).expanduser()
+            if not source_path.is_absolute():
+                raise ValidationError("Dataset source path must be absolute.")
+            if not source_path.exists() or not source_path.is_file():
+                raise ValidationError("Dataset source path must point to an existing file.")
 
-        source_format = detect_source_format(source_path)
-        if source_format is DatasetSourceFormat.UNKNOWN:
-            raise ValidationError("Only .csv, .xlsx, and .xls dataset files are supported.")
+            source_format = detect_source_format(source_path)
+            if source_format is DatasetSourceFormat.UNKNOWN:
+                raise ValidationError("Only .csv, .xlsx, and .xls dataset files are supported.")
 
-        frame = load_dataframe(source_path, source_format)
-        if len(frame.columns) == 0:
-            raise ValidationError("Dataset file must contain at least one column.")
+            frame = load_dataframe(source_path, source_format)
+            if len(frame.columns) == 0:
+                raise ValidationError("Dataset file must contain at least one column.")
 
-        report: dict[str, Any] = {
-            "row_count_before": int(len(frame.index)),
-            "row_count_after": int(len(frame.index)),
-            "operations": [],
-            "validation_rules": [],
-            "warnings": [],
-        }
+            report: dict[str, Any] = {
+                "row_count_before": int(len(frame.index)),
+                "row_count_after": int(len(frame.index)),
+                "operations": [],
+                "validation_rules": [],
+                "warnings": [],
+            }
 
-        if not input_data.operations:
-            report["rows_removed"] = 0
-            report["no_op"] = True
-            return CleanDatasetResult(output_path=str(source_path.resolve()), report=report)
+            if not input_data.operations:
+                report["rows_removed"] = 0
+                report["no_op"] = True
+                self._record_operation(started_at)
+                return CleanDatasetResult(output_path=str(source_path.resolve()), report=report)
 
-        for operation in input_data.operations:
-            frame = self._apply_operation(frame, operation, report)
+            for operation in input_data.operations:
+                frame = self._apply_operation(frame, operation, report)
 
-        output_dir = self._paths.artifacts / "datasets" / "cleaned"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = output_dir / f"{self._slug(input_data.name)}-{uuid4().hex[:12]}.csv"
-        frame.to_csv(output_path, index=False)
+            output_dir = self._paths.artifacts / "datasets" / "cleaned"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_path = output_dir / f"{self._slug(input_data.name)}-{uuid4().hex[:12]}.csv"
+            frame.to_csv(output_path, index=False)
 
-        report["row_count_after"] = int(len(frame.index))
-        report["rows_removed"] = int(report["row_count_before"] - report["row_count_after"])
-        report["no_op"] = False
-        return CleanDatasetResult(output_path=str(output_path.resolve()), report=report)
+            report["row_count_after"] = int(len(frame.index))
+            report["rows_removed"] = int(report["row_count_before"] - report["row_count_after"])
+            report["no_op"] = False
+            self._record_operation(started_at)
+            return CleanDatasetResult(output_path=str(output_path.resolve()), report=report)
+
+    def _record_operation(self, started_at: float) -> None:
+        attributes = {"data.operation": "data.clean", "status": "succeeded"}
+        record_counter("xenix.data.operation.count", attributes=attributes)
+        record_histogram(
+            "xenix.data.operation.duration",
+            (perf_counter() - started_at) * 1000,
+            attributes=attributes,
+            unit="ms",
+        )
 
     def _apply_operation(
         self,

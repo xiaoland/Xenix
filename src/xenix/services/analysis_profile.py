@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 import pandas as pd
@@ -9,6 +10,7 @@ from pydantic import ConfigDict, Field
 from sqlmodel import SQLModel
 
 from ..exceptions import ValidationError
+from ..observability import record_counter, record_histogram, start_span
 from .dataset_inspection import detect_source_format, load_dataframe
 from .storage.models import DatasetSourceFormat
 
@@ -39,59 +41,72 @@ class ProfileDatasetResult(SQLModel):
 
 class AnalysisProfileService:
     def profile_dataset(self, input_data: ProfileDatasetInput) -> ProfileDatasetResult:
-        source_path = self._resolve_source_path(input_data.source_path)
-        top_n = self._normalize_int(
-            input_data.top_n,
-            field_name="top_n",
-            minimum=1,
-            maximum=_MAX_TOP_N,
-        )
-        correlation_column_limit = self._normalize_int(
-            input_data.correlation_column_limit,
-            field_name="correlation_column_limit",
-            minimum=2,
-            maximum=_MAX_CORRELATION_COLUMN_LIMIT,
-        )
-        frame = self._load_frame(source_path)
-        dataset_name = input_data.dataset_name.strip() or source_path.stem
+        started_at = perf_counter()
+        with start_span("analysis.profile"):
+            source_path = self._resolve_source_path(input_data.source_path)
+            top_n = self._normalize_int(
+                input_data.top_n,
+                field_name="top_n",
+                minimum=1,
+                maximum=_MAX_TOP_N,
+            )
+            correlation_column_limit = self._normalize_int(
+                input_data.correlation_column_limit,
+                field_name="correlation_column_limit",
+                minimum=2,
+                maximum=_MAX_CORRELATION_COLUMN_LIMIT,
+            )
+            frame = self._load_frame(source_path)
+            dataset_name = input_data.dataset_name.strip() or source_path.stem
 
-        column_groups = self._column_groups(frame)
-        target_columns = self._normalize_target_columns(
-            frame,
-            input_data.target_columns,
-            column_groups["continuous_numeric"],
-        )
-        profile = {
-            "dataset": {
-                "name": dataset_name,
-                "file_name": source_path.name,
-            },
-            "limits": {
-                "top_n": top_n,
-                "correlation_column_limit": correlation_column_limit,
-            },
-            "basic_info": self._basic_info(frame),
-            "field_info": self._field_info(frame),
-            "field_type_summary": self._field_type_summary(column_groups),
-            "numeric_statistics": self._numeric_statistics(frame, column_groups["continuous_numeric"]),
-            "binary_frequencies": self._frequencies(frame, column_groups["binary"], top_n),
-            "category_frequencies": self._frequencies(frame, column_groups["non_numeric"], top_n),
-            "datetime_statistics": self._datetime_statistics(frame, column_groups["datetime"]),
-            "correlation_matrix": self._correlation_matrix(
+            column_groups = self._column_groups(frame)
+            target_columns = self._normalize_target_columns(
                 frame,
+                input_data.target_columns,
                 column_groups["continuous_numeric"],
-                correlation_column_limit,
-            ),
-            "target_group_statistics": self._target_group_statistics(
-                frame,
-                target_columns,
-                [*column_groups["binary"], *column_groups["non_numeric"]],
-                top_n,
-            ),
-        }
-        return ProfileDatasetResult(
-            profile=profile,
-            markdown=self._profile_markdown(profile),
+            )
+            profile = {
+                "dataset": {
+                    "name": dataset_name,
+                    "file_name": source_path.name,
+                },
+                "limits": {
+                    "top_n": top_n,
+                    "correlation_column_limit": correlation_column_limit,
+                },
+                "basic_info": self._basic_info(frame),
+                "field_info": self._field_info(frame),
+                "field_type_summary": self._field_type_summary(column_groups),
+                "numeric_statistics": self._numeric_statistics(frame, column_groups["continuous_numeric"]),
+                "binary_frequencies": self._frequencies(frame, column_groups["binary"], top_n),
+                "category_frequencies": self._frequencies(frame, column_groups["non_numeric"], top_n),
+                "datetime_statistics": self._datetime_statistics(frame, column_groups["datetime"]),
+                "correlation_matrix": self._correlation_matrix(
+                    frame,
+                    column_groups["continuous_numeric"],
+                    correlation_column_limit,
+                ),
+                "target_group_statistics": self._target_group_statistics(
+                    frame,
+                    target_columns,
+                    [*column_groups["binary"], *column_groups["non_numeric"]],
+                    top_n,
+                ),
+            }
+            self._record_operation("analysis.profile", started_at)
+            return ProfileDatasetResult(
+                profile=profile,
+                markdown=self._profile_markdown(profile),
+            )
+
+    def _record_operation(self, operation: str, started_at: float) -> None:
+        attributes = {"analysis.operation": operation, "status": "succeeded"}
+        record_counter("xenix.analysis.operation.count", attributes=attributes)
+        record_histogram(
+            "xenix.analysis.operation.duration",
+            (perf_counter() - started_at) * 1000,
+            attributes=attributes,
+            unit="ms",
         )
 
     def _resolve_source_path(self, raw_path: str) -> Path:

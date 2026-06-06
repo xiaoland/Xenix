@@ -5,6 +5,8 @@ import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+import structlog
+
 from .config import AppPaths
 
 LOG_FILE_NAME = "xenix.log"
@@ -15,13 +17,15 @@ def setup_logging(paths: AppPaths) -> Path:
     log_level = getattr(logging, log_level_name, logging.INFO)
     log_path = paths.logs / LOG_FILE_NAME
 
-    formatter = logging.Formatter(
-        "%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    formatter = structlog.stdlib.ProcessorFormatter(
+        processor=structlog.processors.JSONRenderer(sort_keys=True),
+        foreign_pre_chain=_shared_processors(),
     )
 
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level)
     root_logger.handlers.clear()
+    _configure_structlog(log_level)
 
     file_handler = RotatingFileHandler(
         log_path,
@@ -39,3 +43,38 @@ def setup_logging(paths: AppPaths) -> Path:
     logging.captureWarnings(True)
 
     return log_path
+
+
+def get_logger(name: str):
+    return structlog.get_logger(name)
+
+
+def _configure_structlog(log_level: int) -> None:
+    structlog.configure(
+        processors=[
+            structlog.contextvars.merge_contextvars,
+            structlog.stdlib.filter_by_level,
+            structlog.stdlib.add_logger_name,
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.ExtraAdder(),
+            structlog.processors.TimeStamper(fmt="iso", utc=True),
+            structlog.processors.StackInfoRenderer(),
+            structlog.processors.format_exc_info,
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+        ],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
+    )
+    logging.getLogger().setLevel(log_level)
+
+
+def _shared_processors():
+    return [
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.ExtraAdder(),
+        structlog.processors.TimeStamper(fmt="iso", utc=True),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+    ]

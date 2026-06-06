@@ -16,6 +16,7 @@ from .config import APP_NAME, APP_ORGANIZATION, ensure_app_dirs, get_app_paths
 from .exceptions import StorageBootstrapError, install_exception_hooks
 from .i18n import TranslationManager
 from .logging import setup_logging
+from .observability import flush_observability, record_counter, setup_observability, start_span
 from .resources import package_resource_path
 from .ui.startup_splash import StartupSplash, StartupStage
 
@@ -270,6 +271,8 @@ def build_main_window(
         splash.show_centered()
         _update_startup_stage(app, splash, StartupStage.STARTING)
 
+    startup_scope = None
+    startup_span_active = False
     try:
         _update_startup_stage(app, splash, StartupStage.PREPARING_APP_DATA)
         paths = ensure_app_dirs(paths)
@@ -280,15 +283,39 @@ def build_main_window(
 
         _update_startup_stage(app, splash, StartupStage.INITIALIZING_LOGGING)
         log_path = setup_logging(paths)
+        observability = setup_observability(paths)
+        startup_scope = start_span("app.startup")
+        startup_scope.__enter__()
+        startup_span_active = True
         install_exception_hooks()
+        LOGGER.info(
+            "Observability initialized",
+            extra={
+                "event_name": "app.observability.initialized",
+                "otlp_enabled": observability.otlp_enabled,
+                "otlp_log_export_enabled": observability.log_export_enabled,
+            },
+        )
 
         if splash is not None:
             splash.retranslate_ui()
 
         _update_startup_stage(app, splash, StartupStage.INITIALIZING_STORAGE)
         try:
-            context = runtime.StorageBootstrapService().initialize(paths)
+            with start_span("storage.bootstrap"):
+                context = runtime.StorageBootstrapService().initialize(paths)
+                record_counter(
+                    "xenix.storage.bootstrap.count",
+                    attributes={
+                        "storage.schema_version": context.schema_version,
+                        "status": "succeeded",
+                    },
+                )
         except StorageBootstrapError as exc:
+            record_counter(
+                "xenix.storage.bootstrap.count",
+                attributes={"status": "failed", "error.type": exc.__class__.__name__},
+            )
             if not show or not runtime.database_path(paths).exists():
                 raise
             _close_startup_splash(app, splash)
@@ -358,8 +385,17 @@ def build_main_window(
             app.processEvents()
 
         LOGGER.info("Xenix native shell started")
+        record_counter("xenix.app.startup.count", attributes={"status": "succeeded"})
+        startup_scope.__exit__(None, None, None)
+        startup_span_active = False
+        flush_observability()
         return app, window
     except Exception:
+        record_counter("xenix.app.startup.count", attributes={"status": "failed"})
+        if startup_span_active and startup_scope is not None:
+            startup_scope.__exit__(*sys.exc_info())
+            startup_span_active = False
+        flush_observability()
         _close_startup_splash(app, splash)
         raise
 
@@ -439,9 +475,11 @@ def run(*, smoke_test: bool = False) -> int:
             app.processEvents()
             window.close()
             LOGGER.info("Xenix smoke test completed")
+            flush_observability()
             return 0
         except Exception:
             LOGGER.exception("Xenix smoke test failed")
             window.close()
+            flush_observability()
             return 1
     return app.exec()

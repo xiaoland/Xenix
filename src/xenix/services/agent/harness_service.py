@@ -6,12 +6,14 @@ import logging
 from pathlib import Path
 import re
 import threading
+from time import perf_counter
 from typing import Any, Iterator
 
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import Field, SQLModel
 
 from ...exceptions import ValidationError
+from ...observability import record_counter, record_histogram, stable_hash, start_span
 from ..storage.models import (
     AgentMessageAuthor,
     AgentMessageKind,
@@ -249,43 +251,59 @@ class AgentHarnessService:
             cancel_event.set()
 
     def submit_user_turn(self, input_data: SubmitUserTurnInput) -> ThreadSnapshot:
-        thread_id, turn_id, run_id, file_paths, provider = self._start_user_turn(input_data)
+        with start_span("agent.turn"):
+            thread_id, turn_id, run_id, file_paths, provider = self._start_user_turn(input_data)
 
-        try:
-            outcome = self._run_provider_loop(
-                thread_id=thread_id,
-                turn_id=turn_id,
-                run_id=run_id,
-                file_paths=file_paths,
-                step_state=self._initial_step_state(),
-                provider=provider,
-            )
-            if isinstance(outcome, StepBudgetPause):
-                return outcome.snapshot
-            self._conversation_store.finish_run(
-                FinishAgentRunInput(
+            try:
+                outcome = self._run_provider_loop(
+                    thread_id=thread_id,
+                    turn_id=turn_id,
                     run_id=run_id,
-                    status=AgentRunStatus.SUCCEEDED,
+                    file_paths=file_paths,
+                    step_state=self._initial_step_state(),
+                    provider=provider,
                 )
-            )
-            return outcome
-        except AgentRunCancelled:
-            snapshot = self._cancel_run_and_turn(thread_id, turn_id, run_id)
-            return snapshot
-        except Exception as exc:
-            self._conversation_store.finish_run(
-                FinishAgentRunInput(
-                    run_id=run_id,
-                    status=AgentRunStatus.FAILED,
-                    error_summary=str(exc),
+                if isinstance(outcome, StepBudgetPause):
+                    self._record_agent_turn("awaiting_confirmation")
+                    return outcome.snapshot
+                self._conversation_store.finish_run(
+                    FinishAgentRunInput(
+                        run_id=run_id,
+                        status=AgentRunStatus.SUCCEEDED,
+                    )
                 )
-            )
-            raise
-        finally:
-            self._clear_cancel_event(run_id)
+                self._record_agent_turn(AgentRunStatus.SUCCEEDED.value)
+                return outcome
+            except AgentRunCancelled:
+                snapshot = self._cancel_run_and_turn(thread_id, turn_id, run_id)
+                self._record_agent_turn(AgentRunStatus.CANCELLED.value)
+                return snapshot
+            except Exception as exc:
+                self._conversation_store.finish_run(
+                    FinishAgentRunInput(
+                        run_id=run_id,
+                        status=AgentRunStatus.FAILED,
+                        error_summary=str(exc),
+                    )
+                )
+                self._record_agent_turn(AgentRunStatus.FAILED.value, exc)
+                raise
+            finally:
+                self._clear_cancel_event(run_id)
 
     def submit_user_turn_stream(self, input_data: SubmitUserTurnInput):
-        thread_id, turn_id, run_id, file_paths, provider = self._start_user_turn(input_data)
+        with start_span("agent.turn"):
+            thread_id, turn_id, run_id, file_paths, provider = self._start_user_turn(input_data)
+            yield from self._submit_user_turn_stream_started(thread_id, turn_id, run_id, file_paths, provider)
+
+    def _submit_user_turn_stream_started(
+        self,
+        thread_id: str,
+        turn_id: str,
+        run_id: str,
+        file_paths: list[str],
+        provider: AgentProvider,
+    ):
         snapshot = self._conversation_store.get_thread_snapshot(thread_id)
         yield AgentHarnessStreamEvent(
             kind="snapshot",
@@ -307,6 +325,7 @@ class AgentHarnessService:
                 provider=provider,
             )
             if isinstance(outcome, StepBudgetPause):
+                self._record_agent_turn("awaiting_confirmation")
                 yield self._step_confirmation_event(outcome)
                 return
             self._conversation_store.finish_run(
@@ -315,6 +334,7 @@ class AgentHarnessService:
                     status=AgentRunStatus.SUCCEEDED,
                 )
             )
+            self._record_agent_turn(AgentRunStatus.SUCCEEDED.value)
             yield AgentHarnessStreamEvent(
                 kind="snapshot",
                 thread_id=thread_id,
@@ -326,6 +346,7 @@ class AgentHarnessService:
             )
         except AgentRunCancelled:
             snapshot = self._cancel_run_and_turn(thread_id, turn_id, run_id)
+            self._record_agent_turn(AgentRunStatus.CANCELLED.value)
             yield AgentHarnessStreamEvent(
                 kind="snapshot",
                 thread_id=thread_id,
@@ -344,6 +365,7 @@ class AgentHarnessService:
                     error_summary=str(exc),
                 )
             )
+            self._record_agent_turn(AgentRunStatus.FAILED.value, exc)
             raise
         finally:
             self._clear_cancel_event(run_id)
@@ -547,12 +569,13 @@ class AgentHarnessService:
             tool_specs = self._tool_specs_for_context(snapshot=snapshot, attached_files=attached_files)
             available_tool_names = {tool.name for tool in tool_specs}
             try:
-                provider_response = provider.complete(
-                    provider_messages,
-                    tool_specs,
-                )
-                self._raise_if_cancelled(run_id)
-                self._validate_provider_tool_calls(provider_response.tool_calls, available_tool_names)
+                with start_span("agent.provider_request", self._provider_request_attributes(provider_request)):
+                    provider_response = provider.complete(
+                        provider_messages,
+                        tool_specs,
+                    )
+                    self._raise_if_cancelled(run_id)
+                    self._validate_provider_tool_calls(provider_response.tool_calls, available_tool_names)
             except AgentRunCancelled:
                 self._complete_provider_request(
                     provider_request,
@@ -625,21 +648,25 @@ class AgentHarnessService:
 
             for tool_call, arguments, persisted_tool_call in persisted_tool_calls:
                 self._raise_if_cancelled(run_id)
+                tool_started_at = perf_counter()
+                tool_error: BaseException | None = None
                 try:
-                    result = self._tool_registry.execute(
-                        tool_call.tool_name,
-                        arguments,
-                        ToolExecutionContext(
-                            thread_id=thread_id,
-                            turn_id=turn_id,
-                            tool_call_id=persisted_tool_call.id,
-                            attached_files=attached_files,
-                            cancel_requested=lambda run_id=run_id: self._is_cancel_requested(run_id),
-                        ),
-                    )
+                    with start_span("agent.tool_call", self._tool_call_attributes(persisted_tool_call)):
+                        result = self._tool_registry.execute(
+                            tool_call.tool_name,
+                            arguments,
+                            ToolExecutionContext(
+                                thread_id=thread_id,
+                                turn_id=turn_id,
+                                tool_call_id=persisted_tool_call.id,
+                                attached_files=attached_files,
+                                cancel_requested=lambda run_id=run_id: self._is_cancel_requested(run_id),
+                            ),
+                        )
                     status = AgentToolCallStatus.SUCCEEDED
                     error_summary = None
                 except Exception as exc:
+                    tool_error = exc
                     if self._is_cancel_requested(run_id):
                         result = self._tool_cancelled_result()
                         status = AgentToolCallStatus.CANCELLED
@@ -657,6 +684,11 @@ class AgentHarnessService:
                         error_summary=error_summary,
                         provider_payload={"tool_call_id": tool_call.provider_call_id},
                     )
+                )
+                self._record_tool_call(
+                    _completed,
+                    (perf_counter() - tool_started_at) * 1000,
+                    tool_error,
                 )
                 if status is AgentToolCallStatus.CANCELLED:
                     raise AgentRunCancelled()
@@ -705,46 +737,47 @@ class AgentHarnessService:
                 status=ChatbotEventStatus.IN_PROGRESS,
             )
             try:
-                for stream_event in self._provider_stream(
-                    provider,
-                    provider_messages,
-                    tool_specs,
-                ):
-                    self._raise_if_cancelled(run_id)
-                    if thinking_in_progress:
-                        thinking_in_progress = False
-                        yield self._thinking_event(
-                            thread_id=thread_id,
-                            turn_id=turn_id,
-                            run_id=run_id,
-                            status=ChatbotEventStatus.COMPLETED,
-                        )
-                    if stream_event.delta_text:
-                        assistant_text += stream_event.delta_text
-                        assistant_blocks = [{"type": "markdown", "text": assistant_text}]
-                        if assistant_message is None:
-                            assistant_message = self._conversation_store.append_message(
-                                AppendAgentMessageInput(
-                                    thread_id=thread_id,
-                                    turn_id=turn_id,
-                                    kind=AgentMessageKind.ASSISTANT,
-                                    ui_author=AgentMessageAuthor.ASSISTANT,
-                                    content_blocks=assistant_blocks,
-                                    status=AgentMessageStatus.IN_PROGRESS,
-                                )
+                with start_span("agent.provider_request", self._provider_request_attributes(provider_request)):
+                    for stream_event in self._provider_stream(
+                        provider,
+                        provider_messages,
+                        tool_specs,
+                    ):
+                        self._raise_if_cancelled(run_id)
+                        if thinking_in_progress:
+                            thinking_in_progress = False
+                            yield self._thinking_event(
+                                thread_id=thread_id,
+                                turn_id=turn_id,
+                                run_id=run_id,
+                                status=ChatbotEventStatus.COMPLETED,
                             )
-                            yield self._message_event("message_created", assistant_message, run_id)
-                        else:
-                            assistant_message = self._conversation_store.update_message(
-                                UpdateAgentMessageInput(
-                                    message_id=assistant_message.id,
-                                    content_blocks=assistant_blocks,
-                                    status=AgentMessageStatus.IN_PROGRESS,
+                        if stream_event.delta_text:
+                            assistant_text += stream_event.delta_text
+                            assistant_blocks = [{"type": "markdown", "text": assistant_text}]
+                            if assistant_message is None:
+                                assistant_message = self._conversation_store.append_message(
+                                    AppendAgentMessageInput(
+                                        thread_id=thread_id,
+                                        turn_id=turn_id,
+                                        kind=AgentMessageKind.ASSISTANT,
+                                        ui_author=AgentMessageAuthor.ASSISTANT,
+                                        content_blocks=assistant_blocks,
+                                        status=AgentMessageStatus.IN_PROGRESS,
+                                    )
                                 )
-                            )
-                            yield self._message_event("message_updated", assistant_message, run_id)
-                    if stream_event.response is not None:
-                        provider_response = stream_event.response
+                                yield self._message_event("message_created", assistant_message, run_id)
+                            else:
+                                assistant_message = self._conversation_store.update_message(
+                                    UpdateAgentMessageInput(
+                                        message_id=assistant_message.id,
+                                        content_blocks=assistant_blocks,
+                                        status=AgentMessageStatus.IN_PROGRESS,
+                                    )
+                                )
+                                yield self._message_event("message_updated", assistant_message, run_id)
+                        if stream_event.response is not None:
+                            provider_response = stream_event.response
                 self._raise_if_cancelled(run_id)
             except AgentRunCancelled:
                 self._complete_provider_request(
@@ -903,21 +936,25 @@ class AgentHarnessService:
 
             for tool_call, arguments, request_message, persisted_tool_call in persisted_tool_calls:
                 self._raise_if_cancelled(run_id)
+                tool_started_at = perf_counter()
+                tool_error: BaseException | None = None
                 try:
-                    result = self._tool_registry.execute(
-                        tool_call.tool_name,
-                        arguments,
-                        ToolExecutionContext(
-                            thread_id=thread_id,
-                            turn_id=turn_id,
-                            tool_call_id=persisted_tool_call.id,
-                            attached_files=attached_files,
-                            cancel_requested=lambda run_id=run_id: self._is_cancel_requested(run_id),
-                        ),
-                    )
+                    with start_span("agent.tool_call", self._tool_call_attributes(persisted_tool_call)):
+                        result = self._tool_registry.execute(
+                            tool_call.tool_name,
+                            arguments,
+                            ToolExecutionContext(
+                                thread_id=thread_id,
+                                turn_id=turn_id,
+                                tool_call_id=persisted_tool_call.id,
+                                attached_files=attached_files,
+                                cancel_requested=lambda run_id=run_id: self._is_cancel_requested(run_id),
+                            ),
+                        )
                     status = AgentToolCallStatus.SUCCEEDED
                     error_summary = None
                 except Exception as exc:
+                    tool_error = exc
                     if self._is_cancel_requested(run_id):
                         result = self._tool_cancelled_result()
                         status = AgentToolCallStatus.CANCELLED
@@ -935,6 +972,11 @@ class AgentHarnessService:
                         error_summary=error_summary,
                         provider_payload={"tool_call_id": tool_call.provider_call_id},
                     )
+                )
+                self._record_tool_call(
+                    completed_tool_call,
+                    (perf_counter() - tool_started_at) * 1000,
+                    tool_error,
                 )
                 yield self._tool_event(
                     "message_created",
@@ -993,7 +1035,7 @@ class AgentHarnessService:
         output_message_ids: list[str] | None = None,
         usage_payload: dict[str, Any] | None = None,
     ) -> AgentProviderRequestRow:
-        return self._conversation_store.complete_provider_request(
+        updated = self._conversation_store.complete_provider_request(
             CompleteProviderRequestInput(
                 provider_request_id=provider_request.id,
                 status=status,
@@ -1001,6 +1043,46 @@ class AgentHarnessService:
                 usage_payload=usage_payload,
             )
         )
+        self._record_provider_request(updated)
+        return updated
+
+    def _provider_request_attributes(self, provider_request: AgentProviderRequestRow) -> dict[str, Any]:
+        attributes: dict[str, Any] = {
+            "agent.provider.name": provider_request.provider_name or "unknown",
+            "agent.provider_request.kind": provider_request.request_kind.value,
+        }
+        if provider_request.model:
+            attributes["agent.model.hash"] = stable_hash(provider_request.model)
+        return attributes
+
+    def _tool_call_attributes(self, tool_call: AgentToolCallRow) -> dict[str, Any]:
+        return {"agent.tool.name": tool_call.tool_name}
+
+    def _record_provider_request(self, provider_request: AgentProviderRequestRow) -> None:
+        attributes = self._provider_request_attributes(provider_request)
+        attributes["status"] = provider_request.status.value
+        record_counter("xenix.agent.provider_request.count", attributes=attributes)
+        if provider_request.completed_at is not None:
+            record_histogram(
+                "xenix.agent.provider_request.duration",
+                max(0.0, (provider_request.completed_at - provider_request.created_at).total_seconds() * 1000),
+                attributes=attributes,
+                unit="ms",
+            )
+
+    def _record_tool_call(self, tool_call: AgentToolCallRow, duration_ms: float, error: BaseException | None = None) -> None:
+        attributes = self._tool_call_attributes(tool_call)
+        attributes["status"] = tool_call.status.value
+        if error is not None:
+            attributes["error.type"] = error.__class__.__name__
+        record_counter("xenix.agent.tool_call.count", attributes=attributes)
+        record_histogram("xenix.agent.tool_call.duration", duration_ms, attributes=attributes, unit="ms")
+
+    def _record_agent_turn(self, status: str, error: BaseException | None = None) -> None:
+        attributes: dict[str, Any] = {"status": status}
+        if error is not None:
+            attributes["error.type"] = error.__class__.__name__
+        record_counter("xenix.agent.turn.count", attributes=attributes)
 
     def _provider_model(self, provider: AgentProvider) -> str | None:
         model = getattr(provider, "model", None)

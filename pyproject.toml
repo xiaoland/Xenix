@@ -22,6 +22,11 @@ dependencies = [
     "marko>=2.2.0",
     "statsmodels>=0.14.0",
     "vl-convert-python>=1.9.0.post1",
+    "opentelemetry-api>=1.42.1",
+    "opentelemetry-sdk>=1.42.1",
+    "opentelemetry-exporter-otlp>=1.42.1",
+    "opentelemetry-instrumentation-logging>=0.63b1",
+    "structlog>=26.1.0",
 ]
 
 [dependency-groups]
@@ -41,6 +46,7 @@ dist = "python scripts/build_distribution_zip.py"
 pytest = "python scripts/run_pytest.py"
 test = "python scripts/run_pytest.py"
 check = "python -m compileall src tests scripts"
+diagnostic-bundle = "python scripts/create_diagnostic_bundle.py"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

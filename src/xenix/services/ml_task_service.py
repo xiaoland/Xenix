@@ -7,13 +7,16 @@ import threading
 from collections.abc import Callable, Mapping
 from datetime import datetime, timezone
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
+from opentelemetry import context as otel_context
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import Field, SQLModel
 
 from ..config import AppPaths
 from ..exceptions import InvalidStateTransitionError, NotFoundError, ValidationError
+from ..observability import extract_context, inject_context, record_counter, record_histogram, start_span
 from .ml.contracts import (
     EvaluateTaskResult,
     FitTaskRequest,
@@ -133,6 +136,7 @@ class MLTaskService:
         self._dispatcher_thread: threading.Thread | None = None
         self._lock = threading.Lock()
         self._submitted_ids: set[str] = set()
+        self._trace_carriers: dict[str, dict[str, str]] = {}
         self._dispatch_semaphore = threading.BoundedSemaphore(
             max(1, int(getattr(self._worker_runner, "max_dispatch_threads", 1)))
         )
@@ -169,6 +173,7 @@ class MLTaskService:
 
             self._ml_tasks.create(session, row)
             session.commit()
+            self._record_task(row)
             return row
 
     def submit_ml_task(self, ml_task_id: str) -> None:
@@ -192,6 +197,7 @@ class MLTaskService:
             if ml_task_id in self._submitted_ids:
                 return
             self._submitted_ids.add(ml_task_id)
+            self._trace_carriers[ml_task_id] = inject_context({})
             self._queue.put(ml_task_id)
             self._ensure_dispatcher_locked()
 
@@ -213,6 +219,7 @@ class MLTaskService:
             session.commit()
 
         ml_task_root(self._paths, input_data.ml_task_id).mkdir(parents=True, exist_ok=True)
+        self._record_task(updated)
         return updated
 
     def complete_ml_task(self, input_data: CompleteMLTaskInput) -> MLTaskRow:
@@ -224,6 +231,7 @@ class MLTaskService:
             self._require_transition(row.status, MLTaskStatus.SUCCEEDED)
             completed = self._complete_row(session, row, input_data.result_payload, input_data.artifacts)
             session.commit()
+            self._record_task(completed)
             return completed
 
     def fail_ml_task(self, input_data: FailMLTaskInput) -> MLTaskRow:
@@ -239,6 +247,7 @@ class MLTaskService:
             self._require_transition(row.status, MLTaskStatus.FAILED)
             failed = self._ml_tasks.fail(session, row.id, error_summary, _utc_now())
             session.commit()
+            self._record_task(failed, error_type="MLTaskFailure")
             return failed
 
     def cancel_ml_task(self, input_data: CancelMLTaskInput) -> MLTaskRow:
@@ -250,6 +259,7 @@ class MLTaskService:
             self._require_transition(row.status, MLTaskStatus.CANCELLED)
             cancelled = self._ml_tasks.cancel(session, row.id, _utc_now())
             session.commit()
+            self._record_task(cancelled)
             return cancelled
 
     def list_dataset_ml_tasks(self, dataset_id: str) -> list[MLTaskRow]:
@@ -299,11 +309,15 @@ class MLTaskService:
             ).start()
 
     def _run_queued_task(self, ml_task_id: str) -> None:
+        carrier = self._trace_carriers.pop(ml_task_id, {})
+        token = otel_context.attach(extract_context(carrier)) if carrier else None
         try:
             finished_task = self._run_task(ml_task_id)
             if finished_task is not None:
                 self._notify_callbacks(finished_task)
         finally:
+            if token is not None:
+                otel_context.detach(token)
             with self._lock:
                 self._submitted_ids.discard(ml_task_id)
             self._queue.task_done()
@@ -314,25 +328,34 @@ class MLTaskService:
         if task.status is not MLTaskStatus.PENDING:
             return task
 
+        task_started_at = perf_counter()
         try:
-            running_task = self.start_ml_task(StartMLTaskInput(ml_task_id=ml_task_id))
-            return_code = self._worker_runner.run(
-                self._resolve_entrypoint(running_task.task_type),
-                ml_task_root(self._paths, ml_task_id),
-                cancel_requested=lambda: self.get_ml_task(ml_task_id).status is MLTaskStatus.CANCELLED,
-            )
-            current = self.get_ml_task(ml_task_id)
-            if current.status is MLTaskStatus.CANCELLED:
-                return current
-            if return_code == 0:
-                return self._finalize_success(ml_task_id)
-            return self._finalize_failure(ml_task_id, return_code)
+            with start_span("ml.task", self._task_attributes(task)):
+                running_task = self.start_ml_task(StartMLTaskInput(ml_task_id=ml_task_id))
+                return_code = self._worker_runner.run(
+                    self._resolve_entrypoint(running_task.task_type),
+                    ml_task_root(self._paths, ml_task_id),
+                    cancel_requested=lambda: self.get_ml_task(ml_task_id).status is MLTaskStatus.CANCELLED,
+                )
+                current = self.get_ml_task(ml_task_id)
+                if current.status is MLTaskStatus.CANCELLED:
+                    self._record_task_duration(current, task_started_at)
+                    return current
+                if return_code == 0:
+                    completed = self._finalize_success(ml_task_id)
+                    self._record_task_duration(completed, task_started_at)
+                    return completed
+                failed = self._finalize_failure(ml_task_id, return_code)
+                self._record_task_duration(failed, task_started_at)
+                return failed
         except Exception as exc:
             current = self.get_ml_task(ml_task_id)
             if current.status is MLTaskStatus.RUNNING:
-                return self.fail_ml_task(
+                failed = self.fail_ml_task(
                     FailMLTaskInput(ml_task_id=ml_task_id, error_summary=str(exc))
                 )
+                self._record_task_duration(failed, task_started_at)
+                return failed
             return current
 
     def _resolve_entrypoint(self, task_type: MLTaskType) -> Callable[[str], None]:
@@ -638,6 +661,26 @@ class MLTaskService:
             dict(result_payload),
             _utc_now(),
             persisted_artifacts,
+        )
+
+    def _task_attributes(self, row: MLTaskRow) -> dict[str, Any]:
+        return {
+            "ml.task.type": row.task_type.value,
+            "ml.task.status": row.status.value,
+        }
+
+    def _record_task(self, row: MLTaskRow, *, error_type: str | None = None) -> None:
+        attributes = self._task_attributes(row)
+        if error_type is not None:
+            attributes["error.type"] = error_type
+        record_counter("xenix.ml.task.count", attributes=attributes)
+
+    def _record_task_duration(self, row: MLTaskRow, started_at: float) -> None:
+        record_histogram(
+            "xenix.ml.task.duration",
+            (perf_counter() - started_at) * 1000,
+            attributes=self._task_attributes(row),
+            unit="ms",
         )
 
     def _copy_canonical_model(

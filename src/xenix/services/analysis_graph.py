@@ -5,6 +5,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
@@ -15,6 +16,7 @@ from sqlmodel import SQLModel
 
 from ..config import AppPaths
 from ..exceptions import ValidationError
+from ..observability import record_counter, record_histogram, start_span
 from .dataset_inspection import detect_source_format, load_dataframe
 from .storage.models import DatasetSourceFormat
 
@@ -62,43 +64,57 @@ class AnalysisGraphService:
         self._paths = paths
 
     def graph_dataset(self, input_data: GraphDatasetInput) -> GraphDatasetResult:
-        source_path = self._resolve_source_path(input_data.source_path)
-        frame = self._load_frame(source_path)
-        dataset_name = input_data.dataset_name.strip() or source_path.stem
-        user_spec = self._validate_spec_object(input_data.spec)
-        spec_json = self._spec_json(user_spec)
-        if len(spec_json.encode("utf-8")) > _MAX_SPEC_BYTES:
-            raise ValidationError(f"analysis.graph spec cannot exceed {_MAX_SPEC_BYTES} bytes.")
+        started_at = perf_counter()
+        with start_span("analysis.graph"):
+            source_path = self._resolve_source_path(input_data.source_path)
+            frame = self._load_frame(source_path)
+            dataset_name = input_data.dataset_name.strip() or source_path.stem
+            user_spec = self._validate_spec_object(input_data.spec)
+            spec_json = self._spec_json(user_spec)
+            if len(spec_json.encode("utf-8")) > _MAX_SPEC_BYTES:
+                raise ValidationError(f"analysis.graph spec cannot exceed {_MAX_SPEC_BYTES} bytes.")
 
-        prepared = self._prepare_spec(user_spec, frame, dataset_name)
-        svg = self._render_svg(prepared.spec)
-        output_bytes = len(svg.encode("utf-8"))
-        if output_bytes > _MAX_OUTPUT_BYTES:
-            raise ValidationError(
-                "analysis.graph rendered SVG is too large. Reduce chart dimensions, rows, marks, or pre-aggregate data."
+            prepared = self._prepare_spec(user_spec, frame, dataset_name)
+            svg = self._render_svg(prepared.spec)
+            output_bytes = len(svg.encode("utf-8"))
+            if output_bytes > _MAX_OUTPUT_BYTES:
+                raise ValidationError(
+                    "analysis.graph rendered SVG is too large. Reduce chart dimensions, rows, marks, or pre-aggregate data."
+                )
+
+            output_dir = self._paths.artifacts / "analysis" / "graphs"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_path = output_dir / f"{self._slug(dataset_name)}-vegalite-{uuid4().hex[:12]}.svg"
+            output_path.write_text(svg, encoding="utf-8")
+            result = GraphDatasetResult(
+                output_path=str(output_path.resolve()),
+                graph_metadata={
+                    "renderer": "vl-convert-python",
+                    "renderer_version": getattr(vlc, "__version__", None),
+                    "spec_format": "vega-lite",
+                    "schema": prepared.schema_url,
+                    "dataset_name": dataset_name,
+                    "title": prepared.title,
+                    "row_count": int(len(frame.index)),
+                    "rendered_row_count": prepared.rendered_row_count,
+                    "truncated": prepared.truncated,
+                    "referenced_fields": prepared.referenced_fields,
+                    "generated_fields": prepared.generated_fields,
+                    "warnings": prepared.warnings,
+                    "output_bytes": output_bytes,
+                },
             )
+            self._record_operation("analysis.graph", started_at)
+            return result
 
-        output_dir = self._paths.artifacts / "analysis" / "graphs"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = output_dir / f"{self._slug(dataset_name)}-vegalite-{uuid4().hex[:12]}.svg"
-        output_path.write_text(svg, encoding="utf-8")
-        return GraphDatasetResult(
-            output_path=str(output_path.resolve()),
-            graph_metadata={
-                "renderer": "vl-convert-python",
-                "renderer_version": getattr(vlc, "__version__", None),
-                "spec_format": "vega-lite",
-                "schema": prepared.schema_url,
-                "dataset_name": dataset_name,
-                "title": prepared.title,
-                "row_count": int(len(frame.index)),
-                "rendered_row_count": prepared.rendered_row_count,
-                "truncated": prepared.truncated,
-                "referenced_fields": prepared.referenced_fields,
-                "generated_fields": prepared.generated_fields,
-                "warnings": prepared.warnings,
-                "output_bytes": output_bytes,
-            },
+    def _record_operation(self, operation: str, started_at: float) -> None:
+        attributes = {"analysis.operation": operation, "status": "succeeded"}
+        record_counter("xenix.analysis.operation.count", attributes=attributes)
+        record_histogram(
+            "xenix.analysis.operation.duration",
+            (perf_counter() - started_at) * 1000,
+            attributes=attributes,
+            unit="ms",
         )
 
     def _resolve_source_path(self, raw_path: str) -> Path:

@@ -25,6 +25,7 @@ Current runtime files and subdirectories:
 - `config/locale.json`
 - `config/agent_settings.json`
 - `config/ml_workers.json`
+- `config/telemetry.json`
 - `state/xenix.db`
 - `artifacts/datasets/`
 - `artifacts/datasets/transformed/`
@@ -43,7 +44,19 @@ Current runtime files and subdirectories:
 5. Inspect `config/agent_settings.json` for persisted LLM providers, configured model lists, default/guard/title model keys, and development AIMock settings.
    Packaged trial LLM providers are marked with `dialect_config.secret_source=packaged_trial`; the real trial API key is embedded in the packaged application and is not written to this file.
 6. Inspect `config/ml_workers.json` for configured local and SSH ML workers. SSH credentials are not stored there; the file stores connection metadata, remote roots, Python command paths, and last setup/validation summaries.
-7. Inspect `state/xenix.db` for metadata, `artifacts/datasets/` for app-managed dataset artifacts, `artifacts/ml-tasks/` for per-ML-task working directories, and `artifacts/models/` for canonical trained-model files.
+7. Inspect `config/telemetry.json` for the randomly generated persistent anonymous install id used to correlate public-beta diagnostics.
+8. Inspect `state/xenix.db` for metadata, `artifacts/datasets/` for app-managed dataset artifacts, `artifacts/ml-tasks/` for per-ML-task working directories, and `artifacts/models/` for canonical trained-model files.
+
+`logs/xenix.log` is JSON Lines. Log records are correlated with active
+OpenTelemetry spans through trace/span fields when a span is active.
+
+OpenTelemetry OTLP export is configured through standard environment variables
+such as `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_PROTOCOL`.
+Remote log export additionally requires `XENIX_OTEL_EXPORT_LOGS=true`.
+
+Run `pdm run diagnostic-bundle` to create a local support bundle under `temp/`.
+The bundle includes logs, ML task logs, telemetry metadata, and SQLite
+schema/table-count summaries; it does not include the raw database file.
 
 ## Reset
 

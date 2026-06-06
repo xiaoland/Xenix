@@ -9,6 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlmodel import Field, SQLModel
 
 from ..exceptions import NotFoundError, ValidationError
+from ..observability import record_counter, start_span
 from .storage.models import ArtifactKind, ArtifactRow
 from .storage.repositories import AgentConversationRepository, ArtifactRepository
 
@@ -67,38 +68,41 @@ class ArtifactService:
         self._conversations = AgentConversationRepository()
 
     def register_artifact(self, input_data: RegisterArtifactInput) -> ArtifactRow:
-        title = input_data.title.strip()
-        if not title:
-            raise ValidationError("Artifact title cannot be empty.")
+        attributes = {"artifact.kind": input_data.kind.value}
+        with start_span("artifact.register", attributes):
+            title = input_data.title.strip()
+            if not title:
+                raise ValidationError("Artifact title cannot be empty.")
 
-        path = Path(input_data.absolute_path).expanduser()
-        if not path.is_absolute():
-            raise ValidationError("Artifact path must be absolute.")
-        if not path.exists():
-            raise ValidationError("Artifact path must exist.")
+            path = Path(input_data.absolute_path).expanduser()
+            if not path.is_absolute():
+                raise ValidationError("Artifact path must be absolute.")
+            if not path.exists():
+                raise ValidationError("Artifact path must exist.")
 
-        now = _utc_now()
-        row = ArtifactRow(
-            thread_id=input_data.thread_id,
-            turn_id=input_data.turn_id,
-            message_id=input_data.message_id,
-            tool_call_id=input_data.tool_call_id,
-            kind=input_data.kind,
-            title=title,
-            absolute_path=str(path),
-            mime_type=input_data.mime_type,
-            summary=input_data.summary,
-            preview_payload=input_data.preview_payload,
-            metadata_payload=dict(input_data.metadata_payload),
-            ready_to_open=input_data.ready_to_open,
-            created_at=now,
-        )
+            now = _utc_now()
+            row = ArtifactRow(
+                thread_id=input_data.thread_id,
+                turn_id=input_data.turn_id,
+                message_id=input_data.message_id,
+                tool_call_id=input_data.tool_call_id,
+                kind=input_data.kind,
+                title=title,
+                absolute_path=str(path),
+                mime_type=input_data.mime_type,
+                summary=input_data.summary,
+                preview_payload=input_data.preview_payload,
+                metadata_payload=dict(input_data.metadata_payload),
+                ready_to_open=input_data.ready_to_open,
+                created_at=now,
+            )
 
-        with self._session_factory() as session:
-            self._validate_links(session, input_data)
-            self._artifacts.create(session, row)
-            session.commit()
-            return row
+            with self._session_factory() as session:
+                self._validate_links(session, input_data)
+                self._artifacts.create(session, row)
+                session.commit()
+                record_counter("xenix.artifact.register.count", attributes={**attributes, "status": "succeeded"})
+                return row
 
     def resolve_uri(self, uri: str) -> ResolvedArtifact:
         parsed = urlparse(uri)

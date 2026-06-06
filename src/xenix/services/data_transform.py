@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
@@ -13,6 +14,7 @@ from sqlmodel import SQLModel
 
 from ..config import AppPaths
 from ..exceptions import ValidationError
+from ..observability import record_counter, record_histogram, start_span
 from .dataset_inspection import detect_source_format, load_dataframe
 from .storage.models import DatasetSourceFormat
 
@@ -295,59 +297,77 @@ class DataQueryTransformService:
         self._validator = DuckDbSqlValidator()
 
     def query(self, input_data: DataQueryInput) -> DataQueryResult:
-        bindings = self._validate_bindings(input_data.bindings)
-        validation_summary = self._validator.validate(input_data.sql, bindings)
-        limit = self._normalize_limit(input_data.limit)
-        sql = self._validator.normalize_sql(input_data.sql)
-        with duckdb.connect(database=":memory:") as connection:
-            self._register_bindings(connection, bindings)
-            frame = connection.execute(
-                f"SELECT * FROM ({sql}) AS xenix_query_result LIMIT {limit + 1}"
-            ).fetchdf()
-        truncated = int(len(frame.index)) > limit
-        if truncated:
-            frame = frame.head(limit)
-        rows = self._records(frame)
-        return DataQueryResult(
-            rows=rows,
-            columns=self._columns(frame),
-            returned_row_count=int(len(rows)),
-            limit=limit,
-            truncated=truncated,
-            validation_summary=validation_summary,
-        )
+        started_at = perf_counter()
+        with start_span("data.query"):
+            bindings = self._validate_bindings(input_data.bindings)
+            validation_summary = self._validator.validate(input_data.sql, bindings)
+            limit = self._normalize_limit(input_data.limit)
+            sql = self._validator.normalize_sql(input_data.sql)
+            with duckdb.connect(database=":memory:") as connection:
+                self._register_bindings(connection, bindings)
+                frame = connection.execute(
+                    f"SELECT * FROM ({sql}) AS xenix_query_result LIMIT {limit + 1}"
+                ).fetchdf()
+            truncated = int(len(frame.index)) > limit
+            if truncated:
+                frame = frame.head(limit)
+            rows = self._records(frame)
+            result = DataQueryResult(
+                rows=rows,
+                columns=self._columns(frame),
+                returned_row_count=int(len(rows)),
+                limit=limit,
+                truncated=truncated,
+                validation_summary=validation_summary,
+            )
+            self._record_operation("data.query", "succeeded", started_at)
+            return result
 
     def transform(self, input_data: DataTransformInput) -> DataTransformResult:
-        bindings = self._validate_bindings(input_data.bindings)
-        validation_summary = self._validator.validate(input_data.sql, bindings)
-        name = input_data.name.strip()
-        if not name:
-            raise ValidationError("Transform output name cannot be empty.")
-        sql = self._validator.normalize_sql(input_data.sql)
-        with duckdb.connect(database=":memory:") as connection:
-            self._register_bindings(connection, bindings)
-            frame = connection.execute(sql).fetchdf()
+        started_at = perf_counter()
+        with start_span("data.transform"):
+            bindings = self._validate_bindings(input_data.bindings)
+            validation_summary = self._validator.validate(input_data.sql, bindings)
+            name = input_data.name.strip()
+            if not name:
+                raise ValidationError("Transform output name cannot be empty.")
+            sql = self._validator.normalize_sql(input_data.sql)
+            with duckdb.connect(database=":memory:") as connection:
+                self._register_bindings(connection, bindings)
+                frame = connection.execute(sql).fetchdf()
 
-        output_dir = self._paths.artifacts / "datasets" / "transformed"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = output_dir / f"{self._slug(name)}-{uuid4().hex[:12]}.csv"
-        frame.to_csv(output_path, index=False)
-        transform_report = {
-            "row_count": int(len(frame.index)),
-            "columns": self._columns(frame),
-            "sql": sql,
-            "bindings": [
-                {"alias": binding.alias, "dataset_id": binding.dataset_id}
-                for binding in bindings
-            ],
-            "validation_summary": validation_summary,
-        }
-        return DataTransformResult(
-            output_path=str(output_path.resolve()),
-            row_count=int(len(frame.index)),
-            columns=self._columns(frame),
-            validation_summary=validation_summary,
-            transform_report=transform_report,
+            output_dir = self._paths.artifacts / "datasets" / "transformed"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_path = output_dir / f"{self._slug(name)}-{uuid4().hex[:12]}.csv"
+            frame.to_csv(output_path, index=False)
+            transform_report = {
+                "row_count": int(len(frame.index)),
+                "columns": self._columns(frame),
+                "sql": sql,
+                "bindings": [
+                    {"alias": binding.alias, "dataset_id": binding.dataset_id}
+                    for binding in bindings
+                ],
+                "validation_summary": validation_summary,
+            }
+            result = DataTransformResult(
+                output_path=str(output_path.resolve()),
+                row_count=int(len(frame.index)),
+                columns=self._columns(frame),
+                validation_summary=validation_summary,
+                transform_report=transform_report,
+            )
+            self._record_operation("data.transform", "succeeded", started_at)
+            return result
+
+    def _record_operation(self, operation: str, status: str, started_at: float) -> None:
+        attributes = {"data.operation": operation, "status": status}
+        record_counter("xenix.data.operation.count", attributes=attributes)
+        record_histogram(
+            "xenix.data.operation.duration",
+            (perf_counter() - started_at) * 1000,
+            attributes=attributes,
+            unit="ms",
         )
 
     def _register_bindings(self, connection, bindings: list[DatasetSqlBinding]) -> None:

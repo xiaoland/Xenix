@@ -16,6 +16,11 @@ Runtime dependencies now include:
 - `pydantic`
 - `joblib`
 - `scikit-learn`
+- `opentelemetry-api`
+- `opentelemetry-sdk`
+- `opentelemetry-exporter-otlp`
+- `opentelemetry-instrumentation-logging`
+- `structlog`
 
 ## Run
 
@@ -47,6 +52,49 @@ pdm run smoke
 
 `pdm run smoke` uses the same native entrypoint as the real app, but exits after validating startup, storage bootstrap, logging, and window creation.
 
+## Observability
+
+Xenix uses OpenTelemetry for traces, metrics, propagation, SDK/export
+configuration, and backend neutrality. Structured local logs use
+`structlog + logging` and are written as JSON Lines to `logs/xenix.log`.
+
+Persistent anonymous install identity is stored in `config/telemetry.json`.
+The value is randomly generated and is not derived from machine information.
+
+OTLP export is configured with standard OpenTelemetry environment variables.
+For a local Collector during development, set for example:
+
+```bash
+$env:OTEL_EXPORTER_OTLP_ENDPOINT="http://127.0.0.1:4317"
+$env:OTEL_EXPORTER_OTLP_PROTOCOL="grpc"
+pdm run dev
+```
+
+For HTTP/protobuf collectors:
+
+```bash
+$env:OTEL_EXPORTER_OTLP_ENDPOINT="http://127.0.0.1:4318"
+$env:OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
+pdm run dev
+```
+
+Remote log export is supported but off by default because application logs may
+contain local diagnostic detail. Enable it explicitly with:
+
+```bash
+$env:XENIX_OTEL_EXPORT_LOGS="true"
+```
+
+Create a local support bundle with:
+
+```bash
+pdm run diagnostic-bundle
+```
+
+The bundle includes JSON logs, ML task logs, telemetry metadata, and SQLite
+schema/table-count summaries. It does not include the raw `state/xenix.db`
+database file.
+
 ## Translations
 
 ```bash
@@ -72,6 +120,9 @@ Expected result:
 - compiled translations are available under the bundled `xenix/translations/` path
 - build commit is embedded into the bundle and shown in Settings; `XENIX_BUILD_COMMIT` can override git discovery for non-checkout build environments
 - DuckDB Python runtime imports successfully and can run an in-memory query inside the packaged app
+- OpenTelemetry OTLP exporter hidden imports are collected by `xenix.spec` so
+  packaged builds can use either gRPC or HTTP/protobuf OTLP export when the
+  corresponding environment variables are set before launching the executable.
 
 ## Packaged Smoke Verification
 
