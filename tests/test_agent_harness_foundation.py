@@ -63,6 +63,11 @@ def test_conversation_store_persists_thread_turn_messages_and_tool_calls(monkeyp
             kind=AgentMessageKind.ASSISTANT,
             ui_author=AgentMessageAuthor.ASSISTANT,
             content_blocks=[{"type": "markdown", "text": "I will inspect the dataset."}],
+            provider_payload={
+                "chunks": [
+                    {"choices": [{"delta": {"reasoning_content": "Need to inspect the dataset first."}}]},
+                ],
+            },
         )
     )
     _tool_message, tool_call = conversations.create_tool_call(
@@ -121,13 +126,13 @@ def test_conversation_store_persists_thread_turn_messages_and_tool_calls(monkeyp
     assert [message.role for message in provider_messages[1:]] == [
         "user",
         "assistant",
-        "assistant",
         "tool",
         "assistant",
     ]
-    assert provider_messages[3].content == ""
-    assert provider_messages[3].source_message_id == snapshot.messages[3].id
-    assert provider_messages[3].provider_payload["tool_calls"] == [
+    assert provider_messages[2].content == "I will inspect the dataset."
+    assert provider_messages[2].source_message_id == assistant_message.id
+    assert provider_messages[2].provider_payload["reasoning_content"] == "Need to inspect the dataset first."
+    assert provider_messages[2].provider_payload["tool_calls"] == [
         {
             "id": "call-data-peek",
             "type": "function",
@@ -137,13 +142,94 @@ def test_conversation_store_persists_thread_turn_messages_and_tool_calls(monkeyp
             },
         }
     ]
-    assert provider_messages[4].provider_payload["tool_call_id"] == "call-data-peek"
-    tool_result_content = json.loads(provider_messages[4].content)
+    assert provider_messages[3].provider_payload["tool_call_id"] == "call-data-peek"
+    tool_result_content = json.loads(provider_messages[3].content)
     assert tool_result_content == {
         "tool_name": "data.peek",
         "status": "succeeded",
         "result": {"dataset_id": "dataset-1"},
     }
+
+
+def test_provider_messages_group_consecutive_tool_calls_into_one_assistant_message(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    conversations, _artifacts = _build_services(monkeypatch, tmp_path)
+
+    thread = conversations.create_thread(CreateAgentThreadInput(title="Multiple tool calls"))
+    turn, _user_message = conversations.start_turn(
+        StartTurnInput(
+            thread_id=thread.id,
+            user_content_blocks=[{"type": "text", "text": "Create charts"}],
+        )
+    )
+    assistant_message = conversations.append_message(
+        AppendAgentMessageInput(
+            thread_id=thread.id,
+            turn_id=turn.id,
+            kind=AgentMessageKind.ASSISTANT,
+            ui_author=AgentMessageAuthor.ASSISTANT,
+            content_blocks=[{"type": "markdown", "text": "I will create two charts."}],
+            provider_payload={
+                "choices": [
+                    {
+                        "message": {
+                            "reasoning_content": "Two visual checks are useful here.",
+                        }
+                    }
+                ]
+            },
+        )
+    )
+    _first_message, first_call = conversations.create_tool_call(
+        CreateToolCallInput(
+            thread_id=thread.id,
+            turn_id=turn.id,
+            tool_name="analysis.graph",
+            arguments_payload={"spec": {"mark": "bar"}},
+            provider_payload={"tool_call_id": "call-chart-1", "provider_name": "analysis_graph"},
+        )
+    )
+    _second_message, second_call = conversations.create_tool_call(
+        CreateToolCallInput(
+            thread_id=thread.id,
+            turn_id=turn.id,
+            tool_name="analysis.graph",
+            arguments_payload={"spec": {"mark": "point"}},
+            provider_payload={"tool_call_id": "call-chart-2", "provider_name": "analysis_graph"},
+        )
+    )
+    conversations.complete_tool_call(
+        CompleteToolCallInput(
+            tool_call_id=first_call.id,
+            status=AgentToolCallStatus.SUCCEEDED,
+            result_payload={"artifact_id": "chart-1"},
+            provider_payload={"tool_call_id": "call-chart-1"},
+        )
+    )
+    conversations.complete_tool_call(
+        CompleteToolCallInput(
+            tool_call_id=second_call.id,
+            status=AgentToolCallStatus.SUCCEEDED,
+            result_payload={"artifact_id": "chart-2"},
+            provider_payload={"tool_call_id": "call-chart-2"},
+        )
+    )
+
+    provider_messages = conversations.get_thread_snapshot(thread.id).provider_messages()
+
+    assert [message.role for message in provider_messages[1:]] == ["user", "assistant", "tool", "tool"]
+    assert provider_messages[2].source_message_id == assistant_message.id
+    assert provider_messages[2].provider_payload["reasoning_content"] == "Two visual checks are useful here."
+    assert [call["id"] for call in provider_messages[2].provider_payload["tool_calls"]] == [
+        "call-chart-1",
+        "call-chart-2",
+    ]
+    assert [message.provider_payload["tool_call_id"] for message in provider_messages[3:]] == [
+        "call-chart-1",
+        "call-chart-2",
+    ]
 
 
 def test_chatbot_event_projection_pairs_tool_call_messages(monkeypatch, tmp_path: Path) -> None:

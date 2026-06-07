@@ -373,6 +373,9 @@ class OpenAICompatibleChatProvider:
         for row in rows:
             message = {"role": row.role, "content": row.content}
             if row.role == "assistant":
+                reasoning_content = row.provider_payload.get("reasoning_content")
+                if self._provider_key == "deepseek" and isinstance(reasoning_content, str):
+                    message["reasoning_content"] = reasoning_content
                 tool_calls = row.provider_payload.get("tool_calls")
                 if isinstance(tool_calls, list) and tool_calls:
                     message["tool_calls"] = tool_calls
@@ -380,3 +383,38 @@ class OpenAICompatibleChatProvider:
                 message["tool_call_id"] = row.provider_payload.get("tool_call_id", "")
             provider_messages.append(message)
         return provider_messages
+
+
+def extract_reasoning_content(raw_payload: dict[str, Any]) -> str | None:
+    choices = raw_payload.get("choices")
+    if isinstance(choices, list):
+        parts = [
+            str(reasoning_content)
+            for choice in choices
+            if isinstance(choice, dict)
+            for message in [choice.get("message")]
+            if isinstance(message, dict)
+            for reasoning_content in [message.get("reasoning_content")]
+            if isinstance(reasoning_content, str)
+        ]
+        if parts:
+            return "".join(parts)
+
+    chunks = raw_payload.get("chunks")
+    if not isinstance(chunks, list):
+        return None
+
+    parts = [
+        str(reasoning_content)
+        for chunk in chunks
+        if isinstance(chunk, dict)
+        for choice in chunk.get("choices") or []
+        if isinstance(choice, dict)
+        for delta in [choice.get("delta")]
+        if isinstance(delta, dict)
+        for reasoning_content in [delta.get("reasoning_content")]
+        if isinstance(reasoning_content, str)
+    ]
+    if parts:
+        return "".join(parts)
+    return None

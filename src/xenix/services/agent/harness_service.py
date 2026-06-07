@@ -62,6 +62,7 @@ from .providers import (
     ProviderResponse,
     ProviderStreamEvent,
     ProviderToolCall,
+    extract_reasoning_content,
 )
 from .tools import (
     AgentToolRegistry,
@@ -620,7 +621,10 @@ class AgentHarnessService:
                         turn_id=turn_id,
                         tool_name=tool_call.tool_name,
                         arguments_payload=arguments,
-                        provider_payload=self._tool_call_provider_payload(tool_call),
+                        provider_payload=self._tool_call_provider_payload(
+                            tool_call,
+                            provider_response,
+                        ),
                     )
                 )
                 provider_output_message_ids.append(request_message.id)
@@ -900,7 +904,10 @@ class AgentHarnessService:
                         turn_id=turn_id,
                         tool_name=tool_call.tool_name,
                         arguments_payload=arguments,
-                        provider_payload=self._tool_call_provider_payload(tool_call),
+                        provider_payload=self._tool_call_provider_payload(
+                            tool_call,
+                            provider_response,
+                        ),
                     )
                 )
                 provider_output_message_ids.append(request_message.id)
@@ -1422,10 +1429,17 @@ class AgentHarnessService:
                 + ", ".join(unavailable_tool_names)
             )
 
-    def _tool_call_provider_payload(self, tool_call: ProviderToolCall) -> dict[str, str]:
+    def _tool_call_provider_payload(
+        self,
+        tool_call: ProviderToolCall,
+        provider_response: ProviderResponse,
+    ) -> dict[str, str]:
         payload = {"tool_call_id": tool_call.provider_call_id}
         if tool_call.provider_name:
             payload["provider_name"] = tool_call.provider_name
+        reasoning_content = extract_reasoning_content(provider_response.raw_payload)
+        if reasoning_content is not None:
+            payload["reasoning_content"] = reasoning_content
         return payload
 
     def _snapshot_has_payload_key(self, snapshot: ThreadSnapshot, key: str) -> bool:

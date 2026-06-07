@@ -576,7 +576,12 @@ def test_openai_compatible_provider_serializes_assistant_tool_calls_before_tool_
         return FakeResponse()
 
     monkeypatch.setattr("xenix.services.agent.providers.request.urlopen", fake_urlopen)
-    provider = OpenAICompatibleChatProvider(base_url="http://aimock.local", api_key="test", model="mock-model")
+    provider = OpenAICompatibleChatProvider(
+        provider_key="deepseek",
+        base_url="http://aimock.local",
+        api_key="test",
+        model="mock-model",
+    )
 
     provider.complete(
         [
@@ -585,6 +590,7 @@ def test_openai_compatible_provider_serializes_assistant_tool_calls_before_tool_
                 role="assistant",
                 content="",
                 provider_payload={
+                    "reasoning_content": "Need to inspect the dataset first.",
                     "tool_calls": [
                         {
                             "id": "call-data-peek",
@@ -611,6 +617,7 @@ def test_openai_compatible_provider_serializes_assistant_tool_calls_before_tool_
         {
             "role": "assistant",
             "content": "",
+            "reasoning_content": "Need to inspect the dataset first.",
             "tool_calls": [
                 {
                     "id": "call-data-peek",

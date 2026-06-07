@@ -28,7 +28,7 @@ from ..storage.models import (
     DEFAULT_AGENT_THREAD_SYSTEM_PROMPT,
 )
 from ..storage.repositories import AgentConversationRepository, ArtifactRepository
-from .providers import ProviderMessage
+from .providers import ProviderMessage, extract_reasoning_content
 
 
 def _utc_now() -> datetime:
@@ -149,23 +149,59 @@ class ThreadSnapshot(SQLModel):
             for tool_call in self.tool_calls
             if tool_call.result_message_id is not None
         }
-        for message in self.messages:
+        index = 0
+        while index < len(self.messages):
+            message = self.messages[index]
+            if message.kind is AgentMessageKind.ASSISTANT:
+                content = _content_blocks_to_text(message.content_blocks)
+                payload = _assistant_provider_payload(message)
+                next_index, grouped_tool_calls = _collect_following_tool_calls(
+                    self.messages,
+                    index + 1,
+                    tool_calls_by_request_message_id,
+                )
+                if grouped_tool_calls:
+                    payload["tool_calls"] = [
+                        _provider_tool_call_item(tool_call, tool_message)
+                        for tool_call, tool_message in grouped_tool_calls
+                    ]
+                    index = next_index
+                else:
+                    index += 1
+                rows.append(
+                    ProviderMessage(
+                        role="assistant",
+                        content=content,
+                        content_blocks=list(message.content_blocks),
+                        provider_payload=payload,
+                        source_message_id=message.id,
+                    )
+                )
+                continue
             if message.kind is AgentMessageKind.TOOL_CALL:
-                tool_call = tool_calls_by_request_message_id.get(message.id)
-                if tool_call is None:
+                next_index, grouped_tool_calls = _collect_following_tool_calls(
+                    self.messages,
+                    index,
+                    tool_calls_by_request_message_id,
+                )
+                if not grouped_tool_calls:
+                    index += 1
                     continue
+                payload = _tool_calls_provider_payload(grouped_tool_calls)
                 rows.append(
                     ProviderMessage(
                         role="assistant",
                         content="",
                         content_blocks=list(message.content_blocks),
-                        provider_payload=_tool_call_provider_payload(tool_call, message),
+                        provider_payload=payload,
                         source_message_id=message.id,
                     )
                 )
+                index = next_index
                 continue
             role = _provider_role_for_message(message)
             if role is None:
+                index += 1
                 continue
             content = _content_blocks_to_text(message.content_blocks)
             if message.kind is AgentMessageKind.TOOL_CALL_RESULT:
@@ -181,6 +217,7 @@ class ThreadSnapshot(SQLModel):
                     source_message_id=message.id,
                 )
             )
+            index += 1
         return rows
 
 
@@ -685,7 +722,48 @@ def _tool_result_to_text(tool_call: AgentToolCallRow) -> str:
     return json.dumps(payload, ensure_ascii=False)
 
 
-def _tool_call_provider_payload(
+def _assistant_provider_payload(message: AgentMessageRow) -> dict[str, Any]:
+    payload = dict(message.provider_payload)
+    reasoning_content = extract_reasoning_content(payload)
+    if reasoning_content is not None:
+        payload["reasoning_content"] = reasoning_content
+    return payload
+
+
+def _collect_following_tool_calls(
+    messages: list[AgentMessageRow],
+    start_index: int,
+    tool_calls_by_request_message_id: dict[str, AgentToolCallRow],
+) -> tuple[int, list[tuple[AgentToolCallRow, AgentMessageRow]]]:
+    index = start_index
+    tool_calls: list[tuple[AgentToolCallRow, AgentMessageRow]] = []
+    while index < len(messages):
+        message = messages[index]
+        if message.kind is not AgentMessageKind.TOOL_CALL:
+            break
+        tool_call = tool_calls_by_request_message_id.get(message.id)
+        if tool_call is not None:
+            tool_calls.append((tool_call, message))
+        index += 1
+    return index, tool_calls
+
+
+def _tool_calls_provider_payload(
+    tool_calls: list[tuple[AgentToolCallRow, AgentMessageRow]],
+) -> dict[str, Any]:
+    first_payload = dict(tool_calls[0][1].provider_payload)
+    reasoning_content = first_payload.get("reasoning_content")
+    payload: dict[str, Any] = {}
+    if isinstance(reasoning_content, str):
+        payload["reasoning_content"] = reasoning_content
+    payload["tool_calls"] = [
+        _provider_tool_call_item(tool_call, message)
+        for tool_call, message in tool_calls
+    ]
+    return payload
+
+
+def _provider_tool_call_item(
     tool_call: AgentToolCallRow,
     message: AgentMessageRow,
 ) -> dict[str, Any]:
@@ -696,18 +774,14 @@ def _tool_call_provider_payload(
         or payload.get("tool_name")
         or tool_call.tool_name.replace(".", "_")
     )
-    payload["tool_call_id"] = provider_call_id
-    payload["tool_calls"] = [
-        {
-            "id": provider_call_id,
-            "type": "function",
-            "function": {
-                "name": provider_name,
-                "arguments": json.dumps(dict(tool_call.arguments_payload or {}), ensure_ascii=False),
-            },
-        }
-    ]
-    return payload
+    return {
+        "id": provider_call_id,
+        "type": "function",
+        "function": {
+            "name": provider_name,
+            "arguments": json.dumps(dict(tool_call.arguments_payload or {}), ensure_ascii=False),
+        },
+    }
 
 
 def _finalized_at_for_status(status: AgentMessageStatus | None, now: datetime) -> datetime | None:
