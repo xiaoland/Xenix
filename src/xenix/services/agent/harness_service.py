@@ -620,7 +620,7 @@ class AgentHarnessService:
                         turn_id=turn_id,
                         tool_name=tool_call.tool_name,
                         arguments_payload=arguments,
-                        provider_payload={"tool_call_id": tool_call.provider_call_id},
+                        provider_payload=self._tool_call_provider_payload(tool_call),
                     )
                 )
                 provider_output_message_ids.append(request_message.id)
@@ -900,7 +900,7 @@ class AgentHarnessService:
                         turn_id=turn_id,
                         tool_name=tool_call.tool_name,
                         arguments_payload=arguments,
-                        provider_payload={"tool_call_id": tool_call.provider_call_id},
+                        provider_payload=self._tool_call_provider_payload(tool_call),
                     )
                 )
                 provider_output_message_ids.append(request_message.id)
@@ -1421,6 +1421,12 @@ class AgentHarnessService:
                 "Provider requested tools that were not attached to this request: "
                 + ", ".join(unavailable_tool_names)
             )
+
+    def _tool_call_provider_payload(self, tool_call: ProviderToolCall) -> dict[str, str]:
+        payload = {"tool_call_id": tool_call.provider_call_id}
+        if tool_call.provider_name:
+            payload["provider_name"] = tool_call.provider_name
+        return payload
 
     def _snapshot_has_payload_key(self, snapshot: ThreadSnapshot, key: str) -> bool:
         for payload in self._snapshot_tool_payloads(snapshot):

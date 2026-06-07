@@ -550,6 +550,86 @@ def test_openai_compatible_provider_omits_tool_choice_without_tools(monkeypatch)
     assert "tool_choice" not in captured_payload
 
 
+def test_openai_compatible_provider_serializes_assistant_tool_calls_before_tool_result(monkeypatch) -> None:
+    captured_payload: dict[str, Any] = {}
+    tool_result_json = json.dumps(
+        {
+            "tool_name": "data.peek",
+            "status": "succeeded",
+            "result": {"dataset_id": "dataset-1"},
+        },
+        ensure_ascii=False,
+    )
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def read(self):
+            return json.dumps({"choices": [{"message": {"content": "complete"}}]}).encode("utf-8")
+
+    def fake_urlopen(http_request, timeout):
+        captured_payload.update(json.loads(http_request.data.decode("utf-8")))
+        return FakeResponse()
+
+    monkeypatch.setattr("xenix.services.agent.providers.request.urlopen", fake_urlopen)
+    provider = OpenAICompatibleChatProvider(base_url="http://aimock.local", api_key="test", model="mock-model")
+
+    provider.complete(
+        [
+            ProviderMessage(role="user", content="inspect"),
+            ProviderMessage(
+                role="assistant",
+                content="",
+                provider_payload={
+                    "tool_calls": [
+                        {
+                            "id": "call-data-peek",
+                            "type": "function",
+                            "function": {
+                                "name": "data_peek",
+                                "arguments": "{\"name\": \"First analysis\"}",
+                            },
+                        }
+                    ]
+                },
+            ),
+            ProviderMessage(
+                role="tool",
+                content=tool_result_json,
+                provider_payload={"tool_call_id": "call-data-peek"},
+            ),
+        ],
+        [],
+    )
+
+    assert captured_payload["messages"] == [
+        {"role": "user", "content": "inspect"},
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+                {
+                    "id": "call-data-peek",
+                    "type": "function",
+                    "function": {
+                        "name": "data_peek",
+                        "arguments": "{\"name\": \"First analysis\"}",
+                    },
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "content": tool_result_json,
+            "tool_call_id": "call-data-peek",
+        },
+    ]
+
+
 def test_agent_harness_streams_assistant_as_message_events(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())

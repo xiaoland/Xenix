@@ -140,12 +140,30 @@ class ThreadSnapshot(SQLModel):
 
     def provider_messages(self) -> list[ProviderMessage]:
         rows: list[ProviderMessage] = []
+        tool_calls_by_request_message_id = {
+            tool_call.request_message_id: tool_call
+            for tool_call in self.tool_calls
+        }
         tool_calls_by_result_message_id = {
             tool_call.result_message_id: tool_call
             for tool_call in self.tool_calls
             if tool_call.result_message_id is not None
         }
         for message in self.messages:
+            if message.kind is AgentMessageKind.TOOL_CALL:
+                tool_call = tool_calls_by_request_message_id.get(message.id)
+                if tool_call is None:
+                    continue
+                rows.append(
+                    ProviderMessage(
+                        role="assistant",
+                        content="",
+                        content_blocks=list(message.content_blocks),
+                        provider_payload=_tool_call_provider_payload(tool_call, message),
+                        source_message_id=message.id,
+                    )
+                )
+                continue
             role = _provider_role_for_message(message)
             if role is None:
                 continue
@@ -665,6 +683,31 @@ def _tool_result_to_text(tool_call: AgentToolCallRow) -> str:
     if tool_call.error_summary:
         payload["error_summary"] = tool_call.error_summary
     return json.dumps(payload, ensure_ascii=False)
+
+
+def _tool_call_provider_payload(
+    tool_call: AgentToolCallRow,
+    message: AgentMessageRow,
+) -> dict[str, Any]:
+    payload = dict(message.provider_payload)
+    provider_call_id = str(payload.get("tool_call_id") or tool_call.id)
+    provider_name = str(
+        payload.get("provider_name")
+        or payload.get("tool_name")
+        or tool_call.tool_name.replace(".", "_")
+    )
+    payload["tool_call_id"] = provider_call_id
+    payload["tool_calls"] = [
+        {
+            "id": provider_call_id,
+            "type": "function",
+            "function": {
+                "name": provider_name,
+                "arguments": json.dumps(dict(tool_call.arguments_payload or {}), ensure_ascii=False),
+            },
+        }
+    ]
+    return payload
 
 
 def _finalized_at_for_status(status: AgentMessageStatus | None, now: datetime) -> datetime | None:

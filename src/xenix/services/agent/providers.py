@@ -34,6 +34,7 @@ class ProviderMessage(SQLModel):
 class ProviderToolCall(SQLModel):
     provider_call_id: str
     tool_name: str
+    provider_name: str | None = None
     arguments: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -274,6 +275,7 @@ class OpenAICompatibleChatProvider:
                 ProviderToolCall(
                     provider_call_id=str(call.get("id") or ""),
                     tool_name=spec.name,
+                    provider_name=str(provider_name or ""),
                     arguments=arguments,
                 )
             )
@@ -360,6 +362,7 @@ class OpenAICompatibleChatProvider:
                 ProviderToolCall(
                     provider_call_id=current["id"],
                     tool_name=spec.name,
+                    provider_name=current["name"],
                     arguments=arguments,
                 )
             )
@@ -369,6 +372,10 @@ class OpenAICompatibleChatProvider:
         provider_messages: list[dict[str, Any]] = []
         for row in rows:
             message = {"role": row.role, "content": row.content}
+            if row.role == "assistant":
+                tool_calls = row.provider_payload.get("tool_calls")
+                if isinstance(tool_calls, list) and tool_calls:
+                    message["tool_calls"] = tool_calls
             if row.role == "tool":
                 message["tool_call_id"] = row.provider_payload.get("tool_call_id", "")
             provider_messages.append(message)

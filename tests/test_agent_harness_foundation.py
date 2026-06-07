@@ -71,6 +71,7 @@ def test_conversation_store_persists_thread_turn_messages_and_tool_calls(monkeyp
             turn_id=turn.id,
             tool_name="data.peek",
             arguments_payload={"name": "First analysis"},
+            provider_payload={"tool_call_id": "call-data-peek", "provider_name": "data_peek"},
         )
     )
     result_message, completed_tool_call = conversations.complete_tool_call(
@@ -78,6 +79,7 @@ def test_conversation_store_persists_thread_turn_messages_and_tool_calls(monkeyp
             tool_call_id=tool_call.id,
             status=AgentToolCallStatus.SUCCEEDED,
             result_payload={"dataset_id": "dataset-1"},
+            provider_payload={"tool_call_id": "call-data-peek"},
         )
     )
     final_assistant_message = conversations.append_message(
@@ -116,8 +118,27 @@ def test_conversation_store_persists_thread_turn_messages_and_tool_calls(monkeyp
     assert provider_messages[0].role == "system"
     assert provider_messages[0].content == DEFAULT_AGENT_THREAD_SYSTEM_PROMPT
     assert provider_messages[0].source_message_id == snapshot.messages[0].id
-    assert [message.role for message in provider_messages[1:]] == ["user", "assistant", "tool", "assistant"]
-    tool_result_content = json.loads(provider_messages[3].content)
+    assert [message.role for message in provider_messages[1:]] == [
+        "user",
+        "assistant",
+        "assistant",
+        "tool",
+        "assistant",
+    ]
+    assert provider_messages[3].content == ""
+    assert provider_messages[3].source_message_id == snapshot.messages[3].id
+    assert provider_messages[3].provider_payload["tool_calls"] == [
+        {
+            "id": "call-data-peek",
+            "type": "function",
+            "function": {
+                "name": "data_peek",
+                "arguments": "{\"name\": \"First analysis\"}",
+            },
+        }
+    ]
+    assert provider_messages[4].provider_payload["tool_call_id"] == "call-data-peek"
+    tool_result_content = json.loads(provider_messages[4].content)
     assert tool_result_content == {
         "tool_name": "data.peek",
         "status": "succeeded",
