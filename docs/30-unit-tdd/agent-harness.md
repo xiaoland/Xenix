@@ -117,6 +117,8 @@ The Harness emits `THINKING` Chatbot Events around each provider request. The st
 
 `AgentThreadRow.system_prompt` stores the default text used to seed the first hidden system Message.
 
+New threads format the default system prompt with the current application interface locale, such as `en_US` or `zh_CN`, so provider-facing assistant language follows the UI language instead of inferring language from user text.
+
 The first user turn persists that hidden system Message before the user Message, with role `system` when projected to provider messages. Empty threads do not send provider requests. Chatbot timeline projection hides system Messages unless a later control-event contract explicitly exposes them.
 
 ## Provider Request Usage

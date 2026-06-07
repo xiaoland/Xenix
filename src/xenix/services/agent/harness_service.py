@@ -77,6 +77,7 @@ class SubmitUserTurnInput(SQLModel):
     text: str
     file_paths: list[str] = Field(default_factory=list)
     fq_model_key: str | None = None
+    interface_locale: str | None = None
 
 
 class ContinueStepBudgetInput(SQLModel):
@@ -170,11 +171,17 @@ class AgentHarnessService:
         self._cancel_events: dict[str, threading.Event] = {}
         self._cancel_lock = threading.Lock()
 
-    def create_thread(self, title: str | None = None, fq_model_key: str | None = None) -> ThreadSnapshot:
+    def create_thread(
+        self,
+        title: str | None = None,
+        fq_model_key: str | None = None,
+        interface_locale: str | None = None,
+    ) -> ThreadSnapshot:
         selected_fq_model_key = self._resolve_fq_model_key(fq_model_key, None)
         thread = self._conversation_store.create_thread(
             CreateAgentThreadInput(
                 title=title,
+                interface_locale=interface_locale,
                 selected_fq_model_key=selected_fq_model_key,
             )
         )
@@ -495,6 +502,7 @@ class AgentHarnessService:
             thread_id = self._conversation_store.create_thread(
                 CreateAgentThreadInput(
                     title=self._title_from_first_message(text, input_data.file_paths),
+                    interface_locale=input_data.interface_locale,
                     selected_fq_model_key=selected_fq_model_key,
                 )
             ).id

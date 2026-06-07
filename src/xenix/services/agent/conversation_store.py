@@ -25,7 +25,7 @@ from ..storage.models import (
     AgentTurnRow,
     AgentTurnStatus,
     ArtifactRow,
-    DEFAULT_AGENT_THREAD_SYSTEM_PROMPT,
+    default_agent_thread_system_prompt,
 )
 from ..storage.repositories import AgentConversationRepository, ArtifactRepository
 from .providers import ProviderMessage, extract_reasoning_content
@@ -38,6 +38,7 @@ def _utc_now() -> datetime:
 class CreateAgentThreadInput(SQLModel):
     title: str | None = None
     system_prompt: str | None = None
+    interface_locale: str | None = None
     selected_fq_model_key: str | None = None
 
 
@@ -232,7 +233,7 @@ class ConversationStore:
         title = input_data.title.strip() if input_data.title else None
         system_prompt = (
             input_data.system_prompt.strip() if input_data.system_prompt else ""
-        ) or DEFAULT_AGENT_THREAD_SYSTEM_PROMPT
+        ) or default_agent_thread_system_prompt(input_data.interface_locale)
         selected_fq_model_key = (
             input_data.selected_fq_model_key.strip()
             if input_data.selected_fq_model_key

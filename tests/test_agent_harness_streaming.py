@@ -833,10 +833,13 @@ def test_agent_harness_projects_thread_system_prompt_as_first_provider_message(m
         conversation_store=ConversationStore(context.session_factory),
     )
 
-    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="show me the data"))
+    snapshot = harness.submit_user_turn(
+        SubmitUserTurnInput(text="show me the data", interface_locale="zh_CN")
+    )
 
     assert snapshot.messages[0].kind is AgentMessageKind.SYSTEM
     assert snapshot.messages[1].kind is AgentMessageKind.USER
+    assert "Communicate with the user in zh_CN." in snapshot.thread.system_prompt
     assert provider.messages[0].role == "system"
     assert provider.messages[0].content == snapshot.thread.system_prompt
     assert provider.messages[0].source_message_id == snapshot.messages[0].id

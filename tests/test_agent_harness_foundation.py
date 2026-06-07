@@ -151,6 +151,31 @@ def test_conversation_store_persists_thread_turn_messages_and_tool_calls(monkeyp
     }
 
 
+def test_conversation_store_formats_default_system_prompt_with_interface_locale(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    conversations, _artifacts = _build_services(monkeypatch, tmp_path)
+
+    thread = conversations.create_thread(
+        CreateAgentThreadInput(title="Chinese interface", interface_locale="zh_CN")
+    )
+    turn, _user_message = conversations.start_turn(
+        StartTurnInput(
+            thread_id=thread.id,
+            user_content_blocks=[{"type": "text", "text": "分析这个文件"}],
+        )
+    )
+    snapshot = conversations.get_thread_snapshot(thread.id)
+
+    assert "Communicate with the user in zh_CN." in thread.system_prompt
+    assert "business-oriented language" in thread.system_prompt
+    assert "Communicate in the user's language" not in thread.system_prompt
+    assert snapshot.messages[0].turn_id == turn.id
+    assert snapshot.messages[0].content_blocks == [{"type": "text", "text": thread.system_prompt}]
+    assert snapshot.provider_messages()[0].content == thread.system_prompt
+
+
 def test_provider_messages_group_consecutive_tool_calls_into_one_assistant_message(
     monkeypatch,
     tmp_path: Path,

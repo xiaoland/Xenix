@@ -252,6 +252,7 @@ class MainWindow(QMainWindow):
                         text=text,
                         file_paths=file_paths,
                         fq_model_key=fq_model_key or None,
+                        interface_locale=self._translation_manager.current_locale(),
                     )
                 ):
                     self._harness_stream_event.emit(event)
@@ -458,7 +459,9 @@ class MainWindow(QMainWindow):
         self._pending_step_confirmation = None
         self._active_agent_run_id = None
         self._thread_detail_view.clear_step_confirmation()
-        snapshot = self._agent_harness_service.create_thread()
+        snapshot = self._agent_harness_service.create_thread(
+            interface_locale=self._translation_manager.current_locale(),
+        )
         self._agent_thread_id = snapshot.thread.id
         self._sync_thread_model_picker(snapshot)
         self._thread_detail_view.render_events(self._agent_harness_service.project_chatbot_events(snapshot))

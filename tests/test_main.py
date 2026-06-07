@@ -1124,6 +1124,35 @@ def test_main_window_keeps_thinking_indicator_during_non_final_snapshot(monkeypa
         window.close()
 
 
+def test_main_window_submit_chat_message_injects_interface_locale(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=False)
+    captured_inputs = []
+    try:
+        window._translation_manager.set_locale("zh_CN", persist=False)
+
+        def fake_submit(input_data):
+            captured_inputs.append(input_data)
+            return []
+
+        monkeypatch.setattr(window._agent_harness_service, "submit_user_turn_stream", fake_submit)
+        window._submit_chat_message("Analyze this.", [], "")
+
+        for _ in range(40):
+            app.processEvents()
+            if captured_inputs:
+                break
+            time.sleep(0.01)
+
+        assert len(captured_inputs) == 1
+        assert captured_inputs[0].interface_locale == "zh_CN"
+    finally:
+        window.close()
+
+
 def test_thread_detail_view_composer_file_drag_hover_attaches_files(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     data_file = tmp_path / "customers.csv"

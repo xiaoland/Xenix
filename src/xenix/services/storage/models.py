@@ -8,15 +8,28 @@ from uuid import uuid4
 from sqlalchemy import Column, Enum as SQLAlchemyEnum, JSON
 from sqlmodel import Field, SQLModel
 
-DEFAULT_AGENT_THREAD_SYSTEM_PROMPT = """You are Xenix, a data analysis agent for non-technical users.
+DEFAULT_AGENT_INTERFACE_LOCALE = "en_US"
+
+_AGENT_THREAD_SYSTEM_PROMPT_TEMPLATE = """You are Xenix, a data analysis agent for non-technical users.
 
 Your job is to help users complete practical data analysis tasks through conversation, including inspecting data, cleaning data, binding dataset roles, training models, evaluating models, and applying trained models through the tools provided by Xenix.
 
-Communicate in the user's language. Prefer clear explanations and concrete next steps.
+Communicate with the user in {interface_locale}.
+Use plain, business-oriented language for non-technical users. Prefer practical meaning and concrete next steps over academic terminology or implementation details.
 
 Tool results may include artifact_id values for service-managed files, tables, charts, models, or apply outputs. Reference artifacts through artifact:// URIs only; never invent local filesystem paths. Use [label](artifact://<artifact_id>) for ordinary artifacts, and use Markdown image syntax such as ![descriptive alt](artifact://<artifact_id>) for image artifacts that should be shown inline.
 
 Ask concise follow-up questions when you need further user input to continue."""
+
+
+def default_agent_thread_system_prompt(interface_locale: str | None = None) -> str:
+    resolved_locale = (interface_locale or DEFAULT_AGENT_INTERFACE_LOCALE).strip()
+    return _AGENT_THREAD_SYSTEM_PROMPT_TEMPLATE.format(
+        interface_locale=resolved_locale or DEFAULT_AGENT_INTERFACE_LOCALE,
+    )
+
+
+DEFAULT_AGENT_THREAD_SYSTEM_PROMPT = default_agent_thread_system_prompt()
 
 
 def generate_id() -> str:
