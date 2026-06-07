@@ -577,7 +577,7 @@ def test_openai_compatible_provider_serializes_assistant_tool_calls_before_tool_
 
     monkeypatch.setattr("xenix.services.agent.providers.request.urlopen", fake_urlopen)
     provider = OpenAICompatibleChatProvider(
-        provider_key="deepseek",
+        provider_key="moonshot",
         base_url="http://aimock.local",
         api_key="test",
         model="mock-model",

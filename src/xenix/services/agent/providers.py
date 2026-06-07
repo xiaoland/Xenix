@@ -374,7 +374,7 @@ class OpenAICompatibleChatProvider:
             message = {"role": row.role, "content": row.content}
             if row.role == "assistant":
                 reasoning_content = row.provider_payload.get("reasoning_content")
-                if self._provider_key == "deepseek" and isinstance(reasoning_content, str):
+                if isinstance(reasoning_content, str):
                     message["reasoning_content"] = reasoning_content
                 tool_calls = row.provider_payload.get("tool_calls")
                 if isinstance(tool_calls, list) and tool_calls:
