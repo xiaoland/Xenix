@@ -7,12 +7,13 @@ Use this overlay when the task is driven by a crash, anomaly, corruption risk, r
 ## Preconditions
 
 - The work has been recognized as primarily `Reality`.
-- A task packet exists under `tasks/<task-slug>/`.
+- An agent-owned task packet exists under `tasks/<task-slug>/`.
 
 ## Constraints
 
 - Stay read-only until evidence justifies a fix.
 - Keep telemetry, reproduction notes, state observations, and hypotheses in the task packet.
+- Search volatile workspaces only when recovering task state or reviewing evidence deliberately stored there.
 - Do not rewrite docs or code based on an unproven story.
 - Promote only stable recurrence protection after the evidence is clear.
 
@@ -22,7 +23,7 @@ Use this overlay when the task is driven by a crash, anomaly, corruption risk, r
 2. Capture the symptom, impact, environment, and reproduction path.
 3. Gather logs, traces, state snapshots, and other available evidence.
 4. Narrow candidate causes and identify the next discriminating check.
-5. Decide whether the next posture is `Execute` for a justified fix or `Solidify` for owner and scope confirmation.
+5. Decide whether the next posture is `Execute` for a justified fix, `Solidify` for owner and scope confirmation, or `Explore` if the evidence opened a broader uncertainty.
 
 ## Exit
 

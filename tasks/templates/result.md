@@ -7,6 +7,7 @@
 ## Summary
 
 - Completed outcomes:
+- Final current-state note:
 
 ## Files Changed
 
@@ -27,3 +28,8 @@
 
 - Item:
 - Reason:
+
+## Search / Cleanup Notes
+
+- Task-local scratch retained:
+- Task-local scratch removed:

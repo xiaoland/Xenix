@@ -9,6 +9,12 @@
 
 - Describe the fuzzy idea or open question.
 
+## Current State
+
+- Current Understanding:
+- Active Mode or Transition Note: Explore
+- Next Step:
+
 ## Guardrails Touched
 
 - Guardrail 1
@@ -48,3 +54,9 @@
 ## Promotion Candidate Truths
 
 - Leave empty until stable.
+
+## Supporting Files
+
+- Notes:
+- Evidence:
+- Work:

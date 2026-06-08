@@ -5,6 +5,12 @@
 - Objective:
 - Hypothesis:
 
+## Current State
+
+- Current Understanding:
+- Active Mode or Transition Note: Execute
+- Next Step:
+
 ## Pre-Execution Restatement
 
 - Target:
@@ -37,3 +43,9 @@
 
 - Durable truth candidates:
 - Keep in task only:
+
+## Supporting Files
+
+- Notes:
+- Evidence:
+- Work:

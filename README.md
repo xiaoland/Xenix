@@ -3,7 +3,7 @@
 PySide6 desktop bootstrap for the `native` branch of Xenix.
 
 This branch is intentionally focused on the Native desktop application line. The web monorepo remains on `web` (previous `master`, read [docs/40-deployment/branch-governance.md](docs/40-deployment/branch-governance.md) for more information)
-Repository governance follows a local single-repo application of SVC v9.7.
+Repository governance follows a local single-repo application of SVC v9.8.
 
 ## Quick Start
 
@@ -30,11 +30,12 @@ Use Python `3.12` to `3.14`. The initial toolchain is pinned below `3.15` becaus
 - `scripts` contains developer helpers used by `pdm run`.
 - `ml` keeps the existing Python model scripts that will be integrated into the native workflow later.
 - `docs` stores canonical durable documentation layers.
-- `tasks` stores active task packets, reusable templates, and archived records.
+- `tasks` stores agent-owned task-local workspaces, reusable templates, and archived records.
 - `xenix.spec` is the canonical Windows PyInstaller `onedir` spec.
 
 ## Documentation Model
 
+- Meta: [docs/00-meta/README.md](docs/00-meta/README.md)
 - PRD: [docs/10-prd/README.md](docs/10-prd/README.md)
 - Alignment: [docs/15-alignment/README.md](docs/15-alignment/README.md)
 - Product TDD: [docs/20-product-tdd/README.md](docs/20-product-tdd/README.md)
