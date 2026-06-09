@@ -36,6 +36,7 @@ from .markdown_renderer import render_chat_markdown
 
 USER_MESSAGE_BACKGROUND = QColor("#000000")
 USER_MESSAGE_FOREGROUND = QColor("#ffffff")
+USER_MESSAGE_SELECTION_BACKGROUND = QColor("#2f3338")
 UNBOUNDED_WIDGET_WIDTH = 16777215
 ArtifactResolver = Callable[[str], Any]
 
@@ -519,6 +520,12 @@ class ChatMessageBubble(QFrame):
 
         text_palette = QPalette(browser.palette())
         for role in (
+            QPalette.ColorRole.Window,
+            QPalette.ColorRole.Base,
+            QPalette.ColorRole.AlternateBase,
+        ):
+            text_palette.setColor(role, USER_MESSAGE_BACKGROUND)
+        for role in (
             QPalette.ColorRole.Text,
             QPalette.ColorRole.WindowText,
             QPalette.ColorRole.BrightText,
@@ -527,6 +534,8 @@ class ChatMessageBubble(QFrame):
             text_palette.setColor(role, USER_MESSAGE_FOREGROUND)
         text_palette.setColor(QPalette.ColorRole.Link, USER_MESSAGE_FOREGROUND)
         text_palette.setColor(QPalette.ColorRole.LinkVisited, USER_MESSAGE_FOREGROUND)
+        text_palette.setColor(QPalette.ColorRole.Highlight, USER_MESSAGE_SELECTION_BACKGROUND)
+        text_palette.setColor(QPalette.ColorRole.HighlightedText, USER_MESSAGE_FOREGROUND)
         browser.setPalette(text_palette)
         browser.viewport().setPalette(text_palette)
 

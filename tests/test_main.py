@@ -1335,9 +1335,30 @@ def test_thread_detail_view_user_message_uses_native_black_panel(monkeypatch, tm
         assert card.frameShape() == QFrame.StyledPanel
         assert card.autoFillBackground()
         assert card.palette().color(QPalette.ColorRole.Window).name() == "#000000"
+        assert card.palette().color(QPalette.ColorRole.WindowText).name() == "#ffffff"
         assert browser is not None
-        assert browser.palette().color(QPalette.ColorRole.Text).name() == "#ffffff"
-        assert browser.viewport().palette().color(QPalette.ColorRole.Text).name() == "#ffffff"
+        for role in (
+            QPalette.ColorRole.Window,
+            QPalette.ColorRole.Base,
+            QPalette.ColorRole.AlternateBase,
+        ):
+            assert browser.palette().color(role).name() == "#000000"
+            assert browser.palette().color(role).alpha() == 255
+            assert browser.viewport().palette().color(role).name() == "#000000"
+            assert browser.viewport().palette().color(role).alpha() == 255
+        for role in (
+            QPalette.ColorRole.Text,
+            QPalette.ColorRole.WindowText,
+            QPalette.ColorRole.BrightText,
+            QPalette.ColorRole.ButtonText,
+            QPalette.ColorRole.Link,
+            QPalette.ColorRole.LinkVisited,
+            QPalette.ColorRole.HighlightedText,
+        ):
+            assert browser.palette().color(role).name() == "#ffffff"
+            assert browser.viewport().palette().color(role).name() == "#ffffff"
+        assert browser.palette().color(QPalette.ColorRole.Highlight).name() == "#2f3338"
+        assert browser.viewport().palette().color(QPalette.ColorRole.Highlight).name() == "#2f3338"
     finally:
         window.close()
 
