@@ -170,6 +170,12 @@ def test_conversation_store_formats_default_system_prompt_with_interface_locale(
 
     assert "Communicate with the user in zh_CN." in thread.system_prompt
     assert "business-oriented language" in thread.system_prompt
+    assert "business scenario, analysis object, data grain, field roles" in thread.system_prompt
+    assert "Do not expose algorithm menus to non-technical users." in thread.system_prompt
+    assert "data structure judgment as more important than model selection" in thread.system_prompt
+    assert "correlation is not causation" in thread.system_prompt
+    assert "prediction is not an automatic decision" in thread.system_prompt
+    assert "business meaning, action recommendations, risk notes, and process trace" in thread.system_prompt
     assert "Communicate in the user's language" not in thread.system_prompt
     assert snapshot.messages[0].turn_id == turn.id
     assert snapshot.messages[0].content_blocks == [{"type": "text", "text": thread.system_prompt}]

@@ -840,6 +840,8 @@ def test_agent_harness_projects_thread_system_prompt_as_first_provider_message(m
     assert snapshot.messages[0].kind is AgentMessageKind.SYSTEM
     assert snapshot.messages[1].kind is AgentMessageKind.USER
     assert "Communicate with the user in zh_CN." in snapshot.thread.system_prompt
+    assert "business scenario, analysis object, data grain, field roles" in snapshot.thread.system_prompt
+    assert "business meaning, action recommendations, risk notes, and process trace" in snapshot.thread.system_prompt
     assert provider.messages[0].role == "system"
     assert provider.messages[0].content == snapshot.thread.system_prompt
     assert provider.messages[0].source_message_id == snapshot.messages[0].id

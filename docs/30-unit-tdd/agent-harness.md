@@ -119,6 +119,8 @@ The Harness emits `THINKING` Chatbot Events around each provider request. The st
 
 New threads format the default system prompt with the current application interface locale, such as `en_US` or `zh_CN`, so provider-facing assistant language follows the UI language instead of inferring language from user text.
 
+The default system prompt frames the Agent as a non-technical business analysis guide. Before choosing an analysis path, it must identify the business scenario, analysis object, data grain, field roles, and user intent; hide algorithm menus behind business-language choices; prefer simple interpretable and data-supported paths; compare complex models against a simple baseline; state evidence boundaries such as correlation not being causation and predictions not being automatic decisions; and make final outputs land in business meaning, action recommendations, risk notes, and process trace.
+
 The first user turn persists that hidden system Message before the user Message, with role `system` when projected to provider messages. Empty threads do not send provider requests. Chatbot timeline projection hides system Messages unless a later control-event contract explicitly exposes them.
 
 ## Provider Request Usage
