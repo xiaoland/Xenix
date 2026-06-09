@@ -17,7 +17,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--timeout-seconds",
         type=float,
-        default=30.0,
+        default=90.0,
         help="Maximum time to wait for the packaged smoke test.",
     )
     return parser

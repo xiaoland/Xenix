@@ -120,6 +120,7 @@ Expected result:
 - compiled translations are available under the bundled `xenix/translations/` path
 - build commit is embedded into the bundle and shown in Settings; `XENIX_BUILD_COMMIT` can override git discovery for non-checkout build environments
 - DuckDB Python runtime imports successfully and can run an in-memory query inside the packaged app
+- Native ML and data-science runtimes used by first-party workflows are present under `dist/xenix/_internal/` and are exercised by packaged verification, not only by startup import discovery.
 - OpenTelemetry OTLP exporter hidden imports are collected by `xenix.spec` so
   packaged builds can use either gRPC or HTTP/protobuf OTLP export when the
   corresponding environment variables are set before launching the executable.
@@ -129,6 +130,21 @@ Expected result:
 ```bash
 pdm run smoke-package
 ```
+
+Packaged smoke checks must cover runtime paths that load package-local native
+libraries, compiled extensions, metadata, or data files. Startup-only smoke can
+miss delayed ML imports: PyInstaller may include a package's Python modules in
+`PYZ` while failing to collect the native files that the package loads later in
+`COLLECT`. XGBoost, LightGBM, DuckDB, scikit-learn, SciPy, NumPy, and pandas
+are examples of dependency families that need this treatment when first-party
+workflows depend on them.
+
+When adding or upgrading an ML/data-science dependency, add or keep a packaged
+verification path that performs the smallest meaningful runtime exercise:
+import the public API used by Xenix, construct the estimator or client, and for
+model libraries prefer a tiny in-memory fit or prediction when it is cheap. If
+that is too expensive for the default smoke, add a targeted packaged check and
+document when release builds must run it.
 
 ## VS Code
 
@@ -166,6 +182,7 @@ Smoke verification should confirm that these directories are created in a fresh 
 - If resources fail to load in the packaged app, verify that `xenix.spec` still copies `src/xenix/resources` into `xenix/resources`.
 - If language switching fails in a packaged app, verify that `src/xenix/translations/*.qm` were rebuilt and copied into `xenix/translations`.
 - If DuckDB-backed tools fail only in the packaged app, rerun `pdm run smoke-package` and inspect whether PyInstaller collected DuckDB's package metadata and native library.
+- If an ML/data-science dependency fails only in the packaged app, inspect `build/xenix/COLLECT-00.toc` and `dist/xenix/_internal/` for package-local native files. Compare them with `PyInstaller.utils.hooks.collect_dynamic_libs("<package>")` and package metadata/data requirements. Do not assume that a successful Python-module import during analysis means the package's DLLs, `.pyd` files, BLAS/OpenMP runtimes, or package data were collected.
 - If `analysis.graph` fails only in the PyInstaller windowed package, check the `vl-convert-python` render path. Local minimal packaging tests showed that `vl_convert.vegalite_to_svg` works in a console bundle but can hang or fail with `oneshot canceled` in a windowed bundle that has no Windows console. Xenix allocates a temporary hidden console around the converter call in frozen Windows builds, then releases it after rendering. Keep `smoke-package` covering graph rendering so this workaround does not regress.
 - If an SSH worker setup fails, inspect `config/ml_workers.json`, the Xenix-managed `Host xenix.*` block in `~/.ssh/config`, and the remote root permissions. Do not add passwords, passphrases, or private-key material to Xenix config.
 - If you need an isolated local run, set `XENIX_APP_HOME` to an empty directory or use the VSCode workspace-home launch profile.

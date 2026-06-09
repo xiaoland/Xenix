@@ -483,6 +483,7 @@ def _run_smoke_checks(paths) -> None:
         DataQueryTransformService,
         DatasetSqlBinding,
     )
+    from .services.ml.models.regression import XGBoostRegressionService
 
     duckdb_smoke_path = paths.temp / "duckdb-smoke.csv"
     duckdb_smoke_path.write_text("value\n1\n2\n", encoding="utf-8")
@@ -521,6 +522,16 @@ def _run_smoke_checks(paths) -> None:
     graph_output = Path(graph_result.output_path)
     if not graph_output.is_file() or not graph_output.read_text(encoding="utf-8").lstrip().startswith("<svg"):
         raise RuntimeError("Vega-Lite graph smoke render failed.")
+
+    xgboost_estimator = XGBoostRegressionService._build_estimator(
+        n_estimators=2,
+        max_depth=1,
+        learning_rate=0.5,
+    )
+    xgboost_estimator.fit([[0.0], [1.0], [2.0], [3.0]], [0.0, 1.0, 2.0, 3.0])
+    xgboost_prediction = xgboost_estimator.predict([[1.5]])
+    if len(xgboost_prediction) != 1:
+        raise RuntimeError("XGBoost packaged runtime smoke fit failed.")
 
 
 def run(*, smoke_test: bool = False) -> int:

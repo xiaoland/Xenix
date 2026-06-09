@@ -2,20 +2,25 @@
 
 from pathlib import Path
 
+from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
+
 
 project_root = Path.cwd()
 src_root = project_root / "src"
 scripts_root = project_root / "scripts"
+xgboost_binaries = collect_dynamic_libs("xgboost")
+xgboost_datas = collect_data_files("xgboost", includes=["VERSION", "py.typed"])
 
 a = Analysis(
     [str(scripts_root / "run_packaged.py")],
     pathex=[str(src_root)],
-    binaries=[],
+    binaries=xgboost_binaries,
     datas=[
         (str(src_root / "xenix" / "resources"), "xenix/resources"),
         (str(src_root / "xenix" / "translations"), "xenix/translations"),
         (str(src_root / "xenix"), "xenix_worker_source/xenix"),
-    ],
+    ]
+    + xgboost_datas,
     hiddenimports=[
         "xenix._generated_trial_llm",
         "xenix.services.agent.chatbot_events",
