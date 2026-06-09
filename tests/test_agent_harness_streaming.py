@@ -197,7 +197,6 @@ class StaticSpecRegistry:
             for tool_name in [
                 "model.metadata",
                 "model.task.query",
-                "analysis.profile",
                 "analysis.graph",
                 "data.peek",
                 "data.integrate",

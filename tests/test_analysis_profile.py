@@ -8,7 +8,7 @@ from xenix.services.analysis_profile import AnalysisProfileService, ProfileDatas
 from xenix.services.artifact_service import ArtifactService
 from xenix.services.data_cleaning import DataCleaningService
 from xenix.services.data_transform import DataQueryTransformService
-from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
+from xenix.services.dataset_service import DatasetService
 from xenix.services.ml_service import MLService
 from xenix.services.ml_task_service import MLTaskService
 from xenix.services.storage import StorageBootstrapService
@@ -121,37 +121,60 @@ def test_analysis_profile_service_builds_bounded_markdown_report(tmp_path: Path)
     assert "## Target group statistics" in result.markdown
 
 
-def test_analysis_profile_tool_returns_markdown_without_artifact(monkeypatch, tmp_path: Path) -> None:
-    dataset_service, artifact_service, registry, conversation_store = _build_runtime(monkeypatch, tmp_path)
+def test_data_peek_tool_profiles_by_default(monkeypatch, tmp_path: Path) -> None:
+    _dataset_service, artifact_service, registry, conversation_store = _build_runtime(monkeypatch, tmp_path)
     source = _write_mixed_csv(tmp_path)
-    dataset = dataset_service.register_dataset(
-        RegisterDatasetInput(source_path=str(source.resolve()), name="Sales")
-    )
-    arguments = {"dataset_id": dataset.id, "target_columns": ["amount"], "top_n": 2}
-    context = _tool_context(conversation_store, "analysis.profile", arguments)
+    arguments = {
+        "source_path": str(source.resolve()),
+        "name": "Sales",
+        "target_columns": ["amount"],
+        "top_n": 2,
+    }
+    context = _tool_context(conversation_store, "data.peek", arguments)
 
     result = registry.execute(
-        "analysis.profile",
+        "data.peek",
         arguments,
         context,
     )
 
-    assert result.payload["dataset_id"] == dataset.id
-    assert "# Dataset profile: Sales" in result.payload["markdown"]
-    assert "artifact_id" not in result.payload
-    assert "artifact_link" not in result.payload
+    assert result.payload["dataset_id"]
+    assert result.payload["artifact_id"]
+    assert result.payload["inspection"]["row_count"] == 5
+    assert result.payload["analysis"]["enabled"] is True
+    assert "# Dataset profile: Sales" in result.payload["analysis"]["markdown"]
+    assert result.payload["analysis"]["profile"]["target_group_statistics"]
     assert result.content_blocks[0]["type"] == "markdown"
     assert "# Dataset profile: Sales" in result.content_blocks[0]["text"]
-    assert artifact_service.list_thread_artifacts(context.thread_id) == []
+    assert len(artifact_service.list_thread_artifacts(context.thread_id)) == 1
 
 
-def test_analysis_profile_tool_schema_is_dataset_scoped(monkeypatch, tmp_path: Path) -> None:
+def test_data_peek_tool_can_skip_profile(monkeypatch, tmp_path: Path) -> None:
+    _dataset_service, _artifact_service, registry, _conversation_store = _build_runtime(monkeypatch, tmp_path)
+    source = _write_mixed_csv(tmp_path)
+    arguments = {"source_path": str(source.resolve()), "name": "Sales", "analysis": False}
+
+    result = registry.execute(
+        "data.peek",
+        arguments,
+        _tool_context(_conversation_store, "data.peek", arguments),
+    )
+
+    assert result.payload["analysis"] == {"enabled": False}
+    assert "# Dataset profile: Sales" not in result.content_blocks[0]["text"]
+
+
+def test_data_peek_tool_schema_owns_profile_controls(monkeypatch, tmp_path: Path) -> None:
     _dataset_service, _artifact_service, registry, _conversation_store = _build_runtime(monkeypatch, tmp_path)
     specs = {spec.name: spec for spec in registry.list_specs()}
 
-    assert "analysis.profile" in specs
-    schema = specs["analysis.profile"].parameters_schema
-    assert schema["required"] == ["dataset_id"]
-    assert "dataset_id" in schema["properties"]
-    assert "source_path" not in schema["properties"]
+    assert "analysis.profile" not in specs
+    schema = specs["data.peek"].parameters_schema
+    assert schema.get("required") is None
+    assert schema["properties"]["analysis"] == {"type": "boolean", "default": True}
+    assert "source_path" in schema["properties"]
+    assert "target_columns" in schema["properties"]
+    assert "top_n" in schema["properties"]
+    assert "correlation_column_limit" in schema["properties"]
+    assert "dataset_id" not in schema["properties"]
     assert "rows" not in schema["properties"]

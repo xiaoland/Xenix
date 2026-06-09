@@ -123,7 +123,6 @@ class AgentToolRegistry:
             for tool in (
                 self._build_data_peek_tool(),
                 self._build_data_integrate_tool(),
-                self._build_analysis_profile_tool(),
                 self._build_analysis_graph_tool(),
                 # analysis.lambda is intentionally retained in code but not registered
                 # in the Agent-facing tool set.
@@ -169,12 +168,19 @@ class AgentToolRegistry:
             spec=AgentToolSpec(
                 name="data.peek",
                 provider_name="data_peek",
-                description="Inspect a CSV/XLS/XLSX file and register it as a dataset artifact.",
+                description=(
+                    "Inspect a CSV/XLS/XLSX file, register it as a dataset artifact, and by default "
+                    "run bounded common descriptive analysis. Set analysis to false to inspect only."
+                ),
                 parameters_schema={
                     "type": "object",
                     "properties": {
                         "source_path": {"type": "string"},
                         "name": {"type": "string"},
+                        "analysis": {"type": "boolean", "default": True},
+                        "target_columns": {"type": "array", "items": {"type": "string"}},
+                        "top_n": {"type": "integer", "minimum": 1, "maximum": 20},
+                        "correlation_column_limit": {"type": "integer", "minimum": 2, "maximum": 12},
                     },
                     "additionalProperties": False,
                 },
@@ -201,31 +207,6 @@ class AgentToolRegistry:
             ),
             handler=self._data_integrate,
             presentation=tool_presentation_for_name("data.integrate"),
-        )
-
-    def _build_analysis_profile_tool(self) -> AgentTool:
-        return AgentTool(
-            spec=AgentToolSpec(
-                name="analysis.profile",
-                provider_name="analysis_profile",
-                description=(
-                    "Run bounded common descriptive analysis for one registered dataset. "
-                    "Returns Markdown directly and does not create an artifact."
-                ),
-                parameters_schema={
-                    "type": "object",
-                    "properties": {
-                        "dataset_id": {"type": "string"},
-                        "target_columns": {"type": "array", "items": {"type": "string"}},
-                        "top_n": {"type": "integer", "minimum": 1, "maximum": 20},
-                        "correlation_column_limit": {"type": "integer", "minimum": 2, "maximum": 12},
-                    },
-                    "required": ["dataset_id"],
-                    "additionalProperties": False,
-                },
-            ),
-            handler=self._analysis_profile,
-            presentation=tool_presentation_for_name("analysis.profile"),
         )
 
     def _build_analysis_graph_tool(self) -> AgentTool:
@@ -610,6 +591,18 @@ class AgentToolRegistry:
 
     def _data_peek(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
+        supported_keys = {
+            "source_path",
+            "name",
+            "analysis",
+            "target_columns",
+            "top_n",
+            "correlation_column_limit",
+        }
+        unsupported_keys = sorted(set(arguments) - supported_keys)
+        if unsupported_keys:
+            raise ValidationError("data.peek does not accept: " + ", ".join(unsupported_keys))
+        analysis_enabled = self._optional_boolean(arguments, "analysis", default=True)
         source_path = self._resolve_source_path(arguments.get("source_path"), context)
         name = str(arguments.get("name") or source_path.stem)
         dataset = self._dataset_service.register_dataset(
@@ -629,21 +622,40 @@ class AgentToolRegistry:
             preview_payload=inspection.model_dump(mode="json"),
         )
         link = build_artifact_markdown_link(artifact)
-        return ToolExecutionResult(
-            payload={
-                "dataset_id": dataset.id,
-                "artifact_id": artifact.id,
-                "inspection": inspection.model_dump(mode="json"),
-            },
-            content_blocks=[
-                {
-                    "type": "markdown",
-                    "text": (
-                        f"Dataset `{dataset.name}` is ready: {link}\n\n"
-                        f"Rows: {inspection.row_count}; columns: {', '.join(inspection.preview_columns)}"
+        payload: dict[str, Any] = {
+            "dataset_id": dataset.id,
+            "artifact_id": artifact.id,
+            "inspection": inspection.model_dump(mode="json"),
+        }
+        markdown_text = (
+            f"Dataset `{dataset.name}` is ready: {link}\n\n"
+            f"Rows: {inspection.row_count}; columns: {', '.join(inspection.preview_columns)}"
+        )
+        if analysis_enabled:
+            profile_result = self._analysis_profile_service.profile_dataset(
+                ProfileDatasetInput(
+                    source_path=dataset.source_path,
+                    dataset_name=dataset.name,
+                    target_columns=self._optional_string_list(arguments, "target_columns"),
+                    top_n=self._optional_integer(arguments, "top_n", default=10),
+                    correlation_column_limit=self._optional_integer(
+                        arguments,
+                        "correlation_column_limit",
+                        default=8,
                     ),
-                }
-            ],
+                )
+            )
+            payload["analysis"] = {
+                "enabled": True,
+                "profile": profile_result.profile,
+                "markdown": profile_result.markdown,
+            }
+            markdown_text = f"{markdown_text}\n\n{profile_result.markdown}"
+        else:
+            payload["analysis"] = {"enabled": False}
+        return ToolExecutionResult(
+            payload=payload,
+            content_blocks=[{"type": "markdown", "text": markdown_text}],
         )
 
     def _data_integrate(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
@@ -662,34 +674,6 @@ class AgentToolRegistry:
             output_path=output_path,
             name=name,
             summary="Integrated dataset created.",
-        )
-
-    def _analysis_profile(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
-        self._raise_if_cancelled(context)
-        unsupported_keys = sorted(set(arguments) - {"dataset_id", "target_columns", "top_n", "correlation_column_limit"})
-        if unsupported_keys:
-            raise ValidationError("analysis.profile does not accept: " + ", ".join(unsupported_keys))
-        dataset_id = self._require_string(arguments, "dataset_id")
-        dataset = self._dataset_service.get_dataset(dataset_id)
-        result = self._analysis_profile_service.profile_dataset(
-            ProfileDatasetInput(
-                source_path=dataset.source_path,
-                dataset_name=dataset.name,
-                target_columns=self._optional_string_list(arguments, "target_columns"),
-                top_n=self._optional_integer(arguments, "top_n", default=10),
-                correlation_column_limit=self._optional_integer(
-                    arguments,
-                    "correlation_column_limit",
-                    default=8,
-                ),
-            )
-        )
-        payload = dict(result.profile)
-        payload["dataset_id"] = dataset.id
-        payload["markdown"] = result.markdown
-        return ToolExecutionResult(
-            payload=payload,
-            content_blocks=[{"type": "markdown", "text": result.markdown}],
         )
 
     def _analysis_graph(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
@@ -1981,6 +1965,14 @@ class AgentToolRegistry:
             return int(value)
         except (TypeError, ValueError) as exc:
             raise ValidationError(f"{key} must be an integer.") from exc
+
+    def _optional_boolean(self, arguments: dict[str, Any], key: str, *, default: bool) -> bool:
+        value = arguments.get(key)
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        raise ValidationError(f"{key} must be a boolean.")
 
     def _slug(self, value: str) -> str:
         normalized = "".join(char.lower() if char.isalnum() else "-" for char in value).strip("-")
