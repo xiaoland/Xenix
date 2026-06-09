@@ -63,6 +63,7 @@ class SettingsDialog(QDialog):
         self._ml_worker_settings_service = ml_worker_settings_service
         self._provider_configs: list[LLMProviderConfig] = []
         self._loading_provider = False
+        self._active_provider_index = 0
         self._ssh_worker_wizard: SshWorkerSetupWizard | None = None
 
         self._language_label = QLabel()
@@ -454,7 +455,8 @@ class SettingsDialog(QDialog):
     def _load_provider_fields(self, index: int) -> None:
         if not self._provider_configs:
             return
-        provider = self._provider_configs[max(0, min(index, len(self._provider_configs) - 1))]
+        provider_index = max(0, min(index, len(self._provider_configs) - 1))
+        provider = self._provider_configs[provider_index]
         self._loading_provider = True
         self._provider_key_input.setText(provider.key)
         self._provider_name_input.setText(provider.display_name)
@@ -467,13 +469,14 @@ class SettingsDialog(QDialog):
         self._provider_timeout_input.setValue(provider.timeout_seconds)
         self._provider_streaming_checkbox.setChecked(provider.streaming_enabled)
         self._apply_provider_field_state(provider)
+        self._active_provider_index = provider_index
         self._loading_provider = False
 
     def _store_current_provider_fields(self) -> None:
         if self._loading_provider or not self._provider_configs:
             return
-        index = max(0, self._provider_selector.currentIndex())
-        if index >= len(self._provider_configs):
+        index = self._active_provider_index
+        if index < 0 or index >= len(self._provider_configs):
             return
         current = self._provider_configs[index]
         packaged_trial = self._is_packaged_trial_provider(current)
@@ -488,8 +491,16 @@ class SettingsDialog(QDialog):
             streaming_enabled=self._provider_streaming_checkbox.isChecked(),
             dialect_config=current.dialect_config,
         )
-        self._reload_provider_selector(index)
-        self._apply_provider_field_state(self._provider_configs[index])
+        self._update_provider_selector_item(index)
+        if index == self._provider_selector.currentIndex():
+            self._apply_provider_field_state(self._provider_configs[index])
+
+    def _update_provider_selector_item(self, index: int) -> None:
+        if index < 0 or index >= len(self._provider_configs) or index >= self._provider_selector.count():
+            return
+        provider = self._provider_configs[index]
+        self._provider_selector.setItemText(index, provider.display_name or provider.key)
+        self._provider_selector.setItemData(index, provider.key)
 
     def _refresh_provider_field_state(self) -> None:
         index = self._provider_selector.currentIndex()
