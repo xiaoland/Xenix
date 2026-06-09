@@ -1,53 +1,45 @@
-from .registry import (
-    get_model_catalog_entry,
-    get_model_service,
-    list_model_catalog,
-    list_model_keys,
-)
-from .types import (
-    ColumnRoleKind,
-    ColumnRoleBinding,
-    EvaluationKind,
-    ModelCatalogEntry,
-    ModelFamily,
-    ModelResultContract,
-    ModelRoleDefinition,
-    ModelRoleSchema,
-    ModelServiceBase,
-    ModelTaskKind,
-)
-from .worker_settings import (
-    MLWorkerConfig,
-    MLWorkerKind,
-    MLWorkerPoolConfig,
-    MLWorkerSettings,
-    MLWorkerSettingsService,
-    MLWorkerSetupState,
-    MLWorkerValidationRecord,
-    MLWorkerValidationStatus,
-)
+from __future__ import annotations
 
-__all__ = [
-    "ColumnRoleKind",
-    "ColumnRoleBinding",
-    "EvaluationKind",
-    "ModelCatalogEntry",
-    "ModelFamily",
-    "ModelResultContract",
-    "ModelRoleDefinition",
-    "ModelRoleSchema",
-    "ModelServiceBase",
-    "ModelTaskKind",
-    "MLWorkerConfig",
-    "MLWorkerKind",
-    "MLWorkerPoolConfig",
-    "MLWorkerSettings",
-    "MLWorkerSettingsService",
-    "MLWorkerSetupState",
-    "MLWorkerValidationRecord",
-    "MLWorkerValidationStatus",
-    "get_model_catalog_entry",
-    "get_model_service",
-    "list_model_catalog",
-    "list_model_keys",
-]
+from importlib import import_module
+
+
+_EXPORTS = {
+    "get_model_catalog_entry": ".registry",
+    "get_model_service": ".registry",
+    "list_model_catalog": ".registry",
+    "list_model_keys": ".registry",
+    "ColumnRoleBinding": ".types",
+    "ColumnRoleKind": ".types",
+    "EvaluationKind": ".types",
+    "ModelCatalogEntry": ".types",
+    "ModelFamily": ".types",
+    "ModelResultContract": ".types",
+    "ModelRoleDefinition": ".types",
+    "ModelRoleSchema": ".types",
+    "ModelServiceBase": ".types",
+    "ModelTaskKind": ".types",
+    "MLWorkerConfig": ".worker_settings",
+    "MLWorkerKind": ".worker_settings",
+    "MLWorkerPoolConfig": ".worker_settings",
+    "MLWorkerSettings": ".worker_settings",
+    "MLWorkerSettingsService": ".worker_settings",
+    "MLWorkerSetupState": ".worker_settings",
+    "MLWorkerValidationRecord": ".worker_settings",
+    "MLWorkerValidationStatus": ".worker_settings",
+}
+
+__all__ = sorted(_EXPORTS)
+
+
+def __getattr__(name: str) -> object:
+    module_name = _EXPORTS.get(name)
+    if module_name is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module = import_module(module_name, __name__)
+    value = getattr(module, name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted([*globals(), *__all__])

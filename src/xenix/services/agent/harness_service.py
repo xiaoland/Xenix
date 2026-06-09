@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 import threading
 from time import perf_counter
-from typing import Any, Iterator
+from typing import TYPE_CHECKING, Any, Iterator
 
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import Field, SQLModel
@@ -64,12 +64,11 @@ from .providers import (
     ProviderToolCall,
     extract_reasoning_content,
 )
-from .tools import (
-    AgentToolRegistry,
-    ToolExecutionContext,
-    tool_presentation_for_name,
-)
+from .tool_presentations import tool_presentation_for_name
 from ..llm import LLMModelOption, LLMService
+
+if TYPE_CHECKING:
+    from .tools import AgentToolRegistry, ToolExecutionContext
 
 
 class SubmitUserTurnInput(SQLModel):
@@ -667,7 +666,7 @@ class AgentHarnessService:
                         result = self._tool_registry.execute(
                             tool_call.tool_name,
                             arguments,
-                            ToolExecutionContext(
+                            _tool_execution_context(
                                 thread_id=thread_id,
                                 turn_id=turn_id,
                                 tool_call_id=persisted_tool_call.id,
@@ -958,7 +957,7 @@ class AgentHarnessService:
                         result = self._tool_registry.execute(
                             tool_call.tool_name,
                             arguments,
-                            ToolExecutionContext(
+                            _tool_execution_context(
                                 thread_id=thread_id,
                                 turn_id=turn_id,
                                 tool_call_id=persisted_tool_call.id,
@@ -1660,6 +1659,25 @@ def _assistant_text(blocks: list[dict[str, Any]]) -> str:
             if text:
                 lines.append(text)
     return "\n".join(lines).strip()
+
+
+def _tool_execution_context(
+    *,
+    thread_id: str,
+    turn_id: str,
+    tool_call_id: str,
+    attached_files: list[str],
+    cancel_requested,
+) -> "ToolExecutionContext":
+    from .tools import ToolExecutionContext
+
+    return ToolExecutionContext(
+        thread_id=thread_id,
+        turn_id=turn_id,
+        tool_call_id=tool_call_id,
+        attached_files=attached_files,
+        cancel_requested=cancel_requested,
+    )
 
 
 def _sanitize_thread_title(raw: str) -> str | None:

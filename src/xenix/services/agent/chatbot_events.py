@@ -18,7 +18,7 @@ from ..storage.models import (
     AgentTurnStatus,
 )
 from .conversation_store import ThreadSnapshot
-from .tools import ToolPresentation, tool_presentation_for_name
+from .tool_presentations import ToolPresentation, tool_presentation_for_name
 
 
 class ChatbotEventKind(StrEnum):

@@ -48,3 +48,6 @@ nul
 
 # Temp
 .codex-test-tmp
+
+# Special
+tasks/packaged-startup-latency/artifacts

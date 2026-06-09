@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QEvent, QPoint, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
@@ -32,13 +33,15 @@ from ..services.agent import (
 )
 from ..services.artifact_service import ArtifactService
 from ..services.llm import LLMService, LLMSettingsService
-from ..services.ml_service import MLService
 from ..services.ml.worker_settings import MLWorkerSettingsService
 from .chatbot import ThreadDetailView
 from .layout_debug import dump_layout_if_enabled
 from .native_widgets import emphasize_label
 from .settings_dialog import SettingsDialog
 from .tool_call_detail_view import ToolCallDetailView
+
+if TYPE_CHECKING:
+    from ..services.ml_service import MLService
 
 
 class MainWindow(QMainWindow):

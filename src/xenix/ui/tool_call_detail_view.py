@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QEvent, QTimer, Qt, QUrl
 from PySide6.QtGui import QDesktopServices
@@ -17,9 +18,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..services.ml_service import MLService
 from ..services.storage.models import MLTaskStatus
 from .widgets.task_log_view import TaskLogView
+
+if TYPE_CHECKING:
+    from ..services.ml_service import MLService
 
 
 class ToolCallDetailView(QDialog):

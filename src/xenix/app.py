@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import threading
+import time
 from datetime import datetime
+from importlib import import_module
 from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Literal
@@ -25,7 +28,28 @@ if TYPE_CHECKING:
 
 LOGGER = logging.getLogger("xenix.bootstrap")
 STARTUP_SPLASH_HOLD_MS = 2200
+STARTUP_TIMING_ENV = "XENIX_STARTUP_TIMING"
+_STARTUP_TIMING_T0 = time.perf_counter()
 StorageRecoveryAction = Literal["quarantine", "open", "exit"]
+
+
+def _startup_timing_enabled() -> bool:
+    return os.environ.get(STARTUP_TIMING_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _emit_startup_timing(event: str, start: float | None = None, **attributes: object) -> None:
+    if not _startup_timing_enabled():
+        return
+    fields = [
+        "XENIX_STARTUP_TIMING",
+        event,
+        f"since_app_import_ms={(time.perf_counter() - _STARTUP_TIMING_T0) * 1000:.3f}",
+    ]
+    if start is not None:
+        fields.append(f"elapsed_ms={(time.perf_counter() - start) * 1000:.3f}")
+    for key, value in attributes.items():
+        fields.append(f"{key}={value}")
+    print("\t".join(fields), file=sys.stderr, flush=True)
 
 
 def __getattr__(name: str) -> object:
@@ -185,37 +209,38 @@ def _recover_storage_bootstrap(
 
 
 def _load_runtime_imports() -> SimpleNamespace:
-    from .services.agent import (
-        AgentHarnessService,
-        AgentToolRegistry,
-        ConversationStore,
-    )
-    from .services.artifact_service import ArtifactService
-    from .services.data_cleaning import DataCleaningService
-    from .services.data_transform import DataQueryTransformService
-    from .services.dataset_service import DatasetService
-    from .services.llm import LLMService, LLMSettingsService
-    from .services.ml.worker_settings import MLWorkerSettingsService
-    from .services.ml_service import MLService
-    from .services.ml_task_service import MLTaskService
-    from .services.storage import StorageBootstrapService
-    from .services.storage.layout import database_path
+    runtime_start = time.perf_counter()
+
+    def load_module(module_name: str):
+        module_start = time.perf_counter()
+        module = import_module(module_name)
+        _emit_startup_timing("runtime_import.module", module_start, module=module_name)
+        return module
+
+    agent_harness = load_module("xenix.services.agent.harness_service")
+    conversation_store = load_module("xenix.services.agent.conversation_store")
+    lazy_tools = load_module("xenix.services.agent.lazy_tools")
+    artifact_service = load_module("xenix.services.artifact_service")
+    lazy_ml_service = load_module("xenix.services.lazy_ml_service")
+    lazy_services = load_module("xenix.services.lazy_services")
+    llm = load_module("xenix.services.llm")
+    worker_settings = load_module("xenix.services.ml.worker_settings")
+    storage = load_module("xenix.services.storage")
+    storage_layout = load_module("xenix.services.storage.layout")
+    _emit_startup_timing("runtime_import.total", runtime_start)
 
     return SimpleNamespace(
-        AgentHarnessService=AgentHarnessService,
-        AgentToolRegistry=AgentToolRegistry,
-        ArtifactService=ArtifactService,
-        ConversationStore=ConversationStore,
-        DataCleaningService=DataCleaningService,
-        DataQueryTransformService=DataQueryTransformService,
-        DatasetService=DatasetService,
-        LLMService=LLMService,
-        LLMSettingsService=LLMSettingsService,
-        MLService=MLService,
-        MLTaskService=MLTaskService,
-        MLWorkerSettingsService=MLWorkerSettingsService,
-        StorageBootstrapService=StorageBootstrapService,
-        database_path=database_path,
+        AgentHarnessService=agent_harness.AgentHarnessService,
+        AgentToolRegistry=lazy_tools.LazyAgentToolRegistry,
+        ArtifactService=artifact_service.ArtifactService,
+        ConversationStore=conversation_store.ConversationStore,
+        LazyServiceProxy=lazy_services.LazyServiceProxy,
+        LLMService=llm.LLMService,
+        LLMSettingsService=llm.LLMSettingsService,
+        MLService=lazy_ml_service.LazyMLService,
+        MLWorkerSettingsService=worker_settings.MLWorkerSettingsService,
+        StorageBootstrapService=storage.StorageBootstrapService,
+        database_path=storage_layout.database_path,
     )
 
 
@@ -224,7 +249,10 @@ def _load_runtime_imports_with_events(
     splash: StartupSplash | None,
 ) -> SimpleNamespace:
     if splash is None:
-        return _load_runtime_imports()
+        load_start = time.perf_counter()
+        runtime = _load_runtime_imports()
+        _emit_startup_timing("runtime_import.no_splash_wait", load_start)
+        return runtime
 
     completed = threading.Event()
     result: SimpleNamespace | None = None
@@ -239,6 +267,7 @@ def _load_runtime_imports_with_events(
         finally:
             completed.set()
 
+    load_start = time.perf_counter()
     thread = threading.Thread(target=load, name="xenix-startup-imports", daemon=True)
     thread.start()
     while not completed.is_set():
@@ -246,6 +275,7 @@ def _load_runtime_imports_with_events(
         completed.wait(0.016)
     thread.join()
     app.processEvents()
+    _emit_startup_timing("runtime_import.splash_wait", load_start)
 
     if error is not None:
         raise error
@@ -260,28 +290,47 @@ def build_main_window(
     show_splash: bool | None = None,
     splash_hold_ms: int = 0,
 ) -> tuple[QApplication, MainWindow]:
+    build_start = time.perf_counter()
+    _emit_startup_timing("build_main_window.start")
+    step_start = time.perf_counter()
     app = create_application()
+    _emit_startup_timing("create_application", step_start)
+    step_start = time.perf_counter()
     paths = get_app_paths()
+    _emit_startup_timing("get_app_paths", step_start)
+    step_start = time.perf_counter()
     translation_manager = TranslationManager(app, paths)
     translation_manager.initialize()
+    _emit_startup_timing("translation.initialize", step_start)
     should_show_splash = show if show_splash is None else show_splash
+    step_start = time.perf_counter()
     splash = StartupSplash() if should_show_splash else None
+    _emit_startup_timing("splash.create", step_start, enabled=splash is not None)
 
     if splash is not None:
+        step_start = time.perf_counter()
         splash.show_centered()
         _update_startup_stage(app, splash, StartupStage.STARTING)
+        _emit_startup_timing("splash.show", step_start)
 
     startup_scope = None
     startup_span_active = False
     try:
         _update_startup_stage(app, splash, StartupStage.PREPARING_APP_DATA)
+        step_start = time.perf_counter()
         paths = ensure_app_dirs(paths)
+        _emit_startup_timing("ensure_app_dirs", step_start)
 
         _update_startup_stage(app, splash, StartupStage.LOADING_RUNTIME)
+        step_start = time.perf_counter()
         runtime = _load_runtime_imports_with_events(app, splash)
+        _emit_startup_timing("load_runtime_imports", step_start)
+        step_start = time.perf_counter()
         from .ui.main_window import MainWindow
+        _emit_startup_timing("import_main_window", step_start)
 
         _update_startup_stage(app, splash, StartupStage.INITIALIZING_LOGGING)
+        step_start = time.perf_counter()
         log_path = setup_logging(paths)
         observability = setup_observability(paths)
         startup_scope = start_span("app.startup")
@@ -296,12 +345,16 @@ def build_main_window(
                 "otlp_log_export_enabled": observability.log_export_enabled,
             },
         )
+        _emit_startup_timing("logging_observability.initialize", step_start)
 
         if splash is not None:
+            step_start = time.perf_counter()
             splash.retranslate_ui()
+            _emit_startup_timing("splash.retranslate", step_start)
 
         _update_startup_stage(app, splash, StartupStage.INITIALIZING_STORAGE)
         try:
+            step_start = time.perf_counter()
             with start_span("storage.bootstrap"):
                 context = runtime.StorageBootstrapService().initialize(paths)
                 record_counter(
@@ -311,6 +364,7 @@ def build_main_window(
                         "status": "succeeded",
                     },
                 )
+            _emit_startup_timing("storage.bootstrap", step_start)
         except StorageBootstrapError as exc:
             record_counter(
                 "xenix.storage.bootstrap.count",
@@ -328,20 +382,36 @@ def build_main_window(
             )
 
         _update_startup_stage(app, splash, StartupStage.LOADING_WORKBENCH)
-        dataset_service = runtime.DatasetService(context.session_factory, paths)
-        data_cleaning_service = runtime.DataCleaningService(paths)
-        data_transform_service = runtime.DataQueryTransformService(paths)
+        step_start = time.perf_counter()
+        dataset_service = runtime.LazyServiceProxy(
+            "xenix.services.dataset_service",
+            "DatasetService",
+            context.session_factory,
+            paths,
+        )
+        data_cleaning_service = runtime.LazyServiceProxy(
+            "xenix.services.data_cleaning",
+            "DataCleaningService",
+            paths,
+        )
+        data_transform_service = runtime.LazyServiceProxy(
+            "xenix.services.data_transform",
+            "DataQueryTransformService",
+            paths,
+        )
         ml_worker_settings_service = runtime.MLWorkerSettingsService(paths)
-        ml_task_service = runtime.MLTaskService(
+        ml_task_service = runtime.LazyServiceProxy(
+            "xenix.services.ml_task_service",
+            "MLTaskService",
             context.session_factory,
             paths,
             worker_settings_service=ml_worker_settings_service,
         )
         ml_service = runtime.MLService(
-            paths,
-            context.session_factory,
-            dataset_service,
-            ml_task_service,
+            paths=paths,
+            session_factory=context.session_factory,
+            dataset_service=dataset_service,
+            ml_task_service=ml_task_service,
         )
         artifact_service = runtime.ArtifactService(context.session_factory)
         conversation_store = runtime.ConversationStore(context.session_factory)
@@ -363,7 +433,9 @@ def build_main_window(
             thread_title_provider=llm_service.build_thread_title_provider(),
             conversation_store=conversation_store,
         )
+        _emit_startup_timing("services.construct", step_start)
 
+        step_start = time.perf_counter()
         window = MainWindow(
             paths=paths,
             log_path=log_path,
@@ -376,19 +448,23 @@ def build_main_window(
             artifact_service=artifact_service,
             ml_service=ml_service,
         )
+        _emit_startup_timing("main_window.construct", step_start)
 
         _update_startup_stage(app, splash, StartupStage.READY)
         _hold_startup_splash(app, splash, splash_hold_ms)
         _close_startup_splash(app, splash)
         if show:
+            step_start = time.perf_counter()
             window.show()
             app.processEvents()
+            _emit_startup_timing("window.show", step_start)
 
         LOGGER.info("Xenix native shell started")
         record_counter("xenix.app.startup.count", attributes={"status": "succeeded"})
         startup_scope.__exit__(None, None, None)
         startup_span_active = False
         flush_observability()
+        _emit_startup_timing("build_main_window.total", build_start)
         return app, window
     except Exception:
         record_counter("xenix.app.startup.count", attributes={"status": "failed"})

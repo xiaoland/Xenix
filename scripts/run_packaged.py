@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import sys
 import time
-from pathlib import Path
 
 
 _STARTUP_TIMING_T0 = time.perf_counter()
@@ -19,7 +18,7 @@ def _emit_startup_timing(event: str, start: float | None = None) -> None:
     fields = [
         "XENIX_STARTUP_TIMING",
         event,
-        f"since_run_dev_start_ms={(time.perf_counter() - _STARTUP_TIMING_T0) * 1000:.3f}",
+        f"since_run_packaged_start_ms={(time.perf_counter() - _STARTUP_TIMING_T0) * 1000:.3f}",
     ]
     if start is not None:
         fields.append(f"elapsed_ms={(time.perf_counter() - start) * 1000:.3f}")
@@ -27,18 +26,13 @@ def _emit_startup_timing(event: str, start: float | None = None) -> None:
 
 
 def main() -> int:
-    _emit_startup_timing("run_dev.main.start")
-    project_root = Path(__file__).resolve().parents[1]
-    src_path = project_root / "src"
-    if str(src_path) not in sys.path:
-        sys.path.insert(0, str(src_path))
-    _emit_startup_timing("run_dev.path.ready")
+    _emit_startup_timing("run_packaged.main.start")
 
     if len(sys.argv) >= 2 and sys.argv[1] == "--analysis-lambda-worker":
         import_start = time.perf_counter()
         from xenix.services.analysis_lambda_worker import main as worker_main
-        _emit_startup_timing("run_dev.import_analysis_lambda_worker", import_start)
 
+        _emit_startup_timing("run_packaged.import_analysis_lambda_worker", import_start)
         if len(sys.argv) != 4:
             raise SystemExit("Usage: xenix --analysis-lambda-worker <input-json> <output-json>")
         worker_main(sys.argv[2], sys.argv[3])
@@ -46,11 +40,11 @@ def main() -> int:
 
     import_start = time.perf_counter()
     from xenix.main import main as application_main
-    _emit_startup_timing("run_dev.import_xenix_main", import_start)
 
+    _emit_startup_timing("run_packaged.import_xenix_main", import_start)
     call_start = time.perf_counter()
     exit_code = application_main(sys.argv[1:])
-    _emit_startup_timing("run_dev.application_main", call_start)
+    _emit_startup_timing("run_packaged.application_main", call_start)
     return exit_code
 
 

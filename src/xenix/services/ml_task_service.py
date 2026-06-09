@@ -27,9 +27,7 @@ from .ml.contracts import (
     TrainedModelContextPayload,
 )
 from .ml.contracts import InferenceTaskResult
-from .ml.registry import get_model_catalog_entry
 from .ml.execution import MLWorkerRunner
-from .ml.operations import run_evaluate_task, run_fit_task, run_hyperparameter_tuning_task, run_inference_task
 from .ml.worker_pool import MLWorkerPool
 from .ml.worker_settings import MLWorkerSettingsService
 from .storage.layout import (
@@ -70,6 +68,12 @@ from .storage.repositories import (
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _get_model_catalog_entry(model_key: str):
+    from .ml.registry import get_model_catalog_entry
+
+    return get_model_catalog_entry(model_key)
 
 
 ALLOWED_TRANSITIONS: dict[MLTaskStatus, set[MLTaskStatus]] = {
@@ -359,6 +363,13 @@ class MLTaskService:
             return current
 
     def _resolve_entrypoint(self, task_type: MLTaskType) -> Callable[[str], None]:
+        from .ml.operations import (
+            run_evaluate_task,
+            run_fit_task,
+            run_hyperparameter_tuning_task,
+            run_inference_task,
+        )
+
         if task_type is MLTaskType.FIT:
             return run_fit_task
         if task_type is MLTaskType.HYPERPARAMETER_TUNING:
@@ -407,7 +418,7 @@ class MLTaskService:
             self._require_existing_path(holdout_path)
         if export_path is not None:
             self._require_existing_path(export_path)
-        catalog_entry = get_model_catalog_entry(result.model_key)
+        catalog_entry = _get_model_catalog_entry(result.model_key)
         model_display_name = catalog_entry.display_name
         artifact_file_name = build_artifact_file_name(
             trained_model_context.run_name,
@@ -497,7 +508,7 @@ class MLTaskService:
             self._require_existing_path(holdout_path)
         if export_path is not None:
             self._require_existing_path(export_path)
-        catalog_entry = get_model_catalog_entry(result.model_key)
+        catalog_entry = _get_model_catalog_entry(result.model_key)
         model_display_name = catalog_entry.display_name
         artifact_file_name = build_artifact_file_name(
             trained_model_context.run_name,
