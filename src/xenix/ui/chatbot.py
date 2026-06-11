@@ -37,6 +37,24 @@ from .markdown_renderer import render_chat_markdown
 USER_MESSAGE_BACKGROUND = QColor("#000000")
 USER_MESSAGE_FOREGROUND = QColor("#ffffff")
 USER_MESSAGE_SELECTION_BACKGROUND = QColor("#2f3338")
+USER_MESSAGE_BODY_STYLE_SHEET = """
+#chatMessageBody {
+    background-color: #000000;
+    color: #ffffff;
+    border: none;
+    selection-background-color: #2f3338;
+    selection-color: #ffffff;
+}
+""".strip()
+USER_MESSAGE_DOCUMENT_STYLE_SHEET = """
+body, p, li, pre, code, table, thead, tbody, tr, td, th {
+    background-color: #000000;
+    color: #ffffff;
+}
+a {
+    color: #ffffff;
+}
+""".strip()
 UNBOUNDED_WIDGET_WIDTH = 16777215
 ArtifactResolver = Callable[[str], Any]
 
@@ -517,6 +535,11 @@ class ChatMessageBubble(QFrame):
         card_palette.setColor(QPalette.ColorRole.WindowText, USER_MESSAGE_FOREGROUND)
         card.setPalette(card_palette)
         card.setAutoFillBackground(True)
+
+        browser.setAttribute(Qt.WA_TranslucentBackground, False)
+        browser.viewport().setAttribute(Qt.WA_TranslucentBackground, False)
+        browser.setStyleSheet(USER_MESSAGE_BODY_STYLE_SHEET)
+        browser.document().setDefaultStyleSheet(USER_MESSAGE_DOCUMENT_STYLE_SHEET)
 
         text_palette = QPalette(browser.palette())
         for role in (

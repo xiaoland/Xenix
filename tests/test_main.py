@@ -1342,6 +1342,8 @@ def test_thread_detail_view_message_text_uses_transparent_native_background(monk
         assert browser.testAttribute(Qt.WA_TranslucentBackground)
         assert not browser.viewport().autoFillBackground()
         assert browser.viewport().testAttribute(Qt.WA_TranslucentBackground)
+        assert browser.styleSheet() == ""
+        assert browser.document().defaultStyleSheet() == ""
     finally:
         window.close()
 
@@ -1371,6 +1373,17 @@ def test_thread_detail_view_user_message_uses_native_black_panel(monkeypatch, tm
         assert card.palette().color(QPalette.ColorRole.Window).name() == "#000000"
         assert card.palette().color(QPalette.ColorRole.WindowText).name() == "#ffffff"
         assert browser is not None
+        assert not browser.testAttribute(Qt.WA_TranslucentBackground)
+        assert not browser.viewport().testAttribute(Qt.WA_TranslucentBackground)
+        body_style_sheet = browser.styleSheet()
+        assert "#chatMessageBody" in body_style_sheet
+        assert "background-color: #000000" in body_style_sheet
+        assert "color: #ffffff" in body_style_sheet
+        assert "selection-background-color: #2f3338" in body_style_sheet
+        document_style_sheet = browser.document().defaultStyleSheet()
+        assert "body, p, li, pre, code" in document_style_sheet
+        assert "background-color: #000000" in document_style_sheet
+        assert "color: #ffffff" in document_style_sheet
         for role in (
             QPalette.ColorRole.Window,
             QPalette.ColorRole.Base,

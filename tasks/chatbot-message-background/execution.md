@@ -50,3 +50,51 @@ Verification:
 - `pdm run pytest tests/test_main.py::test_thread_detail_view_user_message_uses_native_black_panel -q` -> passed.
 - `pdm run pytest tests/test_main.py -q` -> 40 passed.
 - `pdm run check` -> passed.
+# QTextDocument / Win11 UserMessage Follow-up Research
+
+## 2026-06-11 Diagnosis Notes
+
+User re-tested on Windows 11 after commit `5677f09 Fix Chatbot user message background`; issue persists. This means the previous palette-only fix is insufficient.
+
+Local evidence from current code:
+
+- `render_chat_markdown("plain user text")` and `ChatMessageBubble(author="You")` do not produce explicit `background` or `bgcolor` in `QTextDocument.toHtml()`.
+- `QTextDocument.rootFrame().frameFormat().background()`, first block background, and first block char background are all `NoBrush`.
+- Current user message `QTextBrowser` and `viewport()` palettes are black for `Window`, `Base`, and `AlternateBase`, and white for text roles.
+- Therefore the remaining white rectangle is not authored HTML or a missing palette role visible through introspection.
+
+External research findings:
+
+- Qt docs say `QPalette::Base` is used mostly as the background color for text entry widgets, but also warn that native styles such as Windows Vista/macOS may ignore palette roles for parts of drawing.
+- `QWidget` docs also state that assigning palette roles is not guaranteed to change appearance under native styles, and recommends style sheets when palette does not achieve the intended result.
+- Qt source shows `QTextEdit::paintEvent()` paints on the `QAbstractScrollArea` viewport, then delegates to `QWidgetTextControl::drawContents()` and finally to `QTextDocument` layout drawing. `QWidgetTextControl::getPaintContext()` uses the control palette as the paint context palette, but if a stylesheet style is present it explicitly asks `QStyleSheetStyle::styleSheetPalette()` to modify the paint context.
+- QtCentre thread `QTextDocument background colour` reports the same shape: changing the edit palette changed only the area without text, while the background of the text/document area did not change; the practical solution reported was setting the `QPlainTextEdit` stylesheet background.
+- Qt Forum thread `QTextEdit transparency in QGraphicsView` reports QTextEdit/QPlainTextEdit background staying white under Windows until frame/native painting was removed, while QLabel/QLineEdit did not show the issue.
+- PyQt mailing-list report from 2007 similarly says QTextEdit objects did not follow the same palette setup that worked for QLineEdit.
+
+Current root-cause claim:
+
+The failed fix targeted the wrong authority. On Windows 11, `QTextBrowser`/`QTextEdit` is not reliably governed by `QPalette` for the rich-text document paint area. The text document is painted through `QWidgetTextControl`/`QTextDocumentLayout` inside a `QAbstractScrollArea` viewport, and the Windows native style can keep/restore a light text-editor background even when `browser.palette()` and `viewport().palette()` report black roles. In Qt's own paint path, stylesheet-derived palette is treated as a distinct input to the text paint context, which explains why forum fixes use `QTextEdit { background-color: ... }` rather than palette-only mutation.
+
+Next discriminating implementation experiment, after explicit start:
+
+- Apply a narrowly scoped stylesheet to the user-message `QTextBrowser` only, e.g. object-name-scoped `QTextBrowser#chatMessageBody { background-color: #000000; color: #ffffff; border: none; }`, plus selection colors.
+- If the white rectangle remains, set the document body/root background explicitly by wrapping user-message HTML with a `body bgcolor="#000000"` or using `document().setDefaultStyleSheet("body { background-color: #000000; color: #ffffff; }")` before `setHtml()`, then reload the HTML.
+- Verification should include a Windows-visible pixel probe or screenshot test, not only palette role assertions, because the palette can report black while native drawing remains white.
+
+## 2026-06-11 Execution
+
+Change:
+
+- `src/xenix/ui/chatbot.py`: user messages now keep the black palette fallback but no longer rely on it as the primary authority. The user-message `QTextBrowser` exits the translucent path, receives an object-scoped stylesheet for black background, white text, and selection colors, and its `QTextDocument` receives a default stylesheet for body/block/table/link text.
+- `tests/test_main.py`: user-message coverage now checks the widget stylesheet and `QTextDocument.defaultStyleSheet()` contract. Assistant message coverage now asserts that ordinary assistant text remains on the transparent native path with no stylesheet.
+
+Verification:
+
+- `pdm run pytest tests/test_main.py::test_thread_detail_view_message_text_uses_transparent_native_background tests/test_main.py::test_thread_detail_view_user_message_uses_native_black_panel -q` -> 2 passed.
+- `pdm run pytest tests/test_main.py -q` -> 41 passed.
+- `pdm run check` -> passed.
+
+Open verification gap:
+
+- Per user instruction, no Windows screenshot/pixel check was added in this slice.
