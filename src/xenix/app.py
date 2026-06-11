@@ -21,6 +21,7 @@ from .i18n import TranslationManager
 from .logging import setup_logging
 from .observability import flush_observability, record_counter, setup_observability, start_span
 from .resources import package_resource_path
+from .trial_lock import TRIAL_PURCHASE_URL, TrialLockCheck, check_trial_lock
 from .ui.startup_splash import StartupSplash, StartupStage
 
 if TYPE_CHECKING:
@@ -31,6 +32,10 @@ STARTUP_SPLASH_HOLD_MS = 2200
 STARTUP_TIMING_ENV = "XENIX_STARTUP_TIMING"
 _STARTUP_TIMING_T0 = time.perf_counter()
 StorageRecoveryAction = Literal["quarantine", "open", "exit"]
+
+
+class TrialLockStartupExit(Exception):
+    pass
 
 
 def _startup_timing_enabled() -> bool:
@@ -173,6 +178,52 @@ def _prompt_storage_recovery(
     if clicked_button is exit_button:
         return "exit"
     return "exit"
+
+
+def _prompt_trial_lock(check: TrialLockCheck) -> None:
+    message_box = QMessageBox()
+    message_box.setIcon(QMessageBox.Warning)
+    message_box.setWindowTitle(
+        QCoreApplication.translate("XenixStartup", "Xenix test build locked")
+    )
+    message_box.setText(
+        QCoreApplication.translate(
+            "XenixStartup",
+            "This Xenix test build is locked.",
+        )
+    )
+    message_box.setInformativeText(
+        QCoreApplication.translate(
+            "XenixStartup",
+            "Please purchase a license or download a licensed Xenix build from {url}.",
+        ).format(url=TRIAL_PURCHASE_URL)
+    )
+    if check.expires_at_utc is not None:
+        message_box.setDetailedText(
+            QCoreApplication.translate(
+                "XenixStartup",
+                "Trial expired at: {expires_at}\nReason: {reason}",
+            ).format(
+                expires_at=check.expires_at_utc.isoformat(),
+                reason=check.reason.value,
+            )
+        )
+    buy_button = message_box.addButton(
+        QCoreApplication.translate("XenixStartup", "Buy license"),
+        QMessageBox.AcceptRole,
+    )
+    exit_button = message_box.addButton(
+        QCoreApplication.translate("XenixStartup", "Exit"),
+        QMessageBox.RejectRole,
+    )
+    message_box.setDefaultButton(buy_button)
+    message_box.exec()
+
+    clicked_button = message_box.clickedButton()
+    if clicked_button is buy_button:
+        QDesktopServices.openUrl(QUrl(TRIAL_PURCHASE_URL))
+    elif clicked_button is exit_button:
+        return
 
 
 def _recover_storage_bootstrap(
@@ -320,6 +371,23 @@ def build_main_window(
         step_start = time.perf_counter()
         paths = ensure_app_dirs(paths)
         _emit_startup_timing("ensure_app_dirs", step_start)
+
+        step_start = time.perf_counter()
+        trial_lock_check = check_trial_lock(paths)
+        _emit_startup_timing(
+            "trial_lock.check",
+            step_start,
+            enabled=trial_lock_check.enabled,
+            locked=trial_lock_check.locked,
+            reason=trial_lock_check.reason.value,
+        )
+        if trial_lock_check.locked:
+            _close_startup_splash(app, splash)
+            splash = None
+            if show:
+                _prompt_trial_lock(trial_lock_check)
+                app.processEvents()
+            raise TrialLockStartupExit(trial_lock_check.reason.value)
 
         _update_startup_stage(app, splash, StartupStage.LOADING_RUNTIME)
         step_start = time.perf_counter()
@@ -541,6 +609,8 @@ def run(*, smoke_test: bool = False) -> int:
             show_splash=not smoke_test,
             splash_hold_ms=0 if smoke_test else STARTUP_SPLASH_HOLD_MS,
         )
+    except TrialLockStartupExit:
+        return 1
     except Exception as exc:
         if smoke_test:
             raise

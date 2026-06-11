@@ -22,6 +22,7 @@ a = Analysis(
     ]
     + xgboost_datas,
     hiddenimports=[
+        "xenix._generated_trial_lock",
         "xenix._generated_trial_llm",
         "xenix.services.agent.chatbot_events",
         "xenix.services.agent.completion_guard",

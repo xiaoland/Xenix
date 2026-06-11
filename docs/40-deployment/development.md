@@ -119,6 +119,7 @@ Expected result:
 - package resources are available under the bundled `xenix/resources/` path
 - compiled translations are available under the bundled `xenix/translations/` path
 - build commit is embedded into the bundle and shown in Settings; `XENIX_BUILD_COMMIT` can override git discovery for non-checkout build environments
+- test-build startup locking is embedded from `XENIX_TRIAL_LOCK_DAYS`; unset, blank, or `0` disables it, while a positive integer locks startup after that many elapsed first-run days
 - DuckDB Python runtime imports successfully and can run an in-memory query inside the packaged app
 - Native ML and data-science runtimes used by first-party workflows are present under `dist/xenix/_internal/` and are exercised by packaged verification, not only by startup import discovery.
 - OpenTelemetry OTLP exporter hidden imports are collected by `xenix.spec` so

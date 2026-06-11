@@ -26,6 +26,7 @@ Current runtime files and subdirectories:
 - `config/agent_settings.json`
 - `config/ml_workers.json`
 - `config/telemetry.json`
+- `state/trial_lock.json`
 - `state/xenix.db`
 - `artifacts/datasets/`
 - `artifacts/datasets/transformed/`
@@ -45,7 +46,8 @@ Current runtime files and subdirectories:
    Packaged trial LLM providers are marked with `dialect_config.secret_source=packaged_trial`; the real trial API key is embedded in the packaged application and is not written to this file.
 6. Inspect `config/ml_workers.json` for configured local and SSH ML workers. SSH credentials are not stored there; the file stores connection metadata, remote roots, Python command paths, and last setup/validation summaries.
 7. Inspect `config/telemetry.json` for the randomly generated persistent anonymous install id used to correlate public-beta diagnostics.
-8. Inspect `state/xenix.db` for metadata, `artifacts/datasets/` for app-managed dataset artifacts, `artifacts/ml-tasks/` for per-ML-task working directories, and `artifacts/models/` for canonical trained-model files.
+8. Inspect `state/trial_lock.json` for the signed first-run and last-run timestamps used by build-time limited test builds. Editing the file invalidates its signature and locks the test build; deleting all local runtime state can still reset purely local trial state because this is not a license activation service.
+9. Inspect `state/xenix.db` for metadata, `artifacts/datasets/` for app-managed dataset artifacts, `artifacts/ml-tasks/` for per-ML-task working directories, and `artifacts/models/` for canonical trained-model files.
 
 `logs/xenix.log` is JSON Lines. Log records are correlated with active
 OpenTelemetry spans through trace/span fields when a span is active.
@@ -85,6 +87,8 @@ Provider request usage records are stored in `agent_provider_request`. Each row 
 Per-thread next-turn model selection is stored on `agent_thread.selected_fq_model_key`. The global default and configured model list live in `config/agent_settings.json`; if a thread has no selected key, runtime code falls back to the current global default.
 
 Packaged builds may embed a first-run trial LLM provider from `XENIX_TRIAL_LLM_BASE_URL`, `XENIX_TRIAL_LLM_API_KEY`, and `XENIX_TRIAL_LLM_MODEL` during `scripts/package_app.py`. If `XENIX_TRIAL_LLM_API_KEY` is missing, packaging still succeeds and the build keeps the normal manual-provider default. Generated trial secrets are removed from the source tree after packaging.
+
+Packaged test builds may also embed a local startup trial lock from `XENIX_TRIAL_LOCK_DAYS` during `scripts/package_app.py`. Unset, blank, or `0` disables the lock. A positive integer records a signed `state/trial_lock.json` first-run timestamp and blocks startup after the configured elapsed day count. Invalid values fail packaging. This local lock is tamper-evident, not tamper-proof; full license authority belongs to a future activation boundary.
 
 ML worker pool configuration lives in `config/ml_workers.json`. The default configuration contains a local worker. SSH workers can be added through Settings; the setup wizard may create clearly marked `Host xenix.*` entries in the user's OpenSSH config, initializes remote execution directories, and validates a key/agent-based SSH connection. Remote worker directories are execution/cache state. Local SQLite metadata and local service-managed artifacts remain the final authority.
 

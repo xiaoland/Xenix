@@ -28,6 +28,7 @@ Record which product concepts remain in the native edition and which are intenti
 - Configurable ML worker pool for local and SSH-backed remote execution, where remote workers are execution/cache locations and not product data authorities
 - Local runtime logs and metadata
 - Settings as the supporting entry for multi-provider LLM configuration, model lists, global default model, and development mock configuration
+- Small-scope test builds may include a build-time configured local startup lock that expires after a fixed number of days and directs users to purchase or download a licensed build
 
 ## Removed Concepts
 
@@ -38,6 +39,7 @@ Record which product concepts remain in the native edition and which are intenti
 - Always-on online access assumptions
 - Predefined workflow screens as the product operator path
 - Work item as the target workspace owner
+- License activation in the small-scope test build
 
 ## Design Implications
 
@@ -54,6 +56,7 @@ Record which product concepts remain in the native edition and which are intenti
 - Model apply outputs must remain reviewable through artifact links after the originating turn closes.
 - Agent tools express ML workload intent only. Worker selection is an internal service decision and is not exposed as a tool argument.
 - First-slice working context is represented by Thread messages, tool-call records, tool-result records, and artifact metadata.
+- The test-build startup lock is a local distribution gate, not an entitlement service. It can make ordinary local state edits evident and block startup, but durable license activation belongs to a future activation boundary.
 - Data cleaning tools operate on registered datasets and create new derived datasets when cleaning operations are applied; source datasets remain intact.
 - Query tools read registered datasets and return bounded results without creating dataset artifacts by default.
 - Analysis profiling tools read registered datasets and return bounded descriptive statistics directly in the tool result without creating artifacts by default.

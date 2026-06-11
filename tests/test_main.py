@@ -1,15 +1,16 @@
 import json
 import sqlite3
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
 from PySide6.QtCore import QEvent, QMimeData, QPoint, QPointF, Qt, QUrl
 from PySide6.QtGui import QPalette, QTextDocument
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QFrame, QMessageBox, QTextBrowser, QWidget
 
-from xenix.app import build_main_window, quarantine_database
+from xenix.app import TrialLockStartupExit, build_main_window, quarantine_database
 from xenix.build_info import BUILD_COMMIT_DISPLAY
 from xenix.main import main
 from xenix.services.agent import (
@@ -30,6 +31,7 @@ from xenix.services.storage.models import (
     AgentMessageStatus,
     ArtifactKind,
 )
+from xenix.trial_lock import TrialLockCheck, TrialLockReason
 from xenix.ui.chatbot import _format_token_count
 from xenix.ui.startup_splash import StartupSplash, StartupStage
 
@@ -86,6 +88,38 @@ def test_quarantine_database_renames_with_timestamp_and_collision_suffix(tmp_pat
     assert quarantined_path.read_text(encoding="utf-8") == "failed database"
     assert existing_backup.read_text(encoding="utf-8") == "older backup"
     assert not db_path.exists()
+
+
+def test_main_window_blocks_expired_trial_before_runtime_imports(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    prompts = []
+
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+    monkeypatch.setattr(
+        "xenix.app.check_trial_lock",
+        lambda paths: TrialLockCheck(
+            enabled=True,
+            locked=True,
+            reason=TrialLockReason.EXPIRED,
+            state_path=paths.state / "trial_lock.json",
+            expires_at_utc=datetime(2026, 6, 18, 12, 0, 0, tzinfo=UTC),
+        ),
+    )
+    monkeypatch.setattr("xenix.app._prompt_trial_lock", lambda check: prompts.append(check))
+    monkeypatch.setattr(
+        "xenix.app._load_runtime_imports_with_events",
+        lambda *args, **kwargs: pytest.fail("runtime imports should not run after trial lock"),
+    )
+
+    with pytest.raises(TrialLockStartupExit):
+        build_main_window(show=True)
+
+    assert len(prompts) == 1
+    assert prompts[0].reason is TrialLockReason.EXPIRED
 
 
 def test_main_window_can_quarantine_failed_startup_database_and_rebuild(

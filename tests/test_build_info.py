@@ -78,3 +78,53 @@ def test_package_trial_llm_file_allows_missing_api_key(monkeypatch, tmp_path: Pa
     content = trial_llm_path.read_text(encoding="utf-8")
 
     assert "TRIAL_LLM_API_KEY = ''" in content
+
+
+def test_package_trial_lock_days_defaults_to_disabled(monkeypatch) -> None:
+    monkeypatch.delenv("XENIX_TRIAL_LOCK_DAYS", raising=False)
+
+    assert package_app._resolve_trial_lock_days() == 0
+
+
+def test_package_trial_lock_days_rejects_invalid_values(monkeypatch) -> None:
+    monkeypatch.setenv("XENIX_TRIAL_LOCK_DAYS", "three")
+
+    with pytest.raises(ValueError, match="XENIX_TRIAL_LOCK_DAYS"):
+        package_app._resolve_trial_lock_days()
+
+    monkeypatch.setenv("XENIX_TRIAL_LOCK_DAYS", "-1")
+
+    with pytest.raises(ValueError, match="XENIX_TRIAL_LOCK_DAYS"):
+        package_app._resolve_trial_lock_days()
+
+
+def test_package_trial_lock_file_embeds_days_secret_and_build_id(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XENIX_TRIAL_LOCK_DAYS", "14")
+
+    trial_lock_path = package_app._write_generated_trial_lock(tmp_path, "abcdef123456")
+
+    assert trial_lock_path == tmp_path / "src" / "xenix" / "_generated_trial_lock.py"
+    content = trial_lock_path.read_text(encoding="utf-8")
+    assert "TRIAL_LOCK_DAYS = 14" in content
+    assert "TRIAL_LOCK_STATE_SECRET = ''" not in content
+    assert "TRIAL_LOCK_BUILD_ID = 'abcdef123456'" in content
+
+    package_app._remove_generated_trial_lock(tmp_path)
+
+    assert not trial_lock_path.exists()
+
+
+def test_package_trial_lock_disabled_file_omits_state_secret(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XENIX_TRIAL_LOCK_DAYS", "0")
+
+    trial_lock_path = package_app._write_generated_trial_lock(tmp_path, "abcdef123456")
+    content = trial_lock_path.read_text(encoding="utf-8")
+
+    assert "TRIAL_LOCK_DAYS = 0" in content
+    assert "TRIAL_LOCK_STATE_SECRET = ''" in content
