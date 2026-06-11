@@ -38,6 +38,8 @@ _histograms: dict[str, Any] = {}
 class ObservabilityContext:
     install_id: str
     otlp_enabled: bool
+    trace_export_enabled: bool
+    metric_export_enabled: bool
     log_export_enabled: bool
 
 
@@ -65,8 +67,10 @@ def setup_observability(paths: AppPaths) -> ObservabilityContext:
     global _configured, _logging_instrumented, _meter_provider, _tracer_provider
 
     install_id = load_or_create_install_id(paths)
-    otlp_enabled = _otlp_enabled()
-    log_export_enabled = otlp_enabled and _env_truthy("XENIX_OTEL_EXPORT_LOGS", default=False)
+    trace_export_enabled = _trace_export_enabled()
+    metric_export_enabled = _metric_export_enabled()
+    log_export_enabled = _log_export_enabled()
+    otlp_enabled = trace_export_enabled or metric_export_enabled or log_export_enabled
 
     if _configured or _env_truthy("OTEL_SDK_DISABLED", default=False):
         if not _logging_instrumented:
@@ -75,19 +79,21 @@ def setup_observability(paths: AppPaths) -> ObservabilityContext:
         return ObservabilityContext(
             install_id=install_id,
             otlp_enabled=otlp_enabled,
+            trace_export_enabled=trace_export_enabled,
+            metric_export_enabled=metric_export_enabled,
             log_export_enabled=log_export_enabled,
         )
 
     resource = Resource.create(_resource_attributes(paths, install_id))
 
     tracer_provider = TracerProvider(resource=resource)
-    if otlp_enabled:
+    if trace_export_enabled:
         tracer_provider.add_span_processor(BatchSpanProcessor(_build_span_exporter()))
     trace.set_tracer_provider(tracer_provider)
     _tracer_provider = tracer_provider
 
     metric_readers = []
-    if otlp_enabled:
+    if metric_export_enabled:
         metric_readers.append(PeriodicExportingMetricReader(_build_metric_exporter()))
     meter_provider = MeterProvider(resource=resource, metric_readers=metric_readers)
     metrics.set_meter_provider(meter_provider)
@@ -104,6 +110,8 @@ def setup_observability(paths: AppPaths) -> ObservabilityContext:
     return ObservabilityContext(
         install_id=install_id,
         otlp_enabled=otlp_enabled,
+        trace_export_enabled=trace_export_enabled,
+        metric_export_enabled=metric_export_enabled,
         log_export_enabled=log_export_enabled,
     )
 
@@ -175,6 +183,11 @@ def safe_attributes(values: dict[str, Any]) -> dict[str, str | bool | int | floa
     return safe
 
 
+def set_span_attributes(span: Any, attributes: dict[str, Any]) -> None:
+    for key, value in safe_attributes(attributes).items():
+        span.set_attribute(key, value)
+
+
 def error_type(exc: BaseException) -> str:
     return exc.__class__.__name__
 
@@ -213,22 +226,45 @@ def _service_version() -> str:
 
 
 def _otlp_enabled() -> bool:
-    return any(
-        os.getenv(name)
-        for name in (
-            "OTEL_EXPORTER_OTLP_ENDPOINT",
-            "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
-            "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
-        )
-    )
+    return _trace_export_enabled() or _metric_export_enabled() or _log_export_enabled()
 
 
-def _otlp_protocol() -> str:
+def _trace_export_enabled() -> bool:
+    return _signal_export_enabled("TRACES", "XENIX_OTEL_EXPORT_TRACES", global_default=True)
+
+
+def _metric_export_enabled() -> bool:
+    return _signal_export_enabled("METRICS", "XENIX_OTEL_EXPORT_METRICS", global_default=True)
+
+
+def _log_export_enabled() -> bool:
+    return _env_truthy("XENIX_OTEL_EXPORT_LOGS", default=False) and _signal_endpoint_configured("LOGS")
+
+
+def _signal_export_enabled(signal: str, override_name: str, *, global_default: bool) -> bool:
+    override = os.getenv(override_name)
+    if override is not None:
+        return _env_truthy(override_name, default=False) and _signal_endpoint_configured(signal)
+    if _signal_endpoint_configured(signal, include_global=False):
+        return True
+    return global_default and bool(os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
+
+
+def _signal_endpoint_configured(signal: str, *, include_global: bool = True) -> bool:
+    signal_endpoint = os.getenv(f"OTEL_EXPORTER_OTLP_{signal}_ENDPOINT")
+    return bool(signal_endpoint or (include_global and os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")))
+
+
+def _otlp_protocol(signal: str | None = None) -> str:
+    if signal is not None:
+        signal_protocol = os.getenv(f"OTEL_EXPORTER_OTLP_{signal}_PROTOCOL")
+        if signal_protocol:
+            return signal_protocol.lower()
     return os.getenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc").lower()
 
 
 def _build_span_exporter():
-    if _otlp_protocol() == "http/protobuf":
+    if _otlp_protocol("TRACES") == "http/protobuf":
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
     else:
         from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -237,7 +273,7 @@ def _build_span_exporter():
 
 
 def _build_metric_exporter():
-    if _otlp_protocol() == "http/protobuf":
+    if _otlp_protocol("METRICS") == "http/protobuf":
         from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
     else:
         from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
@@ -251,7 +287,7 @@ def _setup_otlp_log_export(resource: Resource) -> None:
     from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
     from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 
-    if _otlp_protocol() == "http/protobuf":
+    if _otlp_protocol("LOGS") == "http/protobuf":
         from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
     else:
         from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter

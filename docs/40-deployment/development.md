@@ -62,6 +62,32 @@ Persistent anonymous install identity is stored in `config/telemetry.json`.
 The value is randomly generated and is not derived from machine information.
 
 OTLP export is configured with standard OpenTelemetry environment variables.
+Xenix enables export per signal:
+
+- traces are enabled by `OTEL_EXPORTER_OTLP_ENDPOINT` or
+  `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, unless
+  `XENIX_OTEL_EXPORT_TRACES=false`.
+- metrics are enabled by `OTEL_EXPORTER_OTLP_ENDPOINT` or
+  `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`, unless
+  `XENIX_OTEL_EXPORT_METRICS=false`.
+- logs are exported only when `XENIX_OTEL_EXPORT_LOGS=true` and either
+  `OTEL_EXPORTER_OTLP_ENDPOINT` or `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` is set.
+
+Endpoint, protocol, and headers can all be configured per signal with standard
+OTel variables:
+
+| Signal | Endpoint | Protocol | Headers |
+| --- | --- | --- | --- |
+| traces | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL` | `OTEL_EXPORTER_OTLP_TRACES_HEADERS` |
+| metrics | `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | `OTEL_EXPORTER_OTLP_METRICS_PROTOCOL` | `OTEL_EXPORTER_OTLP_METRICS_HEADERS` |
+| logs | `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | `OTEL_EXPORTER_OTLP_LOGS_PROTOCOL` | `OTEL_EXPORTER_OTLP_LOGS_HEADERS` |
+
+When a signal-specific value is absent, the OTel exporter falls back to the
+global `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_PROTOCOL`, and
+`OTEL_EXPORTER_OTLP_HEADERS` variables. Prefer signal-specific headers when
+different backends require different API keys. Do not add Xenix-specific API key
+environment variables for telemetry backends.
+
 For a local Collector during development, set for example:
 
 ```bash
@@ -75,6 +101,45 @@ For HTTP/protobuf collectors:
 ```bash
 $env:OTEL_EXPORTER_OTLP_ENDPOINT="http://127.0.0.1:4318"
 $env:OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
+pdm run dev
+```
+
+For Arize Phoenix as a direct traces-only backend, set the trace endpoint only:
+
+```bash
+$env:OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="http://127.0.0.1:6006/v1/traces"
+$env:OTEL_EXPORTER_OTLP_TRACES_PROTOCOL="http/protobuf"
+# Only when Phoenix auth is enabled:
+# $env:OTEL_EXPORTER_OTLP_TRACES_HEADERS="Authorization=Bearer <phoenix-api-key>"
+pdm run dev
+```
+
+or, if using Phoenix's gRPC trace collector:
+
+```bash
+$env:OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="http://127.0.0.1:4317"
+$env:OTEL_EXPORTER_OTLP_TRACES_PROTOCOL="grpc"
+# Only when Phoenix auth is enabled:
+# $env:OTEL_EXPORTER_OTLP_TRACES_HEADERS="Authorization=Bearer <phoenix-api-key>"
+pdm run dev
+```
+
+Phoenix is an AI trace backend, not a full replacement for a logs/metrics
+collector. Prefer routing through an OpenTelemetry Collector when traces,
+metrics, and logs need different destinations.
+
+When sending different signals to different backends directly, keep all three
+transport settings signal-specific:
+
+```bash
+$env:OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="http://127.0.0.1:6006/v1/traces"
+$env:OTEL_EXPORTER_OTLP_TRACES_PROTOCOL="http/protobuf"
+$env:OTEL_EXPORTER_OTLP_TRACES_HEADERS="Authorization=Bearer <phoenix-api-key>"
+
+$env:OTEL_EXPORTER_OTLP_METRICS_ENDPOINT="http://metrics.example.internal:4317"
+$env:OTEL_EXPORTER_OTLP_METRICS_PROTOCOL="grpc"
+$env:OTEL_EXPORTER_OTLP_METRICS_HEADERS="api-key=<metrics-key>"
+
 pdm run dev
 ```
 

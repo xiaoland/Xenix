@@ -410,6 +410,8 @@ def build_main_window(
             extra={
                 "event_name": "app.observability.initialized",
                 "otlp_enabled": observability.otlp_enabled,
+                "otlp_trace_export_enabled": observability.trace_export_enabled,
+                "otlp_metric_export_enabled": observability.metric_export_enabled,
                 "otlp_log_export_enabled": observability.log_export_enabled,
             },
         )

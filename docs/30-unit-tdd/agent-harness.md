@@ -18,6 +18,8 @@ Agent Harness owns:
 - Provider boundary calls through a canonical provider contract
 - Contextual provider-facing tool exposure and tool execution
 - Agent run recording and cancellation state
+- AI observability projection from Harness-owned turn, provider request, tool-call,
+  guard, step-budget, cancellation, and token usage facts
 
 Storage owns persistence mechanics. Data, artifact, project, and ML services own domain operations. Qt UI owns rendering and user input collection.
 
@@ -136,6 +138,19 @@ The normalized usage payload uses:
 - `provider_usage`
 
 Cached input tokens are a subset of input tokens and are not added to totals again. OpenAI-compatible streaming requests include `stream_options.include_usage=true`; if a compatible provider does not return usage, the row remains useful as a request record and Chatbot omits the token overview for that usage-missing slice.
+
+## AI Observability Projection
+
+Agent Harness owns AI observability collection semantics because it owns the turn-level causal graph. It projects safe telemetry from existing Harness facts into OpenTelemetry-compatible spans and metrics. LLM Service remains a provider router and provider-construction boundary; it does not own turn semantics, trace hierarchy, token attribution, tool exposure attribution, or AI behavior diagnosis.
+
+The first AI observability projection records causality and request shape without exporting raw content by default:
+
+- `agent.turn` spans carry the Agent workflow identity and hashed thread, turn, and run correlation.
+- `agent.provider_request` spans carry GenAI/OpenInference-compatible operation metadata, request kind, loop step, provider, model hash, message role counts, tool exposure counts, response shape, token usage when reported, usage-present state, and invalid-tool-call classification.
+- `agent.tool_call` spans carry tool operation metadata, tool category, hashed tool-call id, parent provider request correlation, and loop step.
+- Provider request metrics expose low-cardinality status, duration, usage-present, and token usage measurements. Correlation ids stay on spans rather than metrics.
+
+Remote telemetry must not include raw prompts, assistant completions, tool arguments, tool result payloads, dataset values, local paths, provider credentials, raw provider payloads, or raw provider usage payloads by default. Eval scores, judge-model decisions, human ratings, prompt quality judgments, and optimization recommendations belong to later analysis layers, not the collection layer.
 
 ## Step Budget And Cancellation
 

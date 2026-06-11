@@ -13,7 +13,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlmodel import Field, SQLModel
 
 from ...exceptions import ValidationError
-from ...observability import record_counter, record_histogram, stable_hash, start_span
+from ...observability import record_counter, record_histogram, set_span_attributes, start_span
 from ..storage.models import (
     AgentMessageAuthor,
     AgentMessageKind,
@@ -64,6 +64,7 @@ from .providers import (
     ProviderToolCall,
     extract_reasoning_content,
 )
+from . import observability as ai_observability
 from .tool_presentations import tool_presentation_for_name
 from ..llm import LLMModelOption, LLMService
 
@@ -258,8 +259,9 @@ class AgentHarnessService:
             cancel_event.set()
 
     def submit_user_turn(self, input_data: SubmitUserTurnInput) -> ThreadSnapshot:
-        with start_span("agent.turn"):
+        with start_span("agent.turn") as span:
             thread_id, turn_id, run_id, file_paths, provider = self._start_user_turn(input_data)
+            set_span_attributes(span, ai_observability.turn_span_attributes(thread_id=thread_id, turn_id=turn_id, run_id=run_id))
 
             try:
                 outcome = self._run_provider_loop(
@@ -299,8 +301,9 @@ class AgentHarnessService:
                 self._clear_cancel_event(run_id)
 
     def submit_user_turn_stream(self, input_data: SubmitUserTurnInput):
-        with start_span("agent.turn"):
+        with start_span("agent.turn") as span:
             thread_id, turn_id, run_id, file_paths, provider = self._start_user_turn(input_data)
+            set_span_attributes(span, ai_observability.turn_span_attributes(thread_id=thread_id, turn_id=turn_id, run_id=run_id))
             yield from self._submit_user_turn_stream_started(thread_id, turn_id, run_id, file_paths, provider)
 
     def _submit_user_turn_stream_started(
@@ -576,14 +579,37 @@ class AgentHarnessService:
             )
             tool_specs = self._tool_specs_for_context(snapshot=snapshot, attached_files=attached_files)
             available_tool_names = {tool.name for tool in tool_specs}
+            provider_span_attributes = ai_observability.provider_request_span_attributes(
+                provider_request,
+                provider_messages=provider_messages,
+                tool_specs=tool_specs,
+                loop_step_index=step_state["used_steps"],
+                stream=False,
+            )
             try:
-                with start_span("agent.provider_request", self._provider_request_attributes(provider_request)):
+                with start_span("agent.provider_request", provider_span_attributes) as provider_span:
                     provider_response = provider.complete(
                         provider_messages,
                         tool_specs,
                     )
                     self._raise_if_cancelled(run_id)
+                    set_span_attributes(provider_span, ai_observability.provider_response_shape_attributes(provider_response))
+                    invalid_tool_attributes = ai_observability.invalid_tool_call_attributes(
+                        provider_response.tool_calls,
+                        available_tool_names,
+                    )
+                    if invalid_tool_attributes:
+                        set_span_attributes(provider_span, invalid_tool_attributes)
+                        set_span_attributes(provider_span, {"xenix.ai.provider_request.status": AgentProviderRequestStatus.FAILED.value})
                     self._validate_provider_tool_calls(provider_response.tool_calls, available_tool_names)
+                    set_span_attributes(
+                        provider_span,
+                        ai_observability.provider_usage_payload_attributes(
+                            provider_request,
+                            provider_response.usage_payload,
+                        ),
+                    )
+                    set_span_attributes(provider_span, {"xenix.ai.provider_request.status": AgentProviderRequestStatus.SUCCEEDED.value})
             except AgentRunCancelled:
                 self._complete_provider_request(
                     provider_request,
@@ -662,7 +688,14 @@ class AgentHarnessService:
                 tool_started_at = perf_counter()
                 tool_error: BaseException | None = None
                 try:
-                    with start_span("agent.tool_call", self._tool_call_attributes(persisted_tool_call)):
+                    with start_span(
+                        "agent.tool_call",
+                        self._tool_call_attributes(
+                            persisted_tool_call,
+                            provider_request=provider_request,
+                            loop_step_index=step_state["used_steps"],
+                        ),
+                    ):
                         result = self._tool_registry.execute(
                             tool_call.tool_name,
                             arguments,
@@ -741,6 +774,13 @@ class AgentHarnessService:
             thinking_in_progress = True
             tool_specs = self._tool_specs_for_context(snapshot=snapshot, attached_files=attached_files)
             available_tool_names = {tool.name for tool in tool_specs}
+            provider_span_attributes = ai_observability.provider_request_span_attributes(
+                provider_request,
+                provider_messages=provider_messages,
+                tool_specs=tool_specs,
+                loop_step_index=step_state["used_steps"],
+                stream=True,
+            )
             yield self._thinking_event(
                 thread_id=thread_id,
                 turn_id=turn_id,
@@ -748,12 +788,18 @@ class AgentHarnessService:
                 status=ChatbotEventStatus.IN_PROGRESS,
             )
             try:
-                with start_span("agent.provider_request", self._provider_request_attributes(provider_request)):
+                provider_started_at = perf_counter()
+                first_event_ms: float | None = None
+                first_text_ms: float | None = None
+                with start_span("agent.provider_request", provider_span_attributes) as provider_span:
                     for stream_event in self._provider_stream(
                         provider,
                         provider_messages,
                         tool_specs,
                     ):
+                        elapsed_ms = (perf_counter() - provider_started_at) * 1000
+                        if first_event_ms is None:
+                            first_event_ms = elapsed_ms
                         self._raise_if_cancelled(run_id)
                         if thinking_in_progress:
                             thinking_in_progress = False
@@ -764,6 +810,8 @@ class AgentHarnessService:
                                 status=ChatbotEventStatus.COMPLETED,
                             )
                         if stream_event.delta_text:
+                            if first_text_ms is None:
+                                first_text_ms = elapsed_ms
                             assistant_text += stream_event.delta_text
                             assistant_blocks = [{"type": "markdown", "text": assistant_text}]
                             if assistant_message is None:
@@ -789,6 +837,31 @@ class AgentHarnessService:
                                 yield self._message_event("message_updated", assistant_message, run_id)
                         if stream_event.response is not None:
                             provider_response = stream_event.response
+                    set_span_attributes(
+                        provider_span,
+                        ai_observability.streaming_timing_attributes(
+                            first_event_ms=first_event_ms,
+                            first_text_ms=first_text_ms,
+                        ),
+                    )
+                    if provider_response is not None:
+                        set_span_attributes(provider_span, ai_observability.provider_response_shape_attributes(provider_response))
+                        invalid_tool_attributes = ai_observability.invalid_tool_call_attributes(
+                            provider_response.tool_calls,
+                            available_tool_names,
+                        )
+                        if invalid_tool_attributes:
+                            set_span_attributes(provider_span, invalid_tool_attributes)
+                            set_span_attributes(provider_span, {"xenix.ai.provider_request.status": AgentProviderRequestStatus.FAILED.value})
+                        self._validate_provider_tool_calls(provider_response.tool_calls, available_tool_names)
+                        set_span_attributes(
+                            provider_span,
+                            ai_observability.provider_usage_payload_attributes(
+                                provider_request,
+                                provider_response.usage_payload,
+                            ),
+                        )
+                        set_span_attributes(provider_span, {"xenix.ai.provider_request.status": AgentProviderRequestStatus.SUCCEEDED.value})
                 self._raise_if_cancelled(run_id)
             except AgentRunCancelled:
                 self._complete_provider_request(
@@ -855,22 +928,6 @@ class AgentHarnessService:
                     status=AgentProviderRequestStatus.FAILED,
                 )
                 raise ValidationError("Provider stream ended without a completed response.")
-            try:
-                self._validate_provider_tool_calls(provider_response.tool_calls, available_tool_names)
-            except Exception:
-                if assistant_message is not None:
-                    assistant_message = self._conversation_store.update_message(
-                        UpdateAgentMessageInput(
-                            message_id=assistant_message.id,
-                            status=AgentMessageStatus.FAILED,
-                        )
-                    )
-                    yield self._message_event("message_finalized", assistant_message, run_id)
-                self._complete_provider_request(
-                    provider_request,
-                    status=AgentProviderRequestStatus.FAILED,
-                )
-                raise
 
             final_assistant_blocks = provider_response.assistant_content_blocks
             if assistant_message is not None and not final_assistant_blocks:
@@ -953,7 +1010,14 @@ class AgentHarnessService:
                 tool_started_at = perf_counter()
                 tool_error: BaseException | None = None
                 try:
-                    with start_span("agent.tool_call", self._tool_call_attributes(persisted_tool_call)):
+                    with start_span(
+                        "agent.tool_call",
+                        self._tool_call_attributes(
+                            persisted_tool_call,
+                            provider_request=provider_request,
+                            loop_step_index=step_state["used_steps"],
+                        ),
+                    ):
                         result = self._tool_registry.execute(
                             tool_call.tool_name,
                             arguments,
@@ -1061,16 +1125,20 @@ class AgentHarnessService:
         return updated
 
     def _provider_request_attributes(self, provider_request: AgentProviderRequestRow) -> dict[str, Any]:
-        attributes: dict[str, Any] = {
-            "agent.provider.name": provider_request.provider_name or "unknown",
-            "agent.provider_request.kind": provider_request.request_kind.value,
-        }
-        if provider_request.model:
-            attributes["agent.model.hash"] = stable_hash(provider_request.model)
-        return attributes
+        return ai_observability.provider_metric_attributes(provider_request)
 
-    def _tool_call_attributes(self, tool_call: AgentToolCallRow) -> dict[str, Any]:
-        return {"agent.tool.name": tool_call.tool_name}
+    def _tool_call_attributes(
+        self,
+        tool_call: AgentToolCallRow,
+        *,
+        provider_request: AgentProviderRequestRow | None = None,
+        loop_step_index: int | None = None,
+    ) -> dict[str, Any]:
+        return ai_observability.tool_call_span_attributes(
+            tool_call,
+            provider_request=provider_request,
+            loop_step_index=loop_step_index,
+        )
 
     def _record_provider_request(self, provider_request: AgentProviderRequestRow) -> None:
         attributes = self._provider_request_attributes(provider_request)
@@ -1083,9 +1151,17 @@ class AgentHarnessService:
                 attributes=attributes,
                 unit="ms",
             )
+        for _token_type, token_count, token_attributes in ai_observability.token_metric_measurements(provider_request):
+            token_attributes["status"] = provider_request.status.value
+            record_histogram(
+                "gen_ai.client.token.usage",
+                token_count,
+                attributes=token_attributes,
+                unit="{token}",
+            )
 
     def _record_tool_call(self, tool_call: AgentToolCallRow, duration_ms: float, error: BaseException | None = None) -> None:
-        attributes = self._tool_call_attributes(tool_call)
+        attributes = ai_observability.tool_call_metric_attributes(tool_call)
         attributes["status"] = tool_call.status.value
         if error is not None:
             attributes["error.type"] = error.__class__.__name__

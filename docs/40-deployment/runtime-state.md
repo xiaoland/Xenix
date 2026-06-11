@@ -52,9 +52,18 @@ Current runtime files and subdirectories:
 `logs/xenix.log` is JSON Lines. Log records are correlated with active
 OpenTelemetry spans through trace/span fields when a span is active.
 
-OpenTelemetry OTLP export is configured through standard environment variables
-such as `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_PROTOCOL`.
-Remote log export additionally requires `XENIX_OTEL_EXPORT_LOGS=true`.
+OpenTelemetry OTLP export is configured per signal through standard
+environment variables. `OTEL_EXPORTER_OTLP_ENDPOINT` enables traces and metrics
+for a Collector-style endpoint. `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`,
+`OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`, and
+`OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` enable signal-specific export. Signal-specific
+protocol and auth headers should use `OTEL_EXPORTER_OTLP_<SIGNAL>_PROTOCOL` and
+`OTEL_EXPORTER_OTLP_<SIGNAL>_HEADERS`, for example
+`OTEL_EXPORTER_OTLP_TRACES_PROTOCOL=http/protobuf` and
+`OTEL_EXPORTER_OTLP_TRACES_HEADERS="Authorization=Bearer ..."`. Remote log
+export additionally requires `XENIX_OTEL_EXPORT_LOGS=true`. Use
+`XENIX_OTEL_EXPORT_TRACES=false` or `XENIX_OTEL_EXPORT_METRICS=false` to disable
+a signal even when a global OTLP endpoint is configured.
 
 Run `pdm run diagnostic-bundle` to create a local support bundle under `temp/`.
 The bundle includes logs, ML task logs, telemetry metadata, and SQLite
