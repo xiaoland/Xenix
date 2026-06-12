@@ -1285,7 +1285,9 @@ def test_thread_detail_view_uses_available_width_for_user_messages(monkeypatch, 
 
         assert view.isVisibleTo(window)
         assert user_cards
-        assert user_cards[0].maximumWidth() == max(280, int(view._message_column.width() * 0.6))
+        assert user_cards[0].minimumWidth() == max(280, int(view._message_column.width() * 0.6))
+        assert user_cards[0].maximumWidth() == max(320, int(view._message_column.width() * 0.8))
+        assert user_cards[0].width() >= user_cards[0].minimumWidth()
     finally:
         window.close()
 
@@ -1365,47 +1367,22 @@ def test_thread_detail_view_user_message_uses_native_black_panel(monkeypatch, tm
         bubble = bubble_item.widget() if bubble_item is not None else None
         card = getattr(bubble, "_card", None)
         browser = bubble.findChild(QTextBrowser) if bubble is not None else None
+        body = bubble.findChild(QWidget, "chatMessageBody") if bubble is not None else None
 
         assert card is not None
         assert card.objectName() == "chatMessageUser"
-        assert card.frameShape() == QFrame.StyledPanel
-        assert card.autoFillBackground()
-        assert card.palette().color(QPalette.ColorRole.Window).name() == "#000000"
-        assert card.palette().color(QPalette.ColorRole.WindowText).name() == "#ffffff"
-        assert browser is not None
-        assert not browser.testAttribute(Qt.WA_TranslucentBackground)
-        assert not browser.viewport().testAttribute(Qt.WA_TranslucentBackground)
-        body_style_sheet = browser.styleSheet()
-        assert "#chatMessageBody" in body_style_sheet
-        assert "background-color: #000000" in body_style_sheet
-        assert "color: #ffffff" in body_style_sheet
-        assert "selection-background-color: #2f3338" in body_style_sheet
-        document_style_sheet = browser.document().defaultStyleSheet()
+        assert type(card).__name__ == "UserMessageCard"
+        assert not isinstance(card, QFrame)
+        assert not card.autoFillBackground()
+        assert card.styleSheet() == ""
+        assert browser is None
+        assert body is not None
+        assert type(body).__name__ == "UserMessageBody"
+        assert body.styleSheet() == ""
+        document_style_sheet = body.document().defaultStyleSheet()
         assert "body, p, li, pre, code" in document_style_sheet
-        assert "background-color: #000000" in document_style_sheet
         assert "color: #ffffff" in document_style_sheet
-        for role in (
-            QPalette.ColorRole.Window,
-            QPalette.ColorRole.Base,
-            QPalette.ColorRole.AlternateBase,
-        ):
-            assert browser.palette().color(role).name() == "#000000"
-            assert browser.palette().color(role).alpha() == 255
-            assert browser.viewport().palette().color(role).name() == "#000000"
-            assert browser.viewport().palette().color(role).alpha() == 255
-        for role in (
-            QPalette.ColorRole.Text,
-            QPalette.ColorRole.WindowText,
-            QPalette.ColorRole.BrightText,
-            QPalette.ColorRole.ButtonText,
-            QPalette.ColorRole.Link,
-            QPalette.ColorRole.LinkVisited,
-            QPalette.ColorRole.HighlightedText,
-        ):
-            assert browser.palette().color(role).name() == "#ffffff"
-            assert browser.viewport().palette().color(role).name() == "#ffffff"
-        assert browser.palette().color(QPalette.ColorRole.Highlight).name() == "#2f3338"
-        assert browser.viewport().palette().color(QPalette.ColorRole.Highlight).name() == "#2f3338"
+        assert "background-color" not in document_style_sheet
     finally:
         window.close()
 

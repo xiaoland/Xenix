@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from PySide6.QtCore import QCoreApplication, QEvent, QPoint, QSize, QTimer, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QPalette, QPixmap, QTextDocument, QTextOption
+from PySide6.QtGui import QColor, QFont, QPainter, QPalette, QPixmap, QTextDocument, QTextOption
 from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
@@ -36,19 +36,8 @@ from .markdown_renderer import render_chat_markdown
 
 USER_MESSAGE_BACKGROUND = QColor("#000000")
 USER_MESSAGE_FOREGROUND = QColor("#ffffff")
-USER_MESSAGE_SELECTION_BACKGROUND = QColor("#2f3338")
-USER_MESSAGE_BODY_STYLE_SHEET = """
-#chatMessageBody {
-    background-color: #000000;
-    color: #ffffff;
-    border: none;
-    selection-background-color: #2f3338;
-    selection-color: #ffffff;
-}
-""".strip()
 USER_MESSAGE_DOCUMENT_STYLE_SHEET = """
 body, p, li, pre, code, table, thead, tbody, tr, td, th {
-    background-color: #000000;
     color: #ffffff;
 }
 a {
@@ -335,6 +324,132 @@ class AutoHeightTextBrowser(QTextBrowser):
             return pixmap
         return pixmap.scaled(max_width, max_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
 
+
+class UserMessageCard(QWidget):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("chatMessageUser")
+        self.setAutoFillBackground(False)
+
+    def paintEvent(self, event) -> None:  # type: ignore[override]
+        painter = QPainter(self)
+        painter.fillRect(self.rect(), USER_MESSAGE_BACKGROUND)
+        super().paintEvent(event)
+
+
+class UserMessageDocument(QTextDocument):
+    def __init__(self, owner, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._owner = owner
+
+    def loadResource(self, resource_type: int, name):  # type: ignore[override]
+        if resource_type == QTextDocument.ImageResource and name.scheme() == "artifact":
+            pixmap = self._owner.load_artifact_pixmap(name.toString())
+            if not pixmap.isNull():
+                return pixmap
+        return super().loadResource(resource_type, name)
+
+
+class UserMessageBody(QWidget):
+    link_activated = Signal(str)
+
+    def __init__(
+        self,
+        *,
+        artifact_resolver: ArtifactResolver | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._artifact_resolver = artifact_resolver
+        self._document = UserMessageDocument(self, self)
+        self._document.setDefaultStyleSheet(USER_MESSAGE_DOCUMENT_STYLE_SHEET)
+        self._document.setDocumentMargin(0)
+        self._document.setDefaultFont(self.font())
+        text_option = self._document.defaultTextOption()
+        text_option.setWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
+        self._document.setDefaultTextOption(text_option)
+        self._document.contentsChanged.connect(self._sync_height)
+        self.setMouseTracking(True)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+    def document(self) -> QTextDocument:
+        return self._document
+
+    def set_artifact_resolver(self, resolver: ArtifactResolver | None) -> None:
+        self._artifact_resolver = resolver
+
+    def load_artifact_pixmap(self, uri: str) -> QPixmap:
+        if self._artifact_resolver is None:
+            return QPixmap()
+        try:
+            artifact = self._artifact_resolver(uri)
+        except Exception:
+            return QPixmap()
+
+        mime_type = str(getattr(artifact, "mime_type", "") or "")
+        if mime_type and not mime_type.startswith("image/"):
+            return QPixmap()
+        if not bool(getattr(artifact, "ready_to_open", False)):
+            return QPixmap()
+        if not bool(getattr(artifact, "exists", False)):
+            return QPixmap()
+
+        pixmap = QPixmap(str(getattr(artifact, "absolute_path", "")))
+        if pixmap.isNull():
+            return pixmap
+        max_width = max(160, min(720, self.width() - 24))
+        max_height = 360
+        if pixmap.width() <= max_width and pixmap.height() <= max_height:
+            return pixmap
+        return pixmap.scaled(max_width, max_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
+    def setHtml(self, html: str) -> None:
+        self._document.setHtml(html)
+        self._sync_height()
+        self.update()
+
+    def sizeHint(self) -> QSize:  # type: ignore[override]
+        width = max(1, int(self._document.idealWidth()))
+        height = max(1, int(self._document.size().height()))
+        return QSize(width, height)
+
+    def resizeEvent(self, event) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        self._sync_height()
+
+    def paintEvent(self, event) -> None:  # type: ignore[override]
+        painter = QPainter(self)
+        self._document.drawContents(painter)
+        super().paintEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:  # type: ignore[override]
+        if self._anchor_at_event(event):
+            self.setCursor(Qt.PointingHandCursor)
+        else:
+            self.unsetCursor()
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:  # type: ignore[override]
+        if event.button() == Qt.LeftButton:
+            anchor = self._anchor_at_event(event)
+            if anchor:
+                self.link_activated.emit(anchor)
+                event.accept()
+                return
+        super().mouseReleaseEvent(event)
+
+    def _sync_height(self) -> None:
+        self._document.setTextWidth(max(1, self.width()))
+        height = max(1, int(self._document.size().height()) + 2)
+        if self.height() != height:
+            self.setFixedHeight(height)
+        _propagate_geometry_change(self)
+
+    def _anchor_at_event(self, event) -> str:
+        position = event.position() if hasattr(event, "position") else event.pos()
+        return self._document.documentLayout().anchorAt(position)
+
+
 class AutoGrowingTextEdit(QPlainTextEdit):
     multiline_changed = Signal(bool)
     submit_requested = Signal()
@@ -464,10 +579,14 @@ class ChatMessageBubble(QFrame):
         self._artifact_resolver = artifact_resolver
         self.setObjectName("chatMessageRow")
 
-        card = QFrame(self)
+        if author == "You":
+            card = UserMessageCard(self)
+        else:
+            card = QFrame(self)
+            card.setObjectName(self._card_object_name(author, blocks))
+            card.setFrameShape(QFrame.StyledPanel)
+            card.setAutoFillBackground(False)
         self._card = card
-        card.setObjectName(self._card_object_name(author, blocks))
-        card.setFrameShape(QFrame.StyledPanel)
 
         card_layout = QVBoxLayout(card)
         card_layout.setObjectName("chatMessageCardLayout")
@@ -483,17 +602,24 @@ class ChatMessageBubble(QFrame):
             author_label.setFont(author_font)
             card_layout.addWidget(author_label)
 
-        browser = AutoHeightTextBrowser(artifact_resolver=artifact_resolver)
-        self._browser = browser
         self._blocks = list(blocks)
-        browser.setObjectName("chatMessageBody")
-        browser.setOpenLinks(False)
-        browser.setOpenExternalLinks(False)
-        browser.setFrameShape(QFrame.NoFrame)
-        browser.anchorClicked.connect(self._handle_link_activated)
-        self._apply_message_palette(author, card, browser)
-        browser.setHtml(self._render_blocks(blocks))
-        card_layout.addWidget(browser)
+        if author == "You":
+            body = UserMessageBody(artifact_resolver=artifact_resolver, parent=card)
+            self._browser = body
+            body.setObjectName("chatMessageBody")
+            body.link_activated.connect(self.link_activated.emit)
+            body.setHtml(self._render_blocks(blocks))
+            card_layout.addWidget(body)
+        else:
+            browser = AutoHeightTextBrowser(artifact_resolver=artifact_resolver)
+            self._browser = browser
+            browser.setObjectName("chatMessageBody")
+            browser.setOpenLinks(False)
+            browser.setOpenExternalLinks(False)
+            browser.setFrameShape(QFrame.NoFrame)
+            browser.anchorClicked.connect(self._handle_link_activated)
+            browser.setHtml(self._render_blocks(blocks))
+            card_layout.addWidget(browser)
 
         row_layout = QHBoxLayout(self)
         row_layout.setObjectName("chatMessageRowLayout")
@@ -525,49 +651,13 @@ class ChatMessageBubble(QFrame):
             return self.tr("System")
         return self._author
 
-    def _apply_message_palette(self, author: str, card: QFrame, browser: QTextBrowser) -> None:
-        if author != "You":
-            card.setAutoFillBackground(False)
-            return
-
-        card_palette = QPalette(card.palette())
-        card_palette.setColor(QPalette.ColorRole.Window, USER_MESSAGE_BACKGROUND)
-        card_palette.setColor(QPalette.ColorRole.WindowText, USER_MESSAGE_FOREGROUND)
-        card.setPalette(card_palette)
-        card.setAutoFillBackground(True)
-
-        browser.setAttribute(Qt.WA_TranslucentBackground, False)
-        browser.viewport().setAttribute(Qt.WA_TranslucentBackground, False)
-        browser.setStyleSheet(USER_MESSAGE_BODY_STYLE_SHEET)
-        browser.document().setDefaultStyleSheet(USER_MESSAGE_DOCUMENT_STYLE_SHEET)
-
-        text_palette = QPalette(browser.palette())
-        for role in (
-            QPalette.ColorRole.Window,
-            QPalette.ColorRole.Base,
-            QPalette.ColorRole.AlternateBase,
-        ):
-            text_palette.setColor(role, USER_MESSAGE_BACKGROUND)
-        for role in (
-            QPalette.ColorRole.Text,
-            QPalette.ColorRole.WindowText,
-            QPalette.ColorRole.BrightText,
-            QPalette.ColorRole.ButtonText,
-        ):
-            text_palette.setColor(role, USER_MESSAGE_FOREGROUND)
-        text_palette.setColor(QPalette.ColorRole.Link, USER_MESSAGE_FOREGROUND)
-        text_palette.setColor(QPalette.ColorRole.LinkVisited, USER_MESSAGE_FOREGROUND)
-        text_palette.setColor(QPalette.ColorRole.Highlight, USER_MESSAGE_SELECTION_BACKGROUND)
-        text_palette.setColor(QPalette.ColorRole.HighlightedText, USER_MESSAGE_FOREGROUND)
-        browser.setPalette(text_palette)
-        browser.viewport().setPalette(text_palette)
-
     def _render_blocks(self, blocks: list[dict[str, Any]]) -> str:
         return render_chat_markdown(_render_content_blocks(blocks), inline_artifact_images=True)
 
     def set_available_width(self, width: int) -> None:
         if self._card.objectName() == "chatMessageUser":
-            self._card.setMaximumWidth(max(280, int(width * 0.6)))
+            self._card.setMinimumWidth(max(280, int(width * 0.6)))
+            self._card.setMaximumWidth(max(320, int(width * 0.8)))
         elif self._card.objectName() == "chatMessageSystem":
             self._card.setMaximumWidth(max(320, int(width * 0.78)))
 

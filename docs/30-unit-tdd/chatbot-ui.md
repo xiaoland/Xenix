@@ -33,7 +33,7 @@ Transient thinking state is also driven by Chatbot Events: `THINKING` with `IN_P
 
 ## Event Rendering
 
-- User text events are right-aligned and capped at about 60% of the EventList column width.
+- User text events are right-aligned, at least about 60% of the EventList column width, and capped at about 80%.
 - Assistant text events use the remaining readable width of the EventList column.
 - Tool events render at full EventList column width as one compact row with tool-type icon, Harness-provided summary text, and chevron when result detail is available.
 - A tool-call request without a result renders as a pending tool event.
@@ -54,6 +54,8 @@ Transient thinking state is also driven by Chatbot Events: `THINKING` with `IN_P
 Prefer native Qt Widgets styling unless the component needs an explicit product surface. When custom styling is needed, style the whole visual component rather than one isolated property. A message bubble, editor, list row, chip, or tool item includes its outer frame, layout container, text widget, viewport, document/editor area, icon labels, action buttons, and relevant interaction states.
 
 Do not customize only foreground text, icon color, or one palette role while leaving the corresponding background, viewport, selection, disabled, focus, hover, link, and visited-link roles to platform defaults. Partial styling can leak native theme colors across nested Qt widgets, especially through `QAbstractScrollArea.viewport()` and text-document `Base` roles. Either keep the component native, or define the complete foreground/background contract for every child that participates in the same visual unit.
+
+User text message bubbles own their black background as one custom-painted visual unit. Do not render the user-message black bubble through native `QFrame.StyledPanel`, `QTextBrowser`, or another `QAbstractScrollArea` stack; those layers can repaint independent platform backgrounds on Windows. User message rich text may use `QTextDocument` for layout, but the bubble background is painted by the user-message surface itself.
 
 ## Composer Contract
 
