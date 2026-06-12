@@ -702,7 +702,9 @@ def _content_blocks_to_text(blocks: list[dict[str, Any]]) -> str:
         if block_type in {"text", "markdown"}:
             lines.append(str(block.get("text", "")))
         elif block_type == "file":
-            lines.append(f"Attached file: {block.get('path')}")
+            lines.append("Legacy local file attachment omitted; reattach it as a dataset to use it.")
+        elif block_type == "dataset":
+            lines.append(_dataset_block_to_text(block))
         elif block_type == "step_confirmation":
             lines.append(str(block.get("text", "")))
         elif block_type == "tool_event_summary":
@@ -710,6 +712,29 @@ def _content_blocks_to_text(blocks: list[dict[str, Any]]) -> str:
         else:
             lines.append(json.dumps(block, ensure_ascii=False))
     return "\n".join(line for line in lines if line)
+
+
+def _dataset_block_to_text(block: dict[str, Any]) -> str:
+    dataset_id = str(block.get("dataset_id") or "").strip()
+    name = str(block.get("name") or "").strip()
+    file_name = str(block.get("file_name") or "").strip()
+    row_count = block.get("row_count")
+    column_count = block.get("column_count")
+    preview_columns = block.get("preview_columns")
+    parts = ["Attached dataset"]
+    if name:
+        parts.append(name)
+    if dataset_id:
+        parts.append(f"dataset_id: {dataset_id}")
+    if file_name:
+        parts.append(f"file: {file_name}")
+    if isinstance(row_count, int) and isinstance(column_count, int):
+        parts.append(f"rows: {row_count}")
+        parts.append(f"columns: {column_count}")
+    if isinstance(preview_columns, list) and preview_columns:
+        column_names = ", ".join(str(column) for column in preview_columns[:20])
+        parts.append(f"column names: {column_names}")
+    return parts[0] + " (" + "; ".join(parts[1:]) + ")" if len(parts) > 1 else parts[0]
 
 
 def _tool_result_to_text(tool_call: AgentToolCallRow) -> str:

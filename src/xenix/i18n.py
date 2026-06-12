@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import ClassVar
 
 from PySide6.QtCore import QLocale, QTranslator
 from PySide6.QtWidgets import QApplication
@@ -77,6 +78,8 @@ def resolve_startup_locale(paths: AppPaths, *, system_locale: str | None = None)
 
 
 class TranslationManager:
+    _active_translators: ClassVar[dict[int, QTranslator]] = {}
+
     def __init__(self, app: QApplication, paths: AppPaths) -> None:
         self._app = app
         self._paths = paths
@@ -99,8 +102,10 @@ class TranslationManager:
         if resolved_locale is None:
             raise ValueError(f"Unsupported locale '{locale_code}'.")
 
+        app_key = id(self._app)
+        active_translator = self._active_translators.get(app_key)
         if resolved_locale == self._current_locale and (
-            resolved_locale == DEFAULT_LOCALE or self._translator is not None
+            resolved_locale != DEFAULT_LOCALE or active_translator is None
         ):
             if persist:
                 write_saved_locale(self._paths, resolved_locale)
@@ -115,12 +120,16 @@ class TranslationManager:
             if not next_translator.load(str(translation_path)):
                 raise RuntimeError(f"Unable to load translation file '{translation_path}'.")
 
-        if self._translator is not None:
+        if active_translator is not None:
+            self._app.removeTranslator(active_translator)
+            self._active_translators.pop(app_key, None)
+        elif self._translator is not None:
             self._app.removeTranslator(self._translator)
 
         self._translator = next_translator
         if next_translator is not None:
             self._app.installTranslator(next_translator)
+            self._active_translators[app_key] = next_translator
         self._current_locale = resolved_locale
 
         if persist:

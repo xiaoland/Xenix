@@ -66,7 +66,7 @@ def _tool_context(conversation_store: ConversationStore, tool_name: str, argumen
         thread_id=thread.id,
         turn_id=turn.id,
         tool_call_id=tool_call.id,
-        attached_files=[],
+        dataset_ids=[],
     )
 
 

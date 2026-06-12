@@ -69,7 +69,7 @@ def _tool_context(conversation_store: ConversationStore, tool_name: str, argumen
         thread_id=thread.id,
         turn_id=turn.id,
         tool_call_id=tool_call.id,
-        attached_files=[],
+        dataset_ids=[],
     )
 
 
@@ -79,6 +79,29 @@ def _register_csv(dataset_service: DatasetService, tmp_path: Path, name: str, co
     return dataset_service.register_dataset(
         RegisterDatasetInput(source_path=str(source.resolve()), name=name)
     )
+
+
+def test_data_integrate_tool_uses_dataset_ids_and_registers_generated_artifact(monkeypatch, tmp_path: Path) -> None:
+    _paths, dataset_service, _service, artifact_service, registry, store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    orders = _register_csv(dataset_service, tmp_path, "orders", "order_id,amount\n1,10\n")
+    more_orders = _register_csv(dataset_service, tmp_path, "more-orders", "order_id,amount\n2,20\n")
+    arguments = {"dataset_ids": [orders.id, more_orders.id], "name": "All orders"}
+
+    result = registry.execute(
+        "data.integrate",
+        arguments,
+        _tool_context(store, "data.integrate", arguments),
+    )
+
+    derived_dataset = dataset_service.get_dataset(result.payload["dataset_id"])
+    resolved_artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
+    assert pd.read_csv(derived_dataset.source_path)["order_id"].tolist() == [1, 2]
+    assert result.payload["input_dataset_ids"] == [orders.id, more_orders.id]
+    assert resolved_artifact.metadata_payload["input_dataset_ids"] == [orders.id, more_orders.id]
+    assert "source_path" not in result.payload["inspection"]
 
 
 def test_data_query_service_runs_read_only_select(monkeypatch, tmp_path: Path) -> None:

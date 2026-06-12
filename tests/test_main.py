@@ -1187,6 +1187,42 @@ def test_main_window_submit_chat_message_injects_interface_locale(monkeypatch, t
         window.close()
 
 
+def test_main_window_submit_chat_message_registers_dataset_attachments(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    data_file = tmp_path / "customers.csv"
+    data_file.write_text("name,value\nAcme,12\n", encoding="utf-8")
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=False)
+    captured_inputs = []
+    try:
+        def fake_submit(input_data):
+            captured_inputs.append(input_data)
+            return []
+
+        monkeypatch.setattr(window._agent_harness_service, "submit_user_turn_stream", fake_submit)
+        window._submit_chat_message("Analyze this.", [str(data_file.resolve())], "")
+
+        for _ in range(40):
+            app.processEvents()
+            if captured_inputs:
+                break
+            time.sleep(0.01)
+
+        assert len(captured_inputs) == 1
+        submitted = captured_inputs[0]
+        assert len(submitted.dataset_attachments) == 1
+        attachment = submitted.dataset_attachments[0]
+        assert attachment.file_name == "customers.csv"
+        assert attachment.source_format == "csv"
+        assert attachment.row_count == 1
+        assert attachment.preview_columns == ["name", "value"]
+        assert not hasattr(submitted, "file_paths")
+    finally:
+        window.close()
+
+
 def test_thread_detail_view_composer_file_drag_hover_attaches_files(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     data_file = tmp_path / "customers.csv"

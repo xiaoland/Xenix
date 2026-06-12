@@ -46,6 +46,7 @@ a {
 """.strip()
 UNBOUNDED_WIDGET_WIDTH = 16777215
 ArtifactResolver = Callable[[str], Any]
+SUPPORTED_DATASET_SUFFIXES = {".csv", ".xlsx", ".xls"}
 
 
 def _render_content_blocks(blocks: list[dict[str, Any]]) -> str:
@@ -64,6 +65,13 @@ def _render_content_blocks(blocks: list[dict[str, Any]]) -> str:
         elif block_type == "file":
             file_path = Path(str(block.get("path", "")))
             parts.append(f"`{file_path.name}`")
+        elif block_type == "dataset":
+            name = str(block.get("name") or block.get("file_name") or "")
+            dataset_id = str(block.get("dataset_id") or "")
+            if dataset_id:
+                parts.append(f"`{name}` (`{dataset_id}`)")
+            elif name:
+                parts.append(f"`{name}`")
         elif block_type == "step_confirmation":
             parts.append(str(block.get("text", "")))
         elif block_type == "thinking":
@@ -1358,7 +1366,7 @@ class ThreadDetailView(QWidget):
             self,
             self.tr("Attach files"),
             "",
-            self.tr("Data files (*.csv *.xlsx *.xls);;All files (*)"),
+            self.tr("Data files (*.csv *.xlsx *.xls)"),
         )
         self._add_local_files(paths)
 
@@ -1372,6 +1380,8 @@ class ThreadDetailView(QWidget):
     def _add_local_files(self, paths: list[str]) -> None:
         for raw_path in paths:
             path = str(Path(raw_path).resolve())
+            if Path(path).suffix.lower() not in SUPPORTED_DATASET_SUFFIXES:
+                continue
             if path not in self._attached_files:
                 self._attached_files.append(path)
         self._refresh_attachment_chips()
@@ -1407,7 +1417,11 @@ class ThreadDetailView(QWidget):
         mime_data = event.mimeData()
         if mime_data is None:
             return []
-        return [url.toLocalFile() for url in mime_data.urls() if url.isLocalFile()]
+        return [
+            url.toLocalFile()
+            for url in mime_data.urls()
+            if url.isLocalFile() and Path(url.toLocalFile()).suffix.lower() in SUPPORTED_DATASET_SUFFIXES
+        ]
 
     def _is_event_over_composer(self, event) -> bool:
         point = self._event_point(event)

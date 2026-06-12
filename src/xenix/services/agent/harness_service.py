@@ -72,10 +72,20 @@ if TYPE_CHECKING:
     from .tools import AgentToolRegistry, ToolExecutionContext
 
 
+class DatasetAttachmentInput(SQLModel):
+    dataset_id: str
+    name: str
+    file_name: str
+    source_format: str
+    row_count: int
+    column_count: int
+    preview_columns: list[str] = Field(default_factory=list)
+
+
 class SubmitUserTurnInput(SQLModel):
     thread_id: str | None = None
     text: str
-    file_paths: list[str] = Field(default_factory=list)
+    dataset_attachments: list[DatasetAttachmentInput] = Field(default_factory=list)
     fq_model_key: str | None = None
     interface_locale: str | None = None
 
@@ -106,7 +116,7 @@ class AgentHarnessStreamEvent:
 
 @dataclass(frozen=True)
 class _ToolAvailabilityContext:
-    attached_files: tuple[str, ...] = ()
+    dataset_ids: tuple[str, ...] = ()
     has_dataset: bool = False
     has_selection: bool = False
     has_trained_model: bool = False
@@ -260,7 +270,7 @@ class AgentHarnessService:
 
     def submit_user_turn(self, input_data: SubmitUserTurnInput) -> ThreadSnapshot:
         with start_span("agent.turn") as span:
-            thread_id, turn_id, run_id, file_paths, provider = self._start_user_turn(input_data)
+            thread_id, turn_id, run_id, provider = self._start_user_turn(input_data)
             set_span_attributes(span, ai_observability.turn_span_attributes(thread_id=thread_id, turn_id=turn_id, run_id=run_id))
 
             try:
@@ -268,7 +278,6 @@ class AgentHarnessService:
                     thread_id=thread_id,
                     turn_id=turn_id,
                     run_id=run_id,
-                    file_paths=file_paths,
                     step_state=self._initial_step_state(),
                     provider=provider,
                 )
@@ -302,16 +311,15 @@ class AgentHarnessService:
 
     def submit_user_turn_stream(self, input_data: SubmitUserTurnInput):
         with start_span("agent.turn") as span:
-            thread_id, turn_id, run_id, file_paths, provider = self._start_user_turn(input_data)
+            thread_id, turn_id, run_id, provider = self._start_user_turn(input_data)
             set_span_attributes(span, ai_observability.turn_span_attributes(thread_id=thread_id, turn_id=turn_id, run_id=run_id))
-            yield from self._submit_user_turn_stream_started(thread_id, turn_id, run_id, file_paths, provider)
+            yield from self._submit_user_turn_stream_started(thread_id, turn_id, run_id, provider)
 
     def _submit_user_turn_stream_started(
         self,
         thread_id: str,
         turn_id: str,
         run_id: str,
-        file_paths: list[str],
         provider: AgentProvider,
     ):
         snapshot = self._conversation_store.get_thread_snapshot(thread_id)
@@ -330,7 +338,6 @@ class AgentHarnessService:
                 thread_id=thread_id,
                 turn_id=turn_id,
                 run_id=run_id,
-                file_paths=file_paths,
                 step_state=self._initial_step_state(),
                 provider=provider,
             )
@@ -400,7 +407,6 @@ class AgentHarnessService:
         )
         self._register_cancel_event(input_data.run_id)
         snapshot = self._conversation_store.get_thread_snapshot(input_data.thread_id)
-        file_paths = self._attached_files_for_thread(snapshot)
         yield AgentHarnessStreamEvent(
             kind="snapshot",
             thread_id=input_data.thread_id,
@@ -416,7 +422,6 @@ class AgentHarnessService:
                 thread_id=input_data.thread_id,
                 turn_id=input_data.turn_id,
                 run_id=input_data.run_id,
-                file_paths=file_paths,
                 step_state=step_state,
                 provider=provider,
             )
@@ -492,10 +497,11 @@ class AgentHarnessService:
         )
         return self._conversation_store.get_thread_snapshot(input_data.thread_id)
 
-    def _start_user_turn(self, input_data: SubmitUserTurnInput) -> tuple[str, str, str, list[str], AgentProvider]:
+    def _start_user_turn(self, input_data: SubmitUserTurnInput) -> tuple[str, str, str, AgentProvider]:
         text = input_data.text.strip()
-        if not text and not input_data.file_paths:
-            raise ValidationError("A turn needs a user message or at least one file.")
+        dataset_attachments = list(input_data.dataset_attachments)
+        if not text and not dataset_attachments:
+            raise ValidationError("A turn needs a user message or at least one dataset.")
 
         thread_id = input_data.thread_id
         should_auto_title_existing_thread = False
@@ -503,7 +509,7 @@ class AgentHarnessService:
             selected_fq_model_key = self._resolve_fq_model_key(input_data.fq_model_key, None)
             thread_id = self._conversation_store.create_thread(
                 CreateAgentThreadInput(
-                    title=self._title_from_first_message(text, input_data.file_paths),
+                    title=self._title_from_first_message(text, dataset_attachments),
                     interface_locale=input_data.interface_locale,
                     selected_fq_model_key=selected_fq_model_key,
                 )
@@ -524,7 +530,7 @@ class AgentHarnessService:
                 )
         provider = self._provider_for_fq_model_key(selected_fq_model_key)
 
-        content_blocks = self._user_content_blocks(text, input_data.file_paths)
+        content_blocks = self._user_content_blocks(text, dataset_attachments)
         turn, _user_message = self._conversation_store.start_turn(
             StartTurnInput(
                 thread_id=thread_id,
@@ -535,7 +541,7 @@ class AgentHarnessService:
             self._conversation_store.rename_thread(
                 RenameAgentThreadInput(
                     thread_id=thread_id,
-                    title=self._title_from_first_message(text, input_data.file_paths),
+                    title=self._title_from_first_message(text, dataset_attachments),
                 )
             )
         run = self._conversation_store.start_run(
@@ -550,7 +556,7 @@ class AgentHarnessService:
             )
         )
         self._register_cancel_event(run.id)
-        return thread_id, turn.id, run.id, list(input_data.file_paths), provider
+        return thread_id, turn.id, run.id, provider
 
 
     def _run_provider_loop(
@@ -559,7 +565,6 @@ class AgentHarnessService:
         thread_id: str,
         turn_id: str,
         run_id: str,
-        file_paths: list[str],
         step_state: dict[str, int],
         provider: AgentProvider,
     ) -> ThreadSnapshot | StepBudgetPause:
@@ -568,7 +573,7 @@ class AgentHarnessService:
             self._raise_if_cancelled(run_id)
             snapshot = self._conversation_store.get_thread_snapshot(thread_id)
             provider_messages = snapshot.provider_messages()
-            attached_files = self._attached_files_for_thread(snapshot) or list(file_paths)
+            dataset_ids = self._dataset_ids_for_thread(snapshot)
             provider_request = self._create_provider_request(
                 thread_id=thread_id,
                 turn_id=turn_id,
@@ -577,7 +582,7 @@ class AgentHarnessService:
                 request_kind=AgentProviderRequestKind.PRIMARY,
                 input_message_ids=self._provider_input_message_ids(provider_messages),
             )
-            tool_specs = self._tool_specs_for_context(snapshot=snapshot, attached_files=attached_files)
+            tool_specs = self._tool_specs_for_context(snapshot=snapshot, dataset_ids=dataset_ids)
             available_tool_names = {tool.name for tool in tool_specs}
             provider_span_attributes = ai_observability.provider_request_span_attributes(
                 provider_request,
@@ -703,7 +708,7 @@ class AgentHarnessService:
                                 thread_id=thread_id,
                                 turn_id=turn_id,
                                 tool_call_id=persisted_tool_call.id,
-                                attached_files=attached_files,
+                                dataset_ids=dataset_ids,
                                 cancel_requested=lambda run_id=run_id: self._is_cancel_requested(run_id),
                             ),
                         )
@@ -749,7 +754,6 @@ class AgentHarnessService:
         thread_id: str,
         turn_id: str,
         run_id: str,
-        file_paths: list[str],
         step_state: dict[str, int],
         provider: AgentProvider,
     ):
@@ -758,7 +762,7 @@ class AgentHarnessService:
             self._raise_if_cancelled(run_id)
             snapshot = self._conversation_store.get_thread_snapshot(thread_id)
             provider_messages = snapshot.provider_messages()
-            attached_files = self._attached_files_for_thread(snapshot) or list(file_paths)
+            dataset_ids = self._dataset_ids_for_thread(snapshot)
             provider_request = self._create_provider_request(
                 thread_id=thread_id,
                 turn_id=turn_id,
@@ -772,7 +776,7 @@ class AgentHarnessService:
             assistant_text = ""
             provider_output_message_ids: list[str] = []
             thinking_in_progress = True
-            tool_specs = self._tool_specs_for_context(snapshot=snapshot, attached_files=attached_files)
+            tool_specs = self._tool_specs_for_context(snapshot=snapshot, dataset_ids=dataset_ids)
             available_tool_names = {tool.name for tool in tool_specs}
             provider_span_attributes = ai_observability.provider_request_span_attributes(
                 provider_request,
@@ -1025,7 +1029,7 @@ class AgentHarnessService:
                                 thread_id=thread_id,
                                 turn_id=turn_id,
                                 tool_call_id=persisted_tool_call.id,
-                                attached_files=attached_files,
+                                dataset_ids=dataset_ids,
                                 cancel_requested=lambda run_id=run_id: self._is_cancel_requested(run_id),
                             ),
                         )
@@ -1458,10 +1462,10 @@ class AgentHarnessService:
         )
         return guard_action
 
-    def _tool_specs_for_context(self, *, snapshot: ThreadSnapshot, attached_files: list[str]) -> list[AgentToolSpec]:
+    def _tool_specs_for_context(self, *, snapshot: ThreadSnapshot, dataset_ids: list[str]) -> list[AgentToolSpec]:
         context = _ToolAvailabilityContext(
-            attached_files=tuple(attached_files),
-            has_dataset=self._snapshot_has_dataset(snapshot),
+            dataset_ids=tuple(dataset_ids),
+            has_dataset=bool(dataset_ids),
             has_selection=self._snapshot_has_payload_key(snapshot, "binding_id"),
             has_trained_model=self._snapshot_has_trained_model(snapshot),
         )
@@ -1473,9 +1477,9 @@ class AgentHarnessService:
 
     def _tool_available_for_context(self, tool_name: str, context: _ToolAvailabilityContext) -> bool:
         if tool_name == "data.peek":
-            return bool(context.attached_files) or context.has_dataset
+            return context.has_dataset
         if tool_name == "data.integrate":
-            return bool(context.attached_files)
+            return len(context.dataset_ids) >= 2
         if tool_name.startswith("data."):
             return context.has_dataset
         if tool_name.startswith("analysis."):
@@ -1486,15 +1490,29 @@ class AgentHarnessService:
             return context.has_trained_model
         return True
 
-    def _snapshot_has_dataset(self, snapshot: ThreadSnapshot) -> bool:
+    def _dataset_ids_for_thread(self, snapshot: ThreadSnapshot) -> list[str]:
+        dataset_ids: list[str] = []
+        seen: set[str] = set()
+        for message in snapshot.messages:
+            for block in message.content_blocks:
+                if block.get("type") != "dataset":
+                    continue
+                dataset_id = str(block.get("dataset_id") or "").strip()
+                if dataset_id and dataset_id not in seen:
+                    dataset_ids.append(dataset_id)
+                    seen.add(dataset_id)
         for payload in self._snapshot_tool_payloads(snapshot):
             value = payload.get("dataset_id")
-            if isinstance(value, str) and value.strip():
-                return True
+            if isinstance(value, str) and value.strip() and value not in seen:
+                dataset_ids.append(value)
+                seen.add(value)
             values = payload.get("input_dataset_ids")
-            if isinstance(values, list) and any(isinstance(item, str) and item.strip() for item in values):
-                return True
-        return False
+            if isinstance(values, list):
+                for item in values:
+                    if isinstance(item, str) and item.strip() and item not in seen:
+                        dataset_ids.append(item)
+                        seen.add(item)
+        return dataset_ids
 
     def _validate_provider_tool_calls(
         self,
@@ -1550,21 +1568,6 @@ class AgentHarnessService:
         for tool_call in snapshot.tool_calls:
             if isinstance(tool_call.result_payload, dict):
                 yield tool_call.result_payload
-
-    def _attached_files_for_thread(self, snapshot: ThreadSnapshot) -> list[str]:
-        paths: list[str] = []
-        seen: set[str] = set()
-        for message in snapshot.messages:
-            if message.kind is not AgentMessageKind.USER:
-                continue
-            for block in message.content_blocks:
-                if block.get("type") != "file":
-                    continue
-                path = str(block.get("path") or "").strip()
-                if path and path not in seen:
-                    paths.append(path)
-                    seen.add(path)
-        return paths
 
     def _register_cancel_event(self, run_id: str) -> None:
         with self._cancel_lock:
@@ -1637,32 +1640,44 @@ class AgentHarnessService:
             content_blocks=[{"type": "tool_call_result", "status": "cancelled", "error_summary": "Cancelled by user."}],
         )
 
-    def _user_content_blocks(self, text: str, file_paths: list[str]) -> list[dict[str, Any]]:
+    def _user_content_blocks(
+        self,
+        text: str,
+        dataset_attachments: list[DatasetAttachmentInput],
+    ) -> list[dict[str, Any]]:
         blocks: list[dict[str, Any]] = []
         if text:
             blocks.append({"type": "text", "text": text})
-        for file_path in file_paths:
-            blocks.append({"type": "file", "path": file_path})
+        for attachment in dataset_attachments:
+            blocks.append({"type": "dataset", **attachment.model_dump(mode="json")})
         return blocks
 
     def _title_from_text(self, text: str) -> str | None:
         return self._fallback_thread_title(text, [])
 
-    def _title_from_first_message(self, text: str, file_paths: list[str]) -> str:
+    def _title_from_first_message(
+        self,
+        text: str,
+        dataset_attachments: list[DatasetAttachmentInput],
+    ) -> str:
         if self._thread_title_provider is not None:
             try:
-                generated = self._llm_thread_title(text, file_paths)
+                generated = self._llm_thread_title(text, dataset_attachments)
                 if generated is not None:
                     return generated
             except Exception as exc:
                 LOGGER.warning("Thread title model failed; using deterministic fallback: %s", exc)
-        return self._fallback_thread_title(text, file_paths)
+        return self._fallback_thread_title(text, dataset_attachments)
 
-    def _llm_thread_title(self, text: str, file_paths: list[str]) -> str | None:
+    def _llm_thread_title(
+        self,
+        text: str,
+        dataset_attachments: list[DatasetAttachmentInput],
+    ) -> str | None:
         response = self._thread_title_provider.complete(
             [
                 ProviderMessage(role="system", content=THREAD_TITLE_SYSTEM_PROMPT),
-                ProviderMessage(role="user", content=self._thread_title_prompt(text, file_paths)),
+                ProviderMessage(role="user", content=self._thread_title_prompt(text, dataset_attachments)),
             ],
             [],
         )
@@ -1678,14 +1693,21 @@ class AgentHarnessService:
         )
         return _sanitize_thread_title(_assistant_text(response.assistant_content_blocks))
 
-    def _thread_title_prompt(self, text: str, file_paths: list[str]) -> str:
+    def _thread_title_prompt(
+        self,
+        text: str,
+        dataset_attachments: list[DatasetAttachmentInput],
+    ) -> str:
         lines = ["Create a short title for this first user message."]
         if text:
             lines.extend(["", "Message:", text])
-        if file_paths:
-            file_names = ", ".join(Path(file_path).name for file_path in file_paths if str(file_path).strip())
-            if file_names:
-                lines.extend(["", "Attached files:", file_names])
+        dataset_names = [
+            attachment.name.strip() or attachment.file_name.strip()
+            for attachment in dataset_attachments
+            if attachment.name.strip() or attachment.file_name.strip()
+        ]
+        if dataset_names:
+            lines.extend(["", "Attached datasets:", ", ".join(dataset_names)])
         return "\n".join(lines)
 
     def _thread_title_snapshot_prompt(self, snapshot: ThreadSnapshot) -> str:
@@ -1696,7 +1718,7 @@ class AgentHarnessService:
                 "sequence_index": message.sequence_index,
                 "kind": message.kind.value,
                 "ui_author": message.ui_author.value,
-                "content_blocks": message.content_blocks,
+                "content_blocks": [_provider_safe_content_block(block) for block in message.content_blocks],
                 "status": message.status.value,
             }
             for message in snapshot.messages
@@ -1712,13 +1734,12 @@ class AgentHarnessService:
             f"{json.dumps(payload, ensure_ascii=False)}"
         )
 
-    def _fallback_thread_title(self, text: str, file_paths: list[str]) -> str:
+    def _fallback_thread_title(self, text: str, dataset_attachments: list[DatasetAttachmentInput]) -> str:
         title = _sanitize_thread_title(text)
         if title is not None:
             return title
-        for file_path in file_paths:
-            path = Path(file_path)
-            title = _sanitize_thread_title(path.stem or path.name)
+        for attachment in dataset_attachments:
+            title = _sanitize_thread_title(attachment.name or Path(attachment.file_name).stem or attachment.file_name)
             if title is not None:
                 return title
         return "New analysis"
@@ -1737,12 +1758,20 @@ def _assistant_text(blocks: list[dict[str, Any]]) -> str:
     return "\n".join(lines).strip()
 
 
+def _provider_safe_content_block(block: dict[str, Any]) -> dict[str, Any]:
+    if block.get("type") != "file":
+        return dict(block)
+    return {
+        "type": "legacy_file_attachment_omitted",
+    }
+
+
 def _tool_execution_context(
     *,
     thread_id: str,
     turn_id: str,
     tool_call_id: str,
-    attached_files: list[str],
+    dataset_ids: list[str],
     cancel_requested,
 ) -> "ToolExecutionContext":
     from .tools import ToolExecutionContext
@@ -1751,7 +1780,7 @@ def _tool_execution_context(
         thread_id=thread_id,
         turn_id=turn_id,
         tool_call_id=tool_call_id,
-        attached_files=attached_files,
+        dataset_ids=dataset_ids,
         cancel_requested=cancel_requested,
     )
 

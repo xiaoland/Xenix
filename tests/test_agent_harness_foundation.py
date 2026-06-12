@@ -278,7 +278,7 @@ def test_chatbot_event_projection_pairs_tool_call_messages(monkeypatch, tmp_path
             thread_id=thread.id,
             turn_id=turn.id,
             tool_name="data.peek",
-            arguments_payload={"source_path": "sample.csv"},
+            arguments_payload={"dataset_id": "dataset-1"},
         )
     )
 
@@ -312,7 +312,7 @@ def test_chatbot_event_projection_pairs_tool_call_messages(monkeypatch, tmp_path
     detail_text = final_tool_events[0].detail_blocks[0]["text"]
     assert "Status: `failed`" in detail_text
     assert "Source file is missing." in detail_text
-    assert '"source_path": "sample.csv"' in detail_text
+    assert '"dataset_id": "dataset-1"' in detail_text
     assert '"error": "Source file is missing."' in detail_text
     assert final_tool_events[0].source_message_ids == [request_message.id, result_message.id]
 
@@ -513,7 +513,7 @@ def test_conversation_store_renames_and_deletes_thread_records(monkeypatch, tmp_
             thread_id=thread.id,
             turn_id=turn.id,
             tool_name="data.peek",
-            arguments_payload={"source_path": "attached.csv"},
+            arguments_payload={"dataset_id": "dataset-1"},
         )
     )
     artifact_path = tmp_path / "result.csv"

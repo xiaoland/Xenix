@@ -29,6 +29,7 @@ _EXPORTS = {
     "AgentHarnessService": ".harness_service",
     "AgentHarnessStreamEvent": ".harness_service",
     "ContinueStepBudgetInput": ".harness_service",
+    "DatasetAttachmentInput": ".harness_service",
     "SubmitUserTurnInput": ".harness_service",
     "OpenAICompatibleChatProvider": ".providers",
     "ProviderMessage": ".providers",

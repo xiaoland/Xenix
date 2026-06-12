@@ -58,7 +58,7 @@ Current app-managed runtime layout includes:
 - Agent Harness owns Thread, Turn, Message, tool-call, tool-result, and run semantics.
 - Storage provides persistence interfaces for Agent Harness records.
 - UI code consumes resolved paths from services instead of constructing storage layouts itself.
-- Source dataset registration stores the external source path and stable naming metadata.
+- Source dataset registration stores the external source path and stable naming metadata. Composer data attachments enter storage through this source-dataset path at message send time, not through artifact registration.
 - Derived dataset registration stores the generated artifact path and an explicit `derived_from_dataset_id` when one source dataset owns the lineage.
 - Query results returned by `data.query` are tool-result payloads by default and do not create dataset rows or artifact rows.
 - `data.transform` stores transformed output files under app-managed dataset artifact directories and registers them as derived datasets.
@@ -66,8 +66,9 @@ Current app-managed runtime layout includes:
 - `copied_from` is retained for compatibility copy semantics; data cleaning and transformation use derived lineage.
 - Dataset inspection metadata such as row counts, inferred column kinds, and previews is runtime-derived and should not be persisted by default.
 - Dataset column role binding is stored as immutable metadata. Model outputs and apply outputs are represented by service-owned metadata and artifact records.
-- Artifacts are produced durable outputs such as datasets, reports, images, models, apply outputs, and other generated files.
+- Artifacts are produced durable outputs such as derived datasets, reports, images, models, apply outputs, and other generated files. User-supplied Composer datasets are referenced by dataset ids rather than artifact ids.
 - Artifact links resolve through `ArtifactService`; Chatbot receives an artifact id and view hint, while filesystem access stays behind services.
+- LLM-facing Agent content, tool schemas, and tool result payloads use dataset ids for registered datasets. Dataset `source_path` values remain internal persistence facts resolved by services.
 - Trained-model registration rows are durable metadata pointers to canonical model artifacts.
 - Task working files such as `request.json`, `result.json`, `logs.jsonl`, and holdout artifacts are execution-scoped ML task files.
 - Remote staging paths may mirror task working files during execution. Services must download and normalize remote outputs to local service-owned paths before registering artifacts or trained-model rows.

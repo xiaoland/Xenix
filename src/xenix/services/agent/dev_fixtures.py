@@ -33,8 +33,14 @@ def _create_message_rendering_fixture(store: ConversationStore) -> None:
                     "text": "请检查这个销售数据文件，并给我一个后续分析计划。",
                 },
                 {
-                    "type": "file",
-                    "path": "C:/mock-data/sales-demand.csv",
+                    "type": "dataset",
+                    "dataset_id": "mock_dataset_sales",
+                    "name": "sales-demand",
+                    "file_name": "sales-demand.csv",
+                    "source_format": "csv",
+                    "row_count": 128,
+                    "column_count": 5,
+                    "preview_columns": ["price", "traffic", "sales"],
                 },
             ],
         )
@@ -65,7 +71,7 @@ def _create_message_rendering_fixture(store: ConversationStore) -> None:
             thread_id=thread.id,
             turn_id=first_turn.id,
             tool_name="data.peek",
-            arguments_payload={"source_path": "C:/mock-data/sales-demand.csv"},
+            arguments_payload={"dataset_id": "mock_dataset_sales"},
         )
     )
     store.complete_tool_call(
@@ -76,7 +82,6 @@ def _create_message_rendering_fixture(store: ConversationStore) -> None:
                 "dataset_id": "mock_dataset_sales",
                 "row_count": 128,
                 "column_count": 5,
-                "artifact_id": "mock-sales-dataset",
             },
         )
     )

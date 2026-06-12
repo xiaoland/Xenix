@@ -14,6 +14,7 @@ from xenix.services.agent import (
     ConversationStore,
     CreateAgentThreadInput,
     CreateToolCallInput,
+    DatasetAttachmentInput,
     ProviderResponse,
     ProviderToolCall,
     StartTurnInput,
@@ -24,7 +25,8 @@ from xenix.services.agent.tools import ToolExecutionContext
 from xenix.services.artifact_service import ArtifactService
 from xenix.services.data_cleaning import DataCleaningService
 from xenix.services.data_transform import DataQueryTransformService
-from xenix.services.dataset_service import DatasetService
+from xenix.services.dataset_inspection import InspectDatasetInput
+from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
 from xenix.services.ml_service import MLService
 from xenix.services.ml_task_service import MLTaskService
 from xenix.services.storage import StorageBootstrapService
@@ -41,17 +43,20 @@ class FirstSliceProvider:
 
     def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
         dataset_id = self._find_payload_value(messages, "dataset_id")
+        attached_dataset_id = self._find_content_block_value(messages, "dataset_id")
         binding_id = self._find_payload_value(messages, "binding_id")
         trained_model_id = self._find_trained_model_id(messages)
         apply_artifact_id = self._find_apply_artifact_id(messages)
         if dataset_id is None:
+            if attached_dataset_id is None:
+                raise AssertionError("FirstSliceProvider requires an attached dataset id.")
             return ProviderResponse(
                 assistant_content_blocks=[{"type": "markdown", "text": "I will inspect the uploaded dataset."}],
                 tool_calls=[
                     ProviderToolCall(
                         provider_call_id="call-peek",
                         tool_name="data.peek",
-                        arguments={"name": "Harness Demand"},
+                        arguments={"dataset_id": attached_dataset_id},
                     )
                 ],
             )
@@ -127,6 +132,13 @@ class FirstSliceProvider:
         for payload in self._tool_result_payloads(messages):
             if isinstance(payload.get(key), str):
                 return payload[key]
+        return None
+
+    def _find_content_block_value(self, messages: list[Any], key: str) -> str | None:
+        for message in reversed(messages):
+            for block in reversed(getattr(message, "content_blocks", []) or []):
+                if isinstance(block, dict) and isinstance(block.get(key), str):
+                    return block[key]
         return None
 
     def _find_trained_model_id(self, messages: list[Any]) -> str | None:
@@ -207,6 +219,23 @@ def _build_first_slice_runtime(monkeypatch, tmp_path: Path, *, worker_runner=Non
     return context, registry
 
 
+def _dataset_attachment(registry: AgentToolRegistry, source_path: Path) -> DatasetAttachmentInput:
+    dataset_service = registry._dataset_service
+    dataset = dataset_service.register_dataset(
+        RegisterDatasetInput(source_path=str(source_path.resolve()), name=source_path.stem)
+    )
+    inspection = dataset_service.inspect_source_file(InspectDatasetInput(source_path=dataset.source_path))
+    return DatasetAttachmentInput(
+        dataset_id=dataset.id,
+        name=dataset.name,
+        file_name=inspection.file_name,
+        source_format=inspection.source_format.value,
+        row_count=inspection.row_count,
+        column_count=inspection.column_count,
+        preview_columns=inspection.preview_columns,
+    )
+
+
 class ToolCaptureProvider:
     def __init__(self) -> None:
         self.tools_by_call: list[list[str]] = []
@@ -243,12 +272,15 @@ class PeekFromThreadFilesProvider:
                 assistant_content_blocks=[{"type": "markdown", "text": "Inspected previous file."}],
                 tool_calls=[],
             )
+        dataset_id = self._find_content_block_value(messages, "dataset_id")
+        if dataset_id is None:
+            raise AssertionError("Expected a dataset attachment in provider messages.")
         return ProviderResponse(
             tool_calls=[
                 ProviderToolCall(
                     provider_call_id="call-peek-previous-file",
                     tool_name="data.peek",
-                    arguments={"name": "previous_file_dataset"},
+                    arguments={"dataset_id": dataset_id},
                 )
             ],
         )
@@ -257,6 +289,13 @@ class PeekFromThreadFilesProvider:
         for payload in self._tool_result_payloads(messages):
             if isinstance(payload.get(key), str):
                 return payload[key]
+        return None
+
+    def _find_content_block_value(self, messages: list[Any], key: str) -> str | None:
+        for message in reversed(messages):
+            for block in reversed(getattr(message, "content_blocks", []) or []):
+                if isinstance(block, dict) and isinstance(block.get(key), str):
+                    return block[key]
         return None
 
     def _tool_result_payloads(self, messages: list[Any]) -> list[dict[str, Any]]:
@@ -283,7 +322,7 @@ def _tool_context() -> ToolExecutionContext:
         thread_id="thread-id",
         turn_id="turn-id",
         tool_call_id="tool-call-id",
-        attached_files=[],
+        dataset_ids=[],
     )
 
 
@@ -308,7 +347,7 @@ def _persisted_tool_context(context) -> ToolExecutionContext:
         thread_id=thread.id,
         turn_id=turn.id,
         tool_call_id=tool_call.id,
-        attached_files=[],
+        dataset_ids=[],
     )
 
 
@@ -366,6 +405,7 @@ def test_agent_harness_exposes_data_tools_when_file_is_attached(monkeypatch, tmp
     provider = ToolCaptureProvider()
     source_file = tmp_path / "source.csv"
     source_file.write_text("value\n1\n", encoding="utf-8")
+    attachment = _dataset_attachment(registry, source_file)
     harness = AgentHarnessService(
         session_factory=context.session_factory,
         provider=provider,
@@ -376,18 +416,21 @@ def test_agent_harness_exposes_data_tools_when_file_is_attached(monkeypatch, tmp
     harness.submit_user_turn(
         SubmitUserTurnInput(
             text="inspect this file",
-            file_paths=[str(source_file.resolve())],
+            dataset_attachments=[attachment],
         )
     )
 
     tool_names = provider.tools_by_call[0]
     assert "data.peek" in tool_names
-    assert "data.integrate" in tool_names
+    assert "data.integrate" not in tool_names
     assert "analysis.profile" not in tool_names
-    assert "analysis.graph" not in tool_names
+    assert "analysis.graph" in tool_names
     assert "analysis.lambda" not in tool_names
-    assert "data.clean.metadata" not in tool_names
-    assert "data.feature.select" not in tool_names
+    assert "data.clean" in tool_names
+    assert "data.clean.metadata" in tool_names
+    assert "data.query" in tool_names
+    assert "data.transform" in tool_names
+    assert "data.feature.select" in tool_names
     assert "model.train" not in tool_names
     assert "model.hyper_train" not in tool_names
     assert "model.apply" not in tool_names
@@ -426,6 +469,7 @@ def test_agent_harness_exposes_and_uses_data_tools_after_prior_thread_file(
     context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
     source_file = tmp_path / "source.csv"
     source_file.write_text("value\n1\n", encoding="utf-8")
+    attachment = _dataset_attachment(registry, source_file)
     harness = AgentHarnessService(
         session_factory=context.session_factory,
         provider=ToolCaptureProvider(),
@@ -435,7 +479,7 @@ def test_agent_harness_exposes_and_uses_data_tools_after_prior_thread_file(
     first_snapshot = harness.submit_user_turn(
         SubmitUserTurnInput(
             text="keep this file available",
-            file_paths=[str(source_file.resolve())],
+            dataset_attachments=[attachment],
         )
     )
     provider = PeekFromThreadFilesProvider()
@@ -450,17 +494,18 @@ def test_agent_harness_exposes_and_uses_data_tools_after_prior_thread_file(
 
     first_tool_list = provider.tools_by_call[0]
     assert "data.peek" in first_tool_list
-    assert "data.integrate" in first_tool_list
+    assert "data.integrate" not in first_tool_list
     assert "analysis.profile" not in first_tool_list
-    assert "analysis.graph" not in first_tool_list
+    assert "analysis.graph" in first_tool_list
     assert "analysis.lambda" not in first_tool_list
-    assert "data.clean" not in first_tool_list
-    assert "data.clean.metadata" not in first_tool_list
-    assert "data.transform" not in first_tool_list
-    assert "data.feature.select" not in first_tool_list
+    assert "data.clean" in first_tool_list
+    assert "data.clean.metadata" in first_tool_list
+    assert "data.query" in first_tool_list
+    assert "data.transform" in first_tool_list
+    assert "data.feature.select" in first_tool_list
     assert second_snapshot.tool_calls[-1].tool_name == "data.peek"
     assert second_snapshot.tool_calls[-1].status.value == "succeeded"
-    assert second_snapshot.tool_calls[-1].result_payload["inspection"]["source_path"] == str(source_file.resolve())
+    assert "source_path" not in second_snapshot.tool_calls[-1].result_payload["inspection"]
 
 
 def test_agent_harness_exposes_training_tools_after_selection_payload(monkeypatch, tmp_path: Path) -> None:
@@ -672,9 +717,10 @@ def test_agent_harness_train_returns_background_receipt_after_grace(monkeypatch,
         "5,3,13\n",
         encoding="utf-8",
     )
+    attachment = _dataset_attachment(registry, training_file)
     dataset_result = registry.execute(
         "data.peek",
-        {"source_path": str(training_file.resolve()), "name": "Slow demand"},
+        {"dataset_id": attachment.dataset_id},
         tool_context,
     )
     binding_result = registry.execute(
@@ -734,6 +780,7 @@ def test_agent_harness_first_slice_runs_from_file_to_apply_result(monkeypatch, t
         "10,8,28\n",
         encoding="utf-8",
     )
+    attachment = _dataset_attachment(registry, training_file)
     apply_file = tmp_path / "apply.csv"
     apply_file.write_text("feature_a,feature_b\n11,9\n12,10\n", encoding="utf-8")
     harness = AgentHarnessService(
@@ -746,7 +793,7 @@ def test_agent_harness_first_slice_runs_from_file_to_apply_result(monkeypatch, t
     snapshot = harness.submit_user_turn(
         SubmitUserTurnInput(
             text="Analyze this dataset, train a model, and predict the attached future rows.",
-            file_paths=[str(training_file.resolve())],
+            dataset_attachments=[attachment],
         )
     )
 
@@ -781,6 +828,7 @@ def test_agent_harness_first_slice_runs_inline_rows_to_apply_result(monkeypatch,
         "10,8,28\n",
         encoding="utf-8",
     )
+    attachment = _dataset_attachment(registry, training_file)
     harness = AgentHarnessService(
         session_factory=context.session_factory,
         provider=FirstSliceProvider(
@@ -796,7 +844,7 @@ def test_agent_harness_first_slice_runs_inline_rows_to_apply_result(monkeypatch,
     snapshot = harness.submit_user_turn(
         SubmitUserTurnInput(
             text="Analyze this dataset, train a model, and predict the inline future rows.",
-            file_paths=[str(training_file.resolve())],
+            dataset_attachments=[attachment],
         )
     )
 

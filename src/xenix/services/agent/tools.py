@@ -27,7 +27,7 @@ from ..data_transform import (
     DataTransformInput,
     DatasetSqlBinding,
 )
-from ..dataset_inspection import InspectDatasetInput, detect_source_format, load_dataframe
+from ..dataset_inspection import DatasetInspection, InspectDatasetInput, detect_source_format, load_dataframe
 from ..dataset_service import DatasetService, RegisterDatasetInput
 from ..ml.registry import get_model_catalog_entry, list_model_catalog, list_model_keys
 from ..ml.types import EvaluationKind, ModelFamily, ModelTaskKind
@@ -76,7 +76,7 @@ class ToolExecutionContext:
     thread_id: str
     turn_id: str
     tool_call_id: str
-    attached_files: list[str]
+    dataset_ids: list[str]
     cancel_requested: Callable[[], bool] = lambda: False
 
 
@@ -169,19 +169,19 @@ class AgentToolRegistry:
                 name="data.peek",
                 provider_name="data_peek",
                 description=(
-                    "Inspect a CSV/XLS/XLSX file, register it as a dataset artifact, and by default "
+                    "Inspect a registered dataset by dataset_id and by default "
                     "run bounded common descriptive analysis. Set analysis to false to inspect only."
                 ),
                 parameters_schema={
                     "type": "object",
                     "properties": {
-                        "source_path": {"type": "string"},
-                        "name": {"type": "string"},
+                        "dataset_id": {"type": "string"},
                         "analysis": {"type": "boolean", "default": True},
                         "target_columns": {"type": "array", "items": {"type": "string"}},
                         "top_n": {"type": "integer", "minimum": 1, "maximum": 20},
                         "correlation_column_limit": {"type": "integer", "minimum": 2, "maximum": 12},
                     },
+                    "required": ["dataset_id"],
                     "additionalProperties": False,
                 },
             ),
@@ -194,14 +194,14 @@ class AgentToolRegistry:
             spec=AgentToolSpec(
                 name="data.integrate",
                 provider_name="data_integrate",
-                description="Combine one or more CSV/XLS/XLSX files into a registered dataset artifact.",
+                description="Combine two or more registered datasets into a generated dataset artifact.",
                 parameters_schema={
                     "type": "object",
                     "properties": {
-                        "source_paths": {"type": "array", "items": {"type": "string"}},
+                        "dataset_ids": {"type": "array", "items": {"type": "string"}, "minItems": 2},
                         "name": {"type": "string"},
                     },
-                    "required": ["source_paths"],
+                    "required": ["dataset_ids"],
                     "additionalProperties": False,
                 },
             ),
@@ -592,8 +592,7 @@ class AgentToolRegistry:
     def _data_peek(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
         supported_keys = {
-            "source_path",
-            "name",
+            "dataset_id",
             "analysis",
             "target_columns",
             "top_n",
@@ -603,32 +602,17 @@ class AgentToolRegistry:
         if unsupported_keys:
             raise ValidationError("data.peek does not accept: " + ", ".join(unsupported_keys))
         analysis_enabled = self._optional_boolean(arguments, "analysis", default=True)
-        source_path = self._resolve_source_path(arguments.get("source_path"), context)
-        name = str(arguments.get("name") or source_path.stem)
-        dataset = self._dataset_service.register_dataset(
-            RegisterDatasetInput(
-                source_path=str(source_path),
-                name=name,
-            )
-        )
+        dataset_id = self._require_string(arguments, "dataset_id")
+        dataset = self._dataset_service.get_dataset(dataset_id)
         inspection = self._dataset_service.inspect_source_file(
             InspectDatasetInput(source_path=dataset.source_path)
         )
-        artifact = self._register_dataset_artifact(
-            context,
-            title=dataset.name,
-            path=Path(dataset.source_path),
-            dataset_id=dataset.id,
-            preview_payload=inspection.model_dump(mode="json"),
-        )
-        link = build_artifact_markdown_link(artifact)
         payload: dict[str, Any] = {
             "dataset_id": dataset.id,
-            "artifact_id": artifact.id,
-            "inspection": inspection.model_dump(mode="json"),
+            "inspection": self._inspection_payload(inspection),
         }
         markdown_text = (
-            f"Dataset `{dataset.name}` is ready: {link}\n\n"
+            f"Dataset `{dataset.name}` is ready.\n\n"
             f"Rows: {inspection.row_count}; columns: {', '.join(inspection.preview_columns)}"
         )
         if analysis_enabled:
@@ -660,21 +644,26 @@ class AgentToolRegistry:
 
     def _data_integrate(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
-        raw_paths = arguments.get("source_paths")
-        if not isinstance(raw_paths, list) or not raw_paths:
-            raise ValidationError("data.integrate requires at least one source path.")
-        frames = [self._load_frame(Path(str(path)).expanduser().resolve()) for path in raw_paths]
+        raw_dataset_ids = arguments.get("dataset_ids")
+        if not isinstance(raw_dataset_ids, list) or len(raw_dataset_ids) < 2:
+            raise ValidationError("data.integrate requires at least two dataset ids.")
+        datasets = [self._dataset_service.get_dataset(str(dataset_id)) for dataset_id in raw_dataset_ids]
+        frames = [self._load_frame(Path(dataset.source_path).expanduser().resolve()) for dataset in datasets]
         output_dir = self._paths.artifacts / "datasets" / "integrated"
         output_dir.mkdir(parents=True, exist_ok=True)
         name = str(arguments.get("name") or "Integrated dataset").strip() or "Integrated dataset"
         output_path = output_dir / f"{self._slug(name)}-{int(time.time())}.csv"
         pd.concat(frames, ignore_index=True).to_csv(output_path, index=False)
-        return self._register_generated_dataset_result(
+        input_dataset_ids = [dataset.id for dataset in datasets]
+        result = self._register_generated_dataset_result(
             context,
             output_path=output_path,
             name=name,
             summary="Integrated dataset created.",
+            metadata_payload={"input_dataset_ids": input_dataset_ids},
         )
+        result.payload["input_dataset_ids"] = input_dataset_ids
+        return result
 
     def _analysis_graph(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
@@ -1350,6 +1339,7 @@ class AgentToolRegistry:
             )
         )
         inspection = self._dataset_service.inspect_source_file(InspectDatasetInput(source_path=dataset.source_path))
+        inspection_payload = self._inspection_payload(inspection)
         artifact_metadata = dict(metadata_payload or {})
         if derived_from_dataset_id:
             artifact_metadata["derived_from_dataset_id"] = derived_from_dataset_id
@@ -1358,7 +1348,7 @@ class AgentToolRegistry:
             title=dataset.name,
             path=Path(dataset.source_path),
             dataset_id=dataset.id,
-            preview_payload=inspection.model_dump(mode="json"),
+            preview_payload=inspection_payload,
             metadata_payload=artifact_metadata,
         )
         link = build_artifact_markdown_link(artifact)
@@ -1366,10 +1356,13 @@ class AgentToolRegistry:
             payload={
                 "dataset_id": dataset.id,
                 "artifact_id": artifact.id,
-                "inspection": inspection.model_dump(mode="json"),
+                "inspection": inspection_payload,
             },
             content_blocks=[{"type": "markdown", "text": f"{summary} {link}"}],
         )
+
+    def _inspection_payload(self, inspection: DatasetInspection) -> dict[str, Any]:
+        return inspection.model_dump(mode="json", exclude={"source_path"})
 
     def _register_dataset_artifact(
         self,
@@ -1422,17 +1415,6 @@ class AgentToolRegistry:
                 for key, item in value.items()
             }
         return value
-
-    def _resolve_source_path(self, raw_path: Any, context: ToolExecutionContext) -> Path:
-        value = str(raw_path or "").strip()
-        if not value and context.attached_files:
-            value = context.attached_files[0]
-        if not value:
-            raise ValidationError("A source path is required.")
-        path = Path(value).expanduser().resolve()
-        if not path.exists() or not path.is_file():
-            raise ValidationError("Source path must point to an existing file.")
-        return path
 
     def _load_frame(self, path: Path) -> pd.DataFrame:
         source_format = detect_source_format(path)

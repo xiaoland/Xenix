@@ -9,11 +9,29 @@ import pytest
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import ValidationError
 from xenix.observability import stable_hash
-from xenix.services.agent import AgentHarnessService, ProviderResponse, ProviderToolCall, SubmitUserTurnInput
+from xenix.services.agent import (
+    AgentHarnessService,
+    DatasetAttachmentInput,
+    ProviderResponse,
+    ProviderToolCall,
+    SubmitUserTurnInput,
+)
 from xenix.services.agent.providers import AgentToolSpec
 from xenix.services.agent.tools import ToolExecutionContext, ToolExecutionResult
 import xenix.services.agent.harness_service as harness_module
 from xenix.services.storage import StorageBootstrapService
+
+
+def _dataset_attachment(dataset_id: str = "dataset-1") -> DatasetAttachmentInput:
+    return DatasetAttachmentInput(
+        dataset_id=dataset_id,
+        name="Customers",
+        file_name="customers.csv",
+        source_format="csv",
+        row_count=1,
+        column_count=1,
+        preview_columns=["customer"],
+    )
 
 
 @dataclass
@@ -175,7 +193,7 @@ def test_provider_request_projects_ai_shape_usage_and_tool_exposure(monkeypatch,
     harness.submit_user_turn(
         SubmitUserTurnInput(
             text="Please analyze SECRET_CUSTOMER_FIELD",
-            file_paths=["customers.csv"],
+            dataset_attachments=[_dataset_attachment()],
         )
     )
 
@@ -194,8 +212,8 @@ def test_provider_request_projects_ai_shape_usage_and_tool_exposure(monkeypatch,
     assert provider_span.attributes["xenix.ai.request.message.system_count"] == 1
     assert provider_span.attributes["xenix.ai.request.message.user_count"] == 1
     assert provider_span.attributes["xenix.ai.request.system_present"] is True
-    assert provider_span.attributes["xenix.ai.tools.exposed.count"] == 2
-    assert provider_span.attributes["xenix.ai.tools.exposed.data_count"] == 2
+    assert provider_span.attributes["xenix.ai.tools.exposed.count"] == 1
+    assert provider_span.attributes["xenix.ai.tools.exposed.data_count"] == 1
     assert provider_span.attributes["xenix.ai.response.assistant_text_present"] is True
     assert provider_span.attributes["xenix.ai.response.tool_call_count"] == 0
     assert provider_span.attributes["xenix.ai.provider_request.status"] == "succeeded"
@@ -223,7 +241,9 @@ def test_tool_call_span_keeps_parent_provider_context(monkeypatch, tmp_path: Pat
     telemetry = TelemetryCapture(monkeypatch)
     harness = _build_harness(monkeypatch, tmp_path, provider=ToolThenDoneProvider())
 
-    harness.submit_user_turn(SubmitUserTurnInput(text="Inspect the uploaded file", file_paths=["customers.csv"]))
+    harness.submit_user_turn(
+        SubmitUserTurnInput(text="Inspect the uploaded file", dataset_attachments=[_dataset_attachment()])
+    )
 
     provider_spans = telemetry.spans_named("agent.provider_request")
     tool_span = telemetry.spans_named("agent.tool_call")[0]

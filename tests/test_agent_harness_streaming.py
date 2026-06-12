@@ -18,6 +18,7 @@ from xenix.services.agent import (
     ProviderResponse,
     ProviderStreamEvent,
     ProviderToolCall,
+    DatasetAttachmentInput,
     SubmitUserTurnInput,
 )
 from xenix.services.agent.providers import AgentToolSpec
@@ -32,6 +33,18 @@ from xenix.services.storage.models import (
     AgentToolCallStatus,
     AgentTurnStatus,
 )
+
+
+def _dataset_attachment(dataset_id: str = "dataset-1") -> DatasetAttachmentInput:
+    return DatasetAttachmentInput(
+        dataset_id=dataset_id,
+        name="Orders",
+        file_name="orders.csv",
+        source_format="csv",
+        row_count=1,
+        column_count=1,
+        preview_columns=["value"],
+    )
 
 
 class StreamingProviderFixture:
@@ -743,8 +756,6 @@ def test_agent_harness_stream_filters_tools_by_thread_files(monkeypatch, tmp_pat
     paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
     provider = ToolCaptureStreamingProvider()
-    source_file = tmp_path / "source.csv"
-    source_file.write_text("value\n1\n", encoding="utf-8")
     harness = AgentHarnessService(
         session_factory=context.session_factory,
         provider=provider,
@@ -756,20 +767,21 @@ def test_agent_harness_stream_filters_tools_by_thread_files(monkeypatch, tmp_pat
         harness.submit_user_turn_stream(
             SubmitUserTurnInput(
                 text="inspect file",
-                file_paths=[str(source_file.resolve())],
+                dataset_attachments=[_dataset_attachment()],
             )
         )
     )
 
     tool_names = provider.tools_by_call[0]
     assert "data.peek" in tool_names
-    assert "data.integrate" in tool_names
+    assert "data.integrate" not in tool_names
     assert "analysis.profile" not in tool_names
-    assert "analysis.graph" not in tool_names
+    assert "analysis.graph" in tool_names
     assert "analysis.lambda" not in tool_names
-    assert "data.clean" not in tool_names
-    assert "data.clean.metadata" not in tool_names
-    assert "data.transform" not in tool_names
+    assert "data.clean" in tool_names
+    assert "data.clean.metadata" in tool_names
+    assert "data.query" in tool_names
+    assert "data.transform" in tool_names
     assert "model.train" not in tool_names
     assert "model.hyper_train" not in tool_names
     assert "model.apply" not in tool_names
@@ -785,13 +797,14 @@ def test_agent_harness_stream_filters_tools_by_thread_files(monkeypatch, tmp_pat
 
     tool_names = provider.tools_by_call[1]
     assert "data.peek" in tool_names
-    assert "data.integrate" in tool_names
+    assert "data.integrate" not in tool_names
     assert "analysis.profile" not in tool_names
-    assert "analysis.graph" not in tool_names
+    assert "analysis.graph" in tool_names
     assert "analysis.lambda" not in tool_names
-    assert "data.clean" not in tool_names
-    assert "data.clean.metadata" not in tool_names
-    assert "data.transform" not in tool_names
+    assert "data.clean" in tool_names
+    assert "data.clean.metadata" in tool_names
+    assert "data.query" in tool_names
+    assert "data.transform" in tool_names
     assert "model.train" not in tool_names
     assert "model.hyper_train" not in tool_names
     assert "model.apply" not in tool_names
@@ -925,9 +938,9 @@ def test_agent_harness_thread_title_falls_back_when_model_fails(monkeypatch, tmp
         conversation_store=ConversationStore(context.session_factory),
     )
 
-    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="", file_paths=[str(tmp_path / "orders.csv")]))
+    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="", dataset_attachments=[_dataset_attachment()]))
 
-    assert snapshot.thread.title == "orders"
+    assert snapshot.thread.title == "Orders"
 
 
 def test_agent_harness_thread_title_does_not_overwrite_existing_title(monkeypatch, tmp_path: Path) -> None:

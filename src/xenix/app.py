@@ -516,6 +516,7 @@ def build_main_window(
             llm_settings_service=llm_settings_service,
             ml_worker_settings_service=ml_worker_settings_service,
             artifact_service=artifact_service,
+            dataset_service=dataset_service,
             ml_service=ml_service,
         )
         _emit_startup_timing("main_window.construct", step_start)

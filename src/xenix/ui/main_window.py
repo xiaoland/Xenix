@@ -28,10 +28,13 @@ from ..services.agent import (
     AgentHarnessService,
     AgentHarnessStreamEvent,
     ContinueStepBudgetInput,
+    DatasetAttachmentInput,
     SubmitUserTurnInput,
     ThreadSnapshot,
 )
 from ..services.artifact_service import ArtifactService
+from ..services.dataset_inspection import InspectDatasetInput
+from ..services.dataset_service import DatasetService, RegisterDatasetInput
 from ..services.llm import LLMService, LLMSettingsService
 from ..services.ml.worker_settings import MLWorkerSettingsService
 from .chatbot import ThreadDetailView
@@ -61,6 +64,7 @@ class MainWindow(QMainWindow):
         llm_settings_service: LLMSettingsService,
         ml_worker_settings_service: MLWorkerSettingsService,
         artifact_service: ArtifactService,
+        dataset_service: DatasetService,
         ml_service: MLService,
     ) -> None:
         super().__init__()
@@ -73,6 +77,7 @@ class MainWindow(QMainWindow):
         self._llm_settings_service = llm_settings_service
         self._ml_worker_settings_service = ml_worker_settings_service
         self._artifact_service = artifact_service
+        self._dataset_service = dataset_service
         self._ml_service = ml_service
         self._agent_thread_id: str | None = None
         self._active_agent_run_id: str | None = None
@@ -239,11 +244,17 @@ class MainWindow(QMainWindow):
     def _submit_chat_message(self, text: str, file_paths: list[str], fq_model_key: str) -> None:
         self._pending_step_confirmation = None
         self._thread_detail_view.clear_step_confirmation()
+        try:
+            dataset_attachments = self._register_composer_datasets(file_paths)
+        except Exception as exc:
+            self._thread_detail_view.show_error(str(exc))
+            return
+
         user_blocks = []
         if text:
             user_blocks.append({"type": "text", "text": text})
-        for file_path in file_paths:
-            user_blocks.append({"type": "file", "path": file_path})
+        for attachment in dataset_attachments:
+            user_blocks.append({"type": "dataset", **attachment.model_dump(mode="json")})
         self._thread_detail_view.add_user_message(user_blocks)
         self._thread_detail_view.set_running(True)
 
@@ -253,7 +264,7 @@ class MainWindow(QMainWindow):
                     SubmitUserTurnInput(
                         thread_id=self._agent_thread_id,
                         text=text,
-                        file_paths=file_paths,
+                        dataset_attachments=dataset_attachments,
                         fq_model_key=fq_model_key or None,
                         interface_locale=self._translation_manager.current_locale(),
                     )
@@ -263,6 +274,32 @@ class MainWindow(QMainWindow):
                 self._harness_failed.emit(str(exc))
 
         threading.Thread(target=run_harness, name="xenix-agent-harness", daemon=True).start()
+
+    def _register_composer_datasets(self, file_paths: list[str]) -> list[DatasetAttachmentInput]:
+        attachments: list[DatasetAttachmentInput] = []
+        for file_path in file_paths:
+            source_path = Path(file_path).expanduser().resolve()
+            dataset = self._dataset_service.register_dataset(
+                RegisterDatasetInput(
+                    source_path=str(source_path),
+                    name=source_path.stem,
+                )
+            )
+            inspection = self._dataset_service.inspect_source_file(
+                InspectDatasetInput(source_path=dataset.source_path)
+            )
+            attachments.append(
+                DatasetAttachmentInput(
+                    dataset_id=dataset.id,
+                    name=dataset.name,
+                    file_name=inspection.file_name,
+                    source_format=inspection.source_format.value,
+                    row_count=inspection.row_count,
+                    column_count=inspection.column_count,
+                    preview_columns=inspection.preview_columns,
+                )
+            )
+        return attachments
 
     def _render_harness_snapshot(self, snapshot: ThreadSnapshot) -> None:
         self._agent_thread_id = snapshot.thread.id

@@ -68,7 +68,7 @@ def _tool_context(
         thread_id=thread.id,
         turn_id=turn.id,
         tool_call_id=tool_call.id,
-        attached_files=[],
+        dataset_ids=[],
     )
 
 
@@ -508,6 +508,9 @@ def test_data_clean_tool_schema_stays_compact(monkeypatch, tmp_path: Path) -> No
 
     assert "project_id" not in specs["data.peek"].parameters_schema["properties"]
     assert "project_id" not in specs["data.integrate"].parameters_schema["properties"]
+    assert "source_path" not in specs["data.peek"].parameters_schema["properties"]
+    assert "source_paths" not in specs["data.integrate"].parameters_schema["properties"]
+    assert specs["data.integrate"].parameters_schema["required"] == ["dataset_ids"]
     assert "profile" not in specs["data.clean"].parameters_schema["properties"]
     assert "duplicate_policy" not in specs["data.clean"].parameters_schema["properties"]
     assert "drop_duplicates" not in specs["data.clean"].parameters_schema["properties"]
