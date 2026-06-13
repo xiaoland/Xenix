@@ -103,6 +103,7 @@ def test_package_trial_lock_file_embeds_days_secret_and_build_id(
     tmp_path: Path,
 ) -> None:
     monkeypatch.setenv("XENIX_TRIAL_LOCK_DAYS", "14")
+    monkeypatch.delenv("XENIX_TRIAL_LOCK_STATE_SECRET", raising=False)
 
     trial_lock_path = package_app._write_generated_trial_lock(tmp_path, "abcdef123456")
 
@@ -117,11 +118,26 @@ def test_package_trial_lock_file_embeds_days_secret_and_build_id(
     assert not trial_lock_path.exists()
 
 
+def test_package_trial_lock_file_uses_fixed_state_secret(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XENIX_TRIAL_LOCK_DAYS", "60")
+    monkeypatch.setenv("XENIX_TRIAL_LOCK_STATE_SECRET", "stable-secret-for-test-wave")
+
+    trial_lock_path = package_app._write_generated_trial_lock(tmp_path, "abcdef123456")
+    content = trial_lock_path.read_text(encoding="utf-8")
+
+    assert "TRIAL_LOCK_DAYS = 60" in content
+    assert "TRIAL_LOCK_STATE_SECRET = 'stable-secret-for-test-wave'" in content
+
+
 def test_package_trial_lock_disabled_file_omits_state_secret(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     monkeypatch.setenv("XENIX_TRIAL_LOCK_DAYS", "0")
+    monkeypatch.setenv("XENIX_TRIAL_LOCK_STATE_SECRET", "unused-secret")
 
     trial_lock_path = package_app._write_generated_trial_lock(tmp_path, "abcdef123456")
     content = trial_lock_path.read_text(encoding="utf-8")

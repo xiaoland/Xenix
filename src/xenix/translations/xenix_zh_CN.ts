@@ -1216,7 +1216,7 @@ Reason: {reason}</source>
     </message>
     <message>
         <location filename="../app.py" line="167"/>
-        <location filename="../app.py" line="216"/>
+        <location filename="../app.py" line="217"/>
         <source>Exit</source>
         <translation>退出</translation>
     </message>
@@ -1229,6 +1229,15 @@ Reason: {reason}</source>
         <location filename="../app.py" line="190"/>
         <source>This Xenix test build is locked.</source>
         <translation>此 Xenix 测试版本已锁定。</translation>
+    </message>
+    <message>
+        <location filename="../app.py" line="203"/>
+        <source>Reason: {reason}
+Trial expired at: {expires_at}
+State file: {state_path}</source>
+        <translation>原因：{reason}
+试用到期时间：{expires_at}
+状态文件：{state_path}</translation>
     </message>
     <message>
         <source>Xenix test build expired</source>
@@ -1244,24 +1253,23 @@ Reason: {reason}</source>
         <translation>请前往 {url} 购买许可证或下载包含许可证激活的新版本。</translation>
     </message>
     <message>
-        <location filename="../app.py" line="203"/>
         <source>Trial expired at: {expires_at}
 Reason: {reason}</source>
-        <translation>试用到期时间：{expires_at}
+        <translation type="vanished">试用到期时间：{expires_at}
 原因：{reason}</translation>
     </message>
     <message>
-        <location filename="../app.py" line="212"/>
+        <location filename="../app.py" line="213"/>
         <source>Buy license</source>
         <translation>前往购买</translation>
     </message>
     <message>
-        <location filename="../app.py" line="623"/>
+        <location filename="../app.py" line="624"/>
         <source>Unable to start Xenix</source>
         <translation>无法启动 Xenix</translation>
     </message>
     <message>
-        <location filename="../app.py" line="624"/>
+        <location filename="../app.py" line="625"/>
         <source>Xenix could not finish startup.
 
 {error}</source>

@@ -198,16 +198,17 @@ def _prompt_trial_lock(check: TrialLockCheck) -> None:
             "Please purchase a license or download a licensed Xenix build from {url}.",
         ).format(url=TRIAL_PURCHASE_URL)
     )
-    if check.expires_at_utc is not None:
-        message_box.setDetailedText(
-            QCoreApplication.translate(
-                "XenixStartup",
-                "Trial expired at: {expires_at}\nReason: {reason}",
-            ).format(
-                expires_at=check.expires_at_utc.isoformat(),
-                reason=check.reason.value,
-            )
+    expires_at = check.expires_at_utc.isoformat() if check.expires_at_utc is not None else "-"
+    message_box.setDetailedText(
+        QCoreApplication.translate(
+            "XenixStartup",
+            "Reason: {reason}\nTrial expired at: {expires_at}\nState file: {state_path}",
+        ).format(
+            reason=check.reason.value,
+            expires_at=expires_at,
+            state_path=check.state_path,
         )
+    )
     buy_button = message_box.addButton(
         QCoreApplication.translate("XenixStartup", "Buy license"),
         QMessageBox.AcceptRole,

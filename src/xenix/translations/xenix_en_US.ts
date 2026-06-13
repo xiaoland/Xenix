@@ -1743,7 +1743,7 @@ Reason: {reason}</translation>
     </message>
     <message>
         <location filename="../app.py" line="167"/>
-        <location filename="../app.py" line="216"/>
+        <location filename="../app.py" line="217"/>
         <source>Exit</source>
         <translation>Exit</translation>
     </message>
@@ -1764,22 +1764,23 @@ Reason: {reason}</translation>
     </message>
     <message>
         <location filename="../app.py" line="203"/>
-        <source>Trial expired at: {expires_at}
-Reason: {reason}</source>
+        <source>Reason: {reason}
+Trial expired at: {expires_at}
+State file: {state_path}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app.py" line="212"/>
+        <location filename="../app.py" line="213"/>
         <source>Buy license</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app.py" line="623"/>
+        <location filename="../app.py" line="624"/>
         <source>Unable to start Xenix</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app.py" line="624"/>
+        <location filename="../app.py" line="625"/>
         <source>Xenix could not finish startup.
 
 {error}</source>

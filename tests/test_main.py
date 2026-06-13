@@ -10,7 +10,7 @@ from PySide6.QtGui import QPalette, QTextDocument
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QFrame, QMessageBox, QTextBrowser, QWidget
 
-from xenix.app import TrialLockStartupExit, build_main_window, quarantine_database
+from xenix.app import TrialLockStartupExit, _prompt_trial_lock, build_main_window, quarantine_database
 from xenix.build_info import BUILD_COMMIT_DISPLAY
 from xenix.main import main
 from xenix.services.agent import (
@@ -120,6 +120,65 @@ def test_main_window_blocks_expired_trial_before_runtime_imports(
 
     assert len(prompts) == 1
     assert prompts[0].reason is TrialLockReason.EXPIRED
+
+
+def test_trial_lock_prompt_always_includes_lock_reason(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    captured = {}
+
+    class FakeMessageBox:
+        Warning = QMessageBox.Warning
+        AcceptRole = QMessageBox.AcceptRole
+        RejectRole = QMessageBox.RejectRole
+
+        def __init__(self) -> None:
+            self._clicked_button = object()
+
+        def setIcon(self, icon) -> None:
+            captured["icon"] = icon
+
+        def setWindowTitle(self, title: str) -> None:
+            captured["title"] = title
+
+        def setText(self, text: str) -> None:
+            captured["text"] = text
+
+        def setInformativeText(self, text: str) -> None:
+            captured["informative_text"] = text
+
+        def setDetailedText(self, text: str) -> None:
+            captured["detailed_text"] = text
+
+        def addButton(self, label: str, role):
+            captured.setdefault("buttons", []).append((label, role))
+            return object()
+
+        def setDefaultButton(self, button) -> None:
+            captured["default_button"] = button
+
+        def exec(self) -> None:
+            captured["exec"] = True
+
+        def clickedButton(self):
+            return self._clicked_button
+
+    monkeypatch.setattr("xenix.app.QMessageBox", FakeMessageBox)
+
+    state_path = tmp_path / "state" / "trial_lock.json"
+    _prompt_trial_lock(
+        TrialLockCheck(
+            enabled=True,
+            locked=True,
+            reason=TrialLockReason.TAMPERED,
+            state_path=state_path,
+        )
+    )
+
+    assert "Reason: tampered" in captured["detailed_text"]
+    assert "Trial expired at: -" in captured["detailed_text"]
+    assert f"State file: {state_path}" in captured["detailed_text"]
 
 
 def test_main_window_can_quarantine_failed_startup_database_and_rebuild(

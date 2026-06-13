@@ -116,6 +116,14 @@ def _resolve_trial_lock_days() -> int:
     return days
 
 
+def _resolve_trial_lock_state_secret(days: int) -> str:
+    raw_secret = os.environ.get("XENIX_TRIAL_LOCK_STATE_SECRET", "")
+    secret = raw_secret.strip()
+    if days <= 0:
+        return ""
+    return secret or secrets.token_urlsafe(32)
+
+
 def _write_generated_trial_lock(
     project_root: Path,
     build_commit: str,
@@ -124,7 +132,7 @@ def _write_generated_trial_lock(
     trial_lock_path = _generated_trial_lock_path(project_root)
     trial_lock_path.parent.mkdir(parents=True, exist_ok=True)
     days = _resolve_trial_lock_days() if trial_lock_days is None else trial_lock_days
-    state_secret = secrets.token_urlsafe(32) if days > 0 else ""
+    state_secret = _resolve_trial_lock_state_secret(days)
     trial_lock_path.write_text(
         "\n".join(
             (

@@ -53,3 +53,15 @@ Implementation completed for the local test-build startup lock. Review the final
 - `pdm run pytest tests\test_i18n.py -k startup`
 - `pdm run check`
 - `pdm run smoke`
+
+## Follow-up Fix
+
+- Added build-time `XENIX_TRIAL_LOCK_STATE_SECRET` so all builds in one 60-day test wave can share the same state signing secret. When the variable is absent and the lock is enabled, packaging still generates a per-build random secret.
+- Trial lock dialogs now always include the lock `reason`, expiry value or `-`, and state file path in detailed text, including `tampered` and `clock_rollback` cases.
+
+Verification:
+
+- `pdm run i18n-compile`
+- `pdm run pytest tests\test_build_info.py tests\test_main.py -k "trial_lock or trial"`
+- `pdm run pytest tests\test_trial_lock.py`
+- `pdm run check`
