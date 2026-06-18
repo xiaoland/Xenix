@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import sys
 import threading
 import time
@@ -582,18 +583,101 @@ def _run_smoke_checks(paths) -> None:
             source_path=str(graph_smoke_path.resolve()),
             dataset_name="Graph smoke",
             spec={
-                "mark": "bar",
-                "encoding": {
-                    "x": {"field": "label", "type": "nominal"},
-                    "y": {"field": "value", "type": "quantitative"},
-                },
+                "width": 300,
+                "height": 180,
                 "title": "Graph smoke",
+                "scales": [
+                    {
+                        "name": "x",
+                        "type": "band",
+                        "domain": {"field": "label"},
+                        "range": "width",
+                        "padding": 0.1,
+                    },
+                    {
+                        "name": "y",
+                        "type": "linear",
+                        "domain": {"field": "value"},
+                        "range": "height",
+                        "nice": True,
+                        "zero": True,
+                    },
+                ],
+                "axes": [{"orient": "bottom", "scale": "x"}, {"orient": "left", "scale": "y"}],
+                "marks": [
+                    {
+                        "type": "rect",
+                        "encode": {
+                            "enter": {
+                                "x": {"scale": "x", "field": "label"},
+                                "width": {"scale": "x", "band": 1},
+                                "y": {"scale": "y", "field": "value"},
+                                "y2": {"scale": "y", "value": 0},
+                                "fill": {"value": "#4c78a8"},
+                            }
+                        },
+                    }
+                ],
             },
         )
     )
     graph_output = Path(graph_result.output_path)
     if not graph_output.is_file() or not graph_output.read_text(encoding="utf-8").lstrip().startswith("<svg"):
-        raise RuntimeError("Vega-Lite graph smoke render failed.")
+        raise RuntimeError("Vega graph smoke render failed.")
+
+    wordcloud_smoke_path = paths.temp / "graph-wordcloud-smoke.csv"
+    wordcloud_smoke_path.write_text(
+        "term,count,angle,weight\nsales,40,0,600\nmargin,28,-35,300\nnorth,22,35,300\n",
+        encoding="utf-8",
+    )
+    wordcloud_result = AnalysisGraphService(paths).graph_dataset(
+        GraphDatasetInput(
+            source_path=str(wordcloud_smoke_path.resolve()),
+            dataset_name="Graph wordcloud smoke",
+            spec={
+                "width": 360,
+                "height": 220,
+                "padding": 0,
+                "title": "Graph wordcloud smoke",
+                "marks": [
+                    {
+                        "type": "text",
+                        "encode": {
+                            "enter": {
+                                "text": {"field": "term"},
+                                "align": {"value": "center"},
+                                "baseline": {"value": "alphabetic"},
+                                "fill": {"value": "#2f5d8c"},
+                            }
+                        },
+                        "transform": [
+                            {
+                                "type": "wordcloud",
+                                "size": [360, 220],
+                                "text": {"field": "term"},
+                                "font": "Arial",
+                                "fontSize": {"field": "datum.count"},
+                                "fontSizeRange": [12, 56],
+                                "fontWeight": {"field": "datum.weight"},
+                                "padding": 2,
+                                "rotate": {"field": "datum.angle"},
+                            }
+                        ],
+                    }
+                ],
+            },
+        )
+    )
+    wordcloud_svg = Path(wordcloud_result.output_path).read_text(encoding="utf-8")
+    wordcloud_text_nodes = re.findall(r"<text[^>]*>[^<]+</text>", wordcloud_svg)
+    wordcloud_has_positioned_term = any(
+        "Graph wordcloud smoke" not in node
+        and "translate(0,0)" not in node
+        and 'font-size="0px"' not in node
+        for node in wordcloud_text_nodes
+    )
+    if "sales" not in wordcloud_svg or not wordcloud_has_positioned_term:
+        raise RuntimeError("Vega wordcloud smoke render failed.")
 
     xgboost_estimator = XGBoostRegressionService._build_estimator(
         n_estimators=2,

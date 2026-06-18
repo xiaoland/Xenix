@@ -31,19 +31,9 @@ _MAX_SPEC_BYTES = 64 * 1024
 _MAX_OUTPUT_BYTES = 2 * 1024 * 1024
 _MAX_RENDER_ROWS = 10_000
 _MAX_COLUMNS_IN_ERROR = 30
+_INJECTED_DATA_NAME = "__xenix_dataset"
 _DATUM_FIELD_RE = re.compile(r"\bdatum(?:\[['\"]([^'\"]+)['\"]\]|\.([A-Za-z_][A-Za-z0-9_]*))")
-_WHOLE_DATASET_TRANSFORMS = {
-    "aggregate",
-    "density",
-    "joinaggregate",
-    "loess",
-    "pivot",
-    "quantile",
-    "regression",
-    "stack",
-    "window",
-}
-_STATIC_WARNING_KEYS = {"params", "selection"}
+_STATIC_WARNING_KEYS = {"signals"}
 
 
 class GraphDatasetInput(SQLModel):
@@ -84,14 +74,14 @@ class AnalysisGraphService:
 
             output_dir = self._paths.artifacts / "analysis" / "graphs"
             output_dir.mkdir(parents=True, exist_ok=True)
-            output_path = output_dir / f"{self._slug(dataset_name)}-vegalite-{uuid4().hex[:12]}.svg"
+            output_path = output_dir / f"{self._slug(dataset_name)}-vega-{uuid4().hex[:12]}.svg"
             output_path.write_text(svg, encoding="utf-8")
             result = GraphDatasetResult(
                 output_path=str(output_path.resolve()),
                 graph_metadata={
                     "renderer": "vl-convert-python",
                     "renderer_version": getattr(vlc, "__version__", None),
-                    "spec_format": "vega-lite",
+                    "spec_format": "vega",
                     "schema": prepared.schema_url,
                     "dataset_name": dataset_name,
                     "title": prepared.title,
@@ -138,7 +128,7 @@ class AnalysisGraphService:
 
     def _validate_spec_object(self, value: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(value, dict):
-            raise ValidationError("analysis.graph spec must be a Vega-Lite object.")
+            raise ValidationError("analysis.graph spec must be a Vega object.")
         if not value:
             raise ValidationError("analysis.graph spec cannot be empty.")
         return value
@@ -151,11 +141,14 @@ class AnalysisGraphService:
 
     def _prepare_spec(self, user_spec: dict[str, Any], frame: pd.DataFrame, dataset_name: str) -> "_PreparedSpec":
         self._validate_visual_shape(user_spec)
-        self._validate_no_spec_data(user_spec)
-        self._validate_dimensions(user_spec)
+        spec = copy.deepcopy(user_spec)
+        self._drop_user_data_declarations(spec)
+        self._validate_no_external_urls(spec)
+        self._validate_transform_scope(spec)
+        self._validate_dimensions(spec)
 
         columns = [str(column) for column in frame.columns]
-        field_scan = self._scan_fields(user_spec)
+        field_scan = self._scan_fields(spec)
         unknown_fields = sorted(field_scan.referenced_fields - set(columns) - field_scan.generated_fields)
         if unknown_fields:
             available = ", ".join(columns[:_MAX_COLUMNS_IN_ERROR])
@@ -167,23 +160,16 @@ class AnalysisGraphService:
                 + f". Use exact dataset columns. Available columns: {available}."
             )
 
-        uses_whole_dataset = self._uses_whole_dataset_semantics(user_spec)
         row_count = int(len(frame.index))
-        if row_count > _MAX_RENDER_ROWS and uses_whole_dataset:
-            raise ValidationError(
-                "analysis.graph spec uses aggregate or whole-dataset Vega-Lite semantics, but the dataset has "
-                f"{row_count} rows and the safe render cap is {_MAX_RENDER_ROWS}. "
-                "Use data.query or data.transform to pre-aggregate the dataset, then graph the derived dataset."
-            )
-
         truncated = row_count > _MAX_RENDER_ROWS
         render_frame = frame.head(_MAX_RENDER_ROWS) if truncated else frame
-        spec = copy.deepcopy(user_spec)
+        spec.setdefault("$schema", "https://vega.github.io/schema/vega/v6.json")
         spec.setdefault("width", _DEFAULT_WIDTH)
         spec.setdefault("height", _DEFAULT_HEIGHT)
         spec.setdefault("title", dataset_name)
-        spec["data"] = {"values": self._records(render_frame)}
-        warnings = self._static_warnings(user_spec)
+        self._patch_vega_references(spec)
+        spec["data"] = [{"name": _INJECTED_DATA_NAME, "values": self._records(render_frame)}]
+        warnings = self._static_warnings(spec)
         if truncated:
             warnings.append(
                 f"Rendered the first {_MAX_RENDER_ROWS} rows from {row_count} total rows. "
@@ -201,30 +187,44 @@ class AnalysisGraphService:
         )
 
     def _validate_visual_shape(self, spec: dict[str, Any]) -> None:
-        visual_keys = {"mark", "encoding", "layer", "facet", "concat", "vconcat", "hconcat"}
-        if not any(key in spec for key in visual_keys):
-            raise ValidationError(
-                "analysis.graph spec must include a Vega-Lite visual definition such as mark/encoding, layer, or facet."
-            )
+        marks = spec.get("marks")
+        if not isinstance(marks, list) or not marks:
+            raise ValidationError("analysis.graph spec must include a non-empty Vega marks array.")
+        if not all(isinstance(mark, dict) for mark in marks):
+            raise ValidationError("analysis.graph spec.marks entries must be Vega mark objects.")
 
-    def _validate_no_spec_data(self, value: Any, path: str = "spec") -> None:
+    def _drop_user_data_declarations(self, value: Any, path: str = "spec") -> None:
+        if isinstance(value, dict):
+            for key in list(value):
+                child = value[key]
+                child_path = f"{path}.{key}"
+                if key == "data" and not self._is_patchable_data_reference(path):
+                    del value[key]
+                    continue
+                if key == "datasets":
+                    del value[key]
+                    continue
+                self._drop_user_data_declarations(child, child_path)
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                self._drop_user_data_declarations(child, f"{path}[{index}]")
+
+    def _is_patchable_data_reference(self, parent_path: str) -> bool:
+        return parent_path.endswith(".from") or parent_path.endswith(".domain")
+
+    def _validate_no_external_urls(self, value: Any, path: str = "spec") -> None:
         if isinstance(value, dict):
             for key, child in value.items():
                 child_path = f"{path}.{key}"
-                if key in {"data", "datasets"}:
-                    raise ValidationError(
-                        f"analysis.graph does not accept {child_path}. "
-                        "Pass only dataset_id; Xenix injects the registered dataset into the Vega-Lite spec."
-                    )
                 if key == "url":
                     raise ValidationError(
                         f"analysis.graph does not accept {child_path}. "
                         "External data or resource URLs are not allowed in graph specs."
                     )
-                self._validate_no_spec_data(child, child_path)
+                self._validate_no_external_urls(child, child_path)
         elif isinstance(value, list):
             for index, child in enumerate(value):
-                self._validate_no_spec_data(child, f"{path}[{index}]")
+                self._validate_no_external_urls(child, f"{path}[{index}]")
 
     def _validate_dimensions(self, spec: dict[str, Any]) -> None:
         for key, minimum, maximum in (("width", _MIN_WIDTH, _MAX_WIDTH), ("height", _MIN_HEIGHT, _MAX_HEIGHT)):
@@ -236,6 +236,24 @@ class AnalysisGraphService:
             if value < minimum or value > maximum:
                 raise ValidationError(f"analysis.graph spec.{key} must be between {minimum} and {maximum}.")
 
+    def _validate_transform_scope(self, spec: dict[str, Any]) -> None:
+        mark_ids = {id(mark) for mark in self._iter_marks(spec.get("marks", []))}
+        self._validate_transform_scope_value(spec, mark_ids)
+
+    def _validate_transform_scope_value(self, value: Any, mark_ids: set[int], path: str = "spec") -> None:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                child_path = f"{path}.{key}"
+                if key == "transform" and id(value) not in mark_ids:
+                    raise ValidationError(
+                        f"analysis.graph only supports Vega mark-level transform at {child_path}. "
+                        "Use data.transform before graphing for data preparation."
+                    )
+                self._validate_transform_scope_value(child, mark_ids, child_path)
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                self._validate_transform_scope_value(child, mark_ids, f"{path}[{index}]")
+
     def _scan_fields(self, spec: dict[str, Any]) -> "_FieldScan":
         scan = _FieldScan()
         self._scan_fields_value(spec, scan)
@@ -245,9 +263,17 @@ class AnalysisGraphService:
         if isinstance(value, dict):
             for key, child in value.items():
                 if key == "field" and isinstance(child, str):
-                    scan.referenced_fields.add(child)
+                    normalized = self._normalize_field_reference(child)
+                    if normalized is not None:
+                        scan.referenced_fields.add(normalized)
                 elif key in {"groupby", "fields"} and isinstance(child, list):
-                    scan.referenced_fields.update(str(item) for item in child if isinstance(item, str))
+                    scan.referenced_fields.update(
+                        normalized
+                        for item in child
+                        if isinstance(item, str)
+                        for normalized in [self._normalize_field_reference(item)]
+                        if normalized is not None
+                    )
                 elif key == "as":
                     scan.generated_fields.update(self._as_fields(child))
                 elif key == "filter" and isinstance(child, str):
@@ -257,6 +283,16 @@ class AnalysisGraphService:
             for child in value:
                 self._scan_fields_value(child, scan, parent_key)
 
+    def _normalize_field_reference(self, value: str) -> str | None:
+        if value.startswith("datum."):
+            return value.removeprefix("datum.")
+        if value.startswith("datum["):
+            match = _DATUM_FIELD_RE.search(value)
+            if match is not None:
+                return match.group(1) or match.group(2)
+            return None
+        return value
+
     def _as_fields(self, value: Any) -> set[str]:
         if isinstance(value, str):
             return {value}
@@ -264,24 +300,11 @@ class AnalysisGraphService:
             return {str(item) for item in value if isinstance(item, str)}
         return set()
 
-    def _uses_whole_dataset_semantics(self, value: Any) -> bool:
-        if isinstance(value, dict):
-            for key, child in value.items():
-                if key == "aggregate":
-                    return True
-                if key in _WHOLE_DATASET_TRANSFORMS and child:
-                    return True
-                if self._uses_whole_dataset_semantics(child):
-                    return True
-        elif isinstance(value, list):
-            return any(self._uses_whole_dataset_semantics(child) for child in value)
-        return False
-
     def _static_warnings(self, spec: dict[str, Any]) -> list[str]:
         warnings: list[str] = []
         for key in sorted(self._present_keys(spec, _STATIC_WARNING_KEYS)):
             warnings.append(
-                f"Vega-Lite '{key}' may not be visible in a static SVG artifact. "
+                f"Vega '{key}' may not be visible in a static SVG artifact. "
                 "The chart was rendered as a static image."
             )
         return warnings
@@ -298,20 +321,79 @@ class AnalysisGraphService:
                 present.update(self._present_keys(child, keys))
         return present
 
+    def _patch_vega_references(self, spec: dict[str, Any]) -> None:
+        for mark in self._iter_marks(spec.get("marks", [])):
+            self._patch_mark_source(mark)
+        self._patch_scale_domains(spec.get("scales", []))
+
+    def _iter_marks(self, marks: Any):
+        if not isinstance(marks, list):
+            return
+        for mark in marks:
+            if not isinstance(mark, dict):
+                continue
+            yield mark
+            yield from self._iter_marks(mark.get("marks", []))
+
+    def _patch_mark_source(self, mark: dict[str, Any]) -> None:
+        source = mark.get("from")
+        if source is None:
+            mark["from"] = {"data": _INJECTED_DATA_NAME}
+            return
+        if not isinstance(source, dict):
+            raise ValidationError("analysis.graph spec marks must use object-shaped Vega from definitions.")
+        if "facet" in source:
+            raise ValidationError(
+                "analysis.graph does not support Vega facet dataflow inside marks. "
+                "Use data.transform to prepare a drawable dataset first."
+            )
+        unsupported_keys = sorted(set(source) - {"data"})
+        if unsupported_keys:
+            raise ValidationError(
+                "analysis.graph does not support complex Vega mark dataflow keys: " + ", ".join(unsupported_keys)
+            )
+        source["data"] = _INJECTED_DATA_NAME
+
+    def _patch_scale_domains(self, scales: Any) -> None:
+        if not isinstance(scales, list):
+            return
+        for scale in scales:
+            if not isinstance(scale, dict):
+                continue
+            domain = scale.get("domain")
+            if isinstance(domain, dict):
+                self._patch_scale_domain(domain)
+
+    def _patch_scale_domain(self, domain: dict[str, Any]) -> None:
+        if "fields" in domain:
+            raise ValidationError(
+                "analysis.graph does not support complex Vega scale domains. "
+                "Use data.transform to prepare one drawable field first."
+            )
+        unsupported_keys = sorted(set(domain) - {"data", "field", "sort"})
+        if unsupported_keys:
+            raise ValidationError(
+                "analysis.graph does not support complex Vega scale domain keys: " + ", ".join(unsupported_keys)
+            )
+        if "field" in domain:
+            domain["data"] = _INJECTED_DATA_NAME
+
     def _render_svg(self, spec: dict[str, Any]) -> str:
         console_guard = self._allocate_hidden_console_for_packaged_windows()
         try:
-            svg = vlc.vegalite_to_svg(self._spec_json(spec))
+            svg = vlc.vega_to_svg(self._spec_json(spec))
         except Exception as exc:
             raise ValidationError(
-                "analysis.graph could not render the Vega-Lite spec. "
-                "Check mark, encoding, transform, and field types, then retry with a simpler valid Vega-Lite chart."
+                "analysis.graph could not render the Vega spec. "
+                "Check marks, scales, encodings, transforms, and field types, then retry with a simpler valid Vega chart."
             ) from exc
         finally:
             if console_guard is not None:
                 console_guard.FreeConsole()
         if not isinstance(svg, str) or not svg.lstrip().startswith("<svg"):
             raise ValidationError("analysis.graph renderer did not return a valid SVG image.")
+        if "ERROR" in svg:
+            raise ValidationError("analysis.graph renderer returned a Vega error SVG. Simplify the spec and retry.")
         return svg
 
     def _allocate_hidden_console_for_packaged_windows(self):

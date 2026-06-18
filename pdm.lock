@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:9c74d59f519f1d35066a4a02cf58674fa81c9118d68b7e55ae2dd881054a6c08"
+content_hash = "sha256:f23d89b2f1c205702f892a208e214f515454ed33aa5b575354c838119635d194"
 
 [[metadata.targets]]
 requires_python = ">=3.12,<3.15"
@@ -1707,17 +1707,17 @@ files = [
 
 [[package]]
 name = "vl-convert-python"
-version = "1.9.0.post1"
+version = "2.0.0rc1"
 requires_python = ">=3.7"
 summary = "Convert Vega-Lite chart specifications to SVG, PNG, or Vega"
 groups = ["default"]
 files = [
-    {file = "vl_convert_python-1.9.0.post1-cp37-abi3-macosx_10_12_x86_64.whl", hash = "sha256:43e9515f65bbcd317d1ef328787fd7bf0344c2fde9292eb7a0e64d5d3d29fccb"},
-    {file = "vl_convert_python-1.9.0.post1-cp37-abi3-macosx_11_0_arm64.whl", hash = "sha256:b0e7a3245f32addec7e7abeb1badf72b1513ed71ba1dba7aca853901217b3f4e"},
-    {file = "vl_convert_python-1.9.0.post1-cp37-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:e6ecfe4b7e2ea9e8c30fd6d6eaea3ef85475be1ad249407d9796dce4ecdb5b32"},
-    {file = "vl_convert_python-1.9.0.post1-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:3c1558fa0055e88c465bd3d71760cde9fa2c94a95f776a0ef9178252fd820b1f"},
-    {file = "vl_convert_python-1.9.0.post1-cp37-abi3-win_amd64.whl", hash = "sha256:7e263269ac0d304640ca842b44dfe430ed863accd9edecff42e279bfc48ce940"},
-    {file = "vl_convert_python-1.9.0.post1.tar.gz", hash = "sha256:a5b06b3128037519001166f5341ec7831e19fbd7f3a5f78f73d557ac2d5859ef"},
+    {file = "vl_convert_python-2.0.0rc1-cp37-abi3-macosx_10_12_x86_64.whl", hash = "sha256:964c38b28eb6c3bba0e56f38f17b50579a864b68704ac0b6832634b1a8fd3e08"},
+    {file = "vl_convert_python-2.0.0rc1-cp37-abi3-macosx_11_0_arm64.whl", hash = "sha256:8779a5a7916d6ab904e30f2e9eee122b96d43cb5e1b45a144f370a8a229d4881"},
+    {file = "vl_convert_python-2.0.0rc1-cp37-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:80163dcad94845b09bdd65728bc46af25f910311b014e16f04d58bf6f9e537b8"},
+    {file = "vl_convert_python-2.0.0rc1-cp37-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:515471601379738432aad071cb45279397f0f070054896d4ce64f7b256c4a98c"},
+    {file = "vl_convert_python-2.0.0rc1-cp37-abi3-win_amd64.whl", hash = "sha256:c820210f1ff96e3d062fa7f6c7e0fb994235a53d1c02c9a607b6be0b1f3bf66a"},
+    {file = "vl_convert_python-2.0.0rc1.tar.gz", hash = "sha256:bfb5e52ea3a5d972228b096b18c8e18db4ab2b4edeed13674a0a3be05e42ddac"},
 ]
 
 [[package]]
