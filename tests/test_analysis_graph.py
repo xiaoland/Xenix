@@ -224,6 +224,49 @@ def _wordcloud_spec() -> dict:
     }
 
 
+def _ungrouped_encode_wordcloud_spec() -> dict:
+    return {
+        "width": 360,
+        "height": 220,
+        "marks": [
+            {
+                "type": "text",
+                "encode": {
+                    "text": {"field": "term"},
+                    "fill": {"value": "#2f5d8c"},
+                    "align": {"value": "center"},
+                    "baseline": {"value": "middle"},
+                },
+                "transform": [
+                    {
+                        "type": "wordcloud",
+                        "text": {"field": "term"},
+                        "size": [360, 220],
+                        "font": "Arial",
+                        "fontSize": {"field": "datum.count"},
+                        "fontSizeRange": [12, 56],
+                    }
+                ],
+            }
+        ],
+        "scales": [
+            {
+                "name": "size",
+                "type": "sqrt",
+                "domain": {"field": "count"},
+                "range": [12, 56],
+            }
+        ],
+        "title": "Term cloud",
+    }
+
+
+def _wordcloud_without_font_size_range_spec() -> dict:
+    spec = _wordcloud_spec()
+    del spec["marks"][0]["transform"][0]["fontSizeRange"]
+    return spec
+
+
 def test_analysis_graph_service_writes_svg_from_vega_profile_spec(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
@@ -266,6 +309,36 @@ def test_analysis_graph_service_supports_vega_mark_level_transform(monkeypatch, 
     assert "sales" in svg
     assert "ERROR" not in svg
     assert any('translate(0,0)' not in node and 'font-size="0px"' not in node for node in text_nodes)
+
+
+def test_analysis_graph_rejects_wordcloud_without_grouped_encode(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    source = _write_terms_csv(tmp_path)
+
+    with pytest.raises(ValidationError, match="encode.enter.*fontSizeRange.*top terms.*width/height"):
+        AnalysisGraphService(paths).graph_dataset(
+            GraphDatasetInput(
+                source_path=str(source.resolve()),
+                dataset_name="Terms",
+                spec=_ungrouped_encode_wordcloud_spec(),
+            )
+        )
+
+
+def test_analysis_graph_rejects_wordcloud_without_font_size_range(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    source = _write_terms_csv(tmp_path)
+
+    with pytest.raises(ValidationError, match="bounded fontSizeRange.*encode.enter.*top terms.*width/height"):
+        AnalysisGraphService(paths).graph_dataset(
+            GraphDatasetInput(
+                source_path=str(source.resolve()),
+                dataset_name="Terms",
+                spec=_wordcloud_without_font_size_range_spec(),
+            )
+        )
 
 
 def test_analysis_graph_ignores_user_authored_data_sources(monkeypatch, tmp_path: Path) -> None:

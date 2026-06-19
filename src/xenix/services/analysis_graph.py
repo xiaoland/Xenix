@@ -34,6 +34,16 @@ _MAX_COLUMNS_IN_ERROR = 30
 _INJECTED_DATA_NAME = "__xenix_dataset"
 _DATUM_FIELD_RE = re.compile(r"\bdatum(?:\[['\"]([^'\"]+)['\"]\]|\.([A-Za-z_][A-Za-z0-9_]*))")
 _STATIC_WARNING_KEYS = {"signals"}
+_TEXT_NODE_RE = re.compile(r"<text\b(?P<attrs>[^>]*)>(?P<text>.*?)</text>|<text\b(?P<self_attrs>[^>]*)/>", re.DOTALL)
+_MAX_WORDCLOUD_FAILED_TERM_RATIO = 0.2
+_MAX_WORDCLOUD_FAILED_TERM_COUNT = 8
+_WORDCLOUD_REPAIR_HINT = (
+    "For wordcloud charts, use a text mark with grouped Vega encoding such as "
+    "encode.enter.text {'field': '<word>'}; use a mark-level wordcloud transform with "
+    "text {'field': '<word>'}, fontSize {'field': 'datum.<count>'}, and a bounded "
+    "fontSizeRange such as [10, 48]; pre-filter to fewer top terms or increase width/height "
+    "when labels are many or long."
+)
 
 
 class GraphDatasetInput(SQLModel):
@@ -66,6 +76,7 @@ class AnalysisGraphService:
 
             prepared = self._prepare_spec(user_spec, frame, dataset_name)
             svg = self._render_svg(prepared.spec)
+            self._validate_rendered_svg(prepared.spec, svg, prepared.title)
             output_bytes = len(svg.encode("utf-8"))
             if output_bytes > _MAX_OUTPUT_BYTES:
                 raise ValidationError(
@@ -146,6 +157,7 @@ class AnalysisGraphService:
         self._validate_no_external_urls(spec)
         self._validate_transform_scope(spec)
         self._validate_dimensions(spec)
+        self._validate_wordcloud_spec_shape(spec)
 
         columns = [str(column) for column in frame.columns]
         field_scan = self._scan_fields(spec)
@@ -378,11 +390,77 @@ class AnalysisGraphService:
         if "field" in domain:
             domain["data"] = _INJECTED_DATA_NAME
 
+    def _validate_wordcloud_spec_shape(self, spec: dict[str, Any]) -> None:
+        for mark in self._iter_marks(spec.get("marks", [])):
+            transforms = mark.get("transform")
+            if not isinstance(transforms, list):
+                continue
+            for transform in transforms:
+                if isinstance(transform, dict) and transform.get("type") == "wordcloud":
+                    self._validate_wordcloud_mark_shape(mark, transform)
+
+    def _validate_wordcloud_mark_shape(self, mark: dict[str, Any], transform: dict[str, Any]) -> None:
+        if mark.get("type") != "text":
+            raise ValidationError("analysis.graph wordcloud transform must be used on a text mark. " + _WORDCLOUD_REPAIR_HINT)
+
+        encode = mark.get("encode")
+        if not isinstance(encode, dict):
+            raise ValidationError(
+                "analysis.graph wordcloud text mark must define encode.enter or encode.update. "
+                + _WORDCLOUD_REPAIR_HINT
+            )
+        grouped_text = False
+        for phase in ("enter", "update"):
+            phase_encode = encode.get(phase)
+            if isinstance(phase_encode, dict) and isinstance(phase_encode.get("text"), dict):
+                grouped_text = True
+                break
+        if not grouped_text:
+            raise ValidationError(
+                "analysis.graph wordcloud text mark must encode text under encode.enter or encode.update. "
+                + _WORDCLOUD_REPAIR_HINT
+            )
+
+        text = transform.get("text")
+        if not isinstance(text, dict) or not isinstance(text.get("field"), str):
+            raise ValidationError("analysis.graph wordcloud transform.text must be {'field': '<word>'}. " + _WORDCLOUD_REPAIR_HINT)
+
+        font_size = transform.get("fontSize")
+        if not isinstance(font_size, dict) or not isinstance(font_size.get("field"), str):
+            raise ValidationError(
+                "analysis.graph wordcloud transform.fontSize must be {'field': 'datum.<count>'}. "
+                + _WORDCLOUD_REPAIR_HINT
+            )
+        if not font_size["field"].startswith("datum."):
+            raise ValidationError(
+                "analysis.graph wordcloud transform.fontSize field must use datum.<count>. " + _WORDCLOUD_REPAIR_HINT
+            )
+
+        font_size_range = transform.get("fontSizeRange")
+        if not self._is_font_size_range(font_size_range):
+            raise ValidationError(
+                "analysis.graph wordcloud transform must include a bounded fontSizeRange. " + _WORDCLOUD_REPAIR_HINT
+            )
+
+    def _is_font_size_range(self, value: Any) -> bool:
+        if not isinstance(value, list) or len(value) != 2:
+            return False
+        low, high = value
+        if not isinstance(low, (int, float)) or not isinstance(high, (int, float)):
+            return False
+        if isinstance(low, bool) or isinstance(high, bool):
+            return False
+        return 1 <= low < high <= 200
+
     def _render_svg(self, spec: dict[str, Any]) -> str:
         console_guard = self._allocate_hidden_console_for_packaged_windows()
         try:
             svg = vlc.vega_to_svg(self._spec_json(spec))
         except Exception as exc:
+            if self._has_wordcloud_transform(spec):
+                raise ValidationError(
+                    "analysis.graph could not render the Vega wordcloud spec. " + _WORDCLOUD_REPAIR_HINT
+                ) from exc
             raise ValidationError(
                 "analysis.graph could not render the Vega spec. "
                 "Check marks, scales, encodings, transforms, and field types, then retry with a simpler valid Vega chart."
@@ -393,8 +471,57 @@ class AnalysisGraphService:
         if not isinstance(svg, str) or not svg.lstrip().startswith("<svg"):
             raise ValidationError("analysis.graph renderer did not return a valid SVG image.")
         if "ERROR" in svg:
+            if self._has_wordcloud_transform(spec):
+                raise ValidationError("analysis.graph renderer returned a Vega wordcloud error SVG. " + _WORDCLOUD_REPAIR_HINT)
             raise ValidationError("analysis.graph renderer returned a Vega error SVG. Simplify the spec and retry.")
         return svg
+
+    def _validate_rendered_svg(self, spec: dict[str, Any], svg: str, title: str) -> None:
+        if self._has_wordcloud_transform(spec):
+            self._validate_wordcloud_svg(svg, title)
+
+    def _has_wordcloud_transform(self, spec: dict[str, Any]) -> bool:
+        for mark in self._iter_marks(spec.get("marks", [])):
+            transforms = mark.get("transform")
+            if not isinstance(transforms, list):
+                continue
+            for transform in transforms:
+                if isinstance(transform, dict) and transform.get("type") == "wordcloud":
+                    return True
+        return False
+
+    def _validate_wordcloud_svg(self, svg: str, title: str) -> None:
+        text_nodes = list(_TEXT_NODE_RE.finditer(svg))
+        if not text_nodes:
+            raise ValidationError(self._wordcloud_render_failure_message())
+
+        visible_terms = 0
+        failed_terms = 0
+        for node in text_nodes:
+            attrs = node.group("attrs") or node.group("self_attrs") or ""
+            text = re.sub(r"<[^>]+>", "", node.group("text") or "").strip()
+            if text == title:
+                continue
+            failed = 'font-size="0px"' in attrs or "translate(0,0)" in attrs or not text
+            if failed:
+                failed_terms += 1
+            else:
+                visible_terms += 1
+
+        if visible_terms == 0:
+            raise ValidationError(self._wordcloud_render_failure_message())
+
+        total_terms = visible_terms + failed_terms
+        if total_terms and (
+            failed_terms > _MAX_WORDCLOUD_FAILED_TERM_COUNT
+            and failed_terms / total_terms > _MAX_WORDCLOUD_FAILED_TERM_RATIO
+        ):
+            raise ValidationError(
+                "analysis.graph wordcloud could not place enough terms. " + _WORDCLOUD_REPAIR_HINT
+            )
+
+    def _wordcloud_render_failure_message(self) -> str:
+        return "analysis.graph wordcloud rendered no visible terms. " + _WORDCLOUD_REPAIR_HINT
 
     def _allocate_hidden_console_for_packaged_windows(self):
         if sys.platform != "win32" or not getattr(sys, "frozen", False):

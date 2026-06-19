@@ -220,7 +220,7 @@ class AgentToolRegistry:
                     "signals, config, and mark-level transforms. Xenix injects the registered dataset; any "
                     "Vega data or datasets in the spec are ignored and replaced. Do not use url resources. "
                     "Use data.transform before analysis.graph for grouping, aggregation, joins, reshaping, "
-                    "or durable derived rows."
+                    "or durable derived rows. For word clouds, use a text mark with a mark-level wordcloud transform."
                 ),
                 parameters_schema={
                     "type": "object",
