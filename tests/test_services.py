@@ -81,6 +81,36 @@ def test_dataset_service_registers_dataset_without_product_project(monkeypatch, 
     assert [row.id for row in sources] == [dataset.id]
 
 
+def test_dataset_service_registers_xlsx_attachment_without_full_inspection(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _project_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
+    dataset_file = tmp_path / "customers.xlsx"
+    pd.DataFrame(
+        [
+            {"name": "Acme", "value": 12},
+            {"name": "Contoso", "value": 18},
+        ]
+    ).to_excel(dataset_file, index=False)
+
+    def fail_read_excel(*_args, **_kwargs):
+        pytest.fail("attachment registration should not read the full xlsx dataframe")
+
+    monkeypatch.setattr("xenix.services.dataset_inspection.pd.read_excel", fail_read_excel)
+
+    attachment = dataset_service.register_dataset_attachment(
+        RegisterDatasetInput(source_path=str(dataset_file.resolve()), name="Customers")
+    )
+
+    assert attachment.name == "Customers"
+    assert attachment.file_name == "customers.xlsx"
+    assert attachment.source_format == "xlsx"
+    assert attachment.row_count == 2
+    assert attachment.column_count == 2
+    assert attachment.preview_columns == ["name", "value"]
+
+
 def test_dataset_service_rejects_empty_dataset_file(monkeypatch, tmp_path: Path) -> None:
     _project_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
     dataset_file = tmp_path / "empty.csv"

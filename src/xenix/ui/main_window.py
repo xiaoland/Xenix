@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import threading
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from PySide6.QtCore import QEvent, QPoint, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
@@ -33,7 +35,6 @@ from ..services.agent import (
     ThreadSnapshot,
 )
 from ..services.artifact_service import ArtifactService
-from ..services.dataset_inspection import InspectDatasetInput
 from ..services.dataset_service import DatasetService, RegisterDatasetInput
 from ..services.llm import LLMService, LLMSettingsService
 from ..services.ml.worker_settings import MLWorkerSettingsService
@@ -47,9 +48,28 @@ if TYPE_CHECKING:
     from ..services.ml_service import MLService
 
 
+@dataclass(frozen=True)
+class _DatasetPreflightSucceeded:
+    submission_id: str
+    text: str
+    dataset_attachments: list[DatasetAttachmentInput]
+    fq_model_key: str
+    interface_locale: str
+
+
+@dataclass(frozen=True)
+class _DatasetPreflightFailed:
+    submission_id: str
+    text: str
+    file_paths: list[str]
+    message: str
+
+
 class MainWindow(QMainWindow):
     _harness_failed = Signal(str)
     _harness_stream_event = Signal(object)
+    _dataset_preflight_succeeded = Signal(object)
+    _dataset_preflight_failed = Signal(object)
     _thread_title_generated = Signal(str, str)
     _thread_title_generation_failed = Signal(str, str)
 
@@ -81,6 +101,8 @@ class MainWindow(QMainWindow):
         self._ml_service = ml_service
         self._agent_thread_id: str | None = None
         self._active_agent_run_id: str | None = None
+        self._pending_dataset_submission_id: str | None = None
+        self._cancelled_dataset_submission_ids: set[str] = set()
         self._pending_step_confirmation: AgentHarnessStreamEvent | None = None
         self._cancelled_agent_run_ids: set[str] = set()
         self._settings_dialog: SettingsDialog | None = None
@@ -116,6 +138,8 @@ class MainWindow(QMainWindow):
         self._thread_detail_view.step_budget_stop_requested.connect(self._stop_step_budget)
         self._harness_failed.connect(self._render_harness_error)
         self._harness_stream_event.connect(self._render_harness_stream_event)
+        self._dataset_preflight_succeeded.connect(self._finish_dataset_preflight)
+        self._dataset_preflight_failed.connect(self._fail_dataset_preflight)
         self._thread_title_generated.connect(self._finish_generated_thread_title)
         self._thread_title_generation_failed.connect(self._fail_generated_thread_title)
 
@@ -244,10 +268,96 @@ class MainWindow(QMainWindow):
     def _submit_chat_message(self, text: str, file_paths: list[str], fq_model_key: str) -> None:
         self._pending_step_confirmation = None
         self._thread_detail_view.clear_step_confirmation()
+        if file_paths:
+            self._start_dataset_preflight(text, file_paths, fq_model_key)
+            return
+
+        self._start_harness_submission(
+            text=text,
+            dataset_attachments=[],
+            fq_model_key=fq_model_key,
+            interface_locale=self._translation_manager.current_locale(),
+        )
+
+    def _start_dataset_preflight(self, text: str, file_paths: list[str], fq_model_key: str) -> None:
+        submission_id = uuid4().hex
+        self._pending_dataset_submission_id = submission_id
+        self._thread_detail_view.set_running(True)
+        interface_locale = self._translation_manager.current_locale()
+
+        def run_preflight() -> None:
+            try:
+                dataset_attachments = self._register_composer_datasets(file_paths)
+            except Exception as exc:
+                self._dataset_preflight_failed.emit(
+                    _DatasetPreflightFailed(
+                        submission_id=submission_id,
+                        text=text,
+                        file_paths=list(file_paths),
+                        message=str(exc),
+                    )
+                )
+                return
+            self._dataset_preflight_succeeded.emit(
+                _DatasetPreflightSucceeded(
+                    submission_id=submission_id,
+                    text=text,
+                    dataset_attachments=dataset_attachments,
+                    fq_model_key=fq_model_key,
+                    interface_locale=interface_locale,
+                )
+            )
+
+        threading.Thread(target=run_preflight, name="xenix-dataset-preflight", daemon=True).start()
+
+    def _finish_dataset_preflight(self, result: object) -> None:
+        if not isinstance(result, _DatasetPreflightSucceeded):
+            return
+        if result.submission_id in self._cancelled_dataset_submission_ids:
+            self._cancelled_dataset_submission_ids.discard(result.submission_id)
+            return
+        if self._pending_dataset_submission_id != result.submission_id:
+            return
+        self._pending_dataset_submission_id = None
+        self._start_harness_submission(
+            text=result.text,
+            dataset_attachments=result.dataset_attachments,
+            fq_model_key=result.fq_model_key,
+            interface_locale=result.interface_locale,
+        )
+
+    def _fail_dataset_preflight(self, result: object) -> None:
+        if not isinstance(result, _DatasetPreflightFailed):
+            return
+        if result.submission_id in self._cancelled_dataset_submission_ids:
+            self._cancelled_dataset_submission_ids.discard(result.submission_id)
+            return
+        if self._pending_dataset_submission_id != result.submission_id:
+            return
+        self._pending_dataset_submission_id = None
+        self._thread_detail_view.show_error(result.message)
+        self._thread_detail_view.restore_composer(result.text, result.file_paths)
+        self._thread_detail_view.set_running(False)
+
+    def _start_harness_submission(
+        self,
+        *,
+        text: str,
+        dataset_attachments: list[DatasetAttachmentInput],
+        fq_model_key: str,
+        interface_locale: str,
+    ) -> None:
         try:
-            dataset_attachments = self._register_composer_datasets(file_paths)
+            submit_input = SubmitUserTurnInput(
+                thread_id=self._agent_thread_id,
+                text=text,
+                dataset_attachments=dataset_attachments,
+                fq_model_key=fq_model_key or None,
+                interface_locale=interface_locale,
+            )
         except Exception as exc:
             self._thread_detail_view.show_error(str(exc))
+            self._thread_detail_view.set_running(False)
             return
 
         user_blocks = []
@@ -260,15 +370,7 @@ class MainWindow(QMainWindow):
 
         def run_harness() -> None:
             try:
-                for event in self._agent_harness_service.submit_user_turn_stream(
-                    SubmitUserTurnInput(
-                        thread_id=self._agent_thread_id,
-                        text=text,
-                        dataset_attachments=dataset_attachments,
-                        fq_model_key=fq_model_key or None,
-                        interface_locale=self._translation_manager.current_locale(),
-                    )
-                ):
+                for event in self._agent_harness_service.submit_user_turn_stream(submit_input):
                     self._harness_stream_event.emit(event)
             except Exception as exc:
                 self._harness_failed.emit(str(exc))
@@ -279,24 +381,18 @@ class MainWindow(QMainWindow):
         attachments: list[DatasetAttachmentInput] = []
         for file_path in file_paths:
             source_path = Path(file_path).expanduser().resolve()
-            dataset = self._dataset_service.register_dataset(
-                RegisterDatasetInput(
-                    source_path=str(source_path),
-                    name=source_path.stem,
-                )
-            )
-            inspection = self._dataset_service.inspect_source_file(
-                InspectDatasetInput(source_path=dataset.source_path)
+            attachment = self._dataset_service.register_dataset_attachment(
+                RegisterDatasetInput(source_path=str(source_path), name=source_path.stem)
             )
             attachments.append(
                 DatasetAttachmentInput(
-                    dataset_id=dataset.id,
-                    name=dataset.name,
-                    file_name=inspection.file_name,
-                    source_format=inspection.source_format.value,
-                    row_count=inspection.row_count,
-                    column_count=inspection.column_count,
-                    preview_columns=inspection.preview_columns,
+                    dataset_id=attachment.dataset_id,
+                    name=attachment.name,
+                    file_name=attachment.file_name,
+                    source_format=attachment.source_format,
+                    row_count=attachment.row_count,
+                    column_count=attachment.column_count,
+                    preview_columns=attachment.preview_columns,
                 )
             )
         return attachments
@@ -403,6 +499,9 @@ class MainWindow(QMainWindow):
             self._tool_call_detail_views.remove(view)
 
     def _request_harness_stop(self) -> None:
+        if self._pending_dataset_submission_id is not None:
+            self._cancelled_dataset_submission_ids.add(self._pending_dataset_submission_id)
+            self._pending_dataset_submission_id = None
         if self._active_agent_run_id is not None:
             self._agent_harness_service.cancel_run(self._active_agent_run_id)
             self._cancelled_agent_run_ids.add(self._active_agent_run_id)

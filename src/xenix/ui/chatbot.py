@@ -1386,6 +1386,11 @@ class ThreadDetailView(QWidget):
                 self._attached_files.append(path)
         self._refresh_attachment_chips()
 
+    def restore_composer(self, text: str, file_paths: list[str]) -> None:
+        self._editor.setPlainText(text)
+        self._attached_files.clear()
+        self._add_local_files(file_paths)
+
     def _install_composer_drop_filters(self) -> None:
         widgets = [
             self._composer_shell,

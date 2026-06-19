@@ -13,9 +13,11 @@ from sqlmodel import SQLModel
 from ..config import AppPaths
 from ..exceptions import NotFoundError, ValidationError
 from .dataset_inspection import (
+    DatasetAttachmentMetadata,
     DatasetInspection,
     InspectDatasetInput,
     detect_source_format,
+    inspect_attachment_metadata_file,
     inspect_dataset_file,
     load_dataframe,
 )
@@ -48,6 +50,16 @@ class ExportDatasetCopyInput(SQLModel):
     dataset_id: str
     destination_path: str
     csv_encoding: str = "utf-8"
+
+
+class RegisteredDatasetAttachment(SQLModel):
+    dataset_id: str
+    name: str
+    file_name: str
+    source_format: str
+    row_count: int
+    column_count: int
+    preview_columns: list[str]
 
 
 class DatasetService:
@@ -114,6 +126,32 @@ class DatasetService:
             raise
         except Exception as exc:  # pragma: no cover - exercised by failure surface
             raise ValidationError("Unable to read dataset file.") from exc
+
+    def inspect_attachment_metadata(self, input_data: InspectDatasetInput) -> DatasetAttachmentMetadata:
+        source_path = Path(input_data.source_path).expanduser()
+        if not source_path.is_absolute():
+            raise ValidationError("Dataset source path must be absolute.")
+        if not source_path.exists() or not source_path.is_file():
+            raise ValidationError("Dataset source path must point to an existing file.")
+        try:
+            return inspect_attachment_metadata_file(source_path)
+        except ValidationError:
+            raise
+        except Exception as exc:  # pragma: no cover - exercised by failure surface
+            raise ValidationError("Unable to read dataset file.") from exc
+
+    def register_dataset_attachment(self, input_data: RegisterDatasetInput) -> RegisteredDatasetAttachment:
+        dataset = self.register_dataset(input_data)
+        metadata = self.inspect_attachment_metadata(InspectDatasetInput(source_path=dataset.source_path))
+        return RegisteredDatasetAttachment(
+            dataset_id=dataset.id,
+            name=dataset.name,
+            file_name=metadata.file_name,
+            source_format=metadata.source_format.value,
+            row_count=metadata.row_count,
+            column_count=metadata.column_count,
+            preview_columns=metadata.preview_columns,
+        )
 
     def rename_dataset(self, input_data: RenameDatasetInput) -> DatasetRow:
         new_name = input_data.new_name.strip()

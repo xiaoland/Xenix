@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import threading
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,6 +20,7 @@ from xenix.services.agent import (
     ChatbotEventAuthor,
     ChatbotEventKind,
     ChatbotEventStatus,
+    DatasetAttachmentInput,
 )
 from xenix.services.agent.dev_fixtures import MESSAGE_RENDERING_FIXTURE_TITLE, ensure_mock_conversation_history
 from xenix.services.artifact_service import RegisterArtifactInput
@@ -1279,6 +1281,66 @@ def test_main_window_submit_chat_message_registers_dataset_attachments(monkeypat
         assert attachment.preview_columns == ["name", "value"]
         assert not hasattr(submitted, "file_paths")
     finally:
+        window.close()
+
+
+def test_main_window_submit_chat_message_runs_dataset_preflight_off_ui_thread(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    data_file = tmp_path / "customers.csv"
+    data_file.write_text("name,value\nAcme,12\n", encoding="utf-8")
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=False)
+    captured_inputs = []
+    preflight_started = threading.Event()
+    release_preflight = threading.Event()
+    try:
+        def fake_register(file_paths):
+            preflight_started.set()
+            assert file_paths == [str(data_file.resolve())]
+            assert release_preflight.wait(timeout=2.0)
+            return [
+                DatasetAttachmentInput(
+                    dataset_id="dataset-1",
+                    name="customers",
+                    file_name="customers.csv",
+                    source_format="csv",
+                    row_count=1,
+                    column_count=2,
+                    preview_columns=["name", "value"],
+                )
+            ]
+
+        def fake_submit(input_data):
+            captured_inputs.append(input_data)
+            return []
+
+        monkeypatch.setattr(window, "_register_composer_datasets", fake_register)
+        monkeypatch.setattr(window._agent_harness_service, "submit_user_turn_stream", fake_submit)
+
+        started_at = time.perf_counter()
+        window._submit_chat_message("Analyze this.", [str(data_file.resolve())], "")
+        elapsed = time.perf_counter() - started_at
+
+        assert elapsed < 0.5
+        assert preflight_started.wait(timeout=1.0)
+        assert captured_inputs == []
+
+        release_preflight.set()
+        for _ in range(40):
+            app.processEvents()
+            if captured_inputs:
+                break
+            time.sleep(0.01)
+
+        assert len(captured_inputs) == 1
+        assert captured_inputs[0].dataset_attachments[0].dataset_id == "dataset-1"
+    finally:
+        release_preflight.set()
         window.close()
 
 
