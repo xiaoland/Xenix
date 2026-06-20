@@ -1,18 +1,20 @@
 from __future__ import annotations
 
+from datetime import date, datetime
+import math
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 
-import pandas as pd
-from pandas.api.types import is_bool_dtype, is_datetime64_any_dtype, is_numeric_dtype
+import polars as pl
 from pydantic import ConfigDict, Field
 from sqlmodel import SQLModel
 
 from ..exceptions import ValidationError
 from ..observability import record_counter, record_histogram, start_span
-from .dataset_inspection import detect_source_format, load_dataframe
+from .dataset_inspection import detect_source_format
 from .storage.models import DatasetSourceFormat
+from .tabular import load_tabular_frame
 
 
 _DEFAULT_TOP_N = 10
@@ -117,15 +119,15 @@ class AnalysisProfileService:
             raise ValidationError("Dataset source path must point to an existing file.")
         return source_path.resolve()
 
-    def _load_frame(self, source_path: Path) -> pd.DataFrame:
+    def _load_frame(self, source_path: Path) -> pl.DataFrame:
         source_format = detect_source_format(source_path)
         if source_format is DatasetSourceFormat.UNKNOWN:
             raise ValidationError("Only .csv, .xlsx, and .xls dataset files are supported.")
-        frame = load_dataframe(source_path, source_format)
-        frame = frame.rename(columns=str)
-        if len(frame.columns) == 0:
+        frame = load_tabular_frame(source_path, source_format)
+        frame = frame.rename({column: str(column) for column in frame.columns})
+        if frame.width == 0:
             raise ValidationError("Dataset file must contain at least one column.")
-        if len(frame.index) == 0:
+        if frame.height == 0:
             raise ValidationError("Dataset file must contain at least one data row.")
         return frame
 
@@ -138,7 +140,7 @@ class AnalysisProfileService:
             raise ValidationError(f"{field_name} must be between {minimum} and {maximum}.")
         return normalized
 
-    def _column_groups(self, frame: pd.DataFrame) -> dict[str, list[str]]:
+    def _column_groups(self, frame: pl.DataFrame) -> dict[str, list[str]]:
         binary_columns = [column for column in frame.columns if self._is_binary_column(frame[column])]
         datetime_columns = [
             column
@@ -150,7 +152,7 @@ class AnalysisProfileService:
             for column in frame.columns
             if column not in binary_columns
             and column not in datetime_columns
-            and is_numeric_dtype(frame[column])
+            and frame[column].dtype.is_numeric()
         ]
         non_numeric_columns = [
             column
@@ -166,10 +168,10 @@ class AnalysisProfileService:
             "datetime": [str(column) for column in datetime_columns],
         }
 
-    def _is_binary_column(self, series: pd.Series) -> bool:
-        if is_bool_dtype(series):
+    def _is_binary_column(self, series: pl.Series) -> bool:
+        if series.dtype == pl.Boolean:
             return True
-        values = series.dropna().unique()
+        values = series.drop_nulls().unique().to_list()
         if len(values) == 0 or len(values) > 2:
             return False
         normalized_values = {self._binary_value(value) for value in values}
@@ -185,20 +187,23 @@ class AnalysisProfileService:
             return None
         return None
 
-    def _is_datetime_column(self, series: pd.Series) -> bool:
-        if is_datetime64_any_dtype(series):
+    def _is_datetime_column(self, series: pl.Series) -> bool:
+        if series.dtype.is_temporal():
             return True
-        if is_numeric_dtype(series):
+        if series.dtype.is_numeric():
             return False
-        values = series.dropna()
-        if values.empty:
+        values = series.drop_nulls()
+        if values.is_empty():
             return False
-        parsed = pd.to_datetime(values, errors="coerce", format="mixed")
-        return bool(parsed.notna().mean() >= 0.8)
+        parsed = self._to_datetime_series(values)
+        if parsed.is_empty():
+            return False
+        valid_count = int(parsed.is_not_null().sum())
+        return bool(valid_count / len(parsed) >= 0.8)
 
     def _normalize_target_columns(
         self,
-        frame: pd.DataFrame,
+        frame: pl.DataFrame,
         raw_columns: list[str],
         numeric_columns: list[str],
     ) -> list[str]:
@@ -215,27 +220,27 @@ class AnalysisProfileService:
             normalized.append(column)
         return normalized
 
-    def _basic_info(self, frame: pd.DataFrame) -> dict[str, int]:
+    def _basic_info(self, frame: pl.DataFrame) -> dict[str, int]:
         return {
-            "row_count": int(len(frame.index)),
-            "column_count": int(len(frame.columns)),
-            "duplicate_row_count": int(frame.duplicated().sum()),
+            "row_count": int(frame.height),
+            "column_count": int(frame.width),
+            "duplicate_row_count": int(frame.height - frame.unique().height),
         }
 
-    def _field_info(self, frame: pd.DataFrame) -> list[dict[str, Any]]:
-        row_count = max(int(len(frame.index)), 1)
+    def _field_info(self, frame: pl.DataFrame) -> list[dict[str, Any]]:
+        row_count = max(int(frame.height), 1)
         fields: list[dict[str, Any]] = []
         for column in frame.columns:
             series = frame[column]
-            missing_count = int(series.isna().sum())
+            missing_count = self._missing_count(series)
             fields.append(
                 {
                     "column": str(column),
                     "dtype": str(series.dtype),
-                    "non_null_count": int(series.notna().sum()),
+                    "non_null_count": int(row_count - missing_count),
                     "missing_count": missing_count,
                     "missing_ratio": self._number(missing_count / row_count),
-                    "unique_count": int(series.nunique(dropna=True)),
+                    "unique_count": self._unique_count(series),
                 }
             )
         return fields
@@ -251,27 +256,27 @@ class AnalysisProfileService:
     def _field_type_entry(self, columns: list[str]) -> dict[str, Any]:
         return {"count": len(columns), "columns": columns}
 
-    def _numeric_statistics(self, frame: pd.DataFrame, numeric_columns: list[str]) -> list[dict[str, Any]]:
+    def _numeric_statistics(self, frame: pl.DataFrame, numeric_columns: list[str]) -> list[dict[str, Any]]:
         summaries: list[dict[str, Any]] = []
         for column in numeric_columns:
-            series = pd.to_numeric(frame[column], errors="coerce").dropna()
+            series = self._numeric_series(frame[column])
             mode = series.mode()
-            mean = series.mean() if not series.empty else None
-            std = series.std() if not series.empty else None
+            mean = series.mean() if not series.is_empty() else None
+            std = series.std() if not series.is_empty() else None
             summaries.append(
                 {
                     "column": column,
-                    "count": int(series.count()),
+                    "count": int(series.len()),
                     "mean": self._number(mean),
                     "std": self._number(std),
-                    "min": self._number(series.min() if not series.empty else None),
-                    "q1": self._number(series.quantile(0.25) if not series.empty else None),
-                    "median": self._number(series.median() if not series.empty else None),
-                    "q3": self._number(series.quantile(0.75) if not series.empty else None),
-                    "max": self._number(series.max() if not series.empty else None),
-                    "mode": self._number(mode.iloc[0] if not mode.empty else None),
-                    "skew": self._number(series.skew() if len(series.index) >= 3 else None),
-                    "kurtosis": self._number(series.kurtosis() if len(series.index) >= 4 else None),
+                    "min": self._number(series.min() if not series.is_empty() else None),
+                    "q1": self._number(series.quantile(0.25) if not series.is_empty() else None),
+                    "median": self._number(series.median() if not series.is_empty() else None),
+                    "q3": self._number(series.quantile(0.75) if not series.is_empty() else None),
+                    "max": self._number(series.max() if not series.is_empty() else None),
+                    "mode": self._number(mode[0] if not mode.is_empty() else None),
+                    "skew": self._number(series.skew() if len(series) >= 3 else None),
+                    "kurtosis": self._number(series.kurtosis() if len(series) >= 4 else None),
                     "coefficient_of_variation": self._coefficient_of_variation(mean, std),
                 }
             )
@@ -284,28 +289,30 @@ class AnalysisProfileService:
             return None
         return self._number(std_value / mean_value)
 
-    def _frequencies(self, frame: pd.DataFrame, columns: list[str], top_n: int) -> list[dict[str, Any]]:
+    def _frequencies(self, frame: pl.DataFrame, columns: list[str], top_n: int) -> list[dict[str, Any]]:
         summaries: list[dict[str, Any]] = []
-        row_count = max(int(len(frame.index)), 1)
+        row_count = max(int(frame.height), 1)
         for column in columns[:_MAX_FREQUENCY_COLUMNS]:
-            counts = frame[column].value_counts(dropna=False).head(top_n)
+            counts = frame[column].value_counts(sort=True).head(top_n)
+            value_column = counts.columns[0]
             values = [
                 {
-                    "value": self._display_value(value),
+                    "value": self._display_value(row[value_column]),
                     "count": int(count),
                     "ratio": self._number(int(count) / row_count),
                 }
-                for value, count in counts.items()
+                for row in counts.to_dicts()
+                for count in [row["count"]]
             ]
             summaries.append({"column": column, "values": values})
         return summaries
 
-    def _datetime_statistics(self, frame: pd.DataFrame, datetime_columns: list[str]) -> list[dict[str, Any]]:
+    def _datetime_statistics(self, frame: pl.DataFrame, datetime_columns: list[str]) -> list[dict[str, Any]]:
         summaries: list[dict[str, Any]] = []
         for column in datetime_columns:
-            series = pd.to_datetime(frame[column], errors="coerce", format="mixed").dropna()
-            min_value = series.min() if not series.empty else None
-            max_value = series.max() if not series.empty else None
+            series = self._to_datetime_series(frame[column]).drop_nulls()
+            min_value = series.min() if not series.is_empty() else None
+            max_value = series.max() if not series.is_empty() else None
             span_days = None
             if min_value is not None and max_value is not None:
                 span = max_value - min_value
@@ -322,23 +329,23 @@ class AnalysisProfileService:
 
     def _correlation_matrix(
         self,
-        frame: pd.DataFrame,
+        frame: pl.DataFrame,
         numeric_columns: list[str],
         column_limit: int,
     ) -> dict[str, Any]:
         selected_columns = numeric_columns[:column_limit]
         if len(selected_columns) < 2:
             return {"columns": selected_columns, "rows": [], "truncated": False}
-        matrix = frame[selected_columns].corr()
+        matrix = frame.select(selected_columns).corr()
         rows = [
             {
                 "column": row_column,
                 "values": {
-                    column: self._number(matrix.loc[row_column, column])
-                    for column in selected_columns
+                    column: self._number(matrix[row_index, column_index])
+                    for column_index, column in enumerate(selected_columns)
                 },
             }
-            for row_column in selected_columns
+            for row_index, row_column in enumerate(selected_columns)
         ]
         return {
             "columns": selected_columns,
@@ -348,7 +355,7 @@ class AnalysisProfileService:
 
     def _target_group_statistics(
         self,
-        frame: pd.DataFrame,
+        frame: pl.DataFrame,
         target_columns: list[str],
         group_columns: list[str],
         top_n: int,
@@ -356,16 +363,24 @@ class AnalysisProfileService:
         summaries: list[dict[str, Any]] = []
         for target_column in target_columns:
             for group_column in group_columns[:_MAX_FREQUENCY_COLUMNS]:
-                if frame[group_column].nunique(dropna=True) > top_n:
+                if self._unique_count(frame[group_column]) > top_n:
                     continue
                 grouped = (
-                    frame.groupby(group_column, dropna=False)[target_column]
-                    .agg(["count", "mean", "median", "std", "min", "max"])
-                    .reset_index()
-                    .sort_values("count", ascending=False)
+                    frame.group_by(group_column, maintain_order=True)
+                    .agg(
+                        [
+                            pl.col(target_column).count().alias("count"),
+                            pl.col(target_column).mean().alias("mean"),
+                            pl.col(target_column).median().alias("median"),
+                            pl.col(target_column).std().alias("std"),
+                            pl.col(target_column).min().alias("min"),
+                            pl.col(target_column).max().alias("max"),
+                        ]
+                    )
+                    .sort("count", descending=True)
                     .head(top_n)
                 )
-                for row in grouped.to_dict(orient="records"):
+                for row in grouped.to_dicts():
                     summaries.append(
                         {
                             "target_column": target_column,
@@ -559,13 +574,39 @@ class AnalysisProfileService:
                 + " |"
             )
 
+    def _missing_count(self, series: pl.Series) -> int:
+        missing_count = int(series.null_count())
+        if series.dtype.is_float():
+            missing_count += int(series.is_nan().sum())
+        return missing_count
+
+    def _unique_count(self, series: pl.Series) -> int:
+        values = series.drop_nulls()
+        if values.dtype.is_float():
+            values = values.filter(~values.is_nan())
+        return int(values.n_unique())
+
+    def _numeric_series(self, series: pl.Series) -> pl.Series:
+        values = series.cast(pl.Float64, strict=False).drop_nulls()
+        return values.filter(~values.is_nan())
+
+    def _to_datetime_series(self, series: pl.Series) -> pl.Series:
+        if series.dtype == pl.Date:
+            return series.cast(pl.Datetime)
+        if series.dtype.is_temporal():
+            return series
+        values = series.cast(pl.String, strict=False)
+        for datetime_format in ("%Y-%m-%d", "%Y/%m/%d", "%Y-%m-%d %H:%M:%S", "%Y/%m/%d %H:%M:%S", None):
+            try:
+                return values.str.to_datetime(format=datetime_format, strict=False)
+            except pl.exceptions.ComputeError:
+                continue
+        return pl.Series(series.name, [None] * len(series), dtype=pl.Datetime)
+
     def _number(self, value: Any, *, digits: int = 4) -> float | int | None:
         if value is None:
             return None
-        try:
-            if pd.isna(value):
-                return None
-        except (TypeError, ValueError):
+        if isinstance(value, float) and math.isnan(value):
             return None
         if hasattr(value, "item"):
             value = value.item()
@@ -577,13 +618,14 @@ class AnalysisProfileService:
             return None
 
     def _display_value(self, value: Any) -> str:
-        try:
-            if pd.isna(value):
-                return "<missing>"
-        except (TypeError, ValueError):
-            pass
-        if isinstance(value, pd.Timestamp):
+        if value is None:
+            return "<missing>"
+        if isinstance(value, float) and math.isnan(value):
+            return "<missing>"
+        if isinstance(value, datetime):
             return value.isoformat()
+        if isinstance(value, date):
+            return datetime.combine(value, datetime.min.time()).isoformat()
         return str(value)
 
     def _percent(self, ratio: Any) -> str:

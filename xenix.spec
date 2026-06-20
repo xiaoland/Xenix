@@ -10,6 +10,7 @@ src_root = project_root / "src"
 scripts_root = project_root / "scripts"
 xgboost_binaries = collect_dynamic_libs("xgboost")
 xgboost_datas = collect_data_files("xgboost", includes=["VERSION", "py.typed"])
+polars_datas = collect_data_files("polars") + collect_data_files("fastexcel")
 
 a = Analysis(
     [str(scripts_root / "run_packaged.py")],
@@ -20,7 +21,8 @@ a = Analysis(
         (str(src_root / "xenix" / "translations"), "xenix/translations"),
         (str(src_root / "xenix"), "xenix_worker_source/xenix"),
     ]
-    + xgboost_datas,
+    + xgboost_datas
+    + polars_datas,
     hiddenimports=[
         "xenix._generated_trial_lock",
         "xenix._generated_trial_llm",
@@ -45,12 +47,14 @@ a = Analysis(
         "xenix.services.ml_task_service",
         "xenix.services.storage",
         "xenix.services.storage.layout",
+        "fastexcel",
         "opentelemetry.exporter.otlp.proto.grpc.trace_exporter",
         "opentelemetry.exporter.otlp.proto.grpc.metric_exporter",
         "opentelemetry.exporter.otlp.proto.grpc._log_exporter",
         "opentelemetry.exporter.otlp.proto.http.trace_exporter",
         "opentelemetry.exporter.otlp.proto.http.metric_exporter",
         "opentelemetry.exporter.otlp.proto.http._log_exporter",
+        "polars",
     ],
     hookspath=[],
     hooksconfig={},

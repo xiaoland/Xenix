@@ -63,6 +63,70 @@ def test_dataset_service_inspects_csv_summary_and_column_kinds(monkeypatch, tmp_
     assert inspection.columns[0].kind.value == "numeric"
 
 
+def test_dataset_service_inspects_polars_native_column_metadata(monkeypatch, tmp_path: Path) -> None:
+    _project_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
+    dataset_file = tmp_path / "events.xlsx"
+    pd.DataFrame(
+        [
+            {
+                "amount": 10.5,
+                "segment": "retail",
+                "active": True,
+                "event_date": pd.Timestamp("2026-01-01"),
+                "note": "first",
+            },
+            {
+                "amount": None,
+                "segment": "enterprise",
+                "active": False,
+                "event_date": pd.Timestamp("2026-01-02"),
+                "note": "second",
+            },
+        ]
+    ).to_excel(dataset_file, index=False)
+
+    inspection = dataset_service.inspect_source_file(
+        InspectDatasetInput(source_path=str(dataset_file.resolve()))
+    )
+
+    kinds = {column.name: column.kind.value for column in inspection.columns}
+    nullable = {column.name: column.nullable for column in inspection.columns}
+    assert kinds == {
+        "amount": "numeric",
+        "segment": "categorical",
+        "active": "boolean",
+        "event_date": "datetime",
+        "note": "categorical",
+    }
+    assert nullable["amount"] is True
+    assert nullable["segment"] is False
+    assert inspection.preview_rows[0] == ["10.5", "retail", "True", "2026-01-01", "first"]
+
+
+def test_dataset_service_inspects_xlsx_without_pandas_read_excel(monkeypatch, tmp_path: Path) -> None:
+    _project_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
+    dataset_file = tmp_path / "customers.xlsx"
+    pd.DataFrame(
+        [
+            {"name": "Acme", "value": 12},
+            {"name": "Contoso", "value": 18},
+        ]
+    ).to_excel(dataset_file, index=False)
+
+    def fail_read_excel(*_args, **_kwargs):
+        pytest.fail("xlsx inspection should use the Polars-native tabular path")
+
+    monkeypatch.setattr("xenix.services.dataset_inspection.pd.read_excel", fail_read_excel)
+
+    inspection = dataset_service.inspect_source_file(
+        InspectDatasetInput(source_path=str(dataset_file.resolve()))
+    )
+
+    assert inspection.row_count == 2
+    assert inspection.column_count == 2
+    assert inspection.preview_columns == ["name", "value"]
+
+
 def test_dataset_service_registers_dataset_without_product_project(monkeypatch, tmp_path: Path) -> None:
     _project_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
     dataset_file = tmp_path / "customers.csv"

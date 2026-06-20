@@ -12,6 +12,8 @@ Runtime dependencies now include:
 
 - `pandas`
 - `openpyxl`
+- `polars`
+- `fastexcel`
 - `duckdb`
 - `pydantic`
 - `joblib`
@@ -207,7 +209,7 @@ Packaged smoke checks must cover runtime paths that load package-local native
 libraries, compiled extensions, metadata, or data files. Startup-only smoke can
 miss delayed ML imports: PyInstaller may include a package's Python modules in
 `PYZ` while failing to collect the native files that the package loads later in
-`COLLECT`. XGBoost, LightGBM, DuckDB, scikit-learn, SciPy, NumPy, and pandas
+`COLLECT`. XGBoost, LightGBM, DuckDB, scikit-learn, SciPy, NumPy, pandas, Polars, and Fastexcel
 are examples of dependency families that need this treatment when first-party
 workflows depend on them.
 

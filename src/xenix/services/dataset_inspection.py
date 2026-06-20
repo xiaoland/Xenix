@@ -5,17 +5,12 @@ from enum import StrEnum
 from pathlib import Path
 
 import pandas as pd
-from pandas.api.types import (
-    is_bool_dtype,
-    is_datetime64_any_dtype,
-    is_numeric_dtype,
-    is_object_dtype,
-    is_string_dtype,
-)
+import polars as pl
 from pydantic import BaseModel, Field
 
 from ..exceptions import ValidationError
 from .storage.models import DatasetSourceFormat
+from .tabular import format_column, format_value, load_tabular_frame, preview_rows
 
 
 class DatasetColumnKind(StrEnum):
@@ -76,20 +71,16 @@ def load_dataframe(path: Path, source_format: DatasetSourceFormat) -> pd.DataFra
     raise ValidationError("Only .csv, .xlsx, and .xls dataset files are supported.")
 
 
-def infer_column_kind(series: pd.Series) -> DatasetColumnKind:
-    if is_bool_dtype(series):
+def infer_column_kind(series: pl.Series) -> DatasetColumnKind:
+    dtype = series.dtype
+    if dtype == pl.Boolean:
         return DatasetColumnKind.BOOLEAN
-    if is_numeric_dtype(series):
+    if dtype.is_numeric():
         return DatasetColumnKind.NUMERIC
-    if is_datetime64_any_dtype(series):
+    if dtype.is_temporal():
         return DatasetColumnKind.DATETIME
-    if is_string_dtype(series):
-        unique_values = {value for value in series.dropna().unique()}
-        if unique_values and len(unique_values) <= 16:
-            return DatasetColumnKind.CATEGORICAL
-        return DatasetColumnKind.TEXT
-    if is_object_dtype(series):
-        unique_values = {value for value in series.dropna().unique()}
+    if dtype in {pl.String, pl.Categorical, pl.Enum, pl.Object}:
+        unique_values = series.drop_nulls().unique().head(17).to_list()
         if unique_values and len(unique_values) <= 16:
             return DatasetColumnKind.CATEGORICAL
         return DatasetColumnKind.TEXT
@@ -101,34 +92,30 @@ def inspect_dataset_file(source_path: Path) -> DatasetInspection:
     if source_format is DatasetSourceFormat.UNKNOWN:
         raise ValidationError("Only .csv, .xlsx, and .xls dataset files are supported.")
 
-    dataframe = load_dataframe(source_path, source_format)
-    if len(dataframe.columns) == 0:
+    dataframe = load_tabular_frame(source_path, source_format)
+    if dataframe.width == 0:
         raise ValidationError("Dataset file must contain at least one column.")
-    if len(dataframe.index) == 0:
+    if dataframe.height == 0:
         raise ValidationError("Dataset file must contain at least one data row.")
 
     columns = [
         DatasetColumnMetadata(
             name=str(column_name),
             kind=infer_column_kind(dataframe[column_name]),
-            nullable=bool(dataframe[column_name].isna().any()),
+            nullable=_has_missing_values(dataframe[column_name]),
         )
         for column_name in dataframe.columns
     ]
     preview_columns = [str(column_name) for column_name in dataframe.columns]
-    preview_rows = [
-        [_format_preview_value(value) for value in row]
-        for row in dataframe.head(5).itertuples(index=False, name=None)
-    ]
     return DatasetInspection(
         source_path=str(source_path),
         source_format=source_format,
         file_name=source_path.name,
-        row_count=int(len(dataframe.index)),
-        column_count=int(len(dataframe.columns)),
+        row_count=int(dataframe.height),
+        column_count=int(dataframe.width),
         columns=columns,
         preview_columns=preview_columns,
-        preview_rows=preview_rows,
+        preview_rows=preview_rows(dataframe, limit=5),
     )
 
 
@@ -165,7 +152,7 @@ def _inspect_csv_attachment_metadata(
                 raise ValidationError("Dataset file must contain at least one column.") from exc
 
             preview_columns = [
-                _format_preview_column(column_name, index)
+                format_column(column_name, index)
                 for index, column_name in enumerate(header)
             ]
             if not preview_columns:
@@ -209,7 +196,7 @@ def _inspect_xlsx_attachment_metadata(
             (),
         )
         preview_columns = [
-            _format_preview_column(value, index)
+            format_column(value, index)
             for index, value in enumerate(header_row)
         ]
         if len(preview_columns) < column_count:
@@ -233,14 +220,9 @@ def _inspect_xlsx_attachment_metadata(
     )
 
 
-def _format_preview_value(value: object) -> str:
-    if pd.isna(value):
-        return ""
-    return str(value)
-
-
-def _format_preview_column(value: object, index: int) -> str:
-    text = _format_preview_value(value)
-    if text:
-        return text
-    return f"Unnamed: {index}"
+def _has_missing_values(series: pl.Series) -> bool:
+    if series.null_count() > 0:
+        return True
+    if series.dtype.is_float():
+        return bool(series.is_nan().sum())
+    return False
