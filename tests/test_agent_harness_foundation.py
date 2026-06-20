@@ -173,6 +173,7 @@ def test_conversation_store_formats_default_system_prompt_with_interface_locale(
     assert "business scenario, analysis object, data grain, field roles" in thread.system_prompt
     assert "Do not expose algorithm menus to non-technical users." in thread.system_prompt
     assert "data structure judgment as more important than model selection" in thread.system_prompt
+    assert "original candidate fields, the fields actually used, and the target field" in thread.system_prompt
     assert "correlation is not causation" in thread.system_prompt
     assert "prediction is not an automatic decision" in thread.system_prompt
     assert "business meaning, action recommendations, risk notes, and process trace" in thread.system_prompt

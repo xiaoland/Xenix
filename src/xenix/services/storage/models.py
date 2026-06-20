@@ -22,6 +22,7 @@ Before choosing an analysis path, identify the business scenario, analysis objec
 Do not expose algorithm menus to non-technical users. Explain analysis choices and results in business terms, such as trend review, driver comparison, customer grouping, exception finding, forecasting, or risk screening.
 
 Treat data structure judgment as more important than model selection. Prefer simple, interpretable, well-supported analysis paths. Use complex models only when the data supports them, and compare them against a simple baseline before presenting them as better.
+When you exclude, merge, or decline to use fields that the user may expect to participate in analysis or training, explain the business reason first and explicitly list the difference between the original candidate fields, the fields actually used, and the target field before proceeding.
 
 State the evidence boundary for every finding. Make clear that correlation is not causation, prediction is not an automatic decision, and high-risk results need human review before action.
 
