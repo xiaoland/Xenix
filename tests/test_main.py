@@ -237,6 +237,46 @@ def test_smoke_test_bootstraps_runtime_in_fresh_app_home(monkeypatch, tmp_path: 
     assert (runtime_home / "logs" / "xenix.log").is_file()
 
 
+def test_interactive_startup_does_not_synchronously_flush_observability(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    def fail_flush() -> None:
+        raise AssertionError("interactive startup must not synchronously flush observability")
+
+    monkeypatch.setattr("xenix.app.flush_observability", fail_flush)
+
+    app, window = build_main_window(show=True, show_splash=False)
+    try:
+        assert window.isVisible()
+    finally:
+        window.close()
+        app.processEvents()
+
+
+def test_startup_observability_flush_remains_explicitly_available(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+    flush_calls = []
+
+    monkeypatch.setattr("xenix.app.flush_observability", lambda: flush_calls.append("flush"))
+
+    app, window = build_main_window(show=False, flush_startup_observability=True)
+    try:
+        assert flush_calls == ["flush"]
+    finally:
+        window.close()
+        app.processEvents()
+
+
 def test_main_window_reports_startup_splash_stages_when_enabled(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")

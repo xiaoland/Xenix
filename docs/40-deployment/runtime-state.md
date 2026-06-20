@@ -65,6 +65,11 @@ export additionally requires `XENIX_OTEL_EXPORT_LOGS=true`. Use
 `XENIX_OTEL_EXPORT_TRACES=false` or `XENIX_OTEL_EXPORT_METRICS=false` to disable
 a signal even when a global OTLP endpoint is configured.
 
+Interactive startup does not synchronously flush OTLP exporters after the shell
+is visible. This keeps a slow or unreachable telemetry backend from blocking the
+Qt event loop; non-interactive smoke and diagnostic process-exit paths may still
+flush to preserve deterministic validation behavior.
+
 Run `pdm run diagnostic-bundle` to create a local support bundle under `temp/`.
 The bundle includes logs, ML task logs, telemetry metadata, and SQLite
 schema/table-count summaries; it does not include the raw database file.

@@ -128,6 +128,12 @@ Phoenix is an AI trace backend, not a full replacement for a logs/metrics
 collector. Prefer routing through an OpenTelemetry Collector when traces,
 metrics, and logs need different destinations.
 
+Interactive startup does not force-flush OTLP exporters after the MainWindow is
+shown. Startup spans are handed to the OpenTelemetry batch processors so a slow
+or unreachable telemetry backend cannot block Qt input. Smoke and diagnostic
+process-exit paths may still flush synchronously to make validation output
+deterministic.
+
 When sending different signals to different backends directly, keep all three
 transport settings signal-specific:
 

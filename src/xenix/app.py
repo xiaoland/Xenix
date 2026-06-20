@@ -342,6 +342,7 @@ def build_main_window(
     show: bool = True,
     show_splash: bool | None = None,
     splash_hold_ms: int = 0,
+    flush_startup_observability: bool = False,
 ) -> tuple[QApplication, MainWindow]:
     build_start = time.perf_counter()
     _emit_startup_timing("build_main_window.start")
@@ -536,7 +537,8 @@ def build_main_window(
         record_counter("xenix.app.startup.count", attributes={"status": "succeeded"})
         startup_scope.__exit__(None, None, None)
         startup_span_active = False
-        flush_observability()
+        if flush_startup_observability:
+            flush_observability()
         _emit_startup_timing("build_main_window.total", build_start)
         return app, window
     except Exception:
@@ -696,6 +698,7 @@ def run(*, smoke_test: bool = False) -> int:
             show=not smoke_test,
             show_splash=not smoke_test,
             splash_hold_ms=0 if smoke_test else STARTUP_SPLASH_HOLD_MS,
+            flush_startup_observability=smoke_test,
         )
     except TrialLockStartupExit:
         return 1
