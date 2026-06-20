@@ -29,7 +29,7 @@ The central thread detail view stretches to consume remaining horizontal space. 
 - step-budget confirmation controls
 
 The ThreadDetailView EventList renders projected Chatbot Events emitted by Agent Harness. System messages are hidden from the normal EventList unless Agent Harness exposes a dedicated control event.
-Transient thinking state is also driven by Chatbot Events: `THINKING` with `IN_PROGRESS` inserts or updates the temporary thinking item, while a terminal `THINKING` event with the same id removes it. Thinking represents the interval from provider request send to the first provider stream event. MainWindow and ThreadDetailView must not infer thinking lifetime from snapshots or assistant message arrival.
+Transient thinking state is owned by Agent Harness events for the active Agent processing window. MainWindow and ThreadDetailView must not create local Thinking placeholders or infer thinking lifetime from assistant message arrival. `THINKING` with `IN_PROGRESS` inserts or updates the temporary thinking item, while a terminal `THINKING` event with the same id removes it.
 
 ## Event Rendering
 
@@ -70,12 +70,14 @@ User text message bubbles own their black background as one custom-painted visua
 - Changing the model picker during a running turn must not change the provider already locked for that turn.
 - ML worker setup belongs in Settings, not in Agent tool messages or Composer controls. The setup wizard may show connection, environment setup, and validation state, but Chatbot tools do not expose worker selection.
 - Dragging local files over any child of the composer shell keeps the hover overlay visible.
+- Attached dataset files are preflighted before send. Attachment chips show pending, ready, or failed state and expose removal. Pending or failed attachments block send; removing a pending attachment aborts its preflight logically and removing an unsent registered attachment discards the unreferenced dataset record.
 
 ## Streaming Contract
 
 During a running turn:
 
 - user message appears immediately
+- when attachments are present, the user message appears only after all attached datasets are ready; pending or failed attachments remain in the Composer
 - send button becomes stop
 - non-final snapshots initialize or resume the running turn without releasing the composer
 - Chatbot Events create, update, or finalize visible EventList items by event id

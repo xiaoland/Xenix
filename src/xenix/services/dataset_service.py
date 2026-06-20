@@ -8,7 +8,7 @@ from uuid import uuid4
 
 import pandas as pd
 from sqlalchemy.orm import sessionmaker
-from sqlmodel import SQLModel
+from sqlmodel import SQLModel, select
 
 from ..config import AppPaths
 from ..exceptions import NotFoundError, ValidationError
@@ -21,7 +21,14 @@ from .dataset_inspection import (
     inspect_dataset_file,
     load_dataframe,
 )
-from .storage.models import DatasetRow, DatasetSourceFormat, ProjectRow
+from .storage.models import (
+    DatasetColumnBindingRow,
+    DatasetRow,
+    DatasetSourceFormat,
+    MLTaskRow,
+    ProjectRow,
+    TrainedModelRow,
+)
 from .storage.repositories import DatasetRepository, ProjectRepository
 
 
@@ -142,7 +149,11 @@ class DatasetService:
 
     def register_dataset_attachment(self, input_data: RegisterDatasetInput) -> RegisteredDatasetAttachment:
         dataset = self.register_dataset(input_data)
-        metadata = self.inspect_attachment_metadata(InspectDatasetInput(source_path=dataset.source_path))
+        try:
+            metadata = self.inspect_attachment_metadata(InspectDatasetInput(source_path=dataset.source_path))
+        except Exception:
+            self.discard_unreferenced_dataset(dataset.id)
+            raise
         return RegisteredDatasetAttachment(
             dataset_id=dataset.id,
             name=dataset.name,
@@ -152,6 +163,22 @@ class DatasetService:
             column_count=metadata.column_count,
             preview_columns=metadata.preview_columns,
         )
+
+    def discard_unreferenced_dataset(self, dataset_id: str) -> bool:
+        normalized = dataset_id.strip()
+        if not normalized:
+            raise ValidationError("Dataset id cannot be empty.")
+        with self._session_factory() as session:
+            row = self._datasets.get(session, normalized)
+            if row is None:
+                return False
+            if not self._is_discardable_source_dataset(row):
+                raise ValidationError("Dataset is already owned by another workflow and cannot be discarded.")
+            if self._has_dataset_references(session, row.id):
+                raise ValidationError("Dataset is already referenced and cannot be discarded.")
+            self._datasets.delete(session, row)
+            session.commit()
+            return True
 
     def rename_dataset(self, input_data: RenameDatasetInput) -> DatasetRow:
         new_name = input_data.new_name.strip()
@@ -297,3 +324,16 @@ class DatasetService:
         row = ProjectRow(name="Agent Analysis")
         self._projects.create(session, row)
         return row.id
+
+    def _is_discardable_source_dataset(self, row: DatasetRow) -> bool:
+        return row.copied_from is None and row.derived_from_dataset_id is None and row.ml_task_id is None
+
+    def _has_dataset_references(self, session, dataset_id: str) -> bool:
+        reference_statements = [
+            select(DatasetRow.id).where(DatasetRow.copied_from == dataset_id),
+            select(DatasetRow.id).where(DatasetRow.derived_from_dataset_id == dataset_id),
+            select(DatasetColumnBindingRow.id).where(DatasetColumnBindingRow.dataset_id == dataset_id),
+            select(MLTaskRow.id).where(MLTaskRow.dataset_id == dataset_id),
+            select(TrainedModelRow.id).where(TrainedModelRow.dataset_id == dataset_id),
+        ]
+        return any(session.exec(statement).first() is not None for statement in reference_statements)

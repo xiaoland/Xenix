@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from xenix.config import ensure_app_dirs, get_app_paths
-from xenix.exceptions import InvalidStateTransitionError, ValidationError
+from xenix.exceptions import InvalidStateTransitionError, NotFoundError, ValidationError
 from xenix.services.dataset_inspection import InspectDatasetInput
 from xenix.services.dataset_service import (
     DatasetService,
@@ -109,6 +109,44 @@ def test_dataset_service_registers_xlsx_attachment_without_full_inspection(
     assert attachment.row_count == 2
     assert attachment.column_count == 2
     assert attachment.preview_columns == ["name", "value"]
+
+
+def test_dataset_service_discards_unreferenced_dataset(monkeypatch, tmp_path: Path) -> None:
+    _project_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
+    dataset_file = tmp_path / "customers.csv"
+    dataset_file.write_text("name,value\nAcme,12\n", encoding="utf-8")
+    dataset = dataset_service.register_dataset(
+        RegisterDatasetInput(source_path=str(dataset_file.resolve()), name="Customers")
+    )
+
+    assert dataset_service.discard_unreferenced_dataset(dataset.id) is True
+
+    with pytest.raises(NotFoundError):
+        dataset_service.get_dataset(dataset.id)
+
+
+def test_dataset_service_rejects_discard_when_dataset_is_referenced(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _project_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
+    source_file = tmp_path / "customers.csv"
+    derived_file = tmp_path / "customers-clean.csv"
+    source_file.write_text("name,value\nAcme,12\n", encoding="utf-8")
+    derived_file.write_text("name,value\nAcme,12\n", encoding="utf-8")
+    source = dataset_service.register_dataset(
+        RegisterDatasetInput(source_path=str(source_file.resolve()), name="Customers")
+    )
+    dataset_service.register_dataset(
+        RegisterDatasetInput(
+            source_path=str(derived_file.resolve()),
+            name="Customers clean",
+            derived_from_dataset_id=source.id,
+        )
+    )
+
+    with pytest.raises(ValidationError):
+        dataset_service.discard_unreferenced_dataset(source.id)
 
 
 def test_dataset_service_rejects_empty_dataset_file(monkeypatch, tmp_path: Path) -> None:

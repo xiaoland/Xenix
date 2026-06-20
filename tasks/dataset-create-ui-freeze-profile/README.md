@@ -38,6 +38,20 @@
   - `MainWindow` runs dataset attachment preflight in a background `threading.Thread` and marshals completion through Qt signals.
   - Existing Agent Harness streaming stays unchanged and starts only after preflight succeeds.
   - Preflight failure restores composer text and attachment chips.
+- Follow-up implementation after UX correction:
+  - Attachment preflight now starts when a file is attached, not when the user sends.
+  - Composer attachment chips carry pending, ready, and failed state.
+  - Pending or failed attachments block send; the send button shows a loading state while any attachment is pending.
+  - Attachment chips expose removal. Removing a pending attachment logically aborts its preflight; if the background worker later succeeds, the newly registered dataset is discarded instead of being attached back to the composer.
+  - Removing a ready unsent attachment discards its unreferenced dataset registration.
+  - Sending consumes only ready attachment metadata and no longer performs dataset registration or metadata inspection.
+  - Runtime and Chatbot UI TDD docs were updated to reflect attach-time dataset registration.
+- Thinking ownership correction:
+  - The local Thinking placeholder caused duplicate Thinking rows because Agent Harness also emitted an authoritative `THINKING` event with its own event id.
+  - Thinking is now owned only by Agent Harness events.
+  - Agent Harness emits `THINKING IN_PROGRESS` immediately after the initial non-final snapshot for a new or resumed run.
+  - The streaming provider loop no longer emits a second `THINKING IN_PROGRESS`; it only completes/fails/cancels the run-level Thinking event.
+  - `ThreadDetailView.show_thinking_indicator()` was removed so UI code cannot create a second local Thinking source.
 
 ## Evidence Log
 
@@ -72,7 +86,15 @@
   - Result: 51 passed.
   - Added service coverage that `.xlsx` attachment registration does not call `pandas.read_excel()`.
   - Added UI coverage that dataset preflight runs off the UI thread before harness submission.
+- Follow-up automated verification:
+  - `pdm run pytest tests/test_main.py tests/test_services.py -q`
+  - Result: 54 passed.
+  - Added coverage for attach-time preflight, pending attachment abort/removal, and unreferenced dataset discard.
+- Thinking ownership verification:
+  - `pdm run pytest tests/test_agent_harness_streaming.py tests/test_main.py tests/test_i18n.py tests/test_services.py -q`
+  - Result: 80 passed.
+  - Added/updated coverage that a Harness snapshot followed by a Harness Thinking event produces one visible Thinking row.
 
 ## Next Step
 
-- Done for this slice. A future improvement could expose visible "preparing dataset" status text during preflight, but the blocking behavior and full-read attachment path are fixed.
+- Done for this slice. Remaining possible hardening: cleanup of unsent ready attachments on application shutdown, if runtime evidence shows composer-draft dataset records accumulating.

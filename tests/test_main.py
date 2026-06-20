@@ -958,7 +958,15 @@ def test_main_window_stop_cancels_active_agent_run(monkeypatch, tmp_path: Path) 
 
         window._active_agent_run_id = "run-to-stop"
         window._thread_detail_view.set_running(True)
-        window._thread_detail_view.show_thinking_indicator()
+        window._thread_detail_view.apply_chatbot_event(
+            ChatbotEvent(
+                id="run-to-stop:thinking",
+                kind=ChatbotEventKind.THINKING,
+                author=ChatbotEventAuthor.ASSISTANT,
+                status=ChatbotEventStatus.IN_PROGRESS,
+                content_blocks=[{"type": "thinking", "text": "Thinking..."}],
+            )
+        )
         window._thread_detail_view._send_button.click()
         app.processEvents()
 
@@ -1211,6 +1219,12 @@ def test_main_window_keeps_thinking_indicator_during_non_final_snapshot(monkeypa
         thinking = window._thread_detail_view._thinking_bubble
         assert thinking is not None
         assert thinking._blocks == [{"type": "thinking", "text": "Thinking..."}]
+        thinking_widgets = []
+        for index in range(window._thread_detail_view._message_layout.count()):
+            widget = window._thread_detail_view._message_layout.itemAt(index).widget()
+            if getattr(widget, "_blocks", None) == [{"type": "thinking", "text": "Thinking..."}]:
+                thinking_widgets.append(widget)
+        assert len(thinking_widgets) == 1
     finally:
         release_stream = True
         for _ in range(5):
@@ -1248,7 +1262,7 @@ def test_main_window_submit_chat_message_injects_interface_locale(monkeypatch, t
         window.close()
 
 
-def test_main_window_submit_chat_message_registers_dataset_attachments(monkeypatch, tmp_path: Path) -> None:
+def test_main_window_submit_chat_message_uses_ready_dataset_attachments(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     data_file = tmp_path / "customers.csv"
     data_file.write_text("name,value\nAcme,12\n", encoding="utf-8")
@@ -1263,6 +1277,15 @@ def test_main_window_submit_chat_message_registers_dataset_attachments(monkeypat
             return []
 
         monkeypatch.setattr(window._agent_harness_service, "submit_user_turn_stream", fake_submit)
+        window._thread_detail_view._add_local_files([str(data_file.resolve())])
+        resolved_path = str(data_file.resolve())
+        for _ in range(40):
+            app.processEvents()
+            record = window._composer_attachments.get(resolved_path)
+            if record is not None and record.attachment is not None:
+                break
+            time.sleep(0.01)
+
         window._submit_chat_message("Analyze this.", [str(data_file.resolve())], "")
 
         for _ in range(40):
@@ -1284,7 +1307,7 @@ def test_main_window_submit_chat_message_registers_dataset_attachments(monkeypat
         window.close()
 
 
-def test_main_window_submit_chat_message_runs_dataset_preflight_off_ui_thread(
+def test_main_window_attach_file_runs_dataset_preflight_off_ui_thread(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -1295,50 +1318,102 @@ def test_main_window_submit_chat_message_runs_dataset_preflight_off_ui_thread(
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
 
     app, window = build_main_window(show=False)
-    captured_inputs = []
     preflight_started = threading.Event()
     release_preflight = threading.Event()
     try:
-        def fake_register(file_paths):
+        def fake_register(file_path):
             preflight_started.set()
-            assert file_paths == [str(data_file.resolve())]
+            assert file_path == str(data_file.resolve())
             assert release_preflight.wait(timeout=2.0)
-            return [
-                DatasetAttachmentInput(
-                    dataset_id="dataset-1",
-                    name="customers",
-                    file_name="customers.csv",
-                    source_format="csv",
-                    row_count=1,
-                    column_count=2,
-                    preview_columns=["name", "value"],
-                )
-            ]
+            return DatasetAttachmentInput(
+                dataset_id="dataset-1",
+                name="customers",
+                file_name="customers.csv",
+                source_format="csv",
+                row_count=1,
+                column_count=2,
+                preview_columns=["name", "value"],
+            )
 
-        def fake_submit(input_data):
-            captured_inputs.append(input_data)
-            return []
-
-        monkeypatch.setattr(window, "_register_composer_datasets", fake_register)
-        monkeypatch.setattr(window._agent_harness_service, "submit_user_turn_stream", fake_submit)
+        monkeypatch.setattr(window, "_register_composer_dataset", fake_register)
 
         started_at = time.perf_counter()
-        window._submit_chat_message("Analyze this.", [str(data_file.resolve())], "")
+        window._thread_detail_view._add_local_files([str(data_file.resolve())])
         elapsed = time.perf_counter() - started_at
 
         assert elapsed < 0.5
         assert preflight_started.wait(timeout=1.0)
-        assert captured_inputs == []
+        assert window._thread_detail_view._send_button.isEnabled() is False
+
+        release_preflight.set()
+        resolved_path = str(data_file.resolve())
+        for _ in range(40):
+            app.processEvents()
+            record = window._composer_attachments.get(resolved_path)
+            if record is not None and record.attachment is not None:
+                break
+            time.sleep(0.01)
+
+        assert window._composer_attachments[resolved_path].attachment is not None
+        assert window._thread_detail_view._send_button.isEnabled() is True
+    finally:
+        release_preflight.set()
+        window.close()
+
+
+def test_main_window_remove_pending_attachment_aborts_preflight_and_discards_dataset(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    data_file = tmp_path / "customers.csv"
+    data_file.write_text("name,value\nAcme,12\n", encoding="utf-8")
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=False)
+    preflight_started = threading.Event()
+    release_preflight = threading.Event()
+    discarded_dataset_ids = []
+    try:
+        def fake_register(file_path):
+            preflight_started.set()
+            assert file_path == str(data_file.resolve())
+            assert release_preflight.wait(timeout=2.0)
+            return DatasetAttachmentInput(
+                dataset_id="dataset-removed",
+                name="customers",
+                file_name="customers.csv",
+                source_format="csv",
+                row_count=1,
+                column_count=2,
+                preview_columns=["name", "value"],
+            )
+
+        monkeypatch.setattr(window, "_register_composer_dataset", fake_register)
+        monkeypatch.setattr(
+            window._dataset_service,
+            "discard_unreferenced_dataset",
+            lambda dataset_id: discarded_dataset_ids.append(dataset_id) or True,
+        )
+
+        resolved_path = str(data_file.resolve())
+        window._thread_detail_view._add_local_files([resolved_path])
+        assert preflight_started.wait(timeout=1.0)
+
+        window._thread_detail_view._remove_attached_file(resolved_path)
+        assert resolved_path not in window._thread_detail_view._attached_files
+        assert resolved_path not in window._composer_attachments
 
         release_preflight.set()
         for _ in range(40):
             app.processEvents()
-            if captured_inputs:
+            if discarded_dataset_ids:
                 break
             time.sleep(0.01)
 
-        assert len(captured_inputs) == 1
-        assert captured_inputs[0].dataset_attachments[0].dataset_id == "dataset-1"
+        assert discarded_dataset_ids == ["dataset-removed"]
+        assert resolved_path not in window._composer_attachments
     finally:
         release_preflight.set()
         window.close()

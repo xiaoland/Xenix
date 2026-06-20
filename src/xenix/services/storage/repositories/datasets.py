@@ -119,3 +119,7 @@ class DatasetRepository:
         session.flush()
         session.refresh(row)
         return row
+
+    def delete(self, session: Session, row: DatasetRow) -> None:
+        session.delete(row)
+        session.flush()

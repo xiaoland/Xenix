@@ -40,6 +40,10 @@ def attach_file_icon(*, color: QColor | str = DEFAULT_ICON_COLOR) -> QIcon:
     return icon("ph.paperclip", color=color)
 
 
+def remove_icon(*, color: QColor | str = DEFAULT_ICON_COLOR) -> QIcon:
+    return icon("ph.x", color=color)
+
+
 def _color_value(color: QColor | str) -> str:
     if isinstance(color, QColor):
         return color.name()

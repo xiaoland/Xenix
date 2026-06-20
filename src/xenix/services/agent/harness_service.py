@@ -332,6 +332,12 @@ class AgentHarnessService:
             chatbot_events=self.project_chatbot_events(snapshot),
             is_final=False,
         )
+        yield self._thinking_event(
+            thread_id=thread_id,
+            turn_id=turn_id,
+            run_id=run_id,
+            status=ChatbotEventStatus.IN_PROGRESS,
+        )
 
         try:
             outcome = yield from self._run_provider_loop_stream(
@@ -340,6 +346,7 @@ class AgentHarnessService:
                 run_id=run_id,
                 step_state=self._initial_step_state(),
                 provider=provider,
+                thinking_active=True,
             )
             if isinstance(outcome, StepBudgetPause):
                 self._record_agent_turn("awaiting_confirmation")
@@ -416,6 +423,12 @@ class AgentHarnessService:
             chatbot_events=self.project_chatbot_events(snapshot),
             is_final=False,
         )
+        yield self._thinking_event(
+            thread_id=input_data.thread_id,
+            turn_id=input_data.turn_id,
+            run_id=input_data.run_id,
+            status=ChatbotEventStatus.IN_PROGRESS,
+        )
 
         try:
             outcome = yield from self._run_provider_loop_stream(
@@ -424,6 +437,7 @@ class AgentHarnessService:
                 run_id=input_data.run_id,
                 step_state=step_state,
                 provider=provider,
+                thinking_active=True,
             )
             if isinstance(outcome, StepBudgetPause):
                 yield self._step_confirmation_event(outcome)
@@ -756,6 +770,7 @@ class AgentHarnessService:
         run_id: str,
         step_state: dict[str, int],
         provider: AgentProvider,
+        thinking_active: bool = False,
     ):
         while step_state["used_steps"] < step_state["granted_steps"]:
             step_state["used_steps"] += 1
@@ -775,7 +790,6 @@ class AgentHarnessService:
             assistant_message: AgentMessageRow | None = None
             assistant_text = ""
             provider_output_message_ids: list[str] = []
-            thinking_in_progress = True
             tool_specs = self._tool_specs_for_context(snapshot=snapshot, dataset_ids=dataset_ids)
             available_tool_names = {tool.name for tool in tool_specs}
             provider_span_attributes = ai_observability.provider_request_span_attributes(
@@ -784,12 +798,6 @@ class AgentHarnessService:
                 tool_specs=tool_specs,
                 loop_step_index=step_state["used_steps"],
                 stream=True,
-            )
-            yield self._thinking_event(
-                thread_id=thread_id,
-                turn_id=turn_id,
-                run_id=run_id,
-                status=ChatbotEventStatus.IN_PROGRESS,
             )
             try:
                 provider_started_at = perf_counter()
@@ -805,8 +813,8 @@ class AgentHarnessService:
                         if first_event_ms is None:
                             first_event_ms = elapsed_ms
                         self._raise_if_cancelled(run_id)
-                        if thinking_in_progress:
-                            thinking_in_progress = False
+                        if thinking_active:
+                            thinking_active = False
                             yield self._thinking_event(
                                 thread_id=thread_id,
                                 turn_id=turn_id,
@@ -872,7 +880,8 @@ class AgentHarnessService:
                     provider_request,
                     status=AgentProviderRequestStatus.CANCELLED,
                 )
-                if thinking_in_progress:
+                if thinking_active:
+                    thinking_active = False
                     yield self._thinking_event(
                         thread_id=thread_id,
                         turn_id=turn_id,
@@ -893,7 +902,8 @@ class AgentHarnessService:
                     provider_request,
                     status=AgentProviderRequestStatus.FAILED,
                 )
-                if thinking_in_progress:
+                if thinking_active:
+                    thinking_active = False
                     yield self._thinking_event(
                         thread_id=thread_id,
                         turn_id=turn_id,
@@ -909,8 +919,8 @@ class AgentHarnessService:
                     )
                     yield self._message_event("message_finalized", assistant_message, run_id)
                 raise
-            if thinking_in_progress:
-                thinking_in_progress = False
+            if thinking_active:
+                thinking_active = False
                 yield self._thinking_event(
                     thread_id=thread_id,
                     turn_id=turn_id,

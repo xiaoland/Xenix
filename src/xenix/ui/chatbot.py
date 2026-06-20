@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, Callable
 
@@ -31,7 +33,7 @@ from ..services.agent import (
     project_chatbot_events,
 )
 from ..services.storage.models import AgentMessageAuthor, AgentMessageKind
-from .icons import attach_file_icon, chevron_icon, tool_icon
+from .icons import attach_file_icon, chevron_icon, remove_icon, tool_icon
 from .markdown_renderer import render_chat_markdown
 
 USER_MESSAGE_BACKGROUND = QColor("#000000")
@@ -47,6 +49,19 @@ a {
 UNBOUNDED_WIDGET_WIDTH = 16777215
 ArtifactResolver = Callable[[str], Any]
 SUPPORTED_DATASET_SUFFIXES = {".csv", ".xlsx", ".xls"}
+
+
+class ComposerAttachmentStatus(StrEnum):
+    PENDING = "pending"
+    READY = "ready"
+    FAILED = "failed"
+
+
+@dataclass
+class ComposerAttachmentState:
+    path: str
+    status: ComposerAttachmentStatus = ComposerAttachmentStatus.PENDING
+    error: str | None = None
 
 
 def _render_content_blocks(blocks: list[dict[str, Any]]) -> str:
@@ -849,21 +864,51 @@ class UsageOverviewItem(QFrame):
 
 
 class AttachmentChip(QFrame):
-    def __init__(self, path: str, parent: QWidget | None = None) -> None:
+    remove_requested = Signal(str)
+
+    def __init__(self, state: ComposerAttachmentState, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.path = path
+        self.path = state.path
         self.setObjectName("attachmentChip")
         self.setFrameShape(QFrame.StyledPanel)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(9, 5, 9, 5)
         layout.setSpacing(6)
-        name_label = QLabel(Path(path).name)
+        name_label = QLabel(Path(state.path).name)
         name_label.setObjectName("attachmentChipLabel")
+        status_label = QLabel()
+        status_label.setObjectName("attachmentChipStatus")
+        status_label.setFixedWidth(16)
+        remove_button = QToolButton()
+        remove_button.setObjectName("attachmentChipRemoveButton")
+        remove_button.setFixedSize(18, 18)
+        remove_button.setIcon(remove_icon())
+        remove_button.setIconSize(QSize(12, 12))
+        remove_button.clicked.connect(lambda: self.remove_requested.emit(self.path))
+        self._status_label = status_label
+        self._remove_button = remove_button
         layout.addWidget(name_label)
+        layout.addWidget(status_label)
+        layout.addWidget(remove_button)
+        self.set_state(state)
+
+    def set_state(self, state: ComposerAttachmentState) -> None:
+        self.path = state.path
+        if state.status is ComposerAttachmentStatus.PENDING:
+            self._status_label.setText("...")
+        elif state.status is ComposerAttachmentStatus.FAILED:
+            self._status_label.setText("!")
+        else:
+            self._status_label.clear()
+        self._status_label.setProperty("attachmentStatus", state.status.value)
+        self.setProperty("attachmentStatus", state.status.value)
+        self._status_label.setToolTip(state.error or "")
 
 
 class ThreadDetailView(QWidget):
     message_submitted = Signal(str, list, str)
+    files_attached = Signal(list)
+    attachment_removed = Signal(str)
     artifact_link_activated = Signal(str)
     tool_action_requested = Signal(object)
     stop_requested = Signal()
@@ -876,6 +921,7 @@ class ThreadDetailView(QWidget):
         self.setObjectName("threadDetailView")
         self.setAcceptDrops(True)
         self._attached_files: list[str] = []
+        self._attachment_states: dict[str, ComposerAttachmentState] = {}
         self._running = False
         self._awaiting_step_confirmation = False
         self._thinking_bubble: ChatMessageBubble | None = None
@@ -1206,26 +1252,14 @@ class ThreadDetailView(QWidget):
         self._message_layout.removeWidget(widget)
         widget.deleteLater()
 
-    def show_thinking_indicator(self) -> None:
-        if self._thinking_bubble is not None:
-            self._scroll_to_latest()
-            return
-        self._thinking_bubble = ChatMessageBubble(
-            author="Xenix",
-            blocks=[{"type": "thinking", "text": "Thinking..."}],
-            artifact_resolver=self._artifact_resolver,
-            parent=self,
-        )
-        self._thinking_bubble.link_activated.connect(self.artifact_link_activated.emit)
-        self._thinking_bubble.set_available_width(self._message_column.width())
-        self._message_layout.insertWidget(self._message_layout.count() - 1, self._thinking_bubble)
-        self._scroll_to_latest()
-
     def hide_thinking_indicator(self) -> None:
         if self._thinking_bubble is None:
             return
         bubble = self._thinking_bubble
         self._thinking_bubble = None
+        for event_id, widget in list(self._event_widgets_by_id.items()):
+            if widget is bubble:
+                self._event_widgets_by_id.pop(event_id, None)
         self._message_layout.removeWidget(bubble)
         bubble.deleteLater()
 
@@ -1315,7 +1349,12 @@ class ThreadDetailView(QWidget):
             self.model_selected.emit(fq_model_key)
 
     def _sync_send_button_text(self) -> None:
-        send_text = self.tr("Stop") if self._running else self.tr("Send")
+        if self._running:
+            send_text = self.tr("Stop")
+        elif self._has_pending_attachments():
+            send_text = "..."
+        else:
+            send_text = self.tr("Send")
         self._send_button.setText(send_text)
 
     def show_step_confirmation(self, message: str) -> None:
@@ -1377,19 +1416,55 @@ class ThreadDetailView(QWidget):
         button.setIconSize(QSize(16, 16))
         button.setToolTip(self.tr("Attach files"))
 
-    def _add_local_files(self, paths: list[str]) -> None:
+    def _add_local_files(self, paths: list[str], *, notify: bool = True) -> None:
+        added_paths: list[str] = []
         for raw_path in paths:
             path = str(Path(raw_path).resolve())
             if Path(path).suffix.lower() not in SUPPORTED_DATASET_SUFFIXES:
                 continue
             if path not in self._attached_files:
                 self._attached_files.append(path)
+                self._attachment_states[path] = ComposerAttachmentState(path=path)
+                added_paths.append(path)
         self._refresh_attachment_chips()
+        self._sync_composer_controls_enabled()
+        if notify and added_paths:
+            self.files_attached.emit(added_paths)
 
     def restore_composer(self, text: str, file_paths: list[str]) -> None:
         self._editor.setPlainText(text)
         self._attached_files.clear()
-        self._add_local_files(file_paths)
+        self._attachment_states.clear()
+        self._add_local_files(file_paths, notify=False)
+
+    def set_attachment_status(
+        self,
+        path: str,
+        status: ComposerAttachmentStatus,
+        *,
+        error: str | None = None,
+    ) -> None:
+        resolved_path = str(Path(path).resolve())
+        state = self._attachment_states.get(resolved_path)
+        if state is None:
+            return
+        state.status = status
+        state.error = error
+        self._refresh_attachment_chips()
+        self._sync_send_button_text()
+        self._sync_composer_controls_enabled()
+
+    def _remove_attached_file(self, path: str, *, notify: bool = True) -> None:
+        resolved_path = str(Path(path).resolve())
+        if resolved_path not in self._attached_files:
+            return
+        self._attached_files.remove(resolved_path)
+        self._attachment_states.pop(resolved_path, None)
+        self._refresh_attachment_chips()
+        self._sync_send_button_text()
+        self._sync_composer_controls_enabled()
+        if notify:
+            self.attachment_removed.emit(resolved_path)
 
     def _install_composer_drop_filters(self) -> None:
         widgets = [
@@ -1461,11 +1536,14 @@ class ThreadDetailView(QWidget):
         if self._awaiting_step_confirmation:
             return
         text = self._editor.toPlainText().strip()
-        files = list(self._attached_files)
+        if self._has_unready_attachments():
+            return
+        files = self._ready_attachment_paths()
         if not text and not files:
             return
         self._editor.clear()
         self._attached_files.clear()
+        self._attachment_states.clear()
         self._refresh_attachment_chips()
         self.message_submitted.emit(text, files, self.selected_fq_model_key())
 
@@ -1473,7 +1551,7 @@ class ThreadDetailView(QWidget):
         can_edit = not self._running and not self._awaiting_step_confirmation
         self._editor.setEnabled(can_edit)
         self._attach_button.setEnabled(can_edit)
-        self._send_button.setEnabled(not self._awaiting_step_confirmation)
+        self._send_button.setEnabled(not self._awaiting_step_confirmation and not self._has_unready_attachments())
         self._model_picker.setEnabled(bool(self._model_options))
         self._step_continue_button.setEnabled(self._awaiting_step_confirmation)
         self._step_stop_button.setEnabled(self._awaiting_step_confirmation)
@@ -1486,7 +1564,33 @@ class ThreadDetailView(QWidget):
                 widget.deleteLater()
         self._attachment_bar.setVisible(bool(self._attached_files))
         for path in self._attached_files:
-            self._attachment_layout.insertWidget(self._attachment_layout.count() - 1, AttachmentChip(path, self))
+            state = self._attachment_states.get(path) or ComposerAttachmentState(
+                path=path,
+                status=ComposerAttachmentStatus.READY,
+            )
+            chip = AttachmentChip(state, self)
+            chip.remove_requested.connect(self._remove_attached_file)
+            self._attachment_layout.insertWidget(self._attachment_layout.count() - 1, chip)
+
+    def _has_unready_attachments(self) -> bool:
+        return any(
+            state.status is not ComposerAttachmentStatus.READY
+            for state in self._attachment_states.values()
+        )
+
+    def _has_pending_attachments(self) -> bool:
+        return any(
+            state.status is ComposerAttachmentStatus.PENDING
+            for state in self._attachment_states.values()
+        )
+
+    def _ready_attachment_paths(self) -> list[str]:
+        ready_paths: list[str] = []
+        for path in self._attached_files:
+            state = self._attachment_states.get(path)
+            if state is not None and state.status is ComposerAttachmentStatus.READY:
+                ready_paths.append(path)
+        return ready_paths
 
     def _author_label(self, author: AgentMessageAuthor) -> str:
         if author is AgentMessageAuthor.USER:

@@ -108,7 +108,16 @@ def test_main_window_language_switch_updates_chat_shell(
         chat_view.clear_messages()
         chat_view.show_error("Stopped.")
         error_bubble = chat_view._message_layout.itemAt(0).widget()
-        chat_view.show_thinking_indicator()
+        chat_view.apply_chatbot_event(
+            ChatbotEvent(
+                id="run-i18n:thinking",
+                kind=ChatbotEventKind.THINKING,
+                author=ChatbotEventAuthor.ASSISTANT,
+                status=ChatbotEventStatus.IN_PROGRESS,
+                content_blocks=[{"type": "thinking", "text": "Thinking..."}],
+            ),
+            auto_scroll=False,
+        )
         tool_item = chat_view.add_tool_event(
             ChatbotEvent(
                 id="tool-event",
