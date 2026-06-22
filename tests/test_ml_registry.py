@@ -1,7 +1,13 @@
+import numpy as np
 import pandas as pd
 
 from xenix.services.ml.contracts import CandidateMetrics
-from xenix.services.ml.evaluation import compare_metric_snapshots, get_default_policy
+from xenix.services.ml.evaluation import (
+    build_classification_metrics,
+    build_regression_metrics,
+    compare_metric_snapshots,
+    get_default_policy,
+)
 from xenix.services.ml.models.classification import XGBoostClassificationService
 from xenix.services.ml.registry import get_model_catalog_entry, list_model_catalog
 from xenix.services.ml.types import ColumnRoleKind, EvaluationKind, ModelCatalogEntry, ModelFamily, ModelTaskKind
@@ -174,3 +180,72 @@ def test_compare_metric_snapshots_prefers_higher_primary_metric_then_tie_breaker
     comparison = compare_metric_snapshots(policy, left, right)
 
     assert comparison > 0
+
+
+def test_regression_metrics_include_extended_evaluation_evidence() -> None:
+    metrics = build_regression_metrics(
+        pd.Series([10.0, 20.0, 30.0, 40.0]),
+        np.array([12.0, 18.0, 33.0, 37.0]),
+    )
+
+    assert metrics.primary_metric_name == "r2"
+    assert {
+        "r2",
+        "mse",
+        "rmse",
+        "mae",
+        "mape",
+        "explained_variance",
+        "residual_mean",
+        "residual_std",
+    }.issubset(metrics.metrics)
+
+
+def test_classification_metrics_include_structured_and_probability_evidence() -> None:
+    metrics = build_classification_metrics(
+        pd.Series(["stay", "stay", "leave", "leave"]),
+        np.array(["stay", "leave", "leave", "leave"]),
+        y_proba=np.array(
+            [
+                [0.1, 0.9],
+                [0.6, 0.4],
+                [0.8, 0.2],
+                [0.9, 0.1],
+            ]
+        ),
+        classes=["leave", "stay"],
+    )
+
+    assert metrics.primary_metric_name == "f1_weighted"
+    assert {
+        "accuracy",
+        "balanced_accuracy",
+        "precision_macro",
+        "precision_weighted",
+        "recall_macro",
+        "recall_weighted",
+        "f1_macro",
+        "f1_weighted",
+        "roc_auc",
+        "pr_auc",
+        "log_loss",
+    }.issubset(metrics.metrics)
+    assert metrics.details["labels"] == ["leave", "stay"]
+    assert metrics.details["confusion_matrix"] == [[2, 0], [1, 1]]
+    assert "classification_report" in metrics.details
+    assert metrics.details["probability_metrics"]["available"] is True
+
+
+def test_classification_metrics_record_unavailable_probability_reason() -> None:
+    metrics = build_classification_metrics(
+        pd.Series(["stay", "stay", "leave", "leave"]),
+        np.array(["stay", "leave", "leave", "leave"]),
+    )
+
+    assert "roc_auc" not in metrics.metrics
+    assert "pr_auc" not in metrics.metrics
+    assert "log_loss" not in metrics.metrics
+    assert metrics.details["probability_metrics"] == {
+        "available": False,
+        "reason": "estimator_does_not_expose_predict_proba",
+    }

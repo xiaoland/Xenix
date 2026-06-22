@@ -1746,7 +1746,12 @@ class AgentToolRegistry:
         models = payload.get("trained_models", [])
         lines = ["Training completed."]
         for model in models:
-            lines.append(f"- `{model['model_key']}` trained model id: `{model['trained_model_id']}`")
+            metadata = model.get("metadata") if isinstance(model, dict) else None
+            metric_text = self._metadata_evaluation_summary(metadata if isinstance(metadata, dict) else {})
+            line = f"- `{model['model_key']}` trained model id: `{model['trained_model_id']}`"
+            if metric_text:
+                line += f"; evaluation: {metric_text}"
+            lines.append(line)
         return "\n".join(lines)
 
     def _model_task_query_markdown(self, tasks: list[dict[str, Any]]) -> str:
@@ -1762,11 +1767,82 @@ class AgentToolRegistry:
             error_summary = str(task.get("error_summary") or "").strip()
             if error_summary:
                 lines.append(f"  Error: {error_summary}")
+            evaluation_lines = self._task_evaluation_summary_lines(task)
+            lines.extend(evaluation_lines)
             follow_up_task_ids = task.get("follow_up_task_ids")
             if isinstance(follow_up_task_ids, list) and follow_up_task_ids:
                 joined_ids = ", ".join(f"`{task_id}`" for task_id in follow_up_task_ids)
                 lines.append(f"  Follow-up task ids: {joined_ids}")
         return "\n".join(lines)
+
+    def _metadata_evaluation_summary(self, metadata: dict[str, Any]) -> str:
+        metric_name = metadata.get("evaluation_primary_metric_name")
+        metric_value = metadata.get("evaluation_primary_metric_value")
+        if not isinstance(metric_name, str) or metric_value is None:
+            return ""
+        return f"{metric_name}={self._format_metric_value(metric_value)}"
+
+    def _task_evaluation_summary_lines(self, task: dict[str, Any]) -> list[str]:
+        if task.get("task_type") != MLTaskType.EVALUATE.value:
+            return []
+        result = task.get("result")
+        if not isinstance(result, dict):
+            return []
+        evaluation = result.get("evaluation")
+        if not isinstance(evaluation, dict):
+            return []
+        metrics = evaluation.get("metrics")
+        if not isinstance(metrics, dict):
+            return []
+
+        lines: list[str] = []
+        primary_name = evaluation.get("primary_metric_name")
+        primary_value = evaluation.get("primary_metric_value")
+        if isinstance(primary_name, str) and primary_value is not None:
+            lines.append(f"  Primary metric: {primary_name}={self._format_metric_value(primary_value)}")
+
+        metric_names = self._summary_metric_names(str(result.get("evaluation_kind") or ""), metrics)
+        metric_text = self._format_metric_list(metrics, metric_names)
+        if metric_text:
+            lines.append(f"  Key metrics: {metric_text}")
+
+        details = evaluation.get("details")
+        if isinstance(details, dict):
+            probability_metrics = details.get("probability_metrics")
+            if isinstance(probability_metrics, dict) and probability_metrics.get("available") is False:
+                reason = probability_metrics.get("reason")
+                if isinstance(reason, str) and reason:
+                    lines.append(f"  Probability metrics unavailable: {reason}.")
+        return lines
+
+    def _summary_metric_names(self, evaluation_kind: str, metrics: dict[str, Any]) -> list[str]:
+        if evaluation_kind == EvaluationKind.REGRESSION.value:
+            return ["r2", "rmse", "mae", "mape", "explained_variance"]
+        if evaluation_kind == EvaluationKind.CLASSIFICATION.value:
+            names = [
+                "accuracy",
+                "balanced_accuracy",
+                "f1_macro",
+                "f1_weighted",
+                "roc_auc",
+                "pr_auc",
+                "log_loss",
+            ]
+            return [name for name in names if name in metrics]
+        return list(metrics)[:5]
+
+    def _format_metric_list(self, metrics: dict[str, Any], names: list[str]) -> str:
+        parts: list[str] = []
+        for name in names:
+            if name not in metrics:
+                continue
+            parts.append(f"{name}={self._format_metric_value(metrics[name])}")
+        return ", ".join(parts)
+
+    def _format_metric_value(self, value: Any) -> str:
+        if isinstance(value, (int, float)):
+            return f"{float(value):.4g}"
+        return str(value)
 
     def _model_catalog_payload(
         self,

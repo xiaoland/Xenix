@@ -762,6 +762,81 @@ def test_agent_harness_train_returns_background_receipt_after_grace(monkeypatch,
     assert "logs" in query_result.payload["tasks"][0]
 
 
+def test_agent_harness_task_query_summarizes_completed_evaluation(monkeypatch, tmp_path: Path) -> None:
+    _context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
+    tool_context = _tool_context()
+    training_file = tmp_path / "evaluated-demand.csv"
+    training_file.write_text(
+        "feature_a,feature_b,target\n"
+        "1,2,5\n"
+        "2,1,5\n"
+        "3,5,11\n"
+        "4,2,10\n"
+        "5,3,13\n"
+        "6,6,18\n"
+        "7,5,19\n"
+        "8,4,20\n"
+        "9,7,25\n"
+        "10,8,28\n",
+        encoding="utf-8",
+    )
+    attachment = _dataset_attachment(registry, training_file)
+    dataset_result = registry.execute(
+        "data.peek",
+        {"dataset_id": attachment.dataset_id},
+        tool_context,
+    )
+    binding_result = registry.execute(
+        "data.feature.select",
+        {
+            "dataset_id": dataset_result.payload["dataset_id"],
+            "model_key": "regression.linear",
+            "role_bindings": [
+                {"role": "feature", "columns": ["feature_a", "feature_b"]},
+                {"role": "target", "columns": ["target"]},
+            ],
+        },
+        tool_context,
+    )
+
+    result = registry.execute(
+        "model.train",
+        {
+            "binding_id": binding_result.payload["binding_id"],
+            "models": ["linear_regression"],
+        },
+        tool_context,
+    )
+    evaluation_task_id = next(
+        task["task_id"]
+        for task in result.payload["ml_tasks"]
+        if task["task_type"] == "evaluate"
+    )
+    query_result = registry.execute(
+        "model.task.query",
+        {"task_ids": [evaluation_task_id]},
+        tool_context,
+    )
+
+    assert result.payload["async_state"] == "completed"
+    assert "evaluation: r2=" in result.content_blocks[0]["text"]
+    evaluation = query_result.payload["tasks"][0]["result"]["evaluation"]
+    assert {
+        "r2",
+        "mse",
+        "rmse",
+        "mae",
+        "mape",
+        "explained_variance",
+        "residual_mean",
+        "residual_std",
+    }.issubset(evaluation["metrics"])
+    markdown = query_result.content_blocks[0]["text"]
+    assert "Primary metric: r2=" in markdown
+    assert "Key metrics: r2=" in markdown
+    assert "rmse=" in markdown
+
+
 def test_agent_harness_first_slice_runs_from_file_to_apply_result(monkeypatch, tmp_path: Path) -> None:
     context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
 

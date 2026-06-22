@@ -125,6 +125,7 @@ class CandidateMetrics(BaseModel):
     primary_metric_name: str
     primary_metric_value: float
     metrics: dict[str, float]
+    details: dict[str, Any] = Field(default_factory=dict)
 
 
 class TuningSummary(BaseModel):

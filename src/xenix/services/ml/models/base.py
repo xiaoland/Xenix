@@ -114,7 +114,15 @@ class NumericAndCategoricalModelService(ModelServiceBase):
         holdout = load_holdout_frame(Path(request.evaluate_model.holdout_artifact_path))
         X_eval, y_eval = cls._split_frame(holdout, request.column_selection.feature_columns, request.column_selection.target_columns)
         y_pred = estimator.predict(X_eval)
-        metrics = build_metric_snapshot(request.evaluation_kind, y_eval, y_pred)
+        y_proba = estimator.predict_proba(X_eval) if hasattr(estimator, "predict_proba") else None
+        classes = getattr(estimator, "classes_", None)
+        metrics = build_metric_snapshot(
+            request.evaluation_kind,
+            y_eval,
+            y_pred,
+            y_proba=y_proba,
+            classes=classes,
+        )
 
         return EvaluateTaskResult(
             task_id=request.task_id,
