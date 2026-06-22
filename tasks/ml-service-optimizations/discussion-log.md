@@ -151,3 +151,158 @@
 
 - The training/evaluation chain now exposes broader evidence without changing model-selection primary metric behavior.
 - The Agent can show a concise metric summary while still retaining structured details for deeper inspection.
+
+## Slice 2 - Fix Apply / Inference Naming Drift
+
+### User Claim
+
+- Forward-looking contract uses `apply`, not `inference`.
+- Existing durable docs already state legacy `inference` names are migration inputs only.
+- Code-level abstractions still contain substantial `inference` naming residue.
+
+### Initial Classification
+
+- Constraint: product contract and durable terminology are already decided; implementation names should align with the contract.
+- Current mode: Explore, then Solidify before source mutation.
+- Durable owners:
+  - ML task lifecycle and execution: `src/xenix/services/ml/`, `src/xenix/services/ml_task_service.py`, `src/xenix/services/ml_service.py`.
+  - Agent-facing tool contract: `src/xenix/services/agent/tools.py`.
+  - Storage migration compatibility: `src/xenix/services/storage/migrations.py`.
+
+### Governing Anchors
+
+- `docs/20-product-tdd/ml-task-lifecycle.md`: new service and Agent contracts use `apply`; legacy persisted task rows or tests using `inference` are migration inputs only.
+- `docs/20-product-tdd/runtime-boundaries.md`: forward-looking tool contracts use `apply`, not `inference`; legacy `inference` names are migration inputs only.
+- `docs/20-product-tdd/storage-ownership.md`: legacy inference task values are outside the current implemented baseline.
+
+### Exploration Findings
+
+- Already aligned:
+  - `MLTaskType.APPLY` persists the forward task type.
+  - Agent tool is `model.apply`.
+  - `MLService.apply(...)` and `ApplyWithFilesInput` are already forward-named.
+  - Artifact kind is `apply_result`.
+- Naming drift to fix:
+  - `InferenceInputFile`, `InferenceModelPayload`, `InferenceTaskRequest`, `InferenceSummary`, `InferenceTaskResult` in `src/xenix/services/ml/contracts.py`.
+  - `ModelServiceBase.infer(...)` in `src/xenix/services/ml/types.py`.
+  - `infer(...)` implementations in supervised, association, and recommendation model services.
+  - `run_inference_task(...)` operation entrypoint and logs in `src/xenix/services/ml/operations/__init__.py`.
+  - `MLTaskService._resolve_entrypoint(...)` maps `MLTaskType.APPLY` to `run_inference_task`.
+  - `_finalize_apply_task(...)` validates `InferenceTaskResult`.
+  - `remote_worker.ENTRYPOINTS` exposes `run_inference_task`.
+  - Agent/task detail helper still checks request payload key `inference_model`.
+  - `tests/test_ml_workers.py` imports and runs `run_inference_task`.
+- Likely keep as legacy/migration:
+  - `src/xenix/services/storage/migrations.py` mappings from `inference` to `apply`.
+  - `tests/test_storage_bootstrap.py::test_storage_bootstrap_migrates_v7_inference_values_to_apply`.
+  - Translation vanished strings and old UI class names are likely historical/legacy unless this slice explicitly expands into UI cleanup.
+- Borderline tactical naming:
+  - `MaterializeManualInferenceCsvInput`, `materialize_manual_inference_csv`, and temp dir `manual-inference` in `DatasetService` are still called from apply inline-row materialization; likely should become apply-named wrappers with legacy aliases only if tests or other callers require them.
+
+### Candidate Slice Shape
+
+- Rename forward ML apply contracts and model-service API:
+  - `Inference*` -> `Apply*`.
+  - `inference_model` payload key -> `apply_model`.
+  - `infer(...)` -> `apply(...)`.
+  - `run_inference_task(...)` -> `run_apply_task(...)`.
+- Preserve backwards compatibility only at migration/legacy-read seams:
+  - storage migrations retain `inference` value handling;
+  - task request parsing may accept old `inference_model` only as a compatibility alias if needed for old task rows or remote worker artifacts.
+- Update tests away from `inference` naming except migration tests.
+
+### Open Questions
+
+- Should this slice include DatasetService manual inline file materialization naming (`manual_inference`) or leave it for a smaller UI/data-service cleanup slice?
+- Should remote worker entrypoint keep `run_inference_task` as a compatibility alias for already-staged remote commands, or can it be removed because task execution always uses the current local entrypoint name?
+
+### User Decision
+
+- No backward compatibility alias is needed for old apply payload or worker entrypoint names because the software has not been officially released.
+- Therefore do not preserve:
+  - `inference_model` as a validation alias for `apply_model`;
+  - `run_inference_task` as a legacy alias for `run_apply_task`.
+
+### Revised Candidate Slice Shape
+
+- Do a clean forward rename:
+  - `Inference*` contract classes become `Apply*`.
+  - request/result payload key becomes `apply_model`.
+  - model adapter method becomes `apply(...)`.
+  - worker entrypoint becomes `run_apply_task`.
+- Keep `inference` only where it is explicitly historical:
+  - storage migrations;
+  - storage migration tests;
+  - OpenInference observability standard names;
+  - vanished translations unless this slice intentionally runs i18n cleanup.
+- Include DatasetService inline apply materialization naming in this slice unless implementation evidence shows the UI/data-service rename would create unrelated churn:
+  - `MaterializeManualInferenceCsvInput` -> `MaterializeManualApplyCsvInput`;
+  - `materialize_manual_inference_csv` -> `materialize_manual_apply_csv`;
+  - temp directory `manual-inference` -> `manual-apply`.
+
+### Execution Notes
+
+- Implemented as clean rename without compatibility aliases.
+- Included DatasetService manual inline apply CSV materialization naming.
+- Renamed the unused row editor widget file/class to apply terminology rather than deleting it.
+- Kept storage migration references to `inference` because those are legacy input normalization.
+- Kept `dataset_inspection.infer_column_kind` because it refers to schema/type inference, not model apply.
+
+### Addendum - Apply Input Artifact/Dataset References
+
+- User reported Agent called `model.apply` with `input_files: ["artifact://..."]` and received `Dataset source path must point to an existing file.`
+- Root cause:
+  - provider-facing Agent instructions tell the Agent to use artifact links rather than invent local paths;
+  - `model.apply` accepted `input_files` as strings but passed them directly into `MLService.apply`;
+  - `MLService.apply` treated each string as a local filesystem path.
+- Decision:
+  - resolve Agent-safe input references at the Agent tool boundary before entering `MLService`;
+  - keep `MLService.apply` operating on resolved local file paths for worker execution;
+  - support both `artifact://...` and registered dataset ids in `model.apply.input_files`;
+  - preserve local absolute/path-like strings for internal and developer workflows.
+- Implementation:
+  - `AgentToolRegistry._model_apply` now normalizes `input_files` through `_resolve_apply_input_files`.
+  - `artifact://...` values resolve through `ArtifactService.resolve_uri`.
+  - dataset id values resolve through `DatasetService.get_dataset`.
+  - path-like values continue unchanged.
+
+### Slice 2 Result
+
+- Forward ML apply contracts, worker entrypoints, model adapter API, Agent/UI task payload projection, and inline apply CSV helper now use apply terminology.
+- The code path no longer exposes `Inference*`, `inference_model`, `run_inference_task`, or model-service `infer(...)` outside explicitly historical/external contexts.
+- Agent `model.apply` can now accept artifact links or dataset ids as apply input sources.
+
+### Addendum - `input_files` Naming Drift
+
+- User noted `input_files` is misleading now that `model.apply` accepts artifact links and dataset ids.
+- Current shape:
+  - Agent-facing `model.apply.input_files` accepts strings that may be local paths, `artifact://...`, or dataset ids.
+  - Agent tool resolves those strings to local paths before calling `MLService.apply`.
+  - Worker-facing `ApplyTaskRequest.input_files` contains resolved `ApplyInputFile` objects with `absolute_path`, so that internal name remains accurate.
+- Proposed correction:
+  - Rename provider-facing Agent tool parameter from `input_files` to `input_sources`.
+  - Rename Agent normalization helpers from `_resolve_apply_input_files` to `_resolve_apply_input_sources`.
+  - Rename `MLService` service input object from `ApplyWithFilesInput` to `ApplyInputSourcesInput` only if we want the service boundary to accept artifact/dataset ids directly.
+- Boundary preference:
+  - Agent-facing contract should use `input_sources`.
+  - Worker-facing task request can keep `input_files` because it is already resolved to concrete files.
+  - `input_rows` remains accurate for inline row payloads.
+
+### User Decision - No Raw Path Apply Inputs
+
+- Agent-facing `model.apply` must not accept raw local paths or path-like strings.
+- Reason: operating on a user-visible but unregistered path violates the privacy boundary; Agent tools should only act on files the user has explicitly provided through service-managed registration.
+- Allowed Agent-facing apply sources:
+  - `artifact://...`
+  - registered dataset ids
+  - inline `input_rows`
+- Disallowed Agent-facing apply sources:
+  - absolute filesystem paths
+  - relative/path-like strings
+
+### Final Apply Input Source Decision
+
+- Implemented `model.apply.input_sources` as the Agent-facing source field.
+- `input_sources` accepts only registered dataset ids and `artifact://...` URIs.
+- Raw filesystem paths are rejected at the Agent tool boundary.
+- Internal `MLService.apply` and worker `ApplyTaskRequest` still use resolved `input_files` because they operate after source authorization and URI/dataset resolution.

@@ -212,7 +212,7 @@ class ToolCallDetailView(QDialog):
             )
 
     def _model_key_from_payload(self, payload: dict) -> str | None:
-        for key in ("manual_training", "hyperparameter_tuning", "evaluate_model", "inference_model"):
+        for key in ("manual_training", "hyperparameter_tuning", "evaluate_model", "apply_model"):
             value = payload.get(key)
             if isinstance(value, dict) and isinstance(value.get("model_key"), str):
                 return value["model_key"]

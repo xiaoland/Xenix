@@ -363,7 +363,7 @@ def _entrypoint_name(entrypoint: Callable[[str], None]) -> str:
         "run_fit_task",
         "run_hyperparameter_tuning_task",
         "run_evaluate_task",
-        "run_inference_task",
+        "run_apply_task",
     }:
         return name
     raise ValueError(f"Unsupported ML worker entrypoint '{name}'.")

@@ -295,14 +295,14 @@
     </message>
 </context>
 <context>
-    <name>InferenceRowEditorWidget</name>
+    <name>ApplyRowEditorWidget</name>
     <message>
-        <location filename="../ui/widgets/inference_row_editor.py" line="48"/>
+        <location filename="../ui/widgets/apply_row_editor.py" line="48"/>
         <source>Add Row</source>
         <translation>Add Row</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/inference_row_editor.py" line="49"/>
+        <location filename="../ui/widgets/apply_row_editor.py" line="49"/>
         <source>Remove Row</source>
         <translation>Remove Row</translation>
     </message>

@@ -65,3 +65,104 @@
 ### Working Tree Note
 
 - Existing unrelated task workspace changes were present under `tasks/diagnose-missing-target-column/`; this slice did not touch them.
+
+## Slice 2 - Fix Apply / Inference Naming Drift
+
+### Task Packet Changes
+
+- Recorded user claim and current exploration findings.
+- No source changes yet; implementation is waiting for explicit start after Impact Handshake.
+- Recorded user decision that no legacy alias is needed for `inference_model` or `run_inference_task`.
+
+### Verification
+
+- Not run for this slice yet.
+
+### Implemented Source Changes
+
+- `src/xenix/services/ml/contracts.py`
+  - Renamed apply task contracts from `Inference*` to `Apply*`.
+  - Renamed request payload field from `inference_model` to `apply_model`.
+- `src/xenix/services/ml/types.py`
+  - Renamed model adapter abstract method from `infer(...)` to `apply(...)`.
+- `src/xenix/services/ml/models/base.py`
+  - Renamed supervised apply implementation and internal variables/messages from inference to apply.
+- `src/xenix/services/ml/models/association.py`
+  - Renamed association apply implementation to `apply(...)` and switched to `request.apply_model`.
+- `src/xenix/services/ml/models/recommendation.py`
+  - Renamed recommendation apply implementation to `apply(...)` and switched to `request.apply_model`.
+- `src/xenix/services/ml/operations/__init__.py`
+  - Renamed worker entrypoint from `run_inference_task` to `run_apply_task`.
+  - Updated worker logs and failure payload access to apply terminology.
+- `src/xenix/services/ml_task_service.py`
+  - Mapped `MLTaskType.APPLY` to `run_apply_task`.
+  - Finalized apply tasks through `ApplyTaskResult`.
+- `src/xenix/services/ml/remote_worker.py`
+  - Registered only `run_apply_task`; no legacy `run_inference_task` alias.
+- `src/xenix/services/ml/execution.py`
+  - Updated SSH entrypoint allowlist to `run_apply_task`.
+- `src/xenix/services/ml_service.py`
+  - Constructed `ApplyTaskRequest` / `ApplyModelPayload`.
+  - Built `ApplyInputFile` lists and manual apply CSV paths.
+- `src/xenix/services/dataset_service.py`
+  - Renamed manual inline CSV materialization to apply terminology and temp path `manual-apply`.
+- `src/xenix/services/agent/tools.py`
+  - Updated task request summary and model-key extraction for `apply_model`.
+- `src/xenix/ui/tool_call_detail_view.py`
+  - Updated detail projection lookup to `apply_model`.
+- `src/xenix/ui/widgets/inference_row_editor.py`
+  - Renamed to `src/xenix/ui/widgets/apply_row_editor.py`.
+  - Renamed widget class to `ApplyRowEditorWidget`.
+- Translation contexts for the renamed row editor were updated.
+- Tests updated:
+  - `tests/test_ml_execution.py`
+  - `tests/test_ml_workers.py`
+  - `tests/test_services.py`
+
+### Addendum Source Changes
+
+- `src/xenix/services/agent/tools.py`
+  - Resolved `model.apply.input_files` entries before calling `MLService.apply`.
+  - Added support for `artifact://...` apply inputs through `ArtifactService.resolve_uri`.
+  - Added support for dataset id apply inputs through `DatasetService.get_dataset`.
+  - Preserved absolute/path-like file inputs.
+- `tests/test_agent_harness_first_slice.py`
+  - Added coverage for `model.apply` using an artifact URI and a dataset id as `input_files`.
+
+### Pending Naming Follow-up
+
+- User flagged `input_files` as misleading after artifact URI and dataset id support.
+- Proposed next change is to rename Agent-facing `model.apply.input_files` to `input_sources` while keeping worker-facing resolved `ApplyTaskRequest.input_files`.
+- User also decided raw local path strings must be rejected at the Agent-facing boundary for privacy.
+
+### Implemented Apply Source Boundary Changes
+
+- `src/xenix/services/agent/tools.py`
+  - Renamed provider-facing `model.apply.input_files` schema to `input_sources`.
+  - Rejected raw local path strings at the Agent-facing boundary.
+  - Kept `artifact://...` and registered dataset id resolution.
+- `src/xenix/services/agent/dev_fixtures.py`
+  - Replaced mock raw apply path with an artifact URI.
+- `docs/30-unit-tdd/agent-harness.md`
+  - Updated `model.apply` contract to use `input_sources` and document that raw filesystem paths are not accepted.
+- `tests/test_agent_harness_first_slice.py`
+  - Updated provider calls to use `input_sources`.
+  - Added a privacy-boundary assertion that raw paths are rejected.
+
+### Residual Inference Terms
+
+- `src/xenix/services/dataset_inspection.py::infer_column_kind` remains intentionally; it means type inference, not model inference.
+- Storage migrations, storage migration tests, durable docs, vanished translations, and OpenInference terms remain intentionally historical/external.
+
+### Verification Results
+
+- Passed: `pdm run pytest tests/test_ml_execution.py`
+- Passed: `pdm run pytest tests/test_ml_workers.py`
+- Passed: `pdm run pytest tests/test_services.py::test_dataset_service_materializes_manual_apply_csv_and_exports_utf8_by_default`
+- Passed: `pdm run pytest tests/test_services.py`
+- Passed: `pdm run pytest tests/test_agent_harness_first_slice.py`
+- Passed: `pdm run pytest tests/test_agent_harness_first_slice.py::test_agent_harness_model_apply_accepts_artifact_uri_or_dataset_id_input_file`
+- Passed: `pdm run pytest tests/test_agent_harness_first_slice.py::test_agent_harness_model_metadata_exposes_catalog_without_train_enums tests/test_agent_harness_first_slice.py::test_agent_harness_model_apply_accepts_artifact_uri_or_dataset_id_input_file tests/test_agent_harness_first_slice.py::test_agent_harness_first_slice_runs_from_file_to_apply_result`
+- Passed: `pdm run pytest tests/test_agent_harness_first_slice.py`
+- Passed: `pdm run pytest tests/test_storage_bootstrap.py::test_storage_bootstrap_migrates_v7_inference_values_to_apply`
+- Passed: `pdm run check`

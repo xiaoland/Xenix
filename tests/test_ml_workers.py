@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QApplication
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.ml.execution import SshMLWorkerRunner
-from xenix.services.ml.operations import run_inference_task
+from xenix.services.ml.operations import run_apply_task
 from xenix.services.ml.ssh_worker_setup import SshWorkerSetupInput, SshWorkerSetupResult, SshWorkerSetupService
 from xenix.services.ml.worker_pool import MLWorkerPool
 from xenix.services.ml.worker_settings import (
@@ -193,7 +193,7 @@ def test_ssh_runner_downloads_result_and_rewrites_remote_paths(tmp_path: Path) -
         last_validation=MLWorkerValidationRecord(status=MLWorkerValidationStatus.SUCCEEDED),
     )
 
-    return_code = SshMLWorkerRunner(worker, client=fake_client).run(run_inference_task, task_dir)
+    return_code = SshMLWorkerRunner(worker, client=fake_client).run(run_apply_task, task_dir)
     result_text = task_dir.joinpath("result.json").read_text(encoding="utf-8")
     result = json.loads(result_text)
 

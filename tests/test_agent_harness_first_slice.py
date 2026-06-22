@@ -22,7 +22,7 @@ from xenix.services.agent import (
 )
 from xenix.services.agent.providers import AgentProvider
 from xenix.services.agent.tools import ToolExecutionContext
-from xenix.services.artifact_service import ArtifactService
+from xenix.services.artifact_service import ArtifactService, RegisterArtifactInput
 from xenix.services.data_cleaning import DataCleaningService
 from xenix.services.data_transform import DataQueryTransformService
 from xenix.services.dataset_inspection import InspectDatasetInput
@@ -30,15 +30,16 @@ from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
 from xenix.services.ml_service import MLService
 from xenix.services.ml_task_service import MLTaskService
 from xenix.services.storage import StorageBootstrapService
+from xenix.services.storage.models import ArtifactKind
 
 
 class FirstSliceProvider:
     def __init__(
         self,
-        apply_path: Path | None = None,
+        apply_source_id: str | None = None,
         apply_rows: dict[str, Any] | None = None,
     ) -> None:
-        self._apply_path = apply_path
+        self._apply_source_id = apply_source_id
         self._apply_rows = apply_rows
 
     def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
@@ -105,9 +106,9 @@ class FirstSliceProvider:
             if self._apply_rows is not None:
                 apply_arguments["input_rows"] = self._apply_rows
             else:
-                if self._apply_path is None:
-                    raise AssertionError("FirstSliceProvider requires apply input data.")
-                apply_arguments["input_files"] = [str(self._apply_path.resolve())]
+                if self._apply_source_id is None:
+                    raise AssertionError("FirstSliceProvider requires an apply input source.")
+                apply_arguments["input_sources"] = [self._apply_source_id]
             return ProviderResponse(
                 assistant_content_blocks=[{"type": "markdown", "text": "I will apply the trained model."}],
                 tool_calls=[
@@ -619,6 +620,8 @@ def test_agent_harness_model_metadata_exposes_catalog_without_train_enums(monkey
     assert "enum" not in specs["model.train"].parameters_schema["properties"]["models"]["items"]
     apply_schema = specs["model.apply"].parameters_schema
     assert apply_schema["required"] == ["trained_model_id"]
+    assert "input_sources" in apply_schema["properties"]
+    assert "input_files" not in apply_schema["properties"]
     assert "input_rows" in apply_schema["properties"]
     assert set(apply_schema["properties"]["input_rows"]["required"]) == {"header_index_map", "data"}
     assert result.payload["model_keys"] == [
@@ -858,9 +861,12 @@ def test_agent_harness_first_slice_runs_from_file_to_apply_result(monkeypatch, t
     attachment = _dataset_attachment(registry, training_file)
     apply_file = tmp_path / "apply.csv"
     apply_file.write_text("feature_a,feature_b\n11,9\n12,10\n", encoding="utf-8")
+    apply_dataset = registry._dataset_service.register_dataset(
+        RegisterDatasetInput(source_path=str(apply_file.resolve()), name="Apply rows")
+    )
     harness = AgentHarnessService(
         session_factory=context.session_factory,
-        provider=FirstSliceProvider(apply_file),
+        provider=FirstSliceProvider(apply_dataset.id),
         tool_registry=registry,
         conversation_store=ConversationStore(context.session_factory),
     )
@@ -883,6 +889,96 @@ def test_agent_harness_first_slice_runs_from_file_to_apply_result(monkeypatch, t
     apply_artifacts = [artifact for artifact in snapshot.artifacts if artifact.kind.value == "file"]
     assert len(apply_artifacts) == 1
     assert Path(apply_artifacts[0].absolute_path).read_text(encoding="utf-8").splitlines()[0].endswith("prediction")
+
+
+def test_agent_harness_model_apply_accepts_artifact_uri_or_dataset_id_input_file(monkeypatch, tmp_path: Path) -> None:
+    context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
+    tool_context = _persisted_tool_context(context)
+    training_file = tmp_path / "artifact-apply-demand.csv"
+    training_file.write_text(
+        "feature_a,feature_b,target\n"
+        "1,2,5\n"
+        "2,1,5\n"
+        "3,5,11\n"
+        "4,2,10\n"
+        "5,3,13\n"
+        "6,6,18\n"
+        "7,5,19\n"
+        "8,4,20\n"
+        "9,7,25\n"
+        "10,8,28\n",
+        encoding="utf-8",
+    )
+    apply_file = tmp_path / "artifact-apply.csv"
+    apply_file.write_text("feature_a,feature_b\n11,9\n12,10\n", encoding="utf-8")
+    input_artifact = registry._artifact_service.register_artifact(
+        RegisterArtifactInput(
+            title="Future rows",
+            absolute_path=str(apply_file.resolve()),
+            kind=ArtifactKind.FILE,
+        )
+    )
+    apply_dataset = registry._dataset_service.register_dataset(
+        RegisterDatasetInput(source_path=str(apply_file.resolve()), name="Future rows")
+    )
+    attachment = _dataset_attachment(registry, training_file)
+    dataset_result = registry.execute("data.peek", {"dataset_id": attachment.dataset_id}, tool_context)
+    binding_result = registry.execute(
+        "data.feature.select",
+        {
+            "dataset_id": dataset_result.payload["dataset_id"],
+            "model_key": "regression.linear",
+            "role_bindings": [
+                {"role": "feature", "columns": ["feature_a", "feature_b"]},
+                {"role": "target", "columns": ["target"]},
+            ],
+        },
+        tool_context,
+    )
+    train_result = registry.execute(
+        "model.train",
+        {
+            "binding_id": binding_result.payload["binding_id"],
+            "models": ["linear_regression"],
+        },
+        tool_context,
+    )
+
+    with pytest.raises(ValidationError, match="registered dataset ids or artifact:// URIs"):
+        registry.execute(
+            "model.apply",
+            {
+                "trained_model_id": train_result.payload["trained_models"][0]["trained_model_id"],
+                "input_sources": [str(apply_file.resolve())],
+            },
+            tool_context,
+        )
+
+    apply_result = registry.execute(
+        "model.apply",
+        {
+            "trained_model_id": train_result.payload["trained_models"][0]["trained_model_id"],
+            "input_sources": [f"artifact://{input_artifact.id}"],
+        },
+        tool_context,
+    )
+
+    assert apply_result.payload["async_state"] == "completed"
+    apply_task = registry._ml_service.get_task_details(apply_result.payload["ml_task_id"]).task
+    assert apply_task.request_payload["input_files"][0]["absolute_path"] == str(apply_file.resolve())
+
+    dataset_apply_result = registry.execute(
+        "model.apply",
+        {
+            "trained_model_id": train_result.payload["trained_models"][0]["trained_model_id"],
+            "input_sources": [apply_dataset.id],
+        },
+        tool_context,
+    )
+
+    assert dataset_apply_result.payload["async_state"] == "completed"
+    dataset_apply_task = registry._ml_service.get_task_details(dataset_apply_result.payload["ml_task_id"]).task
+    assert dataset_apply_task.request_payload["input_files"][0]["absolute_path"] == str(apply_file.resolve())
 
 
 def test_agent_harness_first_slice_runs_inline_rows_to_apply_result(monkeypatch, tmp_path: Path) -> None:

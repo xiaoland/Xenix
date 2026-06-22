@@ -11,14 +11,14 @@ from ..storage.models import ProblemKind
 
 if TYPE_CHECKING:
     from .contracts import (
+        ApplyTaskRequest,
+        ApplyTaskResult,
         EvaluateTaskRequest,
         EvaluateTaskResult,
         FitTaskRequest,
         FitTaskResult,
         HyperparameterTuningTaskRequest,
         HyperparameterTuningTaskResult,
-        InferenceTaskRequest,
-        InferenceTaskResult,
     )
 
 
@@ -286,5 +286,5 @@ class ModelServiceBase(ABC):
 
     @classmethod
     @abstractmethod
-    def infer(cls, request: InferenceTaskRequest, task_dir: Path) -> InferenceTaskResult:
+    def apply(cls, request: ApplyTaskRequest, task_dir: Path) -> ApplyTaskResult:
         raise NotImplementedError

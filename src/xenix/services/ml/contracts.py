@@ -99,26 +99,26 @@ class EvaluateTaskRequest(TaskRequestBase):
     evaluate_model: EvaluateModelPayload
 
 
-class InferenceInputFile(BaseModel):
+class ApplyInputFile(BaseModel):
     absolute_path: str
     file_name: str
     source_kind: str
 
 
-class InferenceModelPayload(BaseModel):
+class ApplyModelPayload(BaseModel):
     trained_model_id: str
     model_key: str
     trained_model_artifact_path: str
 
 
-class InferenceTaskRequest(BaseModel):
+class ApplyTaskRequest(BaseModel):
     task_id: str
     project_id: str
     dataset_id: str
     dataset_source_path: str
     feature_columns: list[str]
-    inference_model: InferenceModelPayload
-    input_files: list[InferenceInputFile]
+    apply_model: ApplyModelPayload
+    input_files: list[ApplyInputFile]
 
 
 class CandidateMetrics(BaseModel):
@@ -165,18 +165,18 @@ class EvaluateTaskResult(TaskResultBase):
     evaluation: CandidateMetrics
 
 
-class InferenceSummary(BaseModel):
+class ApplySummary(BaseModel):
     row_count: int
     input_file_count: int
     prediction_column_name: str = "prediction"
 
 
-class InferenceTaskResult(BaseModel):
+class ApplyTaskResult(BaseModel):
     task_id: str
     trained_model_id: str
     model_key: str
     output_file_path: str
-    summary: InferenceSummary
+    summary: ApplySummary
     error_summary: str | None = None
 
 

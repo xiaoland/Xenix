@@ -10,7 +10,7 @@ import pandas as pd
 from pydantic import BaseModel, Field, ValidationError as PydanticValidationError
 
 from ...config import AppPaths
-from ...exceptions import ValidationError
+from ...exceptions import NotFoundError, ValidationError
 from ..analysis_graph import AnalysisGraphService, GraphDatasetInput
 from ..analysis_lambda import AnalysisLambdaDataset, AnalysisLambdaInput, AnalysisLambdaService
 from ..analysis_profile import AnalysisProfileService, ProfileDatasetInput
@@ -567,12 +567,12 @@ class AgentToolRegistry:
             spec=AgentToolSpec(
                 name="model.apply",
                 provider_name="model_apply",
-                description="Apply a trained model to one or more input files or inline rows.",
+                description="Apply a trained model to registered dataset or artifact inputs, or inline rows.",
                 parameters_schema={
                     "type": "object",
                     "properties": {
                         "trained_model_id": {"type": "string"},
-                        "input_files": {"type": "array", "items": {"type": "string"}},
+                        "input_sources": {"type": "array", "items": {"type": "string"}},
                         "input_rows": {
                             "type": "object",
                             "properties": {
@@ -1200,16 +1200,16 @@ class AgentToolRegistry:
     def _model_apply(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
         trained_model_id = self._require_string(arguments, "trained_model_id")
-        input_files = self._optional_string_list(arguments, "input_files")
+        resolved_input_files = self._resolve_apply_input_sources(self._optional_string_list(arguments, "input_sources"))
         input_rows = arguments.get("input_rows")
         if input_rows is not None and not isinstance(input_rows, dict):
             raise ValidationError("input_rows must be an object.")
-        if not input_files and input_rows is None:
-            raise ValidationError("model.apply requires input_files or input_rows.")
+        if not resolved_input_files and input_rows is None:
+            raise ValidationError("model.apply requires input_sources or input_rows.")
         try:
             apply_input = ApplyWithFilesInput(
                 trained_model_id=trained_model_id,
-                input_files=input_files,
+                input_files=resolved_input_files,
                 input_rows=input_rows,
             )
         except PydanticValidationError as exc:
@@ -1259,6 +1259,25 @@ class AgentToolRegistry:
             },
             content_blocks=[{"type": "markdown", "text": f"Apply results are ready: {link}"}],
         )
+
+    def _resolve_apply_input_sources(self, input_sources: list[str]) -> list[str]:
+        return [self._resolve_apply_input_source(input_source) for input_source in input_sources]
+
+    def _resolve_apply_input_source(self, input_source: str) -> str:
+        source = input_source.strip()
+        if source.startswith("artifact://"):
+            artifact = self._artifact_service.resolve_uri(source)
+            if not artifact.exists:
+                raise ValidationError("Apply input artifact file is missing.")
+            return artifact.absolute_path
+
+        try:
+            dataset = self._dataset_service.get_dataset(source)
+        except NotFoundError:
+            raise ValidationError("model.apply input_sources must be registered dataset ids or artifact:// URIs.") from None
+        if not Path(dataset.source_path).exists():
+            raise ValidationError("Apply input dataset source file is missing.")
+        return dataset.source_path
 
     def _model_task_query(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
@@ -1712,13 +1731,13 @@ class AgentToolRegistry:
             "manual_training",
             "hyperparameter_tuning",
             "evaluate_model",
-            "inference_model",
-            "input_files",
+            "apply_model",
+            "input_sources",
         ]
         return {key: request_payload[key] for key in keys if key in request_payload}
 
     def _model_key_from_task_payload(self, request_payload: dict[str, Any]) -> str | None:
-        for key in ("manual_training", "hyperparameter_tuning", "evaluate_model", "inference_model"):
+        for key in ("manual_training", "hyperparameter_tuning", "evaluate_model", "apply_model"):
             value = request_payload.get(key)
             if isinstance(value, dict) and isinstance(value.get("model_key"), str):
                 return value["model_key"]

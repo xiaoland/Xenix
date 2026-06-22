@@ -9,15 +9,15 @@ from pydantic import BaseModel, Field
 
 from ....exceptions import ValidationError
 from ..contracts import (
+    ApplySummary,
+    ApplyTaskRequest,
+    ApplyTaskResult,
     EvaluateTaskRequest,
     EvaluateTaskResult,
     FitTaskRequest,
     FitTaskResult,
     HyperparameterTuningTaskRequest,
     HyperparameterTuningTaskResult,
-    InferenceSummary,
-    InferenceTaskRequest,
-    InferenceTaskResult,
 )
 from ..dataset_loader import load_dataset
 from ..types import (
@@ -118,8 +118,8 @@ class AssociationRulesModelService(ModelServiceBase):
         raise ValidationError(f"Model '{cls.key}' does not support evaluation.")
 
     @classmethod
-    def infer(cls, request: InferenceTaskRequest, task_dir: Path) -> InferenceTaskResult:
-        artifact = joblib.load(request.inference_model.trained_model_artifact_path)
+    def apply(cls, request: ApplyTaskRequest, task_dir: Path) -> ApplyTaskResult:
+        artifact = joblib.load(request.apply_model.trained_model_artifact_path)
         item_columns = [str(column) for column in artifact.get("item_columns") or request.feature_columns]
         rules = [dict(rule) for rule in artifact.get("rules") or []]
         params = AssociationRulesParams.model_validate(artifact.get("params") or {})
@@ -179,12 +179,12 @@ class AssociationRulesModelService(ModelServiceBase):
                 "lift",
             ],
         ).to_csv(output_path, index=False)
-        return InferenceTaskResult(
+        return ApplyTaskResult(
             task_id=request.task_id,
-            trained_model_id=request.inference_model.trained_model_id,
+            trained_model_id=request.apply_model.trained_model_id,
             model_key=cls.key,
             output_file_path=str(output_path),
-            summary=InferenceSummary(
+            summary=ApplySummary(
                 row_count=len(result_rows),
                 input_file_count=len(request.input_files),
                 prediction_column_name="recommended_items",

@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 
-class InferenceRowEditorWidget(QFrame):
+class ApplyRowEditorWidget(QFrame):
     rows_changed = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:

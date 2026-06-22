@@ -16,15 +16,15 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from ....exceptions import ValidationError
 from ..contracts import (
+    ApplySummary,
+    ApplyTaskRequest,
+    ApplyTaskResult,
     EvaluateTaskRequest,
     EvaluateTaskResult,
     FitTaskRequest,
     FitTaskResult,
     HyperparameterTuningTaskRequest,
     HyperparameterTuningTaskResult,
-    InferenceSummary,
-    InferenceTaskRequest,
-    InferenceTaskResult,
     TuningSummary,
 )
 from ..dataset_loader import load_dataset, load_holdout_frame
@@ -134,18 +134,18 @@ class NumericAndCategoricalModelService(ModelServiceBase):
         )
 
     @classmethod
-    def infer(cls, request: InferenceTaskRequest, task_dir: Path) -> InferenceTaskResult:
-        estimator = joblib.load(request.inference_model.trained_model_artifact_path)
+    def apply(cls, request: ApplyTaskRequest, task_dir: Path) -> ApplyTaskResult:
+        estimator = joblib.load(request.apply_model.trained_model_artifact_path)
         result_frames: list[pd.DataFrame] = []
         for input_file in request.input_files:
             dataframe = load_dataset(Path(input_file.absolute_path))
             missing = [column for column in request.feature_columns if column not in dataframe.columns]
             if missing:
                 raise ValidationError(
-                    f"Inference input '{input_file.file_name}' is missing required columns: {', '.join(missing)}."
+                    f"Apply input '{input_file.file_name}' is missing required columns: {', '.join(missing)}."
                 )
-            X_infer = dataframe.loc[:, request.feature_columns].copy()
-            predictions = estimator.predict(X_infer)
+            X_apply = dataframe.loc[:, request.feature_columns].copy()
+            predictions = estimator.predict(X_apply)
             result_frame = dataframe.copy()
             result_frame["prediction"] = predictions
             if len(request.input_files) > 1:
@@ -156,12 +156,12 @@ class NumericAndCategoricalModelService(ModelServiceBase):
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / "predictions.csv"
         pd.concat(result_frames, ignore_index=True).to_csv(output_path, index=False)
-        return InferenceTaskResult(
+        return ApplyTaskResult(
             task_id=request.task_id,
-            trained_model_id=request.inference_model.trained_model_id,
+            trained_model_id=request.apply_model.trained_model_id,
             model_key=cls.key,
             output_file_path=str(output_path),
-            summary=InferenceSummary(
+            summary=ApplySummary(
                 row_count=int(sum(len(frame.index) for frame in result_frames)),
                 input_file_count=len(request.input_files),
                 prediction_column_name="prediction",
@@ -483,8 +483,8 @@ class UnsupervisedClusteringModelService(ModelServiceBase):
         raise ValidationError(f"Model '{cls.key}' does not support evaluation.")
 
     @classmethod
-    def infer(cls, request: InferenceTaskRequest, task_dir: Path) -> InferenceTaskResult:
-        raise ValidationError(f"Model '{cls.key}' does not support inference.")
+    def apply(cls, request: ApplyTaskRequest, task_dir: Path) -> ApplyTaskResult:
+        raise ValidationError(f"Model '{cls.key}' does not support apply.")
 
     @classmethod
     def _select_features(cls, dataframe: pd.DataFrame, feature_columns: list[str]) -> pd.DataFrame:
@@ -611,8 +611,8 @@ class UnsupervisedAnomalyModelService(ModelServiceBase):
         raise ValidationError(f"Model '{cls.key}' does not support evaluation.")
 
     @classmethod
-    def infer(cls, request: InferenceTaskRequest, task_dir: Path) -> InferenceTaskResult:
-        raise ValidationError(f"Model '{cls.key}' does not support inference.")
+    def apply(cls, request: ApplyTaskRequest, task_dir: Path) -> ApplyTaskResult:
+        raise ValidationError(f"Model '{cls.key}' does not support apply.")
 
     @classmethod
     def _select_features(cls, dataframe: pd.DataFrame, feature_columns: list[str]) -> pd.DataFrame:

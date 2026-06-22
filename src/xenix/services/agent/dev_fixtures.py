@@ -204,7 +204,7 @@ def _create_message_rendering_fixture(store: ConversationStore) -> None:
             tool_name="model.apply",
             arguments_payload={
                 "trained_model_id": "mock_linear_model",
-                "input_files": ["C:/mock-data/future-plan.csv"],
+                "input_sources": ["artifact://mock-future-plan"],
             },
         )
     )

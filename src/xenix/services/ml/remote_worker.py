@@ -4,17 +4,17 @@ import sys
 from collections.abc import Callable
 
 from .operations import (
+    run_apply_task,
     run_evaluate_task,
     run_fit_task,
     run_hyperparameter_tuning_task,
-    run_inference_task,
 )
 
 ENTRYPOINTS: dict[str, Callable[[str], None]] = {
     "run_fit_task": run_fit_task,
     "run_hyperparameter_tuning_task": run_hyperparameter_tuning_task,
     "run_evaluate_task": run_evaluate_task,
-    "run_inference_task": run_inference_task,
+    "run_apply_task": run_apply_task,
 }
 
 

@@ -48,7 +48,7 @@ class RenameDatasetInput(SQLModel):
     new_name: str
 
 
-class MaterializeManualInferenceCsvInput(SQLModel):
+class MaterializeManualApplyCsvInput(SQLModel):
     feature_columns: list[str]
     rows: list[dict[str, str | None]]
 
@@ -227,18 +227,18 @@ class DatasetService:
         with self._session_factory() as session:
             return self._datasets.get_by_ml_task(session, ml_task_id)
 
-    def materialize_manual_inference_csv(self, input_data: MaterializeManualInferenceCsvInput) -> Path:
+    def materialize_manual_apply_csv(self, input_data: MaterializeManualApplyCsvInput) -> Path:
         feature_columns = [column.strip() for column in input_data.feature_columns if column.strip()]
         if not feature_columns:
-            raise ValidationError("Manual inference requires at least one feature column.")
+            raise ValidationError("Manual apply requires at least one feature column.")
         if not input_data.rows:
-            raise ValidationError("Manual inference requires at least one row.")
+            raise ValidationError("Manual apply requires at least one row.")
 
         normalized_rows: list[dict[str, str]] = []
         expected_columns = set(feature_columns)
         for row in input_data.rows:
             if set(row) != expected_columns:
-                raise ValidationError("Manual inference rows must match the selected feature columns exactly.")
+                raise ValidationError("Manual apply rows must match the selected feature columns exactly.")
             normalized_rows.append(
                 {
                     column: "" if row.get(column) is None else str(row.get(column, ""))
@@ -246,7 +246,7 @@ class DatasetService:
                 }
             )
 
-        directory = self._paths.temp / "manual-inference"
+        directory = self._paths.temp / "manual-apply"
         directory.mkdir(parents=True, exist_ok=True)
         csv_path = directory / f"{uuid4().hex}.csv"
         with csv_path.open("w", encoding="utf-8", newline="") as handle:

@@ -18,6 +18,7 @@ from ..config import AppPaths
 from ..exceptions import InvalidStateTransitionError, NotFoundError, ValidationError
 from ..observability import extract_context, inject_context, record_counter, record_histogram, start_span
 from .ml.contracts import (
+    ApplyTaskResult,
     EvaluateTaskResult,
     FitTaskRequest,
     FitTaskResult,
@@ -26,7 +27,6 @@ from .ml.contracts import (
     TaskLogEntry,
     TrainedModelContextPayload,
 )
-from .ml.contracts import InferenceTaskResult
 from .ml.execution import MLWorkerRunner
 from .ml.worker_pool import MLWorkerPool
 from .ml.worker_settings import MLWorkerSettingsService
@@ -364,10 +364,10 @@ class MLTaskService:
 
     def _resolve_entrypoint(self, task_type: MLTaskType) -> Callable[[str], None]:
         from .ml.operations import (
+            run_apply_task,
             run_evaluate_task,
             run_fit_task,
             run_hyperparameter_tuning_task,
-            run_inference_task,
         )
 
         if task_type is MLTaskType.FIT:
@@ -377,7 +377,7 @@ class MLTaskService:
         if task_type is MLTaskType.EVALUATE:
             return run_evaluate_task
         if task_type is MLTaskType.APPLY:
-            return run_inference_task
+            return run_apply_task
         raise ValidationError(f"ML task type '{task_type.value}' is not executable in this workflow.")
 
     def _finalize_success(self, ml_task_id: str) -> MLTaskRow:
@@ -595,7 +595,7 @@ class MLTaskService:
         session: Any,
         row: MLTaskRow,
     ) -> tuple[dict[str, Any], list[MLTaskArtifactInput]]:
-        result = InferenceTaskResult.model_validate_json(
+        result = ApplyTaskResult.model_validate_json(
             task_result_path(self._paths, row.id).read_text(encoding="utf-8")
         )
         if result.error_summary:

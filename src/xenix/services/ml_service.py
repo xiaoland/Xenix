@@ -13,8 +13,11 @@ from sqlmodel import SQLModel
 from ..config import AppPaths
 from ..exceptions import DatasetSourceMissingError, ValidationError
 from .dataset_inspection import InspectDatasetInput
-from .dataset_service import DatasetService, MaterializeManualInferenceCsvInput
+from .dataset_service import DatasetService, MaterializeManualApplyCsvInput
 from .ml.contracts import (
+    ApplyInputFile,
+    ApplyModelPayload,
+    ApplyTaskRequest,
     CandidateMetrics,
     ColumnSelection,
     EvaluateModelPayload,
@@ -23,9 +26,6 @@ from .ml.contracts import (
     FitTaskRequest,
     HyperparameterTuningPayload,
     HyperparameterTuningTaskRequest,
-    InferenceInputFile,
-    InferenceModelPayload,
-    InferenceTaskRequest,
     ManualTrainingPayload,
     TaskContinuationPlan,
     TaskLogEntry,
@@ -298,13 +298,13 @@ class MLService:
         if inline_path is not None:
             input_paths.append(str(inline_path))
         input_files = self._build_apply_input_files(apply_context.feature_columns, input_paths)
-        request = InferenceTaskRequest(
+        request = ApplyTaskRequest(
             task_id="",
             project_id=apply_context.project_id,
             dataset_id=apply_context.dataset.id,
             dataset_source_path=apply_context.dataset.source_path,
             feature_columns=apply_context.feature_columns,
-            inference_model=InferenceModelPayload(
+            apply_model=ApplyModelPayload(
                 trained_model_id=apply_context.trained_model.id,
                 model_key=apply_context.trained_model.model_key,
                 trained_model_artifact_path=apply_context.trained_model.artifact_path,
@@ -433,7 +433,7 @@ class MLService:
     def _create_task_from_request(
         self,
         task_type: MLTaskType,
-        request: FitTaskRequest | HyperparameterTuningTaskRequest | EvaluateTaskRequest | InferenceTaskRequest,
+        request: FitTaskRequest | HyperparameterTuningTaskRequest | EvaluateTaskRequest | ApplyTaskRequest,
         *,
         auto_submit: bool = False,
     ) -> MLTaskRow:
@@ -539,11 +539,11 @@ class MLService:
         self,
         feature_columns: list[str],
         input_paths: list[str],
-    ) -> list[InferenceInputFile]:
+    ) -> list[ApplyInputFile]:
         if not input_paths:
             raise ValidationError("Select at least one apply input file or provide inline apply rows.")
-        manual_root = (self._paths.temp / "manual-inference").resolve()
-        files: list[InferenceInputFile] = []
+        manual_root = (self._paths.temp / "manual-apply").resolve()
+        files: list[ApplyInputFile] = []
         for raw_path in input_paths:
             inspection = self._dataset_service.inspect_source_file(
                 InspectDatasetInput(source_path=str(Path(raw_path).resolve()))
@@ -554,7 +554,7 @@ class MLService:
             absolute_path = Path(inspection.source_path).resolve()
             source_kind = "manual_csv" if manual_root in absolute_path.parents else "user_file"
             files.append(
-                InferenceInputFile(
+                ApplyInputFile(
                     absolute_path=str(absolute_path),
                     file_name=absolute_path.name,
                     source_kind=source_kind,
@@ -588,8 +588,8 @@ class MLService:
                 }
             )
 
-        return self._dataset_service.materialize_manual_inference_csv(
-            MaterializeManualInferenceCsvInput(
+        return self._dataset_service.materialize_manual_apply_csv(
+            MaterializeManualApplyCsvInput(
                 feature_columns=feature_columns,
                 rows=rows,
             )

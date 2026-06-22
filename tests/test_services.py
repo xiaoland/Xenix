@@ -9,7 +9,7 @@ from xenix.services.dataset_inspection import InspectDatasetInput
 from xenix.services.dataset_service import (
     DatasetService,
     ExportDatasetCopyInput,
-    MaterializeManualInferenceCsvInput,
+    MaterializeManualApplyCsvInput,
     RegisterDatasetInput,
 )
 from xenix.services.ml_task_service import CompleteMLTaskInput, CreateMLTaskInput, MLTaskService
@@ -222,7 +222,7 @@ def test_dataset_service_rejects_empty_dataset_file(monkeypatch, tmp_path: Path)
         dataset_service.inspect_source_file(InspectDatasetInput(source_path=str(dataset_file.resolve())))
 
 
-def test_dataset_service_materializes_manual_inference_csv_and_exports_utf8_by_default(
+def test_dataset_service_materializes_manual_apply_csv_and_exports_utf8_by_default(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -232,8 +232,8 @@ def test_dataset_service_materializes_manual_inference_csv_and_exports_utf8_by_d
     dataset_file.write_text("城市,prediction\n上海,1\n", encoding="utf-8")
     dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Predictions")
 
-    materialized = dataset_service.materialize_manual_inference_csv(
-        MaterializeManualInferenceCsvInput(
+    materialized = dataset_service.materialize_manual_apply_csv(
+        MaterializeManualApplyCsvInput(
             feature_columns=["age", "income"],
             rows=[{"age": "30", "income": "9000"}],
         )
