@@ -3,11 +3,13 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
-from sklearn.ensemble import AdaBoostRegressor, GradientBoostingRegressor, RandomForestRegressor
-from sklearn.linear_model import BayesianRidge, Lasso, LinearRegression, Ridge
+from sklearn.ensemble import AdaBoostRegressor, GradientBoostingRegressor, HistGradientBoostingRegressor, RandomForestRegressor
+from sklearn.linear_model import BayesianRidge, ElasticNet, Lasso, LinearRegression, Ridge
+from sklearn.neural_network import MLPRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import PolynomialFeatures
+from sklearn.svm import SVR
 from sklearn.tree import DecisionTreeRegressor
 
 from ...storage.models import ProblemKind
@@ -52,6 +54,20 @@ class LassoParamGrid(BaseModel):
         min_length=1,
         description="Candidate fit_intercept values.",
     )
+
+
+class ElasticNetParams(BaseModel):
+    alpha: float = Field(default=1.0, ge=0.0001, description="Regularization strength.")
+    l1_ratio: float = Field(default=0.5, ge=0.0, le=1.0, description="Balance between L1 and L2 regularization.")
+    fit_intercept: bool = Field(default=True, description="Whether to calculate the intercept.")
+    max_iter: int = Field(default=5000, ge=100, le=100000)
+
+
+class ElasticNetParamGrid(BaseModel):
+    alpha: list[float] = Field(default=[0.001, 0.01, 0.1, 1.0, 10.0], min_length=1)
+    l1_ratio: list[float] = Field(default=[0.1, 0.5, 0.9], min_length=1)
+    fit_intercept: list[bool] = Field(default=[True, False], min_length=1)
+    max_iter: list[int] = Field(default=[5000], min_length=1)
 
 
 class BayesianRidgeParams(BaseModel):
@@ -194,6 +210,55 @@ class LightGBMRegressionParamGrid(BaseModel):
     colsample_bytree: list[float] = Field(default=[0.8, 1.0], min_length=1)
 
 
+class HistGradientBoostingRegressionParams(BaseModel):
+    max_iter: int = Field(default=100, ge=10, le=1000)
+    learning_rate: float = Field(default=0.1, gt=0.0, le=1.0)
+    max_leaf_nodes: int = Field(default=31, ge=2, le=255)
+    max_depth: int | None = Field(default=None, ge=1)
+    min_samples_leaf: int = Field(default=20, ge=1, le=200)
+    l2_regularization: float = Field(default=0.0, ge=0.0)
+
+
+class HistGradientBoostingRegressionParamGrid(BaseModel):
+    max_iter: list[int] = Field(default=[100, 200], min_length=1)
+    learning_rate: list[float] = Field(default=[0.05, 0.1], min_length=1)
+    max_leaf_nodes: list[int] = Field(default=[15, 31, 63], min_length=1)
+    max_depth: list[int] = Field(default=[0, 5, 10], min_length=1)
+    min_samples_leaf: list[int] = Field(default=[10, 20, 40], min_length=1)
+    l2_regularization: list[float] = Field(default=[0.0, 0.1], min_length=1)
+
+
+class SVRRegressionParams(BaseModel):
+    c: float = Field(default=1.0, gt=0.0, alias="C", serialization_alias="C")
+    kernel: Literal["rbf", "linear", "poly", "sigmoid"] = Field(default="rbf")
+    gamma: Literal["scale", "auto"] = Field(default="scale")
+    epsilon: float = Field(default=0.1, ge=0.0)
+    degree: int = Field(default=3, ge=2, le=5)
+    max_iter: int = Field(default=-1, ge=-1, le=100000)
+
+
+class SVRRegressionParamGrid(BaseModel):
+    c: list[float] = Field(default=[0.1, 1.0, 10.0], min_length=1, alias="C", serialization_alias="C")
+    kernel: list[Literal["rbf", "linear"]] = Field(default=["rbf", "linear"], min_length=1)
+    gamma: list[Literal["scale", "auto"]] = Field(default=["scale"], min_length=1)
+    epsilon: list[float] = Field(default=[0.05, 0.1, 0.2], min_length=1)
+
+
+class MLPRegressionParams(BaseModel):
+    hidden_layer_size: int = Field(default=64, ge=4, le=512)
+    activation: Literal["relu", "tanh", "logistic"] = Field(default="relu")
+    alpha: float = Field(default=0.0001, ge=0.0)
+    learning_rate_init: float = Field(default=0.001, gt=0.0, le=1.0)
+    max_iter: int = Field(default=500, ge=100, le=5000)
+
+
+class MLPRegressionParamGrid(BaseModel):
+    hidden_layer_size: list[int] = Field(default=[32, 64, 128], min_length=1)
+    activation: list[Literal["relu", "tanh"]] = Field(default=["relu", "tanh"], min_length=1)
+    alpha: list[float] = Field(default=[0.0001, 0.001], min_length=1)
+    learning_rate_init: list[float] = Field(default=[0.001, 0.01], min_length=1)
+
+
 class PolynomialRegressionParams(BaseModel):
     degree: int = Field(default=2, ge=1, le=4)
     fit_intercept: bool = Field(default=True, description="Whether to calculate the intercept.")
@@ -236,6 +301,24 @@ class LassoRegressionService(NumericAndCategoricalModelService):
         kwargs = dict(estimator_kwargs)
         kwargs.setdefault("max_iter", 5000)
         return Lasso(**kwargs)
+
+
+class ElasticNetRegressionService(NumericAndCategoricalModelService):
+    key = "regression.elastic_net"
+    display_name = "ElasticNet Regression"
+    problem_kind = ProblemKind.REGRESSION
+    family = "Regularized linear"
+    guidance = "Balances Ridge and Lasso regularization for wide or correlated feature sets."
+    recommendation_tier = 32
+    params_model = ElasticNetParams
+    param_grid_model = ElasticNetParamGrid
+    scaler_for_numeric = True
+
+    @classmethod
+    def _build_estimator(cls, **estimator_kwargs: object) -> ElasticNet:
+        kwargs = dict(estimator_kwargs)
+        kwargs.setdefault("random_state", 42)
+        return ElasticNet(**kwargs)
 
 
 class BayesianRidgeRegressionService(NumericAndCategoricalModelService):
@@ -424,6 +507,74 @@ class LightGBMRegressionService(NumericAndCategoricalModelService):
         kwargs.setdefault("verbose", -1)
         kwargs.setdefault("verbosity", -1)
         return LGBMRegressor(**kwargs)
+
+
+class HistGradientBoostingRegressionService(NumericAndCategoricalModelService):
+    key = "regression.hist_gradient_boosting"
+    display_name = "Histogram Gradient Boosting Regressor"
+    problem_kind = ProblemKind.REGRESSION
+    family = "Boosted trees"
+    guidance = "Efficient boosted tree regressor for larger tabular prediction tasks."
+    recommendation_tier = 29
+    params_model = HistGradientBoostingRegressionParams
+    param_grid_model = HistGradientBoostingRegressionParamGrid
+    dense_preprocessing = True
+
+    @classmethod
+    def _build_estimator(cls, **estimator_kwargs: object) -> HistGradientBoostingRegressor:
+        kwargs = dict(estimator_kwargs)
+        if kwargs.get("max_depth") == 0:
+            kwargs["max_depth"] = None
+        kwargs.setdefault("random_state", 42)
+        return HistGradientBoostingRegressor(**kwargs)
+
+
+class SVRRegressionService(NumericAndCategoricalModelService):
+    key = "regression.svr"
+    display_name = "Support Vector Regressor"
+    problem_kind = ProblemKind.REGRESSION
+    family = "Margin based"
+    guidance = "Flexible regression model for smaller datasets where relationships may be nonlinear."
+    recommendation_tier = 65
+    params_model = SVRRegressionParams
+    param_grid_model = SVRRegressionParamGrid
+    scaler_for_numeric = True
+
+    @classmethod
+    def _build_estimator(cls, **estimator_kwargs: object) -> SVR:
+        return SVR(**estimator_kwargs)
+
+
+class MLPRegressionService(NumericAndCategoricalModelService):
+    key = "regression.mlp"
+    display_name = "MLP Regressor"
+    problem_kind = ProblemKind.REGRESSION
+    family = "Neural network"
+    guidance = "Neural-network regressor for nonlinear patterns after simpler baselines are checked."
+    recommendation_tier = 75
+    params_model = MLPRegressionParams
+    param_grid_model = MLPRegressionParamGrid
+    scaler_for_numeric = True
+    dense_preprocessing = True
+
+    @classmethod
+    def _build_estimator(cls, **estimator_kwargs: object) -> MLPRegressor:
+        kwargs = dict(estimator_kwargs)
+        hidden_layer_size = int(kwargs.pop("hidden_layer_size", 64))
+        kwargs.setdefault("hidden_layer_sizes", (hidden_layer_size,))
+        kwargs.setdefault("random_state", 42)
+        return MLPRegressor(**kwargs)
+
+    @classmethod
+    def _build_param_grid(cls, param_grid_model: BaseModel) -> dict[str, list[Any]]:
+        payload = param_grid_model.model_dump(mode="json", by_alias=True)
+        grid: dict[str, list[Any]] = {}
+        for key, values in payload.items():
+            if key == "hidden_layer_size":
+                grid["model__hidden_layer_sizes"] = [(int(value),) for value in values]
+            else:
+                grid[f"model__{key}"] = list(values)
+        return grid
 
 
 class PolynomialRegressionService(NumericAndCategoricalModelService):

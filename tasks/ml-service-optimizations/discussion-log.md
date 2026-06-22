@@ -306,3 +306,136 @@
 - `input_sources` accepts only registered dataset ids and `artifact://...` URIs.
 - Raw filesystem paths are rejected at the Agent tool boundary.
 - Internal `MLService.apply` and worker `ApplyTaskRequest` still use resolved `input_files` because they operate after source authorization and URI/dataset resolution.
+
+## Slice 3 - Expand Supervised Model Catalog
+
+### User Claim
+
+- Classification candidates worth adding:
+  - `ExtraTreesClassifier`
+  - `HistGradientBoostingClassifier`
+  - `SVC`
+  - `LinearSVC + CalibratedClassifierCV`
+  - `MLPClassifier`
+  - `MultinomialNB`
+  - `LabelPropagation`
+  - `LabelSpreading`
+  - `SelfTrainingClassifier`
+- Regression candidates worth adding:
+  - `ElasticNet`
+  - `SVR`
+  - `MLPRegressor`
+  - `HistGradientBoostingRegressor`
+
+### Initial Classification
+
+- Intent: expand the canonical model catalog exposed to ML Service, UI schema forms, and Agent `model.metadata`.
+- Current mode: Explore/Solidify before mutation.
+- Durable owner:
+  - model service definitions under `src/xenix/services/ml/models/`;
+  - canonical registry under `src/xenix/services/ml/registry.py`;
+  - Agent-facing model discovery indirectly through `model.metadata`.
+
+### Exploration Findings
+
+- Existing native model services already cover the teaching directories under `ml/classification` and `ml/regression`; the requested models are not direct script migrations from those directories.
+- Model catalog entries are Pydantic-driven and become Agent-visible through `model.metadata`.
+- Recommendation order is controlled by `recommendation_tier`, so adding many models changes Agent candidate ordering, not only backend capability.
+- Existing supervised model service assumes:
+  - one complete target column;
+  - train/test split evaluation;
+  - feature preprocessing through numeric/categorical selectors and one-hot encoding;
+  - probability metrics are available only if the trained estimator exposes `predict_proba`.
+
+### Candidate Inclusion Decision
+
+- Include in this slice:
+  - `classification.extra_trees`
+  - `classification.hist_gradient_boosting`
+  - `classification.svc`
+  - `classification.linear_svc_calibrated`
+  - `classification.mlp`
+  - `classification.multinomial_naive_bayes`
+  - `regression.elastic_net`
+  - `regression.svr`
+  - `regression.mlp`
+  - `regression.hist_gradient_boosting`
+- Defer:
+  - `LabelPropagation`
+  - `LabelSpreading`
+  - `SelfTrainingClassifier`
+- Reason for deferral:
+  - They are semi-supervised models, but the current product/service contract has no durable role semantics for partially labeled rows or an unlabeled sentinel.
+  - Treating them as ordinary fully supervised classifiers would add catalog surface while hiding the most important evidence boundary.
+  - A later semi-supervised slice should define target role semantics, unlabeled value handling, evaluation split policy, and Agent guidance.
+
+### Candidate Implementation Shape
+
+- Add shallow Pydantic parameter and grid schemas matching current UI form constraints.
+- Keep estimator wrappers local to classification/regression modules when a shallow schema needs translation:
+  - MLP `hidden_layer_size` -> sklearn `hidden_layer_sizes=(...)`.
+  - Calibrated LinearSVC builds `CalibratedClassifierCV(estimator=LinearSVC(...))`.
+  - MultinomialNB overrides preprocessing to keep numeric/categorical features non-negative.
+- Use dense preprocessing for histogram gradient boosting where required by sklearn dense-input expectations.
+- Keep worker parallelism conservative with `n_jobs=1` where supported.
+- Add smoke tests for representative new classifiers/regressors instead of full execution tests for every model.
+
+### Scope Pivot - Support Semi-Supervised Binding Roles
+
+- User proposed expanding bind roles now so semi-supervised learning can be represented honestly.
+- Current binding implementation already persists role-shaped snapshots, but supervised execution still projects them into `feature_columns` and `target_columns`.
+- Current supervised base class requires exactly one complete target column through the `target` role.
+- Semi-supervised models should not be added as ordinary classifiers because they need a distinct contract:
+  - feature columns;
+  - a partial label/target column;
+  - a rule for which rows are unlabeled;
+  - evaluation on held-out labeled rows only, while unlabeled rows may participate in training.
+
+### Revised Semi-Supervised Contract Candidate
+
+- Add a semi-supervised classifier service base rather than widening the ordinary supervised base.
+- Semi-supervised model catalog entries declare a train role schema with:
+  - `feature`: many columns, required;
+  - `partial_target`: one column, required; values may be blank/null to represent unlabeled rows.
+- Apply role schema remains `feature` only.
+- The semi-supervised base projects `partial_target` to scikit-learn labels by:
+  - treating missing/blank cells as unlabeled;
+  - encoding unlabeled rows as `-1` for sklearn;
+  - splitting only labeled rows into train/holdout;
+  - fitting on labeled-train rows plus unlabeled rows;
+  - evaluating only on labeled holdout rows.
+- Defer custom unlabeled sentinel values and separate indicator-column support unless product pressure appears.
+
+### Execution Notes
+
+- Implemented semi-supervised classification as a separate model-service base.
+- Ordinary supervised models still declare and require `feature + target`.
+- Semi-supervised classifiers declare `feature + partial_target`.
+- Blank/null `partial_target` cells are treated as unlabeled rows.
+- The training split holds out only labeled rows; unlabeled rows are added to the training side and never counted as evaluation evidence.
+- Added three semi-supervised classifiers:
+  - `classification.label_propagation`
+  - `classification.label_spreading`
+  - `classification.self_training`
+- Hyperparameter tuning is disabled for the initial semi-supervised services because the current CV flow would treat unlabeled rows as scoring labels unless a separate semi-supervised tuning policy is designed.
+
+### Ordinary Supervised Model Expansion
+
+- After the semi-supervised role contract landed, continued with the ordinary supervised catalog additions from the original Slice 3 request.
+- Added classification models:
+  - `classification.extra_trees`
+  - `classification.hist_gradient_boosting`
+  - `classification.svc`
+  - `classification.linear_svc_calibrated`
+  - `classification.mlp`
+  - `classification.multinomial_naive_bayes`
+- Added regression models:
+  - `regression.elastic_net`
+  - `regression.svr`
+  - `regression.mlp`
+  - `regression.hist_gradient_boosting`
+- Kept schemas shallow for UI/Agent rendering.
+- MLP services expose `hidden_layer_size` and map it to sklearn `hidden_layer_sizes=(...)` internally.
+- SVC enables probability output so expanded classification evaluation evidence can include probability-dependent metrics.
+- Calibrated LinearSVC uses `CalibratedClassifierCV` so it exposes `predict_proba`.
+- MultinomialNB overrides preprocessing to keep numeric/categorical features non-negative.

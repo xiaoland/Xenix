@@ -78,6 +78,78 @@
 
 - Not run for this slice yet.
 
+### Scope Update
+
+- User proposed expanding column role binding semantics to support semi-supervised learning in this slice.
+- Recorded a revised candidate contract:
+  - ordinary supervised models keep `feature + target`;
+  - semi-supervised classifiers use `feature + partial_target`;
+  - missing/blank `partial_target` values represent unlabeled rows for the initial implementation;
+  - evaluation should use held-out labeled rows only.
+- No source changes yet; implementation is waiting for explicit start after contract confirmation.
+
+### Implemented Source Changes
+
+- `src/xenix/services/ml/models/base.py`
+  - Added `EncodedSemiSupervisedClassifier`.
+  - Added `SemiSupervisedClassificationModelService`.
+  - Added split logic where only labeled rows are held out for evaluation and unlabeled rows stay in the training side.
+  - Added blank/null detection for unlabeled `partial_target` values.
+- `src/xenix/services/ml/models/classification.py`
+  - Added `classification.label_propagation`.
+  - Added `classification.label_spreading`.
+  - Added `classification.self_training`.
+  - Added shallow parameter schemas for the three semi-supervised models.
+- `src/xenix/services/ml/models/__init__.py`
+  - Exported the new semi-supervised classification services.
+- `src/xenix/services/ml/registry.py`
+  - Registered the new semi-supervised models in the canonical catalog.
+- `src/xenix/services/ml_service.py`
+  - Changed complete-target validation to apply only to models that explicitly declare a `target` role.
+  - Extended feature/label overlap validation to cover `partial_target`.
+- `docs/30-unit-tdd/agent-harness.md`
+  - Documented the Agent-facing `partial_target` contract.
+- Tests updated:
+  - `tests/test_ml_registry.py`
+  - `tests/test_ml_execution.py`
+
+### Verification Results
+
+- Passed: `pdm run pytest tests/test_ml_registry.py`
+- Passed: `pdm run pytest tests/test_ml_execution.py::test_semisupervised_classifier_uses_partial_target_and_labeled_holdout`
+- Passed: `pdm run pytest tests/test_ml_execution.py`
+- Passed: `pdm run pytest tests/test_agent_harness_first_slice.py::test_agent_harness_model_metadata_exposes_catalog_without_train_enums`
+- Passed: `pdm run check`
+- Passed: semi-supervised catalog/pipeline smoke with `PYTHONPATH=src`
+- Passed: `pdm run pytest tests/test_agent_harness_first_slice.py`
+
+### Implemented Ordinary Supervised Model Additions
+
+- `src/xenix/services/ml/models/classification.py`
+  - Added Extra Trees, Histogram Gradient Boosting, SVC, calibrated LinearSVC, MLP, and MultinomialNB classification services.
+  - Added shallow params and tuning-grid schemas for each new classifier.
+  - Added non-negative preprocessing for MultinomialNB.
+  - Added MLP hidden-layer schema projection to sklearn tuple params.
+- `src/xenix/services/ml/models/regression.py`
+  - Added ElasticNet, SVR, MLP, and Histogram Gradient Boosting regression services.
+  - Added shallow params and tuning-grid schemas for each new regressor.
+  - Added MLP hidden-layer schema projection to sklearn tuple params.
+- `src/xenix/services/ml/models/__init__.py`
+  - Exported the new ordinary supervised services.
+- `src/xenix/services/ml/registry.py`
+  - Registered the new ordinary supervised services.
+- `tests/test_ml_registry.py`
+  - Updated catalog count to 41.
+  - Added schema assertions and direct fit/predict smoke coverage for the new ordinary supervised services.
+
+### Ordinary Supervised Verification Results
+
+- Passed: `pdm run pytest tests/test_ml_registry.py`
+- Passed: `pdm run pytest tests/test_agent_harness_first_slice.py::test_agent_harness_model_metadata_exposes_catalog_without_train_enums`
+- Passed: `pdm run pytest tests/test_agent_harness_first_slice.py`
+- Passed: `pdm run pytest tests/test_ml_execution.py`
+- Passed: `pdm run check`
+
 ### Implemented Source Changes
 
 - `src/xenix/services/ml/contracts.py`
@@ -166,3 +238,19 @@
 - Passed: `pdm run pytest tests/test_agent_harness_first_slice.py`
 - Passed: `pdm run pytest tests/test_storage_bootstrap.py::test_storage_bootstrap_migrates_v7_inference_values_to_apply`
 - Passed: `pdm run check`
+
+## Slice 3 - Expand Supervised Model Catalog
+
+### Task Packet Changes
+
+- Recorded proposed classification and regression model additions.
+- Recorded exploration finding that current `ml/classification` and `ml/regression` teaching directories cover existing native model families, while the requested additions are catalog expansion rather than direct script migration.
+- Recorded recommendation to include ordinary supervised estimators now and defer semi-supervised estimators until the service contract can represent partially labeled data.
+
+### Source Changes
+
+- None. Source mutation is waiting for explicit user start.
+
+### Verification
+
+- Not run for this slice yet.

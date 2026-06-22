@@ -529,6 +529,94 @@ def test_bulk_tuning_creates_one_tuning_task_per_model_and_follow_up_evaluations
     assert len(ml_service.list_dataset_trained_models(dataset.id)) == 2
 
 
+def test_semisupervised_classifier_uses_partial_target_and_labeled_holdout(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    project_service, dataset_service, _ml_task_service, ml_service = _build_services(monkeypatch, tmp_path)
+    project = project_service.create_project(CreateProjectInput(name="Retail"))
+    dataset_file = tmp_path / "partial-churn.csv"
+    dataset_file.write_text(
+        "score,visits,label\n"
+        "0.0,1,stay\n"
+        "0.1,1,stay\n"
+        "0.2,2,stay\n"
+        "0.9,8,leave\n"
+        "1.0,9,leave\n"
+        "1.1,9,leave\n"
+        "0.05,1,\n"
+        "1.05,8,\n",
+        encoding="utf-8",
+    )
+    dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Partial Churn")
+    binding = _create_role_binding(
+        ml_service,
+        dataset.id,
+        "classification.label_spreading",
+        [
+            {"role": "feature", "columns": ["score", "visits"], "role_kind": "many_columns"},
+            {"role": "partial_target", "columns": ["label"], "role_kind": "single_column"},
+        ],
+    )
+
+    fit_task = ml_service.fit_with_evaluate(
+        FitWithEvaluateInput(
+            binding_id=binding.id,
+            run_name="Partial churn",
+            model_key="classification.label_spreading",
+            params={"kernel": "knn", "n_neighbors": 3, "max_iter": 30},
+        )
+    )
+
+    tasks = _wait_for_terminal_dataset_tasks(ml_service, dataset.id, expected_count=2)
+    trained_models = _wait_for_dataset_trained_models(
+        ml_service,
+        dataset.id,
+        expected_count=1,
+        require_evaluation=True,
+    )
+    fit_details = ml_service.get_task_details(fit_task.id)
+    metadata = parse_trained_model_metadata(trained_models[0].metadata_payload)
+
+    assert {task.task_type for task in tasks} == {MLTaskType.FIT, MLTaskType.EVALUATE}
+    assert all(task.status is MLTaskStatus.SUCCEEDED for task in tasks)
+    assert fit_details.task.request_payload["train_role_bindings"] == [
+        {
+            "role": "feature",
+            "columns": ["score", "visits"],
+            "role_kind": "many_columns",
+            "required": True,
+            "metadata": {},
+        },
+        {
+            "role": "partial_target",
+            "columns": ["label"],
+            "role_kind": "single_column",
+            "required": True,
+            "metadata": {},
+        },
+    ]
+    assert fit_details.task.result_payload is not None
+    assert fit_details.task.result_payload["result_summary"]["unlabeled_training_rows"] == 2
+    assert fit_details.task.result_payload["result_summary"]["labeled_holdout_rows"] > 0
+    assert metadata is not None
+    assert metadata.evaluation_kind == "classification"
+    assert [role["name"] for role in metadata.apply_role_schema["roles"]] == ["feature"]
+    assert metadata.evaluation_primary_metric_name == "f1_weighted"
+    assert metadata.evaluation_details["labels"]
+
+    with pytest.raises(ValidationError, match="not accepted"):
+        _create_role_binding(
+            ml_service,
+            dataset.id,
+            "classification.logistic_regression",
+            [
+                {"role": "feature", "columns": ["score", "visits"], "role_kind": "many_columns"},
+                {"role": "partial_target", "columns": ["label"], "role_kind": "single_column"},
+            ],
+        )
+
+
 def test_tuning_rejects_empty_param_grid_sequences_before_worker(monkeypatch, tmp_path: Path) -> None:
     project_service, dataset_service, _ml_task_service, ml_service = _build_services(monkeypatch, tmp_path)
     project = project_service.create_project(CreateProjectInput(name="Retail"))

@@ -383,7 +383,8 @@ class MLService:
         run_name = (input_data.run_name or "").strip()
 
         catalog = get_model_catalog_entry(model_key)
-        if catalog.requires_target and len(target_columns) != 1:
+        requires_complete_target = any(role.name == "target" and role.required for role in catalog.train_role_schema.roles)
+        if requires_complete_target and len(target_columns) != 1:
             raise ValidationError("The selected model requires exactly one target column.")
 
         return _TrainingContext(
@@ -705,8 +706,15 @@ class MLService:
 
     def _validate_feature_target_projection(self, role_bindings: list[ColumnRoleBinding]) -> None:
         feature_columns, target_columns = self._feature_target_columns(role_bindings)
-        if set(feature_columns) & set(target_columns):
-            raise ValidationError("Feature and target columns cannot overlap.")
+        partial_target_columns: list[str] = []
+        for binding in role_bindings:
+            if binding.role == "partial_target":
+                partial_target_columns = list(binding.columns)
+        label_columns = target_columns + partial_target_columns
+        if set(feature_columns) & set(label_columns):
+            raise ValidationError("Feature and label columns cannot overlap.")
+        if set(target_columns) & set(partial_target_columns):
+            raise ValidationError("Target and partial target columns cannot overlap.")
 
     def _apply_columns_from_metadata(self, metadata: Any) -> list[str]:
         schema_roles = metadata.apply_role_schema.get("roles") if isinstance(metadata.apply_role_schema, dict) else None

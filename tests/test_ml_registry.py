@@ -9,7 +9,7 @@ from xenix.services.ml.evaluation import (
     get_default_policy,
 )
 from xenix.services.ml.models.classification import XGBoostClassificationService
-from xenix.services.ml.registry import get_model_catalog_entry, list_model_catalog
+from xenix.services.ml.registry import get_model_catalog_entry, get_model_service, list_model_catalog
 from xenix.services.ml.types import ColumnRoleKind, EvaluationKind, ModelCatalogEntry, ModelFamily, ModelTaskKind
 from xenix.services.storage.models import ProblemKind
 
@@ -17,7 +17,7 @@ from xenix.services.storage.models import ProblemKind
 def test_model_catalog_exposes_json_schema_and_model_axes() -> None:
     catalog = list_model_catalog()
 
-    assert len(catalog) == 28
+    assert len(catalog) == 41
     assert all(isinstance(entry, ModelCatalogEntry) for entry in catalog)
     assert all(entry.model_family for entry in catalog)
     assert all(entry.model_task_kind for entry in catalog)
@@ -54,8 +54,30 @@ def test_model_catalog_exposes_json_schema_and_model_axes() -> None:
     lightgbm_classification = get_model_catalog_entry("classification.lightgbm")
     assert lightgbm_classification.model_task_kind is ModelTaskKind.PREDICTOR
     assert lightgbm_classification.param_schema["properties"]["num_leaves"]["default"] == 31
+    extra_trees = get_model_catalog_entry("classification.extra_trees")
+    assert extra_trees.param_grid_schema is not None
+    assert extra_trees.param_schema["properties"]["n_estimators"]["default"] == 200
+    hist_classifier = get_model_catalog_entry("classification.hist_gradient_boosting")
+    assert hist_classifier.param_grid_schema is not None
+    assert hist_classifier.param_schema["properties"]["max_leaf_nodes"]["default"] == 31
+    svc = get_model_catalog_entry("classification.svc")
+    assert svc.param_schema["properties"]["C"]["default"] == 1.0
+    calibrated_svc = get_model_catalog_entry("classification.linear_svc_calibrated")
+    assert calibrated_svc.param_grid_schema is not None
+    mlp_classifier = get_model_catalog_entry("classification.mlp")
+    assert mlp_classifier.param_schema["properties"]["hidden_layer_size"]["default"] == 64
+    multinomial_nb = get_model_catalog_entry("classification.multinomial_naive_bayes")
+    assert multinomial_nb.family == "Probabilistic baseline"
     bayesian_ridge = get_model_catalog_entry("regression.bayesian_ridge")
     assert bayesian_ridge.param_schema["properties"]["alpha_1"]["default"] == 1e-6
+    elastic_net = get_model_catalog_entry("regression.elastic_net")
+    assert elastic_net.param_schema["properties"]["l1_ratio"]["default"] == 0.5
+    svr = get_model_catalog_entry("regression.svr")
+    assert svr.param_schema["properties"]["epsilon"]["default"] == 0.1
+    mlp_regression = get_model_catalog_entry("regression.mlp")
+    assert mlp_regression.param_grid_schema["properties"]["hidden_layer_size"]["default"] == [32, 64, 128]
+    hist_regression = get_model_catalog_entry("regression.hist_gradient_boosting")
+    assert hist_regression.param_schema["properties"]["max_leaf_nodes"]["default"] == 31
     polynomial = get_model_catalog_entry("regression.polynomial")
     assert polynomial.param_grid_schema is not None
     assert polynomial.param_grid_schema["properties"]["degree"]["default"] == [1, 2, 3]
@@ -69,6 +91,13 @@ def test_model_catalog_exposes_json_schema_and_model_axes() -> None:
     knn = get_model_catalog_entry("classification.knn")
     assert knn.param_grid_schema is not None
     assert knn.param_grid_schema["properties"]["n_neighbors"]["default"] == [3, 5, 7]
+    label_spreading = get_model_catalog_entry("classification.label_spreading")
+    assert label_spreading.problem_kind is ProblemKind.CLASSIFICATION
+    assert label_spreading.evaluation_kind is EvaluationKind.CLASSIFICATION
+    assert label_spreading.supports_hyperparameter_tuning is False
+    assert [role.name for role in label_spreading.train_role_schema.roles] == ["feature", "partial_target"]
+    assert label_spreading.train_role_schema.roles[1].kind is ColumnRoleKind.SINGLE_COLUMN
+    assert [role.name for role in label_spreading.apply_role_schema.roles] == ["feature"]
     clustering = get_model_catalog_entry("clustering.kmeans")
     assert clustering.problem_kind is ProblemKind.CLUSTERING
     assert clustering.evaluation_kind is EvaluationKind.SUMMARY
@@ -249,3 +278,47 @@ def test_classification_metrics_record_unavailable_probability_reason() -> None:
         "available": False,
         "reason": "estimator_does_not_expose_predict_proba",
     }
+
+
+def test_new_supervised_model_services_fit_small_mixed_frames() -> None:
+    classification_features = pd.DataFrame(
+        {
+            "score": [0.0, 0.1, 0.2, 0.3, 1.0, 1.1, 1.2, 1.3],
+            "visits": [1, 1, 2, 2, 8, 8, 9, 9],
+            "segment": ["a", "a", "a", "a", "b", "b", "b", "b"],
+        }
+    )
+    classification_labels = pd.Series(["stay", "stay", "stay", "stay", "leave", "leave", "leave", "leave"])
+    classification_cases = {
+        "classification.extra_trees": {"n_estimators": 10},
+        "classification.hist_gradient_boosting": {"max_iter": 20, "min_samples_leaf": 1},
+        "classification.svc": {"kernel": "linear"},
+        "classification.linear_svc_calibrated": {"cv": 2, "max_iter": 1000},
+        "classification.mlp": {"hidden_layer_size": 4, "max_iter": 200},
+        "classification.multinomial_naive_bayes": {},
+    }
+    for model_key, params in classification_cases.items():
+        service = get_model_service(model_key)
+        estimator = service._build_pipeline(**service._estimator_kwargs(service.validate_params(params)))
+        estimator.fit(classification_features, classification_labels)
+        assert len(estimator.predict(classification_features.head(2))) == 2
+
+    regression_features = pd.DataFrame(
+        {
+            "score": [0.0, 0.1, 0.2, 0.3, 1.0, 1.1, 1.2, 1.3],
+            "visits": [1, 1, 2, 2, 8, 8, 9, 9],
+            "segment": ["a", "a", "a", "a", "b", "b", "b", "b"],
+        }
+    )
+    regression_target = pd.Series([10.0, 11.0, 12.0, 13.0, 30.0, 31.0, 32.0, 33.0])
+    regression_cases = {
+        "regression.elastic_net": {"alpha": 0.1, "l1_ratio": 0.5},
+        "regression.hist_gradient_boosting": {"max_iter": 20, "min_samples_leaf": 1},
+        "regression.svr": {"kernel": "linear"},
+        "regression.mlp": {"hidden_layer_size": 4, "max_iter": 200},
+    }
+    for model_key, params in regression_cases.items():
+        service = get_model_service(model_key)
+        estimator = service._build_pipeline(**service._estimator_kwargs(service.validate_params(params)))
+        estimator.fit(regression_features, regression_target)
+        assert len(estimator.predict(regression_features.head(2))) == 2
