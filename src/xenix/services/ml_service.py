@@ -329,11 +329,12 @@ class MLService:
         result_payload = task.result_payload or {}
         trained_model_id = result_payload.get("trained_model_id")
         canonical_model_path = result_payload.get("canonical_model_artifact_path")
+        evaluation_model_path = result_payload.get("evaluation_model_artifact_path") or canonical_model_path
         holdout_artifact_path = result_payload.get("holdout_artifact_path")
         model_key = result_payload.get("model_key")
         if not all(
             isinstance(value, str) and value
-            for value in (trained_model_id, canonical_model_path, holdout_artifact_path, model_key)
+            for value in (trained_model_id, evaluation_model_path, holdout_artifact_path, model_key)
         ):
             return
 
@@ -348,7 +349,7 @@ class MLService:
             evaluate_model=EvaluateModelPayload(
                 trained_model_id=trained_model_id,
                 model_key=model_key,
-                trained_model_artifact_path=canonical_model_path,
+                trained_model_artifact_path=evaluation_model_path,
                 holdout_artifact_path=holdout_artifact_path,
             ),
         )

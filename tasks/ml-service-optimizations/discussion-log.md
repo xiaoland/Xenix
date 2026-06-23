@@ -439,3 +439,148 @@
 - SVC enables probability output so expanded classification evaluation evidence can include probability-dependent metrics.
 - Calibrated LinearSVC uses `CalibratedClassifierCV` so it exposes `predict_proba`.
 - MultinomialNB overrides preprocessing to keep numeric/categorical features non-negative.
+
+## Slice 4 - Learn From Teaching Model Usage And Parameters
+
+### User Claim
+
+- Teaching materials include concrete model usage and parameter settings.
+- There may be worth-learning implementation details, especially a claim that LightGBM usage has better performance.
+
+### Initial Classification
+
+- Intent: evaluate whether teaching-script model usage should influence native ML Service defaults, tuning grids, preprocessing, or lifecycle.
+- Current mode: Explore; no source mutation yet.
+- Durable owner candidates:
+  - model parameter schemas in `src/xenix/services/ml/models/`;
+  - evaluation/tuning policy in `src/xenix/services/ml/evaluation.py`;
+  - training lifecycle in `src/xenix/services/ml/models/base.py`;
+  - Agent-facing model metadata in `src/xenix/services/agent/tools.py` if defaults/guidance change.
+
+### Exploration Findings
+
+- LightGBM classification teaching script:
+  - avoids normalization because LightGBM is tree-based;
+  - dynamically chooses `objective="binary"` vs `objective="multiclass"` plus `num_class`;
+  - uses `verbose=-1` / `verbosity=-1`;
+  - uses a deliberately simplified active grid: `n_estimators=[100, 200]`, `max_depth=[-1, 5, 10]`;
+  - leaves broader grid dimensions as commented optional parameters.
+- LightGBM regression teaching script:
+  - uses `objective="regression"`;
+  - uses `n_jobs=-1`;
+  - uses grid values that mostly match the current native regression LightGBM grid:
+    - `num_leaves=[15, 31, 63]`
+    - `max_depth=[-1, 3, 5, 7]`
+    - `learning_rate=[0.01, 0.05, 0.1]`
+    - `n_estimators=[100, 200, 300]`
+    - `subsample=[1.0, 0.8]`
+    - `colsample_bytree=[1.0, 0.8]`
+- Current native LightGBM implementation already:
+  - does not scale numeric features;
+  - silences LightGBM logs;
+  - sets objective for regression;
+  - exposes probability output through `predict_proba`.
+- Current native LightGBM classification grid is broader than the active teaching grid.
+- Teaching scripts generally tune on a train split, evaluate on test split, then retrain a final model on all data with the best params for prediction.
+- Current native supervised fit/tune saves the model trained on the training split because the same artifact is later evaluated against holdout.
+
+### Candidate Lessons
+
+- Safe local LightGBM lesson:
+  - consider making the default LightGBM classification tuning grid smaller or tiered, because the teaching script intentionally keeps the active grid compact for runtime.
+- Not a direct copy:
+  - `n_jobs=-1` may improve single-script performance but can oversubscribe when Xenix worker pool dispatches multiple tasks; it should be governed by worker resource policy, not copied into every estimator.
+  - dynamic LightGBM classification objective is useful as explicitness, but sklearn `LGBMClassifier` generally handles objective inference; adding it may require a wrapper that sees labels at fit time.
+- Larger lifecycle lesson:
+  - separate "evaluated candidate model" from "final apply model retrained on all eligible rows" if we want production predictions to use all data while preserving honest holdout evidence.
+  - this is cross-model training lifecycle work, not LightGBM-only tuning.
+
+### User Decision
+
+- Proceed with Slice 4A:
+  - narrow the default LightGBM classification tuning grid to match the teaching script's compact active grid;
+  - keep larger LightGBM classification search spaces available through explicit user/Agent-provided `model.hyper_train` grids.
+- Defer final-refit behavior to a separate future slice because it changes the training/evaluation/apply artifact lifecycle.
+
+## Slice 4B - Final Refit Apply Model
+
+### User Claim
+
+- Continue with final-refit as a separate slice.
+
+### Initial Classification
+
+- Intent: improve training lifecycle so the model used for apply can learn from all eligible training rows while evaluation remains holdout-based and honest.
+- Current mode: Explore/Solidify before source mutation.
+- Durable owners:
+  - supervised model worker behavior in `src/xenix/services/ml/models/base.py`;
+  - fit/tune task result contracts in `src/xenix/services/ml/contracts.py`;
+  - trained model registration/finalization in `src/xenix/services/ml_task_service.py`;
+  - follow-up evaluation routing in `src/xenix/services/ml_service.py`;
+  - trained model metadata in `src/xenix/services/trained_model_metadata.py`.
+
+### Current Lifecycle Finding
+
+- `NumericAndCategoricalModelService.fit()` and `tune()` split the dataset into train/holdout.
+- The estimator trained on the training split is dumped to `model_artifact_path`.
+- `MLTaskService` copies that same artifact to the canonical trained-model path.
+- `MLService._submit_follow_up_evaluation()` evaluates the canonical trained-model path against the holdout artifact.
+- Therefore the current apply model is the holdout-split candidate model, not a final model refit on all eligible training rows.
+
+### Desired Contract
+
+- Keep two model artifacts for supervised fit/tune:
+  - evaluation model: trained on the training split, evaluated on holdout;
+  - apply model: refit on all eligible rows with the accepted params/best params, registered as the canonical trained model.
+- Follow-up evaluate task must use the evaluation model artifact, not the final apply model.
+- Trained model row `artifact_path` should point to the final apply model.
+- Evaluation metadata still attaches to the trained model row, but should be understood as evidence from the holdout-split evaluation model with the same params/training recipe.
+
+### Candidate Implementation Shape
+
+- Extend `FitTaskResult` and `HyperparameterTuningTaskResult` with optional `final_model_artifact_path`.
+- For ordinary supervised `fit()`:
+  - train/evaluate candidate on train split as today;
+  - train a fresh final pipeline on full `X, y`;
+  - dump final pipeline to `final_model_artifact_path`;
+  - write key-driver report from the final apply model.
+- For ordinary supervised `tune()`:
+  - run GridSearchCV on training split as today;
+  - preserve `search.best_estimator_` as the evaluation model;
+  - refit that configured best estimator on full `X, y`;
+  - dump it to `final_model_artifact_path`.
+- For semi-supervised classification:
+  - keep holdout labeled rows out of the evaluation model;
+  - train final apply model on all rows, including all labeled and unlabeled rows.
+- In `MLTaskService` finalization:
+  - canonical trained model path copies `final_model_artifact_path` when present;
+  - result payload records `evaluation_model_artifact_path` for follow-up evaluation;
+  - fallback remains compatible when no final model path exists.
+- In `MLService._submit_follow_up_evaluation()`:
+  - prefer `evaluation_model_artifact_path`;
+  - fallback to `canonical_model_artifact_path` for older/non-refit results.
+- Metadata should record the training scope distinction, likely:
+  - `apply_model_training_scope="all_eligible_rows"`;
+  - `evaluation_model_training_scope="holdout_train_split"`.
+
+### Guardrails
+
+- Do not evaluate the all-row final model on the same holdout labels; that would be leakage.
+- Do not change unsupervised summary models in this slice.
+- Do not change Agent tool inputs.
+- Preserve task payload parseability for task rows that lack `final_model_artifact_path`.
+
+### Execution Notes
+
+- Added `final_model_artifact_path` to fit and tuning task results.
+- Ordinary supervised fit/tune now produce:
+  - an evaluation model trained on the train split;
+  - a final apply model trained on all eligible rows.
+- Semi-supervised fit now produces:
+  - an evaluation model trained on training-side labeled rows plus unlabeled rows;
+  - a final apply model trained on all labeled and unlabeled rows.
+- `MLTaskService` registers the final apply model as the canonical trained model artifact.
+- Follow-up evaluate tasks use `evaluation_model_artifact_path`, not the canonical apply model.
+- Trained model metadata now records:
+  - `evaluation_model_training_scope="holdout_train_split"`;
+  - `apply_model_training_scope="all_eligible_rows"`.

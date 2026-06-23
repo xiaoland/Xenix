@@ -410,10 +410,12 @@ class MLTaskService:
         result = FitTaskResult.model_validate_json(task_result_path(self._paths, row.id).read_text(encoding="utf-8"))
         if result.error_summary:
             raise ValidationError(result.error_summary)
-        model_path = Path(result.model_artifact_path)
+        evaluation_model_path = Path(result.model_artifact_path)
+        final_model_path = Path(result.final_model_artifact_path) if result.final_model_artifact_path else evaluation_model_path
         holdout_path = Path(result.holdout_artifact_path) if result.holdout_artifact_path else None
         export_path = Path(result.export_artifact_path) if result.export_artifact_path else None
-        self._require_existing_path(model_path)
+        self._require_existing_path(evaluation_model_path)
+        self._require_existing_path(final_model_path)
         if holdout_path is not None:
             self._require_existing_path(holdout_path)
         if export_path is not None:
@@ -426,7 +428,7 @@ class MLTaskService:
             row.created_at,
             row.id,
         )
-        canonical_path = self._copy_canonical_model(row, artifact_file_name, model_path)
+        canonical_path = self._copy_canonical_model(row, artifact_file_name, final_model_path)
         metadata = TrainedModelMetadata(
             model_key=result.model_key,
             evaluation_kind=trained_model_context.evaluation_kind or catalog_entry.evaluation_kind.value,
@@ -453,6 +455,8 @@ class MLTaskService:
             preview_columns=list(trained_model_context.preview_columns),
             preview_rows=[list(row_values) for row_values in trained_model_context.preview_rows],
             training_params=dict(result.params),
+            evaluation_model_training_scope="holdout_train_split" if result.final_model_artifact_path else None,
+            apply_model_training_scope="all_eligible_rows" if result.final_model_artifact_path else None,
         )
         trained_model = self._trained_models.create(
             session,
@@ -468,6 +472,7 @@ class MLTaskService:
         payload = result.model_dump(mode="json")
         payload["trained_model_id"] = trained_model.id
         payload["canonical_model_artifact_path"] = str(canonical_path)
+        payload["evaluation_model_artifact_path"] = str(evaluation_model_path)
         artifacts = [
             MLTaskArtifactInput(artifact_kind=MLTaskArtifactKind.MODEL, absolute_path=str(canonical_path)),
         ]
@@ -500,10 +505,12 @@ class MLTaskService:
         )
         if result.error_summary:
             raise ValidationError(result.error_summary)
-        model_path = Path(result.model_artifact_path)
+        evaluation_model_path = Path(result.model_artifact_path)
+        final_model_path = Path(result.final_model_artifact_path) if result.final_model_artifact_path else evaluation_model_path
         holdout_path = Path(result.holdout_artifact_path) if result.holdout_artifact_path else None
         export_path = Path(result.export_artifact_path) if result.export_artifact_path else None
-        self._require_existing_path(model_path)
+        self._require_existing_path(evaluation_model_path)
+        self._require_existing_path(final_model_path)
         if holdout_path is not None:
             self._require_existing_path(holdout_path)
         if export_path is not None:
@@ -516,7 +523,7 @@ class MLTaskService:
             row.created_at,
             row.id,
         )
-        canonical_path = self._copy_canonical_model(row, artifact_file_name, model_path)
+        canonical_path = self._copy_canonical_model(row, artifact_file_name, final_model_path)
         metadata = TrainedModelMetadata(
             model_key=result.model_key,
             evaluation_kind=trained_model_context.evaluation_kind or catalog_entry.evaluation_kind.value,
@@ -547,6 +554,8 @@ class MLTaskService:
                 str(key): list(values)
                 for key, values in request.hyperparameter_tuning.param_grid.items()
             },
+            evaluation_model_training_scope="holdout_train_split" if result.final_model_artifact_path else None,
+            apply_model_training_scope="all_eligible_rows" if result.final_model_artifact_path else None,
         )
         trained_model = self._trained_models.create(
             session,
@@ -562,6 +571,7 @@ class MLTaskService:
         payload = result.model_dump(mode="json")
         payload["trained_model_id"] = trained_model.id
         payload["canonical_model_artifact_path"] = str(canonical_path)
+        payload["evaluation_model_artifact_path"] = str(evaluation_model_path)
         artifacts = [
             MLTaskArtifactInput(artifact_kind=MLTaskArtifactKind.MODEL, absolute_path=str(canonical_path)),
         ]

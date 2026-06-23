@@ -8,7 +8,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel, Field
-from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.pipeline import Pipeline
@@ -45,14 +45,28 @@ class NumericAndCategoricalModelService(ModelServiceBase):
         params_model = cls.validate_params(request.manual_training.params)
         estimator = cls._build_pipeline(**cls._estimator_kwargs(params_model))
         estimator.fit(X_train, y_train)
+        final_estimator = cls._build_pipeline(**cls._estimator_kwargs(params_model))
+        final_X, final_y = cls._split_frame(
+            dataframe,
+            request.column_selection.feature_columns,
+            request.column_selection.target_columns,
+        )
+        final_estimator.fit(final_X, final_y)
 
         model_artifact_path = task_dir / "models" / f"{cls.key.replace('.', '_')}.joblib"
+        final_model_artifact_path = task_dir / "models" / f"{cls.key.replace('.', '_')}-final.joblib"
         holdout_artifact_path = task_dir / "input" / "holdout.pkl"
         model_artifact_path.parent.mkdir(parents=True, exist_ok=True)
         holdout_artifact_path.parent.mkdir(parents=True, exist_ok=True)
         joblib.dump(estimator, model_artifact_path)
+        joblib.dump(final_estimator, final_model_artifact_path)
         cls._save_holdout_frame(_X_test, y_test, request, holdout_artifact_path)
-        export_artifact_path, result_summary = cls._write_key_driver_report(estimator, X_train, task_dir)
+        export_artifact_path, result_summary = cls._write_key_driver_report(final_estimator, final_X, task_dir)
+        result_summary = {
+            **result_summary,
+            "evaluation_model_training_scope": "holdout_train_split",
+            "apply_model_training_scope": "all_eligible_rows",
+        }
 
         return FitTaskResult(
             task_id=request.task_id,
@@ -61,6 +75,7 @@ class NumericAndCategoricalModelService(ModelServiceBase):
             model_key=cls.key,
             params=params_model.model_dump(mode="json"),
             model_artifact_path=str(model_artifact_path),
+            final_model_artifact_path=str(final_model_artifact_path),
             holdout_artifact_path=str(holdout_artifact_path),
             export_artifact_path=str(export_artifact_path) if export_artifact_path is not None else None,
             result_summary=result_summary,
@@ -81,14 +96,28 @@ class NumericAndCategoricalModelService(ModelServiceBase):
         )
         search.fit(X_train, y_train)
         estimator = search.best_estimator_
+        final_estimator = clone(search.best_estimator_)
+        final_X, final_y = cls._split_frame(
+            dataframe,
+            request.column_selection.feature_columns,
+            request.column_selection.target_columns,
+        )
+        final_estimator.fit(final_X, final_y)
 
         model_artifact_path = task_dir / "models" / f"{cls.key.replace('.', '_')}.joblib"
+        final_model_artifact_path = task_dir / "models" / f"{cls.key.replace('.', '_')}-final.joblib"
         holdout_artifact_path = task_dir / "input" / "holdout.pkl"
         model_artifact_path.parent.mkdir(parents=True, exist_ok=True)
         holdout_artifact_path.parent.mkdir(parents=True, exist_ok=True)
         joblib.dump(estimator, model_artifact_path)
+        joblib.dump(final_estimator, final_model_artifact_path)
         cls._save_holdout_frame(_X_test, y_test, request, holdout_artifact_path)
-        export_artifact_path, result_summary = cls._write_key_driver_report(estimator, X_train, task_dir)
+        export_artifact_path, result_summary = cls._write_key_driver_report(final_estimator, final_X, task_dir)
+        result_summary = {
+            **result_summary,
+            "evaluation_model_training_scope": "holdout_train_split",
+            "apply_model_training_scope": "all_eligible_rows",
+        }
 
         return HyperparameterTuningTaskResult(
             task_id=request.task_id,
@@ -97,6 +126,7 @@ class NumericAndCategoricalModelService(ModelServiceBase):
             model_key=cls.key,
             best_params={str(key): value for key, value in search.best_params_.items()},
             model_artifact_path=str(model_artifact_path),
+            final_model_artifact_path=str(final_model_artifact_path),
             holdout_artifact_path=str(holdout_artifact_path),
             export_artifact_path=str(export_artifact_path) if export_artifact_path is not None else None,
             result_summary=result_summary,
@@ -503,20 +533,30 @@ class SemiSupervisedClassificationModelService(NumericAndCategoricalModelService
         params_model = cls.validate_params(request.manual_training.params)
         estimator = cls._build_pipeline(**cls._estimator_kwargs(params_model))
         estimator.fit(X_train, y_train)
+        final_estimator = cls._build_pipeline(**cls._estimator_kwargs(params_model))
+        final_feature_columns = _role_columns(request.train_role_bindings, "feature")
+        final_target_column = cls._partial_target_column(request.train_role_bindings)
+        final_X = dataframe.loc[:, final_feature_columns].copy()
+        final_y = dataframe.loc[:, final_target_column].copy()
+        final_estimator.fit(final_X, final_y)
 
         model_artifact_path = task_dir / "models" / f"{cls.key.replace('.', '_')}.joblib"
+        final_model_artifact_path = task_dir / "models" / f"{cls.key.replace('.', '_')}-final.joblib"
         holdout_artifact_path = task_dir / "input" / "holdout.pkl"
         model_artifact_path.parent.mkdir(parents=True, exist_ok=True)
         holdout_artifact_path.parent.mkdir(parents=True, exist_ok=True)
         joblib.dump(estimator, model_artifact_path)
+        joblib.dump(final_estimator, final_model_artifact_path)
         cls._save_semisupervised_holdout_frame(_X_test, y_test, request, holdout_artifact_path)
-        export_artifact_path, result_summary = cls._write_key_driver_report(estimator, X_train, task_dir)
+        export_artifact_path, result_summary = cls._write_key_driver_report(final_estimator, final_X, task_dir)
         result_summary = {
             **result_summary,
             "labeled_training_rows": int(np.sum(~pd.Series(y_train).map(_is_unlabeled_value).to_numpy(dtype=bool))),
             "unlabeled_training_rows": int(np.sum(pd.Series(y_train).map(_is_unlabeled_value).to_numpy(dtype=bool))),
             "labeled_holdout_rows": int(len(pd.Series(y_test).index)),
             "partial_target_column": cls._partial_target_column(request.train_role_bindings),
+            "evaluation_model_training_scope": "holdout_train_split",
+            "apply_model_training_scope": "all_eligible_rows",
         }
 
         return FitTaskResult(
@@ -526,6 +566,7 @@ class SemiSupervisedClassificationModelService(NumericAndCategoricalModelService
             model_key=cls.key,
             params=params_model.model_dump(mode="json"),
             model_artifact_path=str(model_artifact_path),
+            final_model_artifact_path=str(final_model_artifact_path),
             holdout_artifact_path=str(holdout_artifact_path),
             export_artifact_path=str(export_artifact_path) if export_artifact_path is not None else None,
             result_summary=result_summary,

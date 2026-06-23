@@ -144,6 +144,7 @@ class FitTaskResult(TaskResultBase):
     model_key: str
     params: dict[str, Any]
     model_artifact_path: str
+    final_model_artifact_path: str | None = None
     holdout_artifact_path: str | None = None
     export_artifact_path: str | None = None
     result_summary: dict[str, Any] = Field(default_factory=dict)
@@ -153,6 +154,7 @@ class HyperparameterTuningTaskResult(TaskResultBase):
     model_key: str
     best_params: dict[str, Any]
     model_artifact_path: str
+    final_model_artifact_path: str | None = None
     holdout_artifact_path: str | None = None
     export_artifact_path: str | None = None
     result_summary: dict[str, Any] = Field(default_factory=dict)

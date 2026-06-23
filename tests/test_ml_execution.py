@@ -209,6 +209,10 @@ def test_dataset_scoped_fit_evaluate_and_apply_run(monkeypatch, tmp_path: Path) 
     assert len(trained_models) == 1
     assert fit_details.task.result_payload is not None
     assert fit_details.task.result_payload["trained_model_id"] == trained_models[0].id
+    assert fit_details.task.result_payload["evaluation_model_artifact_path"] == fit_details.task.result_payload["model_artifact_path"]
+    assert fit_details.task.result_payload["final_model_artifact_path"] != fit_details.task.result_payload["model_artifact_path"]
+    assert fit_details.task.result_payload["canonical_model_artifact_path"] != fit_details.task.result_payload["evaluation_model_artifact_path"]
+    assert trained_models[0].artifact_path == fit_details.task.result_payload["canonical_model_artifact_path"]
     assert "column_selection" not in fit_details.task.request_payload
     assert fit_details.task.request_payload["evaluation_kind"] == "regression"
     assert fit_details.task.request_payload["evaluation_policy"]["evaluation_kind"] == "regression"
@@ -234,6 +238,8 @@ def test_dataset_scoped_fit_evaluate_and_apply_run(monkeypatch, tmp_path: Path) 
     assert metadata.train_role_bindings == fit_details.task.request_payload["train_role_bindings"]
     assert metadata.source_run_name == "Direct demand analysis"
     assert metadata.evaluation_kind == "regression"
+    assert metadata.evaluation_model_training_scope == "holdout_train_split"
+    assert metadata.apply_model_training_scope == "all_eligible_rows"
     assert metadata.evaluation_ml_task_id is not None
     assert metadata.evaluation_primary_metric_name == "r2"
     assert {
@@ -249,6 +255,14 @@ def test_dataset_scoped_fit_evaluate_and_apply_run(monkeypatch, tmp_path: Path) 
     evaluate_details = ml_service.get_task_details(metadata.evaluation_ml_task_id)
     assert evaluate_details.task.task_type is MLTaskType.EVALUATE
     assert evaluate_details.task.request_payload["evaluate_model"]["trained_model_id"] == trained_models[0].id
+    assert (
+        evaluate_details.task.request_payload["evaluate_model"]["trained_model_artifact_path"]
+        == fit_details.task.result_payload["evaluation_model_artifact_path"]
+    )
+    assert (
+        evaluate_details.task.request_payload["evaluate_model"]["trained_model_artifact_path"]
+        != trained_models[0].artifact_path
+    )
     assert evaluate_details.task.result_payload is not None
     assert evaluate_details.task.result_payload["trained_model_id"] == trained_models[0].id
     assert "details" in evaluate_details.task.result_payload["evaluation"]
@@ -597,10 +611,15 @@ def test_semisupervised_classifier_uses_partial_target_and_labeled_holdout(
         },
     ]
     assert fit_details.task.result_payload is not None
+    assert fit_details.task.result_payload["evaluation_model_artifact_path"] == fit_details.task.result_payload["model_artifact_path"]
+    assert fit_details.task.result_payload["final_model_artifact_path"] != fit_details.task.result_payload["model_artifact_path"]
+    assert trained_models[0].artifact_path == fit_details.task.result_payload["canonical_model_artifact_path"]
     assert fit_details.task.result_payload["result_summary"]["unlabeled_training_rows"] == 2
     assert fit_details.task.result_payload["result_summary"]["labeled_holdout_rows"] > 0
     assert metadata is not None
     assert metadata.evaluation_kind == "classification"
+    assert metadata.evaluation_model_training_scope == "holdout_train_split"
+    assert metadata.apply_model_training_scope == "all_eligible_rows"
     assert [role["name"] for role in metadata.apply_role_schema["roles"]] == ["feature"]
     assert metadata.evaluation_primary_metric_name == "f1_weighted"
     assert metadata.evaluation_details["labels"]

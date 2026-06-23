@@ -78,6 +78,81 @@
 
 - Not run for this slice yet.
 
+### Implemented Source Changes
+
+- `src/xenix/services/ml/contracts.py`
+  - Added optional `final_model_artifact_path` to fit and tuning task results.
+- `src/xenix/services/ml/models/base.py`
+  - Ordinary supervised `fit()` and `tune()` now write both an evaluation model and a final apply model.
+  - Semi-supervised `fit()` now writes both an evaluation model and a final apply model.
+  - Key-driver reports are generated from the final apply model.
+- `src/xenix/services/ml_task_service.py`
+  - Copies `final_model_artifact_path` into the canonical trained-model artifact path when available.
+  - Preserves `evaluation_model_artifact_path` in result payload for follow-up evaluation.
+  - Records model training-scope metadata.
+- `src/xenix/services/ml_service.py`
+  - Follow-up evaluate tasks now prefer `evaluation_model_artifact_path` and fall back to canonical model path for older payloads.
+- `src/xenix/services/trained_model_metadata.py`
+  - Bumped metadata schema to `4`.
+  - Added evaluation/apply model training scope fields.
+- `docs/20-product-tdd/ml-task-lifecycle.md`
+  - Documented split-trained evaluation model vs all-row final apply model lifecycle semantics.
+- `docs/20-product-tdd/runtime-boundaries.md`
+  - Documented Agent-facing consequence that holdout metrics and apply artifact now have distinct model scopes.
+- `tests/test_ml_execution.py`
+  - Added assertions that fit and semi-supervised flows register the final apply model while evaluating the split-trained model.
+
+### Verification Results
+
+- Passed: `pdm run pytest tests/test_ml_execution.py::test_dataset_scoped_fit_evaluate_and_apply_run tests/test_ml_execution.py::test_semisupervised_classifier_uses_partial_target_and_labeled_holdout tests/test_ml_execution.py::test_bulk_tuning_creates_one_tuning_task_per_model_and_follow_up_evaluations`
+- Passed: `pdm run pytest tests/test_ml_execution.py`
+- Passed: `pdm run pytest tests/test_agent_harness_first_slice.py`
+- Passed: `pdm run pytest tests/test_ml_registry.py`
+- Passed: `pdm run check`
+
+### Scope Decision
+
+- User agreed to Slice 4A:
+  - adjust LightGBM classification default tuning grid to the compact teaching-script shape;
+  - defer final-refit behavior to another slice.
+- No source changes yet; waiting for explicit start before mutating durable code.
+
+### Implemented Source Changes
+
+- `src/xenix/services/ml/models/classification.py`
+  - Narrowed `LightGBMClassificationParamGrid` to the compact teaching-script active grid:
+    - `n_estimators=[100, 200]`
+    - `max_depth=[-1, 5, 10]`
+  - Kept manual LightGBM classification params unchanged so explicit larger grids remain possible.
+- `tests/test_ml_registry.py`
+  - Added assertions that the default LightGBM classification grid contains only the compact default dimensions.
+
+### Verification Results
+
+- Passed: `pdm run pytest tests/test_ml_registry.py`
+- Passed: `pdm run pytest tests/test_agent_harness_first_slice.py::test_agent_harness_model_metadata_exposes_catalog_without_train_enums`
+- Passed: `pdm run check`
+
+## Slice 4B - Final Refit Apply Model
+
+### Task Packet Changes
+
+- Recorded the lifecycle problem found in the current implementation:
+  - the model registered for apply is currently the holdout-split training model;
+  - follow-up evaluation also uses that same artifact.
+- Recorded the proposed contract:
+  - evaluation model remains trained on the train split and evaluated on holdout;
+  - apply model is refit on all eligible training rows and becomes the canonical trained model artifact;
+  - metadata records the distinction.
+
+### Source Changes
+
+- None. Source mutation is waiting for explicit start after Impact Handshake.
+
+### Verification
+
+- Not run for this slice yet.
+
 ### Scope Update
 
 - User proposed expanding column role binding semantics to support semi-supervised learning in this slice.
@@ -149,6 +224,22 @@
 - Passed: `pdm run pytest tests/test_agent_harness_first_slice.py`
 - Passed: `pdm run pytest tests/test_ml_execution.py`
 - Passed: `pdm run check`
+
+## Slice 4 - Learn From Teaching Model Usage And Parameters
+
+### Task Packet Changes
+
+- Recorded exploration findings from `ml/classification/light_gbm_classification_model/light_gbm_classification_model.py`.
+- Recorded exploration findings from `ml/regression/light_gbm/light_gbm.py`.
+- Recorded cross-model teaching-script pattern: tune/evaluate on split, then retrain final model on all data with best params for prediction.
+
+### Source Changes
+
+- None. Source mutation is waiting for explicit user start after scope confirmation.
+
+### Verification
+
+- Not run for this slice yet.
 
 ### Implemented Source Changes
 

@@ -29,7 +29,7 @@ class TrainedModelContextPayload(BaseModel):
 
 
 class TrainedModelMetadata(BaseModel):
-    schema_version: int = 3
+    schema_version: int = 4
     model_key: str
     evaluation_kind: str | None = None
     model_family: str | None = None
@@ -53,6 +53,8 @@ class TrainedModelMetadata(BaseModel):
     training_params: dict[str, Any] = Field(default_factory=dict)
     best_params: dict[str, Any] = Field(default_factory=dict)
     tuning_grid: dict[str, list[Any]] = Field(default_factory=dict)
+    evaluation_model_training_scope: str | None = None
+    apply_model_training_scope: str | None = None
     evaluation_ml_task_id: str | None = None
     evaluation_primary_metric_name: str | None = None
     evaluation_primary_metric_value: float | None = None
@@ -105,7 +107,7 @@ def with_evaluation(
     evaluation_ml_task_id: str | None = None,
 ) -> TrainedModelMetadata:
     update = {
-        "schema_version": max(metadata.schema_version, 3),
+        "schema_version": max(metadata.schema_version, 4),
         "evaluation_primary_metric_name": evaluation.primary_metric_name,
         "evaluation_primary_metric_value": float(evaluation.primary_metric_value),
         "evaluation_metrics": {

@@ -156,12 +156,7 @@ class LightGBMClassificationParams(BaseModel):
 
 class LightGBMClassificationParamGrid(BaseModel):
     n_estimators: list[int] = Field(default=[100, 200], min_length=1)
-    learning_rate: list[float] = Field(default=[0.05, 0.1], min_length=1)
     max_depth: list[int] = Field(default=[-1, 5, 10], min_length=1)
-    num_leaves: list[int] = Field(default=[31, 63], min_length=1)
-    min_child_samples: list[int] = Field(default=[20, 40], min_length=1)
-    subsample: list[float] = Field(default=[0.8, 1.0], min_length=1)
-    colsample_bytree: list[float] = Field(default=[0.8, 1.0], min_length=1)
 
 
 class ExtraTreesClassificationParams(BaseModel):

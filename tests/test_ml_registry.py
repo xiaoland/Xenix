@@ -54,6 +54,10 @@ def test_model_catalog_exposes_json_schema_and_model_axes() -> None:
     lightgbm_classification = get_model_catalog_entry("classification.lightgbm")
     assert lightgbm_classification.model_task_kind is ModelTaskKind.PREDICTOR
     assert lightgbm_classification.param_schema["properties"]["num_leaves"]["default"] == 31
+    assert lightgbm_classification.param_grid_schema is not None
+    assert lightgbm_classification.param_grid_schema["properties"]["n_estimators"]["default"] == [100, 200]
+    assert lightgbm_classification.param_grid_schema["properties"]["max_depth"]["default"] == [-1, 5, 10]
+    assert set(lightgbm_classification.param_grid_schema["properties"]) == {"n_estimators", "max_depth"}
     extra_trees = get_model_catalog_entry("classification.extra_trees")
     assert extra_trees.param_grid_schema is not None
     assert extra_trees.param_schema["properties"]["n_estimators"]["default"] == 200
