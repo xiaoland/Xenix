@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from enum import StrEnum
 from collections.abc import Callable
 from typing import Any
@@ -18,6 +19,7 @@ from ..storage.models import (
     AgentTurnStatus,
 )
 from .conversation_store import ThreadSnapshot
+from .skill_catalog import is_agent_skill_tool
 from .tool_presentations import ToolPresentation, tool_presentation_for_name
 
 
@@ -105,7 +107,9 @@ def project_chatbot_events(
             events.append(project_text_message_event(message))
         elif message.kind is AgentMessageKind.TOOL_CALL:
             tool_call = tool_calls_by_request_id.get(message.id)
-            if tool_call is not None:
+            if tool_call is not None and (
+                not is_agent_skill_tool(tool_call.tool_name) or should_project_agent_skill_tools()
+            ):
                 result_message = (
                     messages_by_id.get(tool_call.result_message_id)
                     if tool_call.result_message_id is not None
@@ -131,6 +135,10 @@ def project_chatbot_events(
                 if usage_event is not None:
                     events.append(usage_event)
     return events
+
+
+def should_project_agent_skill_tools() -> bool:
+    return os.environ.get("XENIX_ENV", "").strip().lower() in {"development", "dev"}
 
 
 def project_text_message_event(message: AgentMessageRow) -> ChatbotEvent:

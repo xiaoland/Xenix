@@ -1,0 +1,41 @@
+{
+  "version": "0.2.0",
+  "business_intent": "",
+  "dataset": {
+    "table_name": "",
+    "unit_of_analysis": "",
+    "row_count": null,
+    "field_count": null,
+    "time_range": null
+  },
+  "data_understanding": {
+    "likely_business_scene": "",
+    "business_object": "",
+    "key_metrics": [],
+    "candidate_target_fields": [],
+    "candidate_time_fields": [],
+    "candidate_entity_fields": [],
+    "candidate_item_fields": []
+  },
+  "selected_task": {
+    "task_type": "profiling | classification | regression | association | semi_supervised | segmentation | forecasting | reporting",
+    "reason": "",
+    "requires_user_confirmation": false,
+    "confirmation_question": null
+  },
+  "tool_plan": {
+    "data_peek": [],
+    "data_query": [],
+    "analysis_graph": [],
+    "model_train": [],
+    "model_tune": [],
+    "model_apply": []
+  },
+  "field_policy": {
+    "target_field": null,
+    "feature_fields": [],
+    "excluded_fields": []
+  },
+  "risk_checks": [],
+  "expected_outputs": []
+}

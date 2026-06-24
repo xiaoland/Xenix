@@ -11,6 +11,22 @@ scripts_root = project_root / "scripts"
 xgboost_binaries = collect_dynamic_libs("xgboost")
 xgboost_datas = collect_data_files("xgboost", includes=["VERSION", "py.typed"])
 polars_datas = collect_data_files("polars") + collect_data_files("fastexcel")
+skill_catalog = src_root / "xenix" / "services" / "agent" / "skills" / "catalog.json"
+
+
+def collect_xenix_worker_source():
+    source_root = src_root / "xenix"
+    entries = []
+    for path in sorted(source_root.rglob("*")):
+        if not path.is_file():
+            continue
+        relative_path = path.relative_to(source_root)
+        if relative_path.parts[:3] == ("services", "agent", "skills"):
+            continue
+        if "__pycache__" in relative_path.parts or path.suffix == ".pyc":
+            continue
+        entries.append((str(path), str(Path("xenix_worker_source") / "xenix" / relative_path.parent)))
+    return entries
 
 a = Analysis(
     [str(scripts_root / "run_packaged.py")],
@@ -19,8 +35,9 @@ a = Analysis(
     datas=[
         (str(src_root / "xenix" / "resources"), "xenix/resources"),
         (str(src_root / "xenix" / "translations"), "xenix/translations"),
-        (str(src_root / "xenix"), "xenix_worker_source/xenix"),
+        (str(skill_catalog), "xenix/services/agent/skills"),
     ]
+    + collect_xenix_worker_source()
     + xgboost_datas
     + polars_datas,
     hiddenimports=[
@@ -33,6 +50,7 @@ a = Analysis(
         "xenix.services.agent.lazy_tools",
         "xenix.services.agent.providers",
         "xenix.services.agent.settings",
+        "xenix.services.agent.skill_catalog",
         "xenix.services.agent.tool_presentations",
         "xenix.services.agent.tools",
         "xenix.services.artifact_service",

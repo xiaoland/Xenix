@@ -1,0 +1,100 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v5.json",
+  "description": "Categorical heatmap. Replace data.values with rows containing x, y, and value.",
+  "width": 620,
+  "height": 360,
+  "padding": {"left": 120, "right": 24, "top": 42, "bottom": 80},
+  "autosize": "none",
+  "title": {
+    "text": "类别关系热力图",
+    "anchor": "start",
+    "font": "Noto Sans SC, Inter, system-ui, sans-serif",
+    "fontSize": 18,
+    "fontWeight": 600
+  },
+  "data": [
+    {
+      "name": "table",
+      "values": [
+        {"x": "渠道A", "y": "品类1", "value": 42},
+        {"x": "渠道B", "y": "品类1", "value": 31},
+        {"x": "渠道A", "y": "品类2", "value": 18}
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "xscale",
+      "type": "band",
+      "domain": {"data": "table", "field": "x"},
+      "range": "width",
+      "paddingInner": 0.05
+    },
+    {
+      "name": "yscale",
+      "type": "band",
+      "domain": {"data": "table", "field": "y"},
+      "range": "height",
+      "paddingInner": 0.05
+    },
+    {
+      "name": "color",
+      "type": "linear",
+      "domain": {"data": "table", "field": "value"},
+      "range": ["#f5efe8", "#d96c1c"],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "orient": "bottom",
+      "scale": "xscale",
+      "labelAngle": -35,
+      "labelAlign": "right",
+      "labelFont": "Noto Sans SC, Inter, system-ui, sans-serif",
+      "labelFontSize": 11,
+      "domain": false,
+      "ticks": false
+    },
+    {
+      "orient": "left",
+      "scale": "yscale",
+      "labelFont": "Noto Sans SC, Inter, system-ui, sans-serif",
+      "labelFontSize": 11,
+      "domain": false,
+      "ticks": false
+    }
+  ],
+  "marks": [
+    {
+      "type": "rect",
+      "from": {"data": "table"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "xscale", "field": "x"},
+          "y": {"scale": "yscale", "field": "y"},
+          "width": {"scale": "xscale", "band": 1},
+          "height": {"scale": "yscale", "band": 1},
+          "fill": {"scale": "color", "field": "value"},
+          "tooltip": {"signal": "datum.y + ' × ' + datum.x + ': ' + datum.value"}
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {"data": "table"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "xscale", "field": "x", "band": 0.5},
+          "y": {"scale": "yscale", "field": "y", "band": 0.5},
+          "text": {"field": "value"},
+          "align": {"value": "center"},
+          "baseline": {"value": "middle"},
+          "fontSize": {"value": 11},
+          "fill": {"value": "#333"}
+        }
+      }
+    }
+  ]
+}

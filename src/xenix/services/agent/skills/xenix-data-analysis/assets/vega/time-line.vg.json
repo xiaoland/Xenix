@@ -1,0 +1,96 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v5.json",
+  "description": "Single-series time line chart. Replace data.values with rows containing period and value.",
+  "width": 680,
+  "height": 320,
+  "padding": {"left": 56, "right": 24, "top": 36, "bottom": 46},
+  "autosize": "none",
+  "title": {
+    "text": "时间趋势",
+    "anchor": "start",
+    "font": "Noto Sans SC, Inter, system-ui, sans-serif",
+    "fontSize": 18,
+    "fontWeight": 600
+  },
+  "data": [
+    {
+      "name": "table",
+      "values": [
+        {"period": "2026-01", "value": 1200},
+        {"period": "2026-02", "value": 1380},
+        {"period": "2026-03", "value": 1320}
+      ],
+      "transform": [
+        {"type": "collect", "sort": {"field": "period", "order": "ascending"}}
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "xscale",
+      "type": "point",
+      "domain": {"data": "table", "field": "period"},
+      "range": "width",
+      "padding": 0.4
+    },
+    {
+      "name": "yscale",
+      "type": "linear",
+      "domain": {"data": "table", "field": "value"},
+      "range": "height",
+      "nice": true,
+      "zero": false
+    }
+  ],
+  "axes": [
+    {
+      "orient": "bottom",
+      "scale": "xscale",
+      "labelAngle": -35,
+      "labelAlign": "right",
+      "labelFontSize": 11,
+      "labelFont": "Inter, system-ui, sans-serif",
+      "domainColor": "#ddd",
+      "tickColor": "#ddd"
+    },
+    {
+      "orient": "left",
+      "scale": "yscale",
+      "grid": true,
+      "gridOpacity": 0.18,
+      "domain": false,
+      "tickColor": "#ddd",
+      "labelFontSize": 11,
+      "labelFont": "Inter, system-ui, sans-serif"
+    }
+  ],
+  "marks": [
+    {
+      "type": "line",
+      "from": {"data": "table"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "xscale", "field": "period"},
+          "y": {"scale": "yscale", "field": "value"},
+          "stroke": {"value": "#d96c1c"},
+          "strokeWidth": {"value": 3}
+        }
+      }
+    },
+    {
+      "type": "symbol",
+      "from": {"data": "table"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "xscale", "field": "period"},
+          "y": {"scale": "yscale", "field": "value"},
+          "size": {"value": 70},
+          "fill": {"value": "#fff"},
+          "stroke": {"value": "#d96c1c"},
+          "strokeWidth": {"value": 2},
+          "tooltip": {"signal": "datum.period + ': ' + datum.value"}
+        }
+      }
+    }
+  ]
+}

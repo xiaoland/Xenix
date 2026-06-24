@@ -31,22 +31,24 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pyinstaller>=6.16.0", "pytest>=8.4.0"]
+dev = ["pyinstaller>=6.16.0", "pytest>=8.4.0", "PyYAML>=6.0.0"]
 
 [tool.pdm]
 distribution = false
 
 [tool.pdm.scripts]
-dev = "python scripts/run_dev.py"
+agent-skills-check = "python scripts/agent_skills.py check"
+agent-skills-generate = "python scripts/agent_skills.py generate"
+dev = { composite = ["agent-skills-generate", "python scripts/run_dev.py"] }
 i18n-extract = "python scripts/update_translations.py"
 i18n-compile = "python scripts/compile_translations.py"
-package = "python scripts/package_app.py"
-smoke = "python scripts/run_dev.py --smoke-test"
+package = { composite = ["agent-skills-generate", "agent-skills-check", "python scripts/package_app.py"] }
+smoke = { composite = ["agent-skills-generate", "python scripts/run_dev.py --smoke-test"] }
 smoke-package = "python scripts/verify_packaged_smoke.py"
 dist = "python scripts/build_distribution_zip.py"
 pytest = "python scripts/run_pytest.py"
 test = "python scripts/run_pytest.py"
-check = "python -m compileall src tests scripts"
+check = { composite = ["agent-skills-generate", "agent-skills-check", "python -m compileall src tests scripts"] }
 diagnostic-bundle = "python scripts/create_diagnostic_bundle.py"
 
 [tool.pytest.ini_options]

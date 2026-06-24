@@ -1,0 +1,79 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v5.json",
+  "description": "Word cloud for Xenix keyword or tag frequency results. Replace data.values with rows containing word and frequency.",
+  "width": 720,
+  "height": 420,
+  "padding": 8,
+  "autosize": "none",
+  "signals": [
+    {"name": "fontScale", "value": 1.0},
+    {"name": "rotateChoices", "value": [-45, 0, 0, 0, 45]}
+  ],
+  "data": [
+    {
+      "name": "table",
+      "values": [
+        {"word": "复购", "frequency": 128},
+        {"word": "价格", "frequency": 96},
+        {"word": "服务", "frequency": 73},
+        {"word": "优惠", "frequency": 58},
+        {"word": "体验", "frequency": 43}
+      ],
+      "transform": [
+        {
+          "type": "formula",
+          "as": "fontSize",
+          "expr": "max(14, min(64, sqrt(datum.frequency) * 5 * fontScale))"
+        },
+        {
+          "type": "formula",
+          "as": "rotate",
+          "expr": "rotateChoices[floor(random() * length(rotateChoices))]"
+        },
+        {
+          "type": "wordcloud",
+          "size": [{"signal": "width"}, {"signal": "height"}],
+          "text": {"field": "word"},
+          "font": "Noto Sans SC, Inter, system-ui, sans-serif",
+          "fontSize": {"field": "fontSize"},
+          "fontWeight": {"value": 600},
+          "rotate": {"field": "rotate"},
+          "padding": 3
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {"data": "table", "field": "word"},
+      "range": ["#d96c1c", "#3b6ea8", "#5e8c61", "#8a6fb0", "#6f6f6f", "#c17f1d"]
+    }
+  ],
+  "marks": [
+    {
+      "type": "text",
+      "from": {"data": "table"},
+      "encode": {
+        "enter": {
+          "text": {"field": "word"},
+          "align": {"value": "center"},
+          "baseline": {"value": "alphabetic"},
+          "fill": {"scale": "color", "field": "word"}
+        },
+        "update": {
+          "x": {"field": "x"},
+          "y": {"field": "y"},
+          "angle": {"field": "angle"},
+          "fontSize": {"field": "fontSize"},
+          "font": {"field": "font"},
+          "fontWeight": {"field": "fontWeight"},
+          "tooltip": {
+            "signal": "datum.word + ': ' + datum.frequency"
+          }
+        }
+      }
+    }
+  ]
+}

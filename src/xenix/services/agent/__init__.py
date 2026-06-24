@@ -37,6 +37,8 @@ _EXPORTS = {
     "ProviderStreamEvent": ".providers",
     "ProviderToolCall": ".providers",
     "ScriptedAgentProvider": ".providers",
+    "AgentSkill": ".skill_catalog",
+    "AgentSkillCatalog": ".skill_catalog",
     "AgentSettings": ".settings",
     "AgentSettingsService": ".settings",
     "AimockSettings": ".settings",

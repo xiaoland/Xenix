@@ -271,6 +271,7 @@ def _load_runtime_imports() -> SimpleNamespace:
         return module
 
     agent_harness = load_module("xenix.services.agent.harness_service")
+    agent_skill_catalog = load_module("xenix.services.agent.skill_catalog")
     conversation_store = load_module("xenix.services.agent.conversation_store")
     lazy_tools = load_module("xenix.services.agent.lazy_tools")
     artifact_service = load_module("xenix.services.artifact_service")
@@ -284,6 +285,7 @@ def _load_runtime_imports() -> SimpleNamespace:
 
     return SimpleNamespace(
         AgentHarnessService=agent_harness.AgentHarnessService,
+        AgentSkillCatalog=agent_skill_catalog.AgentSkillCatalog,
         AgentToolRegistry=lazy_tools.LazyAgentToolRegistry,
         ArtifactService=artifact_service.ArtifactService,
         ConversationStore=conversation_store.ConversationStore,
@@ -505,6 +507,7 @@ def build_main_window(
             turn_completion_guard_provider=llm_service.build_turn_completion_guard_provider(),
             thread_title_provider=llm_service.build_thread_title_provider(),
             conversation_store=conversation_store,
+            skill_catalog=runtime.AgentSkillCatalog.from_default_catalog(),
         )
         _emit_startup_timing("services.construct", step_start)
 

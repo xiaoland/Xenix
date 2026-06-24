@@ -54,6 +54,7 @@ from .chatbot_events import (
     project_chatbot_events,
     project_text_message_event,
     project_tool_chatbot_event,
+    should_project_agent_skill_tools,
 )
 from .providers import (
     AgentProvider,
@@ -63,6 +64,13 @@ from .providers import (
     ProviderStreamEvent,
     ProviderToolCall,
     extract_reasoning_content,
+)
+from .skill_catalog import (
+    AGENT_SKILL_ACTIVATE_TOOL_NAME,
+    AGENT_SKILL_READ_ASSET_TOOL_NAME,
+    AGENT_SKILL_READ_REFERENCE_TOOL_NAME,
+    AgentSkillCatalog,
+    is_agent_skill_tool,
 )
 from . import observability as ai_observability
 from .tool_presentations import tool_presentation_for_name
@@ -158,6 +166,7 @@ class AgentHarnessService:
         turn_completion_guard_provider: AgentProvider | None = None,
         thread_title_provider: AgentProvider | None = None,
         conversation_store: ConversationStore | None = None,
+        skill_catalog: AgentSkillCatalog | None = None,
         initial_step_limit: int = 16,
         step_extension_limit: int = 16,
         max_total_steps: int = 64,
@@ -174,6 +183,7 @@ class AgentHarnessService:
         )
         self._thread_title_provider = thread_title_provider
         self._tool_registry = tool_registry
+        self._skill_catalog = skill_catalog
         self._conversation_store = conversation_store or ConversationStore(session_factory)
         self._initial_step_limit = max(1, initial_step_limit)
         self._step_extension_limit = max(1, step_extension_limit)
@@ -586,7 +596,7 @@ class AgentHarnessService:
             step_state["used_steps"] += 1
             self._raise_if_cancelled(run_id)
             snapshot = self._conversation_store.get_thread_snapshot(thread_id)
-            provider_messages = snapshot.provider_messages()
+            provider_messages = self._provider_messages_for_request(snapshot)
             dataset_ids = self._dataset_ids_for_thread(snapshot)
             provider_request = self._create_provider_request(
                 thread_id=thread_id,
@@ -715,16 +725,14 @@ class AgentHarnessService:
                             loop_step_index=step_state["used_steps"],
                         ),
                     ):
-                        result = self._tool_registry.execute(
-                            tool_call.tool_name,
-                            arguments,
-                            _tool_execution_context(
-                                thread_id=thread_id,
-                                turn_id=turn_id,
-                                tool_call_id=persisted_tool_call.id,
-                                dataset_ids=dataset_ids,
-                                cancel_requested=lambda run_id=run_id: self._is_cancel_requested(run_id),
-                            ),
+                        result = self._execute_tool_call(
+                            tool_name=tool_call.tool_name,
+                            arguments=arguments,
+                            thread_id=thread_id,
+                            turn_id=turn_id,
+                            tool_call_id=persisted_tool_call.id,
+                            dataset_ids=dataset_ids,
+                            run_id=run_id,
                         )
                     status = AgentToolCallStatus.SUCCEEDED
                     error_summary = None
@@ -776,7 +784,7 @@ class AgentHarnessService:
             step_state["used_steps"] += 1
             self._raise_if_cancelled(run_id)
             snapshot = self._conversation_store.get_thread_snapshot(thread_id)
-            provider_messages = snapshot.provider_messages()
+            provider_messages = self._provider_messages_for_request(snapshot)
             dataset_ids = self._dataset_ids_for_thread(snapshot)
             provider_request = self._create_provider_request(
                 thread_id=thread_id,
@@ -1032,16 +1040,14 @@ class AgentHarnessService:
                             loop_step_index=step_state["used_steps"],
                         ),
                     ):
-                        result = self._tool_registry.execute(
-                            tool_call.tool_name,
-                            arguments,
-                            _tool_execution_context(
-                                thread_id=thread_id,
-                                turn_id=turn_id,
-                                tool_call_id=persisted_tool_call.id,
-                                dataset_ids=dataset_ids,
-                                cancel_requested=lambda run_id=run_id: self._is_cancel_requested(run_id),
-                            ),
+                        result = self._execute_tool_call(
+                            tool_name=tool_call.tool_name,
+                            arguments=arguments,
+                            thread_id=thread_id,
+                            turn_id=turn_id,
+                            tool_call_id=persisted_tool_call.id,
+                            dataset_ids=dataset_ids,
+                            run_id=run_id,
                         )
                     status = AgentToolCallStatus.SUCCEEDED
                     error_summary = None
@@ -1388,6 +1394,15 @@ class AgentHarnessService:
         request_message: AgentMessageRow,
         result_message: AgentMessageRow | None = None,
     ) -> AgentHarnessStreamEvent:
+        if is_agent_skill_tool(tool_call.tool_name) and not should_project_agent_skill_tools():
+            return AgentHarnessStreamEvent(
+                kind=kind,
+                thread_id=message.thread_id,
+                turn_id=message.turn_id,
+                run_id=run_id,
+                message_id=message.id,
+                message=message,
+            )
         return AgentHarnessStreamEvent(
             kind=kind,
             thread_id=message.thread_id,
@@ -1479,11 +1494,136 @@ class AgentHarnessService:
             has_selection=self._snapshot_has_payload_key(snapshot, "binding_id"),
             has_trained_model=self._snapshot_has_trained_model(snapshot),
         )
-        return [
+        specs = [
             spec
             for spec in self._tool_registry.list_specs()
             if self._tool_available_for_context(spec.name, context)
         ]
+        skill_spec = self._skill_activation_tool_spec(snapshot)
+        if skill_spec is not None:
+            specs.append(skill_spec)
+        specs.extend(self._skill_resource_tool_specs(snapshot))
+        return specs
+
+    def _skill_activation_tool_spec(self, snapshot: ThreadSnapshot) -> AgentToolSpec | None:
+        if self._skill_catalog is None:
+            return None
+        return self._skill_catalog.activation_tool_spec(
+            activated_skill_names=self._activated_skill_names(snapshot),
+        )
+
+    def _skill_resource_tool_specs(self, snapshot: ThreadSnapshot) -> list[AgentToolSpec]:
+        if self._skill_catalog is None:
+            return []
+        return self._skill_catalog.resource_tool_specs(
+            activated_skill_names=self._activated_skill_names(snapshot),
+        )
+
+    def _provider_messages_for_request(self, snapshot: ThreadSnapshot) -> list[ProviderMessage]:
+        provider_messages = snapshot.provider_messages()
+        if self._skill_catalog is None:
+            return provider_messages
+        catalog_message = self._skill_catalog.catalog_provider_message(
+            activated_skill_names=self._activated_skill_names(snapshot),
+        )
+        if catalog_message is None:
+            return provider_messages
+        insertion_index = 0
+        for index, message in enumerate(provider_messages):
+            if message.role == "system":
+                insertion_index = index + 1
+                break
+        return [*provider_messages[:insertion_index], catalog_message, *provider_messages[insertion_index:]]
+
+    def _activated_skill_names(self, snapshot: ThreadSnapshot) -> set[str]:
+        activated: set[str] = set()
+        for payload in self._snapshot_tool_payloads(snapshot):
+            skill_name = payload.get("skill_name")
+            if isinstance(skill_name, str) and skill_name.strip():
+                activated.add(skill_name.strip())
+        return activated
+
+    def _execute_tool_call(
+        self,
+        *,
+        tool_name: str,
+        arguments: dict[str, Any],
+        thread_id: str,
+        turn_id: str,
+        tool_call_id: str,
+        dataset_ids: list[str],
+        run_id: str,
+    ):
+        if is_agent_skill_tool(tool_name):
+            return self._execute_agent_skill_tool(tool_name, arguments)
+        return self._tool_registry.execute(
+            tool_name,
+            arguments,
+            _tool_execution_context(
+                thread_id=thread_id,
+                turn_id=turn_id,
+                tool_call_id=tool_call_id,
+                dataset_ids=dataset_ids,
+                cancel_requested=lambda run_id=run_id: self._is_cancel_requested(run_id),
+            ),
+        )
+
+    def _execute_agent_skill_tool(self, tool_name: str, arguments: dict[str, Any]):
+        if tool_name == AGENT_SKILL_ACTIVATE_TOOL_NAME:
+            return self._execute_skill_activation(arguments)
+        if tool_name == AGENT_SKILL_READ_REFERENCE_TOOL_NAME:
+            return self._execute_skill_resource_read(tool_name, arguments, resource_kind="reference")
+        if tool_name == AGENT_SKILL_READ_ASSET_TOOL_NAME:
+            return self._execute_skill_resource_read(tool_name, arguments, resource_kind="asset")
+        raise ValidationError(f"Unknown Agent Skill tool: {tool_name}")
+
+    def _execute_skill_activation(self, arguments: dict[str, Any]):
+        if self._skill_catalog is None:
+            raise ValidationError("Agent Skill catalog is not configured.")
+        from .tools import ToolExecutionResult
+
+        skill_name = str(arguments.get("name") or "").strip()
+        if not skill_name:
+            raise ValidationError("Agent Skill activation requires a skill name.")
+        payload = self._skill_catalog.activate(skill_name)
+        return ToolExecutionResult(
+            payload=payload,
+            content_blocks=[
+                {
+                    "type": "agent_skill_activation",
+                    "skill_name": payload["skill_name"],
+                }
+            ],
+        )
+
+    def _execute_skill_resource_read(self, tool_name: str, arguments: dict[str, Any], *, resource_kind: str):
+        if self._skill_catalog is None:
+            raise ValidationError("Agent Skill catalog is not configured.")
+        from .tools import ToolExecutionResult
+
+        skill_name = str(arguments.get("skill_name") or "").strip()
+        path = str(arguments.get("path") or "").strip()
+        if not skill_name:
+            raise ValidationError("Agent Skill resource read requires a skill name.")
+        if not path:
+            raise ValidationError("Agent Skill resource read requires a resource path.")
+        if tool_name == AGENT_SKILL_READ_REFERENCE_TOOL_NAME:
+            payload = self._skill_catalog.read_reference(skill_name=skill_name, path=path)
+        elif tool_name == AGENT_SKILL_READ_ASSET_TOOL_NAME:
+            payload = self._skill_catalog.read_asset(skill_name=skill_name, path=path)
+        else:
+            raise ValidationError(f"Unknown Agent Skill resource tool: {tool_name}")
+        return ToolExecutionResult(
+            payload=payload,
+            content_blocks=[
+                {
+                    "type": "agent_skill_resource",
+                    "resource_kind": resource_kind,
+                    "skill_name": payload["skill_name"],
+                    "path": payload["path"],
+                }
+            ],
+        )
 
     def _tool_available_for_context(self, tool_name: str, context: _ToolAvailabilityContext) -> bool:
         if tool_name == "data.peek":

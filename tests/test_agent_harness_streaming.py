@@ -9,6 +9,8 @@ import pytest
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.agent import (
     AgentHarnessService,
+    AgentSkill,
+    AgentSkillCatalog,
     ChatbotEventKind,
     ChatbotEventStatus,
     ConversationStore,
@@ -185,6 +187,92 @@ class GuardProviderFixture:
         return ProviderResponse(
             assistant_content_blocks=[
                 {"type": "markdown", "text": json.dumps({"verdict": verdict, "reason": reason})}
+            ],
+            tool_calls=[],
+        )
+
+
+class SkillActivatingProviderFixture:
+    def __init__(self) -> None:
+        self.messages_by_call: list[list[ProviderMessage]] = []
+        self.tools_by_call: list[list[str]] = []
+
+    def complete(self, messages: list[ProviderMessage], tools: list[Any]) -> ProviderResponse:
+        self.messages_by_call.append(list(messages))
+        self.tools_by_call.append([tool.name for tool in tools])
+        combined_content = "\n".join(message.content for message in messages)
+        if "Always mention the baseline before model tuning." not in combined_content:
+            return ProviderResponse(
+                tool_calls=[
+                    ProviderToolCall(
+                        provider_call_id="call-skill",
+                        tool_name="agent.skill.activate",
+                        arguments={"name": "tabular-analysis"},
+                    )
+                ]
+            )
+        return ProviderResponse(
+            assistant_content_blocks=[
+                {
+                    "type": "markdown",
+                    "text": "I will start with a baseline before considering model tuning.",
+                }
+            ],
+            tool_calls=[],
+        )
+
+
+class SkillResourceReadingProviderFixture:
+    def __init__(self) -> None:
+        self.messages_by_call: list[list[ProviderMessage]] = []
+        self.tools_by_call: list[list[str]] = []
+
+    def complete(self, messages: list[ProviderMessage], tools: list[Any]) -> ProviderResponse:
+        self.messages_by_call.append(list(messages))
+        self.tools_by_call.append([tool.name for tool in tools])
+        combined_content = "\n".join(message.content for message in messages)
+        if "Use the reference before answering." not in combined_content:
+            return ProviderResponse(
+                tool_calls=[
+                    ProviderToolCall(
+                        provider_call_id="call-skill",
+                        tool_name="agent.skill.activate",
+                        arguments={"name": "tabular-analysis"},
+                    )
+                ]
+            )
+        if "Reference says: segment by margin band." not in combined_content:
+            return ProviderResponse(
+                tool_calls=[
+                    ProviderToolCall(
+                        provider_call_id="call-reference",
+                        tool_name="agent.skill.read_reference",
+                        arguments={
+                            "skill_name": "tabular-analysis",
+                            "path": "references/routing.md",
+                        },
+                    )
+                ]
+            )
+        if "management-report" not in combined_content:
+            return ProviderResponse(
+                tool_calls=[
+                    ProviderToolCall(
+                        provider_call_id="call-asset",
+                        tool_name="agent.skill.read_asset",
+                        arguments={
+                            "skill_name": "tabular-analysis",
+                            "path": "assets/report-template.json",
+                        },
+                    )
+                ]
+            )
+        return ProviderResponse(
+            assistant_content_blocks=[
+                {
+                    "type": "markdown",
+                    "text": "I used the reference and the management-report template.",
+                }
             ],
             tool_calls=[],
         )
@@ -859,6 +947,160 @@ def test_agent_harness_projects_thread_system_prompt_as_first_provider_message(m
     assert provider.messages[0].source_message_id == snapshot.messages[0].id
     assert provider.messages[1].role == "user"
     assert provider.messages[1].content == "show me the data"
+
+
+def test_agent_harness_activates_skill_and_uses_returned_instructions(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    provider = SkillActivatingProviderFixture()
+    conversations = ConversationStore(context.session_factory)
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=provider,
+        tool_registry=EmptyToolRegistry(),
+        conversation_store=conversations,
+        skill_catalog=AgentSkillCatalog(
+            [
+                AgentSkill(
+                    name="tabular-analysis",
+                    description="Use for tabular business analysis.",
+                    body="Always mention the baseline before model tuning.",
+                    metadata={"version": "test"},
+                )
+            ]
+        ),
+    )
+
+    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="Analyze this spreadsheet."))
+    events = harness.project_chatbot_events(snapshot)
+
+    assert len(provider.messages_by_call) == 2
+    assert "agent.skill.activate" in provider.tools_by_call[0]
+    assert "agent.skill.activate" not in provider.tools_by_call[1]
+    assert any(
+        message.role == "system"
+        and "<available_agent_skills>" in message.content
+        and "tabular-analysis" in message.content
+        for message in provider.messages_by_call[0]
+    )
+    assert any(
+        message.role == "tool"
+        and "Always mention the baseline before model tuning." in message.content
+        for message in provider.messages_by_call[1]
+    )
+    assert [tool_call.tool_name for tool_call in snapshot.tool_calls] == ["agent.skill.activate"]
+    assert snapshot.tool_calls[0].result_payload is not None
+    assert snapshot.tool_calls[0].result_payload["skill_name"] == "tabular-analysis"
+    assert "Always mention the baseline" in snapshot.tool_calls[0].result_payload["instructions"]
+    assert [event.kind for event in events] == [ChatbotEventKind.TEXT, ChatbotEventKind.TEXT]
+    assert events[-1].content_blocks == [
+        {
+            "type": "markdown",
+            "text": "I will start with a baseline before considering model tuning.",
+        }
+    ]
+
+
+def test_agent_harness_projects_skill_tools_in_development(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    monkeypatch.setenv("XENIX_ENV", "development")
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    provider = SkillActivatingProviderFixture()
+    conversations = ConversationStore(context.session_factory)
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=provider,
+        tool_registry=EmptyToolRegistry(),
+        conversation_store=conversations,
+        skill_catalog=AgentSkillCatalog(
+            [
+                AgentSkill(
+                    name="tabular-analysis",
+                    description="Use for tabular business analysis.",
+                    body="Always mention the baseline before model tuning.",
+                )
+            ]
+        ),
+    )
+
+    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="Analyze this spreadsheet."))
+    events = harness.project_chatbot_events(snapshot)
+
+    tool_events = [event for event in events if event.kind is ChatbotEventKind.TOOL]
+    assert [event.tool_name for event in tool_events] == ["agent.skill.activate"]
+    assert "Always mention the baseline" in tool_events[0].detail_blocks[0]["text"]
+
+
+def test_agent_harness_reads_activated_skill_resources(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    skill_root = tmp_path / "skills-does-not-exist"
+
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    provider = SkillResourceReadingProviderFixture()
+    conversations = ConversationStore(context.session_factory)
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=provider,
+        tool_registry=EmptyToolRegistry(),
+        conversation_store=conversations,
+        skill_catalog=AgentSkillCatalog(
+            [
+                AgentSkill(
+                    name="tabular-analysis",
+                    description="Use for tabular business analysis.",
+                    body="Use the reference before answering.",
+                    resources={
+                        "references": {
+                            "references/routing.md": "Reference says: segment by margin band.",
+                        },
+                        "assets": {
+                            "assets/report-template.json": '{"template": "management-report"}',
+                        },
+                    },
+                )
+            ],
+        ),
+    )
+
+    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="Analyze this spreadsheet."))
+
+    assert not skill_root.exists()
+    assert len(provider.messages_by_call) == 4
+    assert "agent.skill.activate" in provider.tools_by_call[0]
+    assert "agent.skill.read_reference" not in provider.tools_by_call[0]
+    assert "agent.skill.read_asset" not in provider.tools_by_call[0]
+    assert "agent.skill.activate" not in provider.tools_by_call[1]
+    assert "agent.skill.read_reference" in provider.tools_by_call[1]
+    assert "agent.skill.read_asset" in provider.tools_by_call[1]
+    assert "Reference says: segment by margin band." in "\n".join(
+        message.content for message in provider.messages_by_call[2]
+    )
+    assert "management-report" in "\n".join(
+        message.content for message in provider.messages_by_call[3]
+    )
+    assert [tool_call.tool_name for tool_call in snapshot.tool_calls] == [
+        "agent.skill.activate",
+        "agent.skill.read_reference",
+        "agent.skill.read_asset",
+    ]
+    assert snapshot.tool_calls[0].result_payload is not None
+    assert snapshot.tool_calls[0].result_payload["resources"] == {
+        "references": ["references/routing.md"],
+        "assets": ["assets/report-template.json"],
+    }
+    assert snapshot.tool_calls[1].result_payload is not None
+    assert snapshot.tool_calls[1].result_payload["content"] == "Reference says: segment by margin band."
+    assert snapshot.tool_calls[2].result_payload is not None
+    assert snapshot.tool_calls[2].result_payload["content"] == '{"template": "management-report"}'
+    assert snapshot.messages[-1].content_blocks == [
+        {
+            "type": "markdown",
+            "text": "I used the reference and the management-report template.",
+        }
+    ]
 
 
 def test_agent_harness_uses_thread_title_model_for_implicit_thread(monkeypatch, tmp_path: Path) -> None:

@@ -154,6 +154,14 @@ def _remove_generated_trial_lock(project_root: Path) -> None:
     _generated_trial_lock_path(project_root).unlink(missing_ok=True)
 
 
+def _generate_agent_skill_catalog(project_root: Path) -> None:
+    subprocess.run(
+        [sys.executable, str(project_root / "scripts" / "agent_skills.py"), "generate"],
+        check=True,
+        cwd=project_root,
+    )
+
+
 def main() -> int:
     project_root = Path(__file__).resolve().parents[1]
     subprocess.run(
@@ -161,6 +169,7 @@ def main() -> int:
         check=True,
         cwd=project_root,
     )
+    _generate_agent_skill_catalog(project_root)
     build_commit = _resolve_build_commit(project_root)
     trial_lock_days = _resolve_trial_lock_days()
     _write_generated_build_info(project_root, build_commit)
