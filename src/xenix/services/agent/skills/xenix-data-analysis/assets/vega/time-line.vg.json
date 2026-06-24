@@ -1,6 +1,6 @@
 {
   "$schema": "https://vega.github.io/schema/vega/v5.json",
-  "description": "Single-series time line chart. Replace data.values with rows containing period and value.",
+  "description": "Single-series time line chart. Use with a registered dataset containing period and value columns; Xenix injects the dataset.",
   "width": 680,
   "height": 320,
   "padding": {"left": 56, "right": 24, "top": 36, "bottom": 46},
@@ -12,31 +12,18 @@
     "fontSize": 18,
     "fontWeight": 600
   },
-  "data": [
-    {
-      "name": "table",
-      "values": [
-        {"period": "2026-01", "value": 1200},
-        {"period": "2026-02", "value": 1380},
-        {"period": "2026-03", "value": 1320}
-      ],
-      "transform": [
-        {"type": "collect", "sort": {"field": "period", "order": "ascending"}}
-      ]
-    }
-  ],
   "scales": [
     {
       "name": "xscale",
       "type": "point",
-      "domain": {"data": "table", "field": "period"},
+      "domain": {"data": "xenix_data", "field": "period", "sort": true},
       "range": "width",
       "padding": 0.4
     },
     {
       "name": "yscale",
       "type": "linear",
-      "domain": {"data": "table", "field": "value"},
+      "domain": {"data": "xenix_data", "field": "value"},
       "range": "height",
       "nice": true,
       "zero": false
@@ -67,7 +54,7 @@
   "marks": [
     {
       "type": "line",
-      "from": {"data": "table"},
+      "from": {"data": "xenix_data"},
       "encode": {
         "enter": {
           "x": {"scale": "xscale", "field": "period"},
@@ -79,7 +66,7 @@
     },
     {
       "type": "symbol",
-      "from": {"data": "table"},
+      "from": {"data": "xenix_data"},
       "encode": {
         "enter": {
           "x": {"scale": "xscale", "field": "period"},

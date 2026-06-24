@@ -111,3 +111,15 @@ Agree on packaging model:
 - Runtime consumes only `catalog.json`; `src/xenix/services/agent/skills/<skill>/` directories are dev/build inputs and must not be packaged as runtime assets.
 - Resource reads must remain UTF-8 text, catalog-listed, bounded, and served from the generated catalog.
 - Verification: `pdm run pytest tests/test_agent_harness_streaming.py -q`, `pdm run check`, and `pdm run test` passed after this slice. Worker-source packaging scan reported zero `services/agent/skills` leaks.
+
+## Skill Split Slice
+
+- Split the original broad `xenix-data-analysis` source skill into three static skills:
+  - `xenix-data-analysis`: descriptive analysis, profiling, SQL aggregation, visualization, association discovery, and reporting.
+  - `xenix-data-modeling`: classification, regression, scoring, model training, tuning, application, semi-supervised workflows, and model interpretation.
+  - `xenix-data-preprocessing`: data cleaning, type conversion, duplicate/missing handling, transformation, integration, feature preparation, and role binding.
+- Moved modeling references and model preset assets into `xenix-data-modeling`.
+- Moved the old general tool contract into a preprocessing-specific reference and added a data quality checks reference.
+- Removed the old source-package README/LICENSE from `xenix-data-analysis`; runtime packaging remains catalog-only.
+- Generated catalog now contains three skills.
+- Verification: `pdm run agent-skills-check`, `pdm run pytest tests/test_agent_harness_streaming.py -q`, `pdm run check`, and `pdm run test` passed after this slice.

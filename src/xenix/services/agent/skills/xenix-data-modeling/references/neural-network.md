@@ -30,16 +30,15 @@ Do not use when:
 5. Request feature-importance or permutation-style explanation only if supported.
 6. If neural network is not materially better, recommend the simpler model.
 
-## Suggested parameters
+## Suggested Parameters
 
-Read `references/model-presets.md` for MLP presets. Keep the search small:
+Read `references/model-presets.md` for MLP presets, and call `model.metadata` before passing parameters. Current Xenix MLP tools expose `hidden_layer_size` as one integer, not scikit-learn's `hidden_layer_sizes` tuple/list. Keep the search small:
 
 ```json
 {
-  "hidden_layer_sizes": [[32], [64], [64, 32]],
+  "hidden_layer_size": [32, 64, 128],
   "alpha": [0.0001, 0.001, 0.01],
-  "learning_rate_init": [0.001],
-  "early_stopping": [true]
+  "learning_rate_init": [0.001]
 }
 ```
 

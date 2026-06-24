@@ -4,6 +4,8 @@ Use this file when the data has a subject-item structure: order-product, custome
 
 This workflow can be executed with `data.query` and `analysis.graph`; it does not require scripts.
 
+For single-dataset SQL calls, use `input` as the table name. For multi-dataset calls, pass explicit `bindings` and use each `bindings[].alias`.
+
 ## Structure recognition
 
 Identify:
@@ -22,7 +24,7 @@ WITH basket_items AS (
   SELECT DISTINCT
     "{{subject_col}}" AS subject_id,
     "{{item_col}}" AS item
-  FROM {{table}}
+  FROM input
   WHERE "{{subject_col}}" IS NOT NULL
     AND "{{item_col}}" IS NOT NULL
 ), baskets AS (
@@ -45,7 +47,7 @@ WITH basket_items AS (
   SELECT DISTINCT
     "{{subject_col}}" AS subject_id,
     "{{item_col}}" AS item
-  FROM {{table}}
+  FROM input
   WHERE "{{subject_col}}" IS NOT NULL
     AND "{{item_col}}" IS NOT NULL
 )
@@ -66,7 +68,7 @@ WITH basket_items AS (
   SELECT DISTINCT
     "{{subject_col}}" AS subject_id,
     CAST("{{item_col}}" AS VARCHAR) AS item
-  FROM {{table}}
+  FROM input
   WHERE "{{subject_col}}" IS NOT NULL
     AND "{{item_col}}" IS NOT NULL
 ), total AS (

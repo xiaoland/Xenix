@@ -1,6 +1,6 @@
 # Visualization and Vega Reference
 
-Use this file before calling `analysis.graph`. The graph tool should receive a compact Vega specification and chart-ready aggregated data. Do not pass full raw datasets unless the chart genuinely requires row-level marks and the tool can handle the volume.
+Use this file before calling `analysis.graph`. The graph tool should receive a compact Vega specification for a registered, chart-ready dataset. Xenix injects the selected dataset into the Vega spec; do not add or edit Vega `data.values`.
 
 ## Chart selection
 
@@ -27,17 +27,18 @@ Use this file before calling `analysis.graph`. The graph tool should receive a c
 
 ## Word cloud workflow
 
-1. Use `data.query` to create a table with `word` and `frequency`.
+1. Use `data.query` to inspect candidate word-frequency results.
 2. Remove empty words, stop words, meaningless one-character tokens, and overly generic business words.
 3. Limit to around 80-150 words.
-4. Call `analysis.graph` with a Vega word-cloud spec.
-5. Explain the word cloud as a frequency view, not sentiment or causality.
+4. Use `data.transform` to materialize a registered dataset with exactly `word` and `frequency` columns.
+5. Call `analysis.graph` with a Vega word-cloud spec using a mark-level `wordcloud` transform.
+6. Explain the word cloud as a frequency view, not sentiment or causality.
 
 A word cloud is appropriate for qualitative overview. It is not a substitute for exact ranking. Pair it with a Top-N bar chart when precise comparison matters.
 
 ## Vega word cloud template
 
-Use `assets/vega/wordcloud.vg.json` as the default template. Replace `data.values` with the word-frequency output from `data.query`:
+Use `assets/vega/wordcloud.vg.json` as the default template. Before graphing, create a registered dataset shaped like:
 
 ```json
 [
@@ -47,9 +48,27 @@ Use `assets/vega/wordcloud.vg.json` as the default template. Replace `data.value
 ]
 ```
 
+Do not place wordcloud under `from.transform`, and do not add top-level Vega `data`. The accepted Xenix profile puts the transform directly on the text mark:
+
+```json
+{
+  "type": "text",
+  "from": {"data": "xenix_data"},
+  "encode": {"enter": {"text": {"field": "word"}}},
+  "transform": [
+    {
+      "type": "wordcloud",
+      "text": {"field": "word"},
+      "fontSize": {"field": "datum.frequency"},
+      "fontSizeRange": [12, 56]
+    }
+  ]
+}
+```
+
 ## Vega horizontal bar template
 
-Use `assets/vega/topn-bar.vg.json` for ranked category comparisons. Expected data fields:
+Use `assets/vega/topn-bar.vg.json` for ranked category comparisons. Prepare a registered dataset with:
 
 ```json
 [
@@ -60,7 +79,7 @@ Use `assets/vega/topn-bar.vg.json` for ranked category comparisons. Expected dat
 
 ## Vega line chart template
 
-Use `assets/vega/time-line.vg.json` for a single time-series metric. Expected data fields:
+Use `assets/vega/time-line.vg.json` for a single time-series metric. Prepare a registered dataset with:
 
 ```json
 [
@@ -71,7 +90,7 @@ Use `assets/vega/time-line.vg.json` for a single time-series metric. Expected da
 
 ## Vega heatmap template
 
-Use `assets/vega/heatmap.vg.json` for two categorical dimensions and one measure. Expected data fields:
+Use `assets/vega/heatmap.vg.json` for two categorical dimensions and one measure. Prepare a registered dataset with:
 
 ```json
 [

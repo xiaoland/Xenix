@@ -1,5 +1,5 @@
 {
-  "version": "0.2.0",
+  "version": "0.3.0",
   "business_intent": "",
   "dataset": {
     "table_name": "",
@@ -12,28 +12,31 @@
     "likely_business_scene": "",
     "business_object": "",
     "key_metrics": [],
-    "candidate_target_fields": [],
     "candidate_time_fields": [],
     "candidate_entity_fields": [],
     "candidate_item_fields": []
   },
   "selected_task": {
-    "task_type": "profiling | classification | regression | association | semi_supervised | segmentation | forecasting | reporting",
+    "task_type": "profiling | descriptive_comparison | trend | association | descriptive_segmentation | visualization | reporting",
     "reason": "",
     "requires_user_confirmation": false,
     "confirmation_question": null
   },
+  "handoff": {
+    "requires_preprocessing_skill": false,
+    "requires_modeling_skill": false,
+    "reason": ""
+  },
   "tool_plan": {
     "data_peek": [],
     "data_query": [],
-    "analysis_graph": [],
-    "model_train": [],
-    "model_tune": [],
-    "model_apply": []
+    "data_transform": [],
+    "analysis_graph": []
   },
   "field_policy": {
-    "target_field": null,
-    "feature_fields": [],
+    "business_metric_fields": [],
+    "dimension_fields": [],
+    "time_fields": [],
     "excluded_fields": []
   },
   "risk_checks": [],
