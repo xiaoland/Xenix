@@ -103,6 +103,7 @@ def test_main_window_language_switch_updates_chat_shell(
         assert settings._ml_workers_title_label.text() == "ML workers"
         assert settings._ml_workers_setup_button.text() == "Add SSH worker..."
         assert window.tr("Generate title...") == "Generate title..."
+        assert window.tr("Copy thread ID") == "Copy thread ID"
         assert window.tr("Generating thread title...") == "Generating thread title..."
         chat_view = window._thread_detail_view
         chat_view.clear_messages()
@@ -205,6 +206,7 @@ def test_main_window_language_switch_updates_chat_shell(
         assert settings._ml_workers_title_label.text() == "ML 工作器"
         assert settings._ml_workers_setup_button.text() == "添加 SSH 工作器..."
         assert window.tr("Generate title...") == "生成标题..."
+        assert window.tr("Copy thread ID") == "复制线程 ID"
         assert window.tr("Generating thread title...") == "正在生成线程标题..."
         assert chat_view._editor.placeholderText() == "给 Xenix 发消息"
         assert chat_view._send_button.text() == "发送"
@@ -238,6 +240,7 @@ def test_main_window_language_switch_updates_chat_shell(
         assert settings._ml_workers_title_label.text() == "ML workers"
         assert settings._ml_workers_setup_button.text() == "Add SSH worker..."
         assert window.tr("Generate title...") == "Generate title..."
+        assert window.tr("Copy thread ID") == "Copy thread ID"
         assert window.tr("Generating thread title...") == "Generating thread title..."
         assert chat_view._editor.placeholderText() == "Message Xenix"
         assert chat_view._send_button.text() == "Send"

@@ -9,6 +9,7 @@ from uuid import uuid4
 from PySide6.QtCore import QEvent, QPoint, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
+    QApplication,
     QFrame,
     QHBoxLayout,
     QInputDialog,
@@ -686,6 +687,7 @@ class MainWindow(QMainWindow):
         menu = QMenu(self)
         rename_action = menu.addAction(self.tr("Rename"))
         generate_title_action = menu.addAction(self.tr("Generate title..."))
+        copy_thread_id_action = menu.addAction(self.tr("Copy thread ID"))
         delete_action = menu.addAction(self.tr("Delete"))
         selected_action = menu.exec(self._history_list.viewport().mapToGlobal(position))
 
@@ -693,8 +695,16 @@ class MainWindow(QMainWindow):
             self._rename_history_thread(item)
         elif selected_action is generate_title_action:
             self._generate_history_thread_title(item)
+        elif selected_action is copy_thread_id_action:
+            self._copy_history_thread_id(item)
         elif selected_action is delete_action:
             self._delete_history_thread(item)
+
+    def _copy_history_thread_id(self, item: QListWidgetItem) -> None:
+        thread_id = self._thread_id_from_history_item(item)
+        if thread_id is None:
+            return
+        QApplication.clipboard().setText(thread_id)
 
     def _rename_history_thread(self, item: QListWidgetItem) -> None:
         thread_id = self._thread_id_from_history_item(item)

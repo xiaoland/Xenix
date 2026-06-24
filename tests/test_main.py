@@ -814,6 +814,10 @@ def test_main_window_history_item_handlers_rename_and_delete_thread(monkeypatch,
         assert window._agent_harness_service is not None
         assert window._agent_harness_service.get_thread_snapshot(thread_id).thread.title == "Renamed analysis"
 
+        app.clipboard().clear()
+        window._copy_history_thread_id(renamed_item)
+        assert app.clipboard().text() == thread_id
+
         monkeypatch.setattr(
             "xenix.ui.main_window.QMessageBox.question",
             lambda *args, **kwargs: QMessageBox.Yes,

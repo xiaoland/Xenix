@@ -2,19 +2,32 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="en_US">
 <context>
+    <name>ApplyRowEditorWidget</name>
+    <message>
+        <location filename="../ui/widgets/apply_row_editor.py" line="48"/>
+        <source>Add Row</source>
+        <translation>Add Row</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/apply_row_editor.py" line="49"/>
+        <source>Remove Row</source>
+        <translation>Remove Row</translation>
+    </message>
+</context>
+<context>
     <name>ChatMessageBubble</name>
     <message>
-        <location filename="../ui/chatbot.py" line="655"/>
+        <location filename="../ui/chatbot.py" line="670"/>
         <source>You</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="657"/>
+        <location filename="../ui/chatbot.py" line="672"/>
         <source>Tool</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="659"/>
+        <location filename="../ui/chatbot.py" line="674"/>
         <source>System</source>
         <translation type="unfinished"></translation>
     </message>
@@ -292,19 +305,6 @@
     <message>
         <source>Cancelled</source>
         <translation type="obsolete">Cancelled</translation>
-    </message>
-</context>
-<context>
-    <name>ApplyRowEditorWidget</name>
-    <message>
-        <location filename="../ui/widgets/apply_row_editor.py" line="48"/>
-        <source>Add Row</source>
-        <translation>Add Row</translation>
-    </message>
-    <message>
-        <location filename="../ui/widgets/apply_row_editor.py" line="49"/>
-        <source>Remove Row</source>
-        <translation>Remove Row</translation>
     </message>
 </context>
 <context>
@@ -723,117 +723,122 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../ui/main_window.py" line="179"/>
+        <location filename="../ui/main_window.py" line="210"/>
         <source>Xenix Native</source>
         <translation>Xenix Native</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="180"/>
+        <location filename="../ui/main_window.py" line="211"/>
         <source>Xenix</source>
         <translation type="unfinished">Xenix</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="181"/>
+        <location filename="../ui/main_window.py" line="212"/>
         <source>Settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="182"/>
+        <location filename="../ui/main_window.py" line="213"/>
         <source>History</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="184"/>
+        <location filename="../ui/main_window.py" line="215"/>
         <source>New thread</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="359"/>
+        <location filename="../ui/main_window.py" line="497"/>
         <source>Could not open link: {uri}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="367"/>
+        <location filename="../ui/main_window.py" line="505"/>
         <source>Artifact is not ready to open.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="370"/>
+        <location filename="../ui/main_window.py" line="508"/>
         <source>Artifact file is missing: {path}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="374"/>
+        <location filename="../ui/main_window.py" line="512"/>
         <source>Could not open artifact: {path}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="430"/>
+        <location filename="../ui/main_window.py" line="568"/>
         <source>Step budget used: {used}/{max}. Continue with up to {steps} more steps?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="550"/>
+        <location filename="../ui/main_window.py" line="688"/>
         <source>Rename</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="551"/>
+        <location filename="../ui/main_window.py" line="689"/>
         <source>Generate title...</source>
         <translation>Generate title...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="552"/>
+        <location filename="../ui/main_window.py" line="690"/>
+        <source>Copy thread ID</source>
+        <translation>Copy thread ID</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="691"/>
         <source>Delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="569"/>
+        <location filename="../ui/main_window.py" line="716"/>
         <source>Rename Thread</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="570"/>
-        <location filename="../ui/main_window.py" line="637"/>
+        <location filename="../ui/main_window.py" line="717"/>
+        <location filename="../ui/main_window.py" line="784"/>
         <source>Thread name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="586"/>
-        <location filename="../ui/main_window.py" line="617"/>
-        <location filename="../ui/main_window.py" line="647"/>
-        <location filename="../ui/main_window.py" line="657"/>
+        <location filename="../ui/main_window.py" line="733"/>
+        <location filename="../ui/main_window.py" line="764"/>
+        <location filename="../ui/main_window.py" line="794"/>
+        <location filename="../ui/main_window.py" line="804"/>
         <source>Generate Thread Title</source>
         <translation>Generate Thread Title</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="587"/>
+        <location filename="../ui/main_window.py" line="734"/>
         <source>Thread title model is not configured.</source>
         <translation>Thread title model is not configured.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="610"/>
+        <location filename="../ui/main_window.py" line="757"/>
         <source>Generating thread title...</source>
         <translation>Generating thread title...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="636"/>
+        <location filename="../ui/main_window.py" line="783"/>
         <source>Apply Generated Title</source>
         <translation>Apply Generated Title</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="669"/>
-        <location filename="../ui/main_window.py" line="677"/>
+        <location filename="../ui/main_window.py" line="816"/>
+        <location filename="../ui/main_window.py" line="824"/>
         <source>Delete Thread</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="670"/>
+        <location filename="../ui/main_window.py" line="817"/>
         <source>Stop the current run before deleting this thread.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="678"/>
+        <location filename="../ui/main_window.py" line="825"/>
         <source>Delete &quot;{title}&quot;? This action cannot be undone.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1266,101 +1271,101 @@
 <context>
     <name>ThreadDetailView</name>
     <message>
-        <location filename="../ui/chatbot.py" line="61"/>
+        <location filename="../ui/chatbot.py" line="76"/>
         <source>Error: {message}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="82"/>
+        <location filename="../ui/chatbot.py" line="97"/>
         <source>Thinking...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="88"/>
-        <location filename="../ui/chatbot.py" line="98"/>
+        <location filename="../ui/chatbot.py" line="103"/>
+        <location filename="../ui/chatbot.py" line="113"/>
         <source>tool</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="91"/>
+        <location filename="../ui/chatbot.py" line="106"/>
         <source>Calling `{tool_name}`...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="102"/>
+        <location filename="../ui/chatbot.py" line="117"/>
         <source>`{tool_name}` {status}.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="114"/>
+        <location filename="../ui/chatbot.py" line="129"/>
         <source>completed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="116"/>
+        <location filename="../ui/chatbot.py" line="131"/>
         <source>failed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="118"/>
+        <location filename="../ui/chatbot.py" line="133"/>
         <source>cancelled</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="120"/>
+        <location filename="../ui/chatbot.py" line="135"/>
         <source>running</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="122"/>
+        <location filename="../ui/chatbot.py" line="137"/>
         <source>requested</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1031"/>
+        <location filename="../ui/chatbot.py" line="1077"/>
         <source>Message Xenix</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1032"/>
-        <location filename="../ui/chatbot.py" line="1367"/>
-        <location filename="../ui/chatbot.py" line="1378"/>
+        <location filename="../ui/chatbot.py" line="1078"/>
+        <location filename="../ui/chatbot.py" line="1406"/>
+        <location filename="../ui/chatbot.py" line="1417"/>
         <source>Attach files</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1033"/>
+        <location filename="../ui/chatbot.py" line="1079"/>
         <source>Model for the next turn</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1034"/>
+        <location filename="../ui/chatbot.py" line="1080"/>
         <source>Continue</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1035"/>
-        <location filename="../ui/chatbot.py" line="1318"/>
+        <location filename="../ui/chatbot.py" line="1081"/>
+        <location filename="../ui/chatbot.py" line="1353"/>
         <source>Stop</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1036"/>
+        <location filename="../ui/chatbot.py" line="1082"/>
         <source>Drop files to attach</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1037"/>
+        <location filename="../ui/chatbot.py" line="1083"/>
         <source>Release here to add them to the next message</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1318"/>
+        <location filename="../ui/chatbot.py" line="1357"/>
         <source>Send</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1369"/>
+        <location filename="../ui/chatbot.py" line="1408"/>
         <source>Data files (*.csv *.xlsx *.xls)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1447,247 +1452,247 @@
 <context>
     <name>ToolCallItem</name>
     <message>
-        <location filename="../ui/chatbot.py" line="128"/>
+        <location filename="../ui/chatbot.py" line="143"/>
         <source>Running tool...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="130"/>
+        <location filename="../ui/chatbot.py" line="145"/>
         <source>Ran tool</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="132"/>
+        <location filename="../ui/chatbot.py" line="147"/>
         <source>Cancelled tool run</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="134"/>
+        <location filename="../ui/chatbot.py" line="149"/>
         <source>Inspecting dataset...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="136"/>
+        <location filename="../ui/chatbot.py" line="151"/>
         <source>Inspected dataset</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="138"/>
+        <location filename="../ui/chatbot.py" line="153"/>
         <source>Cancelled dataset inspection</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="140"/>
+        <location filename="../ui/chatbot.py" line="155"/>
         <source>Integrating data...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="142"/>
+        <location filename="../ui/chatbot.py" line="157"/>
         <source>Integrated data</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="144"/>
+        <location filename="../ui/chatbot.py" line="159"/>
         <source>Cancelled data integration</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="146"/>
+        <location filename="../ui/chatbot.py" line="161"/>
         <source>Profiling dataset...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="148"/>
+        <location filename="../ui/chatbot.py" line="163"/>
         <source>Profiled dataset</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="150"/>
+        <location filename="../ui/chatbot.py" line="165"/>
         <source>Cancelled dataset profile</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="152"/>
+        <location filename="../ui/chatbot.py" line="167"/>
         <source>Drawing graph...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="154"/>
+        <location filename="../ui/chatbot.py" line="169"/>
         <source>Drew graph</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="156"/>
+        <location filename="../ui/chatbot.py" line="171"/>
         <source>Cancelled graph drawing</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="158"/>
+        <location filename="../ui/chatbot.py" line="173"/>
         <source>Cleaning dataset...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="160"/>
+        <location filename="../ui/chatbot.py" line="175"/>
         <source>Cleaned dataset</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="162"/>
+        <location filename="../ui/chatbot.py" line="177"/>
         <source>Cancelled dataset cleaning</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="164"/>
+        <location filename="../ui/chatbot.py" line="179"/>
         <source>Querying dataset...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="166"/>
+        <location filename="../ui/chatbot.py" line="181"/>
         <source>Queried dataset</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="168"/>
+        <location filename="../ui/chatbot.py" line="183"/>
         <source>Cancelled dataset query</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="170"/>
+        <location filename="../ui/chatbot.py" line="185"/>
         <source>Transforming dataset...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="172"/>
+        <location filename="../ui/chatbot.py" line="187"/>
         <source>Transformed dataset</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="174"/>
+        <location filename="../ui/chatbot.py" line="189"/>
         <source>Cancelled dataset transformation</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="176"/>
+        <location filename="../ui/chatbot.py" line="191"/>
         <source>Selecting features...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="178"/>
+        <location filename="../ui/chatbot.py" line="193"/>
         <source>Selected features</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="180"/>
+        <location filename="../ui/chatbot.py" line="195"/>
         <source>Cancelled feature selection</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="182"/>
+        <location filename="../ui/chatbot.py" line="197"/>
         <source>Loading model metadata...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="184"/>
+        <location filename="../ui/chatbot.py" line="199"/>
         <source>Loaded model metadata</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="186"/>
+        <location filename="../ui/chatbot.py" line="201"/>
         <source>Cancelled model metadata lookup</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="188"/>
+        <location filename="../ui/chatbot.py" line="203"/>
         <source>Training model...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="190"/>
+        <location filename="../ui/chatbot.py" line="205"/>
         <source>Trained model</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="192"/>
+        <location filename="../ui/chatbot.py" line="207"/>
         <source>Cancelled model training</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="194"/>
+        <location filename="../ui/chatbot.py" line="209"/>
         <source>Tuning model...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="196"/>
+        <location filename="../ui/chatbot.py" line="211"/>
         <source>Tuned model</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="198"/>
+        <location filename="../ui/chatbot.py" line="213"/>
         <source>Model tuning running in background</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="200"/>
+        <location filename="../ui/chatbot.py" line="215"/>
         <source>Cancelled model tuning</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="202"/>
+        <location filename="../ui/chatbot.py" line="217"/>
         <source>Applying model...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="204"/>
+        <location filename="../ui/chatbot.py" line="219"/>
         <source>Applied model</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="206"/>
+        <location filename="../ui/chatbot.py" line="221"/>
         <source>Model training running in background</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="208"/>
+        <location filename="../ui/chatbot.py" line="223"/>
         <source>Model apply running in background</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="210"/>
+        <location filename="../ui/chatbot.py" line="225"/>
         <source>Checking model task...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="212"/>
+        <location filename="../ui/chatbot.py" line="227"/>
         <source>Checked model task</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="214"/>
+        <location filename="../ui/chatbot.py" line="229"/>
         <source>Cancelled model task check</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="216"/>
+        <location filename="../ui/chatbot.py" line="231"/>
         <source>Cancelled model apply</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="760"/>
+        <location filename="../ui/chatbot.py" line="775"/>
         <source>Details</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="761"/>
+        <location filename="../ui/chatbot.py" line="776"/>
         <source>Open tool call details</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="769"/>
+        <location filename="../ui/chatbot.py" line="784"/>
         <source>Hide result</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="769"/>
+        <location filename="../ui/chatbot.py" line="784"/>
         <source>Show result</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1695,12 +1700,12 @@
 <context>
     <name>UsageOverviewItem</name>
     <message>
-        <location filename="../ui/chatbot.py" line="234"/>
+        <location filename="../ui/chatbot.py" line="249"/>
         <source> ({cached} cached)</source>
         <translation> ({cached} cached)</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="238"/>
+        <location filename="../ui/chatbot.py" line="253"/>
         <source>↑ {input} · ↓ {output}</source>
         <translation>↑ {input} · ↓ {output}</translation>
     </message>
@@ -1708,22 +1713,22 @@
 <context>
     <name>XenixStartup</name>
     <message>
-        <location filename="../app.py" line="137"/>
+        <location filename="../app.py" line="138"/>
         <source>Local database recovery</source>
         <translation>Local database recovery</translation>
     </message>
     <message>
-        <location filename="../app.py" line="140"/>
+        <location filename="../app.py" line="141"/>
         <source>Xenix could not initialize the local database.</source>
         <translation>Xenix could not initialize the local database.</translation>
     </message>
     <message>
-        <location filename="../app.py" line="146"/>
+        <location filename="../app.py" line="147"/>
         <source>The database may belong to an unsupported development build or may be damaged. You can back it up and rebuild a fresh database now.</source>
         <translation>The database may belong to an unsupported development build or may be damaged. You can back it up and rebuild a fresh database now.</translation>
     </message>
     <message>
-        <location filename="../app.py" line="153"/>
+        <location filename="../app.py" line="154"/>
         <source>Database: {path}
 
 Reason: {reason}</source>
@@ -1732,55 +1737,55 @@ Reason: {reason}</source>
 Reason: {reason}</translation>
     </message>
     <message>
-        <location filename="../app.py" line="159"/>
+        <location filename="../app.py" line="160"/>
         <source>Back up and rebuild</source>
         <translation>Back up and rebuild</translation>
     </message>
     <message>
-        <location filename="../app.py" line="163"/>
+        <location filename="../app.py" line="164"/>
         <source>Open data folder</source>
         <translation>Open data folder</translation>
     </message>
     <message>
-        <location filename="../app.py" line="167"/>
-        <location filename="../app.py" line="217"/>
+        <location filename="../app.py" line="168"/>
+        <location filename="../app.py" line="218"/>
         <source>Exit</source>
         <translation>Exit</translation>
     </message>
     <message>
-        <location filename="../app.py" line="187"/>
+        <location filename="../app.py" line="188"/>
         <source>Xenix test build locked</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app.py" line="190"/>
+        <location filename="../app.py" line="191"/>
         <source>This Xenix test build is locked.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app.py" line="196"/>
+        <location filename="../app.py" line="197"/>
         <source>Please purchase a license or download a licensed Xenix build from {url}.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app.py" line="203"/>
+        <location filename="../app.py" line="204"/>
         <source>Reason: {reason}
 Trial expired at: {expires_at}
 State file: {state_path}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app.py" line="213"/>
+        <location filename="../app.py" line="214"/>
         <source>Buy license</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app.py" line="624"/>
+        <location filename="../app.py" line="714"/>
         <source>Unable to start Xenix</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app.py" line="625"/>
+        <location filename="../app.py" line="715"/>
         <source>Xenix could not finish startup.
 
 {error}</source>
