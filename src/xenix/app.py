@@ -632,7 +632,7 @@ def _run_smoke_checks(paths) -> None:
 
     wordcloud_smoke_path = paths.temp / "graph-wordcloud-smoke.csv"
     wordcloud_smoke_path.write_text(
-        "term,count,angle,weight\nsales,40,0,600\nmargin,28,-35,300\nnorth,22,35,300\n",
+        "word,count\nsales,40\nmargin,28\nnorth,22\n",
         encoding="utf-8",
     )
     wordcloud_result = AnalysisGraphService(paths).graph_dataset(
@@ -649,23 +649,16 @@ def _run_smoke_checks(paths) -> None:
                         "type": "text",
                         "encode": {
                             "enter": {
-                                "text": {"field": "term"},
+                                "text": {"field": "word"},
                                 "align": {"value": "center"},
                                 "baseline": {"value": "alphabetic"},
-                                "fill": {"value": "#2f5d8c"},
                             }
                         },
                         "transform": [
                             {
                                 "type": "wordcloud",
-                                "size": [360, 220],
-                                "text": {"field": "term"},
-                                "font": "Arial",
+                                "text": {"field": "word"},
                                 "fontSize": {"field": "datum.count"},
-                                "fontSizeRange": [12, 56],
-                                "fontWeight": {"field": "datum.weight"},
-                                "padding": 2,
-                                "rotate": {"field": "datum.angle"},
                             }
                         ],
                     }

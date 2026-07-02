@@ -1777,8 +1777,22 @@ class AgentHarnessService:
     def _tool_error_result(self, exc: Exception):
         from .tools import ToolExecutionResult
 
+        payload: dict[str, Any] = {"error": str(exc)}
+        error_code = getattr(exc, "error_code", None)
+        if isinstance(error_code, str) and error_code.strip():
+            payload["error_code"] = error_code.strip()
+        error_details = getattr(exc, "error_details", None)
+        if isinstance(error_details, dict) and error_details:
+            payload["error_details"] = error_details
+        repair_hints = getattr(exc, "repair_hints", None)
+        if isinstance(repair_hints, list) and repair_hints:
+            payload["repair_hints"] = [str(hint) for hint in repair_hints if str(hint).strip()]
+        retryable = getattr(exc, "retryable", None)
+        if isinstance(retryable, bool):
+            payload["retryable"] = retryable
+
         return ToolExecutionResult(
-            payload={"error": str(exc)},
+            payload=payload,
             content_blocks=[{"type": "markdown", "text": f"Tool failed: {exc}"}],
         )
 

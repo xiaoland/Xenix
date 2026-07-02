@@ -7,6 +7,7 @@ from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import NotFoundError, ValidationError
 from xenix.services.agent import (
     AppendAgentMessageInput,
+    AgentHarnessService,
     ChatbotEventKind,
     ChatbotEventStatus,
     CompleteToolCallInput,
@@ -20,6 +21,7 @@ from xenix.services.agent import (
     StartTurnInput,
     project_chatbot_events,
 )
+from xenix.services.analysis_graph import AnalysisGraphValidationError
 from xenix.services.artifact_service import (
     ArtifactService,
     RegisterArtifactInput,
@@ -316,6 +318,28 @@ def test_chatbot_event_projection_pairs_tool_call_messages(monkeypatch, tmp_path
     assert '"dataset_id": "dataset-1"' in detail_text
     assert '"error": "Source file is missing."' in detail_text
     assert final_tool_events[0].source_message_ids == [request_message.id, result_message.id]
+
+
+def test_agent_harness_tool_error_result_forwards_structured_retry_metadata() -> None:
+    harness = AgentHarnessService.__new__(AgentHarnessService)
+
+    result = harness._tool_error_result(
+        AnalysisGraphValidationError(
+            "wordcloud failed",
+            error_code="wordcloud_render_failed",
+            error_details={"visible_terms": 0},
+            repair_hints=["Reduce the cloud to Top 80."],
+            retryable=True,
+        )
+    )
+
+    assert result.payload == {
+        "error": "wordcloud failed",
+        "error_code": "wordcloud_render_failed",
+        "error_details": {"visible_terms": 0},
+        "repair_hints": ["Reduce the cloud to Top 80."],
+        "retryable": True,
+    }
 
 
 def test_chatbot_event_projection_adds_turn_usage_overview(monkeypatch, tmp_path: Path) -> None:

@@ -220,17 +220,25 @@ class AgentToolRegistry:
                     "signals, config, and mark-level transforms. Xenix injects the registered dataset; any "
                     "Vega data or datasets in the spec are ignored and replaced. Do not use url resources. "
                     "Use data.transform before analysis.graph for grouping, aggregation, joins, reshaping, "
-                    "or durable derived rows. For word clouds, use a text mark with a mark-level wordcloud transform."
+                    "or durable derived rows. For word clouds, prefer an upstream Top 20-80 table with exact "
+                    "`word` and `count` columns, use grouped text encoding plus tooltip, and keep most terms horizontal."
                 ),
                 parameters_schema={
                     "type": "object",
                     "properties": {
-                        "dataset_id": {"type": "string"},
+                        "dataset_id": {
+                            "type": "string",
+                            "description": (
+                                "Use one registered dataset. For word clouds, prepare a chart-ready frequency table "
+                                "and pass its dataset_id here."
+                            ),
+                        },
                         "spec": {
                             "type": "object",
                             "description": (
                                 "Vega chart specification under the Xenix Vega profile. Xenix injects dataset "
-                                "values before rendering."
+                                "values before rendering. For word clouds, prefer an upstream `word` + `count` "
+                                "dataset, include tooltip, and keep the cloud compact and readable."
                             ),
                             "properties": {
                                 "$schema": {"type": "string", "description": "Optional Vega schema URL."},
@@ -258,7 +266,8 @@ class AgentToolRegistry:
                                     "minItems": 1,
                                     "description": (
                                         "Required non-empty Vega marks array. Use mark-level transforms for "
-                                        "drawing/layout behavior such as wordcloud."
+                                        "drawing/layout behavior such as wordcloud. Word-cloud marks should be "
+                                        "text marks with grouped encoding, tooltip, and a mark-level wordcloud transform."
                                     ),
                                     "items": {"type": "object"},
                                 },

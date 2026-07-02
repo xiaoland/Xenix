@@ -174,12 +174,12 @@ def _write_terms_csv(tmp_path: Path) -> Path:
     source.write_text(
         "\n".join(
             [
-                "term,count,angle,weight",
-                "sales,40,0,600",
-                "margin,28,-35,300",
-                "north,22,35,300",
-                "retail,18,0,300",
-                "growth,15,0,300",
+                "word,count",
+                "sales,40",
+                "margin,28",
+                "north,22",
+                "retail,18",
+                "growth,15",
                 "",
             ]
         ),
@@ -199,23 +199,16 @@ def _wordcloud_spec() -> dict:
                 "type": "text",
                 "encode": {
                     "enter": {
-                        "text": {"field": "term"},
+                        "text": {"field": "word"},
                         "align": {"value": "center"},
                         "baseline": {"value": "alphabetic"},
-                        "fill": {"value": "#2f5d8c"},
                     }
                 },
                 "transform": [
                     {
                         "type": "wordcloud",
-                        "size": [360, 220],
-                        "text": {"field": "term"},
-                        "font": "Arial",
+                        "text": {"field": "word"},
                         "fontSize": {"field": "datum.count"},
-                        "fontSizeRange": [12, 56],
-                        "fontWeight": {"field": "datum.weight"},
-                        "padding": 2,
-                        "rotate": {"field": "datum.angle"},
                     }
                 ],
             }
@@ -224,7 +217,35 @@ def _wordcloud_spec() -> dict:
     }
 
 
-def _ungrouped_encode_wordcloud_spec() -> dict:
+def _write_many_terms_csv(tmp_path: Path, total_terms: int = 95) -> Path:
+    source = tmp_path / "many-terms.csv"
+    rows = ["word,count"]
+    rows.extend(f"term_{index},{total_terms - index + 1}" for index in range(1, total_terms + 1))
+    rows.append("")
+    source.write_text("\n".join(rows), encoding="utf-8")
+    return source
+
+
+def _write_legacy_terms_csv(tmp_path: Path) -> Path:
+    source = tmp_path / "legacy-terms.csv"
+    source.write_text(
+        "\n".join(
+            [
+                "term,frequency,angle,weight",
+                "sales,40,0,600",
+                "margin,28,-35,300",
+                "north,22,35,300",
+                "retail,18,0,300",
+                "growth,15,0,300",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return source
+
+
+def _legacy_wordcloud_spec() -> dict:
     return {
         "width": 360,
         "height": 220,
@@ -241,29 +262,19 @@ def _ungrouped_encode_wordcloud_spec() -> dict:
                     {
                         "type": "wordcloud",
                         "text": {"field": "term"},
-                        "size": [360, 220],
-                        "font": "Arial",
-                        "fontSize": {"field": "datum.count"},
-                        "fontSizeRange": [12, 56],
+                        "fontSize": {"field": "datum.frequency"},
+                        "rotate": {"field": "datum.angle"},
                     }
                 ],
-            }
-        ],
-        "scales": [
-            {
-                "name": "size",
-                "type": "sqrt",
-                "domain": {"field": "count"},
-                "range": [12, 56],
             }
         ],
         "title": "Term cloud",
     }
 
 
-def _wordcloud_without_font_size_range_spec() -> dict:
+def _wordcloud_missing_count_spec() -> dict:
     spec = _wordcloud_spec()
-    del spec["marks"][0]["transform"][0]["fontSizeRange"]
+    spec["marks"][0]["transform"][0]["fontSize"] = {"field": "datum.frequency"}
     return spec
 
 
@@ -304,41 +315,67 @@ def test_analysis_graph_service_supports_vega_mark_level_transform(monkeypatch, 
     text_nodes = re.findall(r"<text[^>]*>[^<]+</text>", svg)
 
     assert Path(result.output_path).exists()
-    assert result.graph_metadata["referenced_fields"] == ["angle", "count", "term", "weight"]
-    assert result.graph_metadata["warnings"] == []
+    assert result.graph_metadata["referenced_fields"] == ["count", "word"]
+    assert any("fontSizeRange" in warning for warning in result.graph_metadata["warnings"])
+    assert any("tooltip" in warning for warning in result.graph_metadata["warnings"])
+    assert any("rotation" in warning for warning in result.graph_metadata["warnings"])
     assert "sales" in svg
     assert "ERROR" not in svg
     assert any('translate(0,0)' not in node and 'font-size="0px"' not in node for node in text_nodes)
 
 
-def test_analysis_graph_rejects_wordcloud_without_grouped_encode(monkeypatch, tmp_path: Path) -> None:
+def test_analysis_graph_wordcloud_trims_to_top_80_terms(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    source = _write_many_terms_csv(tmp_path)
+
+    result = AnalysisGraphService(paths).graph_dataset(
+        GraphDatasetInput(
+            source_path=str(source.resolve()),
+            dataset_name="Terms",
+            spec=_wordcloud_spec(),
+        )
+    )
+
+    assert result.graph_metadata["rendered_row_count"] == 80
+    assert any("top 80 terms" in warning for warning in result.graph_metadata["warnings"])
+
+
+def test_analysis_graph_supports_legacy_wordcloud_aliases_and_ungrouped_encode(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    source = _write_legacy_terms_csv(tmp_path)
+
+    result = AnalysisGraphService(paths).graph_dataset(
+        GraphDatasetInput(
+            source_path=str(source.resolve()),
+            dataset_name="Legacy terms",
+            spec=_legacy_wordcloud_spec(),
+        )
+    )
+
+    assert Path(result.output_path).exists()
+    assert result.graph_metadata["referenced_fields"] == ["frequency", "term"]
+    assert any("non-canonical word field 'term'" in warning for warning in result.graph_metadata["warnings"])
+    assert any("non-canonical count field 'frequency'" in warning for warning in result.graph_metadata["warnings"])
+
+
+def test_analysis_graph_wordcloud_missing_count_field_returns_structured_error(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     source = _write_terms_csv(tmp_path)
 
-    with pytest.raises(ValidationError, match="encode.enter.*fontSizeRange.*top terms.*width/height"):
+    with pytest.raises(ValidationError, match="count field 'frequency' was not found") as exc_info:
         AnalysisGraphService(paths).graph_dataset(
             GraphDatasetInput(
                 source_path=str(source.resolve()),
                 dataset_name="Terms",
-                spec=_ungrouped_encode_wordcloud_spec(),
+                spec=_wordcloud_missing_count_spec(),
             )
         )
-
-
-def test_analysis_graph_rejects_wordcloud_without_font_size_range(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    source = _write_terms_csv(tmp_path)
-
-    with pytest.raises(ValidationError, match="bounded fontSizeRange.*encode.enter.*top terms.*width/height"):
-        AnalysisGraphService(paths).graph_dataset(
-            GraphDatasetInput(
-                source_path=str(source.resolve()),
-                dataset_name="Terms",
-                spec=_wordcloud_without_font_size_range_spec(),
-            )
-        )
+    assert getattr(exc_info.value, "error_code", None) == "wordcloud_count_field_missing"
+    assert getattr(exc_info.value, "error_details", {}).get("expected_columns") == ["count", "frequency"]
+    assert any("Top 20-80" in hint for hint in getattr(exc_info.value, "repair_hints", []))
 
 
 def test_analysis_graph_ignores_user_authored_data_sources(monkeypatch, tmp_path: Path) -> None:
@@ -508,9 +545,11 @@ def test_analysis_graph_tool_schema_is_dataset_scoped(monkeypatch, tmp_path: Pat
     assert schema["required"] == ["dataset_id", "spec"]
     assert "dataset_id" in schema["properties"]
     assert "spec" in schema["properties"]
+    assert "`word` + `count`" in schema["properties"]["spec"]["description"]
     spec_schema = schema["properties"]["spec"]
     assert spec_schema["required"] == ["marks"]
     assert spec_schema["properties"]["marks"]["minItems"] == 1
+    assert "grouped encoding" in spec_schema["properties"]["marks"]["description"]
     assert "operation" not in schema["properties"]
     assert "params" not in schema["properties"]
     assert "source_path" not in schema["properties"]

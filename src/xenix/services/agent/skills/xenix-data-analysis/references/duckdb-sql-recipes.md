@@ -222,18 +222,21 @@ FROM baskets;
 
 ## Word-frequency table for word cloud from tokenized field
 
+Prefer the output shape `word`, `count` for `analysis.graph`.
+If the source text is raw Chinese sentences or paragraphs, do not treat `countpattern`-style tokenization as a valid shortcut; segment upstream first or work from existing token/tag rows.
+
 If the dataset already has one token/word/tag per row:
 
 ```sql
 SELECT
   LOWER(TRIM(CAST("{{word_col}}" AS VARCHAR))) AS word,
-  COUNT(*) AS frequency
+  COUNT(*) AS count
 FROM input
 WHERE NULLIF(TRIM(CAST("{{word_col}}" AS VARCHAR)), '') IS NOT NULL
 GROUP BY 1
 HAVING LENGTH(word) >= 2
-ORDER BY frequency DESC
-LIMIT 120;
+ORDER BY count DESC
+LIMIT 80;
 ```
 
 If one field contains delimited tags or keywords:
@@ -252,12 +255,12 @@ WITH exploded AS (
 )
 SELECT
   word,
-  COUNT(*) AS frequency
+  COUNT(*) AS count
 FROM exploded
 WHERE word IS NOT NULL
   AND word <> ''
   AND LENGTH(word) >= 2
 GROUP BY 1
-ORDER BY frequency DESC
-LIMIT 120;
+ORDER BY count DESC
+LIMIT 80;
 ```

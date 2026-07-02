@@ -12,7 +12,7 @@ Use this file before calling `analysis.graph`. The graph tool should receive a c
 | 两个数值变量关系 | scatter | sample or aggregate if there are too many points |
 | 类别 × 类别 强度 | heatmap | group by both dimensions |
 | 数值分布 | histogram or boxplot | bin or compute quantiles |
-| 高频词、标签、关键词 | word cloud | word-frequency table with `word` and `frequency` |
+| 高频词、标签、关键词 | word cloud | word-frequency table with `word` and `count` |
 
 ## Visual quality rules
 
@@ -28,11 +28,18 @@ Use this file before calling `analysis.graph`. The graph tool should receive a c
 ## Word cloud workflow
 
 1. Use `data.query` to inspect candidate word-frequency results.
-2. Remove empty words, stop words, meaningless one-character tokens, and overly generic business words.
-3. Limit to around 80-150 words.
-4. Use `data.transform` to materialize a registered dataset with exactly `word` and `frequency` columns.
-5. Call `analysis.graph` with a Vega word-cloud spec using a mark-level `wordcloud` transform.
-6. Explain the word cloud as a frequency view, not sentiment or causality.
+2. Prefer a chart-ready dataset with exact columns `word` and `count`.
+3. Remove empty words, stop words, meaningless one-character tokens, and overly generic business words.
+4. In Chinese scenarios, do not rely on `countpattern`-style tokenization over raw text. Segment upstream first or work from existing token/tag rows.
+5. Limit to about Top 20-80 words. Default to Top 80 when the source table is longer.
+6. Use `data.transform` only when you need a durable derived dataset with exactly `word` and `count` columns.
+7. Keep most terms horizontal: at least 80% at `0` degrees, with only a small minority at `-30` or `30`.
+8. Use `fontSizeRange` `[12, 56]` by default, or `[10, 42]` when the cloud is dense or labels are long.
+9. Always include tooltip.
+10. If color has no explicit semantics, use only 2-3 restrained colors by rank tier instead of coloring every word independently.
+11. Pair the word cloud with a Top 10 bar chart or table when exact ranking matters.
+12. Call `analysis.graph` with a Vega word-cloud spec using a mark-level `wordcloud` transform.
+13. Explain the word cloud as a frequency view, not sentiment or causality.
 
 A word cloud is appropriate for qualitative overview. It is not a substitute for exact ranking. Pair it with a Top-N bar chart when precise comparison matters.
 
@@ -42,9 +49,9 @@ Use `assets/vega/wordcloud.vg.json` as the default template. Before graphing, cr
 
 ```json
 [
-  {"word": "复购", "frequency": 128},
-  {"word": "价格", "frequency": 96},
-  {"word": "服务", "frequency": 73}
+  {"word": "复购", "count": 128},
+  {"word": "价格", "count": 96},
+  {"word": "服务", "count": 73}
 ]
 ```
 
@@ -54,17 +61,24 @@ Do not place wordcloud under `from.transform`, and do not add top-level Vega `da
 {
   "type": "text",
   "from": {"data": "xenix_data"},
-  "encode": {"enter": {"text": {"field": "word"}}},
+  "encode": {
+    "enter": {
+      "text": {"field": "word"},
+      "tooltip": {"signal": "datum.word + ': ' + datum.count"}
+    }
+  },
   "transform": [
     {
       "type": "wordcloud",
       "text": {"field": "word"},
-      "fontSize": {"field": "datum.frequency"},
+      "fontSize": {"field": "datum.count"},
       "fontSizeRange": [12, 56]
     }
   ]
 }
 ```
+
+Xenix may synthesize restrained rank-tier coloring and gentle rotation defaults when they are omitted, but the Agent should still keep the cloud compact and semantically clean upstream.
 
 ## Vega horizontal bar template
 
