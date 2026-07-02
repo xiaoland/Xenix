@@ -1,4 +1,3 @@
-import re
 from pathlib import Path
 
 import pytest
@@ -190,30 +189,9 @@ def _write_terms_csv(tmp_path: Path) -> Path:
 
 def _wordcloud_spec() -> dict:
     return {
-        "$schema": "https://vega.github.io/schema/vega/v6.json",
+        "title": "Term cloud",
         "width": 360,
         "height": 220,
-        "padding": 0,
-        "marks": [
-            {
-                "type": "text",
-                "encode": {
-                    "enter": {
-                        "text": {"field": "word"},
-                        "align": {"value": "center"},
-                        "baseline": {"value": "alphabetic"},
-                    }
-                },
-                "transform": [
-                    {
-                        "type": "wordcloud",
-                        "text": {"field": "word"},
-                        "fontSize": {"field": "datum.count"},
-                    }
-                ],
-            }
-        ],
-        "title": "Term cloud",
     }
 
 
@@ -226,17 +204,17 @@ def _write_many_terms_csv(tmp_path: Path, total_terms: int = 95) -> Path:
     return source
 
 
-def _write_legacy_terms_csv(tmp_path: Path) -> Path:
-    source = tmp_path / "legacy-terms.csv"
+def _write_semantic_terms_csv(tmp_path: Path) -> Path:
+    source = tmp_path / "semantic-terms.csv"
     source.write_text(
         "\n".join(
             [
-                "term,frequency,angle,weight",
-                "sales,40,0,600",
-                "margin,28,-35,300",
-                "north,22,35,300",
-                "retail,18,0,300",
-                "growth,15,0,300",
+                "word,count,source",
+                "sales,40,reviews",
+                "margin,28,reviews",
+                "north,22,surveys",
+                "retail,18,surveys",
+                "growth,15,reviews",
                 "",
             ]
         ),
@@ -245,37 +223,47 @@ def _write_legacy_terms_csv(tmp_path: Path) -> Path:
     return source
 
 
-def _legacy_wordcloud_spec() -> dict:
+def _semantic_wordcloud_spec() -> dict:
     return {
+        "width": 360,
+        "height": 220,
+        "title": "Term cloud",
+        "color_mode": "field",
+        "color_field": "source",
+        "palette": ["#1f4e79", "#c06c4e"],
+    }
+
+
+def _wordcloud_missing_count_spec() -> dict:
+    spec = _wordcloud_spec()
+    spec["count_field"] = "frequency"
+    return spec
+
+
+def _vega_wordcloud_spec() -> dict:
+    return {
+        "$schema": "https://vega.github.io/schema/vega/v6.json",
         "width": 360,
         "height": 220,
         "marks": [
             {
                 "type": "text",
                 "encode": {
-                    "text": {"field": "term"},
-                    "fill": {"value": "#2f5d8c"},
-                    "align": {"value": "center"},
-                    "baseline": {"value": "middle"},
+                    "enter": {
+                        "text": {"field": "word"},
+                    }
                 },
                 "transform": [
                     {
                         "type": "wordcloud",
-                        "text": {"field": "term"},
-                        "fontSize": {"field": "datum.frequency"},
-                        "rotate": {"field": "datum.angle"},
+                        "text": {"field": "word"},
+                        "fontSize": {"field": "datum.count"},
                     }
                 ],
             }
         ],
-        "title": "Term cloud",
+        "title": "Legacy Vega cloud",
     }
-
-
-def _wordcloud_missing_count_spec() -> dict:
-    spec = _wordcloud_spec()
-    spec["marks"][0]["transform"][0]["fontSize"] = {"field": "datum.frequency"}
-    return spec
 
 
 def test_analysis_graph_service_writes_svg_from_vega_profile_spec(monkeypatch, tmp_path: Path) -> None:
@@ -303,25 +291,28 @@ def test_analysis_graph_service_writes_svg_from_vega_profile_spec(monkeypatch, t
     assert "<svg" in output_path.read_text(encoding="utf-8")
 
 
-def test_analysis_graph_service_supports_vega_mark_level_transform(monkeypatch, tmp_path: Path) -> None:
+def test_analysis_graph_service_renders_wordcloud_from_wordcloud_spec(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     source = _write_terms_csv(tmp_path)
 
     result = AnalysisGraphService(paths).graph_dataset(
-        GraphDatasetInput(source_path=str(source.resolve()), dataset_name="Terms", spec=_wordcloud_spec())
+        GraphDatasetInput(
+            source_path=str(source.resolve()),
+            dataset_name="Terms",
+            wordcloud_spec=_wordcloud_spec(),
+        )
     )
     svg = Path(result.output_path).read_text(encoding="utf-8")
-    text_nodes = re.findall(r"<text[^>]*>[^<]+</text>", svg)
 
     assert Path(result.output_path).exists()
+    assert result.graph_metadata["spec_format"] == "wordcloud"
     assert result.graph_metadata["referenced_fields"] == ["count", "word"]
-    assert any("fontSizeRange" in warning for warning in result.graph_metadata["warnings"])
-    assert any("tooltip" in warning for warning in result.graph_metadata["warnings"])
-    assert any("rotation" in warning for warning in result.graph_metadata["warnings"])
+    assert result.graph_metadata["wordcloud_options"]["font_size_range"] == [12, 56]
     assert "sales" in svg
+    assert "<title>sales: 40</title>" in svg
+    assert "Term cloud" in svg
     assert "ERROR" not in svg
-    assert any('translate(0,0)' not in node and 'font-size="0px"' not in node for node in text_nodes)
 
 
 def test_analysis_graph_wordcloud_trims_to_top_80_terms(monkeypatch, tmp_path: Path) -> None:
@@ -333,7 +324,7 @@ def test_analysis_graph_wordcloud_trims_to_top_80_terms(monkeypatch, tmp_path: P
         GraphDatasetInput(
             source_path=str(source.resolve()),
             dataset_name="Terms",
-            spec=_wordcloud_spec(),
+            wordcloud_spec=_wordcloud_spec(),
         )
     )
 
@@ -341,23 +332,26 @@ def test_analysis_graph_wordcloud_trims_to_top_80_terms(monkeypatch, tmp_path: P
     assert any("top 80 terms" in warning for warning in result.graph_metadata["warnings"])
 
 
-def test_analysis_graph_supports_legacy_wordcloud_aliases_and_ungrouped_encode(monkeypatch, tmp_path: Path) -> None:
+def test_analysis_graph_wordcloud_supports_semantic_color_field(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
-    source = _write_legacy_terms_csv(tmp_path)
+    source = _write_semantic_terms_csv(tmp_path)
 
     result = AnalysisGraphService(paths).graph_dataset(
         GraphDatasetInput(
             source_path=str(source.resolve()),
-            dataset_name="Legacy terms",
-            spec=_legacy_wordcloud_spec(),
+            dataset_name="Semantic terms",
+            wordcloud_spec=_semantic_wordcloud_spec(),
         )
     )
+    svg = Path(result.output_path).read_text(encoding="utf-8")
 
     assert Path(result.output_path).exists()
-    assert result.graph_metadata["referenced_fields"] == ["frequency", "term"]
-    assert any("non-canonical word field 'term'" in warning for warning in result.graph_metadata["warnings"])
-    assert any("non-canonical count field 'frequency'" in warning for warning in result.graph_metadata["warnings"])
+    assert result.graph_metadata["referenced_fields"] == ["count", "source", "word"]
+    assert result.graph_metadata["wordcloud_options"]["color_mode"] == "field"
+    assert "#1f4e79" in svg
+    assert "#c06c4e" in svg
+    assert "<title>sales: 40 | source: reviews</title>" in svg
 
 
 def test_analysis_graph_wordcloud_missing_count_field_returns_structured_error(monkeypatch, tmp_path: Path) -> None:
@@ -370,12 +364,43 @@ def test_analysis_graph_wordcloud_missing_count_field_returns_structured_error(m
             GraphDatasetInput(
                 source_path=str(source.resolve()),
                 dataset_name="Terms",
-                spec=_wordcloud_missing_count_spec(),
+                wordcloud_spec=_wordcloud_missing_count_spec(),
             )
         )
     assert getattr(exc_info.value, "error_code", None) == "wordcloud_count_field_missing"
-    assert getattr(exc_info.value, "error_details", {}).get("expected_columns") == ["count", "frequency"]
-    assert any("Top 20-80" in hint for hint in getattr(exc_info.value, "repair_hints", []))
+    assert getattr(exc_info.value, "error_details", {}).get("requested_field") == "frequency"
+    assert any("data.query or data.transform" in hint for hint in getattr(exc_info.value, "repair_hints", []))
+
+
+def test_analysis_graph_rejects_vega_wordcloud_transform(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    source = _write_terms_csv(tmp_path)
+
+    with pytest.raises(ValidationError, match="Use wordcloud_spec instead"):
+        AnalysisGraphService(paths).graph_dataset(
+            GraphDatasetInput(
+                source_path=str(source.resolve()),
+                dataset_name="Terms",
+                spec=_vega_wordcloud_spec(),
+            )
+        )
+
+
+def test_analysis_graph_requires_exactly_one_mode(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    source = _write_terms_csv(tmp_path)
+
+    with pytest.raises(ValidationError, match="exactly one of spec or wordcloud_spec"):
+        AnalysisGraphService(paths).graph_dataset(
+            GraphDatasetInput(
+                source_path=str(source.resolve()),
+                dataset_name="Terms",
+                spec=_bar_spec(),
+                wordcloud_spec=_wordcloud_spec(),
+            )
+        )
 
 
 def test_analysis_graph_ignores_user_authored_data_sources(monkeypatch, tmp_path: Path) -> None:
@@ -536,20 +561,53 @@ def test_analysis_graph_tool_registers_image_artifact(monkeypatch, tmp_path: Pat
     assert resolved.metadata_payload["analysis_graph"]["renderer"] == "vl-convert-python"
 
 
+def test_analysis_graph_tool_registers_wordcloud_artifact(monkeypatch, tmp_path: Path) -> None:
+    _paths, dataset_service, artifact_service, registry, conversation_store = _build_runtime(monkeypatch, tmp_path)
+    source = _write_terms_csv(tmp_path)
+    dataset = dataset_service.register_dataset(
+        RegisterDatasetInput(source_path=str(source.resolve()), name="Terms")
+    )
+    arguments = {
+        "dataset_id": dataset.id,
+        "wordcloud_spec": _wordcloud_spec(),
+    }
+
+    result = registry.execute(
+        "analysis.graph",
+        arguments,
+        _tool_context(conversation_store, "analysis.graph", arguments),
+    )
+    resolved = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}?view=image")
+
+    assert result.payload["dataset_id"] == dataset.id
+    assert resolved.kind is ArtifactKind.IMAGE
+    assert resolved.mime_type == "image/svg+xml"
+    assert resolved.metadata_payload["analysis_graph"]["spec_format"] == "wordcloud"
+    assert resolved.metadata_payload["analysis_graph"]["renderer"] == "wordcloud"
+    assert Path(resolved.absolute_path).exists()
+
+
 def test_analysis_graph_tool_schema_is_dataset_scoped(monkeypatch, tmp_path: Path) -> None:
     _paths, _dataset_service, _artifact_service, registry, _conversation_store = _build_runtime(monkeypatch, tmp_path)
     specs = {spec.name: spec for spec in registry.list_specs()}
 
     assert "analysis.graph" in specs
     schema = specs["analysis.graph"].parameters_schema
-    assert schema["required"] == ["dataset_id", "spec"]
+    assert schema["required"] == ["dataset_id"]
+    assert schema["oneOf"] == [{"required": ["spec"]}, {"required": ["wordcloud_spec"]}]
     assert "dataset_id" in schema["properties"]
     assert "spec" in schema["properties"]
-    assert "`word` + `count`" in schema["properties"]["spec"]["description"]
+    assert "wordcloud_spec" in schema["properties"]
+    assert "Do not use this field for word clouds" in schema["properties"]["spec"]["description"]
+    assert "data.query or data.transform first" in schema["properties"]["wordcloud_spec"]["description"]
     spec_schema = schema["properties"]["spec"]
     assert spec_schema["required"] == ["marks"]
     assert spec_schema["properties"]["marks"]["minItems"] == 1
-    assert "grouped encoding" in spec_schema["properties"]["marks"]["description"]
+    assert "not for word clouds" in spec_schema["properties"]["marks"]["description"]
+    wordcloud_schema = schema["properties"]["wordcloud_spec"]
+    assert wordcloud_schema["properties"]["top_n"]["minimum"] == 20
+    assert wordcloud_schema["properties"]["top_n"]["maximum"] == 80
+    assert wordcloud_schema["properties"]["color_mode"]["enum"] == ["rank_tier", "field"]
     assert "operation" not in schema["properties"]
     assert "params" not in schema["properties"]
     assert "source_path" not in schema["properties"]

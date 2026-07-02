@@ -639,43 +639,16 @@ def _run_smoke_checks(paths) -> None:
         GraphDatasetInput(
             source_path=str(wordcloud_smoke_path.resolve()),
             dataset_name="Graph wordcloud smoke",
-            spec={
+            wordcloud_spec={
+                "title": "Graph wordcloud smoke",
                 "width": 360,
                 "height": 220,
-                "padding": 0,
-                "title": "Graph wordcloud smoke",
-                "marks": [
-                    {
-                        "type": "text",
-                        "encode": {
-                            "enter": {
-                                "text": {"field": "word"},
-                                "align": {"value": "center"},
-                                "baseline": {"value": "alphabetic"},
-                            }
-                        },
-                        "transform": [
-                            {
-                                "type": "wordcloud",
-                                "text": {"field": "word"},
-                                "fontSize": {"field": "datum.count"},
-                            }
-                        ],
-                    }
-                ],
             },
         )
     )
     wordcloud_svg = Path(wordcloud_result.output_path).read_text(encoding="utf-8")
-    wordcloud_text_nodes = re.findall(r"<text[^>]*>[^<]+</text>", wordcloud_svg)
-    wordcloud_has_positioned_term = any(
-        "Graph wordcloud smoke" not in node
-        and "translate(0,0)" not in node
-        and 'font-size="0px"' not in node
-        for node in wordcloud_text_nodes
-    )
-    if "sales" not in wordcloud_svg or not wordcloud_has_positioned_term:
-        raise RuntimeError("Vega wordcloud smoke render failed.")
+    if "<title>sales: 40</title>" not in wordcloud_svg or "Graph wordcloud smoke" not in wordcloud_svg:
+        raise RuntimeError("Wordcloud smoke render failed.")
 
     xgboost_estimator = XGBoostRegressionService._build_estimator(
         n_estimators=2,

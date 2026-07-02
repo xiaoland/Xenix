@@ -1,6 +1,8 @@
 # Visualization and Vega Reference
 
-Use this file before calling `analysis.graph`. The graph tool should receive a compact Vega specification for a registered, chart-ready dataset. Xenix injects the selected dataset into the Vega spec; do not add or edit Vega `data.values`.
+Use this file before calling `analysis.graph` with a Vega `spec`. The graph tool receives a compact Vega specification for a registered, chart-ready dataset. Xenix injects the selected dataset into the Vega spec; do not add or edit Vega `data.values`.
+
+Use `wordcloud_spec`, not Vega, for word clouds.
 
 ## Chart selection
 
@@ -12,7 +14,6 @@ Use this file before calling `analysis.graph`. The graph tool should receive a c
 | 两个数值变量关系 | scatter | sample or aggregate if there are too many points |
 | 类别 × 类别 强度 | heatmap | group by both dimensions |
 | 数值分布 | histogram or boxplot | bin or compute quantiles |
-| 高频词、标签、关键词 | word cloud | word-frequency table with `word` and `count` |
 
 ## Visual quality rules
 
@@ -24,61 +25,6 @@ Use this file before calling `analysis.graph`. The graph tool should receive a c
 - Use restrained palettes. Do not overuse bright categorical colors.
 - For Chinese text, prefer system fonts or `Noto Sans SC` when available.
 - Avoid 3D, decorative gradients, excessive labels, and overloaded dashboards.
-
-## Word cloud workflow
-
-1. Use `data.query` to inspect candidate word-frequency results.
-2. Prefer a chart-ready dataset with exact columns `word` and `count`.
-3. Remove empty words, stop words, meaningless one-character tokens, and overly generic business words.
-4. In Chinese scenarios, do not rely on `countpattern`-style tokenization over raw text. Segment upstream first or work from existing token/tag rows.
-5. Limit to about Top 20-80 words. Default to Top 80 when the source table is longer.
-6. Use `data.transform` only when you need a durable derived dataset with exactly `word` and `count` columns.
-7. Keep most terms horizontal: at least 80% at `0` degrees, with only a small minority at `-30` or `30`.
-8. Use `fontSizeRange` `[12, 56]` by default, or `[10, 42]` when the cloud is dense or labels are long.
-9. Always include tooltip.
-10. If color has no explicit semantics, use only 2-3 restrained colors by rank tier instead of coloring every word independently.
-11. Pair the word cloud with a Top 10 bar chart or table when exact ranking matters.
-12. Call `analysis.graph` with a Vega word-cloud spec using a mark-level `wordcloud` transform.
-13. Explain the word cloud as a frequency view, not sentiment or causality.
-
-A word cloud is appropriate for qualitative overview. It is not a substitute for exact ranking. Pair it with a Top-N bar chart when precise comparison matters.
-
-## Vega word cloud template
-
-Use `assets/vega/wordcloud.vg.json` as the default template. Before graphing, create a registered dataset shaped like:
-
-```json
-[
-  {"word": "复购", "count": 128},
-  {"word": "价格", "count": 96},
-  {"word": "服务", "count": 73}
-]
-```
-
-Do not place wordcloud under `from.transform`, and do not add top-level Vega `data`. The accepted Xenix profile puts the transform directly on the text mark:
-
-```json
-{
-  "type": "text",
-  "from": {"data": "xenix_data"},
-  "encode": {
-    "enter": {
-      "text": {"field": "word"},
-      "tooltip": {"signal": "datum.word + ': ' + datum.count"}
-    }
-  },
-  "transform": [
-    {
-      "type": "wordcloud",
-      "text": {"field": "word"},
-      "fontSize": {"field": "datum.count"},
-      "fontSizeRange": [12, 56]
-    }
-  ]
-}
-```
-
-Xenix may synthesize restrained rank-tier coloring and gentle rotation defaults when they are omitted, but the Agent should still keep the cloud compact and semantically clean upstream.
 
 ## Vega horizontal bar template
 
@@ -115,7 +61,6 @@ Use `assets/vega/heatmap.vg.json` for two categorical dimensions and one measure
 
 ## Common interpretation phrases
 
-- “这个图展示的是出现频率，不表示好坏或因果。”
+- “这个图展示的是当前口径下的汇总结果，不表示因果。”
 - “Top N 之外的长尾类别没有消失，只是为了阅读性被省略。”
 - “趋势图反映的是按当前口径汇总后的变化，是否为真实季节性还需要更长时间跨度验证。”
-- “词云适合快速看主题密度；若要精确比较，应同时查看频次表或柱状图。”

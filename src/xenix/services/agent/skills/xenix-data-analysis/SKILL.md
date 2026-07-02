@@ -27,7 +27,7 @@ Xenix Agent has no script execution environment. Do not rely on Python, shell, l
 - `data.peek` for schema, preview rows, field summaries, and small samples.
 - `data.query` for full-data computation through read-only DuckDB SQL.
 - `data.transform` when a chart or report needs a durable derived table.
-- `analysis.graph` for charts through Vega specifications.
+- `analysis.graph` for bounded charts or word clouds from chart-ready datasets.
 
 The language model is the orchestration and interpretation layer. The tools are the execution layer.
 
@@ -55,26 +55,13 @@ The language model is the orchestration and interpretation layer. The tools are 
 10. Explain returned results in management language: what the data appears to show, why it may matter, what action it supports, and what remains uncertain.
 11. Include a process trace: assumptions, selected task, fields used/excluded, SQL checks, charts, limitations, and report version.
 
-## Word cloud guardrails
-
-When the requested output is a word cloud:
-
-1. Prefer an upstream chart-ready frequency table with exact columns `word` and `count`.
-2. In Chinese scenarios, do not treat Vega/D3 `countpattern`-style tokenization as a substitute for real segmentation. Work from existing token/tag rows or split keywords upstream with `data.query` / `data.transform`.
-3. Default to Top 80 terms. Keep at least Top 20 when the source supports it; do not dump hundreds of long-tail terms into one cloud.
-4. Use restrained defaults: `fontSizeRange` usually `[12, 56]`, or `[10, 42]` when terms are many or labels are long.
-5. Keep at least 80% of terms horizontal. Only a small minority may use `-30` or `30` degree tilt.
-6. Always include tooltip in the Vega mark encoding, even when the rendered artifact is static.
-7. Use color only when it encodes rank tier, category, sentiment, or source. If color has no semantics, keep it to 2-3 restrained colors rather than coloring every word randomly.
-8. Explain the cloud as a “focus sensing” view, not a precise comparison chart. When the user needs exact comparison, also produce a Top 10 bar chart or table.
-
 ## Optional references
 
 When the resource tool is available, load only the relevant file:
 
 - `references/task-routing.md` when the user request or dataset structure is ambiguous.
 - `references/duckdb-sql-recipes.md` before writing `data.query` SQL.
-- `references/visualization-vega.md` before calling `analysis.graph`, especially for word clouds.
+- `references/visualization-vega.md` before calling `analysis.graph` with an ordinary Vega chart.
 - `references/association-analysis.md` when data has order-product, subject-item, user-behavior, transaction-item, patient-symptom, student-course, or basket-like structure.
 - `references/reporting-and-risk.md` before producing a management-facing report.
 

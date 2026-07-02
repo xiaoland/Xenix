@@ -3,17 +3,22 @@ from __future__ import annotations
 import copy
 import json
 import math
+import os
 import re
 import sys
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 import pandas as pd
 import vl_convert as vlc
+import wordcloud as wordcloud_module
 from pydantic import ConfigDict, Field
 from sqlmodel import SQLModel
+from wordcloud import WordCloud
 
 from ..config import AppPaths
 from ..exceptions import ValidationError
@@ -35,29 +40,42 @@ _MAX_COLUMNS_IN_ERROR = 30
 _INJECTED_DATA_NAME = "__xenix_dataset"
 _DATUM_FIELD_RE = re.compile(r"\bdatum(?:\[['\"]([^'\"]+)['\"]\]|\.([A-Za-z_][A-Za-z0-9_]*))")
 _STATIC_WARNING_KEYS = {"signals"}
-_TEXT_NODE_RE = re.compile(r"<text\b(?P<attrs>[^>]*)>(?P<text>.*?)</text>|<text\b(?P<self_attrs>[^>]*)/>", re.DOTALL)
-_MAX_WORDCLOUD_FAILED_TERM_RATIO = 0.2
-_MAX_WORDCLOUD_FAILED_TERM_COUNT = 8
-_WORDCLOUD_TOP_N = 80
+_WORDCLOUD_DEFAULT_WIDTH = 720
+_WORDCLOUD_DEFAULT_HEIGHT = 420
+_WORDCLOUD_DEFAULT_TOP_N = 80
+_WORDCLOUD_MIN_TOP_N = 20
+_WORDCLOUD_MAX_TOP_N = 80
 _WORDCLOUD_MIN_RECOMMENDED_TERMS = 20
 _WORDCLOUD_DENSE_TERM_THRESHOLD = 60
-_WORDCLOUD_DEFAULT_FONT_SIZE_RANGE = [12, 56]
-_WORDCLOUD_DENSE_FONT_SIZE_RANGE = [10, 42]
-_WORDCLOUD_ALLOWED_ROTATIONS = (-30, 0, 30)
-_WORDCLOUD_DEFAULT_COLORS = ["#1f4e79", "#4f7cac", "#b8c5d6"]
-_WORDCLOUD_COLOR_SCALE_NAME = "__xenix_wordcloud_color"
-_WORDCLOUD_COLOR_TIER_FIELD = "__xenix_wordcloud_color_tier"
-_WORDCLOUD_ROTATE_FIELD = "__xenix_wordcloud_rotate"
-_WORDCLOUD_INTERNAL_FIELDS = {_WORDCLOUD_COLOR_TIER_FIELD, _WORDCLOUD_ROTATE_FIELD}
-_WORDCLOUD_SUPPORTED_WORD_FIELDS = ("word", "term")
-_WORDCLOUD_SUPPORTED_COUNT_FIELDS = ("count", "frequency")
-_WORDCLOUD_FONT_FAMILY = "Microsoft YaHei, Noto Sans SC, Arial Unicode MS, sans-serif"
-_WORDCLOUD_REPAIR_HINT = (
-    "Use a text mark with grouped Vega encoding and tooltip, prepare an upstream Top 20-80 "
-    "word table with `word` and `count`, keep most terms horizontal with only small -30/30 "
-    "rotation, and use `fontSizeRange` [12, 56] or [10, 42] for dense clouds. For Chinese raw "
-    "text, do not use countpattern as the tokenizer."
-)
+_WORDCLOUD_DEFAULT_FONT_SIZE_RANGE = (12, 56)
+_WORDCLOUD_DENSE_FONT_SIZE_RANGE = (10, 42)
+_WORDCLOUD_DEFAULT_PREFER_HORIZONTAL = 0.85
+_WORDCLOUD_MIN_PREFER_HORIZONTAL = 0.8
+_WORDCLOUD_MAX_PREFER_HORIZONTAL = 1.0
+_WORDCLOUD_DEFAULT_RANK_TIER_PALETTE = ["#1f4e79", "#4f7cac", "#b8c5d6"]
+_WORDCLOUD_DEFAULT_SEMANTIC_PALETTE = ["#1f4e79", "#c06c4e", "#6e8b3d", "#2f7d65", "#8f5f3f", "#5078a0"]
+_WORDCLOUD_MAX_PALETTE_SIZE = 8
+_WORDCLOUD_RANDOM_STATE = 42
+_WORDCLOUD_BACKGROUND_COLOR = "white"
+_WORDCLOUD_MAX_FAILED_TERM_RATIO = 0.2
+_WORDCLOUD_MAX_FAILED_TERM_COUNT = 8
+_WORDCLOUD_TITLE_HEIGHT = 40
+_WORDCLOUD_TITLE_Y = 26
+_WORDCLOUD_TITLE_FONT_SIZE = 18
+_WORDCLOUD_WORD_FIELD = "word"
+_WORDCLOUD_COUNT_FIELD = "count"
+_WORDCLOUD_COLOR_MODES = {"rank_tier", "field"}
+_WORDCLOUD_UNSPECIFIED_GROUP = "unspecified"
+_WORDCLOUD_REPAIR_HINTS = [
+    "Use data.query or data.transform first to produce a chart-ready frequency table, usually with exact columns `word` and `count`.",
+    "For Chinese raw text, segment upstream first. Do not pass raw sentences or rely on countpattern-like tokenization here.",
+    "Keep the cloud focused on roughly the Top 20-80 terms and remove blank or meaningless tokens upstream.",
+]
+_SVG_NS = "http://www.w3.org/2000/svg"
+_SVG_STYLE_TAGS = {f"{{{_SVG_NS}}}style", f"{{{_SVG_NS}}}defs", f"{{{_SVG_NS}}}metadata"}
+_CJK_RE = re.compile(r"[\u3400-\u9fff]")
+
+ET.register_namespace("", _SVG_NS)
 
 
 class AnalysisGraphValidationError(ValidationError):
@@ -82,12 +100,50 @@ class GraphDatasetInput(SQLModel):
 
     source_path: str
     dataset_name: str
-    spec: dict[str, Any] = Field(default_factory=dict)
+    spec: dict[str, Any] | None = None
+    wordcloud_spec: dict[str, Any] | None = None
 
 
 class GraphDatasetResult(SQLModel):
     output_path: str
     graph_metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class _FieldScan(SQLModel):
+    referenced_fields: set[str] = Field(default_factory=set)
+    generated_fields: set[str] = Field(default_factory=set)
+
+
+class _PreparedSpec(SQLModel):
+    spec: dict[str, Any]
+    title: str
+    schema_url: str
+    rendered_row_count: int
+    truncated: bool
+    referenced_fields: list[str]
+    generated_fields: list[str]
+    warnings: list[str]
+
+
+@dataclass(frozen=True)
+class _PreparedWordcloud:
+    title: str
+    width: int
+    height: int
+    referenced_fields: list[str]
+    rendered_row_count: int
+    truncated: bool
+    warnings: list[str]
+    frequencies: dict[str, float]
+    tooltip_by_word: dict[str, str]
+    color_by_word: dict[str, str]
+    min_font_size: int
+    max_font_size: int
+    prefer_horizontal: float
+    contains_cjk: bool
+    color_mode: str
+    color_field: str | None
+    top_n: int
 
 
 class AnalysisGraphService:
@@ -100,44 +156,112 @@ class AnalysisGraphService:
             source_path = self._resolve_source_path(input_data.source_path)
             frame = self._load_frame(source_path)
             dataset_name = input_data.dataset_name.strip() or source_path.stem
-            user_spec = self._validate_spec_object(input_data.spec)
-            spec_json = self._spec_json(user_spec)
-            if len(spec_json.encode("utf-8")) > _MAX_SPEC_BYTES:
-                raise ValidationError(f"analysis.graph spec cannot exceed {_MAX_SPEC_BYTES} bytes.")
-
-            prepared = self._prepare_spec(user_spec, frame, dataset_name)
-            svg = self._render_svg(prepared.spec)
-            self._validate_rendered_svg(prepared.spec, svg, prepared.title)
-            output_bytes = len(svg.encode("utf-8"))
-            if output_bytes > _MAX_OUTPUT_BYTES:
-                raise ValidationError(
-                    "analysis.graph rendered SVG is too large. Reduce chart dimensions, rows, marks, or pre-aggregate data."
+            mode = self._select_graph_mode(input_data)
+            if mode == "vega":
+                result = self._graph_vega_dataset(
+                    user_spec=self._validate_spec_object(input_data.spec),
+                    frame=frame,
+                    dataset_name=dataset_name,
                 )
-
-            output_dir = self._paths.artifacts / "analysis" / "graphs"
-            output_dir.mkdir(parents=True, exist_ok=True)
-            output_path = output_dir / f"{self._slug(dataset_name)}-vega-{uuid4().hex[:12]}.svg"
-            output_path.write_text(svg, encoding="utf-8")
-            result = GraphDatasetResult(
-                output_path=str(output_path.resolve()),
-                graph_metadata={
-                    "renderer": "vl-convert-python",
-                    "renderer_version": getattr(vlc, "__version__", None),
-                    "spec_format": "vega",
-                    "schema": prepared.schema_url,
-                    "dataset_name": dataset_name,
-                    "title": prepared.title,
-                    "row_count": int(len(frame.index)),
-                    "rendered_row_count": prepared.rendered_row_count,
-                    "truncated": prepared.truncated,
-                    "referenced_fields": prepared.referenced_fields,
-                    "generated_fields": prepared.generated_fields,
-                    "warnings": prepared.warnings,
-                    "output_bytes": output_bytes,
-                },
-            )
+            else:
+                result = self._graph_wordcloud_dataset(
+                    user_spec=self._validate_wordcloud_spec_object(input_data.wordcloud_spec),
+                    frame=frame,
+                    dataset_name=dataset_name,
+                )
             self._record_operation("analysis.graph", started_at)
             return result
+
+    def _select_graph_mode(self, input_data: GraphDatasetInput) -> Literal["vega", "wordcloud"]:
+        has_spec = input_data.spec is not None
+        has_wordcloud_spec = input_data.wordcloud_spec is not None
+        if has_spec == has_wordcloud_spec:
+            raise ValidationError("analysis.graph requires exactly one of spec or wordcloud_spec.")
+        return "vega" if has_spec else "wordcloud"
+
+    def _graph_vega_dataset(
+        self,
+        *,
+        user_spec: dict[str, Any],
+        frame: pd.DataFrame,
+        dataset_name: str,
+    ) -> GraphDatasetResult:
+        spec_json = self._spec_json(user_spec, field_name="spec")
+        if len(spec_json.encode("utf-8")) > _MAX_SPEC_BYTES:
+            raise ValidationError(f"analysis.graph spec cannot exceed {_MAX_SPEC_BYTES} bytes.")
+
+        prepared = self._prepare_spec(user_spec, frame, dataset_name)
+        svg = self._render_vega_svg(prepared.spec)
+        output_bytes = len(svg.encode("utf-8"))
+        if output_bytes > _MAX_OUTPUT_BYTES:
+            raise ValidationError(
+                "analysis.graph rendered SVG is too large. Reduce chart dimensions, rows, marks, or pre-aggregate data."
+            )
+
+        output_path = self._write_svg_output(svg=svg, dataset_name=dataset_name, suffix="vega")
+        return GraphDatasetResult(
+            output_path=str(output_path.resolve()),
+            graph_metadata={
+                "renderer": "vl-convert-python",
+                "renderer_version": getattr(vlc, "__version__", None),
+                "spec_format": "vega",
+                "schema": prepared.schema_url,
+                "dataset_name": dataset_name,
+                "title": prepared.title,
+                "row_count": int(len(frame.index)),
+                "rendered_row_count": prepared.rendered_row_count,
+                "truncated": prepared.truncated,
+                "referenced_fields": prepared.referenced_fields,
+                "generated_fields": prepared.generated_fields,
+                "warnings": prepared.warnings,
+                "output_bytes": output_bytes,
+            },
+        )
+
+    def _graph_wordcloud_dataset(
+        self,
+        *,
+        user_spec: dict[str, Any],
+        frame: pd.DataFrame,
+        dataset_name: str,
+    ) -> GraphDatasetResult:
+        spec_json = self._spec_json(user_spec, field_name="wordcloud_spec")
+        if len(spec_json.encode("utf-8")) > _MAX_SPEC_BYTES:
+            raise ValidationError(f"analysis.graph wordcloud_spec cannot exceed {_MAX_SPEC_BYTES} bytes.")
+
+        prepared = self._prepare_wordcloud_request(user_spec, frame, dataset_name)
+        svg = self._render_wordcloud_svg(prepared)
+        output_bytes = len(svg.encode("utf-8"))
+        if output_bytes > _MAX_OUTPUT_BYTES:
+            raise ValidationError(
+                "analysis.graph rendered SVG is too large. Reduce the canvas size, top_n, or font_size_range."
+            )
+
+        output_path = self._write_svg_output(svg=svg, dataset_name=dataset_name, suffix="wordcloud")
+        return GraphDatasetResult(
+            output_path=str(output_path.resolve()),
+            graph_metadata={
+                "renderer": "wordcloud",
+                "renderer_version": getattr(wordcloud_module, "__version__", None),
+                "spec_format": "wordcloud",
+                "dataset_name": dataset_name,
+                "title": prepared.title,
+                "row_count": int(len(frame.index)),
+                "rendered_row_count": prepared.rendered_row_count,
+                "truncated": prepared.truncated,
+                "referenced_fields": prepared.referenced_fields,
+                "generated_fields": [],
+                "warnings": prepared.warnings,
+                "output_bytes": output_bytes,
+                "wordcloud_options": {
+                    "top_n": prepared.top_n,
+                    "prefer_horizontal": prepared.prefer_horizontal,
+                    "font_size_range": [prepared.min_font_size, prepared.max_font_size],
+                    "color_mode": prepared.color_mode,
+                    "color_field": prepared.color_field,
+                },
+            },
+        )
 
     def _record_operation(self, operation: str, started_at: float) -> None:
         attributes = {"analysis.operation": operation, "status": "succeeded"}
@@ -168,21 +292,27 @@ class AnalysisGraphService:
             raise ValidationError("Dataset file must contain at least one data row.")
         return frame
 
-    def _validate_spec_object(self, value: dict[str, Any]) -> dict[str, Any]:
+    def _validate_spec_object(self, value: dict[str, Any] | None) -> dict[str, Any]:
         if not isinstance(value, dict):
             raise ValidationError("analysis.graph spec must be a Vega object.")
         if not value:
             raise ValidationError("analysis.graph spec cannot be empty.")
         return value
 
-    def _spec_json(self, spec: dict[str, Any]) -> str:
+    def _validate_wordcloud_spec_object(self, value: dict[str, Any] | None) -> dict[str, Any]:
+        if not isinstance(value, dict):
+            raise ValidationError("analysis.graph wordcloud_spec must be an object.")
+        return value
+
+    def _spec_json(self, spec: dict[str, Any], *, field_name: str) -> str:
         try:
             return json.dumps(spec, ensure_ascii=False, separators=(",", ":"))
         except (TypeError, ValueError) as exc:
-            raise ValidationError("analysis.graph spec must be JSON-serializable.") from exc
+            raise ValidationError(f"analysis.graph {field_name} must be JSON-serializable.") from exc
 
-    def _prepare_spec(self, user_spec: dict[str, Any], frame: pd.DataFrame, dataset_name: str) -> "_PreparedSpec":
+    def _prepare_spec(self, user_spec: dict[str, Any], frame: pd.DataFrame, dataset_name: str) -> _PreparedSpec:
         self._validate_visual_shape(user_spec)
+        self._validate_no_wordcloud_transform(user_spec)
         spec = copy.deepcopy(user_spec)
         self._drop_user_data_declarations(spec)
         self._validate_no_external_urls(spec)
@@ -190,18 +320,10 @@ class AnalysisGraphService:
         self._validate_dimensions(spec)
         spec.setdefault("width", _DEFAULT_WIDTH)
         spec.setdefault("height", _DEFAULT_HEIGHT)
-        wordcloud_warnings: list[str] = []
-        prepared_frame = frame
-        if self._has_wordcloud_transform(spec):
-            prepared_frame, wordcloud_warnings = self._normalize_wordcloud_spec(spec, frame)
-        self._validate_wordcloud_spec_shape(spec)
 
-        columns = [str(column) for column in prepared_frame.columns]
+        columns = [str(column) for column in frame.columns]
         field_scan = self._scan_fields(spec)
-        referenced_wordcloud_internal_fields = field_scan.referenced_fields & _WORDCLOUD_INTERNAL_FIELDS
-        unknown_fields = sorted(
-            field_scan.referenced_fields - set(columns) - field_scan.generated_fields - referenced_wordcloud_internal_fields
-        )
+        unknown_fields = sorted(field_scan.referenced_fields - set(columns) - field_scan.generated_fields)
         if unknown_fields:
             available = ", ".join(columns[:_MAX_COLUMNS_IN_ERROR])
             if len(columns) > _MAX_COLUMNS_IN_ERROR:
@@ -213,17 +335,17 @@ class AnalysisGraphService:
             )
 
         row_count = int(len(frame.index))
-        truncated = int(len(prepared_frame.index)) > _MAX_RENDER_ROWS
-        render_frame = prepared_frame.head(_MAX_RENDER_ROWS) if truncated else prepared_frame
+        truncated = row_count > _MAX_RENDER_ROWS
+        render_frame = frame.head(_MAX_RENDER_ROWS) if truncated else frame
         spec.setdefault("$schema", "https://vega.github.io/schema/vega/v6.json")
         spec.setdefault("title", dataset_name)
         self._patch_vega_references(spec)
         spec["data"] = [{"name": _INJECTED_DATA_NAME, "values": self._records(render_frame)}]
-        warnings = wordcloud_warnings + self._static_warnings(spec)
+        warnings = self._static_warnings(spec)
         if truncated:
             warnings.append(
-                f"Rendered the first {_MAX_RENDER_ROWS} rows from {int(len(prepared_frame.index))} prepared rows. "
-                "Use data.query or data.transform before graphing if row order or sampling affects the conclusion."
+                f"Rendered the first {_MAX_RENDER_ROWS} rows from {row_count} rows. "
+                "Use data.query or data.transform before graphing if row order, grouping, or sampling affects the conclusion."
             )
         return _PreparedSpec(
             spec=spec,
@@ -231,9 +353,150 @@ class AnalysisGraphService:
             schema_url=str(user_spec.get("$schema") or ""),
             rendered_row_count=int(len(render_frame.index)),
             truncated=truncated,
-            referenced_fields=sorted(field_scan.referenced_fields - referenced_wordcloud_internal_fields),
-            generated_fields=sorted(field_scan.generated_fields | referenced_wordcloud_internal_fields),
+            referenced_fields=sorted(field_scan.referenced_fields),
+            generated_fields=sorted(field_scan.generated_fields),
             warnings=warnings,
+        )
+
+    def _prepare_wordcloud_request(
+        self,
+        user_spec: dict[str, Any],
+        frame: pd.DataFrame,
+        dataset_name: str,
+    ) -> _PreparedWordcloud:
+        unsupported_keys = sorted(
+            set(user_spec)
+            - {
+                "title",
+                "word_field",
+                "count_field",
+                "top_n",
+                "width",
+                "height",
+                "prefer_horizontal",
+                "font_size_range",
+                "color_mode",
+                "color_field",
+                "palette",
+            }
+        )
+        if unsupported_keys:
+            raise ValidationError(
+                "analysis.graph wordcloud_spec does not accept: " + ", ".join(unsupported_keys)
+            )
+        title = self._optional_title(user_spec.get("title"), dataset_name)
+        word_field = self._field_name_option(
+            user_spec.get("word_field"),
+            field_name="analysis.graph wordcloud_spec.word_field",
+            default=_WORDCLOUD_WORD_FIELD,
+        )
+        count_field = self._field_name_option(
+            user_spec.get("count_field"),
+            field_name="analysis.graph wordcloud_spec.count_field",
+            default=_WORDCLOUD_COUNT_FIELD,
+        )
+        top_n = self._integer_option(
+            user_spec.get("top_n"),
+            field_name="analysis.graph wordcloud_spec.top_n",
+            minimum=_WORDCLOUD_MIN_TOP_N,
+            maximum=_WORDCLOUD_MAX_TOP_N,
+            default=_WORDCLOUD_DEFAULT_TOP_N,
+        )
+        width = self._integer_option(
+            user_spec.get("width"),
+            field_name="analysis.graph wordcloud_spec.width",
+            minimum=_MIN_WIDTH,
+            maximum=_MAX_WIDTH,
+            default=_WORDCLOUD_DEFAULT_WIDTH,
+        )
+        height = self._integer_option(
+            user_spec.get("height"),
+            field_name="analysis.graph wordcloud_spec.height",
+            minimum=_MIN_HEIGHT,
+            maximum=_MAX_HEIGHT,
+            default=_WORDCLOUD_DEFAULT_HEIGHT,
+        )
+        prefer_horizontal = self._float_option(
+            user_spec.get("prefer_horizontal"),
+            field_name="analysis.graph wordcloud_spec.prefer_horizontal",
+            minimum=_WORDCLOUD_MIN_PREFER_HORIZONTAL,
+            maximum=_WORDCLOUD_MAX_PREFER_HORIZONTAL,
+            default=_WORDCLOUD_DEFAULT_PREFER_HORIZONTAL,
+        )
+        color_mode = self._wordcloud_color_mode(user_spec.get("color_mode"))
+        color_field = self._optional_field_name(
+            user_spec.get("color_field"),
+            field_name="analysis.graph wordcloud_spec.color_field",
+        )
+        if color_mode == "field" and color_field is None:
+            self._raise_wordcloud_error(
+                "analysis.graph wordcloud_spec.color_mode='field' requires color_field.",
+                error_code="wordcloud_color_field_required",
+                error_details={"color_mode": color_mode},
+            )
+        if color_mode != "field" and color_field is not None:
+            raise ValidationError(
+                "analysis.graph wordcloud_spec.color_field is only allowed when color_mode is 'field'."
+            )
+
+        columns = [str(column) for column in frame.columns]
+        required_fields = [
+            ("word", word_field),
+            ("count", count_field),
+        ]
+        if color_field is not None:
+            required_fields.append(("color", color_field))
+        self._validate_wordcloud_required_fields(required_fields, columns)
+
+        prepared_frame, warnings, truncated = self._prepare_wordcloud_frame(
+            frame=frame,
+            word_field=word_field,
+            count_field=count_field,
+            color_field=color_field,
+            top_n=top_n,
+        )
+        words = prepared_frame[word_field].tolist()
+        contains_cjk = any(self._contains_cjk(word) for word in words)
+        font_size_range = self._font_size_range_option(
+            user_spec.get("font_size_range"),
+            words=words,
+        )
+        palette, palette_warnings = self._wordcloud_palette(
+            raw_palette=user_spec.get("palette"),
+            color_mode=color_mode,
+            category_count=int(prepared_frame[color_field].nunique()) if color_field is not None else 0,
+        )
+        warnings.extend(palette_warnings)
+        frequencies = {
+            str(word): float(count)
+            for word, count in zip(prepared_frame[word_field].tolist(), prepared_frame[count_field].tolist(), strict=False)
+        }
+        color_by_word, tooltip_by_word = self._wordcloud_annotations(
+            frame=prepared_frame,
+            word_field=word_field,
+            count_field=count_field,
+            color_mode=color_mode,
+            color_field=color_field,
+            palette=palette,
+        )
+        return _PreparedWordcloud(
+            title=title,
+            width=width,
+            height=height,
+            referenced_fields=sorted(field for _role, field in required_fields),
+            rendered_row_count=int(len(prepared_frame.index)),
+            truncated=truncated,
+            warnings=warnings,
+            frequencies=frequencies,
+            tooltip_by_word=tooltip_by_word,
+            color_by_word=color_by_word,
+            min_font_size=font_size_range[0],
+            max_font_size=font_size_range[1],
+            prefer_horizontal=prefer_horizontal,
+            contains_cjk=contains_cjk,
+            color_mode=color_mode,
+            color_field=color_field,
+            top_n=top_n,
         )
 
     def _validate_visual_shape(self, spec: dict[str, Any]) -> None:
@@ -242,6 +505,18 @@ class AnalysisGraphService:
             raise ValidationError("analysis.graph spec must include a non-empty Vega marks array.")
         if not all(isinstance(mark, dict) for mark in marks):
             raise ValidationError("analysis.graph spec.marks entries must be Vega mark objects.")
+
+    def _validate_no_wordcloud_transform(self, spec: dict[str, Any]) -> None:
+        for mark in self._iter_marks(spec.get("marks", [])):
+            transforms = mark.get("transform")
+            if not isinstance(transforms, list):
+                continue
+            for transform in transforms:
+                if isinstance(transform, dict) and transform.get("type") == "wordcloud":
+                    raise ValidationError(
+                        "analysis.graph Vega specs no longer support wordcloud transforms. "
+                        "Use wordcloud_spec instead, and prepare the frequency table with data.query or data.transform first."
+                    )
 
     def _drop_user_data_declarations(self, value: Any, path: str = "spec") -> None:
         if isinstance(value, dict):
@@ -304,12 +579,12 @@ class AnalysisGraphService:
             for index, child in enumerate(value):
                 self._validate_transform_scope_value(child, mark_ids, f"{path}[{index}]")
 
-    def _scan_fields(self, spec: dict[str, Any]) -> "_FieldScan":
+    def _scan_fields(self, spec: dict[str, Any]) -> _FieldScan:
         scan = _FieldScan()
         self._scan_fields_value(spec, scan)
         return scan
 
-    def _scan_fields_value(self, value: Any, scan: "_FieldScan", parent_key: str | None = None) -> None:
+    def _scan_fields_value(self, value: Any, scan: _FieldScan, parent_key: str | None = None) -> None:
         if isinstance(value, dict):
             for key, child in value.items():
                 if key == "field" and isinstance(child, str):
@@ -428,487 +703,11 @@ class AnalysisGraphService:
         if "field" in domain:
             domain["data"] = _INJECTED_DATA_NAME
 
-    def _normalize_wordcloud_spec(
-        self,
-        spec: dict[str, Any],
-        frame: pd.DataFrame,
-    ) -> tuple[pd.DataFrame, list[str]]:
-        normalized_frame = frame.copy()
-        warnings: list[str] = []
-        for mark in self._iter_marks(spec.get("marks", [])):
-            transforms = mark.get("transform")
-            if not isinstance(transforms, list):
-                continue
-            for transform in transforms:
-                if isinstance(transform, dict) and transform.get("type") == "wordcloud":
-                    normalized_frame, mark_warnings = self._normalize_wordcloud_mark(
-                        spec,
-                        mark,
-                        transform,
-                        normalized_frame,
-                    )
-                    warnings.extend(mark_warnings)
-        return normalized_frame, warnings
-
-    def _normalize_wordcloud_mark(
-        self,
-        spec: dict[str, Any],
-        mark: dict[str, Any],
-        transform: dict[str, Any],
-        frame: pd.DataFrame,
-    ) -> tuple[pd.DataFrame, list[str]]:
-        if mark.get("type") != "text":
-            self._raise_wordcloud_error(
-                "analysis.graph wordcloud transform must be used on a text mark.",
-                error_code="wordcloud_mark_type_invalid",
-                error_details={"mark_type": mark.get("type")},
-            )
-
-        warnings: list[str] = []
-        encode, enter, _update = self._normalize_wordcloud_encode(mark)
-        columns = [str(column) for column in frame.columns]
-        word_field = self._resolve_wordcloud_dataset_field(
-            explicit_field=self._extract_wordcloud_text_field(mark, transform),
-            available_columns=columns,
-            supported_fields=_WORDCLOUD_SUPPORTED_WORD_FIELDS,
-            role="word",
-        )
-        count_field = self._resolve_wordcloud_dataset_field(
-            explicit_field=self._extract_wordcloud_count_field(transform),
-            available_columns=columns,
-            supported_fields=_WORDCLOUD_SUPPORTED_COUNT_FIELDS,
-            role="count",
-        )
-        normalized_frame, frame_warnings = self._prepare_wordcloud_frame(
-            frame,
-            word_field=word_field,
-            count_field=count_field,
-        )
-        warnings.extend(frame_warnings)
-        if word_field != "word":
-            warnings.append(
-                f"Wordcloud used non-canonical word field '{word_field}'. Prefer upstream column name `word`."
-            )
-        if count_field != "count":
-            warnings.append(
-                f"Wordcloud used non-canonical count field '{count_field}'. Prefer upstream column name `count`."
-            )
-
-        enter["text"] = {"field": word_field}
-        transform["text"] = {"field": word_field}
-        transform["fontSize"] = {"field": f"datum.{count_field}"}
-
-        default_font_size_range = self._default_wordcloud_font_size_range(normalized_frame[word_field].tolist())
-        if not self._is_font_size_range(transform.get("fontSizeRange")):
-            transform["fontSizeRange"] = list(default_font_size_range)
-            warnings.append(
-                f"Wordcloud defaulted fontSizeRange to [{default_font_size_range[0]}, {default_font_size_range[1]}]."
-            )
-
-        font = transform.get("font")
-        if not isinstance(font, str) or not font.strip():
-            transform["font"] = _WORDCLOUD_FONT_FAMILY
-        transform.setdefault("padding", 2)
-        transform.setdefault("fontWeight", {"value": 600})
-
-        width, height = self._effective_dimensions(spec)
-        size = transform.get("size")
-        if not (
-            isinstance(size, list)
-            and len(size) == 2
-            and all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in size)
-        ):
-            transform["size"] = [width, height]
-
-        rotation_series, rotation_warnings = self._wordcloud_rotation_series(normalized_frame, transform.get("rotate"))
-        normalized_frame[_WORDCLOUD_ROTATE_FIELD] = rotation_series
-        transform["rotate"] = {"field": f"datum.{_WORDCLOUD_ROTATE_FIELD}"}
-        warnings.extend(rotation_warnings)
-
-        normalized_frame[_WORDCLOUD_COLOR_TIER_FIELD] = self._wordcloud_color_tiers(int(len(normalized_frame.index)))
-        if self._should_use_default_wordcloud_fill(encode, word_field):
-            enter["fill"] = {"scale": _WORDCLOUD_COLOR_SCALE_NAME, "field": _WORDCLOUD_COLOR_TIER_FIELD}
-            self._ensure_wordcloud_color_scale(spec)
-            warnings.append(
-                "Wordcloud color encoding was normalized to restrained rank tiers; avoid coloring every word randomly."
-            )
-
-        if not self._has_wordcloud_tooltip(encode):
-            enter["tooltip"] = {"signal": self._wordcloud_tooltip_signal(word_field, count_field)}
-            warnings.append("Wordcloud defaulted tooltip to `word: count`.")
-        return normalized_frame, warnings
-
-    def _normalize_wordcloud_encode(
-        self,
-        mark: dict[str, Any],
-    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-        encode = mark.get("encode")
-        if not isinstance(encode, dict):
-            encode = {}
-            mark["encode"] = encode
-        enter = encode.get("enter")
-        if not isinstance(enter, dict):
-            enter = {}
-            encode["enter"] = enter
-        update = encode.get("update")
-        if not isinstance(update, dict):
-            update = {}
-            encode["update"] = update
-
-        grouped_keys = {"enter", "update", "hover", "exit"}
-        direct_keys = [key for key, value in encode.items() if key not in grouped_keys and isinstance(value, dict)]
-        for key in direct_keys:
-            enter.setdefault(key, encode[key])
-            del encode[key]
-        return encode, enter, update
-
-    def _extract_wordcloud_text_field(self, mark: dict[str, Any], transform: dict[str, Any]) -> str | None:
-        text = transform.get("text")
-        if isinstance(text, dict) and isinstance(text.get("field"), str):
-            return self._normalize_field_reference(text["field"])
-
-        encode = mark.get("encode")
-        if not isinstance(encode, dict):
-            return None
-        for phase in ("enter", "update"):
-            phase_encode = encode.get(phase)
-            if isinstance(phase_encode, dict):
-                phase_text = phase_encode.get("text")
-                if isinstance(phase_text, dict) and isinstance(phase_text.get("field"), str):
-                    return self._normalize_field_reference(phase_text["field"])
-        return None
-
-    def _extract_wordcloud_count_field(self, transform: dict[str, Any]) -> str | None:
-        font_size = transform.get("fontSize")
-        if isinstance(font_size, dict) and isinstance(font_size.get("field"), str):
-            return self._normalize_field_reference(font_size["field"])
-        return None
-
-    def _resolve_wordcloud_dataset_field(
-        self,
-        *,
-        explicit_field: str | None,
-        available_columns: list[str],
-        supported_fields: tuple[str, ...],
-        role: str,
-    ) -> str:
-        if explicit_field:
-            if explicit_field in available_columns:
-                return explicit_field
-            self._raise_wordcloud_error(
-                f"analysis.graph wordcloud {role} field '{explicit_field}' was not found in the dataset.",
-                error_code=f"wordcloud_{role}_field_missing",
-                error_details={
-                    "requested_field": explicit_field,
-                    "available_columns": available_columns[:_MAX_COLUMNS_IN_ERROR],
-                    "expected_columns": list(supported_fields),
-                },
-            )
-
-        for candidate in supported_fields:
-            if candidate in available_columns:
-                return candidate
-
-        self._raise_wordcloud_error(
-            f"analysis.graph wordcloud requires a dataset column for {role}.",
-            error_code=f"wordcloud_{role}_field_missing",
-            error_details={
-                "available_columns": available_columns[:_MAX_COLUMNS_IN_ERROR],
-                "expected_columns": list(supported_fields),
-            },
-        )
-
-    def _prepare_wordcloud_frame(
-        self,
-        frame: pd.DataFrame,
-        *,
-        word_field: str,
-        count_field: str,
-    ) -> tuple[pd.DataFrame, list[str]]:
-        warnings: list[str] = []
-        normalized_frame = frame.copy()
-        normalized_words = normalized_frame[word_field].where(pd.notna(normalized_frame[word_field]), "").astype(str).str.strip()
-        normalized_counts = pd.to_numeric(normalized_frame[count_field], errors="coerce")
-        valid_mask = normalized_words.ne("") & normalized_counts.notna() & normalized_counts.gt(0)
-        removed_rows = int((~valid_mask).sum())
-        if removed_rows:
-            warnings.append(f"Wordcloud ignored {removed_rows} rows with blank words or non-positive counts.")
-
-        normalized_frame = normalized_frame.loc[valid_mask].copy()
-        if normalized_frame.empty:
-            self._raise_wordcloud_error(
-                "analysis.graph wordcloud requires at least one non-empty word with a positive count.",
-                error_code="wordcloud_no_valid_terms",
-                error_details={"word_field": word_field, "count_field": count_field},
-            )
-        normalized_frame[word_field] = normalized_words.loc[valid_mask]
-        normalized_frame[count_field] = normalized_counts.loc[valid_mask]
-        normalized_frame.sort_values(
-            by=[count_field, word_field],
-            ascending=[False, True],
-            kind="mergesort",
-            inplace=True,
-        )
-
-        if len(normalized_frame.index) > _WORDCLOUD_TOP_N:
-            warnings.append(
-                f"Wordcloud rendered the top {_WORDCLOUD_TOP_N} terms by `{count_field}` for readability."
-            )
-            normalized_frame = normalized_frame.head(_WORDCLOUD_TOP_N).copy()
-        elif len(normalized_frame.index) < _WORDCLOUD_MIN_RECOMMENDED_TERMS:
-            warnings.append(
-                f"Wordcloud dataset contains only {int(len(normalized_frame.index))} terms. "
-                f"Top {_WORDCLOUD_MIN_RECOMMENDED_TERMS}+ usually reads better when the source supports it."
-            )
-        return normalized_frame, warnings
-
-    def _default_wordcloud_font_size_range(self, words: list[str]) -> list[int]:
-        longest_word = max((len(word) for word in words), default=0)
-        if len(words) >= _WORDCLOUD_DENSE_TERM_THRESHOLD or longest_word >= 8:
-            return list(_WORDCLOUD_DENSE_FONT_SIZE_RANGE)
-        return list(_WORDCLOUD_DEFAULT_FONT_SIZE_RANGE)
-
-    def _effective_dimensions(self, spec: dict[str, Any]) -> tuple[int, int]:
-        width = spec.get("width", _DEFAULT_WIDTH)
-        height = spec.get("height", _DEFAULT_HEIGHT)
-        resolved_width = int(width) if isinstance(width, (int, float)) and not isinstance(width, bool) else _DEFAULT_WIDTH
-        resolved_height = (
-            int(height) if isinstance(height, (int, float)) and not isinstance(height, bool) else _DEFAULT_HEIGHT
-        )
-        return resolved_width, resolved_height
-
-    def _wordcloud_rotation_series(
-        self,
-        frame: pd.DataFrame,
-        rotate: Any,
-    ) -> tuple[pd.Series, list[str]]:
-        warnings: list[str] = []
-        term_count = int(len(frame.index))
-        target_tilt_count = 0 if term_count < 10 else max(1, math.floor(term_count * 0.2))
-        default_angles = self._default_wordcloud_rotations(term_count, target_tilt_count)
-
-        if isinstance(rotate, dict) and isinstance(rotate.get("field"), str):
-            rotation_field = self._normalize_field_reference(rotate["field"])
-            if rotation_field is not None and rotation_field in frame.columns:
-                raw_series = pd.to_numeric(frame[rotation_field], errors="coerce").fillna(0)
-                normalized = raw_series.apply(self._normalize_rotation_value)
-                if normalized.tolist() != [int(value) for value in raw_series.tolist()]:
-                    warnings.append("Wordcloud rotation angles were normalized to -30, 0, or 30 degrees.")
-                non_zero_indices = [index for index, value in enumerate(normalized.tolist()) if value != 0]
-                if len(non_zero_indices) > target_tilt_count:
-                    trimmed = normalized.tolist()
-                    for index in non_zero_indices[target_tilt_count:]:
-                        trimmed[index] = 0
-                    normalized = pd.Series(trimmed, index=frame.index)
-                    warnings.append("Wordcloud rotation was capped so that at least 80% of terms stay horizontal.")
-                return normalized.astype("int64"), warnings
-            warnings.append("Wordcloud rotation field was missing; defaulted to mostly horizontal placement.")
-            return pd.Series(default_angles, index=frame.index, dtype="int64"), warnings
-
-        if isinstance(rotate, dict) and "value" in rotate:
-            explicit_value = self._normalize_rotation_value(rotate.get("value"))
-            if explicit_value == 0:
-                return pd.Series([0] * term_count, index=frame.index, dtype="int64"), warnings
-            warnings.append("Wordcloud constant rotation was normalized to mostly horizontal placement.")
-            return pd.Series(default_angles, index=frame.index, dtype="int64"), warnings
-
-        warnings.append("Wordcloud defaulted rotation to mostly horizontal placement.")
-        return pd.Series(default_angles, index=frame.index, dtype="int64"), warnings
-
-    def _default_wordcloud_rotations(self, term_count: int, target_tilt_count: int) -> list[int]:
-        angles = [0] * term_count
-        if target_tilt_count <= 0:
-            return angles
-        positions = []
-        for index in range(target_tilt_count):
-            position = round(((index + 1) * (term_count + 1)) / (target_tilt_count + 1)) - 1
-            positions.append(max(0, min(term_count - 1, position)))
-        for index, position in enumerate(sorted(set(positions))):
-            angles[position] = -30 if index % 2 == 0 else 30
-        return angles
-
-    def _normalize_rotation_value(self, value: Any) -> int:
-        if not isinstance(value, (int, float)) or isinstance(value, bool):
-            return 0
-        numeric = float(value)
-        return int(min(_WORDCLOUD_ALLOWED_ROTATIONS, key=lambda candidate: abs(candidate - numeric)))
-
-    def _wordcloud_color_tiers(self, term_count: int) -> list[str]:
-        if term_count <= 0:
-            return []
-        top_cut = max(1, math.ceil(term_count * 0.2))
-        mid_cut = max(top_cut, math.ceil(term_count * 0.5))
-        tiers: list[str] = []
-        for index in range(term_count):
-            if index < top_cut:
-                tiers.append("top")
-            elif index < mid_cut:
-                tiers.append("mid")
-            else:
-                tiers.append("tail")
-        return tiers
-
-    def _should_use_default_wordcloud_fill(self, encode: dict[str, Any], word_field: str) -> bool:
-        fill_encodings: list[dict[str, Any]] = []
-        for phase in ("enter", "update"):
-            phase_encode = encode.get(phase)
-            if isinstance(phase_encode, dict) and isinstance(phase_encode.get("fill"), dict):
-                fill_encodings.append(phase_encode["fill"])
-        if not fill_encodings:
-            return True
-        for fill in fill_encodings:
-            field = fill.get("field")
-            if isinstance(field, str):
-                normalized = self._normalize_field_reference(field)
-                if normalized in {word_field, "rank_tier", "color_tier", _WORDCLOUD_COLOR_TIER_FIELD}:
-                    return True
-            if fill.get("scale") == _WORDCLOUD_COLOR_SCALE_NAME:
-                return False
-        return False
-
-    def _ensure_wordcloud_color_scale(self, spec: dict[str, Any]) -> None:
-        scales = spec.get("scales")
-        if not isinstance(scales, list):
-            scales = []
-            spec["scales"] = scales
-        for scale in scales:
-            if isinstance(scale, dict) and scale.get("name") == _WORDCLOUD_COLOR_SCALE_NAME:
-                scale["type"] = "ordinal"
-                scale["domain"] = ["top", "mid", "tail"]
-                scale["range"] = list(_WORDCLOUD_DEFAULT_COLORS)
-                return
-        scales.append(
-            {
-                "name": _WORDCLOUD_COLOR_SCALE_NAME,
-                "type": "ordinal",
-                "domain": ["top", "mid", "tail"],
-                "range": list(_WORDCLOUD_DEFAULT_COLORS),
-            }
-        )
-
-    def _has_wordcloud_tooltip(self, encode: dict[str, Any]) -> bool:
-        for phase in ("enter", "update"):
-            phase_encode = encode.get(phase)
-            if isinstance(phase_encode, dict) and isinstance(phase_encode.get("tooltip"), dict):
-                return True
-        return False
-
-    def _wordcloud_tooltip_signal(self, word_field: str, count_field: str) -> str:
-        return f"datum.{word_field} + ': ' + datum.{count_field}"
-
-    def _raise_wordcloud_error(
-        self,
-        message: str,
-        *,
-        error_code: str,
-        error_details: dict[str, Any] | None = None,
-        repair_hints: list[str] | None = None,
-        retryable: bool = True,
-    ) -> None:
-        hints = [
-            "Prepare a chart-ready dataset with exact columns `word` and `count` whenever possible.",
-            "Use data.query or data.transform to pre-aggregate and keep roughly the Top 20-80 terms.",
-            "For Chinese raw text, segment upstream first; do not use countpattern as the tokenizer.",
-        ]
-        if repair_hints:
-            hints.extend(repair_hints)
-        raise AnalysisGraphValidationError(
-            f"{message} {_WORDCLOUD_REPAIR_HINT}",
-            error_code=error_code,
-            error_details=error_details,
-            repair_hints=hints,
-            retryable=retryable,
-        )
-
-    def _validate_wordcloud_spec_shape(self, spec: dict[str, Any]) -> None:
-        for mark in self._iter_marks(spec.get("marks", [])):
-            transforms = mark.get("transform")
-            if not isinstance(transforms, list):
-                continue
-            for transform in transforms:
-                if isinstance(transform, dict) and transform.get("type") == "wordcloud":
-                    self._validate_wordcloud_mark_shape(mark, transform)
-
-    def _validate_wordcloud_mark_shape(self, mark: dict[str, Any], transform: dict[str, Any]) -> None:
-        if mark.get("type") != "text":
-            self._raise_wordcloud_error(
-                "analysis.graph wordcloud transform must be used on a text mark.",
-                error_code="wordcloud_mark_type_invalid",
-                error_details={"mark_type": mark.get("type")},
-            )
-
-        encode = mark.get("encode")
-        if not isinstance(encode, dict):
-            self._raise_wordcloud_error(
-                "analysis.graph wordcloud text mark must define encode.enter or encode.update.",
-                error_code="wordcloud_encode_missing",
-            )
-        grouped_text = False
-        for phase in ("enter", "update"):
-            phase_encode = encode.get(phase)
-            if isinstance(phase_encode, dict) and isinstance(phase_encode.get("text"), dict):
-                grouped_text = True
-                break
-        if not grouped_text:
-            self._raise_wordcloud_error(
-                "analysis.graph wordcloud text mark must encode text under encode.enter or encode.update.",
-                error_code="wordcloud_text_encoding_missing",
-            )
-
-        text = transform.get("text")
-        if not isinstance(text, dict) or not isinstance(text.get("field"), str):
-            self._raise_wordcloud_error(
-                "analysis.graph wordcloud transform.text must be {'field': '<word>'}.",
-                error_code="wordcloud_text_field_invalid",
-            )
-
-        font_size = transform.get("fontSize")
-        if not isinstance(font_size, dict) or not isinstance(font_size.get("field"), str):
-            self._raise_wordcloud_error(
-                "analysis.graph wordcloud transform.fontSize must be {'field': 'datum.<count>'}.",
-                error_code="wordcloud_font_size_invalid",
-            )
-        if not font_size["field"].startswith("datum."):
-            self._raise_wordcloud_error(
-                "analysis.graph wordcloud transform.fontSize field must use datum.<count>.",
-                error_code="wordcloud_font_size_field_invalid",
-            )
-
-        font_size_range = transform.get("fontSizeRange")
-        if not self._is_font_size_range(font_size_range):
-            self._raise_wordcloud_error(
-                "analysis.graph wordcloud transform must include a bounded fontSizeRange.",
-                error_code="wordcloud_font_size_range_invalid",
-            )
-
-    def _is_font_size_range(self, value: Any) -> bool:
-        if not isinstance(value, list) or len(value) != 2:
-            return False
-        low, high = value
-        if not isinstance(low, (int, float)) or not isinstance(high, (int, float)):
-            return False
-        if isinstance(low, bool) or isinstance(high, bool):
-            return False
-        return 1 <= low < high <= 200
-
-    def _render_svg(self, spec: dict[str, Any]) -> str:
+    def _render_vega_svg(self, spec: dict[str, Any]) -> str:
         console_guard = self._allocate_hidden_console_for_packaged_windows()
         try:
-            svg = vlc.vega_to_svg(self._spec_json(spec))
+            svg = vlc.vega_to_svg(self._spec_json(spec, field_name="spec"))
         except Exception as exc:
-            if self._has_wordcloud_transform(spec):
-                self._raise_wordcloud_error(
-                    "analysis.graph could not render the Vega wordcloud spec.",
-                    error_code="wordcloud_render_failed",
-                    error_details={
-                        "width": spec.get("width"),
-                        "height": spec.get("height"),
-                    },
-                    repair_hints=[
-                        "Reduce the number of terms or long labels before graphing.",
-                        "Increase width or height when labels are long.",
-                    ],
-                )
             raise ValidationError(
                 "analysis.graph could not render the Vega spec. "
                 "Check marks, scales, encodings, transforms, and field types, then retry with a simpler valid Vega chart."
@@ -919,61 +718,59 @@ class AnalysisGraphService:
         if not isinstance(svg, str) or not svg.lstrip().startswith("<svg"):
             raise ValidationError("analysis.graph renderer did not return a valid SVG image.")
         if "ERROR" in svg:
-            if self._has_wordcloud_transform(spec):
-                self._raise_wordcloud_error(
-                    "analysis.graph renderer returned a Vega wordcloud error SVG.",
-                    error_code="wordcloud_render_error_svg",
-                )
             raise ValidationError("analysis.graph renderer returned a Vega error SVG. Simplify the spec and retry.")
         return svg
 
-    def _validate_rendered_svg(self, spec: dict[str, Any], svg: str, title: str) -> None:
-        if self._has_wordcloud_transform(spec):
-            self._validate_wordcloud_svg(svg, title)
-
-    def _has_wordcloud_transform(self, spec: dict[str, Any]) -> bool:
-        for mark in self._iter_marks(spec.get("marks", [])):
-            transforms = mark.get("transform")
-            if not isinstance(transforms, list):
-                continue
-            for transform in transforms:
-                if isinstance(transform, dict) and transform.get("type") == "wordcloud":
-                    return True
-        return False
-
-    def _validate_wordcloud_svg(self, svg: str, title: str) -> None:
-        text_nodes = list(_TEXT_NODE_RE.finditer(svg))
-        if not text_nodes:
-            self._raise_wordcloud_error(
-                self._wordcloud_render_failure_message(),
-                error_code="wordcloud_rendered_no_terms",
-                error_details={"visible_terms": 0, "failed_terms": 0},
+    def _render_wordcloud_svg(self, prepared: _PreparedWordcloud) -> str:
+        font_path = self._resolve_wordcloud_font_path(prepared.contains_cjk)
+        color_func = lambda word, *args, **kwargs: prepared.color_by_word.get(str(word), _WORDCLOUD_DEFAULT_RANK_TIER_PALETTE[-1])
+        try:
+            cloud = WordCloud(
+                width=prepared.width,
+                height=prepared.height,
+                background_color=_WORDCLOUD_BACKGROUND_COLOR,
+                prefer_horizontal=prepared.prefer_horizontal,
+                min_font_size=prepared.min_font_size,
+                max_font_size=prepared.max_font_size,
+                font_path=str(font_path) if font_path is not None else None,
+                color_func=color_func,
+                random_state=_WORDCLOUD_RANDOM_STATE,
+                margin=2,
+                collocations=False,
+                normalize_plurals=False,
             )
+            cloud.generate_from_frequencies(prepared.frequencies)
+        except Exception as exc:
+            self._raise_wordcloud_error(
+                "analysis.graph could not render the wordcloud.",
+                error_code="wordcloud_render_failed",
+                error_details={
+                    "width": prepared.width,
+                    "height": prepared.height,
+                    "top_n": prepared.top_n,
+                },
+                repair_hints=[
+                    "Reduce top_n or long labels when the cloud is too dense.",
+                    "Use the denser font_size_range [10, 42] when terms are many or labels are long.",
+                ],
+            )
+            raise AssertionError("unreachable") from exc
 
-        visible_terms = 0
-        failed_terms = 0
-        for node in text_nodes:
-            attrs = node.group("attrs") or node.group("self_attrs") or ""
-            text = re.sub(r"<[^>]+>", "", node.group("text") or "").strip()
-            if text == title:
-                continue
-            failed = 'font-size="0px"' in attrs or "translate(0,0)" in attrs or not text
-            if failed:
-                failed_terms += 1
-            else:
-                visible_terms += 1
-
+        layout = getattr(cloud, "layout_", []) or []
+        visible_terms = len(layout)
+        total_terms = len(prepared.frequencies)
         if visible_terms == 0:
             self._raise_wordcloud_error(
-                self._wordcloud_render_failure_message(),
+                "analysis.graph wordcloud rendered no visible terms.",
                 error_code="wordcloud_rendered_no_terms",
-                error_details={"visible_terms": 0, "failed_terms": failed_terms},
+                error_details={"visible_terms": 0, "total_terms": total_terms},
             )
-
-        total_terms = visible_terms + failed_terms
-        if total_terms and (
-            failed_terms > _MAX_WORDCLOUD_FAILED_TERM_COUNT
-            and failed_terms / total_terms > _MAX_WORDCLOUD_FAILED_TERM_RATIO
+        failed_terms = max(0, total_terms - visible_terms)
+        minimum_readable_terms = min(total_terms, _WORDCLOUD_MIN_RECOMMENDED_TERMS)
+        if (
+            visible_terms < minimum_readable_terms
+            and failed_terms > _WORDCLOUD_MAX_FAILED_TERM_COUNT
+            and failed_terms / max(total_terms, 1) > _WORDCLOUD_MAX_FAILED_TERM_RATIO
         ):
             self._raise_wordcloud_error(
                 "analysis.graph wordcloud could not place enough terms.",
@@ -984,13 +781,438 @@ class AnalysisGraphService:
                     "total_terms": total_terms,
                 },
                 repair_hints=[
-                    "Reduce the cloud to fewer top terms before graphing.",
-                    "Use the denser fontSizeRange [10, 42] when terms are many or labels are long.",
+                    "Reduce top_n or enlarge width and height before retrying.",
+                    "Use shorter labels or pre-aggregate similar variants upstream.",
                 ],
             )
 
-    def _wordcloud_render_failure_message(self) -> str:
-        return "analysis.graph wordcloud rendered no visible terms."
+        try:
+            svg = cloud.to_svg(embed_font=False)
+            svg = self._inject_wordcloud_tooltips(svg, prepared.tooltip_by_word)
+            svg = self._add_wordcloud_title(
+                svg=svg,
+                title=prepared.title,
+                width=prepared.width,
+                height=prepared.height,
+            )
+        except Exception as exc:
+            self._raise_wordcloud_error(
+                "analysis.graph rendered the wordcloud layout but could not finalize the SVG.",
+                error_code="wordcloud_svg_finalize_failed",
+                retryable=False,
+            )
+            raise AssertionError("unreachable") from exc
+
+        if not isinstance(svg, str) or not svg.lstrip().startswith("<svg"):
+            raise ValidationError("analysis.graph renderer did not return a valid SVG image.")
+        return svg
+
+    def _inject_wordcloud_tooltips(self, svg: str, tooltip_by_word: dict[str, str]) -> str:
+        root = ET.fromstring(svg)
+        for element in root.iter(f"{{{_SVG_NS}}}text"):
+            word = (element.text or "").strip()
+            if not word or word not in tooltip_by_word:
+                continue
+            element.text = None
+            title = ET.Element(f"{{{_SVG_NS}}}title")
+            title.text = tooltip_by_word[word]
+            title.tail = word
+            element.insert(0, title)
+        return ET.tostring(root, encoding="unicode")
+
+    def _add_wordcloud_title(self, *, svg: str, title: str, width: int, height: int) -> str:
+        root = ET.fromstring(svg)
+        content_group = ET.Element(f"{{{_SVG_NS}}}g", {"transform": f"translate(0,{_WORDCLOUD_TITLE_HEIGHT})"})
+        content_children = [child for child in list(root) if child.tag not in _SVG_STYLE_TAGS]
+        for child in content_children:
+            root.remove(child)
+            content_group.append(child)
+
+        total_height = height + _WORDCLOUD_TITLE_HEIGHT
+        root.set("height", str(total_height))
+        root.set("viewBox", f"0 0 {width} {total_height}")
+
+        insertion_index = len(list(root))
+        for index, child in enumerate(list(root)):
+            if child.tag not in _SVG_STYLE_TAGS:
+                insertion_index = index
+                break
+
+        background = ET.Element(
+            f"{{{_SVG_NS}}}rect",
+            {
+                "width": "100%",
+                "height": "100%",
+                "style": f"fill:{_WORDCLOUD_BACKGROUND_COLOR}",
+            },
+        )
+        title_element = ET.Element(
+            f"{{{_SVG_NS}}}text",
+            {
+                "x": str(width // 2),
+                "y": str(_WORDCLOUD_TITLE_Y),
+                "text-anchor": "middle",
+                "font-size": str(_WORDCLOUD_TITLE_FONT_SIZE),
+                "font-weight": "600",
+                "style": "fill:#172033",
+            },
+        )
+        title_element.text = title
+        root.insert(insertion_index, background)
+        root.insert(insertion_index + 1, title_element)
+        root.append(content_group)
+        return ET.tostring(root, encoding="unicode")
+
+    def _write_svg_output(self, *, svg: str, dataset_name: str, suffix: str) -> Path:
+        output_dir = self._paths.artifacts / "analysis" / "graphs"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / f"{self._slug(dataset_name)}-{suffix}-{uuid4().hex[:12]}.svg"
+        output_path.write_text(svg, encoding="utf-8")
+        return output_path
+
+    def _validate_wordcloud_required_fields(
+        self,
+        required_fields: list[tuple[str, str]],
+        available_columns: list[str],
+    ) -> None:
+        missing_fields = [(role, field) for role, field in required_fields if field not in available_columns]
+        if not missing_fields:
+            return
+        role, missing_field = missing_fields[0]
+        self._raise_wordcloud_error(
+            f"analysis.graph wordcloud_spec {role} field '{missing_field}' was not found in the dataset.",
+            error_code=f"wordcloud_{role}_field_missing",
+            error_details={
+                "requested_field": missing_field,
+                "available_columns": available_columns[:_MAX_COLUMNS_IN_ERROR],
+            },
+        )
+
+    def _prepare_wordcloud_frame(
+        self,
+        *,
+        frame: pd.DataFrame,
+        word_field: str,
+        count_field: str,
+        color_field: str | None,
+        top_n: int,
+    ) -> tuple[pd.DataFrame, list[str], bool]:
+        warnings: list[str] = []
+        prepared = pd.DataFrame()
+        prepared[word_field] = frame[word_field].where(pd.notna(frame[word_field]), "").astype(str).str.strip()
+        prepared[count_field] = pd.to_numeric(frame[count_field], errors="coerce")
+        if color_field is not None:
+            prepared[color_field] = frame[color_field].where(pd.notna(frame[color_field]), "").astype(str).str.strip()
+            blank_groups = int(prepared[color_field].eq("").sum())
+            if blank_groups:
+                prepared.loc[prepared[color_field].eq(""), color_field] = _WORDCLOUD_UNSPECIFIED_GROUP
+                warnings.append(
+                    f"Wordcloud filled {blank_groups} blank `{color_field}` values as `{_WORDCLOUD_UNSPECIFIED_GROUP}`."
+                )
+
+        valid_mask = prepared[word_field].ne("") & prepared[count_field].notna() & prepared[count_field].gt(0)
+        removed_rows = int((~valid_mask).sum())
+        if removed_rows:
+            warnings.append(f"Wordcloud ignored {removed_rows} rows with blank words or non-positive counts.")
+
+        prepared = prepared.loc[valid_mask].copy()
+        if prepared.empty:
+            self._raise_wordcloud_error(
+                "analysis.graph wordcloud requires at least one non-empty word with a positive count.",
+                error_code="wordcloud_no_valid_terms",
+                error_details={"word_field": word_field, "count_field": count_field},
+            )
+
+        initial_rows = int(len(prepared.index))
+        if color_field is None:
+            prepared = prepared.groupby(word_field, as_index=False, sort=False)[count_field].sum()
+            if len(prepared.index) < initial_rows:
+                warnings.append("Wordcloud aggregated duplicate words by summed counts.")
+        else:
+            prepared = prepared.groupby([word_field, color_field], as_index=False, sort=False)[count_field].sum()
+            if len(prepared.index) < initial_rows:
+                warnings.append("Wordcloud aggregated duplicate word/group rows by summed counts.")
+            repeated_words = int(prepared[word_field].duplicated(keep=False).sum())
+            if repeated_words:
+                warnings.append(
+                    "Wordcloud kept the highest-count semantic group when the same word appeared in multiple groups."
+                )
+            prepared.sort_values(
+                by=[count_field, word_field, color_field],
+                ascending=[False, True, True],
+                kind="mergesort",
+                inplace=True,
+            )
+            prepared = prepared.drop_duplicates(subset=[word_field], keep="first").copy()
+
+        prepared.sort_values(
+            by=[count_field, word_field],
+            ascending=[False, True],
+            kind="mergesort",
+            inplace=True,
+        )
+        total_terms = int(len(prepared.index))
+        truncated = total_terms > top_n
+        if truncated:
+            warnings.append(f"Wordcloud rendered the top {top_n} terms by `{count_field}` for readability.")
+            prepared = prepared.head(top_n).copy()
+        elif total_terms < _WORDCLOUD_MIN_RECOMMENDED_TERMS:
+            warnings.append(
+                f"Wordcloud dataset contains only {total_terms} terms. "
+                f"Top {_WORDCLOUD_MIN_RECOMMENDED_TERMS}+ usually reads better when the source supports it."
+            )
+        return prepared, warnings, truncated
+
+    def _wordcloud_annotations(
+        self,
+        *,
+        frame: pd.DataFrame,
+        word_field: str,
+        count_field: str,
+        color_mode: str,
+        color_field: str | None,
+        palette: list[str],
+    ) -> tuple[dict[str, str], dict[str, str]]:
+        records = frame.to_dict(orient="records")
+        color_by_word: dict[str, str] = {}
+        tooltip_by_word: dict[str, str] = {}
+        if color_mode == "rank_tier":
+            tier_palette = self._wordcloud_rank_tier_palette(palette)
+            for index, record in enumerate(records):
+                word = str(record[word_field])
+                count_text = self._format_wordcloud_count(record[count_field])
+                tier = self._wordcloud_color_tier(index=index, term_count=len(records))
+                color_by_word[word] = tier_palette[tier]
+                tooltip_by_word[word] = f"{word}: {count_text}"
+            return color_by_word, tooltip_by_word
+
+        assert color_field is not None
+        category_order: list[str] = []
+        for record in records:
+            category = str(record[color_field])
+            if category not in category_order:
+                category_order.append(category)
+        category_colors = {category: palette[index] for index, category in enumerate(category_order)}
+        for record in records:
+            word = str(record[word_field])
+            category = str(record[color_field])
+            count_text = self._format_wordcloud_count(record[count_field])
+            color_by_word[word] = category_colors[category]
+            tooltip_by_word[word] = f"{word}: {count_text} | {color_field}: {category}"
+        return color_by_word, tooltip_by_word
+
+    def _wordcloud_rank_tier_palette(self, palette: list[str]) -> dict[str, str]:
+        if len(palette) == 2:
+            return {"top": palette[0], "mid": palette[1], "tail": palette[1]}
+        return {"top": palette[0], "mid": palette[1], "tail": palette[2]}
+
+    def _wordcloud_color_tier(self, *, index: int, term_count: int) -> str:
+        top_cut = max(1, math.ceil(term_count * 0.2))
+        mid_cut = max(top_cut, math.ceil(term_count * 0.5))
+        if index < top_cut:
+            return "top"
+        if index < mid_cut:
+            return "mid"
+        return "tail"
+
+    def _wordcloud_palette(
+        self,
+        *,
+        raw_palette: Any,
+        color_mode: str,
+        category_count: int,
+    ) -> tuple[list[str], list[str]]:
+        warnings: list[str] = []
+        if raw_palette is None:
+            palette = (
+                list(_WORDCLOUD_DEFAULT_RANK_TIER_PALETTE)
+                if color_mode == "rank_tier"
+                else list(_WORDCLOUD_DEFAULT_SEMANTIC_PALETTE)
+            )
+        else:
+            if not isinstance(raw_palette, list) or not raw_palette:
+                raise ValidationError("analysis.graph wordcloud_spec.palette must be a non-empty color list.")
+            palette = [str(value).strip() for value in raw_palette if str(value).strip()]
+            if not palette:
+                raise ValidationError("analysis.graph wordcloud_spec.palette must contain non-empty color strings.")
+            if len(palette) > _WORDCLOUD_MAX_PALETTE_SIZE:
+                raise ValidationError(
+                    f"analysis.graph wordcloud_spec.palette cannot exceed {_WORDCLOUD_MAX_PALETTE_SIZE} colors."
+                )
+
+        if color_mode == "rank_tier":
+            if len(palette) < 2:
+                self._raise_wordcloud_error(
+                    "analysis.graph wordcloud_spec rank-tier palette needs at least 2 colors.",
+                    error_code="wordcloud_palette_too_small",
+                    error_details={"palette_size": len(palette)},
+                )
+            if len(palette) > 3:
+                warnings.append("Wordcloud rank-tier coloring used only the first 3 palette colors.")
+                palette = palette[:3]
+            return palette, warnings
+
+        if category_count > len(palette):
+            self._raise_wordcloud_error(
+                "analysis.graph wordcloud_spec palette is too small for the semantic color groups.",
+                error_code="wordcloud_palette_too_small",
+                error_details={"palette_size": len(palette), "category_count": category_count},
+                repair_hints=["Reduce category, sentiment, or source groups upstream, or provide a longer palette."],
+            )
+        return palette, warnings
+
+    def _resolve_wordcloud_font_path(self, contains_cjk: bool) -> Path | None:
+        candidates: list[Path] = []
+        env_value = str(os.environ.get("XENIX_WORDCLOUD_FONT_PATH") or "").strip()
+        if env_value:
+            candidates.append(Path(env_value).expanduser())
+        candidates.extend(
+            [
+                Path(r"C:\Windows\Fonts\msyh.ttc"),
+                Path(r"C:\Windows\Fonts\simhei.ttf"),
+                Path(r"C:\Windows\Fonts\segoeui.ttf"),
+                Path(r"C:\Windows\Fonts\arial.ttf"),
+                Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
+                Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"),
+                Path("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"),
+                Path("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttf"),
+                Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+                Path("/System/Library/Fonts/PingFang.ttc"),
+                Path("/System/Library/Fonts/Hiragino Sans GB.ttc"),
+                Path("/Library/Fonts/Arial Unicode.ttf"),
+            ]
+        )
+        for candidate in candidates:
+            if candidate.exists() and candidate.is_file():
+                return candidate
+        if contains_cjk:
+            self._raise_wordcloud_error(
+                "analysis.graph could not find a usable CJK font for the wordcloud renderer.",
+                error_code="wordcloud_font_unavailable",
+                retryable=False,
+            )
+        return None
+
+    def _contains_cjk(self, value: str) -> bool:
+        return bool(_CJK_RE.search(value))
+
+    def _optional_title(self, value: Any, default: str) -> str:
+        if value is None:
+            return default
+        if not isinstance(value, str):
+            raise ValidationError("analysis.graph wordcloud_spec.title must be a string.")
+        return value.strip() or default
+
+    def _field_name_option(self, value: Any, *, field_name: str, default: str) -> str:
+        if value is None:
+            return default
+        if not isinstance(value, str) or not value.strip():
+            raise ValidationError(f"{field_name} must be a non-empty string.")
+        return value.strip()
+
+    def _optional_field_name(self, value: Any, *, field_name: str) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str) or not value.strip():
+            raise ValidationError(f"{field_name} must be a non-empty string when provided.")
+        return value.strip()
+
+    def _integer_option(
+        self,
+        value: Any,
+        *,
+        field_name: str,
+        minimum: int,
+        maximum: int,
+        default: int,
+    ) -> int:
+        if value is None:
+            return default
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or int(value) != value:
+            raise ValidationError(f"{field_name} must be an integer between {minimum} and {maximum}.")
+        integer = int(value)
+        if integer < minimum or integer > maximum:
+            raise ValidationError(f"{field_name} must be between {minimum} and {maximum}.")
+        return integer
+
+    def _float_option(
+        self,
+        value: Any,
+        *,
+        field_name: str,
+        minimum: float,
+        maximum: float,
+        default: float,
+    ) -> float:
+        if value is None:
+            return default
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise ValidationError(f"{field_name} must be a number between {minimum} and {maximum}.")
+        numeric = float(value)
+        if numeric < minimum or numeric > maximum:
+            raise ValidationError(f"{field_name} must be between {minimum} and {maximum}.")
+        return numeric
+
+    def _font_size_range_option(self, value: Any, *, words: list[str]) -> tuple[int, int]:
+        if value is None:
+            return self._default_wordcloud_font_size_range(words)
+        if not isinstance(value, list) or len(value) != 2:
+            raise ValidationError("analysis.graph wordcloud_spec.font_size_range must be [min, max].")
+        low, high = value
+        if not isinstance(low, (int, float)) or not isinstance(high, (int, float)):
+            raise ValidationError("analysis.graph wordcloud_spec.font_size_range must contain two numbers.")
+        if isinstance(low, bool) or isinstance(high, bool):
+            raise ValidationError("analysis.graph wordcloud_spec.font_size_range must contain two numbers.")
+        low_int = int(low)
+        high_int = int(high)
+        if not (1 <= low_int < high_int <= 200):
+            raise ValidationError("analysis.graph wordcloud_spec.font_size_range must satisfy 1 <= min < max <= 200.")
+        return low_int, high_int
+
+    def _wordcloud_color_mode(self, value: Any) -> str:
+        if value is None:
+            return "rank_tier"
+        if not isinstance(value, str):
+            raise ValidationError("analysis.graph wordcloud_spec.color_mode must be 'rank_tier' or 'field'.")
+        normalized = value.strip()
+        if normalized not in _WORDCLOUD_COLOR_MODES:
+            raise ValidationError("analysis.graph wordcloud_spec.color_mode must be 'rank_tier' or 'field'.")
+        return normalized
+
+    def _default_wordcloud_font_size_range(self, words: list[str]) -> tuple[int, int]:
+        longest_word = max((len(word) for word in words), default=0)
+        if len(words) >= _WORDCLOUD_DENSE_TERM_THRESHOLD or longest_word >= 8:
+            return _WORDCLOUD_DENSE_FONT_SIZE_RANGE
+        return _WORDCLOUD_DEFAULT_FONT_SIZE_RANGE
+
+    def _format_wordcloud_count(self, value: Any) -> str:
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            return str(value)
+        if numeric.is_integer():
+            return str(int(numeric))
+        return f"{numeric:.4g}"
+
+    def _raise_wordcloud_error(
+        self,
+        message: str,
+        *,
+        error_code: str,
+        error_details: dict[str, Any] | None = None,
+        repair_hints: list[str] | None = None,
+        retryable: bool = True,
+    ) -> None:
+        hints = list(_WORDCLOUD_REPAIR_HINTS)
+        if repair_hints:
+            hints.extend(repair_hints)
+        raise AnalysisGraphValidationError(
+            message,
+            error_code=error_code,
+            error_details=error_details,
+            repair_hints=hints,
+            retryable=retryable,
+        )
 
     def _allocate_hidden_console_for_packaged_windows(self):
         if sys.platform != "win32" or not getattr(sys, "frozen", False):
@@ -1027,19 +1249,3 @@ class AnalysisGraphService:
     def _slug(self, value: str) -> str:
         normalized = "".join(char.lower() if char.isalnum() else "-" for char in value).strip("-")
         return normalized or "graph"
-
-
-class _FieldScan(SQLModel):
-    referenced_fields: set[str] = Field(default_factory=set)
-    generated_fields: set[str] = Field(default_factory=set)
-
-
-class _PreparedSpec(SQLModel):
-    spec: dict[str, Any]
-    title: str
-    schema_url: str
-    rendered_row_count: int
-    truncated: bool
-    referenced_fields: list[str]
-    generated_fields: list[str]
-    warnings: list[str]

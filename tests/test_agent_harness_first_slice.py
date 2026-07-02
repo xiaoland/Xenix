@@ -590,8 +590,10 @@ def test_agent_harness_model_metadata_exposes_contract_without_train_enums(monke
     assert "model.hyper_train" in specs
     assert "model.apply" in specs
     graph_schema = specs["analysis.graph"].parameters_schema
-    assert graph_schema["required"] == ["dataset_id", "spec"]
+    assert graph_schema["required"] == ["dataset_id"]
+    assert graph_schema["oneOf"] == [{"required": ["spec"]}, {"required": ["wordcloud_spec"]}]
     assert "spec" in graph_schema["properties"]
+    assert "wordcloud_spec" in graph_schema["properties"]
     assert "operation" not in graph_schema["properties"]
     assert "params" not in graph_schema["properties"]
     model_metadata_schema = specs["model.metadata"].parameters_schema

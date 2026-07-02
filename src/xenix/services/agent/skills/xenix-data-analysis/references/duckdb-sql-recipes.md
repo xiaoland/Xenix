@@ -222,7 +222,7 @@ FROM baskets;
 
 ## Word-frequency table for word cloud from tokenized field
 
-Prefer the output shape `word`, `count` for `analysis.graph`.
+Prefer the output shape `word`, `count` for `analysis.graph` when using `wordcloud_spec`.
 If the source text is raw Chinese sentences or paragraphs, do not treat `countpattern`-style tokenization as a valid shortcut; segment upstream first or work from existing token/tag rows.
 
 If the dataset already has one token/word/tag per row:

@@ -215,13 +215,10 @@ class AgentToolRegistry:
                 name="analysis.graph",
                 provider_name="analysis_graph",
                 description=(
-                    "Draw one bounded static SVG chart for a registered dataset from a Vega JSON spec and return "
-                    "an image artifact. Write only drawing structure such as marks, scales, axes, legends, "
-                    "signals, config, and mark-level transforms. Xenix injects the registered dataset; any "
-                    "Vega data or datasets in the spec are ignored and replaced. Do not use url resources. "
-                    "Use data.transform before analysis.graph for grouping, aggregation, joins, reshaping, "
-                    "or durable derived rows. For word clouds, prefer an upstream Top 20-80 table with exact "
-                    "`word` and `count` columns, use grouped text encoding plus tooltip, and keep most terms horizontal."
+                    "Draw one bounded static SVG artifact for a registered dataset. Use exactly one of `spec` "
+                    "or `wordcloud_spec`. `spec` is for ordinary Vega charts under the Xenix Vega profile. "
+                    "`wordcloud_spec` is the dedicated word-cloud path and expects an upstream chart-ready "
+                    "frequency table from data.query or data.transform."
                 ),
                 parameters_schema={
                     "type": "object",
@@ -229,16 +226,17 @@ class AgentToolRegistry:
                         "dataset_id": {
                             "type": "string",
                             "description": (
-                                "Use one registered dataset. For word clouds, prepare a chart-ready frequency table "
-                                "and pass its dataset_id here."
+                                "Use one registered dataset. For word clouds, this dataset should already be a "
+                                "chart-ready frequency table."
                             ),
                         },
                         "spec": {
                             "type": "object",
                             "description": (
                                 "Vega chart specification under the Xenix Vega profile. Xenix injects dataset "
-                                "values before rendering. For word clouds, prefer an upstream `word` + `count` "
-                                "dataset, include tooltip, and keep the cloud compact and readable."
+                                "values before rendering. Write drawing structure only: marks, scales, axes, "
+                                "legends, signals, config, and simple mark-level transforms. Do not use this "
+                                "field for word clouds."
                             ),
                             "properties": {
                                 "$schema": {"type": "string", "description": "Optional Vega schema URL."},
@@ -265,9 +263,8 @@ class AgentToolRegistry:
                                     "type": "array",
                                     "minItems": 1,
                                     "description": (
-                                        "Required non-empty Vega marks array. Use mark-level transforms for "
-                                        "drawing/layout behavior such as wordcloud. Word-cloud marks should be "
-                                        "text marks with grouped encoding, tooltip, and a mark-level wordcloud transform."
+                                        "Required non-empty Vega marks array. Use mark-level transforms only for "
+                                        "ordinary drawing/layout behavior, not for word clouds."
                                     ),
                                     "items": {"type": "object"},
                                 },
@@ -275,8 +272,87 @@ class AgentToolRegistry:
                             "required": ["marks"],
                             "additionalProperties": True,
                         },
+                        "wordcloud_spec": {
+                            "type": "object",
+                            "description": (
+                                "Dedicated word-cloud configuration. Use data.query or data.transform first to "
+                                "produce chart-ready rows, usually exact columns `word` and `count`. For Chinese "
+                                "text, segment upstream first; do not pass raw sentences or expect analysis.graph "
+                                "to tokenize them."
+                            ),
+                            "properties": {
+                                "title": {
+                                    "type": "string",
+                                    "description": "Optional visible word-cloud title.",
+                                },
+                                "word_field": {
+                                    "type": "string",
+                                    "description": "Word column name. Default is `word`.",
+                                },
+                                "count_field": {
+                                    "type": "string",
+                                    "description": "Positive count column name. Default is `count`.",
+                                },
+                                "top_n": {
+                                    "type": "integer",
+                                    "minimum": 20,
+                                    "maximum": 80,
+                                    "description": "Render only the top 20-80 terms for readability. Default is 80.",
+                                },
+                                "width": {
+                                    "type": "integer",
+                                    "minimum": 200,
+                                    "maximum": 1600,
+                                    "description": "Word-cloud width in pixels.",
+                                },
+                                "height": {
+                                    "type": "integer",
+                                    "minimum": 160,
+                                    "maximum": 1200,
+                                    "description": "Word-cloud height in pixels.",
+                                },
+                                "prefer_horizontal": {
+                                    "type": "number",
+                                    "minimum": 0.8,
+                                    "maximum": 1.0,
+                                    "description": "Keep at least 80% of terms horizontal. Default is 0.85.",
+                                },
+                                "font_size_range": {
+                                    "type": "array",
+                                    "minItems": 2,
+                                    "maxItems": 2,
+                                    "items": {"type": "number"},
+                                    "description": (
+                                        "Optional [min, max] font-size range. Default is [12, 56], or [10, 42] "
+                                        "for denser clouds."
+                                    ),
+                                },
+                                "color_mode": {
+                                    "type": "string",
+                                    "enum": ["rank_tier", "field"],
+                                    "description": (
+                                        "Use `rank_tier` for restrained 2-3 color ranking. Use `field` only when "
+                                        "an upstream low-cardinality field already encodes category, sentiment, or source."
+                                    ),
+                                },
+                                "color_field": {
+                                    "type": "string",
+                                    "description": "Required only when color_mode is `field`.",
+                                },
+                                "palette": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "Optional restrained color palette for rank tiers or semantic groups.",
+                                },
+                            },
+                            "additionalProperties": False,
+                        },
                     },
-                    "required": ["dataset_id", "spec"],
+                    "required": ["dataset_id"],
+                    "oneOf": [
+                        {"required": ["spec"]},
+                        {"required": ["wordcloud_spec"]},
+                    ],
                     "additionalProperties": False,
                 },
             ),
@@ -784,24 +860,33 @@ class AgentToolRegistry:
 
     def _analysis_graph(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
-        unsupported_keys = sorted(set(arguments) - {"dataset_id", "spec"})
+        unsupported_keys = sorted(set(arguments) - {"dataset_id", "spec", "wordcloud_spec"})
         if unsupported_keys:
             raise ValidationError("analysis.graph does not accept: " + ", ".join(unsupported_keys))
         dataset_id = self._require_string(arguments, "dataset_id")
         dataset = self._dataset_service.get_dataset(dataset_id)
+        has_spec = "spec" in arguments
+        has_wordcloud_spec = "wordcloud_spec" in arguments
+        if has_spec == has_wordcloud_spec:
+            raise ValidationError("analysis.graph requires exactly one of spec or wordcloud_spec.")
         raw_spec = arguments.get("spec")
-        if not isinstance(raw_spec, dict):
+        raw_wordcloud_spec = arguments.get("wordcloud_spec")
+        if has_spec and not isinstance(raw_spec, dict):
             raise ValidationError("analysis.graph spec must be a Vega object.")
+        if has_wordcloud_spec and not isinstance(raw_wordcloud_spec, dict):
+            raise ValidationError("analysis.graph wordcloud_spec must be an object.")
         graph_result = self._analysis_graph_service.graph_dataset(
             GraphDatasetInput(
                 source_path=dataset.source_path,
                 dataset_name=dataset.name,
                 spec=raw_spec,
+                wordcloud_spec=raw_wordcloud_spec,
             )
         )
         graph_metadata = graph_result.graph_metadata
         default_title = f"{dataset.name} graph"
         title = str(graph_metadata.get("title") or default_title).strip() or default_title
+        spec_format = str(graph_metadata.get("spec_format") or "graph")
         artifact = self._artifact_service.register_artifact(
             RegisterArtifactInput(
                 thread_id=context.thread_id,
@@ -811,7 +896,7 @@ class AgentToolRegistry:
                 title=title,
                 absolute_path=graph_result.output_path,
                 mime_type="image/svg+xml",
-                summary="Graph generated by analysis.graph from a Vega spec.",
+                summary=f"Graph generated by analysis.graph ({spec_format}).",
                 preview_payload=graph_metadata,
                 metadata_payload={
                     "dataset_id": dataset.id,
