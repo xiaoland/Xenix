@@ -1,0 +1,187 @@
+# Data Tokenize And Text Analysis
+
+## Objective & Hypothesis
+
+- Objective & Hypothesis: Introduce a durable `data.tokenize` tool for service-owned text segmentation, then productize the first useful text-analysis model capabilities: text classification, text clustering, topic modeling, and similarity retrieval. Current hypothesis: tokenization should live in `data.*` as a dedicated derived-dataset tool rather than as a `data.clean` operation, and the first text-analysis slice should reuse one stable tokenization/vectorization contract instead of promoting the current demo pipeline wholesale.
+
+## Guardrails Touched
+
+- Root `AGENTS.md` operating model:
+  - classify the request before mutation;
+  - create and maintain a task packet for non-trivial work;
+  - use Impact Handshake before mutating durable truth with non-local blast radius.
+- `docs/00-meta/implementation-taste.md`:
+  - keep authority and boundary shape explicit;
+  - avoid leaking raw library contracts such as `jieba` or ad-hoc demo-script parameters into provider-facing schemas.
+- Existing durable runtime boundaries:
+  - `data.clean` is for deterministic atomic cleaning operations;
+  - `data.transform` is for SQL/CTE-derived datasets;
+  - `analysis.graph` must keep the current boundary that word clouds consume pre-tokenized upstream data.
+- Ignore unrelated dirty workspace files.
+
+## Verification
+
+- Read-only exploration before implementation:
+  - inspect current `data.*` tool contracts and `DataCleaningService` operation catalog;
+  - inspect current ML model catalog and task/runtime docs;
+  - inspect `tasks/ml-service-optimizations/assets/text_analysis` demo assets.
+- Pre-implementation verification target:
+  - confirm the intended output shapes for tokenized datasets;
+  - confirm whether text capabilities belong in a new model family or can remain under existing catalog families without losing clarity.
+- Post-implementation verification target:
+  - tool-schema coverage in Agent Harness tests;
+  - service-level tests for tokenization outputs;
+  - model-registry and ML execution tests for the first text-analysis models;
+  - `pdm run check`.
+
+## Current State
+
+- Current Understanding:
+  - current product code has no formal tokenization tool;
+  - the implementation now carries `jieba` as a durable dependency in `pyproject.toml` and `pdm.lock`;
+  - `data.clean` supports text standardization such as trim/lowercase but not segmentation;
+  - `analysis.graph` and word-cloud rendering explicitly require upstream tokenization instead of tokenizing raw Chinese text internally;
+  - `tasks/ml-service-optimizations/assets/text_analysis/02_text_analysis_all.py` is a demo pipeline that mixes preprocessing, descriptive analysis, heuristics, and modeling in one script;
+  - the first executable slice now exists as durable product code:
+    - `data.tokenize`
+    - `ModelFamily.TEXT_ANALYSIS`
+    - text classification
+    - text clustering
+    - topic modeling
+    - similarity retrieval
+  - a follow-up diagnose on the live `data.tokenize` failures showed the true break was not tokenization itself but the downstream dataset inspection/profile path when local `polars` and `polars-runtime-*` drifted out of sync;
+  - the durable fix for that follow-up slice is:
+    - strict `polars[calamine]==1.42.1` dependency pinning;
+    - packaged smoke coverage that exercises strict Polars CSV/XLSX reads;
+    - structured runtime-error passthrough from dataset inspection/profile into Agent Harness tool-failure payloads.
+  - a second follow-up on dedicated word-cloud rendering found that the renderer was producing a double-background SVG when a title was added:
+    - the outer title wrapper added one full-canvas white rect;
+    - the original `wordcloud.to_svg()` background rect was moved down inside the translated content group;
+    - medium-sized Chinese clouds were also staying on the looser `[12, 56]` font-size range too long.
+- User-Confirmed Constraints:
+  - create a new task packet;
+  - core scope is `data.tokenize` plus text-analysis model intake;
+  - target text-analysis capability set is:
+    - text classification
+    - text clustering
+    - topic modeling
+    - similarity retrieval
+- Active Mode or Transition Note:
+  - current mode is `Solidify`;
+  - the user confirmed Chinese-first scope and agreed to add a dedicated `text_analysis` model family rather than rewiring the whole model taxonomy in the same slice.
+- Next Step:
+  - wait for the next user-directed slice, likely around text-analysis asset cleanup or broader text-analysis capability intake.
+
+## Exploration Scaffold
+
+- Perturbation:
+  - add one new `data.*` capability that changes dataset shape through tokenization;
+  - add one new text-analysis capability family or equivalent model-catalog projection on top of that shared text representation.
+- Input Type: Intent
+- Governing Anchors:
+  - `AGENTS.md`
+  - `docs/00-meta/implementation-taste.md`
+  - `docs/20-product-tdd/runtime-boundaries.md`
+  - `docs/30-unit-tdd/agent-harness.md`
+  - `src/xenix/services/AGENTS.md`
+- Impact Hypothesis:
+  - a dedicated `data.tokenize` contract will reduce repeated ad-hoc tokenization logic in charting and future text models;
+  - productizing text classification/clustering/topic/similarity on top of one shared text representation will keep the blast radius manageable;
+  - forcing tokenization into `data.clean` would blur the line between atomic cleaning and shape-changing text derivation.
+- Temporary Assumptions:
+  - first useful output modes for `data.tokenize` are likely:
+    - `token_rows`: one token per row, with source id columns preserved;
+    - `token_text`: one row per source row, with a normalized token-joined text field;
+  - first implementation may be Chinese-first;
+  - provider-facing tokenization profiles should be Xenix-owned names such as `zh_business_v1`, not raw `jieba` knobs.
+- Negotiation Triggers:
+  - whether multilingual tokenization is required in the first slice;
+  - whether similarity retrieval is modeled as a train/apply analyzer or as a summary-only retrieval artifact producer;
+  - whether tokenization should preserve positions, frequencies, or stopword policy in the first contract.
+- Promotion Candidates:
+  - durable `data.tokenize` runtime boundary;
+  - tokenized dataset output-shape contract;
+  - text-analysis model-family and role-binding contract if it stabilizes.
+- Supporting Files:
+  - `src/xenix/services/agent/tools.py`
+  - `src/xenix/services/data_cleaning.py`
+  - `src/xenix/services/data_transform.py`
+  - `src/xenix/services/ml/registry.py`
+  - `src/xenix/services/ml/types.py`
+  - `src/xenix/services/ml/models/`
+  - `docs/20-product-tdd/runtime-boundaries.md`
+  - `docs/30-unit-tdd/agent-harness.md`
+  - `tasks/ml-service-optimizations/assets/text_analysis/`
+
+## Execution Notes
+
+- Key findings:
+  - text tokenization is absent from durable product tools today;
+  - the repository already has a strong boundary that graphing must consume pre-tokenized word/count tables rather than tokenize inside rendering;
+  - the demo text-analysis assets contain at least four candidate productizable model capabilities, but also several heuristic outputs that should not be promoted blindly.
+- Decisions made:
+  - create a fresh packet instead of extending the older broad `ml-service-optimizations` log;
+  - treat `data.tokenize` as the likely backbone contract for later text-analysis intake;
+  - keep the first model-intake target set narrow: classification, clustering, topic modeling, similarity retrieval;
+  - make the first tokenization slice Chinese-first with one stable provider-facing profile, `zh_business_v1`;
+  - introduce `ModelFamily.TEXT_ANALYSIS` as a product-directory grouping, while leaving `ProblemKind`, `EvaluationKind`, and `ModelTaskKind` semantics intact.
+- Impact Handshake:
+  - Address and Object:
+    - `src/xenix/services/agent/tools.py`
+    - `src/xenix/services/agent/tool_presentations.py`
+    - `src/xenix/services/data_tokenization.py` (new)
+    - `src/xenix/services/ml/types.py`
+    - `src/xenix/services/ml/registry.py`
+    - `src/xenix/services/ml/models/text_analysis.py` (new)
+    - `src/xenix/services/ml_service.py`
+    - durable docs and selected Agent skills that describe `data.*` and model directory behavior
+    - focused tests for tokenization, agent tool schemas, model registry, and ML execution
+  - State Diff:
+    - From:
+      - no tokenization tool;
+      - no text-analysis model family;
+      - no durable text classification/clustering/topic/similarity analyzers.
+    - To:
+      - `data.tokenize` creates derived datasets in one of two stable shapes:
+        - `token_text`: preserve source rows and append `token_text` plus token-count metadata columns;
+        - `token_rows`: explode rows into `source_row_number`, optional id columns, `token`, and `token_index`;
+      - `text_analysis` becomes a browsable model family in `model.metadata`;
+      - first model set consumes tokenized text columns through text-specific role schemas.
+  - Blast Radius Forecast:
+    - Agent-facing tool registry and contextual tool exposure
+    - dataset-derived artifact flows
+    - model directory browsing and model metadata schemas
+    - MLService role-binding validation and apply-column projection
+    - trained-model metadata and downstream tests
+  - Invariants Check:
+    - `data.clean` remains atomic cleaning only;
+    - `data.transform` remains SQL-only;
+    - `analysis.graph` still refuses to tokenize raw Chinese text;
+    - existing tabular model keys and families stay intact in this slice;
+    - provider-facing tokenization config stays Xenix-owned and does not expose raw `jieba` parameters.
+  - Verification:
+    - add service tests for `data.tokenize` output shapes;
+    - add first-slice tool-schema and execution tests for `data.tokenize`;
+    - add model-catalog and ML execution tests for the new text-analysis models;
+    - run targeted pytest slices and `pdm run check`.
+- Verification outcomes:
+  - added `tests/test_data_tokenization.py` for service outputs, tool registration, and schema coverage;
+  - extended `tests/test_agent_harness_first_slice.py` for `data.tokenize` contextual exposure and `text_analysis` family browsing;
+  - extended `tests/test_ml_registry.py` for the new family and four text-analysis model entries;
+  - extended `tests/test_ml_execution.py` for end-to-end fit/apply coverage across text classification, text clustering, topic modeling, and similarity retrieval;
+  - added structured-failure coverage for dataset inspection/profile and generic Harness passthrough:
+    - `tests/test_services.py`
+    - `tests/test_analysis_profile.py`
+    - `tests/test_agent_harness_foundation.py`
+  - tightened dedicated word-cloud renderer coverage in `tests/test_analysis_graph.py`:
+    - assert titled word clouds keep only one full-background rect;
+    - assert medium/high term-count clouds switch to the dense `[10, 42]` default range.
+  - passed:
+    - `pdm run pytest tests/test_data_tokenization.py tests/test_ml_registry.py tests/test_ml_execution.py tests/test_agent_harness_first_slice.py`
+    - `pdm run pytest tests/test_services.py tests/test_analysis_profile.py tests/test_agent_harness_foundation.py`
+    - `pdm run pytest tests/test_analysis_graph.py`
+    - `pdm run smoke`
+    - `pdm run check`
+- Final outcome:
+  - the implementation slice is complete and verified;
+  - durable docs and selected Agent skills now describe `data.tokenize` and `text_analysis` as first-class contracts.

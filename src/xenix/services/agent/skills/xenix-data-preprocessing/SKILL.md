@@ -4,12 +4,12 @@ description: >-
   Use this skill when the user asks Xenix to prepare tabular data before
   analysis or modeling: inspect schema quality, clean missing values, normalize
   column names, remove duplicates, convert types, standardize text/categories,
-  clip outliers, encode categories, scale numeric fields, integrate datasets,
-  transform/query data into derived datasets, select feature/target roles, or
-  fix data-quality blockers. Use for Chinese requests such as “清洗数据”, “预处理”,
-  “处理缺失值”, “去重”, “字段类型不对”, “合并表”, “构造特征”, “选择特征和目标”,
-  or “训练前准备数据”. Do not use as the primary skill for final analysis reports,
-  charts, or prediction interpretation; use xenix-data-analysis or
+  clip outliers, encode categories, scale numeric fields, tokenize Chinese text,
+  integrate datasets, transform/query data into derived datasets, select
+  feature/target roles, or fix data-quality blockers. Use for Chinese requests
+  such as “清洗数据”, “预处理”, “处理缺失值”, “去重”, “字段类型不对”, “合并表”,
+  “构造特征”, “分词”, “选择特征和目标”, or “训练前准备数据”. Do not use as the
+  primary skill for final analysis reports, charts, or prediction interpretation; use xenix-data-analysis or
   xenix-data-modeling after the data is ready.
 license: MIT
 metadata:
@@ -30,6 +30,7 @@ Xenix Agent has no script execution environment. Use only available Xenix tools:
 - `data.integrate` when multiple registered datasets need to be vertically appended.
 - `data.clean.metadata` to inspect supported cleaning operations.
 - `data.clean` to apply explicit predefined cleaning operations to one dataset.
+- `data.tokenize` to create a derived dataset from one Chinese text column before word clouds or text-analysis models.
 - `data.transform` to materialize SELECT/CTE transformations as a derived dataset.
 - `data.feature.select` to create a role-binding snapshot before modeling.
 
@@ -53,10 +54,11 @@ Xenix Agent has no script execution environment. Use only available Xenix tools:
    - convenience cleanup: column names, type casts, whitespace, display formats.
 4. Call `data.clean.metadata` before selecting cleaning operations.
 5. Use `data.clean` for atomic supported operations such as missing-value handling, duplicate handling, type conversion, text standardization, outlier clipping, categorical encoding, or numeric scaling.
-6. Use `data.transform` for SQL-derived features, filtering, joins, aggregation, reshaping, or durable chart/model-ready derived datasets. Use it, not `data.integrate`, for horizontal joins.
-7. Use `data.feature.select` when a modeling task needs explicit target/features/exclusions.
-8. Validate the result with `data.peek` or `data.query`.
-9. Hand off to `xenix-data-analysis` or `xenix-data-modeling` only after the prepared dataset or role binding is clear.
+6. Use `data.tokenize` when raw Chinese text must become a stable derived dataset for word clouds, text clustering, text classification, topic modeling, or similarity retrieval.
+7. Use `data.transform` for SQL-derived features, filtering, joins, aggregation, reshaping, or durable chart/model-ready derived datasets. Use it, not `data.integrate`, for horizontal joins.
+8. Use `data.feature.select` when a modeling task needs explicit target/features/exclusions.
+9. Validate the result with `data.peek` or `data.query`.
+10. Hand off to `xenix-data-analysis` or `xenix-data-modeling` only after the prepared dataset or role binding is clear.
 
 ## Optional References
 

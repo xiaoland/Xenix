@@ -342,6 +342,28 @@ def test_agent_harness_tool_error_result_forwards_structured_retry_metadata() ->
     }
 
 
+def test_agent_harness_tool_error_result_forwards_generic_validation_metadata() -> None:
+    harness = AgentHarnessService.__new__(AgentHarnessService)
+
+    result = harness._tool_error_result(
+        ValidationError(
+            "dataset read failed",
+            error_code="tabular_runtime_unavailable",
+            error_details={"operation": "inspect_source_file"},
+            repair_hints=["Run `pdm sync -d --clean` and retry."],
+            retryable=False,
+        )
+    )
+
+    assert result.payload == {
+        "error": "dataset read failed",
+        "error_code": "tabular_runtime_unavailable",
+        "error_details": {"operation": "inspect_source_file"},
+        "repair_hints": ["Run `pdm sync -d --clean` and retry."],
+        "retryable": False,
+    }
+
+
 def test_chatbot_event_projection_adds_turn_usage_overview(monkeypatch, tmp_path: Path) -> None:
     conversations, _artifacts = _build_services(monkeypatch, tmp_path)
 

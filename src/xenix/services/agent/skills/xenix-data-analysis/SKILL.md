@@ -27,6 +27,7 @@ Xenix Agent has no script execution environment. Do not rely on Python, shell, l
 - `data.peek` for schema, preview rows, field summaries, and small samples.
 - `data.query` for full-data computation through read-only DuckDB SQL.
 - `data.transform` when a chart or report needs a durable derived table.
+- `data.tokenize` only after activating `xenix-data-preprocessing`, when raw Chinese text must be segmented upstream for word clouds.
 - `analysis.graph` for bounded charts or word clouds from chart-ready datasets.
 
 The language model is the orchestration and interpretation layer. The tools are the execution layer.
@@ -48,12 +49,13 @@ The language model is the orchestration and interpretation layer. The tools are 
 3. Use `data.query` for profiling: row count, missingness, cardinality, numeric ranges, categorical distributions, date ranges, duplicates, target distribution, and entity-item structure where relevant.
 4. Identify the likely business scene, unit of analysis, key metrics, time fields, subject-item candidates, and data quality blockers.
 5. If data quality blocks interpretation, activate `xenix-data-preprocessing`; if prediction/modeling is the true task, activate `xenix-data-modeling`.
-6. Load only relevant references through `agent.skill.read_reference` or `agent.skill.read_asset`.
-7. Produce a compact analysis plan: selected analysis path, required fields, SQL checks, chart calls if any, expected outputs, risk checks, and whether user confirmation is needed.
-8. Ask for confirmation only when the unit of analysis is ambiguous, the business metric is ambiguous, or a user-visible destructive/exporting action is requested.
-9. Execute through the tools.
-10. Explain returned results in management language: what the data appears to show, why it may matter, what action it supports, and what remains uncertain.
-11. Include a process trace: assumptions, selected task, fields used/excluded, SQL checks, charts, limitations, and report version.
+6. For word clouds, prepare a chart-ready frequency table first. If the source is raw Chinese text, activate `xenix-data-preprocessing` so `data.tokenize` can segment upstream before `data.query` or `data.transform` aggregates `word` and `count`.
+7. Load only relevant references through `agent.skill.read_reference` or `agent.skill.read_asset`.
+8. Produce a compact analysis plan: selected analysis path, required fields, SQL checks, chart calls if any, expected outputs, risk checks, and whether user confirmation is needed.
+9. Ask for confirmation only when the unit of analysis is ambiguous, the business metric is ambiguous, or a user-visible destructive/exporting action is requested.
+10. Execute through the tools.
+11. Explain returned results in management language: what the data appears to show, why it may matter, what action it supports, and what remains uncertain.
+12. Include a process trace: assumptions, selected task, fields used/excluded, SQL checks, charts, limitations, and report version.
 
 ## Optional references
 

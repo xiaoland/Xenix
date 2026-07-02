@@ -64,6 +64,23 @@ Use for predefined atomic cleaning operations on one registered dataset:
 
 If `operations` is absent or empty, no cleaning happens. Do not use `data.clean` as a vague instruction such as “clean everything”; provide explicit operations and parameters.
 
+### `data.tokenize`
+
+Use for service-owned Chinese text segmentation when raw text must become a durable derived dataset:
+
+- upstream preparation for word clouds;
+- text classification, text clustering, topic modeling, or similarity retrieval;
+- token-preserving analysis that should not be re-segmented ad hoc in later tools.
+
+The current tool accepts one text column plus optional identifier columns and one Xenix-owned profile, `zh_business_v1`.
+
+Choose:
+
+- `output=token_text` to preserve source rows and append `token_text` plus `token_count`;
+- `output=token_rows` to explode one token per row with `source_row_number`, optional identifiers, `token_index`, and `token`.
+
+Do not treat `data.tokenize` as a generic tokenizer wrapper. It does not expose raw tokenizer parameters or arbitrary language profiles in the current slice.
+
 ### `data.transform`
 
 Use for SQL-derived datasets:
@@ -94,9 +111,10 @@ Do not include identifiers, post-outcome fields, target duplicates, or sensitive
 2. `data.query` to profile quality and candidate roles.
 3. `data.clean.metadata` to confirm supported cleaning operations.
 4. `data.clean` for explicit atomic cleaning.
-5. `data.transform` for derived features, joins, grain changes, and chart/model-ready datasets.
-6. `data.feature.select` when handing off to modeling.
-7. `data.peek` or `data.query` to validate the result.
+5. `data.tokenize` when raw Chinese text must be segmented into a stable derived dataset.
+6. `data.transform` for derived features, joins, grain changes, and chart/model-ready datasets.
+7. `data.feature.select` when handing off to modeling.
+8. `data.peek` or `data.query` to validate the result.
 
 ## Output Discipline
 

@@ -213,6 +213,11 @@ miss delayed ML imports: PyInstaller may include a package's Python modules in
 are examples of dependency families that need this treatment when first-party
 workflows depend on them.
 
+Current smoke coverage intentionally exercises the strict Polars CSV and XLSX
+read paths before higher-level dataset inspection or profiling code runs. This
+keeps packaged builds from silently shipping with a missing or mismatched
+`polars-runtime-*` binary while other features still appear healthy.
+
 When adding or upgrading an ML/data-science dependency, add or keep a packaged
 verification path that performs the smallest meaningful runtime exercise:
 import the public API used by Xenix, construct the estimator or client, and for
@@ -257,6 +262,7 @@ Smoke verification should confirm that these directories are created in a fresh 
 - If language switching fails in a packaged app, verify that `src/xenix/translations/*.qm` were rebuilt and copied into `xenix/translations`.
 - If DuckDB-backed tools fail only in the packaged app, rerun `pdm run smoke-package` and inspect whether PyInstaller collected DuckDB's package metadata and native library.
 - If an ML/data-science dependency fails only in the packaged app, inspect `build/xenix/COLLECT-00.toc` and `dist/xenix/_internal/` for package-local native files. Compare them with `PyInstaller.utils.hooks.collect_dynamic_libs("<package>")` and package metadata/data requirements. Do not assume that a successful Python-module import during analysis means the package's DLLs, `.pyd` files, BLAS/OpenMP runtimes, or package data were collected.
+- If dataset inspection or `data.peek` reports `tabular_runtime_unavailable`, verify that `polars` and `polars-runtime-*` resolve to the same version in the active environment. Close running Xenix/Python processes that may keep old binaries loaded, then run `pdm sync -d --clean` and retry.
 - If `analysis.graph` fails only in the PyInstaller windowed package, separate the renderer path first: Vega charts still go through `vl-convert-python`, while `wordcloud_spec` goes through `wordcloud` plus a real font file. Local minimal packaging tests showed that `vl_convert` SVG conversion can work in a console bundle but hang or fail with `oneshot canceled` in a windowed bundle that has no Windows console. Xenix allocates a temporary hidden console around the Vega converter call in frozen Windows builds, then releases it after rendering. Keep `smoke-package` covering both Vega rendering and dedicated word-cloud rendering so this boundary does not regress.
 - If an SSH worker setup fails, inspect `config/ml_workers.json`, the Xenix-managed `Host xenix.*` block in `~/.ssh/config`, and the remote root permissions. Do not add passwords, passphrases, or private-key material to Xenix config.
 - If you need an isolated local run, set `XENIX_APP_HOME` to an empty directory or use the VSCode workspace-home launch profile.

@@ -1,4 +1,5 @@
 from pathlib import Path
+import xml.etree.ElementTree as ET
 
 import pytest
 
@@ -315,6 +316,29 @@ def test_analysis_graph_service_renders_wordcloud_from_wordcloud_spec(monkeypatc
     assert "ERROR" not in svg
 
 
+def test_analysis_graph_wordcloud_title_keeps_single_full_background_rect(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    source = _write_terms_csv(tmp_path)
+
+    result = AnalysisGraphService(paths).graph_dataset(
+        GraphDatasetInput(
+            source_path=str(source.resolve()),
+            dataset_name="Terms",
+            wordcloud_spec=_wordcloud_spec(),
+        )
+    )
+    root = ET.fromstring(Path(result.output_path).read_text(encoding="utf-8"))
+
+    background_rects = [
+        element
+        for element in root.iter(f"{{{analysis_graph_module._SVG_NS}}}rect")
+        if element.attrib.get("width") == "100%" and element.attrib.get("height") == "100%"
+    ]
+
+    assert len(background_rects) == 1
+
+
 def test_analysis_graph_wordcloud_trims_to_top_80_terms(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
@@ -329,7 +353,28 @@ def test_analysis_graph_wordcloud_trims_to_top_80_terms(monkeypatch, tmp_path: P
     )
 
     assert result.graph_metadata["rendered_row_count"] == 80
+    assert result.graph_metadata["wordcloud_options"]["font_size_range"] == [10, 42]
     assert any("top 80 terms" in warning for warning in result.graph_metadata["warnings"])
+
+
+def test_analysis_graph_wordcloud_uses_dense_font_range_for_medium_term_count(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    source = _write_many_terms_csv(tmp_path, total_terms=45)
+
+    result = AnalysisGraphService(paths).graph_dataset(
+        GraphDatasetInput(
+            source_path=str(source.resolve()),
+            dataset_name="Terms",
+            wordcloud_spec=_wordcloud_spec(),
+        )
+    )
+
+    assert result.graph_metadata["rendered_row_count"] == 45
+    assert result.graph_metadata["wordcloud_options"]["font_size_range"] == [10, 42]
 
 
 def test_analysis_graph_wordcloud_supports_semantic_color_field(monkeypatch, tmp_path: Path) -> None:

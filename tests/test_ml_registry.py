@@ -17,7 +17,7 @@ from xenix.services.storage.models import ProblemKind
 def test_model_catalog_exposes_json_schema_and_model_axes() -> None:
     catalog = list_model_catalog()
 
-    assert len(catalog) == 41
+    assert len(catalog) == 45
     assert all(isinstance(entry, ModelCatalogEntry) for entry in catalog)
     assert all(entry.model_family for entry in catalog)
     assert all(entry.model_task_kind for entry in catalog)
@@ -145,6 +145,39 @@ def test_model_catalog_exposes_json_schema_and_model_axes() -> None:
     assert recommender.model_task_kind is ModelTaskKind.RECOMMENDER
     assert [role.name for role in recommender.train_role_schema.roles] == ["user", "item", "rating"]
     assert [role.name for role in recommender.apply_role_schema.roles] == ["item"]
+    text_classifier = get_model_catalog_entry("text.classification.logistic_regression_tfidf")
+    assert text_classifier.problem_kind is ProblemKind.CLASSIFICATION
+    assert text_classifier.evaluation_kind is EvaluationKind.CLASSIFICATION
+    assert text_classifier.model_family is ModelFamily.TEXT_ANALYSIS
+    assert text_classifier.model_task_kind is ModelTaskKind.PREDICTOR
+    assert [role.name for role in text_classifier.train_role_schema.roles] == ["text", "target"]
+    assert [role.name for role in text_classifier.apply_role_schema.roles] == ["text"]
+    assert text_classifier.param_grid_schema is not None
+    text_clustering = get_model_catalog_entry("text.clustering.kmeans_tfidf")
+    assert text_clustering.problem_kind is ProblemKind.CLUSTERING
+    assert text_clustering.evaluation_kind is EvaluationKind.SUMMARY
+    assert text_clustering.summary_metric_name == "cluster_count"
+    assert text_clustering.model_family is ModelFamily.TEXT_ANALYSIS
+    assert text_clustering.model_task_kind is ModelTaskKind.SEGMENTER
+    assert text_clustering.supports_hyperparameter_tuning is False
+    assert [role.name for role in text_clustering.train_role_schema.roles] == ["text"]
+    text_topic = get_model_catalog_entry("text.topic_modeling.lda")
+    assert text_topic.problem_kind is None
+    assert text_topic.evaluation_kind is EvaluationKind.SUMMARY
+    assert text_topic.summary_metric_name == "topic_count"
+    assert text_topic.model_family is ModelFamily.TEXT_ANALYSIS
+    assert text_topic.model_task_kind is ModelTaskKind.SEGMENTER
+    assert text_topic.supports_hyperparameter_tuning is False
+    assert [role.name for role in text_topic.train_role_schema.roles] == ["text"]
+    text_similarity = get_model_catalog_entry("text.similarity.tfidf_cosine")
+    assert text_similarity.problem_kind is None
+    assert text_similarity.evaluation_kind is EvaluationKind.SUMMARY
+    assert text_similarity.summary_metric_name == "match_count"
+    assert text_similarity.model_family is ModelFamily.TEXT_ANALYSIS
+    assert text_similarity.model_task_kind is ModelTaskKind.RECOMMENDER
+    assert text_similarity.supports_hyperparameter_tuning is False
+    assert [role.name for role in text_similarity.train_role_schema.roles] == ["text", "text_id"]
+    assert [role.name for role in text_similarity.apply_role_schema.roles] == ["text"]
 
 
 def test_clustering_policy_uses_non_split_metric_defaults() -> None:

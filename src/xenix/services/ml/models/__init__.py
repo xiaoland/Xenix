@@ -32,6 +32,12 @@ from .regression import (
     RidgeRegressionService,
     SVRRegressionService,
 )
+from .text_analysis import (
+    TokenizedTextClassificationService,
+    TokenizedTextClusteringService,
+    TokenizedTextSimilarityService,
+    TokenizedTextTopicModelingService,
+)
 
 __all__ = [
     "AdaBoostClassificationService",
@@ -64,4 +70,8 @@ __all__ = [
     "SelfTrainingClassificationService",
     "SVCClassificationService",
     "SVRRegressionService",
+    "TokenizedTextClassificationService",
+    "TokenizedTextClusteringService",
+    "TokenizedTextTopicModelingService",
+    "TokenizedTextSimilarityService",
 ]

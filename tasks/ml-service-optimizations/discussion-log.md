@@ -584,3 +584,89 @@
 - Trained model metadata now records:
   - `evaluation_model_training_scope="holdout_train_split"`;
   - `apply_model_training_scope="all_eligible_rows"`.
+
+## Slice 5 - Text Analysis Capability Intake
+
+### User Claim
+
+- Organize `tasks/ml-service-optimizations/assets/text_analysis`.
+- The core goal is to bring several text-analysis model capabilities into the native product surface instead of leaving them as an isolated demo bundle.
+
+### Initial Classification
+
+- Intent: introduce new productized analysis/model capability around text data.
+- Current mode: Explore first; do not mutate durable source until the user explicitly says to start.
+- Likely durable owners:
+  - model catalog and execution contracts under `src/xenix/services/ml/`;
+  - Agent-facing model metadata and tool projection under `src/xenix/services/agent/tools.py`;
+  - durable capability wording under `docs/20-product-tdd/` and `docs/30-unit-tdd/`.
+
+### Exploration Findings
+
+- `tasks/ml-service-optimizations/assets/text_analysis/02_text_analysis_all.py` is one monolithic demo pipeline, not a product contract.
+- The demo bundle currently covers these capability atoms:
+  - text cleaning and Chinese segmentation via `jieba`;
+  - word frequency;
+  - TF-IDF keywords;
+  - word cloud;
+  - co-occurrence pairs;
+  - lexicon-style sentiment;
+  - aspect sentiment;
+  - LDA topic keywords;
+  - TF-IDF + KMeans text clustering;
+  - TF-IDF + logistic-regression text classification;
+  - TF-IDF cosine-similarity retrieval;
+  - simple extractive summary;
+  - rule-based information extraction.
+- Current native ML Service does not yet have a text-analysis family or text-vectorization pipeline.
+- Existing catalog is still centered on:
+  - supervised tabular models;
+  - clustering/anomaly analyzers;
+  - association rules;
+  - rating-style recommendation.
+- Some demo outputs should not be forced into the model catalog because they are better expressed as data-analysis flows:
+  - word frequency;
+  - TF-IDF keyword ranking;
+  - co-occurrence tables;
+  - word cloud rendering.
+- Some demo outputs are closer to productizable analyzer/model capabilities:
+  - topic modeling;
+  - text clustering;
+  - text classification;
+  - text similarity retrieval.
+- Some demo outputs are currently heuristic and would need a stronger product contract before being called “model capabilities”:
+  - lexicon sentiment;
+  - aspect sentiment;
+  - extractive summary;
+  - rule-based information extraction.
+
+### First-Principles Recommendation
+
+- Separate “text analysis workflow” from “model catalog” instead of porting the demo script as-is.
+- Keep frequency/keyword/word-cloud/co-occurrence in the data-analysis + graphing stack.
+- Introduce productized text model capability only where the current ML Service shape can defend it:
+  - vectorize text;
+  - fit/store/apply a model or analyzer;
+  - return bounded structured outputs.
+- Recommended first intake slice:
+  - text classification with TF-IDF + supervised classifier;
+  - text clustering with TF-IDF + KMeans;
+  - topic modeling with vectorizer + LDA;
+  - text similarity retrieval with stored vectorizer/index contract.
+- Defer sentiment/aspect-summary/extraction until the dependency and output contracts are explicit enough to avoid a pile of brittle heuristics in the durable model catalog.
+
+### Open Questions
+
+- Should these be exposed as a new `text_analysis` model family, or should they be folded into existing family names with text-specific guidance?
+- What is the minimal input contract:
+  - one text column only;
+  - optional id column;
+  - optional label column for supervised text classification?
+- Is Chinese-first tokenization acceptable as the initial scope, or must the first contract be multilingual?
+- Should `jieba` become a durable dependency, or should tokenization stay pluggable behind a service-owned adapter?
+
+### Recommended Next Step
+
+- If the user says to start implementation, do an Impact Handshake for the first intake slice before mutating source:
+  - likely start with text classification + text clustering + topic modeling;
+  - leave sentiment/summarization/extraction for a later contract-driven slice.

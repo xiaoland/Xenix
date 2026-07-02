@@ -555,13 +555,17 @@ def build_main_window(
 
 
 def _run_smoke_checks(paths) -> None:
+    import pandas as pd
+
     from .services.analysis_graph import AnalysisGraphService, GraphDatasetInput
     from .services.data_transform import (
         DataQueryInput,
         DataQueryTransformService,
         DatasetSqlBinding,
     )
+    from .services.dataset_inspection import detect_source_format
     from .services.ml.models.regression import XGBoostRegressionService
+    from .services.tabular import load_tabular_frame
 
     duckdb_smoke_path = paths.temp / "duckdb-smoke.csv"
     duckdb_smoke_path.write_text("value\n1\n2\n", encoding="utf-8")
@@ -580,6 +584,27 @@ def _run_smoke_checks(paths) -> None:
     )
     if not result.rows or result.rows[0].get("total") != 3:
         raise RuntimeError("DuckDB smoke query failed.")
+
+    tabular_csv_smoke_path = paths.temp / "tabular-smoke.csv"
+    tabular_csv_smoke_path.write_text("label,value\nA,1\nB,2\n", encoding="utf-8")
+    csv_frame = load_tabular_frame(
+        tabular_csv_smoke_path,
+        detect_source_format(tabular_csv_smoke_path),
+    )
+    if csv_frame.height != 2 or csv_frame.width != 2:
+        raise RuntimeError("Polars CSV smoke read failed.")
+
+    tabular_xlsx_smoke_path = paths.temp / "tabular-smoke.xlsx"
+    pd.DataFrame([{"label": "A", "value": 1}, {"label": "B", "value": 2}]).to_excel(
+        tabular_xlsx_smoke_path,
+        index=False,
+    )
+    xlsx_frame = load_tabular_frame(
+        tabular_xlsx_smoke_path,
+        detect_source_format(tabular_xlsx_smoke_path),
+    )
+    if xlsx_frame.height != 2 or xlsx_frame.width != 2:
+        raise RuntimeError("Polars Excel smoke read failed.")
 
     graph_smoke_path = paths.temp / "graph-smoke.csv"
     graph_smoke_path.write_text("label,value\nA,1\nB,2\n", encoding="utf-8")

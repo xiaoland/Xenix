@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import pandas as pd
@@ -12,6 +13,7 @@ from xenix.services.dataset_service import (
     MaterializeManualApplyCsvInput,
     RegisterDatasetInput,
 )
+from xenix.services.tabular import TabularRuntimeError
 from xenix.services.ml_task_service import CompleteMLTaskInput, CreateMLTaskInput, MLTaskService
 from xenix.services.project_service import CreateProjectInput, ProjectService
 from xenix.services.storage import StorageBootstrapService
@@ -125,6 +127,45 @@ def test_dataset_service_inspects_xlsx_without_pandas_read_excel(monkeypatch, tm
     assert inspection.row_count == 2
     assert inspection.column_count == 2
     assert inspection.preview_columns == ["name", "value"]
+
+
+def test_dataset_service_wraps_tabular_runtime_failure_with_structured_error(
+    monkeypatch,
+    tmp_path: Path,
+    caplog,
+) -> None:
+    _project_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
+    dataset_file = tmp_path / "customers.csv"
+    dataset_file.write_text("age,city\n30,Shanghai\n", encoding="utf-8")
+
+    def fail_inspection(_path: Path):
+        raise TabularRuntimeError(
+            "Polars failed to read the dataset file.",
+            error_details={
+                "engine": "polars",
+                "phase": "read",
+                "package_versions": {
+                    "polars": "1.42.1",
+                    "polars-runtime-32": "1.41.2",
+                },
+            },
+        )
+
+    monkeypatch.setattr("xenix.services.dataset_service.inspect_dataset_file", fail_inspection)
+
+    with caplog.at_level(logging.ERROR, logger="xenix.services.dataset"):
+        with pytest.raises(ValidationError) as exc_info:
+            dataset_service.inspect_source_file(
+                InspectDatasetInput(source_path=str(dataset_file.resolve()))
+            )
+
+    assert "Dataset read failed during inspect_source_file" in caplog.text
+    assert exc_info.value.error_code == "tabular_runtime_unavailable"
+    assert exc_info.value.error_details["operation"] == "inspect_source_file"
+    assert exc_info.value.error_details["source_path"] == str(dataset_file.resolve())
+    assert exc_info.value.error_details["tabular"]["package_versions"]["polars-runtime-32"] == "1.41.2"
+    assert any("pdm sync -d --clean" in hint for hint in exc_info.value.repair_hints)
+    assert exc_info.value.retryable is False
 
 
 def test_dataset_service_registers_dataset_without_product_project(monkeypatch, tmp_path: Path) -> None:

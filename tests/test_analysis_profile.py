@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import pytest
+
+from xenix.exceptions import ValidationError
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.agent import ConversationStore
 from xenix.services.agent.conversation_store import CreateToolCallInput, StartTurnInput
@@ -12,6 +15,7 @@ from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
 from xenix.services.ml_service import MLService
 from xenix.services.ml_task_service import MLTaskService
 from xenix.services.storage import StorageBootstrapService
+from xenix.services.tabular import TabularRuntimeError
 
 
 def _build_runtime(monkeypatch, tmp_path: Path):
@@ -148,6 +152,45 @@ def test_data_peek_tool_profiles_by_default(monkeypatch, tmp_path: Path) -> None
     assert result.content_blocks[0]["type"] == "markdown"
     assert "# Dataset profile: Sales" in result.content_blocks[0]["text"]
     assert artifact_service.list_thread_artifacts(context.thread_id) == []
+
+
+def test_analysis_profile_service_surfaces_structured_runtime_error(
+    monkeypatch,
+    tmp_path: Path,
+    caplog,
+) -> None:
+    source = _write_mixed_csv(tmp_path)
+
+    def fail_load(*_args, **_kwargs):
+        raise TabularRuntimeError(
+            "Polars failed to read the dataset file.",
+            error_details={
+                "engine": "polars",
+                "phase": "read",
+                "package_versions": {
+                    "polars": "1.42.1",
+                    "polars-runtime-32": "1.41.2",
+                },
+            },
+        )
+
+    monkeypatch.setattr("xenix.services.analysis_profile.load_tabular_frame", fail_load)
+
+    with caplog.at_level("ERROR", logger="xenix.services.analysis_profile"):
+        with pytest.raises(ValidationError) as exc_info:
+            AnalysisProfileService().profile_dataset(
+                ProfileDatasetInput(
+                    source_path=str(source.resolve()),
+                    dataset_name="Sales",
+                )
+            )
+
+    assert "Dataset profile could not load the tabular runtime" in caplog.text
+    assert exc_info.value.error_code == "tabular_runtime_unavailable"
+    assert exc_info.value.error_details["operation"] == "analysis.profile"
+    assert exc_info.value.error_details["tabular"]["package_versions"]["polars-runtime-32"] == "1.41.2"
+    assert any("analysis=false" in hint for hint in exc_info.value.repair_hints)
+    assert exc_info.value.retryable is True
 
 
 def test_data_peek_tool_can_skip_profile(monkeypatch, tmp_path: Path) -> None:

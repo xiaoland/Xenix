@@ -706,16 +706,15 @@ class MLService:
         return feature_columns, target_columns
 
     def _validate_feature_target_projection(self, role_bindings: list[ColumnRoleBinding]) -> None:
-        feature_columns, target_columns = self._feature_target_columns(role_bindings)
-        partial_target_columns: list[str] = []
+        role_by_column: dict[str, str] = {}
         for binding in role_bindings:
-            if binding.role == "partial_target":
-                partial_target_columns = list(binding.columns)
-        label_columns = target_columns + partial_target_columns
-        if set(feature_columns) & set(label_columns):
-            raise ValidationError("Feature and label columns cannot overlap.")
-        if set(target_columns) & set(partial_target_columns):
-            raise ValidationError("Target and partial target columns cannot overlap.")
+            for column in binding.columns:
+                previous = role_by_column.get(column)
+                if previous is not None and previous != binding.role:
+                    raise ValidationError(
+                        f"Column '{column}' cannot be bound to multiple roles: '{previous}' and '{binding.role}'."
+                    )
+                role_by_column[column] = binding.role
 
     def _apply_columns_from_metadata(self, metadata: Any) -> list[str]:
         schema_roles = metadata.apply_role_schema.get("roles") if isinstance(metadata.apply_role_schema, dict) else None

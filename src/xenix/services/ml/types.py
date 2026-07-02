@@ -28,6 +28,7 @@ class ModelFamily(StrEnum):
     ANOMALY_DETECTION = "anomaly_detection"
     ASSOCIATION_RULES = "association_rules"
     RECOMMENDATION = "recommendation"
+    TEXT_ANALYSIS = "text_analysis"
 
 
 class ModelTaskKind(StrEnum):

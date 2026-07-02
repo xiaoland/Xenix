@@ -345,3 +345,26 @@
 ### Verification
 
 - Not run for this slice yet.
+
+## Slice 5 - Text Analysis Capability Intake
+
+### Task Packet Changes
+
+- Recorded the current `assets/text_analysis` bundle as a demo/reference input rather than a direct product contract.
+- Mapped the demo bundle into capability atoms and separated:
+  - analysis-flow capabilities better served by `data.query` / `data.transform` / `analysis.graph`;
+  - candidate model/analyzer capabilities that may belong in the ML catalog.
+- Recorded the recommended first intake order:
+  - text classification;
+  - text clustering;
+  - topic modeling;
+  - text similarity retrieval.
+- Recorded that sentiment/aspect-sentiment/summarization/information-extraction are currently heuristic demo outputs and should not be promoted blindly.
+
+### Source Changes
+
+- None. Source mutation is waiting for explicit user start.
+
+### Verification
+
+- Not run. No durable code or docs changed in this slice.

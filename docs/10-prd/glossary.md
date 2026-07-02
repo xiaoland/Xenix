@@ -20,7 +20,7 @@ This glossary defines product-facing terms used by Xenix Native.
 - Dataset registration: a metadata pointer to a user-managed source dataset.
 - Model: a reusable analyzer, not only a supervised estimator. It is a service-owned artifact that can be trained from declared input roles and later applied to compatible input roles.
 - Trained model: a canonical reusable analyzer artifact tracked by metadata and stored on the filesystem.
-- Model family: the product taxonomy for a reusable analyzer, such as supervised, clustering, anomaly detection, association rules, or recommendation.
+- Model family: the product taxonomy for a reusable analyzer, such as supervised, clustering, anomaly detection, association rules, recommendation, or text analysis.
 - Model task kind: the operational contract for what a reusable analyzer does when applied, such as predictor, segmenter, anomaly scorer, rule miner, or recommender.
 - ML workload: a service-backed model operation such as training, hyperparameter tuning, follow-up evaluation, or model apply.
 - ML worker pool: the local service-owned set of configured execution workers that can run ML workloads. Worker selection is an internal placement decision, not a user-facing Agent tool argument.

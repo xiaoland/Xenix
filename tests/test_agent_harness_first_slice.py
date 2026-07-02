@@ -429,6 +429,7 @@ def test_agent_harness_exposes_data_tools_when_file_is_attached(monkeypatch, tmp
     assert "analysis.lambda" not in tool_names
     assert "data.clean" in tool_names
     assert "data.clean.metadata" in tool_names
+    assert "data.tokenize" in tool_names
     assert "data.query" in tool_names
     assert "data.transform" in tool_names
     assert "data.feature.select" in tool_names
@@ -455,6 +456,7 @@ def test_agent_harness_exposes_dataset_tools_after_dataset_payload(monkeypatch, 
     assert "data.integrate" not in tool_names
     assert "data.clean" in tool_names
     assert "data.clean.metadata" in tool_names
+    assert "data.tokenize" in tool_names
     assert "data.query" in tool_names
     assert "data.transform" in tool_names
     assert "data.feature.select" in tool_names
@@ -501,6 +503,7 @@ def test_agent_harness_exposes_and_uses_data_tools_after_prior_thread_file(
     assert "analysis.lambda" not in first_tool_list
     assert "data.clean" in first_tool_list
     assert "data.clean.metadata" in first_tool_list
+    assert "data.tokenize" in first_tool_list
     assert "data.query" in first_tool_list
     assert "data.transform" in first_tool_list
     assert "data.feature.select" in first_tool_list
@@ -585,6 +588,7 @@ def test_agent_harness_model_metadata_exposes_contract_without_train_enums(monke
     assert "analysis.lambda" not in specs
     assert "data.peek" in specs
     assert "data.clean.metadata" in specs
+    assert "data.tokenize" in specs
     assert "data.feature.select" in specs
     assert "model.train" in specs
     assert "model.hyper_train" in specs
@@ -596,6 +600,11 @@ def test_agent_harness_model_metadata_exposes_contract_without_train_enums(monke
     assert "wordcloud_spec" in graph_schema["properties"]
     assert "operation" not in graph_schema["properties"]
     assert "params" not in graph_schema["properties"]
+    tokenize_schema = specs["data.tokenize"].parameters_schema
+    assert tokenize_schema["required"] == ["dataset_id", "text_column"]
+    assert tokenize_schema["properties"]["output"]["enum"] == ["token_text", "token_rows"]
+    assert tokenize_schema["properties"]["tokenizer_profile"]["enum"] == ["zh_business_v1"]
+    assert "jieba" not in str(tokenize_schema)
     model_metadata_schema = specs["model.metadata"].parameters_schema
     assert set(model_metadata_schema["properties"]) == {
         "model_key",
@@ -685,6 +694,18 @@ def test_agent_harness_model_metadata_directory_queries_return_lightweight_summa
     assert "regression.linear" in supervised_result.payload["model_keys"]
     assert "classification.logistic_regression" in supervised_result.payload["model_keys"]
     assert "clustering.kmeans" not in supervised_result.payload["model_keys"]
+    text_analysis_result = registry.execute(
+        "model.metadata",
+        {"model_family": "text_analysis"},
+        _tool_context(),
+    )
+    assert set(text_analysis_result.payload["model_keys"]) == {
+        "text.classification.logistic_regression_tfidf",
+        "text.clustering.kmeans_tfidf",
+        "text.similarity.tfidf_cosine",
+        "text.topic_modeling.lda",
+    }
+    assert text_analysis_result.payload["models"][0]["model_family"] == "text_analysis"
 
 
 def test_agent_harness_model_metadata_detail_query_returns_default_param_schema(

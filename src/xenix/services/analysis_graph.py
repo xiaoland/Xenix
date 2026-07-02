@@ -46,7 +46,7 @@ _WORDCLOUD_DEFAULT_TOP_N = 80
 _WORDCLOUD_MIN_TOP_N = 20
 _WORDCLOUD_MAX_TOP_N = 80
 _WORDCLOUD_MIN_RECOMMENDED_TERMS = 20
-_WORDCLOUD_DENSE_TERM_THRESHOLD = 60
+_WORDCLOUD_DENSE_TERM_THRESHOLD = 40
 _WORDCLOUD_DEFAULT_FONT_SIZE_RANGE = (12, 56)
 _WORDCLOUD_DENSE_FONT_SIZE_RANGE = (10, 42)
 _WORDCLOUD_DEFAULT_PREFER_HORIZONTAL = 0.85
@@ -59,6 +59,7 @@ _WORDCLOUD_RANDOM_STATE = 42
 _WORDCLOUD_BACKGROUND_COLOR = "white"
 _WORDCLOUD_MAX_FAILED_TERM_RATIO = 0.2
 _WORDCLOUD_MAX_FAILED_TERM_COUNT = 8
+_WORDCLOUD_MARGIN = 1
 _WORDCLOUD_TITLE_HEIGHT = 40
 _WORDCLOUD_TITLE_Y = 26
 _WORDCLOUD_TITLE_FONT_SIZE = 18
@@ -88,11 +89,13 @@ class AnalysisGraphValidationError(ValidationError):
         repair_hints: list[str] | None = None,
         retryable: bool | None = None,
     ) -> None:
-        super().__init__(message)
-        self.error_code = error_code
-        self.error_details = error_details or {}
-        self.repair_hints = repair_hints or []
-        self.retryable = retryable
+        super().__init__(
+            message,
+            error_code=error_code,
+            error_details=error_details,
+            repair_hints=repair_hints,
+            retryable=retryable,
+        )
 
 
 class GraphDatasetInput(SQLModel):
@@ -735,7 +738,7 @@ class AnalysisGraphService:
                 font_path=str(font_path) if font_path is not None else None,
                 color_func=color_func,
                 random_state=_WORDCLOUD_RANDOM_STATE,
-                margin=2,
+                margin=_WORDCLOUD_MARGIN,
                 collocations=False,
                 normalize_plurals=False,
             )
@@ -826,6 +829,8 @@ class AnalysisGraphService:
         content_children = [child for child in list(root) if child.tag not in _SVG_STYLE_TAGS]
         for child in content_children:
             root.remove(child)
+            if self._is_wordcloud_background_rect(child):
+                continue
             content_group.append(child)
 
         total_height = height + _WORDCLOUD_TITLE_HEIGHT
@@ -862,6 +867,19 @@ class AnalysisGraphService:
         root.insert(insertion_index + 1, title_element)
         root.append(content_group)
         return ET.tostring(root, encoding="unicode")
+
+    def _is_wordcloud_background_rect(self, element: ET.Element) -> bool:
+        if element.tag != f"{{{_SVG_NS}}}rect":
+            return False
+        width = str(element.attrib.get("width") or "").strip()
+        height = str(element.attrib.get("height") or "").strip()
+        if width != "100%" or height != "100%":
+            return False
+        style = str(element.attrib.get("style") or "").replace(" ", "").lower()
+        if f"fill:{_WORDCLOUD_BACKGROUND_COLOR}".lower() in style:
+            return True
+        fill = str(element.attrib.get("fill") or "").strip().lower()
+        return fill == _WORDCLOUD_BACKGROUND_COLOR.lower()
 
     def _write_svg_output(self, *, svg: str, dataset_name: str, suffix: str) -> Path:
         output_dir = self._paths.artifacts / "analysis" / "graphs"

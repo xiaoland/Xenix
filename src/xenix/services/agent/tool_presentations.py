@@ -82,6 +82,13 @@ TOOL_PRESENTATIONS: dict[str, ToolPresentation] = {
         failure_action="load cleaning metadata",
         cancellation_summary="Cancelled cleaning metadata lookup",
     ),
+    "data.tokenize": ToolPresentation(
+        icon_key="text",
+        pending_summary="Tokenizing text...",
+        success_summary="Tokenized text",
+        failure_action="tokenize text",
+        cancellation_summary="Cancelled text tokenization",
+    ),
     "data.query": ToolPresentation(
         icon_key="table-search",
         pending_summary="Querying dataset...",

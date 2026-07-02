@@ -43,6 +43,12 @@ from .models.regression import (
     SVRRegressionService,
     XGBoostRegressionService,
 )
+from .models.text_analysis import (
+    TokenizedTextClassificationService,
+    TokenizedTextClusteringService,
+    TokenizedTextSimilarityService,
+    TokenizedTextTopicModelingService,
+)
 from .types import ModelCatalogEntry, ModelServiceBase
 
 _MODEL_SERVICES: dict[str, type[ModelServiceBase]] = {
@@ -89,6 +95,10 @@ _MODEL_SERVICES: dict[str, type[ModelServiceBase]] = {
         ApyoriAssociationRulesService,
         MlxtendAssociationRulesService,
         ItemSimilarityRecommendationService,
+        TokenizedTextClassificationService,
+        TokenizedTextClusteringService,
+        TokenizedTextTopicModelingService,
+        TokenizedTextSimilarityService,
     )
 }
 

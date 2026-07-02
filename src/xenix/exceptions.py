@@ -22,6 +22,25 @@ class NotFoundError(XenixError):
 class ValidationError(XenixError):
     """Raised when user-provided input is invalid."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        error_code: str | None = None,
+        error_details: dict | None = None,
+        repair_hints: list[str] | None = None,
+        retryable: bool | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.error_code = error_code.strip() if isinstance(error_code, str) and error_code.strip() else None
+        self.error_details = dict(error_details) if isinstance(error_details, dict) and error_details else {}
+        self.repair_hints = [
+            str(hint).strip()
+            for hint in (repair_hints or [])
+            if str(hint).strip()
+        ]
+        self.retryable = retryable if isinstance(retryable, bool) else None
+
 
 class InvalidStateTransitionError(XenixError):
     """Raised when an entity transition violates the state contract."""

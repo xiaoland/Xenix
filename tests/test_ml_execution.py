@@ -486,6 +486,278 @@ def test_recommendation_train_and_apply_run(monkeypatch, tmp_path: Path) -> None
     assert "recommended_item" in result_lines[0]
 
 
+def test_text_classification_train_evaluate_and_apply_run(monkeypatch, tmp_path: Path) -> None:
+    project_service, dataset_service, _ml_task_service, ml_service = _build_services(monkeypatch, tmp_path)
+    project = project_service.create_project(CreateProjectInput(name="Reviews"))
+    dataset_file = tmp_path / "tokenized-reviews.csv"
+    dataset_file.write_text(
+        "review_id,token_text,label\n"
+        "1,退款 售后 速度 慢,bad\n"
+        "2,退货 处理 流程 慢,bad\n"
+        "3,配送 延迟 包装 差,bad\n"
+        "4,客服 冷淡 体验 差,bad\n"
+        "5,服务 热情 环境 舒适,good\n"
+        "6,味道 新鲜 价格 合理,good\n"
+        "7,配送 及时 包装 完整,good\n"
+        "8,客服 专业 回复 及时,good\n"
+        "9,售后 退款 复杂,bad\n"
+        "10,环境 干净 服务 贴心,good\n",
+        encoding="utf-8",
+    )
+    dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Tokenized Reviews")
+    binding = _create_role_binding(
+        ml_service,
+        dataset.id,
+        "text.classification.logistic_regression_tfidf",
+        [
+            {"role": "text", "columns": ["token_text"], "role_kind": "single_column"},
+            {"role": "target", "columns": ["label"], "role_kind": "single_column"},
+        ],
+    )
+
+    fit_task = ml_service.fit_with_evaluate(
+        FitWithEvaluateInput(
+            binding_id=binding.id,
+            run_name="Review sentiment",
+            model_key="text.classification.logistic_regression_tfidf",
+            params={"max_features": 200, "ngram_max": 1, "c": 1.0, "max_iter": 300},
+        )
+    )
+
+    tasks = _wait_for_terminal_dataset_tasks(ml_service, dataset.id, expected_count=2)
+    trained_models = _wait_for_dataset_trained_models(
+        ml_service,
+        dataset.id,
+        expected_count=1,
+        require_evaluation=True,
+    )
+    fit_details = ml_service.get_task_details(fit_task.id)
+    apply_input = tmp_path / "tokenized-reviews-apply.csv"
+    apply_input.write_text(
+        "token_text\n"
+        "退款 售后 处理 慢\n"
+        "环境 干净 服务 热情\n",
+        encoding="utf-8",
+    )
+    apply_task = ml_service.apply(
+        ApplyWithFilesInput(
+            trained_model_id=trained_models[0].id,
+            input_files=[str(apply_input.resolve())],
+        )
+    )
+    tasks_after_apply = _wait_for_terminal_dataset_tasks(ml_service, dataset.id, expected_count=3)
+    apply_result_dataset = dataset_service.get_dataset_by_ml_task(apply_task.id)
+    metadata = parse_trained_model_metadata(trained_models[0].metadata_payload)
+
+    assert {task.task_type for task in tasks} == {MLTaskType.FIT, MLTaskType.EVALUATE}
+    assert all(task.status is MLTaskStatus.SUCCEEDED for task in tasks_after_apply)
+    assert fit_details.task.result_payload["result_summary"]["text_column"] == "token_text"
+    assert fit_details.task.result_payload["result_summary"]["target_column"] == "label"
+    assert metadata is not None
+    assert metadata.model_family == "text_analysis"
+    assert metadata.model_task_kind == "predictor"
+    assert metadata.evaluation_kind == "classification"
+    assert [role["name"] for role in metadata.apply_role_schema["roles"]] == ["text"]
+    assert apply_result_dataset is not None
+    result_lines = Path(apply_result_dataset.source_path).read_text(encoding="utf-8").splitlines()
+    assert result_lines[0].split(",") == ["token_text", "prediction", "prediction_score"]
+
+
+def test_text_clustering_train_and_apply_run(monkeypatch, tmp_path: Path) -> None:
+    project_service, dataset_service, _ml_task_service, ml_service = _build_services(monkeypatch, tmp_path)
+    project = project_service.create_project(CreateProjectInput(name="Reviews"))
+    dataset_file = tmp_path / "clustered-text.csv"
+    dataset_file.write_text(
+        "token_text\n"
+        "退款 售后 处理\n"
+        "退货 退款 流程\n"
+        "售后 响应 延迟\n"
+        "环境 舒适 服务\n"
+        "味道 新鲜 菜品\n"
+        "服务 热情 干净\n",
+        encoding="utf-8",
+    )
+    dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Clustered Text")
+    binding = _create_role_binding(
+        ml_service,
+        dataset.id,
+        "text.clustering.kmeans_tfidf",
+        [{"role": "text", "columns": ["token_text"], "role_kind": "single_column"}],
+    )
+
+    fit_task = ml_service.fit_with_evaluate(
+        FitWithEvaluateInput(
+            binding_id=binding.id,
+            run_name="Text clustering",
+            model_key="text.clustering.kmeans_tfidf",
+            params={"n_clusters": 2, "max_features": 200, "ngram_max": 1, "max_iter": 100},
+        )
+    )
+
+    tasks = _wait_for_terminal_dataset_tasks(ml_service, dataset.id, expected_count=1)
+    trained_models = ml_service.list_dataset_trained_models(dataset.id)
+    fit_details = ml_service.get_task_details(fit_task.id)
+    apply_input = tmp_path / "clustered-text-apply.csv"
+    apply_input.write_text(
+        "token_text\n"
+        "退款 售后 慢\n"
+        "环境 干净 舒适\n",
+        encoding="utf-8",
+    )
+    apply_task = ml_service.apply(
+        ApplyWithFilesInput(
+            trained_model_id=trained_models[0].id,
+            input_files=[str(apply_input.resolve())],
+        )
+    )
+    tasks_after_apply = _wait_for_terminal_dataset_tasks(ml_service, dataset.id, expected_count=2)
+    apply_result_dataset = dataset_service.get_dataset_by_ml_task(apply_task.id)
+    metadata = parse_trained_model_metadata(trained_models[0].metadata_payload)
+
+    assert len(tasks) == 1
+    assert tasks[0].task_type is MLTaskType.FIT
+    assert all(task.status is MLTaskStatus.SUCCEEDED for task in tasks_after_apply)
+    assert fit_details.task.result_payload["result_summary"]["cluster_count"] == 2
+    assert metadata is not None
+    assert metadata.model_family == "text_analysis"
+    assert metadata.model_task_kind == "segmenter"
+    assert [role["name"] for role in metadata.apply_role_schema["roles"]] == ["text"]
+    assert apply_result_dataset is not None
+    result_lines = Path(apply_result_dataset.source_path).read_text(encoding="utf-8").splitlines()
+    assert "cluster_id" in result_lines[0]
+
+
+def test_text_topic_modeling_train_and_apply_run(monkeypatch, tmp_path: Path) -> None:
+    project_service, dataset_service, _ml_task_service, ml_service = _build_services(monkeypatch, tmp_path)
+    project = project_service.create_project(CreateProjectInput(name="Topics"))
+    dataset_file = tmp_path / "topics.csv"
+    dataset_file.write_text(
+        "token_text\n"
+        "退款 售后 处理\n"
+        "退货 售后 退款\n"
+        "售后 响应 延迟\n"
+        "环境 舒适 服务\n"
+        "味道 新鲜 菜品\n"
+        "服务 热情 干净\n",
+        encoding="utf-8",
+    )
+    dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Topics")
+    binding = _create_role_binding(
+        ml_service,
+        dataset.id,
+        "text.topic_modeling.lda",
+        [{"role": "text", "columns": ["token_text"], "role_kind": "single_column"}],
+    )
+
+    fit_task = ml_service.fit_with_evaluate(
+        FitWithEvaluateInput(
+            binding_id=binding.id,
+            run_name="Topic modeling",
+            model_key="text.topic_modeling.lda",
+            params={"topic_count": 2, "max_features": 200, "max_iter": 10, "top_terms_per_topic": 5},
+        )
+    )
+
+    tasks = _wait_for_terminal_dataset_tasks(ml_service, dataset.id, expected_count=1)
+    trained_models = ml_service.list_dataset_trained_models(dataset.id)
+    fit_details = ml_service.get_task_details(fit_task.id)
+    apply_input = tmp_path / "topics-apply.csv"
+    apply_input.write_text(
+        "token_text\n"
+        "退款 售后 流程\n"
+        "环境 服务 热情\n",
+        encoding="utf-8",
+    )
+    apply_task = ml_service.apply(
+        ApplyWithFilesInput(
+            trained_model_id=trained_models[0].id,
+            input_files=[str(apply_input.resolve())],
+        )
+    )
+    tasks_after_apply = _wait_for_terminal_dataset_tasks(ml_service, dataset.id, expected_count=2)
+    apply_result_dataset = dataset_service.get_dataset_by_ml_task(apply_task.id)
+    metadata = parse_trained_model_metadata(trained_models[0].metadata_payload)
+
+    assert len(tasks) == 1
+    assert tasks[0].task_type is MLTaskType.FIT
+    assert all(task.status is MLTaskStatus.SUCCEEDED for task in tasks_after_apply)
+    assert fit_details.task.result_payload["result_summary"]["topic_count"] == 2
+    assert metadata is not None
+    assert metadata.model_family == "text_analysis"
+    assert metadata.model_task_kind == "segmenter"
+    assert [role["name"] for role in metadata.apply_role_schema["roles"]] == ["text"]
+    assert apply_result_dataset is not None
+    result_lines = Path(apply_result_dataset.source_path).read_text(encoding="utf-8").splitlines()
+    assert "dominant_topic" in result_lines[0]
+    assert "topic_score" in result_lines[0]
+
+
+def test_text_similarity_train_and_apply_run(monkeypatch, tmp_path: Path) -> None:
+    project_service, dataset_service, _ml_task_service, ml_service = _build_services(monkeypatch, tmp_path)
+    project = project_service.create_project(CreateProjectInput(name="Similarity"))
+    dataset_file = tmp_path / "similarity.csv"
+    dataset_file.write_text(
+        "text_id,token_text\n"
+        "r1,退款 售后 处理\n"
+        "r2,退款 售后 速度\n"
+        "r3,环境 舒适 服务\n"
+        "r4,味道 新鲜 菜品\n",
+        encoding="utf-8",
+    )
+    dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Similarity")
+    binding = _create_role_binding(
+        ml_service,
+        dataset.id,
+        "text.similarity.tfidf_cosine",
+        [
+            {"role": "text", "columns": ["token_text"], "role_kind": "single_column"},
+            {"role": "text_id", "columns": ["text_id"], "role_kind": "single_column"},
+        ],
+    )
+
+    ml_service.fit_with_evaluate(
+        FitWithEvaluateInput(
+            binding_id=binding.id,
+            run_name="Similarity retrieval",
+            model_key="text.similarity.tfidf_cosine",
+            params={"max_features": 200, "ngram_max": 1, "top_k": 2, "min_similarity": 0.0},
+        )
+    )
+
+    tasks = _wait_for_terminal_dataset_tasks(ml_service, dataset.id, expected_count=1)
+    trained_models = ml_service.list_dataset_trained_models(dataset.id)
+    apply_input = tmp_path / "similarity-apply.csv"
+    apply_input.write_text(
+        "token_text\n"
+        "退款 售后 速度\n"
+        "环境 服务 周到\n",
+        encoding="utf-8",
+    )
+    apply_task = ml_service.apply(
+        ApplyWithFilesInput(
+            trained_model_id=trained_models[0].id,
+            input_files=[str(apply_input.resolve())],
+        )
+    )
+    tasks_after_apply = _wait_for_terminal_dataset_tasks(ml_service, dataset.id, expected_count=2)
+    apply_result_dataset = dataset_service.get_dataset_by_ml_task(apply_task.id)
+    metadata = parse_trained_model_metadata(trained_models[0].metadata_payload)
+
+    assert len(tasks) == 1
+    assert tasks[0].task_type is MLTaskType.FIT
+    assert all(task.status is MLTaskStatus.SUCCEEDED for task in tasks_after_apply)
+    assert metadata is not None
+    assert metadata.model_family == "text_analysis"
+    assert metadata.model_task_kind == "recommender"
+    assert [role["name"] for role in metadata.apply_role_schema["roles"]] == ["text"]
+    assert apply_result_dataset is not None
+    result_lines = Path(apply_result_dataset.source_path).read_text(encoding="utf-8").splitlines()
+    assert result_lines[0].split(",")[:4] == ["source_file", "input_row_number", "query_text", "rank"]
+    assert "matched_text_id" in result_lines[0]
+    assert any(",r2," in line for line in result_lines[1:])
+    assert any(",r3," in line for line in result_lines[1:])
+
+
 def test_bulk_tuning_creates_one_tuning_task_per_model_and_follow_up_evaluations(
     monkeypatch,
     tmp_path: Path,

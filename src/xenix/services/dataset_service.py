@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import codecs
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -30,10 +31,14 @@ from .storage.models import (
     TrainedModelRow,
 )
 from .storage.repositories import DatasetRepository, ProjectRepository
+from .tabular import TabularRuntimeError
 
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+LOGGER = logging.getLogger("xenix.services.dataset")
 
 
 class RegisterDatasetInput(SQLModel):
@@ -132,7 +137,12 @@ class DatasetService:
         except ValidationError:
             raise
         except Exception as exc:  # pragma: no cover - exercised by failure surface
-            raise ValidationError("Unable to read dataset file.") from exc
+            raise self._dataset_read_failure(
+                source_path=source_path,
+                operation="inspect_source_file",
+                exc=exc,
+                message="Unable to read dataset file.",
+            ) from exc
 
     def inspect_attachment_metadata(self, input_data: InspectDatasetInput) -> DatasetAttachmentMetadata:
         source_path = Path(input_data.source_path).expanduser()
@@ -145,7 +155,12 @@ class DatasetService:
         except ValidationError:
             raise
         except Exception as exc:  # pragma: no cover - exercised by failure surface
-            raise ValidationError("Unable to read dataset file.") from exc
+            raise self._dataset_read_failure(
+                source_path=source_path,
+                operation="inspect_attachment_metadata",
+                exc=exc,
+                message="Unable to read dataset file.",
+            ) from exc
 
     def register_dataset_attachment(self, input_data: RegisterDatasetInput) -> RegisteredDatasetAttachment:
         dataset = self.register_dataset(input_data)
@@ -291,7 +306,48 @@ class DatasetService:
         try:
             return load_dataframe(source_path, source_format)
         except Exception as exc:  # pragma: no cover - exercised by failure surface
-            raise ValidationError("Unable to read dataset file for export.") from exc
+            raise self._dataset_read_failure(
+                source_path=source_path,
+                operation="export_dataset_copy",
+                exc=exc,
+                message="Unable to read dataset file for export.",
+            ) from exc
+
+    def _dataset_read_failure(
+        self,
+        *,
+        source_path: Path,
+        operation: str,
+        exc: Exception,
+        message: str,
+    ) -> ValidationError:
+        source_format = detect_source_format(source_path)
+        LOGGER.exception("Dataset read failed during %s for %s.", operation, source_path)
+        error_details = {
+            "operation": operation,
+            "source_path": str(source_path),
+            "source_format": source_format.value,
+            "exception_type": type(exc).__name__,
+            "exception_message": str(exc),
+        }
+        repair_hints = [
+            "Verify that the file is readable and matches its extension, then retry.",
+        ]
+        retryable = False
+        if isinstance(exc, TabularRuntimeError):
+            error_details["tabular"] = exc.error_details
+            repair_hints = [
+                "Close running Xenix or Python processes that may keep old binaries loaded, then repair the environment.",
+                "Run `pdm sync -d --clean` from the project root so `polars` and `polars-runtime-*` are reinstalled to the same version.",
+            ]
+            message = "Unable to read dataset file because the Polars runtime is unavailable."
+        return ValidationError(
+            message,
+            error_code="tabular_runtime_unavailable" if isinstance(exc, TabularRuntimeError) else "dataset_file_read_failed",
+            error_details=error_details,
+            repair_hints=repair_hints,
+            retryable=retryable,
+        )
 
     def _normalize_csv_encoding(self, encoding_name: str) -> str:
         normalized = encoding_name.strip()

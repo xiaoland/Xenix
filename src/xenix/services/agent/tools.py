@@ -21,6 +21,7 @@ from ..artifact_service import (
     build_artifact_markdown_link,
 )
 from ..data_cleaning import CleanDatasetInput, DataCleaningService, cleaning_operation_metadata
+from ..data_tokenization import DataTokenizationService, TokenizeDatasetInput
 from ..data_transform import (
     DataQueryInput,
     DataQueryTransformService,
@@ -104,6 +105,7 @@ class AgentToolRegistry:
         data_transform_service: DataQueryTransformService,
         ml_service: MLService,
         artifact_service: ArtifactService,
+        data_tokenization_service: DataTokenizationService | None = None,
         analysis_profile_service: AnalysisProfileService | None = None,
         analysis_graph_service: AnalysisGraphService | None = None,
         analysis_lambda_service: AnalysisLambdaService | None = None,
@@ -111,6 +113,7 @@ class AgentToolRegistry:
         self._paths = paths
         self._dataset_service = dataset_service
         self._data_cleaning_service = data_cleaning_service
+        self._data_tokenization_service = data_tokenization_service or DataTokenizationService(paths)
         self._data_transform_service = data_transform_service
         self._analysis_profile_service = analysis_profile_service or AnalysisProfileService()
         self._analysis_graph_service = analysis_graph_service or AnalysisGraphService(paths)
@@ -129,6 +132,7 @@ class AgentToolRegistry:
                 # self._build_analysis_lambda_tool(),
                 self._build_data_clean_tool(),
                 self._build_data_clean_metadata_tool(),
+                self._build_data_tokenize_tool(),
                 self._build_data_query_tool(),
                 self._build_data_transform_tool(),
                 self._build_data_feature_select_tool(),
@@ -447,6 +451,49 @@ class AgentToolRegistry:
             presentation=tool_presentation_for_name("data.clean.metadata"),
         )
 
+    def _build_data_tokenize_tool(self) -> AgentTool:
+        return AgentTool(
+            spec=AgentToolSpec(
+                name="data.tokenize",
+                provider_name="data_tokenize",
+                description=(
+                    "Create a new derived dataset by tokenizing one Chinese text column with the stable "
+                    "Xenix profile zh_business_v1. Use output=token_text to keep source rows and append "
+                    "token_text for downstream text models, or output=token_rows to explode one token per row."
+                ),
+                parameters_schema={
+                    "type": "object",
+                    "properties": {
+                        "dataset_id": {"type": "string"},
+                        "name": {"type": "string"},
+                        "text_column": {
+                            "type": "string",
+                            "description": "Chinese text column to segment.",
+                        },
+                        "id_columns": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Optional identifier columns preserved in token_rows output.",
+                        },
+                        "output": {
+                            "type": "string",
+                            "enum": ["token_text", "token_rows"],
+                            "description": "Choose token_text for model-ready rows or token_rows for one-token-per-row analysis.",
+                        },
+                        "tokenizer_profile": {
+                            "type": "string",
+                            "enum": ["zh_business_v1"],
+                            "description": "Stable Chinese-first tokenization profile owned by Xenix.",
+                        },
+                    },
+                    "required": ["dataset_id", "text_column"],
+                    "additionalProperties": False,
+                },
+            ),
+            handler=self._data_tokenize,
+            presentation=tool_presentation_for_name("data.tokenize"),
+        )
+
     def _build_data_query_tool(self) -> AgentTool:
         binding_schema = {
             "type": "object",
@@ -621,7 +668,8 @@ class AgentToolRegistry:
                             "enum": [family.value for family in ModelFamily],
                             "description": (
                                 "Browse lightweight candidate models in one family such as supervised, "
-                                "clustering, anomaly_detection, association_rules, or recommendation."
+                                "clustering, anomaly_detection, association_rules, recommendation, "
+                                "or text_analysis."
                             ),
                         },
                         "include_param_grid_schema": {
@@ -1078,6 +1126,41 @@ class AgentToolRegistry:
                 }
             ],
         )
+
+    def _data_tokenize(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+        self._raise_if_cancelled(context)
+        unsupported_keys = sorted(set(arguments) - {"dataset_id", "name", "text_column", "id_columns", "output", "tokenizer_profile"})
+        if unsupported_keys:
+            raise ValidationError("data.tokenize does not accept: " + ", ".join(unsupported_keys))
+        dataset_id = self._require_string(arguments, "dataset_id")
+        dataset = self._dataset_service.get_dataset(dataset_id)
+        default_name = f"{dataset.name} tokenized"
+        name = str(arguments.get("name") or default_name).strip() or default_name
+        id_columns = arguments.get("id_columns") or []
+        if not isinstance(id_columns, list) or not all(isinstance(item, str) for item in id_columns):
+            raise ValidationError("data.tokenize id_columns must be a list of strings.")
+        tokenize_result = self._data_tokenization_service.tokenize_dataset(
+            TokenizeDatasetInput(
+                source_path=dataset.source_path,
+                name=name,
+                text_column=self._require_string(arguments, "text_column"),
+                id_columns=[str(item) for item in id_columns],
+                output=str(arguments.get("output") or "token_text"),
+                tokenizer_profile=str(arguments.get("tokenizer_profile") or "zh_business_v1"),
+            )
+        )
+        row_count = int(tokenize_result.report.get("output_row_count", 0))
+        result = self._register_generated_dataset_result(
+            context,
+            output_path=Path(tokenize_result.output_path),
+            name=name,
+            summary=f"Tokenized dataset created. Rows: {row_count}.",
+            derived_from_dataset_id=dataset.id,
+            metadata_payload={"tokenization_report": tokenize_result.report},
+        )
+        result.payload["row_count"] = row_count
+        result.payload["tokenization_report"] = tokenize_result.report
+        return result
 
     def _data_query(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)

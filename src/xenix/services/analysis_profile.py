@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+import logging
 import math
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 
-import polars as pl
+try:
+    import polars as pl
+except Exception:  # pragma: no cover - depends on local runtime state
+    pl = None
 from pydantic import ConfigDict, Field
 from sqlmodel import SQLModel
 
@@ -14,7 +18,7 @@ from ..exceptions import ValidationError
 from ..observability import record_counter, record_histogram, start_span
 from .dataset_inspection import detect_source_format
 from .storage.models import DatasetSourceFormat
-from .tabular import load_tabular_frame
+from .tabular import TabularRuntimeError, load_tabular_frame
 
 
 _DEFAULT_TOP_N = 10
@@ -24,6 +28,7 @@ _MAX_CORRELATION_COLUMN_LIMIT = 12
 _MAX_FIELD_ROWS_IN_MARKDOWN = 20
 _MAX_FREQUENCY_COLUMNS = 8
 _MAX_TARGET_GROUP_ROWS = 30
+LOGGER = logging.getLogger("xenix.services.analysis_profile")
 
 
 class ProfileDatasetInput(SQLModel):
@@ -123,13 +128,59 @@ class AnalysisProfileService:
         source_format = detect_source_format(source_path)
         if source_format is DatasetSourceFormat.UNKNOWN:
             raise ValidationError("Only .csv, .xlsx, and .xls dataset files are supported.")
-        frame = load_tabular_frame(source_path, source_format)
+        if pl is None:
+            raise self._tabular_runtime_validation_error(
+                source_path=source_path,
+                source_format=source_format,
+                exc=RuntimeError("Polars could not be imported."),
+                phase="import",
+            )
+        try:
+            frame = load_tabular_frame(source_path, source_format)
+        except TabularRuntimeError as exc:
+            LOGGER.exception("Dataset profile could not load the tabular runtime for %s.", source_path)
+            raise self._tabular_runtime_validation_error(
+                source_path=source_path,
+                source_format=source_format,
+                exc=exc,
+            ) from exc
         frame = frame.rename({column: str(column) for column in frame.columns})
         if frame.width == 0:
             raise ValidationError("Dataset file must contain at least one column.")
         if frame.height == 0:
             raise ValidationError("Dataset file must contain at least one data row.")
         return frame
+
+    def _tabular_runtime_validation_error(
+        self,
+        *,
+        source_path: Path,
+        source_format: DatasetSourceFormat,
+        exc: Exception,
+        phase: str | None = None,
+    ) -> ValidationError:
+        tabular_error_details = getattr(exc, "error_details", None)
+        details = {
+            "operation": "analysis.profile",
+            "source_path": str(source_path),
+            "source_format": source_format.value,
+            "exception_type": type(exc).__name__,
+            "exception_message": str(exc),
+        }
+        if isinstance(tabular_error_details, dict) and tabular_error_details:
+            details["tabular"] = tabular_error_details
+        if phase:
+            details["phase"] = phase
+        return ValidationError(
+            "data.peek analysis profile is unavailable because the Polars runtime could not load this dataset.",
+            error_code="tabular_runtime_unavailable",
+            error_details=details,
+            repair_hints=[
+                "Retry data.peek with `analysis=false` when you only need schema and preview rows.",
+                "Repair the local environment so `polars` and `polars-runtime-*` are the same version, then retry.",
+            ],
+            retryable=True,
+        )
 
     def _normalize_int(self, value: Any, *, field_name: str, minimum: int, maximum: int) -> int:
         try:

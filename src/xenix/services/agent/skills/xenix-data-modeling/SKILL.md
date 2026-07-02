@@ -4,9 +4,11 @@ description: >-
   Use this skill when the user asks Xenix to predict, classify, regress, score,
   rank, train a model, tune hyperparameters, apply a trained model, estimate
   risk/probability, identify drivers through model output, compare supervised
-  models, handle partially labeled data, or use neural networks as a candidate
-  model. Use for Chinese requests such as “预测一下”, “训练模型”, “哪些因素影响结果”,
-  “客户流失预测”, “风险评分”, “转化概率”, “调参”, “应用模型”, or “半监督”.
+  models, handle partially labeled data, run text classification, text
+  clustering, topic modeling, similarity retrieval, or use neural networks as a
+  candidate model. Use for Chinese requests such as “预测一下”, “训练模型”,
+  “哪些因素影响结果”, “客户流失预测”, “风险评分”, “转化概率”, “调参”, “应用模型”,
+  “文本分类”, “主题分析”, “相似检索”, or “半监督”.
   Do not use for pure descriptive profiling, charts, reporting, or association
   analysis unless modeling is explicitly part of the task; use xenix-data-analysis
   for that. Activate xenix-data-preprocessing first when cleaning,
@@ -26,6 +28,7 @@ This skill guides Xenix Agent for modeling workflows over tabular business data:
 Xenix Agent has no script execution environment. Use only available Xenix tools:
 
 - `data.peek` and `data.query` for target and feature profiling.
+- `data.tokenize` only after activating `xenix-data-preprocessing`, when raw Chinese text must become a tokenized derived dataset before text-analysis models.
 - `data.feature.select` to create a role-binding snapshot before training.
 - `model.metadata` when candidate model choices, supported tasks, role schemas, or parameters are unclear.
 - `model.train` for baseline and candidate model training.
@@ -46,16 +49,17 @@ Xenix Agent has no script execution environment. Use only available Xenix tools:
 
 ## Default workflow
 
-1. Clarify or infer the modeling objective: classification, regression, scoring, ranking, semi-supervised labeling, or model application.
+1. Clarify or infer the modeling objective: classification, regression, scoring, ranking, semi-supervised labeling, text analysis, or model application.
 2. Use `data.peek` and `data.query` to profile target distribution, feature availability, missingness, outliers, class balance, and leakage risks.
-3. Ask for confirmation when multiple targets are plausible, the target semantics are unclear, missing labels may mean either “negative” or “unlabeled”, or the business threshold is sensitive.
-4. Use `data.feature.select` to bind roles: target, partial_target when applicable, features, and excluded fields with reasons.
-5. Call `model.metadata` with `model_family` to browse candidates, then call it again with one `model_key` to inspect role schema and parameters.
-6. Train an interpretable baseline with `model.train`.
-7. Interpret baseline metrics in business terms. Stop when data quality, label quality, sample size, or leakage blocks a credible model.
-8. Use `model.hyper_train` only for one or two plausible candidates with a small search space.
-9. Use `model.apply` for scored records, probabilities, ranking, prediction output, or applying a trained model to new rows.
-10. Explain model output as decision support, not truth. Include assumptions, fields used/excluded, metrics, threshold policy, risk notes, and next data needed.
+3. If the task is text classification, text clustering, topic modeling, or similarity retrieval, require a tokenized text dataset first; activate `xenix-data-preprocessing` if the source still contains raw Chinese sentences.
+4. Ask for confirmation when multiple targets are plausible, the target semantics are unclear, missing labels may mean either “negative” or “unlabeled”, or the business threshold is sensitive.
+5. Use `data.feature.select` to bind roles: target, partial_target when applicable, text/text_id when applicable, features, and excluded fields with reasons.
+6. Call `model.metadata` with `model_family` to browse candidates, then call it again with one `model_key` to inspect role schema and parameters.
+7. Train an interpretable baseline with `model.train`.
+8. Interpret baseline metrics in business terms. Stop when data quality, label quality, sample size, tokenization quality, or leakage blocks a credible model.
+9. Use `model.hyper_train` only for one or two plausible candidates with a small search space.
+10. Use `model.apply` for scored records, probabilities, ranking, prediction output, cluster/topic assignment, or similarity retrieval against new rows.
+11. Explain model output as decision support, not truth. Include assumptions, fields used/excluded, metrics, threshold policy, risk notes, and next data needed.
 
 ## Optional References
 
