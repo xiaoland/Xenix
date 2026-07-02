@@ -48,3 +48,87 @@
 - Verification outcomes:
   - `pdm run pytest tests\test_agent_harness_first_slice.py -q` passed with 19 tests.
 - Final outcome: Conservative repair prepared; only the TDD-level principle promotion remains in the amended commit alongside the repaired task packet record.
+
+## 2026-07-02 Exploration Refresh
+
+- Current Slice: Execute
+- Objective: Identify a user-confirmable next batch of provider-facing tool schema slimming work inside Agent Harness without silently changing execution semantics.
+- Approved Execution Scope: `Option 1`, Batch A only, schema-only.
+
+### Observed Schema Surface
+
+- `model.metadata` is already the reference shape: split discovery from detail, no provider-side model-key enumeration, and no unnecessary alternate query knobs.
+- `analysis.graph` is the largest remaining provider-facing schema by nested shape because `spec` still expands a Vega sub-schema even though runtime graph validation is service-owned.
+- `data.query` and `data.transform` repeat a small nested `bindings` object shape and still close the top-level schema with `additionalProperties: False`.
+- `data.feature.select`, `model.train`, `model.hyper_train`, and `model.task.query` are already top-level small, but still use closed schemas and sparse field descriptions.
+- `model.apply` has a real nested input contract in `input_rows`; slimming here is lower-confidence because runtime typed validation genuinely depends on that shape.
+- `data.peek`, `data.clean`, and `data.clean.metadata` are already small at the top level; most remaining change would be about closure or runtime tolerance, not token budget.
+
+### Runtime Strictness Split
+
+- Explicit runtime unknown-key rejection exists today in:
+  - `data.peek`
+  - `analysis.graph`
+  - `analysis.lambda`
+  - `data.clean`
+  - `data.clean.metadata`
+- The other listed provider-facing tools do not currently implement the same explicit top-level unknown-key rejection in their handlers.
+- This means the next pass can be separated into:
+  - schema-only slimming: reduce provider prompt surface without changing runtime acceptance behavior
+  - runtime-tolerance change: intentionally stop rejecting unknown top-level keys where safe
+
+### Recommended Candidate Batches
+
+- Batch A, safest and highest signal:
+  - `data.query`
+  - `data.transform`
+  - `data.feature.select`
+  - `model.train`
+  - `model.hyper_train`
+  - `model.task.query`
+- Batch B, high token payoff but needs explicit confirmation because it changes a previously sensitive surface:
+  - `analysis.graph`
+- Batch C, low payoff or semantically hotter:
+  - `data.peek`
+  - `data.clean`
+  - `data.clean.metadata`
+  - `model.apply`
+
+### Proposed Mutation Rules For A First Approved Pass
+
+- Keep tool behavior unchanged.
+- Do not change handler unknown-key behavior unless separately approved.
+- Prefer removing provider-side closure before touching nested payload structure.
+- Only flatten nested objects when the service layer already owns the real validation contract.
+- Do not touch `model.metadata` in this pass except for consistency fixes if strictly necessary.
+
+### Next Negotiation Surface
+
+- Option 1: Approve Batch A only, schema-only.
+- Option 2: Approve Batch A plus `analysis.graph`, schema-only.
+- Option 3: Approve a second pass later for runtime tolerance changes after schema-only verification.
+
+## 2026-07-02 Option 1 Execution
+
+- Address and Object:
+  - `src/xenix/services/agent/tools.py`
+  - `tests/test_agent_harness_first_slice.py`
+  - `tasks/provider-tool-schema-principles/packet.md`
+- State Diff:
+  - From: Batch A tools still used closed provider-facing schemas with sparse field descriptions.
+  - To: Batch A tools expose slimmer provider-facing schemas by removing schema-level closure and adding only short disambiguating descriptions.
+- Blast Radius Forecast:
+  - Agent Harness provider tool exposure payload shape
+  - First-slice schema assertions
+  - No expected runtime business-behavior change
+- Invariants Check:
+  - Do not change handler execution logic.
+  - Do not change explicit runtime unknown-key behavior.
+  - Do not touch `analysis.graph`, `data.peek`, `data.clean*`, `model.apply`, or `model.metadata`.
+- Verification:
+  - Run `pdm run pytest tests\\test_agent_harness_first_slice.py -q`.
+- Verification Outcome:
+  - `pdm run pytest tests\\test_agent_harness_first_slice.py -q` passed with 19 tests.
+- Current Outcome:
+  - Batch A schema-only slimming is implemented and verified.
+  - Runtime handler semantics remain unchanged.

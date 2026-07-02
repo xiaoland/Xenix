@@ -370,10 +370,12 @@ class AgentToolRegistry:
                     "type": "string",
                     "description": "SQL table alias for this registered dataset, such as orders or customers.",
                 },
-                "dataset_id": {"type": "string"},
+                "dataset_id": {
+                    "type": "string",
+                    "description": "Registered dataset id bound to this SQL alias.",
+                },
             },
             "required": ["alias", "dataset_id"],
-            "additionalProperties": False,
         }
         return AgentTool(
             spec=AgentToolSpec(
@@ -387,13 +389,27 @@ class AgentToolRegistry:
                 parameters_schema={
                     "type": "object",
                     "properties": {
-                        "dataset_id": {"type": "string"},
-                        "bindings": {"type": "array", "items": binding_schema},
-                        "sql": {"type": "string"},
-                        "limit": {"type": "integer", "minimum": 1, "maximum": 200},
+                        "dataset_id": {
+                            "type": "string",
+                            "description": "Use for one input dataset, which will be available in SQL as input.",
+                        },
+                        "bindings": {
+                            "type": "array",
+                            "items": binding_schema,
+                            "description": "Use for multiple input datasets with explicit SQL aliases.",
+                        },
+                        "sql": {
+                            "type": "string",
+                            "description": "Read-only SELECT or CTE query to execute.",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 200,
+                            "description": "Maximum number of rows to return in the bounded result.",
+                        },
                     },
                     "required": ["sql"],
-                    "additionalProperties": False,
                 },
             ),
             handler=self._data_query,
@@ -408,10 +424,12 @@ class AgentToolRegistry:
                     "type": "string",
                     "description": "SQL table alias for this registered dataset, such as orders or customers.",
                 },
-                "dataset_id": {"type": "string"},
+                "dataset_id": {
+                    "type": "string",
+                    "description": "Registered dataset id bound to this SQL alias.",
+                },
             },
             "required": ["alias", "dataset_id"],
-            "additionalProperties": False,
         }
         return AgentTool(
             spec=AgentToolSpec(
@@ -424,13 +442,25 @@ class AgentToolRegistry:
                 parameters_schema={
                     "type": "object",
                     "properties": {
-                        "dataset_id": {"type": "string"},
-                        "bindings": {"type": "array", "items": binding_schema},
-                        "sql": {"type": "string"},
-                        "name": {"type": "string"},
+                        "dataset_id": {
+                            "type": "string",
+                            "description": "Use for one input dataset, which will be available in SQL as input.",
+                        },
+                        "bindings": {
+                            "type": "array",
+                            "items": binding_schema,
+                            "description": "Use for multiple input datasets with explicit SQL aliases.",
+                        },
+                        "sql": {
+                            "type": "string",
+                            "description": "SELECT or CTE query whose result becomes the generated dataset.",
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "Optional name for the generated transformed dataset.",
+                        },
                     },
                     "required": ["sql"],
-                    "additionalProperties": False,
                 },
             ),
             handler=self._data_transform,
@@ -441,11 +471,17 @@ class AgentToolRegistry:
         role_binding_schema = {
             "type": "object",
             "properties": {
-                "role": {"type": "string"},
-                "columns": {"type": "array", "items": {"type": "string"}},
+                "role": {
+                    "type": "string",
+                    "description": "Semantic role such as feature, target, or partial_target.",
+                },
+                "columns": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Dataset columns assigned to this semantic role.",
+                },
             },
             "required": ["role", "columns"],
-            "additionalProperties": False,
         }
         return AgentTool(
             spec=AgentToolSpec(
@@ -455,12 +491,21 @@ class AgentToolRegistry:
                 parameters_schema={
                     "type": "object",
                     "properties": {
-                        "dataset_id": {"type": "string"},
-                        "model_key": {"type": "string"},
-                        "role_bindings": {"type": "array", "items": role_binding_schema},
+                        "dataset_id": {
+                            "type": "string",
+                            "description": "Registered dataset id whose columns will be role-bound.",
+                        },
+                        "model_key": {
+                            "type": "string",
+                            "description": "Optional chosen model key to pre-align role validation and later training.",
+                        },
+                        "role_bindings": {
+                            "type": "array",
+                            "items": role_binding_schema,
+                            "description": "Semantic role bindings to persist for later model training or apply.",
+                        },
                     },
                     "required": ["dataset_id", "role_bindings"],
-                    "additionalProperties": False,
                 },
             ),
             handler=self._data_feature_select,
@@ -521,13 +566,25 @@ class AgentToolRegistry:
                 parameters_schema={
                     "type": "object",
                     "properties": {
-                        "binding_id": {"type": "string"},
-                        "models": {"type": "array", "items": {"type": "string"}},
-                        "params_by_model": {"type": "object"},
-                        "run_name": {"type": "string"},
+                        "binding_id": {
+                            "type": "string",
+                            "description": "Column role-binding id returned by data.feature.select.",
+                        },
+                        "models": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "One or more chosen model keys or aliases to train.",
+                        },
+                        "params_by_model": {
+                            "type": "object",
+                            "description": "Optional per-model parameter objects keyed by model key.",
+                        },
+                        "run_name": {
+                            "type": "string",
+                            "description": "Optional human-readable run name.",
+                        },
                     },
                     "required": ["binding_id", "models"],
-                    "additionalProperties": False,
                 },
             ),
             handler=self._model_train,
@@ -547,12 +604,20 @@ class AgentToolRegistry:
                 parameters_schema={
                     "type": "object",
                     "properties": {
-                        "binding_id": {"type": "string"},
-                        "param_grids_by_model": {"type": "object"},
-                        "run_name": {"type": "string"},
+                        "binding_id": {
+                            "type": "string",
+                            "description": "Column role-binding id returned by data.feature.select.",
+                        },
+                        "param_grids_by_model": {
+                            "type": "object",
+                            "description": "Per-model tuning grids keyed by model key.",
+                        },
+                        "run_name": {
+                            "type": "string",
+                            "description": "Optional human-readable run name.",
+                        },
                     },
                     "required": ["binding_id", "param_grids_by_model"],
-                    "additionalProperties": False,
                 },
             ),
             handler=self._model_hyper_train,
@@ -612,16 +677,20 @@ class AgentToolRegistry:
                             "type": "array",
                             "items": {"type": "string"},
                             "minItems": 1,
+                            "description": "One or more explicit ML task ids to inspect.",
                         },
-                        "include_logs": {"type": "boolean"},
+                        "include_logs": {
+                            "type": "boolean",
+                            "description": "Set true to include bounded task logs in the response.",
+                        },
                         "max_log_entries": {
                             "type": "integer",
                             "minimum": 0,
                             "maximum": 1000,
+                            "description": "Maximum number of log entries to return per task when include_logs is true.",
                         },
                     },
                     "required": ["task_ids"],
-                    "additionalProperties": False,
                 },
             ),
             handler=self._model_task_query,

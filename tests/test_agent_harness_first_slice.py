@@ -610,18 +610,39 @@ def test_agent_harness_model_metadata_exposes_contract_without_train_enums(monke
     assert "Inspect one chosen model" in model_metadata_schema["properties"]["model_key"]["description"]
     assert "Browse lightweight candidate models" in model_metadata_schema["properties"]["model_family"]["description"]
     assert "Only use with model_key" in model_metadata_schema["properties"]["include_param_grid_schema"]["description"]
+    data_query_schema = specs["data.query"].parameters_schema
+    assert "additionalProperties" not in data_query_schema
+    assert "Use for one input dataset" in data_query_schema["properties"]["dataset_id"]["description"]
+    assert "Read-only SELECT or CTE query" in data_query_schema["properties"]["sql"]["description"]
+    assert "additionalProperties" not in data_query_schema["properties"]["bindings"]["items"]
+    data_transform_schema = specs["data.transform"].parameters_schema
+    assert "additionalProperties" not in data_transform_schema
+    assert "generated transformed dataset" in data_transform_schema["properties"]["name"]["description"]
+    assert "additionalProperties" not in data_transform_schema["properties"]["bindings"]["items"]
     feature_select_schema = specs["data.feature.select"].parameters_schema
+    assert "additionalProperties" not in feature_select_schema
     assert "enum" not in feature_select_schema["properties"]["model_key"]
     role_binding_schema = feature_select_schema["properties"]["role_bindings"]["items"]
     assert set(role_binding_schema["properties"]) == {"role", "columns"}
     assert role_binding_schema["required"] == ["role", "columns"]
+    assert "additionalProperties" not in feature_select_schema["properties"]["role_bindings"]["items"]
+    assert "Semantic role such as feature" in role_binding_schema["properties"]["role"]["description"]
+    model_train_schema = specs["model.train"].parameters_schema
+    assert "additionalProperties" not in model_train_schema
+    assert "Column role-binding id" in model_train_schema["properties"]["binding_id"]["description"]
     assert "enum" not in specs["model.train"].parameters_schema["properties"]["models"]["items"]
+    model_hyper_train_schema = specs["model.hyper_train"].parameters_schema
+    assert "additionalProperties" not in model_hyper_train_schema
+    assert "Per-model tuning grids" in model_hyper_train_schema["properties"]["param_grids_by_model"]["description"]
     apply_schema = specs["model.apply"].parameters_schema
     assert apply_schema["required"] == ["trained_model_id"]
     assert "input_sources" in apply_schema["properties"]
     assert "input_files" not in apply_schema["properties"]
     assert "input_rows" in apply_schema["properties"]
     assert set(apply_schema["properties"]["input_rows"]["required"]) == {"header_index_map", "data"}
+    model_task_query_schema = specs["model.task.query"].parameters_schema
+    assert "additionalProperties" not in model_task_query_schema
+    assert "explicit ML task ids" in model_task_query_schema["properties"]["task_ids"]["description"]
 
 
 def test_agent_harness_model_metadata_requires_scope(monkeypatch, tmp_path: Path) -> None:
