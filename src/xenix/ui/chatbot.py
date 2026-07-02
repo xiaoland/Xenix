@@ -53,6 +53,7 @@ SUPPORTED_DATASET_SUFFIXES = {".csv", ".xlsx", ".xls"}
 _ARTIFACT_PREVIEW_MIN_WIDTH = 160
 _ARTIFACT_PREVIEW_MAX_WIDTH = 720
 _ARTIFACT_PREVIEW_MAX_HEIGHT = 360
+_ARTIFACT_PREVIEW_BACKGROUND = QColor("#ffffff")
 
 
 class ComposerAttachmentStatus(StrEnum):
@@ -137,7 +138,7 @@ def _render_svg_preview_pixmap(path: Path, *, max_width: int, max_height: int) -
         max_height=max_height,
     )
     image = QImage(target_size, QImage.Format_ARGB32_Premultiplied)
-    image.fill(Qt.transparent)
+    image.fill(_ARTIFACT_PREVIEW_BACKGROUND)
     painter = QPainter(image)
     painter.setRenderHint(QPainter.Antialiasing, True)
     painter.setRenderHint(QPainter.TextAntialiasing, True)

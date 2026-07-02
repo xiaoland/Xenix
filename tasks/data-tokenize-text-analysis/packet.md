@@ -62,6 +62,7 @@
     - `src/xenix/ui/chatbot.py` was loading SVG artifacts through `QPixmap(path)`;
     - native Windows preview could render that path incorrectly even though browsers and `QSvgRenderer` rendered the same SVG correctly;
     - the durable UI fix is to route SVG artifact previews through a dedicated `QSvgRenderer` helper instead of the generic pixmap file loader.
+  - a fourth follow-up showed that the dedicated SVG preview helper still rasterized onto a transparent image, so Qt preview surfaces could still reveal an unexpected block behind charts; the local UI-only fix is to rasterize SVG previews onto an explicit white background.
 - User-Confirmed Constraints:
   - create a new task packet;
   - core scope is `data.tokenize` plus text-analysis model intake;
@@ -181,6 +182,7 @@
     - assert titled word clouds keep only one full-background rect;
     - assert medium/high term-count clouds switch to the dense `[10, 42]` default range.
   - added Chatbot preview regression coverage in `tests/test_main.py` so inline SVG artifact previews must go through the dedicated SVG renderer helper.
+  - tightened the same UI preview coverage so direct SVG preview rasterization must produce an opaque white background.
   - passed:
     - `pdm run pytest tests/test_data_tokenization.py tests/test_ml_registry.py tests/test_ml_execution.py tests/test_agent_harness_first_slice.py`
     - `pdm run pytest tests/test_services.py tests/test_analysis_profile.py tests/test_agent_harness_foundation.py`

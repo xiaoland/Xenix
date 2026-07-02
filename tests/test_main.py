@@ -9,7 +9,7 @@ import pytest
 from PySide6.QtCore import QEvent, QMimeData, QPoint, QPointF, Qt, QUrl
 from PySide6.QtGui import QPalette, QPixmap, QTextDocument
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QFrame, QMessageBox, QTextBrowser, QWidget
+from PySide6.QtWidgets import QApplication, QFrame, QMessageBox, QTextBrowser, QWidget
 
 from xenix.app import TrialLockStartupExit, _prompt_trial_lock, build_main_window, quarantine_database
 from xenix.build_info import BUILD_COMMIT_DISPLAY
@@ -34,7 +34,7 @@ from xenix.services.storage.models import (
     ArtifactKind,
 )
 from xenix.trial_lock import TrialLockCheck, TrialLockReason
-from xenix.ui.chatbot import _format_token_count
+from xenix.ui.chatbot import _format_token_count, _render_svg_preview_pixmap
 from xenix.ui.startup_splash import StartupSplash, StartupStage
 
 
@@ -1870,6 +1870,26 @@ def test_thread_detail_view_renders_inline_image_artifact_preview(monkeypatch, t
         assert [Path(url.toLocalFile()) for url in opened_urls] == [artifact_path.resolve()]
     finally:
         window.close()
+
+
+def test_svg_artifact_preview_rasterizes_on_white_background(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    _app = QApplication.instance() or QApplication([])
+    artifact_path = tmp_path / "preview.svg"
+    artifact_path.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80">'
+        '<text x="24" y="48" font-size="28" fill="#2563eb">Xenix</text>'
+        "</svg>",
+        encoding="utf-8",
+    )
+
+    pixmap = _render_svg_preview_pixmap(artifact_path, max_width=240, max_height=240)
+
+    assert not pixmap.isNull()
+    image = pixmap.toImage()
+    corner = image.pixelColor(0, 0)
+    assert corner.alpha() == 255
+    assert (corner.red(), corner.green(), corner.blue()) == (255, 255, 255)
 
 
 def test_main_window_uses_aimock_settings_in_development(monkeypatch, tmp_path: Path) -> None:
