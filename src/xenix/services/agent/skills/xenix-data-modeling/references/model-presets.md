@@ -4,11 +4,12 @@ Use this file before invoking model tools. Treat `model.metadata` as the source 
 
 ## Non-negotiable Tool Rules
 
-1. Call `model.metadata` with `include_param_schema=true` before passing unfamiliar params.
-2. Use canonical `model_key` values returned by `model.metadata` whenever possible.
-3. Pass only keys accepted by the model's `param_schema` or `param_grid_schema`.
-4. Do not pass split policy, preprocessing policy, requested metrics, random seeds, or early-stopping flags unless `model.metadata` exposes those exact fields.
-5. `model.train` payload shape:
+1. First call `model.metadata` with `model_family` to browse candidates.
+2. After choosing one model, call `model.metadata` with that single `model_key` before passing unfamiliar params.
+3. Use canonical `model_key` values returned by `model.metadata` whenever possible.
+4. Pass only keys accepted by the model's `param_schema` or `param_grid_schema`.
+5. Do not pass split policy, preprocessing policy, requested metrics, random seeds, or early-stopping flags unless `model.metadata` exposes those exact fields.
+6. `model.train` payload shape:
 
 ```json
 {
@@ -20,7 +21,7 @@ Use this file before invoking model tools. Treat `model.metadata` as the source 
 }
 ```
 
-6. `model.hyper_train` payload shape:
+7. `model.hyper_train` payload shape:
 
 ```json
 {

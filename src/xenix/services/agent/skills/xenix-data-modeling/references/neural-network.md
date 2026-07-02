@@ -32,7 +32,7 @@ Do not use when:
 
 ## Suggested Parameters
 
-Read `references/model-presets.md` for MLP presets, and call `model.metadata` before passing parameters. Current Xenix MLP tools expose `hidden_layer_size` as one integer, not scikit-learn's `hidden_layer_sizes` tuple/list. Keep the search small:
+Read `references/model-presets.md` for MLP presets, and call `model.metadata` with the chosen neural-network `model_key` before passing parameters. Current Xenix MLP tools expose `hidden_layer_size` as one integer, not scikit-learn's `hidden_layer_sizes` tuple/list. Keep the search small:
 
 ```json
 {

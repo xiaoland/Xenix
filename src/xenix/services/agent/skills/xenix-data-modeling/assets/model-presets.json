@@ -1,7 +1,7 @@
 {
   "version": "0.3.0",
   "tool_contract": {
-    "source_of_truth": "Call model.metadata with include_param_schema=true and include_param_grid_schema=true before passing unfamiliar params.",
+    "source_of_truth": "First call model.metadata with model_family to browse candidates, then call it again with one model_key. Use include_param_grid_schema=true only when tuning-grid detail is needed.",
     "model_train_shape": {
       "binding_id": "<binding_id>",
       "models": ["classification.logistic_regression"],

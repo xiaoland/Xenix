@@ -27,7 +27,7 @@ Xenix Agent has no script execution environment. Use only available Xenix tools:
 
 - `data.peek` and `data.query` for target and feature profiling.
 - `data.feature.select` to create a role-binding snapshot before training.
-- `model.metadata` when model keys, supported tasks, role schemas, or parameters are unclear.
+- `model.metadata` when candidate model choices, supported tasks, role schemas, or parameters are unclear.
 - `model.train` for baseline and candidate model training.
 - `model.hyper_train` for constrained hyperparameter search after a valid baseline exists.
 - `model.apply` for scoring, prediction, probability output, and batch application.
@@ -50,7 +50,7 @@ Xenix Agent has no script execution environment. Use only available Xenix tools:
 2. Use `data.peek` and `data.query` to profile target distribution, feature availability, missingness, outliers, class balance, and leakage risks.
 3. Ask for confirmation when multiple targets are plausible, the target semantics are unclear, missing labels may mean either “negative” or “unlabeled”, or the business threshold is sensitive.
 4. Use `data.feature.select` to bind roles: target, partial_target when applicable, features, and excluded fields with reasons.
-5. Call `model.metadata` if the model family, task type, role schema, or parameters are unclear.
+5. Call `model.metadata` with `model_family` to browse candidates, then call it again with one `model_key` to inspect role schema and parameters.
 6. Train an interpretable baseline with `model.train`.
 7. Interpret baseline metrics in business terms. Stop when data quality, label quality, sample size, or leakage blocks a credible model.
 8. Use `model.hyper_train` only for one or two plausible candidates with a small search space.

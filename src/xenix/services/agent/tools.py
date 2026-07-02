@@ -473,40 +473,35 @@ class AgentToolRegistry:
                 name="model.metadata",
                 provider_name="model_metadata",
                 description=(
-                    "List available model keys, capabilities, and optional parameter schemas. "
-                    "Call this before model.train or model.hyper_train when model keys or parameters are unclear."
+                    "Browse a lightweight model directory by model_family, or inspect one chosen model's role "
+                    "and parameter schema with model_key."
                 ),
                 parameters_schema={
                     "type": "object",
                     "properties": {
-                        "model_keys": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                        },
-                        "problem_kind": {
+                        "model_key": {
                             "type": "string",
-                            "enum": [kind.value for kind in ProblemKind],
-                        },
-                        "evaluation_kind": {
-                            "type": "string",
-                            "enum": [kind.value for kind in EvaluationKind],
+                            "description": (
+                                "Inspect one chosen model. Accepts a canonical model key or a simple alias. "
+                                "Returns role schemas and param_schema by default."
+                            ),
                         },
                         "model_family": {
                             "type": "string",
                             "enum": [family.value for family in ModelFamily],
+                            "description": (
+                                "Browse lightweight candidate models in one family such as supervised, "
+                                "clustering, anomaly_detection, association_rules, or recommendation."
+                            ),
                         },
-                        "model_task_kind": {
-                            "type": "string",
-                            "enum": [task_kind.value for task_kind in ModelTaskKind],
+                        "include_param_grid_schema": {
+                            "type": "boolean",
+                            "description": (
+                                "Only use with model_key. When true, also return param_grid_schema for "
+                                "hyperparameter tuning."
+                            ),
                         },
-                        "capability": {
-                            "type": "string",
-                            "enum": ["fit", "hyperparameter_tuning"],
-                        },
-                        "include_param_schema": {"type": "boolean"},
-                        "include_param_grid_schema": {"type": "boolean"},
                     },
-                    "additionalProperties": False,
                 },
             ),
             handler=self._model_metadata,
@@ -520,7 +515,8 @@ class AgentToolRegistry:
                 provider_name="model_train",
                 description=(
                     "Train and evaluate one or more models for a persisted dataset column role binding. "
-                    "Use model.metadata to inspect available canonical model keys and parameter schemas."
+                    "Use model.metadata with model_family to browse candidates, then inspect one model_key for "
+                    "parameter detail."
                 ),
                 parameters_schema={
                     "type": "object",
@@ -545,7 +541,8 @@ class AgentToolRegistry:
                 provider_name="model_hyper_train",
                 description=(
                     "Run hyperparameter training for one or more models. "
-                    "Use model.metadata with capability=hyperparameter_tuning to inspect supported models and grids."
+                    "Use model.metadata with model_family to browse candidates, then inspect one model_key with "
+                    "include_param_grid_schema=true."
                 ),
                 parameters_schema={
                     "type": "object",
@@ -1010,32 +1007,22 @@ class AgentToolRegistry:
 
     def _model_metadata(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
+        raw_model_key = str(arguments.get("model_key") or "").strip()
         raw_model_keys = self._optional_string_list(arguments, "model_keys")
-        if raw_model_keys:
+        if raw_model_key and raw_model_keys:
+            raise ValidationError("model.metadata accepts either model_key or model_keys, not both.")
+
+        detail_model_key: str | None = None
+        if raw_model_key:
+            detail_model_key = self._normalize_model_keys([raw_model_key], field_name="model_key")[0]
+        elif raw_model_keys:
             model_keys = self._normalize_model_keys(raw_model_keys, field_name="model_keys")
-            catalog_entries = [get_model_catalog_entry(model_key) for model_key in model_keys]
-        else:
-            catalog_entries = list_model_catalog()
-
-        problem_kind = str(arguments.get("problem_kind") or "").strip()
-        if problem_kind:
-            try:
-                selected_problem_kind = ProblemKind(problem_kind)
-            except ValueError as exc:
-                raise ValidationError(f"Unknown problem_kind '{problem_kind}'.") from exc
-            catalog_entries = [
-                entry for entry in catalog_entries if entry.problem_kind == selected_problem_kind
-            ]
-
-        evaluation_kind = str(arguments.get("evaluation_kind") or "").strip()
-        if evaluation_kind:
-            try:
-                selected_evaluation_kind = EvaluationKind(evaluation_kind)
-            except ValueError as exc:
-                raise ValidationError(f"Unknown evaluation_kind '{evaluation_kind}'.") from exc
-            catalog_entries = [
-                entry for entry in catalog_entries if entry.evaluation_kind == selected_evaluation_kind
-            ]
+            if len(model_keys) != 1:
+                raise ValidationError(
+                    "model.metadata accepts only one model_key for parameter detail. "
+                    "Use narrowing filters such as model_family for directory discovery."
+                )
+            detail_model_key = model_keys[0]
 
         model_family = str(arguments.get("model_family") or "").strip()
         if model_family:
@@ -1043,29 +1030,23 @@ class AgentToolRegistry:
                 selected_model_family = ModelFamily(model_family)
             except ValueError as exc:
                 raise ValidationError(f"Unknown model_family '{model_family}'.") from exc
+
+        detail_query = detail_model_key is not None
+        has_directory_filter = bool(model_family)
+        if not detail_query and not has_directory_filter:
+            raise ValidationError(
+                "model.metadata requires model_key or model_family."
+            )
+
+        if detail_query:
+            catalog_entries = [get_model_catalog_entry(detail_model_key)]
+        else:
+            catalog_entries = list_model_catalog()
+
+        if model_family:
             catalog_entries = [
                 entry for entry in catalog_entries if entry.model_family == selected_model_family
             ]
-
-        model_task_kind = str(arguments.get("model_task_kind") or "").strip()
-        if model_task_kind:
-            try:
-                selected_model_task_kind = ModelTaskKind(model_task_kind)
-            except ValueError as exc:
-                raise ValidationError(f"Unknown model_task_kind '{model_task_kind}'.") from exc
-            catalog_entries = [
-                entry for entry in catalog_entries if entry.model_task_kind == selected_model_task_kind
-            ]
-
-        capability = str(arguments.get("capability") or "").strip()
-        if capability == "fit":
-            catalog_entries = [entry for entry in catalog_entries if entry.supports_fit]
-        elif capability == "hyperparameter_tuning":
-            catalog_entries = [
-                entry for entry in catalog_entries if entry.supports_hyperparameter_tuning
-            ]
-        elif capability:
-            raise ValidationError(f"Unknown model capability '{capability}'.")
 
         catalog_entries = sorted(
             catalog_entries,
@@ -1078,11 +1059,24 @@ class AgentToolRegistry:
                 entry.model_key,
             ),
         )
-        include_param_schema = bool(arguments.get("include_param_schema"))
-        include_param_grid_schema = bool(arguments.get("include_param_grid_schema"))
+        include_param_grid_schema = self._optional_boolean(
+            arguments,
+            "include_param_grid_schema",
+            default=False,
+        )
+        legacy_include_param_schema = self._optional_boolean(
+            arguments,
+            "include_param_schema",
+            default=False,
+        )
+        include_param_schema = detail_query or include_param_grid_schema or legacy_include_param_schema
+        if not detail_query:
+            include_param_schema = False
+            include_param_grid_schema = False
         models = [
             self._model_catalog_payload(
                 entry,
+                detail_query=detail_query,
                 include_param_schema=include_param_schema,
                 include_param_grid_schema=include_param_grid_schema,
             )
@@ -1867,27 +1861,33 @@ class AgentToolRegistry:
         self,
         entry,
         *,
+        detail_query: bool,
         include_param_schema: bool,
         include_param_grid_schema: bool,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model_key": entry.model_key,
             "display_name": entry.display_name,
+            "description": entry.guidance,
             "problem_kind": entry.problem_kind.value if entry.problem_kind is not None else None,
             "evaluation_kind": entry.evaluation_kind.value,
-            "summary_metric_name": entry.summary_metric_name,
             "model_family": entry.model_family.value,
             "model_task_kind": entry.model_task_kind.value,
             "family": entry.family,
-            "guidance": entry.guidance,
             "recommendation_tier": entry.recommendation_tier,
-            "requires_target": entry.requires_target,
             "supports_fit": entry.supports_fit,
             "supports_hyperparameter_tuning": entry.supports_hyperparameter_tuning,
-            "train_role_schema": entry.train_role_schema.model_dump(mode="json"),
-            "apply_role_schema": entry.apply_role_schema.model_dump(mode="json"),
-            "result_contract": entry.result_contract.model_dump(mode="json"),
         }
+        if detail_query:
+            payload.update(
+                {
+                    "summary_metric_name": entry.summary_metric_name,
+                    "requires_target": entry.requires_target,
+                    "train_role_schema": entry.train_role_schema.model_dump(mode="json"),
+                    "apply_role_schema": entry.apply_role_schema.model_dump(mode="json"),
+                    "result_contract": entry.result_contract.model_dump(mode="json"),
+                }
+            )
         if include_param_schema:
             payload["param_schema"] = entry.param_schema
         if include_param_grid_schema:

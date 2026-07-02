@@ -574,24 +574,10 @@ def test_agent_harness_rejects_provider_tool_call_that_was_not_exposed(
     assert snapshot.tool_calls == []
 
 
-def test_agent_harness_model_metadata_exposes_catalog_without_train_enums(monkeypatch, tmp_path: Path) -> None:
+def test_agent_harness_model_metadata_exposes_contract_without_train_enums(monkeypatch, tmp_path: Path) -> None:
     _context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
 
     specs = {spec.name: spec for spec in registry.list_specs()}
-    result = registry.execute(
-        "model.metadata",
-        {
-            "model_keys": [
-                "linear_regression",
-                "random_forest",
-                "decision_tree",
-                "gradient_boosting",
-            ],
-            "include_param_schema": True,
-            "include_param_grid_schema": True,
-        },
-        _tool_context(),
-    )
 
     assert "model.metadata" in specs
     assert "analysis.profile" not in specs
@@ -608,15 +594,27 @@ def test_agent_harness_model_metadata_exposes_catalog_without_train_enums(monkey
     assert "spec" in graph_schema["properties"]
     assert "operation" not in graph_schema["properties"]
     assert "params" not in graph_schema["properties"]
-    assert "enum" not in specs["model.metadata"].parameters_schema["properties"]["model_keys"]["items"]
+    model_metadata_schema = specs["model.metadata"].parameters_schema
+    assert set(model_metadata_schema["properties"]) == {
+        "model_key",
+        "model_family",
+        "include_param_grid_schema",
+    }
+    assert "model_keys" not in model_metadata_schema["properties"]
+    assert "problem_kind" not in model_metadata_schema["properties"]
+    assert "evaluation_kind" not in model_metadata_schema["properties"]
+    assert "model_task_kind" not in model_metadata_schema["properties"]
+    assert "capability" not in model_metadata_schema["properties"]
+    assert "include_param_schema" not in model_metadata_schema["properties"]
+    assert "additionalProperties" not in model_metadata_schema
+    assert "Inspect one chosen model" in model_metadata_schema["properties"]["model_key"]["description"]
+    assert "Browse lightweight candidate models" in model_metadata_schema["properties"]["model_family"]["description"]
+    assert "Only use with model_key" in model_metadata_schema["properties"]["include_param_grid_schema"]["description"]
     feature_select_schema = specs["data.feature.select"].parameters_schema
     assert "enum" not in feature_select_schema["properties"]["model_key"]
     role_binding_schema = feature_select_schema["properties"]["role_bindings"]["items"]
     assert set(role_binding_schema["properties"]) == {"role", "columns"}
     assert role_binding_schema["required"] == ["role", "columns"]
-    assert "model_family" in specs["model.metadata"].parameters_schema["properties"]
-    assert "model_task_kind" in specs["model.metadata"].parameters_schema["properties"]
-    assert "evaluation_kind" in specs["model.metadata"].parameters_schema["properties"]
     assert "enum" not in specs["model.train"].parameters_schema["properties"]["models"]["items"]
     apply_schema = specs["model.apply"].parameters_schema
     assert apply_schema["required"] == ["trained_model_id"]
@@ -624,12 +622,57 @@ def test_agent_harness_model_metadata_exposes_catalog_without_train_enums(monkey
     assert "input_files" not in apply_schema["properties"]
     assert "input_rows" in apply_schema["properties"]
     assert set(apply_schema["properties"]["input_rows"]["required"]) == {"header_index_map", "data"}
-    assert result.payload["model_keys"] == [
-        "regression.linear",
-        "regression.gradient_boosting",
-        "regression.random_forest",
-        "regression.decision_tree",
-    ]
+
+
+def test_agent_harness_model_metadata_requires_scope(monkeypatch, tmp_path: Path) -> None:
+    _context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
+
+    with pytest.raises(ValidationError, match="requires model_key or model_family"):
+        registry.execute("model.metadata", {}, _tool_context())
+    with pytest.raises(ValidationError, match="requires model_key or model_family"):
+        registry.execute("model.metadata", {"include_param_grid_schema": True}, _tool_context())
+    with pytest.raises(ValidationError, match="requires model_key or model_family"):
+        registry.execute("model.metadata", {"include_param_schema": True}, _tool_context())
+
+
+def test_agent_harness_model_metadata_directory_queries_return_lightweight_summaries(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
+
+    clustering_result = registry.execute(
+        "model.metadata",
+        {"model_family": "clustering", "include_param_grid_schema": True},
+        _tool_context(),
+    )
+    assert clustering_result.payload["model_keys"] == ["clustering.kmeans", "clustering.dbscan"]
+    assert clustering_result.payload["models"][0]["model_family"] == "clustering"
+    assert clustering_result.payload["models"][0]["model_task_kind"] == "segmenter"
+    assert clustering_result.payload["models"][0]["description"]
+    assert "param_schema" not in clustering_result.payload["models"][0]
+    assert "param_grid_schema" not in clustering_result.payload["models"][0]
+    assert "train_role_schema" not in clustering_result.payload["models"][0]
+    assert "result_contract" not in clustering_result.payload["models"][0]
+    supervised_result = registry.execute(
+        "model.metadata",
+        {"model_family": "supervised"},
+        _tool_context(),
+    )
+    assert "regression.linear" in supervised_result.payload["model_keys"]
+    assert "classification.logistic_regression" in supervised_result.payload["model_keys"]
+    assert "clustering.kmeans" not in supervised_result.payload["model_keys"]
+
+
+def test_agent_harness_model_metadata_detail_query_returns_default_param_schema(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
+
+    result = registry.execute("model.metadata", {"model_key": "xgboost"}, _tool_context())
+    assert result.payload["model_keys"] == ["regression.xgboost"]
+    assert result.payload["models"][0]["model_key"] == "regression.xgboost"
     assert result.payload["models"][0]["supports_hyperparameter_tuning"] is True
     assert result.payload["models"][0]["evaluation_kind"] == "regression"
     assert result.payload["models"][0]["model_family"] == "supervised"
@@ -638,34 +681,18 @@ def test_agent_harness_model_metadata_exposes_catalog_without_train_enums(monkey
     assert [role["name"] for role in result.payload["models"][0]["apply_role_schema"]["roles"]] == ["feature"]
     assert result.payload["models"][0]["result_contract"]["apply_result_kinds"] == ["table"]
     assert "param_schema" in result.payload["models"][0]
-    assert "param_grid_schema" in result.payload["models"][0]
-    clustering_result = registry.execute(
+    assert "param_grid_schema" not in result.payload["models"][0]
+
+    grid_result = registry.execute(
         "model.metadata",
-        {"model_family": "clustering"},
+        {"model_key": "xgboost", "include_param_grid_schema": True},
         _tool_context(),
     )
-    assert clustering_result.payload["model_keys"] == ["clustering.kmeans", "clustering.dbscan"]
-    predictor_result = registry.execute(
-        "model.metadata",
-        {"model_task_kind": "predictor"},
-        _tool_context(),
-    )
-    assert "regression.linear" in predictor_result.payload["model_keys"]
-    assert "classification.logistic_regression" in predictor_result.payload["model_keys"]
-    assert "clustering.kmeans" not in predictor_result.payload["model_keys"]
-    summary_result = registry.execute(
-        "model.metadata",
-        {"evaluation_kind": "summary"},
-        _tool_context(),
-    )
-    assert "association.apriori_apyori" in summary_result.payload["model_keys"]
-    assert "recommendation.item_similarity" in summary_result.payload["model_keys"]
+    assert "param_schema" in grid_result.payload["models"][0]
+    assert "param_grid_schema" in grid_result.payload["models"][0]
+
     with pytest.raises(ValidationError, match="Unknown model_family"):
         registry.execute("model.metadata", {"model_family": "unknown"}, _tool_context())
-    with pytest.raises(ValidationError, match="Unknown model_task_kind"):
-        registry.execute("model.metadata", {"model_task_kind": "unknown"}, _tool_context())
-    with pytest.raises(ValidationError, match="Unknown evaluation_kind"):
-        registry.execute("model.metadata", {"evaluation_kind": "unknown"}, _tool_context())
     xgboost_result = registry.execute("model.metadata", {"model_keys": ["xgboost"]}, _tool_context())
     assert xgboost_result.payload["model_keys"] == ["regression.xgboost"]
 

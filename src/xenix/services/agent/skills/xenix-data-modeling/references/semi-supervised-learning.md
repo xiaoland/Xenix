@@ -2,7 +2,7 @@
 
 Use this file when a label field exists but only part of the data is labeled, or when labels contain values such as empty, unknown, pending, unreviewed, 待审核, 未标注.
 
-Use `model.metadata` to inspect whether semi-supervised candidates such as label propagation, label spreading, or self-training are available for the current task. If no direct method is suitable, implement a conservative workflow using `data.query`, a supervised `model.train` baseline on labeled rows, `model.apply` on unlabeled rows, and high-confidence candidate pseudo-labels. Do not run iterative self-training unless the selected model tool explicitly supports it.
+Use `model.metadata` with `model_family=supervised` to inspect whether semi-supervised candidates such as label propagation, label spreading, or self-training are available for the current task. After choosing one candidate, call `model.metadata` again with that `model_key` before passing parameters. If no direct method is suitable, implement a conservative workflow using `data.query`, a supervised `model.train` baseline on labeled rows, `model.apply` on unlabeled rows, and high-confidence candidate pseudo-labels. Do not run iterative self-training unless the selected model tool explicitly supports it.
 
 ## Suitability checks
 
