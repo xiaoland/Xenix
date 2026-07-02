@@ -5,8 +5,9 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Callable
 
-from PySide6.QtCore import QCoreApplication, QEvent, QPoint, QSize, QTimer, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPalette, QPixmap, QTextDocument, QTextOption
+from PySide6.QtCore import QCoreApplication, QEvent, QPoint, QRectF, QSize, QTimer, Qt, Signal
+from PySide6.QtGui import QColor, QFont, QImage, QPainter, QPalette, QPixmap, QTextDocument, QTextOption
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
@@ -49,6 +50,9 @@ a {
 UNBOUNDED_WIDGET_WIDTH = 16777215
 ArtifactResolver = Callable[[str], Any]
 SUPPORTED_DATASET_SUFFIXES = {".csv", ".xlsx", ".xls"}
+_ARTIFACT_PREVIEW_MIN_WIDTH = 160
+_ARTIFACT_PREVIEW_MAX_WIDTH = 720
+_ARTIFACT_PREVIEW_MAX_HEIGHT = 360
 
 
 class ComposerAttachmentStatus(StrEnum):
@@ -62,6 +66,103 @@ class ComposerAttachmentState:
     path: str
     status: ComposerAttachmentStatus = ComposerAttachmentStatus.PENDING
     error: str | None = None
+
+
+def _load_artifact_preview_pixmap(
+    artifact_resolver: ArtifactResolver | None,
+    uri: str,
+    *,
+    available_width: int,
+) -> QPixmap:
+    if artifact_resolver is None:
+        return QPixmap()
+    try:
+        artifact = artifact_resolver(uri)
+    except Exception:
+        return QPixmap()
+
+    mime_type = str(getattr(artifact, "mime_type", "") or "")
+    if mime_type and not mime_type.startswith("image/"):
+        return QPixmap()
+    if not bool(getattr(artifact, "ready_to_open", False)):
+        return QPixmap()
+    if not bool(getattr(artifact, "exists", False)):
+        return QPixmap()
+
+    artifact_path = Path(str(getattr(artifact, "absolute_path", "") or "")).expanduser()
+    if not artifact_path.is_file():
+        return QPixmap()
+
+    max_width = max(
+        _ARTIFACT_PREVIEW_MIN_WIDTH,
+        min(_ARTIFACT_PREVIEW_MAX_WIDTH, available_width - 24),
+    )
+    if _artifact_uses_svg_preview(mime_type, artifact_path):
+        return _render_svg_preview_pixmap(
+            artifact_path,
+            max_width=max_width,
+            max_height=_ARTIFACT_PREVIEW_MAX_HEIGHT,
+        )
+
+    pixmap = QPixmap(str(artifact_path))
+    if pixmap.isNull():
+        return pixmap
+    return _scale_artifact_preview_pixmap(
+        pixmap,
+        max_width=max_width,
+        max_height=_ARTIFACT_PREVIEW_MAX_HEIGHT,
+    )
+
+
+def _artifact_uses_svg_preview(mime_type: str, artifact_path: Path) -> bool:
+    normalized_mime_type = mime_type.split(";", 1)[0].strip().lower()
+    return normalized_mime_type == "image/svg+xml" or artifact_path.suffix.lower() == ".svg"
+
+
+def _render_svg_preview_pixmap(path: Path, *, max_width: int, max_height: int) -> QPixmap:
+    renderer = QSvgRenderer(str(path))
+    if not renderer.isValid():
+        return QPixmap()
+
+    source_size = renderer.defaultSize()
+    if source_size.width() <= 0 or source_size.height() <= 0:
+        view_box = renderer.viewBoxF()
+        if view_box.width() > 0 and view_box.height() > 0:
+            source_size = QSize(int(round(view_box.width())), int(round(view_box.height())))
+        else:
+            source_size = QSize(max_width, max_height)
+    target_size = _fit_artifact_preview_size(
+        source_size,
+        max_width=max_width,
+        max_height=max_height,
+    )
+    image = QImage(target_size, QImage.Format_ARGB32_Premultiplied)
+    image.fill(Qt.transparent)
+    painter = QPainter(image)
+    painter.setRenderHint(QPainter.Antialiasing, True)
+    painter.setRenderHint(QPainter.TextAntialiasing, True)
+    painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+    try:
+        renderer.render(painter, QRectF(0, 0, target_size.width(), target_size.height()))
+    finally:
+        painter.end()
+    return QPixmap.fromImage(image)
+
+
+def _scale_artifact_preview_pixmap(pixmap: QPixmap, *, max_width: int, max_height: int) -> QPixmap:
+    if pixmap.width() <= max_width and pixmap.height() <= max_height:
+        return pixmap
+    return pixmap.scaled(max_width, max_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
+
+def _fit_artifact_preview_size(source_size: QSize, *, max_width: int, max_height: int) -> QSize:
+    source_width = max(1, source_size.width())
+    source_height = max(1, source_size.height())
+    scale = min(max_width / source_width, max_height / source_height, 1.0)
+    return QSize(
+        max(1, int(round(source_width * scale))),
+        max(1, int(round(source_height * scale))),
+    )
 
 
 def _render_content_blocks(blocks: list[dict[str, Any]]) -> str:
@@ -323,29 +424,11 @@ class AutoHeightTextBrowser(QTextBrowser):
         _propagate_geometry_change(self)
 
     def _load_artifact_pixmap(self, uri: str) -> QPixmap:
-        if self._artifact_resolver is None:
-            return QPixmap()
-        try:
-            artifact = self._artifact_resolver(uri)
-        except Exception:
-            return QPixmap()
-
-        mime_type = str(getattr(artifact, "mime_type", "") or "")
-        if mime_type and not mime_type.startswith("image/"):
-            return QPixmap()
-        if not bool(getattr(artifact, "ready_to_open", False)):
-            return QPixmap()
-        if not bool(getattr(artifact, "exists", False)):
-            return QPixmap()
-
-        pixmap = QPixmap(str(getattr(artifact, "absolute_path", "")))
-        if pixmap.isNull():
-            return pixmap
-        max_width = max(160, min(720, self.viewport().width() - 24))
-        max_height = 360
-        if pixmap.width() <= max_width and pixmap.height() <= max_height:
-            return pixmap
-        return pixmap.scaled(max_width, max_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        return _load_artifact_preview_pixmap(
+            self._artifact_resolver,
+            uri,
+            available_width=self.viewport().width(),
+        )
 
 
 class UserMessageCard(QWidget):
@@ -402,29 +485,11 @@ class UserMessageBody(QWidget):
         self._artifact_resolver = resolver
 
     def load_artifact_pixmap(self, uri: str) -> QPixmap:
-        if self._artifact_resolver is None:
-            return QPixmap()
-        try:
-            artifact = self._artifact_resolver(uri)
-        except Exception:
-            return QPixmap()
-
-        mime_type = str(getattr(artifact, "mime_type", "") or "")
-        if mime_type and not mime_type.startswith("image/"):
-            return QPixmap()
-        if not bool(getattr(artifact, "ready_to_open", False)):
-            return QPixmap()
-        if not bool(getattr(artifact, "exists", False)):
-            return QPixmap()
-
-        pixmap = QPixmap(str(getattr(artifact, "absolute_path", "")))
-        if pixmap.isNull():
-            return pixmap
-        max_width = max(160, min(720, self.width() - 24))
-        max_height = 360
-        if pixmap.width() <= max_width and pixmap.height() <= max_height:
-            return pixmap
-        return pixmap.scaled(max_width, max_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        return _load_artifact_preview_pixmap(
+            self._artifact_resolver,
+            uri,
+            available_width=self.width(),
+        )
 
     def setHtml(self, html: str) -> None:
         self._document.setHtml(html)

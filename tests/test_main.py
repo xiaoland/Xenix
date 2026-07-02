@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 from PySide6.QtCore import QEvent, QMimeData, QPoint, QPointF, Qt, QUrl
-from PySide6.QtGui import QPalette, QTextDocument
+from PySide6.QtGui import QPalette, QPixmap, QTextDocument
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QFrame, QMessageBox, QTextBrowser, QWidget
 
@@ -1809,7 +1809,19 @@ def test_thread_detail_view_renders_inline_image_artifact_preview(monkeypatch, t
         opened_urls.append(url)
         return True
 
+    rendered_svg: dict[str, object] = {}
+
+    def fake_render_svg_preview(path: Path, *, max_width: int, max_height: int) -> QPixmap:
+        sentinel = QPixmap(91, 53)
+        sentinel.fill(Qt.red)
+        rendered_svg["path"] = path
+        rendered_svg["max_width"] = max_width
+        rendered_svg["max_height"] = max_height
+        rendered_svg["pixmap"] = sentinel
+        return sentinel
+
     monkeypatch.setattr("xenix.ui.main_window.QDesktopServices.openUrl", fake_open_url)
+    monkeypatch.setattr("xenix.ui.chatbot._render_svg_preview_pixmap", fake_render_svg_preview)
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
 
@@ -1843,6 +1855,10 @@ def test_thread_detail_view_renders_inline_image_artifact_preview(monkeypatch, t
         assert image is not None
         assert hasattr(image, "isNull")
         assert not image.isNull()
+        assert rendered_svg["path"] == artifact_path.resolve()
+        assert rendered_svg["max_width"] >= 160
+        assert rendered_svg["max_height"] == 360
+        assert image.size() == rendered_svg["pixmap"].size()
         html = bubble._browser.toHtml()
         assert uri not in html
         assert f'href="{rendered_uri}"' in html

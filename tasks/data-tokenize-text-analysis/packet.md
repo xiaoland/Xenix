@@ -58,6 +58,10 @@
     - the outer title wrapper added one full-canvas white rect;
     - the original `wordcloud.to_svg()` background rect was moved down inside the translated content group;
     - medium-sized Chinese clouds were also staying on the looser `[12, 56]` font-size range too long.
+  - a third follow-up on the reported "white block" after the renderer fix showed the generated SVG artifact itself was already correct; the remaining bug lived in Chatbot inline preview:
+    - `src/xenix/ui/chatbot.py` was loading SVG artifacts through `QPixmap(path)`;
+    - native Windows preview could render that path incorrectly even though browsers and `QSvgRenderer` rendered the same SVG correctly;
+    - the durable UI fix is to route SVG artifact previews through a dedicated `QSvgRenderer` helper instead of the generic pixmap file loader.
 - User-Confirmed Constraints:
   - create a new task packet;
   - core scope is `data.tokenize` plus text-analysis model intake;
@@ -176,10 +180,12 @@
   - tightened dedicated word-cloud renderer coverage in `tests/test_analysis_graph.py`:
     - assert titled word clouds keep only one full-background rect;
     - assert medium/high term-count clouds switch to the dense `[10, 42]` default range.
+  - added Chatbot preview regression coverage in `tests/test_main.py` so inline SVG artifact previews must go through the dedicated SVG renderer helper.
   - passed:
     - `pdm run pytest tests/test_data_tokenization.py tests/test_ml_registry.py tests/test_ml_execution.py tests/test_agent_harness_first_slice.py`
     - `pdm run pytest tests/test_services.py tests/test_analysis_profile.py tests/test_agent_harness_foundation.py`
     - `pdm run pytest tests/test_analysis_graph.py`
+    - `pdm run pytest tests/test_main.py::test_thread_detail_view_renders_inline_image_artifact_preview`
     - `pdm run smoke`
     - `pdm run check`
 - Final outcome:
