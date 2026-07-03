@@ -1,0 +1,90 @@
+name: Website Deploy Production
+
+on:
+  push:
+    branches:
+      - native-ai-first
+    paths:
+      - "website/**"
+      - ".github/workflows/website-*.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: website-production
+  cancel-in-progress: false
+
+jobs:
+  deploy-production:
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.28.1
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: website/.nvmrc
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check required deployment variables
+        run: |
+          test -n "$XENIX_DOWNLOAD_URL"
+          test -n "$XENIX_PAGES_PROJECT_NAME"
+          test -n "$XENIX_WORKER_NAME"
+          test -n "$XENIX_WORKER_ROUTE"
+          test -n "$XENIX_D1_DATABASE_NAME"
+          test -n "$XENIX_D1_DATABASE_ID"
+        env:
+          XENIX_DOWNLOAD_URL: ${{ vars.XENIX_DOWNLOAD_URL }}
+          XENIX_PAGES_PROJECT_NAME: ${{ vars.XENIX_PAGES_PROJECT_NAME }}
+          XENIX_WORKER_NAME: ${{ vars.XENIX_WORKER_NAME }}
+          XENIX_WORKER_ROUTE: ${{ vars.XENIX_WORKER_ROUTE }}
+          XENIX_D1_DATABASE_NAME: ${{ vars.XENIX_D1_DATABASE_NAME }}
+          XENIX_D1_DATABASE_ID: ${{ vars.XENIX_D1_DATABASE_ID }}
+
+      - run: pnpm run check
+        env:
+          XENIX_DOWNLOAD_URL: ${{ vars.XENIX_DOWNLOAD_URL }}
+          XENIX_D1_DATABASE_NAME: ${{ vars.XENIX_D1_DATABASE_NAME }}
+          XENIX_D1_DATABASE_ID: ${{ vars.XENIX_D1_DATABASE_ID }}
+
+      - name: Apply D1 migrations
+        run: pnpm exec wrangler d1 migrations apply "$XENIX_D1_DATABASE_NAME" --remote --config .wrangler-worker-dry-run.toml
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          XENIX_D1_DATABASE_NAME: ${{ vars.XENIX_D1_DATABASE_NAME }}
+
+      - name: Deploy Worker
+        run: pnpm run deploy:worker
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          XENIX_DOWNLOAD_URL: ${{ vars.XENIX_DOWNLOAD_URL }}
+          XENIX_WORKER_NAME: ${{ vars.XENIX_WORKER_NAME }}
+          XENIX_WORKER_ROUTE: ${{ vars.XENIX_WORKER_ROUTE }}
+          XENIX_WORKER_ZONE_NAME: ${{ vars.XENIX_WORKER_ZONE_NAME }}
+          XENIX_D1_DATABASE_NAME: ${{ vars.XENIX_D1_DATABASE_NAME }}
+          XENIX_D1_DATABASE_ID: ${{ vars.XENIX_D1_DATABASE_ID }}
+
+      - name: Build Pages
+        run: pnpm run build && pnpm run verify:dist
+        env:
+          VITE_API_ORIGIN: ${{ vars.VITE_API_ORIGIN }}
+          VITE_SITE_URL: ${{ vars.VITE_SITE_URL }}
+
+      - name: Deploy Pages
+        run: pnpm exec wrangler pages deploy dist --project-name "$XENIX_PAGES_PROJECT_NAME" --branch main
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          XENIX_PAGES_PROJECT_NAME: ${{ vars.XENIX_PAGES_PROJECT_NAME }}

@@ -1,0 +1,38 @@
+{
+  "name": "xenix-website",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.1",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "dev:worker": "tsx scripts/run-worker.ts dev",
+    "build": "vite build",
+    "build:worker": "tsx scripts/run-worker.ts dry-run",
+    "check": "tsc --noEmit && pnpm run build && pnpm run verify:dist && pnpm run build:worker",
+    "deploy:worker": "tsx scripts/run-worker.ts deploy",
+    "deploy:worker:preview": "tsx scripts/deploy-preview-worker.ts",
+    "deploy:pages": "wrangler pages deploy dist",
+    "verify:dist": "tsx scripts/verify-dist.ts"
+  },
+  "dependencies": {
+    "hono": "^4.12.8"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260603.0",
+    "@types/node": "^24.10.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.4",
+    "wrangler": "^4.51.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "workerd"
+    ]
+  }
+}

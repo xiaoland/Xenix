@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.worker-build/
+.wrangler/
+.wrangler-worker-*.toml
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+!.env.example

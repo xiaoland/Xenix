@@ -1,0 +1,48 @@
+name: Website CI
+
+on:
+  pull_request:
+    paths:
+      - "website/**"
+      - ".github/workflows/website-*.yml"
+  push:
+    branches:
+      - native-ai-first
+    paths:
+      - "website/**"
+      - ".github/workflows/website-*.yml"
+
+jobs:
+  website-ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.28.1
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: website/.nvmrc
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check required website variable
+        run: test -n "$XENIX_DOWNLOAD_URL"
+        env:
+          XENIX_DOWNLOAD_URL: ${{ vars.XENIX_DOWNLOAD_URL }}
+
+      - run: pnpm run check
+        env:
+          XENIX_DOWNLOAD_URL: ${{ vars.XENIX_DOWNLOAD_URL }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: website-dist
+          path: website/dist
