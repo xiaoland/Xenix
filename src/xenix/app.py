@@ -22,7 +22,7 @@ from .i18n import TranslationManager
 from .logging import setup_logging
 from .observability import flush_observability, record_counter, setup_observability, start_span
 from .resources import package_resource_path
-from .trial_lock import TRIAL_PURCHASE_URL, TrialLockCheck, check_trial_lock
+from .trial_lock import TrialLockCheck, check_trial_lock, trial_purchase_url
 from .ui.startup_splash import StartupSplash, StartupStage
 
 if TYPE_CHECKING:
@@ -182,6 +182,7 @@ def _prompt_storage_recovery(
 
 
 def _prompt_trial_lock(check: TrialLockCheck) -> None:
+    purchase_url = trial_purchase_url()
     message_box = QMessageBox()
     message_box.setIcon(QMessageBox.Warning)
     message_box.setWindowTitle(
@@ -197,7 +198,7 @@ def _prompt_trial_lock(check: TrialLockCheck) -> None:
         QCoreApplication.translate(
             "XenixStartup",
             "Please purchase a license or download a licensed Xenix build from {url}.",
-        ).format(url=TRIAL_PURCHASE_URL)
+        ).format(url=purchase_url)
     )
     expires_at = check.expires_at_utc.isoformat() if check.expires_at_utc is not None else "-"
     message_box.setDetailedText(
@@ -222,8 +223,8 @@ def _prompt_trial_lock(check: TrialLockCheck) -> None:
     message_box.exec()
 
     clicked_button = message_box.clickedButton()
-    if clicked_button is buy_button:
-        QDesktopServices.openUrl(QUrl(TRIAL_PURCHASE_URL))
+    if clicked_button is buy_button and purchase_url:
+        QDesktopServices.openUrl(QUrl(purchase_url))
     elif clicked_button is exit_button:
         return
 

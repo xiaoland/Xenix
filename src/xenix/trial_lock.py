@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import os
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
@@ -14,7 +15,11 @@ from .config import AppPaths
 
 TRIAL_LOCK_STATE_FILE_NAME = "trial_lock.json"
 TRIAL_LOCK_SCHEMA_VERSION = 1
-TRIAL_PURCHASE_URL = "https://lanzhijiang.dev/xenix"
+TRIAL_PURCHASE_URL_ENV = "TRIAL_PURCHASE_URL"
+
+
+def trial_purchase_url() -> str:
+    return os.environ.get(TRIAL_PURCHASE_URL_ENV, "").strip()
 
 
 class TrialLockReason(StrEnum):

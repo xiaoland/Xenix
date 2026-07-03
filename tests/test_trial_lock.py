@@ -9,6 +9,7 @@ from xenix.trial_lock import (
     PackagedTrialLockConfig,
     TrialLockReason,
     check_trial_lock,
+    trial_purchase_url,
     trial_lock_state_path,
 )
 
@@ -32,6 +33,18 @@ def _enabled_config() -> PackagedTrialLockConfig:
         state_secret="test-secret",
         build_id="test-build",
     )
+
+
+def test_trial_purchase_url_defaults_to_empty_string(monkeypatch) -> None:
+    monkeypatch.delenv("TRIAL_PURCHASE_URL", raising=False)
+
+    assert trial_purchase_url() == ""
+
+
+def test_trial_purchase_url_reads_environment_variable(monkeypatch) -> None:
+    monkeypatch.setenv("TRIAL_PURCHASE_URL", " https://example.test/buy ")
+
+    assert trial_purchase_url() == "https://example.test/buy"
 
 
 def test_trial_lock_disabled_does_not_create_state(tmp_path: Path) -> None:
