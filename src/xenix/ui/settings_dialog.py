@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSpinBox,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -36,6 +37,97 @@ from ..services.llm import (
 )
 from ..services.ml.worker_settings import MLWorkerKind, MLWorkerSettingsService
 from .ssh_worker_setup_wizard import SshWorkerSetupWizard
+
+
+class AboutDialog(QDialog):
+    def __init__(
+        self,
+        *,
+        paths: AppPaths,
+        log_path: Path,
+        db_path: Path,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._paths = paths
+        self._log_path = log_path
+        self._db_path = db_path
+
+        self._runtime_card = QFrame()
+        self._runtime_card.setFrameShape(QFrame.StyledPanel)
+        self._runtime_card_layout = QFormLayout(self._runtime_card)
+        self._runtime_card_layout.setContentsMargins(12, 12, 12, 12)
+
+        self._app_home_label = QLabel()
+        self._state_label = QLabel()
+        self._artifacts_label = QLabel()
+        self._database_label = QLabel()
+        self._current_log_file_label = QLabel()
+        self._build_commit_label = QLabel()
+        self._open_logs_button = QPushButton()
+
+        self._app_home_value = QLabel(str(self._paths.home))
+        self._state_value = QLabel(str(self._paths.state))
+        self._artifacts_value = QLabel(str(self._paths.artifacts))
+        self._database_value = QLabel(str(self._db_path))
+        self._current_log_file_value = QLabel(str(self._log_path))
+        self._build_commit_value = QLabel(BUILD_COMMIT_DISPLAY)
+        if BUILD_COMMIT_DISPLAY != BUILD_COMMIT:
+            self._build_commit_value.setToolTip(BUILD_COMMIT)
+
+        self.resize(640, 360)
+        self._build_ui()
+        self._wire_events()
+        self.retranslate_ui()
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(16)
+
+        for value_label in (
+            self._app_home_value,
+            self._state_value,
+            self._artifacts_value,
+            self._database_value,
+            self._current_log_file_value,
+            self._build_commit_value,
+        ):
+            value_label.setWordWrap(True)
+
+        self._runtime_card_layout.addRow(self._app_home_label, self._app_home_value)
+        self._runtime_card_layout.addRow(self._state_label, self._state_value)
+        self._runtime_card_layout.addRow(self._artifacts_label, self._artifacts_value)
+        self._runtime_card_layout.addRow(self._database_label, self._database_value)
+        self._runtime_card_layout.addRow(self._current_log_file_label, self._current_log_file_value)
+        self._runtime_card_layout.addRow(self._build_commit_label, self._build_commit_value)
+
+        layout.addWidget(self._runtime_card)
+        actions_layout = QHBoxLayout()
+        actions_layout.addWidget(self._open_logs_button)
+        actions_layout.addStretch(1)
+        layout.addLayout(actions_layout)
+
+    def _wire_events(self) -> None:
+        self._open_logs_button.clicked.connect(self._open_logs_dir)
+
+    def retranslate_ui(self) -> None:
+        self.setWindowTitle(self.tr("About"))
+        self._app_home_label.setText(self.tr("App home"))
+        self._state_label.setText(self.tr("State"))
+        self._artifacts_label.setText(self.tr("Artifacts"))
+        self._database_label.setText(self.tr("Database"))
+        self._current_log_file_label.setText(self.tr("Current log file"))
+        self._build_commit_label.setText(self.tr("Build commit"))
+        self._open_logs_button.setText(self.tr("Open log directory"))
+
+    def changeEvent(self, event: QEvent) -> None:
+        if event.type() == QEvent.LanguageChange:
+            self.retranslate_ui()
+        super().changeEvent(event)
+
+    def _open_logs_dir(self) -> None:
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._paths.logs)))
 
 
 class SettingsDialog(QDialog):
@@ -65,21 +157,23 @@ class SettingsDialog(QDialog):
         self._loading_provider = False
         self._active_provider_index = 0
         self._ssh_worker_wizard: SshWorkerSetupWizard | None = None
+        self._about_dialog: AboutDialog | None = None
 
         self._language_label = QLabel()
         self._language_selector = QComboBox()
-        self._open_logs_button = QPushButton()
+        self._about_button = QPushButton()
         self._save_button = QPushButton()
 
-        self._runtime_card = QFrame()
-        self._runtime_card.setFrameShape(QFrame.StyledPanel)
-        self._runtime_card_layout = QFormLayout(self._runtime_card)
-        self._runtime_card_layout.setContentsMargins(12, 12, 12, 12)
-
+        self._tabs = QTabWidget()
         self._llm_card = QFrame()
         self._llm_card.setFrameShape(QFrame.StyledPanel)
         self._llm_card_layout = QFormLayout(self._llm_card)
         self._llm_card_layout.setContentsMargins(12, 12, 12, 12)
+
+        self._global_models_card = QFrame()
+        self._global_models_card.setFrameShape(QFrame.StyledPanel)
+        self._global_models_card_layout = QFormLayout(self._global_models_card)
+        self._global_models_card_layout.setContentsMargins(12, 12, 12, 12)
 
         self._aimock_card = QFrame()
         self._aimock_card.setFrameShape(QFrame.StyledPanel)
@@ -91,13 +185,7 @@ class SettingsDialog(QDialog):
         self._ml_workers_card_layout = QFormLayout(self._ml_workers_card)
         self._ml_workers_card_layout.setContentsMargins(12, 12, 12, 12)
 
-        self._app_home_label = QLabel()
-        self._state_label = QLabel()
-        self._artifacts_label = QLabel()
-        self._database_label = QLabel()
-        self._current_log_file_label = QLabel()
-        self._build_commit_label = QLabel()
-
+        self._global_models_title_label = QLabel()
         self._llm_title_label = QLabel()
         self._provider_selector_label = QLabel()
         self._provider_key_label = QLabel()
@@ -120,15 +208,6 @@ class SettingsDialog(QDialog):
         self._ml_workers_title_label = QLabel()
         self._ml_workers_summary_label = QLabel()
         self._ml_workers_setup_button = QPushButton()
-
-        self._app_home_value = QLabel(str(self._paths.home))
-        self._state_value = QLabel(str(self._paths.state))
-        self._artifacts_value = QLabel(str(self._paths.artifacts))
-        self._database_value = QLabel(str(self._db_path))
-        self._current_log_file_value = QLabel(str(self._log_path))
-        self._build_commit_value = QLabel(BUILD_COMMIT_DISPLAY)
-        if BUILD_COMMIT_DISPLAY != BUILD_COMMIT:
-            self._build_commit_value.setToolTip(BUILD_COMMIT)
 
         self._provider_selector = QComboBox()
         self._add_provider_button = QPushButton()
@@ -181,23 +260,6 @@ class SettingsDialog(QDialog):
         scroll_layout.setSpacing(16)
         scroll.setWidget(scroll_content)
 
-        for value_label in (
-            self._app_home_value,
-            self._state_value,
-            self._artifacts_value,
-            self._database_value,
-            self._current_log_file_value,
-            self._build_commit_value,
-        ):
-            value_label.setWordWrap(True)
-
-        self._runtime_card_layout.addRow(self._app_home_label, self._app_home_value)
-        self._runtime_card_layout.addRow(self._state_label, self._state_value)
-        self._runtime_card_layout.addRow(self._artifacts_label, self._artifacts_value)
-        self._runtime_card_layout.addRow(self._database_label, self._database_value)
-        self._runtime_card_layout.addRow(self._current_log_file_label, self._current_log_file_value)
-        self._runtime_card_layout.addRow(self._build_commit_label, self._build_commit_value)
-
         provider_selector_row = QHBoxLayout()
         provider_selector_row.setSpacing(8)
         provider_selector_row.addWidget(self._provider_selector, 1)
@@ -205,6 +267,14 @@ class SettingsDialog(QDialog):
         provider_selector_row.addWidget(self._remove_provider_button)
 
         self._provider_dialect_selector.addItem("OpenAI-compatible", LLMDialect.OPENAI_COMPATIBLE.value)
+        self._global_models_card_layout.addRow(self._global_models_title_label)
+        self._global_models_card_layout.addRow(self._llm_default_model_label, self._llm_default_model_selector)
+        self._global_models_card_layout.addRow(self._llm_guard_model_label, self._llm_guard_model_selector)
+        self._global_models_card_layout.addRow(
+            self._llm_thread_title_model_label,
+            self._llm_thread_title_model_selector,
+        )
+
         self._llm_card_layout.addRow(self._llm_title_label)
         self._llm_card_layout.addRow(self._provider_selector_label, provider_selector_row)
         self._llm_card_layout.addRow(self._provider_key_label, self._provider_key_input)
@@ -215,12 +285,6 @@ class SettingsDialog(QDialog):
         self._llm_card_layout.addRow(self._provider_models_label, self._provider_models_input)
         self._llm_card_layout.addRow(self._provider_timeout_label, self._provider_timeout_input)
         self._llm_card_layout.addRow(self._provider_streaming_label, self._provider_streaming_checkbox)
-        self._llm_card_layout.addRow(self._llm_default_model_label, self._llm_default_model_selector)
-        self._llm_card_layout.addRow(self._llm_guard_model_label, self._llm_guard_model_selector)
-        self._llm_card_layout.addRow(
-            self._llm_thread_title_model_label,
-            self._llm_thread_title_model_selector,
-        )
 
         self._aimock_card_layout.addRow(self._aimock_title_label)
         self._aimock_card_layout.addRow(self._aimock_enabled_label, self._aimock_enabled_checkbox)
@@ -233,21 +297,36 @@ class SettingsDialog(QDialog):
         self._ml_workers_card_layout.addRow(self._ml_workers_summary_label)
         self._ml_workers_card_layout.addRow(self._ml_workers_setup_button)
 
-        scroll_layout.addWidget(self._llm_card)
-        scroll_layout.addWidget(self._aimock_card)
-        scroll_layout.addWidget(self._ml_workers_card)
-        scroll_layout.addWidget(self._runtime_card)
+        ai_tab = QWidget()
+        ai_layout = QVBoxLayout(ai_tab)
+        ai_layout.setContentsMargins(12, 12, 12, 12)
+        ai_layout.setSpacing(16)
+        ai_layout.addWidget(self._global_models_card)
+        ai_layout.addWidget(self._llm_card)
+        ai_layout.addWidget(self._aimock_card)
+        ai_layout.addStretch(1)
+
+        ml_workers_tab = QWidget()
+        ml_workers_layout = QVBoxLayout(ml_workers_tab)
+        ml_workers_layout.setContentsMargins(12, 12, 12, 12)
+        ml_workers_layout.setSpacing(16)
+        ml_workers_layout.addWidget(self._ml_workers_card)
+        ml_workers_layout.addStretch(1)
+
+        self._tabs.addTab(ai_tab, "")
+        self._tabs.addTab(ml_workers_tab, "")
+        scroll_layout.addWidget(self._tabs)
         scroll_layout.addStretch(1)
         layout.addWidget(scroll, 1)
 
         actions_layout = QHBoxLayout()
-        actions_layout.addWidget(self._open_logs_button)
+        actions_layout.addWidget(self._about_button)
         actions_layout.addStretch(1)
         actions_layout.addWidget(self._save_button)
         layout.addLayout(actions_layout)
 
     def _wire_events(self) -> None:
-        self._open_logs_button.clicked.connect(self._open_logs_dir)
+        self._about_button.clicked.connect(self._open_about_dialog)
         self._language_selector.currentIndexChanged.connect(self._on_language_changed)
         self._save_button.clicked.connect(self._save_agent_settings)
         self._provider_selector.currentIndexChanged.connect(self._on_provider_changed)
@@ -258,6 +337,9 @@ class SettingsDialog(QDialog):
     def retranslate_ui(self) -> None:
         self.setWindowTitle(self.tr("Settings"))
         self._language_label.setText(self.tr("Language"))
+        self._tabs.setTabText(0, self.tr("AI"))
+        self._tabs.setTabText(1, self.tr("ML Workers"))
+        self._global_models_title_label.setText(self.tr("Global models"))
         self._llm_title_label.setText(self.tr("LLM providers"))
         self._provider_selector_label.setText(self.tr("Provider"))
         self._provider_key_label.setText(self.tr("Provider key"))
@@ -281,13 +363,7 @@ class SettingsDialog(QDialog):
         self._aimock_api_key_label.setText(self.tr("AIMock API key"))
         self._ml_workers_title_label.setText(self.tr("ML workers"))
         self._ml_workers_setup_button.setText(self.tr("Add SSH worker..."))
-        self._app_home_label.setText(self.tr("App home"))
-        self._state_label.setText(self.tr("State"))
-        self._artifacts_label.setText(self.tr("Artifacts"))
-        self._database_label.setText(self.tr("Database"))
-        self._current_log_file_label.setText(self.tr("Current log file"))
-        self._build_commit_label.setText(self.tr("Build commit"))
-        self._open_logs_button.setText(self.tr("Open log directory"))
+        self._about_button.setText(self.tr("About"))
         self._save_button.setText(self.tr("Save"))
         self._reload_language_options()
         self._refresh_model_selectors(
@@ -324,6 +400,8 @@ class SettingsDialog(QDialog):
         try:
             self._translation_manager.set_locale(str(locale_code))
             self.retranslate_ui()
+            if self._about_dialog is not None:
+                self._about_dialog.retranslate_ui()
         except Exception as exc:
             self._reload_language_options()
             QMessageBox.critical(
@@ -332,8 +410,17 @@ class SettingsDialog(QDialog):
                 self.tr("Unable to switch the application language.\n\n{details}").format(details=str(exc)),
             )
 
-    def _open_logs_dir(self) -> None:
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._paths.logs)))
+    def _open_about_dialog(self) -> None:
+        if self._about_dialog is None:
+            self._about_dialog = AboutDialog(
+                paths=self._paths,
+                log_path=self._log_path,
+                db_path=self._db_path,
+                parent=self,
+            )
+        self._about_dialog.show()
+        self._about_dialog.raise_()
+        self._about_dialog.activateWindow()
 
     def _load_agent_settings(self) -> None:
         settings = self._llm_settings_service.load()

@@ -95,13 +95,21 @@ def test_main_window_language_switch_updates_chat_shell(
         assert window._title_label.text() == "Xenix"
         assert window._settings_button.text() == "Settings"
         assert window._history_label.text() == "History"
-        assert settings._open_logs_button.text() == "Open log directory"
-        assert settings._build_commit_label.text() == "Build commit"
+        assert settings._about_button.text() == "About"
+        assert settings._tabs.tabText(0) == "AI"
+        assert settings._tabs.tabText(1) == "ML Workers"
+        assert settings._global_models_title_label.text() == "Global models"
         assert settings._llm_title_label.text() == "LLM providers"
         assert settings._llm_default_model_label.text() == "Default model"
         assert settings._llm_thread_title_model_label.text() == "Thread title model"
         assert settings._ml_workers_title_label.text() == "ML workers"
         assert settings._ml_workers_setup_button.text() == "Add SSH worker..."
+        settings._open_about_dialog()
+        about = settings._about_dialog
+        assert about is not None
+        assert about.windowTitle() == "About"
+        assert about._open_logs_button.text() == "Open log directory"
+        assert about._build_commit_label.text() == "Build commit"
         assert window.tr("Generate title...") == "Generate title..."
         assert window.tr("Copy thread ID") == "Copy thread ID"
         assert window.tr("Generating thread title...") == "Generating thread title..."
@@ -198,13 +206,18 @@ def test_main_window_language_switch_updates_chat_shell(
         assert window._title_label.text() == "Xenix"
         assert window._settings_button.text() == "设置"
         assert window._history_label.text() == "历史"
-        assert settings._open_logs_button.text() == "打开日志目录"
-        assert settings._build_commit_label.text() == "构建提交"
+        assert settings._about_button.text() == "关于"
+        assert settings._tabs.tabText(0) == "AI"
+        assert settings._tabs.tabText(1) == "ML 工作器"
+        assert settings._global_models_title_label.text() == "全局模型"
         assert settings._llm_title_label.text() == "LLM 提供商"
         assert settings._llm_default_model_label.text() == "默认模型"
         assert settings._llm_thread_title_model_label.text() == "线程标题模型"
         assert settings._ml_workers_title_label.text() == "ML 工作器"
         assert settings._ml_workers_setup_button.text() == "添加 SSH 工作器..."
+        assert about.windowTitle() == "关于"
+        assert about._open_logs_button.text() == "打开日志目录"
+        assert about._build_commit_label.text() == "构建提交"
         assert window.tr("Generate title...") == "生成标题..."
         assert window.tr("Copy thread ID") == "复制线程 ID"
         assert window.tr("Generating thread title...") == "正在生成线程标题..."
@@ -232,13 +245,18 @@ def test_main_window_language_switch_updates_chat_shell(
         app.processEvents()
 
         assert window.windowTitle() == "Xenix Native"
-        assert settings._open_logs_button.text() == "Open log directory"
-        assert settings._build_commit_label.text() == "Build commit"
+        assert settings._about_button.text() == "About"
+        assert settings._tabs.tabText(0) == "AI"
+        assert settings._tabs.tabText(1) == "ML Workers"
+        assert settings._global_models_title_label.text() == "Global models"
         assert settings._llm_title_label.text() == "LLM providers"
         assert settings._llm_default_model_label.text() == "Default model"
         assert settings._llm_thread_title_model_label.text() == "Thread title model"
         assert settings._ml_workers_title_label.text() == "ML workers"
         assert settings._ml_workers_setup_button.text() == "Add SSH worker..."
+        assert about.windowTitle() == "About"
+        assert about._open_logs_button.text() == "Open log directory"
+        assert about._build_commit_label.text() == "Build commit"
         assert window.tr("Generate title...") == "Generate title..."
         assert window.tr("Copy thread ID") == "Copy thread ID"
         assert window.tr("Generating thread title...") == "Generating thread title..."
@@ -255,6 +273,8 @@ def test_main_window_language_switch_updates_chat_shell(
         assert read_saved_locale(paths) == "en_US"
     finally:
         if window._settings_dialog is not None:
+            if window._settings_dialog._about_dialog is not None:
+                window._settings_dialog._about_dialog.close()
             window._settings_dialog.close()
         window.close()
 

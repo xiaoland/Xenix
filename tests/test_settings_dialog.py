@@ -71,6 +71,12 @@ def test_settings_dialog_provider_switch_preserves_distinct_provider_fields(
     )
 
     try:
+        assert dialog._tabs.count() == 2
+        assert dialog._tabs.tabText(0) == "AI"
+        assert dialog._tabs.tabText(1) == "ML Workers"
+        assert dialog._global_models_title_label.text() == "Global models"
+        assert dialog._about_button.text() == "About"
+
         dialog._provider_base_url_input.setText("https://edited-bailian.example.test")
         dialog._provider_api_key_input.setText("edited-bailian-secret")
         dialog._provider_models_input.setPlainText("edited-qwen\nedited-title")
