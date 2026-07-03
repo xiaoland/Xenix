@@ -44,6 +44,25 @@ Result:
 - `tasks/xenix-logo-refresh/splash-preview.png` captured a 680x400 offscreen splash preview with bright background, orange logo/accent pixels, and nonblank content.
 - ICO outputs contain sizes 16, 24, 32, 48, 64, 128, and 256 px.
 
+Follow-up startup splash optimization:
+
+- Replaced the hand-drawn `Xenix` vector wordmark with large black Qt-rendered text.
+- Loaded common Windows font files into Qt when the font database is empty, so offscreen rendering does not degrade text into square fallback glyphs.
+- Removed the status bay white fill, border, and orange divider while preserving the translated startup stage label.
+- Replaced the segmented pulse strip with an indeterminate sliding capsule progress bar.
+- `pdm run python -m compileall src\xenix\ui\startup_splash.py` passed.
+- `pdm run pytest tests/test_i18n.py::test_startup_splash_renders_nonblank_canvas_offscreen tests/test_i18n.py::test_startup_splash_language_switch_updates_stage_text` passed: 2 tests.
+- `tasks/xenix-logo-refresh/splash-preview.png` was refreshed with the optimized splash preview.
+
+Second follow-up:
+
+- Changed the `Xenix` brand text to prefer monospace fonts (`Consolas`, then Courier-style fallbacks).
+- Added Consolas/Courier font files to the startup font load list for offscreen and packaged stability.
+- Changed the splash panel from rounded corners to a straight rectangular shape.
+- `pdm run python -m compileall src\xenix\ui\startup_splash.py` passed.
+- `pdm run pytest tests/test_i18n.py::test_startup_splash_renders_nonblank_canvas_offscreen tests/test_i18n.py::test_startup_splash_language_switch_updates_stage_text` passed: 2 tests.
+- `tasks/xenix-logo-refresh/splash-preview.png` was refreshed again.
+
 ## Next Step
 
 Await user review. No commit has been made.

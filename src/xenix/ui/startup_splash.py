@@ -1,23 +1,36 @@
 from __future__ import annotations
 
 from enum import Enum
+from pathlib import Path
 
 from PySide6.QtCore import QEvent, QPointF, QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import (
     QColor,
     QFont,
+    QFontDatabase,
     QLinearGradient,
     QPainter,
     QPainterPath,
-    QPainterPathStroker,
     QPalette,
     QPen,
-    QTransform,
 )
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QApplication, QLabel, QWidget
 
 from xenix.resources import package_resource_path
+
+
+_STARTUP_FONT_FILES = (
+    Path("C:/Windows/Fonts/consola.ttf"),
+    Path("C:/Windows/Fonts/consolab.ttf"),
+    Path("C:/Windows/Fonts/cour.ttf"),
+    Path("C:/Windows/Fonts/courbd.ttf"),
+    Path("C:/Windows/Fonts/segoeui.ttf"),
+    Path("C:/Windows/Fonts/segoeuib.ttf"),
+    Path("C:/Windows/Fonts/arial.ttf"),
+    Path("C:/Windows/Fonts/arialbd.ttf"),
+)
+_STARTUP_FONTS_LOADED = False
 
 
 class StartupStage(Enum):
@@ -33,15 +46,15 @@ class StartupStage(Enum):
 class StartupPulseBar(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setFixedHeight(14)
+        self.setFixedHeight(8)
         self.setMinimumWidth(240)
-        self._phase = 0.0
+        self._phase = 0.18
         self._timer = QTimer(self)
         self._timer.setInterval(32)
         self._timer.timeout.connect(self._advance)
 
     def sizeHint(self) -> QSize:
-        return QSize(560, 14)
+        return QSize(560, 8)
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
@@ -52,7 +65,7 @@ class StartupPulseBar(QWidget):
         super().hideEvent(event)
 
     def _advance(self) -> None:
-        self._phase = (self._phase + 0.022) % 1.0
+        self._phase = (self._phase + 0.018) % 1.0
         self.update()
 
     def paintEvent(self, event) -> None:
@@ -62,37 +75,27 @@ class StartupPulseBar(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        paper = QColor("#f6f7f3")
-        graphite = QColor("#242429")
+        track = QColor("#d9ded6")
         accent = QColor("#ed6609")
 
-        track_gradient = QLinearGradient(rect.topLeft(), rect.bottomLeft())
-        track_gradient.setColorAt(0.0, paper)
-        track_gradient.setColorAt(1.0, QColor("#e5e8e1"))
-        painter.setBrush(track_gradient)
-        border = QColor(graphite)
-        border.setAlpha(42)
-        painter.setPen(QPen(border, 1))
-        painter.drawRoundedRect(rect, 2, 2)
-
-        inner = rect.adjusted(3, 3, -3, -3)
-        segment_count = 30
-        gap = 3.0
-        segment_width = (inner.width() - gap * (segment_count - 1)) / segment_count
-        scan_center = self._phase * (segment_count + 8) - 4
-
         painter.setPen(Qt.PenStyle.NoPen)
-        for index in range(segment_count):
-            distance = abs(index - scan_center)
-            intensity = max(0.16, 1.0 - distance / 5.0)
-            color = QColor(graphite)
-            if distance < 4.8:
-                color = QColor(accent)
-            color.setAlpha(int(44 + 188 * intensity))
-            x = inner.left() + index * (segment_width + gap)
-            segment = QRectF(x, inner.top(), segment_width, inner.height())
-            painter.setBrush(color)
-            painter.drawRect(segment)
+        painter.setBrush(track)
+        painter.drawRoundedRect(rect, 4, 4)
+
+        slider_width = max(72.0, rect.width() * 0.24)
+        travel = rect.width() + slider_width
+        x = rect.left() - slider_width + travel * self._phase
+        slider = QRectF(x, rect.top(), slider_width, rect.height())
+        soft_accent = QColor(accent)
+        soft_accent.setAlpha(88)
+        gradient = QLinearGradient(slider.topLeft(), slider.topRight())
+        gradient.setColorAt(0.0, soft_accent)
+        gradient.setColorAt(0.5, accent)
+        gradient.setColorAt(1.0, soft_accent)
+        painter.setClipRect(rect)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(gradient)
+        painter.drawRoundedRect(slider, 4, 4)
 
 
 class StartupSplash(QWidget):
@@ -107,6 +110,7 @@ class StartupSplash(QWidget):
         self._stage_label = QLabel(parent=self)
         self._pulse_bar = StartupPulseBar(parent=self)
 
+        self._ensure_text_fonts_loaded()
         self._setup_ui()
         self.retranslate_ui()
 
@@ -128,8 +132,8 @@ class StartupSplash(QWidget):
     def _position_status_controls(self) -> None:
         width = self.width()
         height = self.height()
-        self._stage_label.setGeometry(42, height - 65, width - 84, 22)
-        self._pulse_bar.setGeometry(42, height - 36, width - 84, 14)
+        self._stage_label.setGeometry(42, height - 62, width - 84, 22)
+        self._pulse_bar.setGeometry(42, height - 30, width - 84, 8)
 
     def show_centered(self) -> None:
         screen = self.screen() or QApplication.primaryScreen()
@@ -160,12 +164,11 @@ class StartupSplash(QWidget):
 
         panel = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
         panel_path = QPainterPath()
-        panel_path.addRoundedRect(panel, 9, 9)
+        panel_path.addRect(panel)
 
         self._draw_shell(painter, panel, panel_path)
         painter.setClipPath(panel_path)
         self._draw_signal_field(painter, panel)
-        self._draw_status_bay(painter, panel)
         self._draw_brand(painter, panel)
         painter.setClipping(False)
 
@@ -229,88 +232,22 @@ class StartupSplash(QWidget):
         painter.drawRoundedRect(QRectF(panel.right() - 176, panel.top() + 42, 116, 12), 6, 6)
         painter.drawRoundedRect(QRectF(panel.right() - 136, panel.top() + 214, 78, 12), 6, 6)
 
-    def _draw_status_bay(self, painter: QPainter, panel: QRectF) -> None:
-        bay = QRectF(panel.left() + 26, panel.bottom() - 82, panel.width() - 52, 62)
-        bay_path = QPainterPath()
-        bay_path.addRoundedRect(bay, 3, 3)
-        bay_color = QColor("#ffffff")
-        bay_color.setAlpha(228)
-        painter.fillPath(bay_path, bay_color)
-        border = QColor("#242429")
-        border.setAlpha(48)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.setPen(QPen(border, 1))
-        painter.drawPath(bay_path)
-
-        divider = QColor("#ed6609")
-        divider.setAlpha(90)
-        painter.setPen(QPen(divider, 1))
-        painter.drawLine(QPointF(bay.left() + 14, bay.top() + 34), QPointF(bay.right() - 14, bay.top() + 34))
-
     def _draw_brand(self, painter: QPainter, panel: QRectF) -> None:
         mark_rect = QRectF(panel.left() + 48, panel.top() + 56, 138, 138)
         if self._logo_renderer.isValid():
             self._logo_renderer.render(painter, mark_rect)
 
-        wordmark = self._xenix_vector_path()
-        transform = QTransform()
-        transform.translate(panel.left() + 210, panel.top() + 72)
-        transform.scale(0.62, 0.62)
-        wordmark = transform.map(wordmark)
-        painter.fillPath(wordmark, QColor("#242429"))
-
-        accent = QColor("#ed6609")
-        graphite = QColor("#242429")
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(accent)
-        painter.drawRoundedRect(QRectF(panel.left() + 212, panel.top() + 148, 92, 6), 3, 3)
-        graphite.setAlpha(190)
-        painter.setBrush(graphite)
-        painter.drawRoundedRect(QRectF(panel.left() + 316, panel.top() + 148, 34, 6), 3, 3)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-
-    def _xenix_vector_path(self) -> QPainterPath:
-        skeleton = QPainterPath()
-        height = 100.0
-
-        def line(x1: float, y1: float, x2: float, y2: float) -> None:
-            skeleton.moveTo(x1, y1)
-            skeleton.lineTo(x2, y2)
-
-        x = 0.0
-        line(x, 0, x + 70, height)
-        line(x + 70, 0, x, height)
-
-        x += 92
-        line(x + 4, 54, x + 20, 42)
-        line(x + 20, 42, x + 58, 42)
-        line(x + 58, 42, x + 58, 68)
-        line(x + 58, 68, x + 14, 68)
-        line(x + 14, 68, x + 14, 88)
-        line(x + 14, 88, x + 58, 88)
-
-        x += 82
-        line(x, height, x, 44)
-        line(x, 44, x + 50, 44)
-        line(x + 50, 44, x + 66, 60)
-        line(x + 66, 60, x + 66, height)
-
-        x += 82
-        line(x + 14, 44, x + 14, height)
-        dot = QPainterPath()
-        dot.addRect(QRectF(x + 6, 14, 17, 17))
-
-        x += 46
-        line(x + 2, 44, x + 58, height)
-        line(x + 58, 44, x + 2, height)
-
-        stroker = QPainterPathStroker()
-        stroker.setWidth(12.5)
-        stroker.setCapStyle(Qt.PenCapStyle.SquareCap)
-        stroker.setJoinStyle(Qt.PenJoinStyle.MiterJoin)
-        path = stroker.createStroke(skeleton)
-        path.addPath(dot)
-        return path
+        brand_font = QFont(self.font())
+        brand_font.setFamilies(["Consolas", "Courier New", "Lucida Console", "Monospace"])
+        brand_font.setPointSize(54)
+        brand_font.setWeight(QFont.Weight.Bold)
+        painter.setFont(brand_font)
+        painter.setPen(QColor("#242429"))
+        painter.drawText(
+            QRectF(panel.left() + 208, panel.top() + 62, 300, 94),
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+            "Xenix",
+        )
 
     def _stage_text(self, stage: StartupStage) -> str:
         stage_text = {
@@ -329,3 +266,16 @@ class StartupSplash(QWidget):
         palette = QPalette(label.palette())
         palette.setColor(QPalette.ColorRole.WindowText, color)
         label.setPalette(palette)
+
+    @staticmethod
+    def _ensure_text_fonts_loaded() -> None:
+        global _STARTUP_FONTS_LOADED
+
+        if _STARTUP_FONTS_LOADED or QFontDatabase.families():
+            _STARTUP_FONTS_LOADED = True
+            return
+
+        for font_path in _STARTUP_FONT_FILES:
+            if font_path.is_file():
+                QFontDatabase.addApplicationFont(str(font_path))
+        _STARTUP_FONTS_LOADED = True
