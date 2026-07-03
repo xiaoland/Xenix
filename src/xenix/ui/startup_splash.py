@@ -14,7 +14,10 @@ from PySide6.QtGui import (
     QPen,
     QTransform,
 )
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QApplication, QLabel, QWidget
+
+from xenix.resources import package_resource_path
 
 
 class StartupStage(Enum):
@@ -59,21 +62,21 @@ class StartupPulseBar(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        deep = QColor("#07111b")
-        steel = QColor("#9fb7c8")
-        accent = QColor("#4da3d8")
+        paper = QColor("#f6f7f3")
+        graphite = QColor("#242429")
+        accent = QColor("#ed6609")
 
         track_gradient = QLinearGradient(rect.topLeft(), rect.bottomLeft())
-        track_gradient.setColorAt(0.0, deep.lighter(118))
-        track_gradient.setColorAt(1.0, deep)
+        track_gradient.setColorAt(0.0, paper)
+        track_gradient.setColorAt(1.0, QColor("#e5e8e1"))
         painter.setBrush(track_gradient)
-        steel_border = QColor(steel)
-        steel_border.setAlpha(120)
-        painter.setPen(QPen(steel_border, 1))
+        border = QColor(graphite)
+        border.setAlpha(42)
+        painter.setPen(QPen(border, 1))
         painter.drawRoundedRect(rect, 2, 2)
 
         inner = rect.adjusted(3, 3, -3, -3)
-        segment_count = 28
+        segment_count = 30
         gap = 3.0
         segment_width = (inner.width() - gap * (segment_count - 1)) / segment_count
         scan_center = self._phase * (segment_count + 8) - 4
@@ -82,10 +85,10 @@ class StartupPulseBar(QWidget):
         for index in range(segment_count):
             distance = abs(index - scan_center)
             intensity = max(0.16, 1.0 - distance / 5.0)
-            color = QColor(steel)
+            color = QColor(graphite)
             if distance < 4.8:
                 color = QColor(accent)
-            color.setAlpha(int(70 + 160 * intensity))
+            color.setAlpha(int(44 + 188 * intensity))
             x = inner.left() + index * (segment_width + gap)
             segment = QRectF(x, inner.top(), segment_width, inner.height())
             painter.setBrush(color)
@@ -97,10 +100,10 @@ class StartupSplash(QWidget):
         flags = Qt.WindowType.SplashScreen | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint
         super().__init__(parent, flags)
         self.setObjectName("startupSplash")
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setFixedSize(680, 400)
 
         self._stage = StartupStage.STARTING
+        self._logo_renderer = QSvgRenderer(str(package_resource_path("app-icon.svg")), self)
         self._stage_label = QLabel(parent=self)
         self._pulse_bar = StartupPulseBar(parent=self)
 
@@ -115,7 +118,7 @@ class StartupSplash(QWidget):
         stage_font.setPointSize(10)
         stage_font.setBold(True)
         self._stage_label.setFont(stage_font)
-        self._apply_label_color(self._stage_label, QColor("#9fb7c8"))
+        self._apply_label_color(self._stage_label, QColor("#242429"))
         self._position_status_controls()
 
     def resizeEvent(self, event) -> None:
@@ -151,8 +154,6 @@ class StartupSplash(QWidget):
         super().changeEvent(event)
 
     def paintEvent(self, event) -> None:
-        super().paintEvent(event)
-
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
@@ -163,121 +164,110 @@ class StartupSplash(QWidget):
 
         self._draw_shell(painter, panel, panel_path)
         painter.setClipPath(panel_path)
-        self._draw_grid(painter, panel)
+        self._draw_signal_field(painter, panel)
         self._draw_status_bay(painter, panel)
-        self._draw_title(painter, panel)
+        self._draw_brand(painter, panel)
         painter.setClipping(False)
 
-        border = QColor("#9fb7c8")
-        border.setAlpha(150)
+        border = QColor("#242429")
+        border.setAlpha(54)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.setPen(QPen(border, 1))
         painter.drawPath(panel_path)
 
     def _draw_shell(self, painter: QPainter, panel: QRectF, panel_path: QPainterPath) -> None:
-        deep = QColor("#07111b")
-        steel = QColor("#9fb7c8")
-
         background = QLinearGradient(panel.topLeft(), panel.bottomRight())
-        background.setColorAt(0.0, deep.lighter(150))
-        background.setColorAt(0.46, deep)
-        background.setColorAt(1.0, deep.darker(145))
+        background.setColorAt(0.0, QColor("#fbfbf8"))
+        background.setColorAt(0.58, QColor("#f1f3ee"))
+        background.setColorAt(1.0, QColor("#dfe5dd"))
         painter.fillPath(panel_path, background)
 
-        sheen = QLinearGradient(QPointF(panel.left(), panel.top()), QPointF(panel.right(), panel.top() + 120))
-        highlight = QColor(steel)
-        highlight.setAlpha(34)
-        transparent = QColor(steel)
+        sheen = QLinearGradient(QPointF(panel.left(), panel.top()), QPointF(panel.right(), panel.bottom()))
+        highlight = QColor("#ed6609")
+        highlight.setAlpha(32)
+        transparent = QColor("#ed6609")
         transparent.setAlpha(0)
         sheen.setColorAt(0.0, highlight)
-        sheen.setColorAt(1.0, transparent)
+        sheen.setColorAt(0.42, transparent)
         painter.fillPath(panel_path, sheen)
 
-    def _draw_grid(self, painter: QPainter, panel: QRectF) -> None:
-        steel = QColor("#9fb7c8")
-        accent = QColor("#4da3d8")
-        vanishing = QPointF(panel.left() + panel.width() * 0.82, panel.top() + panel.height() * 0.12)
-        floor_top = panel.top() + panel.height() * 0.52
-        floor_bottom = panel.bottom() - 72
+    def _draw_signal_field(self, painter: QPainter, panel: QRectF) -> None:
+        graphite = QColor("#242429")
+        accent = QColor("#ed6609")
+        green = QColor("#1f7a68")
 
-        grid_pen_color = QColor(steel)
-        grid_pen_color.setAlpha(42)
-        painter.setPen(QPen(grid_pen_color, 1))
-        for index in range(10):
-            x = panel.left() - 60 + index * 76
-            painter.drawLine(QPointF(x, floor_bottom), vanishing)
+        lane_pen = QColor(graphite)
+        lane_pen.setAlpha(26)
+        painter.setPen(QPen(lane_pen, 1))
+        for index in range(6):
+            y = panel.top() + 42 + index * 37
+            painter.drawLine(QPointF(panel.left() + 210, y), QPointF(panel.right() - 42, y))
 
-        for index in range(7):
-            t = index / 6
-            y = floor_top + (floor_bottom - floor_top) * (t * t)
-            painter.drawLine(QPointF(panel.left() + 26 + 18 * index, y), QPointF(panel.right() - 34 - 8 * index, y - 16 * (1 - t)))
+        node_pen = QColor(graphite)
+        node_pen.setAlpha(48)
+        painter.setPen(QPen(node_pen, 1))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        nodes = [
+            QPointF(panel.left() + 446, panel.top() + 74),
+            QPointF(panel.left() + 514, panel.top() + 126),
+            QPointF(panel.left() + 590, panel.top() + 88),
+            QPointF(panel.left() + 558, panel.top() + 190),
+        ]
+        for start, end in zip(nodes, nodes[1:]):
+            painter.drawLine(start, end)
+        for index, point in enumerate(nodes):
+            color = QColor(accent if index == 1 else green if index == 3 else graphite)
+            color.setAlpha(122)
+            painter.setBrush(color)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawEllipse(point, 4.5, 4.5)
 
-        accent_line = QColor(accent)
-        accent_line.setAlpha(74)
-        painter.setPen(QPen(accent_line, 1))
-        painter.drawLine(QPointF(panel.left() + 40, floor_bottom), QPointF(panel.right() - 30, floor_top - 20))
+        accent_fill = QColor(accent)
+        accent_fill.setAlpha(18)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(accent_fill)
+        painter.drawRoundedRect(QRectF(panel.right() - 176, panel.top() + 42, 116, 12), 6, 6)
+        painter.drawRoundedRect(QRectF(panel.right() - 136, panel.top() + 214, 78, 12), 6, 6)
 
     def _draw_status_bay(self, painter: QPainter, panel: QRectF) -> None:
-        deep = QColor("#07111b")
-        steel = QColor("#9fb7c8")
         bay = QRectF(panel.left() + 26, panel.bottom() - 82, panel.width() - 52, 62)
         bay_path = QPainterPath()
         bay_path.addRoundedRect(bay, 3, 3)
-        bay_color = QColor(deep)
-        bay_color.setAlpha(218)
+        bay_color = QColor("#ffffff")
+        bay_color.setAlpha(228)
         painter.fillPath(bay_path, bay_color)
-        border = QColor(steel)
-        border.setAlpha(100)
+        border = QColor("#242429")
+        border.setAlpha(48)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.setPen(QPen(border, 1))
         painter.drawPath(bay_path)
 
-        divider = QColor(steel)
-        divider.setAlpha(42)
+        divider = QColor("#ed6609")
+        divider.setAlpha(90)
         painter.setPen(QPen(divider, 1))
         painter.drawLine(QPointF(bay.left() + 14, bay.top() + 34), QPointF(bay.right() - 14, bay.top() + 34))
 
-    def _draw_title(self, painter: QPainter, panel: QRectF) -> None:
-        path = self._xenix_vector_path()
+    def _draw_brand(self, painter: QPainter, panel: QRectF) -> None:
+        mark_rect = QRectF(panel.left() + 48, panel.top() + 56, 138, 138)
+        if self._logo_renderer.isValid():
+            self._logo_renderer.render(painter, mark_rect)
 
+        wordmark = self._xenix_vector_path()
         transform = QTransform()
-        transform.translate(panel.left(), panel.top() + 206)
-        transform.scale(1.45, 1.45)
-        transform.shear(-0.18, 0.0)
-        transform.rotate(-5.2)
-        face = transform.map(path)
-        face_bounds = face.boundingRect()
-        face = face.translated(
-            panel.right() - 30 - face_bounds.right(),
-            panel.top() + 70 - face_bounds.top(),
-        )
+        transform.translate(panel.left() + 210, panel.top() + 72)
+        transform.scale(0.62, 0.62)
+        wordmark = transform.map(wordmark)
+        painter.fillPath(wordmark, QColor("#242429"))
 
-        anchor = QPointF(panel.right() - 52, panel.top() + 40)
-        deep = QColor("#07111b")
-        steel = QColor("#9fb7c8")
-        accent = QColor("#4da3d8")
-
-        for index in range(10, 0, -1):
-            t = index / 10
-            depth_transform = QTransform()
-            depth_transform.translate(anchor.x(), anchor.y())
-            depth_transform.scale(1.0 - 0.055 * t, 1.0 - 0.055 * t)
-            depth_transform.translate(-anchor.x(), -anchor.y())
-            depth_transform.translate(44 * t, -26 * t)
-            depth_path = depth_transform.map(face)
-            shade = QColor(deep)
-            shade.setAlpha(int(128 + 72 * t))
-            painter.fillPath(depth_path, shade)
-
-        face_bounds = face.boundingRect()
-        fill = QLinearGradient(face_bounds.topLeft(), face_bounds.bottomRight())
-        fill.setColorAt(0.0, steel.lighter(132))
-        fill.setColorAt(0.58, steel)
-        fill.setColorAt(1.0, accent.darker(122))
-        painter.fillPath(face, fill)
-
-        edge = QColor(steel)
-        edge.setAlpha(220)
-        painter.setPen(QPen(edge, 1.4))
-        painter.drawPath(face)
+        accent = QColor("#ed6609")
+        graphite = QColor("#242429")
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(accent)
+        painter.drawRoundedRect(QRectF(panel.left() + 212, panel.top() + 148, 92, 6), 3, 3)
+        graphite.setAlpha(190)
+        painter.setBrush(graphite)
+        painter.drawRoundedRect(QRectF(panel.left() + 316, panel.top() + 148, 34, 6), 3, 3)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
 
     def _xenix_vector_path(self) -> QPainterPath:
         skeleton = QPainterPath()
