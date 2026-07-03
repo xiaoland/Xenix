@@ -670,3 +670,98 @@
 - If the user says to start implementation, do an Impact Handshake for the first intake slice before mutating source:
   - likely start with text classification + text clustering + topic modeling;
   - leave sentiment/summarization/extraction for a later contract-driven slice.
+
+## Slice 6 - Clustering Analysis Capability Intake
+
+### Objective & Hypothesis
+
+- Objective: inspect `tasks/ml-service-optimizations/assets/clustering_analysis` for clustering models or usage improvements worth introducing into native ML Service.
+- Hypothesis: the asset bundle is useful as model-selection and workflow evidence, but should not be copied directly because native Xenix already owns preprocessing, catalog, task, artifact, and apply contracts.
+
+### Guardrails Touched
+
+- Current mode: Explore only.
+- Durable source mutation: none; wait for explicit user start before changing product code.
+- Likely durable owners if implementation starts:
+  - `src/xenix/services/ml/models/clustering.py`
+  - `src/xenix/services/ml/models/base.py`
+  - `src/xenix/services/ml/registry.py`
+  - ML registry/execution/Agent harness tests
+  - `docs/20-product-tdd/` or `docs/30-unit-tdd/` if capability contracts change
+
+### Current Understanding
+
+- Native clustering currently registers only `clustering.kmeans` and `clustering.dbscan`.
+- `UnsupervisedClusteringModelService.fit()` trains a preprocessing + model pipeline, persists cluster assignments, and normalizes DBSCAN-style `-1` noise labels.
+- `UnsupervisedClusteringModelService.apply()` currently always raises `ValidationError`, even though the default segmenter result contract exposes apply table output and apply role schema.
+- The asset bundle covers:
+  - KMeans
+  - MiniBatchKMeans
+  - Agglomerative
+  - DBSCAN
+  - OPTICS
+  - GaussianMixture
+  - SpectralClustering
+  - Birch
+- Asset `evaluation_with_label.json` results on the simulated labeled customer data:
+  - Birch: ARI 0.8011, NMI 0.8430, can_predict true
+  - MiniBatchKMeans: ARI 0.7873, NMI 0.8414, can_predict true
+  - GaussianMixture: ARI 0.7308, NMI 0.7964, can_predict true
+  - KMeans: ARI 0.6492, NMI 0.8163, can_predict true
+  - Agglomerative: ARI 0.7270, NMI 0.8656, can_predict false
+  - SpectralClustering: ARI 0.6565, NMI 0.8316, can_predict false
+  - DBSCAN: ARI 0.0, NMI 0.0, can_predict false
+  - OPTICS: ARI -0.0002, NMI 0.0401, can_predict false
+- `pdm run python` confirmed sklearn method availability in the project environment:
+  - `MiniBatchKMeans`, `Birch`, and `GaussianMixture` have both `fit_predict` and `predict`.
+  - `AgglomerativeClustering`, `SpectralClustering`, `DBSCAN`, and `OPTICS` have `fit_predict` but no `predict`.
+- Asset docs emphasize that new data should reuse the training-time preprocessing standard rather than refit preprocessing on the new data; native pipelines already align with that direction.
+- Asset preprocessing scripts conflict with their own guide in places: one script label-encodes nominal feature columns, while the guide recommends One-Hot for low-cardinality unordered categories. Native `OneHotEncoder(handle_unknown="ignore")` is the safer default.
+
+### Recommendation
+
+- Highest-value usage improvement: implement clustering `apply` for predictable segmenters, appending `cluster_id` to input rows through the persisted pipeline.
+- Highest-value model additions:
+  - `clustering.minibatch_kmeans`: low-risk extension for larger datasets; same conceptual family as KMeans.
+  - `clustering.birch`: strong candidate for scalable segmentation; best ARI in asset evaluation.
+  - `clustering.gaussian_mixture`: useful probabilistic clustering option; consider whether to expose probabilities later.
+- Defer or gate:
+  - Agglomerative and Spectral until the product can honestly represent train-only segmenters or approximate assignment semantics.
+  - OPTICS and additional DBSCAN promotion until density-model parameter guidance and no-apply catalog semantics are fixed.
+- Existing DBSCAN should be revisited because it is currently cataloged like an apply-capable segmenter even though the estimator cannot predict new rows.
+
+### Verification
+
+- Read asset scripts, configs, evaluation JSON, preprocessing guide, and extracted docx text.
+- Read native clustering model, registry, base service, and targeted tests.
+- Ran `pdm run python` to verify sklearn predict/fit_predict capability for the candidate estimators.
+
+### Next Step
+
+- If the user explicitly starts implementation, perform an Impact Handshake before source edits.
+- Suggested first implementation slice: predictable clusterer apply support plus MiniBatchKMeans and Birch registration.
+
+### Implementation Update
+
+- User explicitly started implementation for:
+  - predictable clustering apply support;
+  - MiniBatchKMeans;
+  - Birch;
+  - GaussianMixture.
+- Implemented clustering apply in the native base service:
+  - loads the persisted sklearn pipeline;
+  - validates required apply feature columns;
+  - calls `predict` only when the trained estimator exposes it;
+  - writes `cluster_predictions.csv`;
+  - appends product-facing `cluster_id`.
+- Registered new native model services:
+  - `clustering.minibatch_kmeans`
+  - `clustering.birch`
+  - `clustering.gaussian_mixture`
+- Left DBSCAN training behavior intact. Runtime apply now fails explicitly for clustering estimators without `predict`, but the broader train-only catalog semantics remain a follow-up concern.
+
+### Implementation Verification
+
+- Passed: `pdm run pytest tests/test_ml_registry.py tests/test_ml_execution.py::test_clustering_fit_runs_without_follow_up_evaluate_and_persists_export_artifact tests/test_ml_execution.py::test_new_predictable_clustering_models_fit_and_persist_export_artifact tests/test_agent_harness_first_slice.py::test_agent_harness_model_metadata_directory_queries_return_lightweight_summaries`
+- Passed: `pdm run pytest tests/test_ml_execution.py tests/test_agent_harness_first_slice.py`
+- Passed: `pdm run check`

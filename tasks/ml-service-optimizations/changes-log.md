@@ -368,3 +368,41 @@
 ### Verification
 
 - Not run. No durable code or docs changed in this slice.
+
+## Slice 6 - Clustering Analysis Capability Intake
+
+### Task Packet Changes
+
+- Recorded findings from `tasks/ml-service-optimizations/assets/clustering_analysis`.
+- Compared asset model coverage and evaluation outputs against the native clustering catalog.
+- Recorded that MiniBatchKMeans, Birch, and GaussianMixture are the strongest new model candidates because they support new-row prediction.
+- Recorded that predictable clustering `apply` support is the highest-value usage improvement.
+- Recorded that non-predictable segmenters such as Agglomerative, Spectral, DBSCAN, and OPTICS need honest train-only/catalog semantics before broader promotion.
+
+### Source Changes
+
+- `src/xenix/services/ml/models/base.py`
+  - Implemented native clustering apply support for estimators whose persisted pipeline exposes `predict`.
+  - Apply outputs `cluster_predictions.csv` and appends `cluster_id`.
+- `src/xenix/services/ml/models/clustering.py`
+  - Added `clustering.minibatch_kmeans`.
+  - Added `clustering.birch`.
+  - Added `clustering.gaussian_mixture`.
+- `src/xenix/services/ml/registry.py`
+  - Registered the new clustering services.
+- `tests/test_ml_registry.py`
+  - Updated catalog size and added metadata assertions for the new clustering services.
+- `tests/test_ml_execution.py`
+  - Added clustering apply coverage.
+  - Added fit/export coverage for MiniBatchKMeans, Birch, and GaussianMixture.
+- `tests/test_agent_harness_first_slice.py`
+  - Updated clustering metadata directory expectations.
+
+### Verification
+
+- Read asset scripts, config, evaluation JSON, preprocessing guide, and extracted docx text.
+- Read native clustering service, registry, base service, and targeted tests.
+- Ran `pdm run python` to verify sklearn `fit_predict`/`predict` support for candidate clustering estimators.
+- Passed: `pdm run pytest tests/test_ml_registry.py tests/test_ml_execution.py::test_clustering_fit_runs_without_follow_up_evaluate_and_persists_export_artifact tests/test_ml_execution.py::test_new_predictable_clustering_models_fit_and_persist_export_artifact tests/test_agent_harness_first_slice.py::test_agent_harness_model_metadata_directory_queries_return_lightweight_summaries`
+- Passed: `pdm run pytest tests/test_ml_execution.py tests/test_agent_harness_first_slice.py`
+- Passed: `pdm run check`

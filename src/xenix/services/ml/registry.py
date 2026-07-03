@@ -23,7 +23,13 @@ from .models.classification import (
     SVCClassificationService,
     XGBoostClassificationService,
 )
-from .models.clustering import DBSCANClusteringService, KMeansClusteringService
+from .models.clustering import (
+    BirchClusteringService,
+    DBSCANClusteringService,
+    GaussianMixtureClusteringService,
+    KMeansClusteringService,
+    MiniBatchKMeansClusteringService,
+)
 from .models.recommendation import ItemSimilarityRecommendationService
 from .models.regression import (
     AdaBoostRegressionService,
@@ -88,7 +94,10 @@ _MODEL_SERVICES: dict[str, type[ModelServiceBase]] = {
         LabelPropagationClassificationService,
         LabelSpreadingClassificationService,
         SelfTrainingClassificationService,
+        BirchClusteringService,
+        GaussianMixtureClusteringService,
         KMeansClusteringService,
+        MiniBatchKMeansClusteringService,
         DBSCANClusteringService,
         IsolationForestAnomalyService,
         LocalOutlierFactorAnomalyService,

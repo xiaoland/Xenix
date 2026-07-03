@@ -311,9 +311,22 @@ def test_clustering_fit_runs_without_follow_up_evaluate_and_persists_export_arti
     trained_models = ml_service.list_dataset_trained_models(dataset.id)
     fit_details = ml_service.get_task_details(fit_task.id)
 
+    apply_input = tmp_path / "segments-apply.csv"
+    apply_input.write_text("spend,visits,segment\n115,2,A\n435,9,C\n", encoding="utf-8")
+    apply_task = ml_service.apply(
+        ApplyWithFilesInput(
+            trained_model_id=trained_models[0].id,
+            input_files=[str(apply_input.resolve())],
+        )
+    )
+    tasks_after_apply = _wait_for_terminal_dataset_tasks(ml_service, dataset.id, expected_count=2)
+    apply_details = ml_service.get_task_details(apply_task.id)
+    result_dataset = dataset_service.get_dataset_by_ml_task(apply_task.id)
+
     assert len(tasks) == 1
     assert tasks[0].task_type is MLTaskType.FIT
     assert tasks[0].status is MLTaskStatus.SUCCEEDED
+    assert all(task.status is MLTaskStatus.SUCCEEDED for task in tasks_after_apply)
     assert len(trained_models) == 1
     assert len(fit_details.artifacts) == 2
     export_artifact = next(
@@ -339,6 +352,66 @@ def test_clustering_fit_runs_without_follow_up_evaluate_and_persists_export_arti
         }
     ]
     assert [role["name"] for role in metadata.apply_role_schema["roles"]] == ["feature"]
+    assert apply_details.task.task_type is MLTaskType.APPLY
+    assert apply_details.task.result_payload["prediction_column_name"] == "cluster_id"
+    assert result_dataset is not None
+    result_lines = Path(result_dataset.source_path).read_text(encoding="utf-8").splitlines()
+    assert "cluster_id" in result_lines[0]
+    assert [artifact.artifact_kind for artifact in apply_details.artifacts] == [MLTaskArtifactKind.APPLY_RESULT]
+
+
+@pytest.mark.parametrize(
+    ("model_key", "params"),
+    [
+        ("clustering.minibatch_kmeans", {"n_clusters": 2, "batch_size": 10, "n_init": 3, "max_iter": 100}),
+        ("clustering.birch", {"n_clusters": 2, "threshold": 0.5, "branching_factor": 20}),
+        ("clustering.gaussian_mixture", {"n_components": 2, "covariance_type": "full", "n_init": 2, "max_iter": 100}),
+    ],
+)
+def test_new_predictable_clustering_models_fit_and_persist_export_artifact(
+    monkeypatch,
+    tmp_path: Path,
+    model_key: str,
+    params: dict[str, object],
+) -> None:
+    project_service, dataset_service, _ml_task_service, ml_service = _build_services(monkeypatch, tmp_path)
+    project = project_service.create_project(CreateProjectInput(name="Retail"))
+    dataset_file = tmp_path / f"{model_key.replace('.', '-')}.csv"
+    dataset_file.write_text(
+        "spend,visits,channel\n"
+        "100,1,store\n"
+        "110,1,store\n"
+        "120,2,store\n"
+        "420,9,app\n"
+        "430,8,app\n"
+        "440,9,app\n",
+        encoding="utf-8",
+    )
+    dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Segments")
+    binding = _create_binding(ml_service, dataset.id, ["spend", "visits", "channel"])
+
+    fit_task = ml_service.fit_with_evaluate(
+        FitWithEvaluateInput(
+            binding_id=binding.id,
+            run_name="Segments",
+            model_key=model_key,
+            params=params,
+        )
+    )
+
+    tasks = _wait_for_terminal_dataset_tasks(ml_service, dataset.id, expected_count=1)
+    trained_models = ml_service.list_dataset_trained_models(dataset.id)
+    fit_details = ml_service.get_task_details(fit_task.id)
+
+    assert len(tasks) == 1
+    assert tasks[0].status is MLTaskStatus.SUCCEEDED
+    assert len(trained_models) == 1
+    assert fit_details.task.result_payload["model_key"] == model_key
+    assert fit_details.task.result_payload["result_summary"]["cluster_count"] == 2
+    export_artifact = next(
+        artifact for artifact in fit_details.artifacts if artifact.artifact_kind is MLTaskArtifactKind.EXPORT_FILE
+    )
+    assert export_artifact.absolute_path.endswith("cluster_assignments.csv")
 
 
 def test_association_rules_train_and_apply_run(monkeypatch, tmp_path: Path) -> None:

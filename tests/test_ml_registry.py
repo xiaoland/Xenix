@@ -17,7 +17,7 @@ from xenix.services.storage.models import ProblemKind
 def test_model_catalog_exposes_json_schema_and_model_axes() -> None:
     catalog = list_model_catalog()
 
-    assert len(catalog) == 45
+    assert len(catalog) == 48
     assert all(isinstance(entry, ModelCatalogEntry) for entry in catalog)
     assert all(entry.model_family for entry in catalog)
     assert all(entry.model_task_kind for entry in catalog)
@@ -115,6 +115,21 @@ def test_model_catalog_exposes_json_schema_and_model_axes() -> None:
     assert clustering.result_contract.train_result_kinds == ["model", "table"]
     assert clustering.supports_hyperparameter_tuning is False
     assert clustering.param_grid_schema is None
+    minibatch = get_model_catalog_entry("clustering.minibatch_kmeans")
+    assert minibatch.problem_kind is ProblemKind.CLUSTERING
+    assert minibatch.evaluation_kind is EvaluationKind.SUMMARY
+    assert minibatch.summary_metric_name == "cluster_count"
+    assert minibatch.model_family is ModelFamily.CLUSTERING
+    assert minibatch.model_task_kind is ModelTaskKind.SEGMENTER
+    assert minibatch.param_schema["properties"]["batch_size"]["default"] == 256
+    birch = get_model_catalog_entry("clustering.birch")
+    assert birch.problem_kind is ProblemKind.CLUSTERING
+    assert birch.evaluation_kind is EvaluationKind.SUMMARY
+    assert birch.param_schema["properties"]["threshold"]["default"] == 0.5
+    gaussian_mixture = get_model_catalog_entry("clustering.gaussian_mixture")
+    assert gaussian_mixture.problem_kind is ProblemKind.CLUSTERING
+    assert gaussian_mixture.evaluation_kind is EvaluationKind.SUMMARY
+    assert gaussian_mixture.param_schema["properties"]["covariance_type"]["default"] == "full"
     anomaly = get_model_catalog_entry("anomaly.isolation_forest")
     assert anomaly.problem_kind is ProblemKind.ANOMALY_DETECTION
     assert anomaly.evaluation_kind is EvaluationKind.SUMMARY

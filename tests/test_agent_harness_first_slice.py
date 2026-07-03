@@ -678,7 +678,13 @@ def test_agent_harness_model_metadata_directory_queries_return_lightweight_summa
         {"model_family": "clustering", "include_param_grid_schema": True},
         _tool_context(),
     )
-    assert clustering_result.payload["model_keys"] == ["clustering.kmeans", "clustering.dbscan"]
+    assert clustering_result.payload["model_keys"] == [
+        "clustering.kmeans",
+        "clustering.minibatch_kmeans",
+        "clustering.birch",
+        "clustering.gaussian_mixture",
+        "clustering.dbscan",
+    ]
     assert clustering_result.payload["models"][0]["model_family"] == "clustering"
     assert clustering_result.payload["models"][0]["model_task_kind"] == "segmenter"
     assert clustering_result.payload["models"][0]["description"]

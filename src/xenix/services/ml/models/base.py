@@ -733,7 +733,42 @@ class UnsupervisedClusteringModelService(ModelServiceBase):
 
     @classmethod
     def apply(cls, request: ApplyTaskRequest, task_dir: Path) -> ApplyTaskResult:
-        raise ValidationError(f"Model '{cls.key}' does not support apply.")
+        estimator = joblib.load(request.apply_model.trained_model_artifact_path)
+        if not hasattr(estimator, "predict"):
+            raise ValidationError(f"Model '{cls.key}' does not support apply.")
+
+        result_frames: list[pd.DataFrame] = []
+        for input_file in request.input_files:
+            dataframe = load_dataset(Path(input_file.absolute_path))
+            missing = [column for column in request.feature_columns if column not in dataframe.columns]
+            if missing:
+                raise ValidationError(
+                    f"Apply input '{input_file.file_name}' is missing required columns: {', '.join(missing)}."
+                )
+            X_apply = cls._select_features(dataframe, request.feature_columns)
+            raw_predictions = estimator.predict(X_apply)
+            display_labels, _cluster_count, _noise_count = cls._normalize_cluster_labels(raw_predictions)
+            result_frame = dataframe.copy()
+            result_frame[cls.cluster_column_name] = display_labels
+            if len(request.input_files) > 1:
+                result_frame["source_file"] = input_file.file_name
+            result_frames.append(result_frame)
+
+        output_dir = task_dir / "output"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / "cluster_predictions.csv"
+        pd.concat(result_frames, ignore_index=True).to_csv(output_path, index=False)
+        return ApplyTaskResult(
+            task_id=request.task_id,
+            trained_model_id=request.apply_model.trained_model_id,
+            model_key=cls.key,
+            output_file_path=str(output_path),
+            summary=ApplySummary(
+                row_count=int(sum(len(frame.index) for frame in result_frames)),
+                input_file_count=len(request.input_files),
+                prediction_column_name=cls.cluster_column_name,
+            ),
+        )
 
     @classmethod
     def _select_features(cls, dataframe: pd.DataFrame, feature_columns: list[str]) -> pd.DataFrame:
