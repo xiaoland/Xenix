@@ -10,7 +10,13 @@ src_root = project_root / "src"
 scripts_root = project_root / "scripts"
 xgboost_binaries = collect_dynamic_libs("xgboost")
 xgboost_datas = collect_data_files("xgboost", includes=["VERSION", "py.typed"])
-polars_datas = collect_data_files("polars") + collect_data_files("fastexcel")
+polars_binaries = collect_dynamic_libs("_polars_runtime_compat") + collect_dynamic_libs("_polars_runtime_32")
+polars_datas = (
+    collect_data_files("polars")
+    + collect_data_files("_polars_runtime_compat")
+    + collect_data_files("_polars_runtime_32")
+    + collect_data_files("fastexcel")
+)
 skill_catalog = src_root / "xenix" / "services" / "agent" / "skills" / "catalog.json"
 
 
@@ -31,7 +37,7 @@ def collect_xenix_worker_source():
 a = Analysis(
     [str(scripts_root / "run_packaged.py")],
     pathex=[str(src_root)],
-    binaries=xgboost_binaries,
+    binaries=xgboost_binaries + polars_binaries,
     datas=[
         (str(src_root / "xenix" / "resources"), "xenix/resources"),
         (str(src_root / "xenix" / "translations"), "xenix/translations"),
@@ -73,6 +79,10 @@ a = Analysis(
         "opentelemetry.exporter.otlp.proto.http.metric_exporter",
         "opentelemetry.exporter.otlp.proto.http._log_exporter",
         "polars",
+        "_polars_runtime_compat",
+        "_polars_runtime_compat._polars_runtime",
+        "_polars_runtime_32",
+        "_polars_runtime_32._polars_runtime",
     ],
     hookspath=[],
     hooksconfig={},

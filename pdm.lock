@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:54491696d4a2ad7dddb1ed273ee5632ade557809aa7fd8c903ea10bceedeaeb8"
+content_hash = "sha256:1aae8f15301ee0049d70a684b1934e27cb882c9f1da3ead78c34e3469c6844ae"
 
 [[metadata.targets]]
 requires_python = ">=3.12,<3.15"
@@ -1128,14 +1128,33 @@ files = [
 ]
 
 [[package]]
+name = "polars-runtime-compat"
+version = "1.42.1"
+requires_python = ">=3.10"
+summary = "Blazingly fast DataFrame library"
+groups = ["default"]
+files = [
+    {file = "polars_runtime_compat-1.42.1-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:09c1e1a2686228a90d37e9ac4a9f4ff0ec15fed3c97fe5046088de81263011e8"},
+    {file = "polars_runtime_compat-1.42.1-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:320efdecb85c04ad553af21aa0cbf704cbc5f7024e4ae7e269953e5a6aee1ced"},
+    {file = "polars_runtime_compat-1.42.1-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:7b19e3d186b88a30829310aa617d244ec9a8c2a81c48d0d34918a8dc5039b1d0"},
+    {file = "polars_runtime_compat-1.42.1-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e59fd9eee92664fbf8c1c0869adcc3f113a81ba055116793ddaa732ec2c26a0c"},
+    {file = "polars_runtime_compat-1.42.1-cp310-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:7fdcb22818688ef82e9a467eda4cb391089fac36d7711fe21e7b79c470ee51d2"},
+    {file = "polars_runtime_compat-1.42.1-cp310-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:26fd6cd1f5f2017296ebea00a860453bd521ca1a7c03b4e6ae3e98bcae864790"},
+    {file = "polars_runtime_compat-1.42.1-cp310-abi3-win_amd64.whl", hash = "sha256:b9a969680655e41d92ffdc298a41861eb1983e0689ae7f1c17231e35f4800090"},
+    {file = "polars_runtime_compat-1.42.1-cp310-abi3-win_arm64.whl", hash = "sha256:9437b4799f77d7be7ff3fc93d7ed811157b81e2808772cfd0a291cd10d369eb3"},
+    {file = "polars_runtime_compat-1.42.1.tar.gz", hash = "sha256:2c54337f1a5c069bb24c7d2f1cf8d1724400d0b6b07193b7f95c198640c887f8"},
+]
+
+[[package]]
 name = "polars"
 version = "1.42.1"
-extras = ["calamine"]
+extras = ["calamine", "rtcompat"]
 requires_python = ">=3.10"
 summary = "Blazingly fast DataFrame library"
 groups = ["default"]
 dependencies = [
     "fastexcel>=0.9",
+    "polars-runtime-compat==1.42.1",
     "polars==1.42.1",
 ]
 files = [

@@ -557,6 +557,7 @@ def build_main_window(
 
 def _run_smoke_checks(paths) -> None:
     import pandas as pd
+    from polars._cpu_check import get_runtime_repr
 
     from .services.analysis_graph import AnalysisGraphService, GraphDatasetInput
     from .services.data_transform import (
@@ -567,6 +568,9 @@ def _run_smoke_checks(paths) -> None:
     from .services.dataset_inspection import detect_source_format
     from .services.ml.models.regression import XGBoostRegressionService
     from .services.tabular import load_tabular_frame
+
+    if get_runtime_repr() != "rtcompat":
+        raise RuntimeError("Polars packaged runtime smoke expected rtcompat runtime.")
 
     duckdb_smoke_path = paths.temp / "duckdb-smoke.csv"
     duckdb_smoke_path.write_text("value\n1\n2\n", encoding="utf-8")

@@ -12,7 +12,7 @@ Runtime dependencies now include:
 
 - `pandas`
 - `openpyxl`
-- `polars`
+- `polars` with `rtcompat` runtime support for older or constrained CPUs
 - `fastexcel`
 - `duckdb`
 - `pydantic`
@@ -195,6 +195,7 @@ Expected result:
 - test-build startup locking is embedded from `XENIX_TRIAL_LOCK_DAYS`; unset, blank, or `0` disables it, while a positive integer locks startup after that many elapsed first-run days. Use a stable `XENIX_TRIAL_LOCK_STATE_SECRET` across rebuilds in the same test wave.
 - DuckDB Python runtime imports successfully and can run an in-memory query inside the packaged app
 - Native ML and data-science runtimes used by first-party workflows are present under `dist/xenix/_internal/` and are exercised by packaged verification, not only by startup import discovery.
+- Polars packages both the compatible runtime and the default runtime. Keep `polars[calamine,rtcompat]` in project dependencies and keep `_polars_runtime_compat` explicitly collected in `xenix.spec`; Polars loads the compatible runtime first when it is available, which avoids startup failure on older CPUs that cannot satisfy the default runtime's AVX-oriented feature set.
 - OpenTelemetry OTLP exporter hidden imports are collected by `xenix.spec` so
   packaged builds can use either gRPC or HTTP/protobuf OTLP export when the
   corresponding environment variables are set before launching the executable.
@@ -215,8 +216,8 @@ workflows depend on them.
 
 Current smoke coverage intentionally exercises the strict Polars CSV and XLSX
 read paths before higher-level dataset inspection or profiling code runs. This
-keeps packaged builds from silently shipping with a missing or mismatched
-`polars-runtime-*` binary while other features still appear healthy.
+keeps packaged builds from silently shipping with a missing, incompatible, or
+mismatched `polars-runtime-*` binary while other features still appear healthy.
 
 When adding or upgrading an ML/data-science dependency, add or keep a packaged
 verification path that performs the smallest meaningful runtime exercise:
@@ -262,6 +263,7 @@ Smoke verification should confirm that these directories are created in a fresh 
 - If language switching fails in a packaged app, verify that `src/xenix/translations/*.qm` were rebuilt and copied into `xenix/translations`.
 - If DuckDB-backed tools fail only in the packaged app, rerun `pdm run smoke-package` and inspect whether PyInstaller collected DuckDB's package metadata and native library.
 - If an ML/data-science dependency fails only in the packaged app, inspect `build/xenix/COLLECT-00.toc` and `dist/xenix/_internal/` for package-local native files. Compare them with `PyInstaller.utils.hooks.collect_dynamic_libs("<package>")` and package metadata/data requirements. Do not assume that a successful Python-module import during analysis means the package's DLLs, `.pyd` files, BLAS/OpenMP runtimes, or package data were collected.
+- If the packaged app fails at startup with `unknown feature flag: 'sse3'`, verify that `_polars_runtime_compat` is present under `dist/xenix/_internal/` and that the release environment was synced after the `polars[calamine,rtcompat]` dependency change. Do not use `POLARS_SKIP_CPU_CHECK` as the packaged fix; it can defer the failure into an illegal CPU instruction crash.
 - If dataset inspection or `data.peek` reports `tabular_runtime_unavailable`, verify that `polars` and `polars-runtime-*` resolve to the same version in the active environment. Close running Xenix/Python processes that may keep old binaries loaded, then run `pdm sync -d --clean` and retry.
 - If `analysis.graph` fails only in the PyInstaller windowed package, separate the renderer path first: Vega charts still go through `vl-convert-python`, while `wordcloud_spec` goes through `wordcloud` plus a real font file. Local minimal packaging tests showed that `vl_convert` SVG conversion can work in a console bundle but hang or fail with `oneshot canceled` in a windowed bundle that has no Windows console. Xenix allocates a temporary hidden console around the Vega converter call in frozen Windows builds, then releases it after rendering. Keep `smoke-package` covering both Vega rendering and dedicated word-cloud rendering so this boundary does not regress.
 - If an SSH worker setup fails, inspect `config/ml_workers.json`, the Xenix-managed `Host xenix.*` block in `~/.ssh/config`, and the remote root permissions. Do not add passwords, passphrases, or private-key material to Xenix config.

@@ -29,7 +29,7 @@ dependencies = [
     "opentelemetry-exporter-otlp>=1.42.1",
     "opentelemetry-instrumentation-logging>=0.63b1",
     "structlog>=26.1.0",
-    "polars[calamine]==1.42.1",
+    "polars[calamine,rtcompat]==1.42.1",
 ]
 
 [dependency-groups]
