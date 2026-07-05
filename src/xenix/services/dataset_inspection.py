@@ -13,6 +13,10 @@ from .storage.models import DatasetSourceFormat
 from .tabular import format_column, format_value, load_tabular_frame, preview_rows
 
 
+_XLSX_ATTACHMENT_SCAN_ROW_LIMIT = 50
+_XLSX_ROW_MARKER = b"<row "
+
+
 class DatasetColumnKind(StrEnum):
     NUMERIC = "numeric"
     BOOLEAN = "boolean"
@@ -191,25 +195,22 @@ def _inspect_xlsx_attachment_metadata(
         if row_count_with_header == 0 or column_count == 0:
             raise ValidationError("Dataset file must contain at least one column.")
 
-        header_row = next(
-            worksheet.iter_rows(min_row=1, max_row=1, max_col=column_count, values_only=True),
-            (),
-        )
-        preview_columns = [
-            format_column(value, index)
-            for index, value in enumerate(header_row)
-        ]
-        if len(preview_columns) < column_count:
-            preview_columns.extend([""] * (column_count - len(preview_columns)))
-        if not preview_columns:
-            raise ValidationError("Dataset file must contain at least one column.")
-
-        row_count = row_count_with_header - 1
-        if row_count <= 0:
-            raise ValidationError("Dataset file must contain at least one data row.")
+        if _xlsx_declared_dimensions_are_suspicious(row_count_with_header, column_count):
+            header_row, row_count, column_count = _scan_xlsx_attachment_metadata(source_path, worksheet)
+        else:
+            header_row = next(
+                worksheet.iter_rows(min_row=1, max_row=1, max_col=column_count, values_only=True),
+                (),
+            )
+            row_count = row_count_with_header - 1
     finally:
         workbook.close()
 
+    preview_columns = _preview_columns(header_row, column_count)
+    if not preview_columns:
+        raise ValidationError("Dataset file must contain at least one column.")
+    if row_count <= 0:
+        raise ValidationError("Dataset file must contain at least one data row.")
     return DatasetAttachmentMetadata(
         source_path=str(source_path),
         source_format=source_format,
@@ -218,6 +219,77 @@ def _inspect_xlsx_attachment_metadata(
         column_count=column_count,
         preview_columns=preview_columns,
     )
+
+
+def _xlsx_declared_dimensions_are_suspicious(row_count_with_header: int, column_count: int) -> bool:
+    return row_count_with_header <= 1 or column_count <= 1
+
+
+def _scan_xlsx_attachment_metadata(source_path: Path, worksheet) -> tuple[tuple[object, ...], int, int]:
+    reset_dimensions = getattr(worksheet, "reset_dimensions", None)
+    if callable(reset_dimensions):
+        reset_dimensions()
+
+    header_row, sampled_data_rows, column_count = _sample_xlsx_attachment_rows(worksheet)
+    worksheet_path = getattr(worksheet, "_worksheet_path", "")
+    row_count_with_header = _count_xlsx_worksheet_rows(source_path, worksheet_path)
+    row_count = max(row_count_with_header - 1, sampled_data_rows)
+    return header_row, row_count, column_count
+
+
+def _sample_xlsx_attachment_rows(worksheet) -> tuple[tuple[object, ...], int, int]:
+    header_row: tuple[object, ...] = ()
+    sampled_data_rows = 0
+    column_count = 0
+    for row_index, row in enumerate(worksheet.iter_rows(values_only=True)):
+        if row_index >= _XLSX_ATTACHMENT_SCAN_ROW_LIMIT:
+            break
+        normalized_row = tuple(row)
+        row_width = _non_empty_row_width(normalized_row)
+        if row_index == 0:
+            header_row = normalized_row
+            column_count = max(column_count, row_width, len(normalized_row))
+            continue
+        if row_width:
+            sampled_data_rows += 1
+            column_count = max(column_count, row_width)
+    return header_row, sampled_data_rows, column_count
+
+
+def _count_xlsx_worksheet_rows(source_path: Path, worksheet_path: str) -> int:
+    if not worksheet_path:
+        return 0
+
+    from zipfile import ZipFile
+
+    row_count = 0
+    tail = b""
+    overlap_size = len(_XLSX_ROW_MARKER) - 1
+    with ZipFile(source_path) as archive:
+        with archive.open(worksheet_path) as worksheet_xml:
+            while True:
+                chunk = worksheet_xml.read(1024 * 1024)
+                if not chunk:
+                    break
+                row_count += chunk.count(_XLSX_ROW_MARKER)
+                row_count += (tail + chunk[:overlap_size]).count(_XLSX_ROW_MARKER)
+                tail = chunk[-overlap_size:]
+    return row_count
+
+
+def _non_empty_row_width(row: tuple[object, ...]) -> int:
+    for index in range(len(row) - 1, -1, -1):
+        value = row[index]
+        if value is not None and str(value).strip():
+            return index + 1
+    return 0
+
+
+def _preview_columns(header_row: tuple[object, ...], column_count: int) -> list[str]:
+    return [
+        format_column(header_row[index] if index < len(header_row) else None, index)
+        for index in range(column_count)
+    ]
 
 
 def _has_missing_values(series: pl.Series) -> bool:

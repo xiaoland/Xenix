@@ -1,5 +1,7 @@
 import logging
+import re
 from pathlib import Path
+from zipfile import ZIP_DEFLATED, ZipFile
 
 import pandas as pd
 import pytest
@@ -44,6 +46,19 @@ def _register_dataset(
             name=name,
         )
     )
+
+
+def _rewrite_xlsx_dimension(path: Path, dimension_ref: str) -> None:
+    replacement_path = path.with_suffix(".rewritten.xlsx")
+    with ZipFile(path, "r") as source, ZipFile(replacement_path, "w", ZIP_DEFLATED) as target:
+        for item in source.infolist():
+            content = source.read(item.filename)
+            if item.filename == "xl/worksheets/sheet1.xml":
+                text = content.decode("utf-8")
+                text = re.sub(r'<dimension ref="[^"]+"\s*/>', f'<dimension ref="{dimension_ref}"/>', text, count=1)
+                content = text.encode("utf-8")
+            target.writestr(item, content)
+    replacement_path.replace(path)
 
 
 def test_dataset_service_inspects_csv_summary_and_column_kinds(monkeypatch, tmp_path: Path) -> None:
@@ -210,6 +225,32 @@ def test_dataset_service_registers_xlsx_attachment_without_full_inspection(
 
     assert attachment.name == "Customers"
     assert attachment.file_name == "customers.xlsx"
+    assert attachment.source_format == "xlsx"
+    assert attachment.row_count == 2
+    assert attachment.column_count == 2
+    assert attachment.preview_columns == ["name", "value"]
+
+
+def test_dataset_service_registers_xlsx_attachment_with_stale_dimension_metadata(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _project_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
+    dataset_file = tmp_path / "stale-dimensions.xlsx"
+    pd.DataFrame(
+        [
+            {"name": "Acme", "value": 12},
+            {"name": "Contoso", "value": 18},
+        ]
+    ).to_excel(dataset_file, index=False)
+    _rewrite_xlsx_dimension(dataset_file, "A1")
+
+    attachment = dataset_service.register_dataset_attachment(
+        RegisterDatasetInput(source_path=str(dataset_file.resolve()), name="Customers")
+    )
+
+    assert attachment.name == "Customers"
+    assert attachment.file_name == "stale-dimensions.xlsx"
     assert attachment.source_format == "xlsx"
     assert attachment.row_count == 2
     assert attachment.column_count == 2
