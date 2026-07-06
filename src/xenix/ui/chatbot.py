@@ -371,6 +371,29 @@ def _usage_overview_text(payload: dict[str, Any] | None) -> str:
     return text
 
 
+def _connection_retry_events(detail_blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    for block in detail_blocks:
+        if block.get("type") != "llm_connection_retry":
+            continue
+        retry_events = block.get("retry_events")
+        if not isinstance(retry_events, list):
+            return []
+        return [
+            dict(item)
+            for item in retry_events
+            if isinstance(item, dict)
+        ]
+    return []
+
+
+def _connection_attempt_counts(detail_blocks: list[dict[str, Any]]) -> tuple[int, int]:
+    retry_events = _connection_retry_events(detail_blocks)
+    last_event = retry_events[-1] if retry_events else {}
+    attempt_number = _payload_int(last_event, "attempt_number") or 1
+    max_attempts = _payload_int(last_event, "max_attempts") or attempt_number
+    return attempt_number, max_attempts
+
+
 def _payload_int(payload: dict[str, Any], key: str) -> int:
     value = payload.get(key)
     if isinstance(value, bool):
@@ -843,7 +866,7 @@ class ToolCallItem(QFrame):
     def set_event(self, event: ChatbotEvent) -> None:
         self._event = event
         self._icon_label.setPixmap(tool_icon(event.icon_key).pixmap(QSize(16, 16)))
-        self._summary_label.setText(_translate_tool_summary(event.summary or ""))
+        self._summary_label.setText(self._summary_text(event))
         details_action = self._action_by_type("open_tool_call_detail")
         self._details_button.setVisible(details_action is not None)
         self._details_button.setEnabled(details_action is not None)
@@ -855,11 +878,16 @@ class ToolCallItem(QFrame):
         if not has_detail:
             self._expanded = False
         self._chevron_button.setIcon(chevron_icon(expanded=self._expanded))
-        self._chevron_button.setToolTip(
-            self.tr("Hide result") if self._expanded else self.tr("Show result")
-        )
+        if event.kind is ChatbotEventKind.CONNECTION:
+            self._chevron_button.setToolTip(
+                self.tr("Hide details") if self._expanded else self.tr("Show details")
+            )
+        else:
+            self._chevron_button.setToolTip(
+                self.tr("Hide result") if self._expanded else self.tr("Show result")
+            )
         self._detail_browser.setHtml(
-            render_chat_markdown(_render_content_blocks(event.detail_blocks), inline_artifact_images=False)
+            render_chat_markdown(self._detail_markdown(event), inline_artifact_images=False)
         )
         self._detail_browser.setVisible(has_detail and self._expanded)
         _propagate_geometry_change(self)
@@ -889,6 +917,49 @@ class ToolCallItem(QFrame):
         action = self._action_by_type("open_tool_call_detail")
         if action is not None:
             self.action_requested.emit(action)
+
+    def _summary_text(self, event: ChatbotEvent) -> str:
+        if event.kind is ChatbotEventKind.CONNECTION:
+            attempt_number, max_attempts = _connection_attempt_counts(event.detail_blocks)
+            return self.tr("Connecting ({attempt}/{max})").format(
+                attempt=attempt_number,
+                max=max_attempts,
+            )
+        return _translate_tool_summary(event.summary or "")
+
+    def _detail_markdown(self, event: ChatbotEvent) -> str:
+        if event.kind is ChatbotEventKind.CONNECTION:
+            return self._connection_detail_markdown(event.detail_blocks)
+        return _render_content_blocks(event.detail_blocks)
+
+    def _connection_detail_markdown(self, detail_blocks: list[dict[str, Any]]) -> str:
+        retry_events = _connection_retry_events(detail_blocks)
+        if not retry_events:
+            return ""
+        lines = ["### " + self.tr("LLM connection retry"), ""]
+        for retry_event in retry_events:
+            attempt_number = _payload_int(retry_event, "attempt_number")
+            max_attempts = _payload_int(retry_event, "max_attempts")
+            if attempt_number and max_attempts:
+                lines.append(
+                    "#### "
+                    + self.tr("Attempt {attempt}/{max}").format(
+                        attempt=attempt_number,
+                        max=max_attempts,
+                    )
+                )
+            else:
+                lines.append("#### " + self.tr("Attempt"))
+            error_code = str(retry_event.get("error_code") or "").strip()
+            if error_code:
+                lines.append(
+                    self.tr("Error code: `{code}`").format(code=error_code)
+                )
+            error_summary = str(retry_event.get("error_summary") or "").strip()
+            if error_summary:
+                lines.append(error_summary)
+            lines.append("")
+        return "\n".join(lines).strip()
 
 
 class UsageOverviewItem(QFrame):
@@ -1248,7 +1319,7 @@ class ThreadDetailView(QWidget):
     def add_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> QWidget:
         if event.kind is ChatbotEventKind.THINKING:
             return self.add_thinking_event(event, auto_scroll=auto_scroll)
-        if event.kind is ChatbotEventKind.TOOL:
+        if event.kind in {ChatbotEventKind.TOOL, ChatbotEventKind.CONNECTION}:
             return self.add_tool_event(event, auto_scroll=auto_scroll)
         if event.kind is ChatbotEventKind.USAGE:
             return self.add_usage_event(event, auto_scroll=auto_scroll)

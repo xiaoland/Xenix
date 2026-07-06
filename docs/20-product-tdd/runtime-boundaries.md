@@ -108,7 +108,7 @@ Agent Harness owns:
 
 The first turn owns the hidden system Message used as the first provider-facing message. Empty threads do not send a provider request. When the first user message starts the first turn, Agent Harness persists the system Message before the user Message; the system Message remains hidden from the Chatbot timeline but remains part of provider-facing conversation history.
 
-LLM Service sits between Agent Harness and provider adapters. It owns persisted provider settings, configured model lists, `fq_model_key` parsing, and provider instance construction. `fq_model_key` uses `provider_key/model_key`; neither segment may contain `/`.
+LLM Service sits between Agent Harness and provider adapters. It owns persisted provider settings, configured model lists, global LLM retry attempts, `fq_model_key` parsing, provider adapter construction, canonical request/stream execution, retryable provider failure classification, and bounded retry. `fq_model_key` uses `provider_key/model_key`; neither segment may contain `/`.
 
 Provider requests are recorded separately from Messages. A provider request row records the provider/model boundary, request kind, lifecycle status, persisted input Message ids, persisted output Message ids, and normalized token usage when the provider reports it. Token usage is aggregated from provider request rows rather than inferred from Messages.
 

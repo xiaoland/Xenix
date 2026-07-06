@@ -627,13 +627,6 @@ class MainWindow(QMainWindow):
         self._render_harness_snapshot(snapshot)
 
     def _reload_agent_provider(self) -> None:
-        self._agent_harness_service.set_provider(self._llm_service.build_provider())
-        self._agent_harness_service.set_turn_completion_guard_provider(
-            self._llm_service.build_turn_completion_guard_provider()
-        )
-        self._agent_harness_service.set_thread_title_provider(
-            self._llm_service.build_thread_title_provider()
-        )
         self._sync_model_picker_options()
 
     def _create_agent_thread(self) -> None:

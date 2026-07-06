@@ -15,7 +15,7 @@ Agent Harness owns:
 - Message persistence for user, assistant, system, tool-call, and tool-call-result records
 - Provider request persistence and token usage aggregation
 - Chatbot timeline projection from persisted records into user-visible Chatbot Events
-- Provider boundary calls through a canonical provider contract
+- LLM boundary calls through the LLM Service canonical request/stream contract
 - Contextual provider-facing tool exposure and tool execution
 - Agent run recording and cancellation state
 - AI observability projection from Harness-owned turn, provider request, tool-call,
@@ -113,7 +113,7 @@ Agent Harness exposes Chatbot timeline changes as ChatbotEvent-shaped stream eve
 - `message_finalized`: a persisted in-progress `Message` reached a terminal lifecycle state and may carry the corresponding Chatbot Event.
 - `step_confirmation_required`: control state for user approval after the step budget is exhausted; the corresponding system Message is still persisted and emitted as a message event.
 
-The Harness emits `THINKING` Chatbot Events around each provider request. The start event is emitted when the provider request boundary is entered; the completed event is emitted when the first provider stream event arrives, before rendering the first assistant delta or tool response. If the request fails or is cancelled before any provider event arrives, the failed or cancelled event clears the same transient thinking item. The Harness converts provider text chunks into updates on one assistant Message and one assistant Chatbot Event. Tool-call and tool-result records are one-shot persisted Messages, but project to one logical tool Chatbot Event. `AgentToolCallRow` remains execution metadata.
+The Harness emits `THINKING` Chatbot Events around each provider request. The start event is emitted when the provider request boundary is entered; the completed event is emitted when the first provider stream event arrives, before rendering the first assistant delta or tool response. If the request fails or is cancelled before any provider event arrives, the failed or cancelled event clears the same transient thinking item. LLM Service retry telemetry is projected as a separate `CONNECTION` Chatbot Event with `Connecting (n/max)` summary text and expandable retry details; it is not folded into `THINKING`. The Harness converts provider text chunks into updates on one assistant Message and one assistant Chatbot Event. Tool-call and tool-result records are one-shot persisted Messages, but project to one logical tool Chatbot Event. `AgentToolCallRow` remains execution metadata.
 
 ## System Prompt
 
@@ -141,7 +141,7 @@ Cached input tokens are a subset of input tokens and are not added to totals aga
 
 ## AI Observability Projection
 
-Agent Harness owns AI observability collection semantics because it owns the turn-level causal graph. It projects safe telemetry from existing Harness facts into OpenTelemetry-compatible spans and metrics. LLM Service remains a provider router and provider-construction boundary; it does not own turn semantics, trace hierarchy, token attribution, tool exposure attribution, or AI behavior diagnosis.
+Agent Harness owns AI observability collection semantics because it owns the turn-level causal graph. It projects safe telemetry from existing Harness facts into OpenTelemetry-compatible spans and metrics. LLM Service remains the provider adapter and canonical LLM request boundary; it owns retryable provider failure classification and bounded retry, but does not own turn semantics, trace hierarchy, token attribution, tool exposure attribution, or AI behavior diagnosis.
 
 The first AI observability projection records causality and request shape without exporting raw content by default:
 
@@ -212,18 +212,18 @@ Agent Harness owns the provider-facing tool schema budget.
 
 ## Provider Boundary
 
-LLM Service owns provider configuration, configured model lists, `fq_model_key` generation/parsing, and provider construction. `fq_model_key` has the format `provider_key/model_key`; provider keys and model keys must not contain `/`.
+LLM Service owns provider configuration, configured model lists, global retry attempts, `fq_model_key` generation/parsing, provider adapter construction, canonical LLM request/stream execution, retryable provider failure classification, and bounded retry. `fq_model_key` has the format `provider_key/model_key`; provider keys and model keys must not contain `/`.
 
-Agent Harness reads the selected Thread `fq_model_key` at turn start and asks LLM Service for a provider instance. That provider instance is locked for the whole turn, including any provider-loop retries and step-budget resume. Changing the Thread model while a turn is running affects only the next turn.
+Agent Harness reads the selected Thread `fq_model_key` at turn start and calls LLM Service through the canonical request/stream interface for primary, guard, and title-model calls. The selected `fq_model_key` is locked for the whole turn, including LLM Service retries and step-budget resume. Changing the Thread model while a turn is running affects only the next turn.
 
-The provider contract is:
+The LLM Service canonical contract is:
 
 ```text
-complete(messages: list[ProviderMessage], tools: list[AgentToolSpec]) -> ProviderResponse
-stream(messages: list[ProviderMessage], tools: list[AgentToolSpec]) -> ProviderStreamEvent*
+complete(fq_model_key, messages: list[ProviderMessage], tools: list[AgentToolSpec]) -> ProviderResponse
+stream(fq_model_key, messages: list[ProviderMessage], tools: list[AgentToolSpec]) -> ProviderStreamEvent* | LLMRetryEvent*
 ```
 
-`ProviderResponse` carries assistant content blocks, normalized tool calls, normalized token usage when available, and raw provider payload. Provider adapters own OpenAI-compatible request assembly, streaming accumulation, provider tool-name mapping, usage parsing, and response parsing.
+`ProviderResponse` carries assistant content blocks, normalized tool calls, normalized token usage when available, and raw provider payload. LLM Service provider adapters own OpenAI-compatible request assembly, streaming accumulation, provider tool-name mapping, usage parsing, response parsing, and invalid-response retry classification. Invalid `function.arguments` JSON is a retryable LLM response failure before any Agent tool is persisted or executed.
 
 CopilotKit AIMock connects through the same OpenAI-compatible HTTP boundary during development testing.
 

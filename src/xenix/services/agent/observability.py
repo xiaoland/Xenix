@@ -6,7 +6,7 @@ from typing import Any
 
 from ...observability import stable_hash
 from ..storage.models import AgentProviderRequestRow, AgentToolCallRow
-from .providers import AgentToolSpec, ProviderMessage, ProviderResponse, ProviderToolCall
+from ..llm import AgentToolSpec, ProviderMessage, ProviderResponse, ProviderToolCall
 
 AI_OPERATION_CHAT = "chat"
 AI_OPERATION_EXECUTE_TOOL = "execute_tool"

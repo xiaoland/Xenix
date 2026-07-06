@@ -199,6 +199,7 @@ class SettingsDialog(QDialog):
         self._llm_default_model_label = QLabel()
         self._llm_guard_model_label = QLabel()
         self._llm_thread_title_model_label = QLabel()
+        self._llm_retry_attempts_label = QLabel()
 
         self._aimock_title_label = QLabel()
         self._aimock_enabled_label = QLabel()
@@ -227,6 +228,8 @@ class SettingsDialog(QDialog):
         self._llm_default_model_selector = QComboBox()
         self._llm_guard_model_selector = QComboBox()
         self._llm_thread_title_model_selector = QComboBox()
+        self._llm_retry_attempts_input = QSpinBox()
+        self._llm_retry_attempts_input.setRange(1, 20)
 
         self._aimock_enabled_checkbox = QCheckBox()
         self._aimock_base_url_input = QLineEdit()
@@ -274,6 +277,7 @@ class SettingsDialog(QDialog):
             self._llm_thread_title_model_label,
             self._llm_thread_title_model_selector,
         )
+        self._global_models_card_layout.addRow(self._llm_retry_attempts_label, self._llm_retry_attempts_input)
 
         self._llm_card_layout.addRow(self._llm_title_label)
         self._llm_card_layout.addRow(self._provider_selector_label, provider_selector_row)
@@ -353,6 +357,7 @@ class SettingsDialog(QDialog):
         self._llm_default_model_label.setText(self.tr("Default model"))
         self._llm_guard_model_label.setText(self.tr("Turn guard model"))
         self._llm_thread_title_model_label.setText(self.tr("Thread title model"))
+        self._llm_retry_attempts_label.setText(self.tr("LLM retry attempts"))
         self._add_provider_button.setText(self.tr("Add"))
         self._remove_provider_button.setText(self.tr("Remove"))
         self._provider_dialect_selector.setItemText(0, self.tr("OpenAI-compatible"))
@@ -432,6 +437,7 @@ class SettingsDialog(QDialog):
             guard_key=settings.turn_completion_guard_fq_model_key,
             title_key=settings.thread_title_fq_model_key,
         )
+        self._llm_retry_attempts_input.setValue(settings.retry_attempts)
         self._aimock_enabled_checkbox.setChecked(settings.aimock.enabled)
         self._aimock_base_url_input.setText(settings.aimock.base_url)
         self._aimock_api_key_input.setText(settings.aimock.api_key)
@@ -444,6 +450,7 @@ class SettingsDialog(QDialog):
                 default_fq_model_key=str(self._llm_default_model_selector.currentData() or ""),
                 turn_completion_guard_fq_model_key=str(self._llm_guard_model_selector.currentData() or ""),
                 thread_title_fq_model_key=str(self._llm_thread_title_model_selector.currentData() or ""),
+                retry_attempts=self._llm_retry_attempts_input.value(),
                 aimock=AimockSettings(
                     enabled=self._aimock_enabled_checkbox.isChecked(),
                     base_url=self._aimock_base_url_input.text().strip(),

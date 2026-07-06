@@ -28,7 +28,7 @@ from ..storage.models import (
     default_agent_thread_system_prompt,
 )
 from ..storage.repositories import AgentConversationRepository, ArtifactRepository
-from .providers import ProviderMessage, extract_reasoning_content
+from ..llm import ProviderMessage, extract_reasoning_content
 
 
 def _utc_now() -> datetime:

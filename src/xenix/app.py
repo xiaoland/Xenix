@@ -505,8 +505,6 @@ def build_main_window(
             session_factory=context.session_factory,
             tool_registry=agent_tool_registry,
             llm_service=llm_service,
-            turn_completion_guard_provider=llm_service.build_turn_completion_guard_provider(),
-            thread_title_provider=llm_service.build_thread_title_provider(),
             conversation_store=conversation_store,
             skill_catalog=runtime.AgentSkillCatalog.from_default_catalog(),
         )

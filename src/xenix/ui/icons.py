@@ -20,6 +20,7 @@ _TOOL_ICON_NAMES: dict[str, str] = {
     "model": "ph.brain",
     "sliders": "ph.sliders-horizontal",
     "prediction": "ph.trend-up",
+    "connection": "ph.plugs-connected",
     "tool": "ph.wrench",
 }
 

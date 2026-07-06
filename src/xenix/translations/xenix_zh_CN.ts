@@ -87,17 +87,17 @@
 <context>
     <name>ChatMessageBubble</name>
     <message>
-        <location filename="../ui/chatbot.py" line="745"/>
+        <location filename="../ui/chatbot.py" line="768"/>
         <source>You</source>
         <translation>你</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="747"/>
+        <location filename="../ui/chatbot.py" line="770"/>
         <source>Tool</source>
         <translation>工具</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="749"/>
+        <location filename="../ui/chatbot.py" line="772"/>
         <source>System</source>
         <translation>系统</translation>
     </message>
@@ -309,72 +309,72 @@ This route will stay available after model selection is connected.</source>
         <translation>步骤预算已使用：{used}/{max}。是否继续最多 {steps} 个步骤？</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="691"/>
+        <location filename="../ui/main_window.py" line="684"/>
         <source>Rename</source>
         <translation>重命名</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="692"/>
+        <location filename="../ui/main_window.py" line="685"/>
         <source>Generate title...</source>
         <translation>生成标题...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="693"/>
+        <location filename="../ui/main_window.py" line="686"/>
         <source>Copy thread ID</source>
         <translation>复制线程 ID</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="694"/>
+        <location filename="../ui/main_window.py" line="687"/>
         <source>Delete</source>
         <translation>删除</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="719"/>
+        <location filename="../ui/main_window.py" line="712"/>
         <source>Rename Thread</source>
         <translation>重命名线程</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="720"/>
-        <location filename="../ui/main_window.py" line="787"/>
+        <location filename="../ui/main_window.py" line="713"/>
+        <location filename="../ui/main_window.py" line="780"/>
         <source>Thread name</source>
         <translation>线程名称</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="736"/>
-        <location filename="../ui/main_window.py" line="767"/>
-        <location filename="../ui/main_window.py" line="797"/>
-        <location filename="../ui/main_window.py" line="807"/>
+        <location filename="../ui/main_window.py" line="729"/>
+        <location filename="../ui/main_window.py" line="760"/>
+        <location filename="../ui/main_window.py" line="790"/>
+        <location filename="../ui/main_window.py" line="800"/>
         <source>Generate Thread Title</source>
         <translation>生成线程标题</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="737"/>
+        <location filename="../ui/main_window.py" line="730"/>
         <source>Thread title model is not configured.</source>
         <translation>未配置线程标题模型。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="760"/>
+        <location filename="../ui/main_window.py" line="753"/>
         <source>Generating thread title...</source>
         <translation>正在生成线程标题...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="786"/>
+        <location filename="../ui/main_window.py" line="779"/>
         <source>Apply Generated Title</source>
         <translation>应用生成的标题</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="819"/>
-        <location filename="../ui/main_window.py" line="827"/>
+        <location filename="../ui/main_window.py" line="812"/>
+        <location filename="../ui/main_window.py" line="820"/>
         <source>Delete Thread</source>
         <translation>删除线程</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="820"/>
+        <location filename="../ui/main_window.py" line="813"/>
         <source>Stop the current run before deleting this thread.</source>
         <translation>删除此线程前请先停止当前运行。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="828"/>
+        <location filename="../ui/main_window.py" line="821"/>
         <source>Delete &quot;{title}&quot;? This action cannot be undone.</source>
         <translation>删除“{title}”？此操作无法撤销。</translation>
     </message>
@@ -382,14 +382,14 @@ This route will stay available after model selection is connected.</source>
 <context>
     <name>SettingsDialog</name>
     <message>
-        <location filename="../ui/settings_dialog.py" line="338"/>
-        <location filename="../ui/settings_dialog.py" line="454"/>
-        <location filename="../ui/settings_dialog.py" line="503"/>
+        <location filename="../ui/settings_dialog.py" line="342"/>
+        <location filename="../ui/settings_dialog.py" line="461"/>
+        <location filename="../ui/settings_dialog.py" line="510"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="339"/>
+        <location filename="../ui/settings_dialog.py" line="343"/>
         <source>Language</source>
         <translation>语言</translation>
     </message>
@@ -398,12 +398,12 @@ This route will stay available after model selection is connected.</source>
         <translation type="vanished">LLM 提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="348"/>
+        <location filename="../ui/settings_dialog.py" line="352"/>
         <source>Base URL</source>
         <translation>基础 URL</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="349"/>
+        <location filename="../ui/settings_dialog.py" line="353"/>
         <source>API key</source>
         <translation>API 密钥</translation>
     </message>
@@ -412,122 +412,127 @@ This route will stay available after model selection is connected.</source>
         <translation type="vanished">模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="354"/>
+        <location filename="../ui/settings_dialog.py" line="358"/>
         <source>Turn guard model</source>
         <translation>轮次守卫模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="355"/>
+        <location filename="../ui/settings_dialog.py" line="359"/>
         <source>Thread title model</source>
         <translation>线程标题模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="351"/>
+        <location filename="../ui/settings_dialog.py" line="355"/>
         <source>Timeout</source>
         <translation>超时</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="340"/>
+        <location filename="../ui/settings_dialog.py" line="344"/>
         <source>AI</source>
         <translation>AI</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="341"/>
+        <location filename="../ui/settings_dialog.py" line="345"/>
         <source>ML Workers</source>
         <translation>ML 工作器</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="342"/>
+        <location filename="../ui/settings_dialog.py" line="346"/>
         <source>Global models</source>
         <translation>全局模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="343"/>
+        <location filename="../ui/settings_dialog.py" line="347"/>
         <source>LLM providers</source>
         <translation>LLM 提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="344"/>
+        <location filename="../ui/settings_dialog.py" line="348"/>
         <source>Provider</source>
         <translation>提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="345"/>
+        <location filename="../ui/settings_dialog.py" line="349"/>
         <source>Provider key</source>
         <translation>提供商键</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="346"/>
+        <location filename="../ui/settings_dialog.py" line="350"/>
         <source>Provider name</source>
         <translation>提供商名称</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="347"/>
+        <location filename="../ui/settings_dialog.py" line="351"/>
         <source>Dialect</source>
         <translation>方言</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="350"/>
+        <location filename="../ui/settings_dialog.py" line="354"/>
         <source>Models</source>
         <translation>模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="352"/>
+        <location filename="../ui/settings_dialog.py" line="356"/>
         <source>Streaming</source>
         <translation>流式输出</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="353"/>
+        <location filename="../ui/settings_dialog.py" line="357"/>
         <source>Default model</source>
         <translation>默认模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="356"/>
+        <location filename="../ui/settings_dialog.py" line="360"/>
+        <source>LLM retry attempts</source>
+        <translation>LLM 重试次数</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="361"/>
         <source>Add</source>
         <translation>添加</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="357"/>
+        <location filename="../ui/settings_dialog.py" line="362"/>
         <source>Remove</source>
         <translation>移除</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="358"/>
+        <location filename="../ui/settings_dialog.py" line="363"/>
         <source>OpenAI-compatible</source>
         <translation>OpenAI 兼容</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="360"/>
+        <location filename="../ui/settings_dialog.py" line="365"/>
         <source>AIMock</source>
         <translation>AIMock</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="361"/>
+        <location filename="../ui/settings_dialog.py" line="366"/>
         <source>Use AIMock</source>
         <translation>使用 AIMock</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="362"/>
+        <location filename="../ui/settings_dialog.py" line="367"/>
         <source>AIMock base URL</source>
         <translation>AIMock 基础 URL</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="363"/>
+        <location filename="../ui/settings_dialog.py" line="368"/>
         <source>AIMock API key</source>
         <translation>AIMock API 密钥</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="364"/>
+        <location filename="../ui/settings_dialog.py" line="369"/>
         <source>ML workers</source>
         <translation>ML 工作器</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="365"/>
+        <location filename="../ui/settings_dialog.py" line="370"/>
         <source>Add SSH worker...</source>
         <translation>添加 SSH 工作器...</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="366"/>
+        <location filename="../ui/settings_dialog.py" line="371"/>
         <source>About</source>
         <translation>关于</translation>
     </message>
@@ -560,27 +565,27 @@ This route will stay available after model selection is connected.</source>
         <translation type="vanished">打开日志目录</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="367"/>
+        <location filename="../ui/settings_dialog.py" line="372"/>
         <source>Save</source>
         <translation>保存</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="384"/>
+        <location filename="../ui/settings_dialog.py" line="389"/>
         <source>English</source>
         <translation>English</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="385"/>
+        <location filename="../ui/settings_dialog.py" line="390"/>
         <source>Simplified Chinese</source>
         <translation>简体中文</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="409"/>
+        <location filename="../ui/settings_dialog.py" line="414"/>
         <source>Language Switch Failed</source>
         <translation>语言切换失败</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="410"/>
+        <location filename="../ui/settings_dialog.py" line="415"/>
         <source>Unable to switch the application language.
 
 {details}</source>
@@ -589,17 +594,17 @@ This route will stay available after model selection is connected.</source>
 {details}</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="466"/>
+        <location filename="../ui/settings_dialog.py" line="473"/>
         <source>{local_count} local, {ssh_count} SSH, {slots} execution slot(s).</source>
         <translation>{local_count} 个本地，{ssh_count} 个 SSH，{slots} 个执行槽。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="602"/>
+        <location filename="../ui/settings_dialog.py" line="609"/>
         <source>Built into packaged app</source>
         <translation>已内置于打包应用</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="653"/>
+        <location filename="../ui/settings_dialog.py" line="660"/>
         <source>None</source>
         <translation>无</translation>
     </message>
@@ -819,55 +824,55 @@ This route will stay available after model selection is connected.</source>
         <translation>已请求</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1173"/>
+        <location filename="../ui/chatbot.py" line="1244"/>
         <source>Message Xenix</source>
         <translation>给 Xenix 发消息</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1174"/>
-        <location filename="../ui/chatbot.py" line="1508"/>
-        <location filename="../ui/chatbot.py" line="1519"/>
+        <location filename="../ui/chatbot.py" line="1245"/>
+        <location filename="../ui/chatbot.py" line="1579"/>
+        <location filename="../ui/chatbot.py" line="1590"/>
         <source>Attach files</source>
         <translation>添加文件</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1175"/>
+        <location filename="../ui/chatbot.py" line="1246"/>
         <source>Model for the next turn</source>
         <translation>下一轮使用的模型</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1176"/>
+        <location filename="../ui/chatbot.py" line="1247"/>
         <source>Continue</source>
         <translation>继续</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1177"/>
-        <location filename="../ui/chatbot.py" line="1453"/>
+        <location filename="../ui/chatbot.py" line="1248"/>
+        <location filename="../ui/chatbot.py" line="1524"/>
         <source>Stop</source>
         <translation>停止</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1178"/>
+        <location filename="../ui/chatbot.py" line="1249"/>
         <source>Drop files to attach</source>
         <translation>拖放文件以添加附件</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1179"/>
+        <location filename="../ui/chatbot.py" line="1250"/>
         <source>Release here to add them to the next message</source>
         <translation>松开后添加到下一条消息</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1180"/>
+        <location filename="../ui/chatbot.py" line="1251"/>
         <source>Scroll to bottom</source>
         <translation>滚动到底部</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1459"/>
+        <location filename="../ui/chatbot.py" line="1530"/>
         <source>Send</source>
         <translation>发送</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1510"/>
+        <location filename="../ui/chatbot.py" line="1581"/>
         <source>Data files (*.csv *.xlsx *.xls)</source>
         <translation>数据文件 (*.csv *.xlsx *.xls)</translation>
     </message>
@@ -1191,14 +1196,49 @@ This route will stay available after model selection is connected.</source>
         <translation>模型应用已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="850"/>
+        <location filename="../ui/chatbot.py" line="873"/>
         <source>Details</source>
         <translation>详情</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="851"/>
+        <location filename="../ui/chatbot.py" line="874"/>
         <source>Open tool call details</source>
         <translation>打开工具调用详情</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="883"/>
+        <source>Hide details</source>
+        <translation>隐藏详情</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="883"/>
+        <source>Show details</source>
+        <translation>显示详情</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="924"/>
+        <source>Connecting ({attempt}/{max})</source>
+        <translation>正在连接（{attempt}/{max}）</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="939"/>
+        <source>LLM connection retry</source>
+        <translation>LLM 连接重试</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="946"/>
+        <source>Attempt {attempt}/{max}</source>
+        <translation>第 {attempt}/{max} 次尝试</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="952"/>
+        <source>Attempt</source>
+        <translation>尝试</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="956"/>
+        <source>Error code: `{code}`</source>
+        <translation>错误代码：`{code}`</translation>
     </message>
     <message>
         <source>Cancel</source>
@@ -1221,12 +1261,12 @@ This route will stay available after model selection is connected.</source>
         <translation type="vanished">预测运行已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="859"/>
+        <location filename="../ui/chatbot.py" line="887"/>
         <source>Hide result</source>
         <translation>隐藏结果</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="859"/>
+        <location filename="../ui/chatbot.py" line="887"/>
         <source>Show result</source>
         <translation>显示结果</translation>
     </message>
@@ -1330,12 +1370,12 @@ Reason: {reason}</source>
         <translation>前往购买</translation>
     </message>
     <message>
-        <location filename="../app.py" line="710"/>
+        <location filename="../app.py" line="682"/>
         <source>Unable to start Xenix</source>
         <translation>无法启动 Xenix</translation>
     </message>
     <message>
-        <location filename="../app.py" line="711"/>
+        <location filename="../app.py" line="683"/>
         <source>Xenix could not finish startup.
 
 {error}</source>

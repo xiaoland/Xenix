@@ -40,7 +40,7 @@ The delivered workflow includes:
 - Chatbot previews for generated datasets, reports, metrics, models, images, and apply result files
 - local persistence for conversations, messages, tool calls, tool results, artifacts, ML task metadata, and logs
 
-LLM provider settings are stored through the Settings dialog in `config/agent_settings.json`. The file stores configured providers, each provider's model list, the global default model, and optional guard/title model selections. Chatbot model switching is per thread and changes only that thread's next turn. `XENIX_ENV=development` exposes development-only mock controls in Settings. AIMock uses the same OpenAI-compatible provider HTTP boundary as the live provider.
+LLM provider settings are stored through the Settings dialog in `config/agent_settings.json`. The file stores configured providers, each provider's model list, the global default model, optional guard/title model selections, and global LLM retry attempts. Chatbot model switching is per thread and changes only that thread's next turn. `XENIX_ENV=development` exposes development-only mock controls in Settings. AIMock uses the same OpenAI-compatible provider HTTP boundary as the live provider.
 
 ML worker pool settings are stored through Settings in `config/ml_workers.json`. The default configuration uses the local worker. SSH workers require OpenSSH-family `ssh` and `scp` commands, key/agent-based authentication, a POSIX-like remote target, Python 3.12+, and a writable remote root. The SSH setup wizard can write clearly marked `Host xenix.*` blocks to the user's OpenSSH config, create a remote virtual environment, install required ML dependencies, and run upload/download and worker smoke checks.
 

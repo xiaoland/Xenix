@@ -4,9 +4,9 @@ import json
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from .providers import AgentProvider, ProviderMessage
+from ..llm import AgentProvider, ProviderMessage
 
 
 TURN_COMPLETION_GUARD_REMINDER = (
@@ -38,6 +38,7 @@ class TurnCompletionGuardResult(BaseModel):
     verdict: TurnCompletionGuardVerdict
     reason: str = ""
     usage_payload: dict[str, Any] | None = None
+    retry_events: list[dict[str, Any]] = Field(default_factory=list)
     provider_failed: bool = False
 
 

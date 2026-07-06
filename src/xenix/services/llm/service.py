@@ -5,15 +5,21 @@ import os
 from importlib import import_module
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any, Callable, Iterator
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from ...config import AppPaths
 from ...exceptions import NotFoundError, ValidationError
-
-if TYPE_CHECKING:
-    from ..agent.providers import OpenAICompatibleChatProvider
+from .providers import (
+    AgentToolSpec,
+    LLMRequestMetadata,
+    LLMRetryEvent,
+    OpenAICompatibleChatProvider,
+    ProviderMessage,
+    ProviderResponse,
+    ProviderStreamEvent,
+)
 
 SETTINGS_FILE_NAME = "agent_settings.json"
 DEFAULT_PROVIDER_KEY = "openai"
@@ -138,6 +144,7 @@ class LLMSettings(BaseModel):
     default_fq_model_key: str = DEFAULT_FQ_MODEL_KEY
     turn_completion_guard_fq_model_key: str = ""
     thread_title_fq_model_key: str = ""
+    retry_attempts: int = Field(default=5, ge=1, le=20)
     aimock: AimockSettings = Field(default_factory=AimockSettings)
 
     @model_validator(mode="before")
@@ -231,10 +238,80 @@ class LLMService:
     def model_options(self) -> list[LLMModelOption]:
         return self.model_options_from_settings(self.load_settings())
 
-    def build_provider(self, fq_model_key: str | None = None) -> "OpenAICompatibleChatProvider":
-        from ..agent.providers import OpenAICompatibleChatProvider
-
+    def complete(
+        self,
+        *,
+        fq_model_key: str | None = None,
+        messages: list[ProviderMessage],
+        tools: list[AgentToolSpec],
+        retry_callback: Callable[[LLMRetryEvent], None] | None = None,
+    ) -> ProviderResponse:
         settings = self.load_settings()
+        provider = self._build_provider_from_settings(settings, fq_model_key)
+        return self._complete_with_retry(
+            provider=provider,
+            messages=messages,
+            tools=tools,
+            max_attempts=settings.retry_attempts,
+            retry_callback=retry_callback,
+        )
+
+    def stream(
+        self,
+        *,
+        fq_model_key: str | None = None,
+        messages: list[ProviderMessage],
+        tools: list[AgentToolSpec],
+    ) -> Iterator[ProviderStreamEvent | LLMRetryEvent]:
+        settings = self.load_settings()
+        provider = self._build_provider_from_settings(settings, fq_model_key)
+        max_attempts = self._max_attempts(settings.retry_attempts)
+        previous_error: Exception | None = None
+        for attempt_number in range(1, max_attempts + 1):
+            if previous_error is not None:
+                yield self._retry_event(
+                    attempt_number=attempt_number,
+                    max_attempts=max_attempts,
+                    exc=previous_error,
+                )
+            try:
+                stream = getattr(provider, "stream", None)
+                if callable(stream):
+                    buffered_events = list(stream(messages, tools))
+                else:
+                    buffered_events = [ProviderStreamEvent(response=provider.complete(messages, tools))]
+                yield from buffered_events
+                return
+            except Exception as exc:
+                if not self._should_retry(exc, attempt_number=attempt_number, max_attempts=max_attempts):
+                    raise
+                previous_error = exc
+
+    def request_metadata(self, fq_model_key: str | None = None) -> LLMRequestMetadata:
+        settings = self.load_settings()
+        selected_key = fq_model_key or settings.default_fq_model_key
+        ref = self.parse_fq_model_key(selected_key)
+        provider_config = self._provider_for_key(settings, ref.provider_key)
+        if ref.model_key not in provider_config.models:
+            raise NotFoundError(f"LLM model '{selected_key}' was not found.")
+        return LLMRequestMetadata(provider_name=provider_config.key, model=ref.model_key)
+
+    def turn_completion_guard_fq_model_key(self) -> str | None:
+        value = self.load_settings().turn_completion_guard_fq_model_key.strip()
+        return value or None
+
+    def thread_title_fq_model_key(self) -> str | None:
+        value = self.load_settings().thread_title_fq_model_key.strip()
+        return value or None
+
+    def build_provider(self, fq_model_key: str | None = None) -> OpenAICompatibleChatProvider:
+        return self._build_provider_from_settings(self.load_settings(), fq_model_key)
+
+    def _build_provider_from_settings(
+        self,
+        settings: LLMSettings,
+        fq_model_key: str | None = None,
+    ) -> OpenAICompatibleChatProvider:
         selected_key = fq_model_key or settings.default_fq_model_key
         ref = self.parse_fq_model_key(selected_key)
         provider_config = self._provider_for_key(settings, ref.provider_key)
@@ -273,6 +350,54 @@ class LLMService:
             timeout_seconds=provider_config.timeout_seconds,
             streaming_enabled=provider_config.streaming_enabled,
         )
+
+    def _complete_with_retry(
+        self,
+        *,
+        provider,
+        messages: list[ProviderMessage],
+        tools: list[AgentToolSpec],
+        max_attempts: int,
+        retry_callback: Callable[[LLMRetryEvent], None] | None,
+    ) -> ProviderResponse:
+        attempts = self._max_attempts(max_attempts)
+        previous_error: Exception | None = None
+        for attempt_number in range(1, attempts + 1):
+            if previous_error is not None and retry_callback is not None:
+                retry_callback(
+                    self._retry_event(
+                        attempt_number=attempt_number,
+                        max_attempts=attempts,
+                        exc=previous_error,
+                    )
+                )
+            try:
+                return provider.complete(messages, tools)
+            except Exception as exc:
+                if not self._should_retry(exc, attempt_number=attempt_number, max_attempts=attempts):
+                    raise
+                previous_error = exc
+        raise AssertionError("LLM retry loop exited without a response or exception.")
+
+    def _should_retry(self, exc: Exception, *, attempt_number: int, max_attempts: int) -> bool:
+        if attempt_number >= max_attempts:
+            return False
+        return getattr(exc, "retryable", None) is True
+
+    def _retry_event(self, *, attempt_number: int, max_attempts: int, exc: Exception) -> LLMRetryEvent:
+        error_code = getattr(exc, "error_code", None)
+        return LLMRetryEvent(
+            attempt_number=attempt_number,
+            max_attempts=max_attempts,
+            reason="retryable_error",
+            error_summary=str(exc),
+            error_code=error_code if isinstance(error_code, str) else None,
+        )
+
+    def _max_attempts(self, value: int) -> int:
+        if isinstance(value, bool):
+            return 1
+        return max(1, min(int(value), 20))
 
     def build_turn_completion_guard_provider(self) -> "OpenAICompatibleChatProvider | None":
         fq_model_key = self.load_settings().turn_completion_guard_fq_model_key

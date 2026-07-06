@@ -26,6 +26,7 @@ from .tool_presentations import ToolPresentation, tool_presentation_for_name
 class ChatbotEventKind(StrEnum):
     TEXT = "text"
     TOOL = "tool"
+    CONNECTION = "connection"
     THINKING = "thinking"
     USAGE = "usage"
 
@@ -88,6 +89,32 @@ def build_thinking_chatbot_event(
     )
 
 
+def llm_connection_chatbot_event_id(provider_request_id: str) -> str:
+    return f"{provider_request_id}:connection"
+
+
+def build_llm_connection_chatbot_event(
+    *,
+    provider_request_id: str,
+    turn_id: str | None,
+    retry_events: list[dict[str, Any]],
+    status: ChatbotEventStatus = ChatbotEventStatus.IN_PROGRESS,
+) -> ChatbotEvent:
+    last_event = retry_events[-1] if retry_events else {}
+    attempt_number = _usage_int(last_event, "attempt_number") or 1
+    max_attempts = _usage_int(last_event, "max_attempts") or attempt_number
+    return ChatbotEvent(
+        id=llm_connection_chatbot_event_id(provider_request_id),
+        kind=ChatbotEventKind.CONNECTION,
+        turn_id=turn_id,
+        author=ChatbotEventAuthor.ASSISTANT,
+        status=status,
+        icon_key="connection",
+        summary="llm_connection_retry",
+        detail_blocks=[{"type": "llm_connection_retry", "retry_events": [dict(event) for event in retry_events]}],
+    )
+
+
 def project_chatbot_events(
     snapshot: ThreadSnapshot,
     *,
@@ -127,6 +154,11 @@ def project_chatbot_events(
         if message.turn_id is not None and message.turn_id != next_turn_id:
             turn = turns_by_id.get(message.turn_id)
             if turn is not None and turn.status is AgentTurnStatus.ENDED:
+                connection_events = project_turn_connection_events(
+                    turn_id=message.turn_id,
+                    provider_requests=provider_requests_by_turn.get(message.turn_id, []),
+                )
+                events.extend(connection_events)
                 usage_event = project_turn_usage_event(
                     turn_id=message.turn_id,
                     sequence_index=message.sequence_index + 1,
@@ -229,6 +261,37 @@ def project_turn_usage_event(
     )
 
 
+def project_turn_connection_events(
+    *,
+    turn_id: str,
+    provider_requests: list[AgentProviderRequestRow],
+) -> list[ChatbotEvent]:
+    events: list[ChatbotEvent] = []
+    for provider_request in provider_requests:
+        usage_payload = provider_request.usage_payload
+        if not isinstance(usage_payload, dict):
+            continue
+        retry_events = usage_payload.get("retry_events")
+        if not isinstance(retry_events, list) or not retry_events:
+            continue
+        safe_retry_events = [
+            dict(item)
+            for item in retry_events
+            if isinstance(item, dict)
+        ]
+        if not safe_retry_events:
+            continue
+        events.append(
+            build_llm_connection_chatbot_event(
+                provider_request_id=provider_request.id,
+                turn_id=turn_id,
+                retry_events=safe_retry_events,
+                status=_chatbot_status_for_provider_request(provider_request),
+            )
+        )
+    return events
+
+
 def tool_presentation(
     tool_name: str,
     *,
@@ -264,6 +327,18 @@ def _chatbot_status_for_tool(status: AgentToolCallStatus) -> ChatbotEventStatus:
         return ChatbotEventStatus.CANCELLED
     if status in {AgentToolCallStatus.REQUESTED, AgentToolCallStatus.RUNNING}:
         return ChatbotEventStatus.PENDING
+    return ChatbotEventStatus.COMPLETED
+
+
+def _chatbot_status_for_provider_request(provider_request: AgentProviderRequestRow) -> ChatbotEventStatus:
+    from ..storage.models import AgentProviderRequestStatus
+
+    if provider_request.status is AgentProviderRequestStatus.FAILED:
+        return ChatbotEventStatus.FAILED
+    if provider_request.status is AgentProviderRequestStatus.CANCELLED:
+        return ChatbotEventStatus.CANCELLED
+    if provider_request.status is AgentProviderRequestStatus.RUNNING:
+        return ChatbotEventStatus.IN_PROGRESS
     return ChatbotEventStatus.COMPLETED
 
 

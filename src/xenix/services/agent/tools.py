@@ -48,7 +48,7 @@ from ..storage.models import (
     ProblemKind,
     TrainedModelRow,
 )
-from .providers import AgentToolSpec
+from ..llm import AgentToolSpec
 from .tool_presentations import DEFAULT_TOOL_PRESENTATION, ToolPresentation, tool_presentation_for_name
 
 

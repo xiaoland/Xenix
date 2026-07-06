@@ -25,6 +25,7 @@ from xenix.services.agent import (
 )
 from xenix.services.agent.providers import AgentToolSpec
 from xenix.services.agent.tools import ToolExecutionContext, ToolExecutionResult
+from xenix.services.llm import LLMRequestMetadata, LLMRetryEvent
 from xenix.services.storage import StorageBootstrapService
 from xenix.exceptions import ValidationError
 from xenix.services.storage.models import (
@@ -401,12 +402,67 @@ class SwitchingLLMServiceFixture:
             raise ValidationError(f"Unknown model: {fq_model_key}")
         return fq_model_key
 
-    def build_provider(self, fq_model_key: str | None = None):
+    def request_metadata(self, fq_model_key: str | None = None) -> LLMRequestMetadata:
         selected = fq_model_key or self.default_fq_model_key()
-        self.build_requests.append(selected)
+        provider = self._provider_for_key(selected)
+        return LLMRequestMetadata(provider_name=provider.provider_key, model=provider.model)
+
+    def thread_title_fq_model_key(self) -> str | None:
+        return None
+
+    def turn_completion_guard_fq_model_key(self) -> str | None:
+        return None
+
+    def stream(self, *, fq_model_key: str | None = None, messages: list[Any], tools: list[Any]):
+        provider = self._provider_for_key(fq_model_key or self.default_fq_model_key())
+        self.build_requests.append(fq_model_key or self.default_fq_model_key())
+        yield ProviderStreamEvent(response=provider.complete(messages, tools))
+
+    def complete(self, *, fq_model_key: str | None = None, messages: list[Any], tools: list[Any], retry_callback=None):
+        provider = self._provider_for_key(fq_model_key or self.default_fq_model_key())
+        self.build_requests.append(fq_model_key or self.default_fq_model_key())
+        return provider.complete(messages, tools)
+
+    def _provider_for_key(self, fq_model_key: str):
+        selected = fq_model_key or self.default_fq_model_key()
         if selected == "openai/second":
             return self.second_provider
         return self.first_provider
+
+
+class RetryingLLMServiceFixture:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def default_fq_model_key(self) -> str:
+        return "mock/chat"
+
+    def validate_fq_model_key(self, fq_model_key: str) -> str:
+        return fq_model_key
+
+    def request_metadata(self, fq_model_key: str | None = None) -> LLMRequestMetadata:
+        return LLMRequestMetadata(provider_name="mock", model="chat")
+
+    def thread_title_fq_model_key(self) -> str | None:
+        return None
+
+    def turn_completion_guard_fq_model_key(self) -> str | None:
+        return None
+
+    def stream(self, *, fq_model_key: str | None = None, messages: list[Any], tools: list[Any]):
+        self.calls += 1
+        yield LLMRetryEvent(
+            attempt_number=2,
+            max_attempts=5,
+            reason="retryable_error",
+            error_summary="Tool call 'analysis.graph' arguments are not valid JSON.",
+            error_code="llm_tool_arguments_invalid_json",
+        )
+        yield ProviderStreamEvent(
+            response=ProviderResponse(
+                assistant_content_blocks=[{"type": "markdown", "text": "Recovered."}],
+            )
+        )
 
     def model_options(self) -> list[Any]:
         return []
@@ -1508,6 +1564,46 @@ def test_agent_harness_locks_model_for_step_budget_resume(monkeypatch, tmp_path:
     assert llm_service.first_provider.calls == 2
     assert llm_service.second_provider.calls == 0
     assert [request.model for request in resumed_snapshot.provider_requests] == ["first", "first"]
+
+
+def test_agent_harness_projects_llm_retry_connection_event(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    llm_service = RetryingLLMServiceFixture()
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        llm_service=llm_service,
+        tool_registry=BudgetedRegistry(),
+        conversation_store=ConversationStore(context.session_factory),
+    )
+
+    events = list(harness.submit_user_turn_stream(SubmitUserTurnInput(text="draw a chart")))
+    live_connection_events = [
+        event.chatbot_event
+        for event in events
+        if event.kind == "chatbot_event"
+        and event.chatbot_event is not None
+        and event.chatbot_event.kind is ChatbotEventKind.CONNECTION
+    ]
+    final_snapshot = events[-1].snapshot
+
+    assert [event.status for event in live_connection_events] == [
+        ChatbotEventStatus.IN_PROGRESS,
+        ChatbotEventStatus.COMPLETED,
+    ]
+    assert live_connection_events[-1].summary == "llm_connection_retry"
+    assert final_snapshot is not None
+    projected_connection = [
+        event
+        for event in harness.project_chatbot_events(final_snapshot)
+        if event.kind is ChatbotEventKind.CONNECTION
+    ]
+    assert len(projected_connection) == 1
+    assert projected_connection[0].summary == "llm_connection_retry"
+    assert projected_connection[0].detail_blocks[0]["retry_events"][0]["error_code"] == (
+        "llm_tool_arguments_invalid_json"
+    )
 
 
 def test_agent_harness_cancel_run_stops_active_tool_call(monkeypatch, tmp_path: Path) -> None:

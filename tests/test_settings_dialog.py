@@ -56,6 +56,7 @@ def test_settings_dialog_provider_switch_preserves_distinct_provider_fields(
                 ),
             ],
             default_fq_model_key="bailian/qwen-plus",
+            retry_attempts=4,
         )
     )
     translation_manager = TranslationManager(app, paths)
@@ -76,10 +77,12 @@ def test_settings_dialog_provider_switch_preserves_distinct_provider_fields(
         assert dialog._tabs.tabText(1) == "ML Workers"
         assert dialog._global_models_title_label.text() == "Global models"
         assert dialog._about_button.text() == "About"
+        assert dialog._llm_retry_attempts_input.value() == 4
 
         dialog._provider_base_url_input.setText("https://edited-bailian.example.test")
         dialog._provider_api_key_input.setText("edited-bailian-secret")
         dialog._provider_models_input.setPlainText("edited-qwen\nedited-title")
+        dialog._llm_retry_attempts_input.setValue(6)
 
         dialog._provider_selector.setCurrentIndex(dialog._provider_selector.findData("deepseek"))
         app.processEvents()
@@ -113,6 +116,7 @@ def test_settings_dialog_provider_switch_preserves_distinct_provider_fields(
             ["deepseek-chat"],
             ["kimi-k2"],
         ]
+        assert loaded.retry_attempts == 6
     finally:
         dialog.close()
 

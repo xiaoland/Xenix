@@ -45,20 +45,25 @@ from .conversation_store import (
 from .completion_guard import (
     TURN_COMPLETION_GUARD_REMINDER,
     TurnCompletionGuard,
+    TurnCompletionGuardResult,
     TurnCompletionGuardVerdict,
+    _GUARD_SYSTEM_PROMPT,
+    _parse_guard_output,
 )
 from .chatbot_events import (
     ChatbotEvent,
     ChatbotEventStatus,
+    build_llm_connection_chatbot_event,
     build_thinking_chatbot_event,
     project_chatbot_events,
     project_text_message_event,
     project_tool_chatbot_event,
     should_project_agent_skill_tools,
 )
-from .providers import (
+from ..llm import (
     AgentProvider,
     AgentToolSpec,
+    LLMRetryEvent,
     ProviderMessage,
     ProviderResponse,
     ProviderStreamEvent,
@@ -241,10 +246,13 @@ class AgentHarnessService:
         return self._conversation_store.get_thread_snapshot(thread.id)
 
     def has_thread_title_provider(self) -> bool:
-        return self._thread_title_provider is not None
+        return self._thread_title_provider is not None or (
+            self._llm_service is not None
+            and self._llm_service.thread_title_fq_model_key() is not None
+        )
 
     def generate_thread_title(self, thread_id: str) -> str:
-        if self._thread_title_provider is None:
+        if not self.has_thread_title_provider():
             raise ValidationError("Thread title model is not configured.")
         snapshot = self._conversation_store.get_thread_snapshot(thread_id)
         title = self._llm_thread_title_from_snapshot(snapshot)
@@ -280,7 +288,7 @@ class AgentHarnessService:
 
     def submit_user_turn(self, input_data: SubmitUserTurnInput) -> ThreadSnapshot:
         with start_span("agent.turn") as span:
-            thread_id, turn_id, run_id, provider = self._start_user_turn(input_data)
+            thread_id, turn_id, run_id, fq_model_key, provider = self._start_user_turn(input_data)
             set_span_attributes(span, ai_observability.turn_span_attributes(thread_id=thread_id, turn_id=turn_id, run_id=run_id))
 
             try:
@@ -289,6 +297,7 @@ class AgentHarnessService:
                     turn_id=turn_id,
                     run_id=run_id,
                     step_state=self._initial_step_state(),
+                    fq_model_key=fq_model_key,
                     provider=provider,
                 )
                 if isinstance(outcome, StepBudgetPause):
@@ -321,16 +330,17 @@ class AgentHarnessService:
 
     def submit_user_turn_stream(self, input_data: SubmitUserTurnInput):
         with start_span("agent.turn") as span:
-            thread_id, turn_id, run_id, provider = self._start_user_turn(input_data)
+            thread_id, turn_id, run_id, fq_model_key, provider = self._start_user_turn(input_data)
             set_span_attributes(span, ai_observability.turn_span_attributes(thread_id=thread_id, turn_id=turn_id, run_id=run_id))
-            yield from self._submit_user_turn_stream_started(thread_id, turn_id, run_id, provider)
+            yield from self._submit_user_turn_stream_started(thread_id, turn_id, run_id, fq_model_key, provider)
 
     def _submit_user_turn_stream_started(
         self,
         thread_id: str,
         turn_id: str,
         run_id: str,
-        provider: AgentProvider,
+        fq_model_key: str | None,
+        provider: AgentProvider | None,
     ):
         snapshot = self._conversation_store.get_thread_snapshot(thread_id)
         yield AgentHarnessStreamEvent(
@@ -355,6 +365,7 @@ class AgentHarnessService:
                 turn_id=turn_id,
                 run_id=run_id,
                 step_state=self._initial_step_state(),
+                fq_model_key=fq_model_key,
                 provider=provider,
                 thinking_active=True,
             )
@@ -412,6 +423,7 @@ class AgentHarnessService:
             raise ValidationError("Step confirmation does not belong to the provided thread and turn.")
 
         step_state = self._step_state_from_payload(run.usage_payload)
+        fq_model_key = self._fq_model_key_from_run_payload(run.usage_payload)
         provider = self._provider_for_run(run)
         granted_steps = self._requested_step_extension(input_data.additional_steps, step_state)
         step_state["granted_steps"] += granted_steps
@@ -446,6 +458,7 @@ class AgentHarnessService:
                 turn_id=input_data.turn_id,
                 run_id=input_data.run_id,
                 step_state=step_state,
+                fq_model_key=fq_model_key,
                 provider=provider,
                 thinking_active=True,
             )
@@ -521,7 +534,7 @@ class AgentHarnessService:
         )
         return self._conversation_store.get_thread_snapshot(input_data.thread_id)
 
-    def _start_user_turn(self, input_data: SubmitUserTurnInput) -> tuple[str, str, str, AgentProvider]:
+    def _start_user_turn(self, input_data: SubmitUserTurnInput) -> tuple[str, str, str, str | None, AgentProvider | None]:
         text = input_data.text.strip()
         dataset_attachments = list(input_data.dataset_attachments)
         if not text and not dataset_attachments:
@@ -552,7 +565,7 @@ class AgentHarnessService:
                         selected_fq_model_key=selected_fq_model_key,
                     )
                 )
-        provider = self._provider_for_fq_model_key(selected_fq_model_key)
+        provider = self._provider_for_fq_model_key(selected_fq_model_key) if self._llm_service is None else None
 
         content_blocks = self._user_content_blocks(text, dataset_attachments)
         turn, _user_message = self._conversation_store.start_turn(
@@ -572,7 +585,7 @@ class AgentHarnessService:
             StartAgentRunInput(
                 thread_id=thread_id,
                 turn_id=turn.id,
-                provider_name=self._provider_name(provider),
+                provider_name=self._target_provider_name(provider=provider, fq_model_key=selected_fq_model_key),
                 usage_payload=self._usage_payload(
                     self._initial_step_state(),
                     fq_model_key=selected_fq_model_key,
@@ -580,7 +593,7 @@ class AgentHarnessService:
             )
         )
         self._register_cancel_event(run.id)
-        return thread_id, turn.id, run.id, provider
+        return thread_id, turn.id, run.id, selected_fq_model_key, provider
 
 
     def _run_provider_loop(
@@ -590,7 +603,8 @@ class AgentHarnessService:
         turn_id: str,
         run_id: str,
         step_state: dict[str, int],
-        provider: AgentProvider,
+        fq_model_key: str | None,
+        provider: AgentProvider | None,
     ) -> ThreadSnapshot | StepBudgetPause:
         while step_state["used_steps"] < step_state["granted_steps"]:
             step_state["used_steps"] += 1
@@ -603,6 +617,7 @@ class AgentHarnessService:
                 turn_id=turn_id,
                 run_id=run_id,
                 provider=provider,
+                fq_model_key=fq_model_key,
                 request_kind=AgentProviderRequestKind.PRIMARY,
                 input_message_ids=self._provider_input_message_ids(provider_messages),
             )
@@ -615,11 +630,15 @@ class AgentHarnessService:
                 loop_step_index=step_state["used_steps"],
                 stream=False,
             )
+            retry_events: list[dict[str, Any]] = []
             try:
                 with start_span("agent.provider_request", provider_span_attributes) as provider_span:
-                    provider_response = provider.complete(
-                        provider_messages,
-                        tool_specs,
+                    provider_response = self._complete_provider_target(
+                        provider=provider,
+                        fq_model_key=fq_model_key,
+                        messages=provider_messages,
+                        tools=tool_specs,
+                        retry_events=retry_events,
                     )
                     self._raise_if_cancelled(run_id)
                     set_span_attributes(provider_span, ai_observability.provider_response_shape_attributes(provider_response))
@@ -649,6 +668,7 @@ class AgentHarnessService:
                 self._complete_provider_request(
                     provider_request,
                     status=AgentProviderRequestStatus.FAILED,
+                    usage_payload=self._provider_request_usage_payload(None, retry_events),
                 )
                 raise
             try:
@@ -696,7 +716,10 @@ class AgentHarnessService:
                 provider_request,
                 status=AgentProviderRequestStatus.SUCCEEDED,
                 output_message_ids=provider_output_message_ids,
-                usage_payload=provider_response.usage_payload,
+                usage_payload=self._provider_request_usage_payload(
+                    provider_response.usage_payload,
+                    retry_events,
+                ),
             )
 
             if not provider_response.tool_calls:
@@ -777,7 +800,8 @@ class AgentHarnessService:
         turn_id: str,
         run_id: str,
         step_state: dict[str, int],
-        provider: AgentProvider,
+        fq_model_key: str | None,
+        provider: AgentProvider | None,
         thinking_active: bool = False,
     ):
         while step_state["used_steps"] < step_state["granted_steps"]:
@@ -791,6 +815,7 @@ class AgentHarnessService:
                 turn_id=turn_id,
                 run_id=run_id,
                 provider=provider,
+                fq_model_key=fq_model_key,
                 request_kind=AgentProviderRequestKind.PRIMARY,
                 input_message_ids=self._provider_input_message_ids(provider_messages),
             )
@@ -807,16 +832,25 @@ class AgentHarnessService:
                 loop_step_index=step_state["used_steps"],
                 stream=True,
             )
+            retry_events: list[dict[str, Any]] = []
             try:
                 provider_started_at = perf_counter()
                 first_event_ms: float | None = None
                 first_text_ms: float | None = None
                 with start_span("agent.provider_request", provider_span_attributes) as provider_span:
                     for stream_event in self._provider_stream(
-                        provider,
-                        provider_messages,
-                        tool_specs,
+                        provider=provider,
+                        fq_model_key=fq_model_key,
+                        messages=provider_messages,
+                        tools=tool_specs,
                     ):
+                        if isinstance(stream_event, LLMRetryEvent):
+                            retry_events.append(stream_event.to_payload())
+                            yield self._llm_connection_event(
+                                provider_request=provider_request,
+                                retry_events=retry_events,
+                            )
+                            continue
                         elapsed_ms = (perf_counter() - provider_started_at) * 1000
                         if first_event_ms is None:
                             first_event_ms = elapsed_ms
@@ -882,12 +916,24 @@ class AgentHarnessService:
                             ),
                         )
                         set_span_attributes(provider_span, {"xenix.ai.provider_request.status": AgentProviderRequestStatus.SUCCEEDED.value})
+                    if retry_events:
+                        yield self._llm_connection_event(
+                            provider_request=provider_request,
+                            retry_events=retry_events,
+                            status=ChatbotEventStatus.COMPLETED,
+                        )
                 self._raise_if_cancelled(run_id)
             except AgentRunCancelled:
                 self._complete_provider_request(
                     provider_request,
                     status=AgentProviderRequestStatus.CANCELLED,
                 )
+                if retry_events:
+                    yield self._llm_connection_event(
+                        provider_request=provider_request,
+                        retry_events=retry_events,
+                        status=ChatbotEventStatus.CANCELLED,
+                    )
                 if thinking_active:
                     thinking_active = False
                     yield self._thinking_event(
@@ -909,7 +955,14 @@ class AgentHarnessService:
                 self._complete_provider_request(
                     provider_request,
                     status=AgentProviderRequestStatus.FAILED,
+                    usage_payload=self._provider_request_usage_payload(None, retry_events),
                 )
+                if retry_events:
+                    yield self._llm_connection_event(
+                        provider_request=provider_request,
+                        retry_events=retry_events,
+                        status=ChatbotEventStatus.FAILED,
+                    )
                 if thinking_active:
                     thinking_active = False
                     yield self._thinking_event(
@@ -1010,7 +1063,10 @@ class AgentHarnessService:
                 provider_request,
                 status=AgentProviderRequestStatus.SUCCEEDED,
                 output_message_ids=provider_output_message_ids,
-                usage_payload=provider_response.usage_payload,
+                usage_payload=self._provider_request_usage_payload(
+                    provider_response.usage_payload,
+                    retry_events,
+                ),
             )
 
             if not provider_response.tool_calls:
@@ -1109,7 +1165,8 @@ class AgentHarnessService:
         thread_id: str,
         turn_id: str,
         run_id: str | None,
-        provider: AgentProvider,
+        provider: AgentProvider | None,
+        fq_model_key: str | None = None,
         request_kind: AgentProviderRequestKind,
         input_message_ids: list[str],
     ) -> AgentProviderRequestRow:
@@ -1118,8 +1175,8 @@ class AgentHarnessService:
                 thread_id=thread_id,
                 turn_id=turn_id,
                 run_id=run_id,
-                provider_name=self._provider_name(provider),
-                model=self._provider_model(provider),
+                provider_name=self._target_provider_name(provider=provider, fq_model_key=fq_model_key),
+                model=self._target_provider_model(provider=provider, fq_model_key=fq_model_key),
                 request_kind=request_kind,
                 input_message_ids=input_message_ids,
             )
@@ -1212,6 +1269,20 @@ class AgentHarnessService:
             return provider_key.strip()
         return type(provider).__name__
 
+    def _target_provider_model(self, *, provider: AgentProvider | None, fq_model_key: str | None) -> str | None:
+        if self._llm_service is not None:
+            return self._llm_service.request_metadata(fq_model_key).model
+        if provider is None:
+            return None
+        return self._provider_model(provider)
+
+    def _target_provider_name(self, *, provider: AgentProvider | None, fq_model_key: str | None) -> str:
+        if self._llm_service is not None:
+            return self._llm_service.request_metadata(fq_model_key).provider_name
+        if provider is None:
+            return "unknown"
+        return self._provider_name(provider)
+
     def _resolve_fq_model_key(
         self,
         requested_fq_model_key: str | None,
@@ -1230,13 +1301,13 @@ class AgentHarnessService:
         return self._llm_service.validate_fq_model_key(fq_model_key)
 
     def _provider_for_fq_model_key(self, fq_model_key: str | None) -> AgentProvider:
-        if self._llm_service is not None:
-            return self._llm_service.build_provider(fq_model_key)
         if self._provider is None:
             raise ValidationError("Agent provider is not configured.")
         return self._provider
 
-    def _provider_for_run(self, run) -> AgentProvider:
+    def _provider_for_run(self, run) -> AgentProvider | None:
+        if self._llm_service is not None:
+            return None
         return self._provider_for_fq_model_key(self._fq_model_key_from_run_payload(run.usage_payload))
 
     def _fq_model_key_from_run_payload(self, payload: dict[str, Any] | None) -> str | None:
@@ -1427,7 +1498,8 @@ class AgentHarnessService:
         source_message_ids: list[str],
         run_id: str | None,
     ) -> AgentMessageRow | None:
-        if self._turn_completion_guard is None:
+        guard_fq_model_key = self._turn_completion_guard_fq_model_key()
+        if self._turn_completion_guard is None and guard_fq_model_key is None:
             return None
 
         last_assistant_text = _assistant_text(provider_response.assistant_content_blocks)
@@ -1448,11 +1520,15 @@ class AgentHarnessService:
             thread_id=thread_id,
             turn_id=turn_id,
             run_id=run_id,
-            provider=self._turn_completion_guard.provider,
+            provider=self._turn_completion_guard.provider if self._turn_completion_guard is not None else None,
+            fq_model_key=guard_fq_model_key,
             request_kind=AgentProviderRequestKind.GUARD,
             input_message_ids=list(source_message_ids),
         )
-        result = self._turn_completion_guard.evaluate(last_assistant_text)
+        result = self._evaluate_turn_completion_guard(
+            last_assistant_text,
+            guard_fq_model_key=guard_fq_model_key,
+        )
         guard_action: AgentMessageRow | None = None
         if result.verdict is TurnCompletionGuardVerdict.CONTINUE:
             guard_action = self._conversation_store.append_message(
@@ -1472,7 +1548,10 @@ class AgentHarnessService:
                 else AgentProviderRequestStatus.SUCCEEDED
             ),
             output_message_ids=[guard_action.id] if guard_action is not None else [],
-            usage_payload=result.usage_payload,
+            usage_payload=self._provider_request_usage_payload(
+                result.usage_payload,
+                result.retry_events,
+            ),
         )
         self._conversation_store.create_turn_completion_guard(
             CreateTurnCompletionGuardInput(
@@ -1486,6 +1565,53 @@ class AgentHarnessService:
             )
         )
         return guard_action
+
+    def _turn_completion_guard_fq_model_key(self) -> str | None:
+        if self._llm_service is None:
+            return None
+        return self._llm_service.turn_completion_guard_fq_model_key()
+
+    def _evaluate_turn_completion_guard(
+        self,
+        last_assistant_text: str,
+        *,
+        guard_fq_model_key: str | None,
+    ) -> TurnCompletionGuardResult:
+        if self._turn_completion_guard is not None:
+            return self._turn_completion_guard.evaluate(last_assistant_text)
+        if self._llm_service is None or guard_fq_model_key is None:
+            return TurnCompletionGuardResult(
+                verdict=TurnCompletionGuardVerdict.COMPLETE,
+                reason="Turn completion guard is not configured.",
+            )
+        retry_events: list[dict[str, Any]] = []
+        try:
+            response = self._llm_service.complete(
+                fq_model_key=guard_fq_model_key,
+                messages=[
+                    ProviderMessage(role="system", content=_GUARD_SYSTEM_PROMPT),
+                    ProviderMessage(
+                        role="user",
+                        content=json.dumps(
+                            {"last_assistant_text": last_assistant_text},
+                            ensure_ascii=False,
+                        ),
+                    ),
+                ],
+                tools=[],
+                retry_callback=lambda event: retry_events.append(event.to_payload()),
+            )
+            result = _parse_guard_output(_assistant_text(response.assistant_content_blocks))
+            result.usage_payload = response.usage_payload
+            result.retry_events = retry_events
+            return result
+        except Exception as exc:
+            return TurnCompletionGuardResult(
+                verdict=TurnCompletionGuardVerdict.COMPLETE,
+                reason=f"Guard failed closed: {exc}",
+                retry_events=retry_events,
+                provider_failed=True,
+            )
 
     def _tool_specs_for_context(self, *, snapshot: ThreadSnapshot, dataset_ids: list[str]) -> list[AgentToolSpec]:
         context = _ToolAvailabilityContext(
@@ -1762,17 +1888,79 @@ class AgentHarnessService:
     def _tool_call_arguments(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         return arguments
 
+    def _complete_provider_target(
+        self,
+        *,
+        provider: AgentProvider | None,
+        fq_model_key: str | None,
+        messages: list[ProviderMessage],
+        tools: list[AgentToolSpec],
+        retry_events: list[dict[str, Any]],
+    ) -> ProviderResponse:
+        if self._llm_service is not None:
+            return self._llm_service.complete(
+                fq_model_key=fq_model_key,
+                messages=messages,
+                tools=tools,
+                retry_callback=lambda event: retry_events.append(event.to_payload()),
+            )
+        if provider is None:
+            raise ValidationError("Agent provider is not configured.")
+        return provider.complete(messages, tools)
+
     def _provider_stream(
         self,
-        provider: AgentProvider,
-        messages: list[Any],
-        tools: list[Any],
+        *,
+        provider: AgentProvider | None,
+        fq_model_key: str | None,
+        messages: list[ProviderMessage],
+        tools: list[AgentToolSpec],
     ):
+        if self._llm_service is not None:
+            yield from self._llm_service.stream(
+                fq_model_key=fq_model_key,
+                messages=messages,
+                tools=tools,
+            )
+            return
+        if provider is None:
+            raise ValidationError("Agent provider is not configured.")
         stream = getattr(provider, "stream", None)
         if callable(stream):
             yield from stream(messages, tools)
             return
         yield ProviderStreamEvent(response=provider.complete(messages, tools))
+
+    def _provider_request_usage_payload(
+        self,
+        usage_payload: dict[str, Any] | None,
+        retry_events: list[dict[str, Any]],
+    ) -> dict[str, Any] | None:
+        if not retry_events:
+            return usage_payload
+        payload = dict(usage_payload or {})
+        payload["retry_events"] = [dict(event) for event in retry_events]
+        return payload
+
+    def _llm_connection_event(
+        self,
+        *,
+        provider_request: AgentProviderRequestRow,
+        retry_events: list[dict[str, Any]],
+        status: ChatbotEventStatus = ChatbotEventStatus.IN_PROGRESS,
+    ) -> AgentHarnessStreamEvent:
+        return AgentHarnessStreamEvent(
+            kind="chatbot_event",
+            thread_id=provider_request.thread_id,
+            turn_id=provider_request.turn_id,
+            run_id=provider_request.run_id,
+            chatbot_event=build_llm_connection_chatbot_event(
+                provider_request_id=provider_request.id,
+                turn_id=provider_request.turn_id,
+                retry_events=retry_events,
+                status=status,
+            ),
+        )
 
     def _tool_error_result(self, exc: Exception):
         from .tools import ToolExecutionResult
@@ -1824,7 +2012,7 @@ class AgentHarnessService:
         text: str,
         dataset_attachments: list[DatasetAttachmentInput],
     ) -> str:
-        if self._thread_title_provider is not None:
+        if self.has_thread_title_provider():
             try:
                 generated = self._llm_thread_title(text, dataset_attachments)
                 if generated is not None:
@@ -1838,24 +2026,36 @@ class AgentHarnessService:
         text: str,
         dataset_attachments: list[DatasetAttachmentInput],
     ) -> str | None:
-        response = self._thread_title_provider.complete(
-            [
+        response = self._complete_thread_title(
+            messages=[
                 ProviderMessage(role="system", content=THREAD_TITLE_SYSTEM_PROMPT),
                 ProviderMessage(role="user", content=self._thread_title_prompt(text, dataset_attachments)),
-            ],
-            [],
+            ]
         )
         return _sanitize_thread_title(_assistant_text(response.assistant_content_blocks))
 
     def _llm_thread_title_from_snapshot(self, snapshot: ThreadSnapshot) -> str | None:
-        response = self._thread_title_provider.complete(
-            [
+        response = self._complete_thread_title(
+            messages=[
                 ProviderMessage(role="system", content=THREAD_TITLE_SYSTEM_PROMPT),
                 ProviderMessage(role="user", content=self._thread_title_snapshot_prompt(snapshot)),
-            ],
-            [],
+            ]
         )
         return _sanitize_thread_title(_assistant_text(response.assistant_content_blocks))
+
+    def _complete_thread_title(self, *, messages: list[ProviderMessage]) -> ProviderResponse:
+        if self._thread_title_provider is not None:
+            return self._thread_title_provider.complete(messages, [])
+        if self._llm_service is None:
+            raise ValidationError("Thread title model is not configured.")
+        fq_model_key = self._llm_service.thread_title_fq_model_key()
+        if fq_model_key is None:
+            raise ValidationError("Thread title model is not configured.")
+        return self._llm_service.complete(
+            fq_model_key=fq_model_key,
+            messages=messages,
+            tools=[],
+        )
 
     def _thread_title_prompt(
         self,

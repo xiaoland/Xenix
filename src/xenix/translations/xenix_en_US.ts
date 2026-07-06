@@ -60,17 +60,17 @@
 <context>
     <name>ChatMessageBubble</name>
     <message>
-        <location filename="../ui/chatbot.py" line="745"/>
+        <location filename="../ui/chatbot.py" line="768"/>
         <source>You</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="747"/>
+        <location filename="../ui/chatbot.py" line="770"/>
         <source>Tool</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="749"/>
+        <location filename="../ui/chatbot.py" line="772"/>
         <source>System</source>
         <translation type="unfinished"></translation>
     </message>
@@ -816,72 +816,72 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="691"/>
+        <location filename="../ui/main_window.py" line="684"/>
         <source>Rename</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="692"/>
+        <location filename="../ui/main_window.py" line="685"/>
         <source>Generate title...</source>
         <translation>Generate title...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="693"/>
+        <location filename="../ui/main_window.py" line="686"/>
         <source>Copy thread ID</source>
         <translation>Copy thread ID</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="694"/>
+        <location filename="../ui/main_window.py" line="687"/>
         <source>Delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="719"/>
+        <location filename="../ui/main_window.py" line="712"/>
         <source>Rename Thread</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="720"/>
-        <location filename="../ui/main_window.py" line="787"/>
+        <location filename="../ui/main_window.py" line="713"/>
+        <location filename="../ui/main_window.py" line="780"/>
         <source>Thread name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="736"/>
-        <location filename="../ui/main_window.py" line="767"/>
-        <location filename="../ui/main_window.py" line="797"/>
-        <location filename="../ui/main_window.py" line="807"/>
+        <location filename="../ui/main_window.py" line="729"/>
+        <location filename="../ui/main_window.py" line="760"/>
+        <location filename="../ui/main_window.py" line="790"/>
+        <location filename="../ui/main_window.py" line="800"/>
         <source>Generate Thread Title</source>
         <translation>Generate Thread Title</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="737"/>
+        <location filename="../ui/main_window.py" line="730"/>
         <source>Thread title model is not configured.</source>
         <translation>Thread title model is not configured.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="760"/>
+        <location filename="../ui/main_window.py" line="753"/>
         <source>Generating thread title...</source>
         <translation>Generating thread title...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="786"/>
+        <location filename="../ui/main_window.py" line="779"/>
         <source>Apply Generated Title</source>
         <translation>Apply Generated Title</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="819"/>
-        <location filename="../ui/main_window.py" line="827"/>
+        <location filename="../ui/main_window.py" line="812"/>
+        <location filename="../ui/main_window.py" line="820"/>
         <source>Delete Thread</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="820"/>
+        <location filename="../ui/main_window.py" line="813"/>
         <source>Stop the current run before deleting this thread.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="828"/>
+        <location filename="../ui/main_window.py" line="821"/>
         <source>Delete &quot;{title}&quot;? This action cannot be undone.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -955,24 +955,24 @@
 <context>
     <name>SettingsDialog</name>
     <message>
-        <location filename="../ui/settings_dialog.py" line="338"/>
-        <location filename="../ui/settings_dialog.py" line="454"/>
-        <location filename="../ui/settings_dialog.py" line="503"/>
+        <location filename="../ui/settings_dialog.py" line="342"/>
+        <location filename="../ui/settings_dialog.py" line="461"/>
+        <location filename="../ui/settings_dialog.py" line="510"/>
         <source>Settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="339"/>
+        <location filename="../ui/settings_dialog.py" line="343"/>
         <source>Language</source>
         <translation type="unfinished">Language</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="348"/>
+        <location filename="../ui/settings_dialog.py" line="352"/>
         <source>Base URL</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="349"/>
+        <location filename="../ui/settings_dialog.py" line="353"/>
         <source>API key</source>
         <translation type="unfinished"></translation>
     </message>
@@ -981,122 +981,127 @@
         <translation type="obsolete">Model</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="354"/>
+        <location filename="../ui/settings_dialog.py" line="358"/>
         <source>Turn guard model</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="355"/>
+        <location filename="../ui/settings_dialog.py" line="359"/>
         <source>Thread title model</source>
         <translation>Thread title model</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="351"/>
+        <location filename="../ui/settings_dialog.py" line="355"/>
         <source>Timeout</source>
         <translation>Timeout</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="340"/>
+        <location filename="../ui/settings_dialog.py" line="344"/>
         <source>AI</source>
         <translation>AI</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="341"/>
+        <location filename="../ui/settings_dialog.py" line="345"/>
         <source>ML Workers</source>
         <translation>ML Workers</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="342"/>
+        <location filename="../ui/settings_dialog.py" line="346"/>
         <source>Global models</source>
         <translation>Global models</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="343"/>
+        <location filename="../ui/settings_dialog.py" line="347"/>
         <source>LLM providers</source>
         <translation>LLM providers</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="344"/>
+        <location filename="../ui/settings_dialog.py" line="348"/>
         <source>Provider</source>
         <translation>Provider</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="345"/>
+        <location filename="../ui/settings_dialog.py" line="349"/>
         <source>Provider key</source>
         <translation>Provider key</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="346"/>
+        <location filename="../ui/settings_dialog.py" line="350"/>
         <source>Provider name</source>
         <translation>Provider name</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="347"/>
+        <location filename="../ui/settings_dialog.py" line="351"/>
         <source>Dialect</source>
         <translation>Dialect</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="350"/>
+        <location filename="../ui/settings_dialog.py" line="354"/>
         <source>Models</source>
         <translation>Models</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="352"/>
+        <location filename="../ui/settings_dialog.py" line="356"/>
         <source>Streaming</source>
         <translation>Streaming</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="353"/>
+        <location filename="../ui/settings_dialog.py" line="357"/>
         <source>Default model</source>
         <translation>Default model</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="356"/>
+        <location filename="../ui/settings_dialog.py" line="360"/>
+        <source>LLM retry attempts</source>
+        <translation>LLM retry attempts</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="361"/>
         <source>Add</source>
         <translation>Add</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="357"/>
+        <location filename="../ui/settings_dialog.py" line="362"/>
         <source>Remove</source>
         <translation>Remove</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="358"/>
+        <location filename="../ui/settings_dialog.py" line="363"/>
         <source>OpenAI-compatible</source>
         <translation>OpenAI-compatible</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="360"/>
+        <location filename="../ui/settings_dialog.py" line="365"/>
         <source>AIMock</source>
         <translation>AIMock</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="361"/>
+        <location filename="../ui/settings_dialog.py" line="366"/>
         <source>Use AIMock</source>
         <translation>Use AIMock</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="362"/>
+        <location filename="../ui/settings_dialog.py" line="367"/>
         <source>AIMock base URL</source>
         <translation>AIMock base URL</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="363"/>
+        <location filename="../ui/settings_dialog.py" line="368"/>
         <source>AIMock API key</source>
         <translation>AIMock API key</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="364"/>
+        <location filename="../ui/settings_dialog.py" line="369"/>
         <source>ML workers</source>
         <translation>ML workers</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="365"/>
+        <location filename="../ui/settings_dialog.py" line="370"/>
         <source>Add SSH worker...</source>
         <translation>Add SSH worker...</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="366"/>
+        <location filename="../ui/settings_dialog.py" line="371"/>
         <source>About</source>
         <translation>About</translation>
     </message>
@@ -1129,44 +1134,44 @@
         <translation type="obsolete">Open log directory</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="367"/>
+        <location filename="../ui/settings_dialog.py" line="372"/>
         <source>Save</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="384"/>
+        <location filename="../ui/settings_dialog.py" line="389"/>
         <source>English</source>
         <translation type="unfinished">English</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="385"/>
+        <location filename="../ui/settings_dialog.py" line="390"/>
         <source>Simplified Chinese</source>
         <translation type="unfinished">Simplified Chinese</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="409"/>
+        <location filename="../ui/settings_dialog.py" line="414"/>
         <source>Language Switch Failed</source>
         <translation type="unfinished">Language Switch Failed</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="410"/>
+        <location filename="../ui/settings_dialog.py" line="415"/>
         <source>Unable to switch the application language.
 
 {details}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="466"/>
+        <location filename="../ui/settings_dialog.py" line="473"/>
         <source>{local_count} local, {ssh_count} SSH, {slots} execution slot(s).</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="602"/>
+        <location filename="../ui/settings_dialog.py" line="609"/>
         <source>Built into packaged app</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="653"/>
+        <location filename="../ui/settings_dialog.py" line="660"/>
         <source>None</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1378,55 +1383,55 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1173"/>
+        <location filename="../ui/chatbot.py" line="1244"/>
         <source>Message Xenix</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1174"/>
-        <location filename="../ui/chatbot.py" line="1508"/>
-        <location filename="../ui/chatbot.py" line="1519"/>
+        <location filename="../ui/chatbot.py" line="1245"/>
+        <location filename="../ui/chatbot.py" line="1579"/>
+        <location filename="../ui/chatbot.py" line="1590"/>
         <source>Attach files</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1175"/>
+        <location filename="../ui/chatbot.py" line="1246"/>
         <source>Model for the next turn</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1176"/>
+        <location filename="../ui/chatbot.py" line="1247"/>
         <source>Continue</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1177"/>
-        <location filename="../ui/chatbot.py" line="1453"/>
+        <location filename="../ui/chatbot.py" line="1248"/>
+        <location filename="../ui/chatbot.py" line="1524"/>
         <source>Stop</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1178"/>
+        <location filename="../ui/chatbot.py" line="1249"/>
         <source>Drop files to attach</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1179"/>
+        <location filename="../ui/chatbot.py" line="1250"/>
         <source>Release here to add them to the next message</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1180"/>
+        <location filename="../ui/chatbot.py" line="1251"/>
         <source>Scroll to bottom</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1459"/>
+        <location filename="../ui/chatbot.py" line="1530"/>
         <source>Send</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1510"/>
+        <location filename="../ui/chatbot.py" line="1581"/>
         <source>Data files (*.csv *.xlsx *.xls)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1738,24 +1743,59 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="850"/>
+        <location filename="../ui/chatbot.py" line="873"/>
         <source>Details</source>
-        <translation type="unfinished"></translation>
+        <translation>Details</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="851"/>
+        <location filename="../ui/chatbot.py" line="874"/>
         <source>Open tool call details</source>
-        <translation type="unfinished"></translation>
+        <translation>Open tool call details</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="859"/>
+        <location filename="../ui/chatbot.py" line="883"/>
+        <source>Hide details</source>
+        <translation>Hide details</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="883"/>
+        <source>Show details</source>
+        <translation>Show details</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="887"/>
         <source>Hide result</source>
-        <translation type="unfinished"></translation>
+        <translation>Hide result</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="859"/>
+        <location filename="../ui/chatbot.py" line="887"/>
         <source>Show result</source>
-        <translation type="unfinished"></translation>
+        <translation>Show result</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="924"/>
+        <source>Connecting ({attempt}/{max})</source>
+        <translation>Connecting ({attempt}/{max})</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="939"/>
+        <source>LLM connection retry</source>
+        <translation>LLM connection retry</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="946"/>
+        <source>Attempt {attempt}/{max}</source>
+        <translation>Attempt {attempt}/{max}</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="952"/>
+        <source>Attempt</source>
+        <translation>Attempt</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="956"/>
+        <source>Error code: `{code}`</source>
+        <translation>Error code: `{code}`</translation>
     </message>
 </context>
 <context>
@@ -1841,12 +1881,12 @@ State file: {state_path}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app.py" line="710"/>
+        <location filename="../app.py" line="682"/>
         <source>Unable to start Xenix</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app.py" line="711"/>
+        <location filename="../app.py" line="683"/>
         <source>Xenix could not finish startup.
 
 {error}</source>
