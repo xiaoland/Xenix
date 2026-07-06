@@ -220,7 +220,7 @@ class AgentToolRegistry:
                 provider_name="analysis_graph",
                 description=(
                     "Draw one bounded static SVG artifact for a registered dataset. Use exactly one of `spec` "
-                    "or `wordcloud_spec`. `spec` is for ordinary Vega charts under the Xenix Vega profile. "
+                    "or `wordcloud_spec`. `spec` is for ordinary Vega-Lite charts. "
                     "`wordcloud_spec` is the dedicated word-cloud path and expects an upstream chart-ready "
                     "frequency table from data.query or data.transform."
                 ),
@@ -237,43 +237,42 @@ class AgentToolRegistry:
                         "spec": {
                             "type": "object",
                             "description": (
-                                "Vega chart specification under the Xenix Vega profile. Xenix injects dataset "
-                                "values before rendering. Write drawing structure only: marks, scales, axes, "
-                                "legends, signals, config, and simple mark-level transforms. Do not use this "
+                                "Vega-Lite chart specification. Xenix injects dataset values before rendering. "
+                                "Use standard Vega-Lite mark, encoding, transform, layer, facet, concat, repeat, "
+                                "config, and params fields. Do not include data or datasets, and do not use this "
                                 "field for word clouds."
                             ),
                             "properties": {
-                                "$schema": {"type": "string", "description": "Optional Vega schema URL."},
+                                "$schema": {"type": "string", "description": "Optional Vega-Lite schema URL."},
                                 "width": {"type": "number", "description": "Chart width in pixels."},
                                 "height": {"type": "number", "description": "Chart height in pixels."},
-                                "padding": {
-                                    "description": "Optional Vega padding value or padding object.",
-                                },
                                 "title": {
-                                    "description": "Optional chart title string or Vega title object.",
+                                    "description": "Optional chart title string or Vega-Lite title object.",
                                 },
-                                "scales": {
+                                "mark": {
+                                    "description": "Vega-Lite mark string or mark definition object.",
+                                },
+                                "encoding": {
+                                    "type": "object",
+                                    "description": "Vega-Lite channel encodings such as x, y, color, tooltip, and text.",
+                                },
+                                "transform": {
                                     "type": "array",
-                                    "description": "Optional Vega scales. Simple domains may use field-only objects.",
+                                    "description": "Optional Vega-Lite transforms for lightweight chart shaping.",
                                 },
-                                "axes": {"type": "array", "description": "Optional Vega axes."},
-                                "legends": {"type": "array", "description": "Optional Vega legends."},
-                                "signals": {
+                                "layer": {
                                     "type": "array",
-                                    "description": "Optional Vega signals; rendered artifact is a static SVG.",
+                                    "description": "Optional Vega-Lite layers.",
                                 },
-                                "config": {"type": "object", "description": "Optional Vega configuration."},
-                                "marks": {
-                                    "type": "array",
-                                    "minItems": 1,
-                                    "description": (
-                                        "Required non-empty Vega marks array. Use mark-level transforms only for "
-                                        "ordinary drawing/layout behavior, not for word clouds."
-                                    ),
-                                    "items": {"type": "object"},
-                                },
+                                "facet": {"type": "object", "description": "Optional Vega-Lite facet definition."},
+                                "repeat": {"type": "object", "description": "Optional Vega-Lite repeat definition."},
+                                "hconcat": {"type": "array", "description": "Optional horizontal concat views."},
+                                "vconcat": {"type": "array", "description": "Optional vertical concat views."},
+                                "concat": {"type": "array", "description": "Optional concat views."},
+                                "spec": {"type": "object", "description": "Nested Vega-Lite view for facet/repeat."},
+                                "config": {"type": "object", "description": "Optional Vega-Lite configuration."},
+                                "params": {"type": "array", "description": "Optional Vega-Lite params."},
                             },
-                            "required": ["marks"],
                             "additionalProperties": True,
                         },
                         "wordcloud_spec": {
@@ -920,7 +919,7 @@ class AgentToolRegistry:
         raw_spec = arguments.get("spec")
         raw_wordcloud_spec = arguments.get("wordcloud_spec")
         if has_spec and not isinstance(raw_spec, dict):
-            raise ValidationError("analysis.graph spec must be a Vega object.")
+            raise ValidationError("analysis.graph spec must be a Vega-Lite object.")
         if has_wordcloud_spec and not isinstance(raw_wordcloud_spec, dict):
             raise ValidationError("analysis.graph wordcloud_spec must be an object.")
         graph_result = self._analysis_graph_service.graph_dataset(

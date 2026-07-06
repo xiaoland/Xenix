@@ -621,44 +621,18 @@ def _run_smoke_checks(paths) -> None:
                 "width": 300,
                 "height": 180,
                 "title": "Graph smoke",
-                "scales": [
-                    {
-                        "name": "x",
-                        "type": "band",
-                        "domain": {"field": "label"},
-                        "range": "width",
-                        "padding": 0.1,
-                    },
-                    {
-                        "name": "y",
-                        "type": "linear",
-                        "domain": {"field": "value"},
-                        "range": "height",
-                        "nice": True,
-                        "zero": True,
-                    },
-                ],
-                "axes": [{"orient": "bottom", "scale": "x"}, {"orient": "left", "scale": "y"}],
-                "marks": [
-                    {
-                        "type": "rect",
-                        "encode": {
-                            "enter": {
-                                "x": {"scale": "x", "field": "label"},
-                                "width": {"scale": "x", "band": 1},
-                                "y": {"scale": "y", "field": "value"},
-                                "y2": {"scale": "y", "value": 0},
-                                "fill": {"value": "#4c78a8"},
-                            }
-                        },
-                    }
-                ],
+                "mark": "bar",
+                "encoding": {
+                    "x": {"field": "label", "type": "nominal"},
+                    "y": {"field": "value", "type": "quantitative"},
+                    "color": {"value": "#4c78a8"},
+                },
             },
         )
     )
     graph_output = Path(graph_result.output_path)
     if not graph_output.is_file() or not graph_output.read_text(encoding="utf-8").lstrip().startswith("<svg"):
-        raise RuntimeError("Vega graph smoke render failed.")
+        raise RuntimeError("Vega-Lite graph smoke render failed.")
 
     wordcloud_smoke_path = paths.temp / "graph-wordcloud-smoke.csv"
     wordcloud_smoke_path.write_text(

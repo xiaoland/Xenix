@@ -21,7 +21,7 @@ dependencies = [
     "apyori>=1.1.2",
     "marko>=2.2.0",
     "statsmodels>=0.14.0",
-    "vl-convert-python==2.0.0rc1",
+    "vl-convert-python==1.9.0.post1",
     "wordcloud>=1.9.6",
     "jieba>=0.42.1",
     "opentelemetry-api>=1.42.1",

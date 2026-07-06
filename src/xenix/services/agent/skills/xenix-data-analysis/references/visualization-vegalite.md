@@ -1,8 +1,8 @@
-# Visualization and Vega Reference
+# Visualization and Vega-Lite Reference
 
-Use this file before calling `analysis.graph` with a Vega `spec`. The graph tool receives a compact Vega specification for a registered, chart-ready dataset. Xenix injects the selected dataset into the Vega spec; do not add or edit Vega `data.values`.
+Use this file before calling `analysis.graph` with a Vega-Lite `spec`. The graph tool receives a compact Vega-Lite specification for a registered, chart-ready dataset. Xenix injects the selected dataset into the Vega-Lite spec; do not add or edit `data` or `datasets`.
 
-Use `wordcloud_spec`, not Vega, for word clouds.
+Use `wordcloud_spec`, not Vega-Lite, for word clouds.
 
 ## Chart selection
 
@@ -17,7 +17,7 @@ Use `wordcloud_spec`, not Vega, for word clouds.
 
 ## Visual quality rules
 
-- Use a descriptive title and short subtitle when the Vega schema supports it.
+- Use a descriptive title and short subtitle when the Vega-Lite schema supports it.
 - Prefer horizontal bars for more than 6 categories or long Chinese labels.
 - Sort ranked charts by value descending.
 - Limit category charts to Top 10-20; group the rest as “其他” when useful.
@@ -26,9 +26,9 @@ Use `wordcloud_spec`, not Vega, for word clouds.
 - For Chinese text, prefer system fonts or `Noto Sans SC` when available.
 - Avoid 3D, decorative gradients, excessive labels, and overloaded dashboards.
 
-## Vega horizontal bar template
+## Vega-Lite horizontal bar template
 
-Use `assets/vega/topn-bar.vg.json` for ranked category comparisons. Prepare a registered dataset with:
+Use `assets/vegalite/topn-bar.vl.json` for ranked category comparisons. Prepare a registered dataset with:
 
 ```json
 [
@@ -37,9 +37,9 @@ Use `assets/vega/topn-bar.vg.json` for ranked category comparisons. Prepare a re
 ]
 ```
 
-## Vega line chart template
+## Vega-Lite line chart template
 
-Use `assets/vega/time-line.vg.json` for a single time-series metric. Prepare a registered dataset with:
+Use `assets/vegalite/time-line.vl.json` for a single time-series metric. Prepare a registered dataset with:
 
 ```json
 [
@@ -48,9 +48,9 @@ Use `assets/vega/time-line.vg.json` for a single time-series metric. Prepare a r
 ]
 ```
 
-## Vega heatmap template
+## Vega-Lite heatmap template
 
-Use `assets/vega/heatmap.vg.json` for two categorical dimensions and one measure. Prepare a registered dataset with:
+Use `assets/vegalite/heatmap.vl.json` for two categorical dimensions and one measure. Prepare a registered dataset with:
 
 ```json
 [

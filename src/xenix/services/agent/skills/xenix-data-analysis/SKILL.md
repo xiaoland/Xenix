@@ -63,7 +63,7 @@ When the resource tool is available, load only the relevant file:
 
 - `references/task-routing.md` when the user request or dataset structure is ambiguous.
 - `references/duckdb-sql-recipes.md` before writing `data.query` SQL.
-- `references/visualization-vega.md` before calling `analysis.graph` with an ordinary Vega chart.
+- `references/visualization-vegalite.md` before calling `analysis.graph` with an ordinary Vega-Lite chart.
 - `references/association-analysis.md` when data has order-product, subject-item, user-behavior, transaction-item, patient-symptom, student-course, or basket-like structure.
 - `references/reporting-and-risk.md` before producing a management-facing report.
 
@@ -71,7 +71,7 @@ Use assets only when they match the concrete output:
 
 - `assets/analysis-plan-template.json` for a structured plan.
 - `assets/management-report-template.md` for a management-facing report.
-- `assets/vega/*.vg.json` for chart templates.
+- `assets/vegalite/*.vl.json` for chart templates.
 
 ## Ask-versus-act policy
 

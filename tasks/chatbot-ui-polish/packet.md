@@ -126,6 +126,37 @@ Resolved unrelated test mismatch:
   - downgrade `vl-convert-python` from `2.0.0rc1` to stable `1.9.0.post1`
   - keep the SVG empty-path normalization unless new evidence shows stable Vega-Lite output no longer needs it; prior diagnosis showed `vl-convert-python==1.9.0.post1` can still output empty `d=""` paths
 
+## Vega-Lite Rollback Implementation
+
+- Committed prior Chatbot UI polish as `147e313 Polish chatbot UI streaming and SVG previews`.
+- `pyproject.toml` and `pdm.lock` now pin `vl-convert-python==1.9.0.post1`.
+- Local `.venv` sync initially failed while VS Code/debugpy `scripts/run_dev.py` processes kept `vl_convert.pyd` loaded.
+- After stopping the dev session, `pdm sync` successfully updated the local runtime to `vl-convert-python==1.9.0.post1`; `vl_convert.__version__` reports `1.9.0`.
+- `AnalysisGraphService` now treats `spec` as Vega-Lite:
+  - injects registered rows as top-level `data.values`
+  - calls `vlc.vegalite_to_svg(...)`
+  - emits `spec_format: "vega-lite"`
+  - keeps SVG empty-path normalization
+  - allows Vega-Lite top-level transforms
+  - removes Vega-only marks/scales/from patching
+- Agent-facing schema now describes Vega-Lite `mark`, `encoding`, `transform`, `layer`, facet/repeat/concat, config, and params.
+- Agent skill visualization reference and assets moved from `assets/vega/*.vg.json` to `assets/vegalite/*.vl.json`; catalog regenerated.
+- Smoke graph spec now uses Vega-Lite.
+- Durable docs now describe Vega-Lite rather than the Xenix Vega profile.
+
+Verification after rollback:
+
+- `pdm sync`
+- direct runtime check: `vl_convert.__version__ == "1.9.0"`
+- `pdm run python -m compileall -q src/xenix/services/analysis_graph.py src/xenix/services/agent/tools.py src/xenix/app.py tests/test_analysis_graph.py`
+- `pdm run agent-skills-check`
+- `pdm run pytest tests/test_analysis_graph.py -q`
+- `pdm run pytest tests/test_agent_harness_first_slice.py::test_agent_harness_model_metadata_exposes_contract_without_train_enums -q`
+- `pdm run pytest tests/test_main.py::test_smoke_test_bootstraps_runtime_in_fresh_app_home -q`
+- `pdm run pytest tests/test_agent_harness_streaming.py -q`
+- Added test assertion that generated Vega-Lite bar paths are non-zero width.
+- Direct generated Vega-Lite bar smoke with runtime `vl-convert 1.9.0` produced non-zero-width bar paths and `QSvgRenderer` emitted no `Invalid path data` messages.
+
 ## Next Step
 
-Wait for explicit user start before mutating product code. Then implement the Vega-Lite rollback across dependency pin/lockfile, `AnalysisGraphService`, Agent tool schema, Agent skill visualization references/assets, docs, smoke coverage, and tests.
+Ready for user review. Commit the Vega-Lite rollback separately if accepted.

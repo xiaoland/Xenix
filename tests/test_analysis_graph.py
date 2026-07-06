@@ -93,41 +93,15 @@ def _write_sales_csv(tmp_path: Path) -> Path:
 
 def _bar_spec() -> dict:
     return {
-        "$schema": "https://vega.github.io/schema/vega/v6.json",
+        "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
         "width": 420,
         "height": 260,
-        "scales": [
-            {
-                "name": "x",
-                "type": "band",
-                "domain": {"field": "region"},
-                "range": "width",
-                "padding": 0.1,
-            },
-            {
-                "name": "y",
-                "type": "linear",
-                "domain": {"field": "amount"},
-                "range": "height",
-                "nice": True,
-                "zero": True,
-            },
-        ],
-        "axes": [{"orient": "bottom", "scale": "x"}, {"orient": "left", "scale": "y"}],
-        "marks": [
-            {
-                "type": "rect",
-                "encode": {
-                    "enter": {
-                        "x": {"scale": "x", "field": "region"},
-                        "width": {"scale": "x", "band": 1},
-                        "y": {"scale": "y", "field": "amount"},
-                        "y2": {"scale": "y", "value": 0},
-                        "fill": {"value": "#4c78a8"},
-                    }
-                },
-            }
-        ],
+        "mark": "bar",
+        "encoding": {
+            "x": {"field": "region", "type": "nominal"},
+            "y": {"field": "amount", "type": "quantitative"},
+            "color": {"value": "#4c78a8"},
+        },
         "title": "Revenue by region",
     }
 
@@ -136,38 +110,12 @@ def _point_spec() -> dict:
     return {
         "width": 420,
         "height": 260,
-        "scales": [
-            {
-                "name": "x",
-                "type": "linear",
-                "domain": {"field": "amount"},
-                "range": "width",
-                "nice": True,
-                "zero": True,
-            },
-            {
-                "name": "y",
-                "type": "linear",
-                "domain": {"field": "score"},
-                "range": "height",
-                "nice": True,
-                "zero": True,
-            },
-        ],
-        "axes": [{"orient": "bottom", "scale": "x"}, {"orient": "left", "scale": "y"}],
-        "marks": [
-            {
-                "type": "symbol",
-                "encode": {
-                    "enter": {
-                        "x": {"scale": "x", "field": "amount"},
-                        "y": {"scale": "y", "field": "score"},
-                        "size": {"value": 80},
-                        "fill": {"value": "#4c78a8"},
-                    }
-                },
-            }
-        ],
+        "mark": "point",
+        "encoding": {
+            "x": {"field": "amount", "type": "quantitative"},
+            "y": {"field": "score", "type": "quantitative"},
+            "color": {"value": "#4c78a8"},
+        },
     }
 
 
@@ -243,33 +191,27 @@ def _wordcloud_missing_count_spec() -> dict:
     return spec
 
 
-def _vega_wordcloud_spec() -> dict:
+def _vegalite_wordcloud_transform_spec() -> dict:
     return {
-        "$schema": "https://vega.github.io/schema/vega/v6.json",
+        "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
         "width": 360,
         "height": 220,
-        "marks": [
+        "mark": "text",
+        "encoding": {
+            "text": {"field": "word", "type": "nominal"},
+        },
+        "transform": [
             {
-                "type": "text",
-                "encode": {
-                    "enter": {
-                        "text": {"field": "word"},
-                    }
-                },
-                "transform": [
-                    {
-                        "type": "wordcloud",
-                        "text": {"field": "word"},
-                        "fontSize": {"field": "datum.count"},
-                    }
-                ],
+                "type": "wordcloud",
+                "text": {"field": "word"},
+                "fontSize": {"field": "datum.count"},
             }
         ],
-        "title": "Legacy Vega cloud",
+        "title": "Legacy wordcloud transform",
     }
 
 
-def test_analysis_graph_service_writes_svg_from_vega_profile_spec(monkeypatch, tmp_path: Path) -> None:
+def test_analysis_graph_service_writes_svg_from_vegalite_spec(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     source = _write_sales_csv(tmp_path)
@@ -286,7 +228,7 @@ def test_analysis_graph_service_writes_svg_from_vega_profile_spec(monkeypatch, t
     assert output_path.exists()
     assert output_path.suffix == ".svg"
     assert result.graph_metadata["renderer"] == "vl-convert-python"
-    assert result.graph_metadata["spec_format"] == "vega"
+    assert result.graph_metadata["spec_format"] == "vega-lite"
     assert result.graph_metadata["title"] == "Revenue by region"
     assert result.graph_metadata["referenced_fields"] == ["amount", "region"]
     assert result.graph_metadata["row_count"] == 4
@@ -297,6 +239,11 @@ def test_analysis_graph_service_writes_svg_from_vega_profile_spec(monkeypatch, t
         element
         for element in root.iter(f"{{{analysis_graph_module._SVG_NS}}}path")
         if not str(element.attrib.get("d") or "").strip()
+    ]
+    bar_paths = [
+        str(element.attrib.get("d") or "")
+        for element in root.iter(f"{{{analysis_graph_module._SVG_NS}}}path")
+        if element.attrib.get("fill") == "#4c78a8"
     ]
     qt_messages: list[str] = []
 
@@ -311,6 +258,8 @@ def test_analysis_graph_service_writes_svg_from_vega_profile_spec(monkeypatch, t
 
     assert "<svg" in svg
     assert empty_paths == []
+    assert bar_paths
+    assert all("h0" not in path for path in bar_paths)
     assert renderer.isValid()
     assert not any("Invalid path data" in message for message in qt_messages)
 
@@ -440,7 +389,7 @@ def test_analysis_graph_wordcloud_missing_count_field_returns_structured_error(m
     assert any("data.query or data.transform" in hint for hint in getattr(exc_info.value, "repair_hints", []))
 
 
-def test_analysis_graph_rejects_vega_wordcloud_transform(monkeypatch, tmp_path: Path) -> None:
+def test_analysis_graph_rejects_vegalite_wordcloud_transform(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     source = _write_terms_csv(tmp_path)
@@ -450,7 +399,7 @@ def test_analysis_graph_rejects_vega_wordcloud_transform(monkeypatch, tmp_path: 
             GraphDatasetInput(
                 source_path=str(source.resolve()),
                 dataset_name="Terms",
-                spec=_vega_wordcloud_spec(),
+                spec=_vegalite_wordcloud_transform_spec(),
             )
         )
 
@@ -501,12 +450,8 @@ def test_analysis_graph_rejects_external_urls(monkeypatch, tmp_path: Path) -> No
     paths = ensure_app_dirs(get_app_paths())
     source = _write_sales_csv(tmp_path)
     spec = {
-        "marks": [
-            {
-                "type": "image",
-                "encode": {"enter": {"url": {"value": "https://example.invalid/image.png"}}},
-            }
-        ],
+        "mark": "image",
+        "encoding": {"url": {"value": "https://example.invalid/image.png"}},
     }
 
     with pytest.raises(ValidationError, match="External data or resource URLs"):
@@ -520,17 +465,11 @@ def test_analysis_graph_rejects_unknown_fields_with_available_columns(monkeypatc
     paths = ensure_app_dirs(get_app_paths())
     source = _write_sales_csv(tmp_path)
     spec = {
-        "marks": [
-            {
-                "type": "symbol",
-                "encode": {
-                    "enter": {
-                        "x": {"field": "missing_amount"},
-                        "y": {"field": "score"},
-                    }
-                },
-            }
-        ],
+        "mark": "point",
+        "encoding": {
+            "x": {"field": "missing_amount", "type": "quantitative"},
+            "y": {"field": "score", "type": "quantitative"},
+        },
     }
 
     with pytest.raises(ValidationError, match="missing_amount.*Available columns: region, amount, score, date"):
@@ -539,17 +478,19 @@ def test_analysis_graph_rejects_unknown_fields_with_available_columns(monkeypatc
         )
 
 
-def test_analysis_graph_rejects_non_mark_level_transform(monkeypatch, tmp_path: Path) -> None:
+def test_analysis_graph_allows_vegalite_top_level_transform(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     source = _write_sales_csv(tmp_path)
     spec = _point_spec()
-    spec["transform"] = [{"type": "filter", "expr": "datum.amount > 10"}]
+    spec["transform"] = [{"filter": "datum.amount > 10"}]
 
-    with pytest.raises(ValidationError, match="only supports Vega mark-level transform"):
-        AnalysisGraphService(paths).graph_dataset(
-            GraphDatasetInput(source_path=str(source.resolve()), dataset_name="Sales", spec=spec)
-        )
+    result = AnalysisGraphService(paths).graph_dataset(
+        GraphDatasetInput(source_path=str(source.resolve()), dataset_name="Sales", spec=spec)
+    )
+
+    assert Path(result.output_path).exists()
+    assert result.graph_metadata["referenced_fields"] == ["amount", "score"]
 
 
 def test_analysis_graph_truncates_large_row_level_chart(monkeypatch, tmp_path: Path) -> None:
@@ -567,37 +508,49 @@ def test_analysis_graph_truncates_large_row_level_chart(monkeypatch, tmp_path: P
     assert "Rendered the first 3 rows" in result.graph_metadata["warnings"][0]
 
 
-def test_analysis_graph_rejects_complex_mark_dataflow(monkeypatch, tmp_path: Path) -> None:
+def test_analysis_graph_rejects_spec_without_vegalite_view(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    source = _write_sales_csv(tmp_path)
+    spec = {"width": 420, "height": 260, "encoding": {"x": {"field": "region"}}}
+
+    with pytest.raises(ValidationError, match="must include a Vega-Lite mark"):
+        AnalysisGraphService(paths).graph_dataset(
+            GraphDatasetInput(source_path=str(source.resolve()), dataset_name="Sales", spec=spec)
+        )
+
+
+def test_analysis_graph_accepts_vegalite_layer_spec(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     source = _write_sales_csv(tmp_path)
     spec = {
-        "marks": [
+        "width": 420,
+        "height": 260,
+        "layer": [
             {
-                "type": "group",
-                "from": {"facet": {"name": "region_groups", "groupby": "region"}},
-                "marks": [{"type": "rect"}],
-            }
+                "mark": "bar",
+                "encoding": {
+                    "x": {"field": "region", "type": "nominal"},
+                    "y": {"field": "amount", "type": "quantitative"},
+                },
+            },
+            {
+                "mark": "point",
+                "encoding": {
+                    "x": {"field": "region", "type": "nominal"},
+                    "y": {"field": "score", "type": "quantitative"},
+                },
+            },
         ],
     }
 
-    with pytest.raises(ValidationError, match="does not support Vega facet dataflow"):
-        AnalysisGraphService(paths).graph_dataset(
-            GraphDatasetInput(source_path=str(source.resolve()), dataset_name="Sales", spec=spec)
-        )
+    result = AnalysisGraphService(paths).graph_dataset(
+        GraphDatasetInput(source_path=str(source.resolve()), dataset_name="Sales", spec=spec)
+    )
 
-
-def test_analysis_graph_rejects_complex_scale_domain(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    source = _write_sales_csv(tmp_path)
-    spec = _bar_spec()
-    spec["scales"][0]["domain"] = {"fields": [{"field": "region"}]}
-
-    with pytest.raises(ValidationError, match="does not support complex Vega scale domains"):
-        AnalysisGraphService(paths).graph_dataset(
-            GraphDatasetInput(source_path=str(source.resolve()), dataset_name="Sales", spec=spec)
-        )
+    assert Path(result.output_path).exists()
+    assert result.graph_metadata["referenced_fields"] == ["amount", "region", "score"]
 
 
 def test_analysis_graph_tool_registers_image_artifact(monkeypatch, tmp_path: Path) -> None:
@@ -666,12 +619,14 @@ def test_analysis_graph_tool_schema_is_dataset_scoped(monkeypatch, tmp_path: Pat
     assert "dataset_id" in schema["properties"]
     assert "spec" in schema["properties"]
     assert "wordcloud_spec" in schema["properties"]
-    assert "Do not use this field for word clouds" in schema["properties"]["spec"]["description"]
+    assert "do not use this field for word clouds" in schema["properties"]["spec"]["description"]
     assert "data.query or data.transform first" in schema["properties"]["wordcloud_spec"]["description"]
     spec_schema = schema["properties"]["spec"]
-    assert spec_schema["required"] == ["marks"]
-    assert spec_schema["properties"]["marks"]["minItems"] == 1
-    assert "not for word clouds" in spec_schema["properties"]["marks"]["description"]
+    assert "required" not in spec_schema
+    assert "mark" in spec_schema["properties"]
+    assert "encoding" in spec_schema["properties"]
+    assert "layer" in spec_schema["properties"]
+    assert "Vega-Lite" in spec_schema["description"]
     wordcloud_schema = schema["properties"]["wordcloud_spec"]
     assert wordcloud_schema["properties"]["top_n"]["minimum"] == 20
     assert wordcloud_schema["properties"]["top_n"]["maximum"] == 80

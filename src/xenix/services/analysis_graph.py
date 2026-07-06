@@ -37,9 +37,8 @@ _MAX_SPEC_BYTES = 64 * 1024
 _MAX_OUTPUT_BYTES = 2 * 1024 * 1024
 _MAX_RENDER_ROWS = 10_000
 _MAX_COLUMNS_IN_ERROR = 30
-_INJECTED_DATA_NAME = "__xenix_dataset"
 _DATUM_FIELD_RE = re.compile(r"\bdatum(?:\[['\"]([^'\"]+)['\"]\]|\.([A-Za-z_][A-Za-z0-9_]*))")
-_STATIC_WARNING_KEYS = {"signals"}
+_STATIC_WARNING_KEYS = {"params"}
 _WORDCLOUD_DEFAULT_WIDTH = 720
 _WORDCLOUD_DEFAULT_HEIGHT = 420
 _WORDCLOUD_DEFAULT_TOP_N = 80
@@ -160,8 +159,8 @@ class AnalysisGraphService:
             frame = self._load_frame(source_path)
             dataset_name = input_data.dataset_name.strip() or source_path.stem
             mode = self._select_graph_mode(input_data)
-            if mode == "vega":
-                result = self._graph_vega_dataset(
+            if mode == "vegalite":
+                result = self._graph_vegalite_dataset(
                     user_spec=self._validate_spec_object(input_data.spec),
                     frame=frame,
                     dataset_name=dataset_name,
@@ -175,14 +174,14 @@ class AnalysisGraphService:
             self._record_operation("analysis.graph", started_at)
             return result
 
-    def _select_graph_mode(self, input_data: GraphDatasetInput) -> Literal["vega", "wordcloud"]:
+    def _select_graph_mode(self, input_data: GraphDatasetInput) -> Literal["vegalite", "wordcloud"]:
         has_spec = input_data.spec is not None
         has_wordcloud_spec = input_data.wordcloud_spec is not None
         if has_spec == has_wordcloud_spec:
             raise ValidationError("analysis.graph requires exactly one of spec or wordcloud_spec.")
-        return "vega" if has_spec else "wordcloud"
+        return "vegalite" if has_spec else "wordcloud"
 
-    def _graph_vega_dataset(
+    def _graph_vegalite_dataset(
         self,
         *,
         user_spec: dict[str, Any],
@@ -194,20 +193,20 @@ class AnalysisGraphService:
             raise ValidationError(f"analysis.graph spec cannot exceed {_MAX_SPEC_BYTES} bytes.")
 
         prepared = self._prepare_spec(user_spec, frame, dataset_name)
-        svg = self._render_vega_svg(prepared.spec)
+        svg = self._render_vegalite_svg(prepared.spec)
         output_bytes = len(svg.encode("utf-8"))
         if output_bytes > _MAX_OUTPUT_BYTES:
             raise ValidationError(
                 "analysis.graph rendered SVG is too large. Reduce chart dimensions, rows, marks, or pre-aggregate data."
             )
 
-        output_path = self._write_svg_output(svg=svg, dataset_name=dataset_name, suffix="vega")
+        output_path = self._write_svg_output(svg=svg, dataset_name=dataset_name, suffix="vegalite")
         return GraphDatasetResult(
             output_path=str(output_path.resolve()),
             graph_metadata={
                 "renderer": "vl-convert-python",
                 "renderer_version": getattr(vlc, "__version__", None),
-                "spec_format": "vega",
+                "spec_format": "vega-lite",
                 "schema": prepared.schema_url,
                 "dataset_name": dataset_name,
                 "title": prepared.title,
@@ -297,7 +296,7 @@ class AnalysisGraphService:
 
     def _validate_spec_object(self, value: dict[str, Any] | None) -> dict[str, Any]:
         if not isinstance(value, dict):
-            raise ValidationError("analysis.graph spec must be a Vega object.")
+            raise ValidationError("analysis.graph spec must be a Vega-Lite object.")
         if not value:
             raise ValidationError("analysis.graph spec cannot be empty.")
         return value
@@ -319,7 +318,6 @@ class AnalysisGraphService:
         spec = copy.deepcopy(user_spec)
         self._drop_user_data_declarations(spec)
         self._validate_no_external_urls(spec)
-        self._validate_transform_scope(spec)
         self._validate_dimensions(spec)
         spec.setdefault("width", _DEFAULT_WIDTH)
         spec.setdefault("height", _DEFAULT_HEIGHT)
@@ -340,10 +338,9 @@ class AnalysisGraphService:
         row_count = int(len(frame.index))
         truncated = row_count > _MAX_RENDER_ROWS
         render_frame = frame.head(_MAX_RENDER_ROWS) if truncated else frame
-        spec.setdefault("$schema", "https://vega.github.io/schema/vega/v6.json")
+        spec.setdefault("$schema", "https://vega.github.io/schema/vega-lite/v5.json")
         spec.setdefault("title", dataset_name)
-        self._patch_vega_references(spec)
-        spec["data"] = [{"name": _INJECTED_DATA_NAME, "values": self._records(render_frame)}]
+        spec["data"] = {"values": self._records(render_frame)}
         warnings = self._static_warnings(spec)
         if truncated:
             warnings.append(
@@ -503,30 +500,42 @@ class AnalysisGraphService:
         )
 
     def _validate_visual_shape(self, spec: dict[str, Any]) -> None:
-        marks = spec.get("marks")
-        if not isinstance(marks, list) or not marks:
-            raise ValidationError("analysis.graph spec must include a non-empty Vega marks array.")
-        if not all(isinstance(mark, dict) for mark in marks):
-            raise ValidationError("analysis.graph spec.marks entries must be Vega mark objects.")
+        if "mark" in spec:
+            return
+        for key in ("layer", "hconcat", "vconcat", "concat"):
+            value = spec.get(key)
+            if isinstance(value, list) and value:
+                return
+        for key in ("facet", "repeat"):
+            if key in spec and isinstance(spec.get("spec"), dict):
+                return
+        raise ValidationError("analysis.graph spec must include a Vega-Lite mark, layer, concat, facet, or repeat view.")
 
     def _validate_no_wordcloud_transform(self, spec: dict[str, Any]) -> None:
-        for mark in self._iter_marks(spec.get("marks", [])):
-            transforms = mark.get("transform")
-            if not isinstance(transforms, list):
-                continue
-            for transform in transforms:
-                if isinstance(transform, dict) and transform.get("type") == "wordcloud":
-                    raise ValidationError(
-                        "analysis.graph Vega specs no longer support wordcloud transforms. "
-                        "Use wordcloud_spec instead, and prepare the frequency table with data.query or data.transform first."
-                    )
+        self._validate_no_wordcloud_transform_value(spec)
+
+    def _validate_no_wordcloud_transform_value(self, value: Any) -> None:
+        if isinstance(value, dict):
+            transforms = value.get("transform")
+            if isinstance(transforms, list):
+                for transform in transforms:
+                    if isinstance(transform, dict) and transform.get("type") == "wordcloud":
+                        raise ValidationError(
+                            "analysis.graph Vega-Lite specs do not support wordcloud transforms. "
+                            "Use wordcloud_spec instead, and prepare the frequency table with data.query or data.transform first."
+                        )
+            for child in value.values():
+                self._validate_no_wordcloud_transform_value(child)
+        elif isinstance(value, list):
+            for child in value:
+                self._validate_no_wordcloud_transform_value(child)
 
     def _drop_user_data_declarations(self, value: Any, path: str = "spec") -> None:
         if isinstance(value, dict):
             for key in list(value):
                 child = value[key]
                 child_path = f"{path}.{key}"
-                if key == "data" and not self._is_patchable_data_reference(path):
+                if key == "data":
                     del value[key]
                     continue
                 if key == "datasets":
@@ -536,9 +545,6 @@ class AnalysisGraphService:
         elif isinstance(value, list):
             for index, child in enumerate(value):
                 self._drop_user_data_declarations(child, f"{path}[{index}]")
-
-    def _is_patchable_data_reference(self, parent_path: str) -> bool:
-        return parent_path.endswith(".from") or parent_path.endswith(".domain")
 
     def _validate_no_external_urls(self, value: Any, path: str = "spec") -> None:
         if isinstance(value, dict):
@@ -564,24 +570,6 @@ class AnalysisGraphService:
             if value < minimum or value > maximum:
                 raise ValidationError(f"analysis.graph spec.{key} must be between {minimum} and {maximum}.")
 
-    def _validate_transform_scope(self, spec: dict[str, Any]) -> None:
-        mark_ids = {id(mark) for mark in self._iter_marks(spec.get("marks", []))}
-        self._validate_transform_scope_value(spec, mark_ids)
-
-    def _validate_transform_scope_value(self, value: Any, mark_ids: set[int], path: str = "spec") -> None:
-        if isinstance(value, dict):
-            for key, child in value.items():
-                child_path = f"{path}.{key}"
-                if key == "transform" and id(value) not in mark_ids:
-                    raise ValidationError(
-                        f"analysis.graph only supports Vega mark-level transform at {child_path}. "
-                        "Use data.transform before graphing for data preparation."
-                    )
-                self._validate_transform_scope_value(child, mark_ids, child_path)
-        elif isinstance(value, list):
-            for index, child in enumerate(value):
-                self._validate_transform_scope_value(child, mark_ids, f"{path}[{index}]")
-
     def _scan_fields(self, spec: dict[str, Any]) -> _FieldScan:
         scan = _FieldScan()
         self._scan_fields_value(spec, scan)
@@ -604,7 +592,7 @@ class AnalysisGraphService:
                     )
                 elif key == "as":
                     scan.generated_fields.update(self._as_fields(child))
-                elif key == "filter" and isinstance(child, str):
+                elif key in {"filter", "calculate"} and isinstance(child, str):
                     scan.referenced_fields.update(match.group(1) or match.group(2) for match in _DATUM_FIELD_RE.finditer(child))
                 self._scan_fields_value(child, scan, key)
         elif isinstance(value, list):
@@ -632,7 +620,7 @@ class AnalysisGraphService:
         warnings: list[str] = []
         for key in sorted(self._present_keys(spec, _STATIC_WARNING_KEYS)):
             warnings.append(
-                f"Vega '{key}' may not be visible in a static SVG artifact. "
+                f"Vega-Lite '{key}' may not be visible in a static SVG artifact. "
                 "The chart was rendered as a static image."
             )
         return warnings
@@ -649,71 +637,14 @@ class AnalysisGraphService:
                 present.update(self._present_keys(child, keys))
         return present
 
-    def _patch_vega_references(self, spec: dict[str, Any]) -> None:
-        for mark in self._iter_marks(spec.get("marks", [])):
-            self._patch_mark_source(mark)
-        self._patch_scale_domains(spec.get("scales", []))
-
-    def _iter_marks(self, marks: Any):
-        if not isinstance(marks, list):
-            return
-        for mark in marks:
-            if not isinstance(mark, dict):
-                continue
-            yield mark
-            yield from self._iter_marks(mark.get("marks", []))
-
-    def _patch_mark_source(self, mark: dict[str, Any]) -> None:
-        source = mark.get("from")
-        if source is None:
-            mark["from"] = {"data": _INJECTED_DATA_NAME}
-            return
-        if not isinstance(source, dict):
-            raise ValidationError("analysis.graph spec marks must use object-shaped Vega from definitions.")
-        if "facet" in source:
-            raise ValidationError(
-                "analysis.graph does not support Vega facet dataflow inside marks. "
-                "Use data.transform to prepare a drawable dataset first."
-            )
-        unsupported_keys = sorted(set(source) - {"data"})
-        if unsupported_keys:
-            raise ValidationError(
-                "analysis.graph does not support complex Vega mark dataflow keys: " + ", ".join(unsupported_keys)
-            )
-        source["data"] = _INJECTED_DATA_NAME
-
-    def _patch_scale_domains(self, scales: Any) -> None:
-        if not isinstance(scales, list):
-            return
-        for scale in scales:
-            if not isinstance(scale, dict):
-                continue
-            domain = scale.get("domain")
-            if isinstance(domain, dict):
-                self._patch_scale_domain(domain)
-
-    def _patch_scale_domain(self, domain: dict[str, Any]) -> None:
-        if "fields" in domain:
-            raise ValidationError(
-                "analysis.graph does not support complex Vega scale domains. "
-                "Use data.transform to prepare one drawable field first."
-            )
-        unsupported_keys = sorted(set(domain) - {"data", "field", "sort"})
-        if unsupported_keys:
-            raise ValidationError(
-                "analysis.graph does not support complex Vega scale domain keys: " + ", ".join(unsupported_keys)
-            )
-        if "field" in domain:
-            domain["data"] = _INJECTED_DATA_NAME
-
-    def _render_vega_svg(self, spec: dict[str, Any]) -> str:
+    def _render_vegalite_svg(self, spec: dict[str, Any]) -> str:
         console_guard = self._allocate_hidden_console_for_packaged_windows()
         try:
-            svg = vlc.vega_to_svg(self._spec_json(spec, field_name="spec"))
+            svg = vlc.vegalite_to_svg(self._spec_json(spec, field_name="spec"))
         except Exception as exc:
             raise ValidationError(
-                "analysis.graph could not render the Vega spec. "
-                "Check marks, scales, encodings, transforms, and field types, then retry with a simpler valid Vega chart."
+                "analysis.graph could not render the Vega-Lite spec. "
+                "Check marks, encodings, transforms, and field types, then retry with a simpler valid Vega-Lite chart."
             ) from exc
         finally:
             if console_guard is not None:
@@ -721,10 +652,10 @@ class AnalysisGraphService:
         if not isinstance(svg, str) or not svg.lstrip().startswith("<svg"):
             raise ValidationError("analysis.graph renderer did not return a valid SVG image.")
         if "ERROR" in svg:
-            raise ValidationError("analysis.graph renderer returned a Vega error SVG. Simplify the spec and retry.")
-        return self._normalize_vega_svg_for_qt(svg)
+            raise ValidationError("analysis.graph renderer returned a Vega-Lite error SVG. Simplify the spec and retry.")
+        return self._normalize_svg_for_qt(svg)
 
-    def _normalize_vega_svg_for_qt(self, svg: str) -> str:
+    def _normalize_svg_for_qt(self, svg: str) -> str:
         try:
             root = ET.fromstring(svg)
         except ET.ParseError as exc:
