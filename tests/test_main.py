@@ -34,6 +34,7 @@ from xenix.services.storage.models import (
     ArtifactKind,
 )
 from xenix.trial_lock import TrialLockCheck, TrialLockReason
+from xenix.ui import icons as ui_icons
 from xenix.ui.chatbot import _format_token_count, _render_svg_preview_pixmap
 from xenix.ui.startup_splash import StartupSplash, StartupStage
 
@@ -73,6 +74,15 @@ def _seed_mock_history(window) -> None:
 def _sqlite_user_version(db_path: Path) -> int:
     with sqlite3.connect(db_path) as connection:
         return int(connection.execute("PRAGMA user_version").fetchone()[0])
+
+
+def test_tool_icon_semantic_names_resolve_to_pixmaps(monkeypatch) -> None:
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    _app = QApplication.instance() or QApplication([])
+
+    for icon_key in sorted(ui_icons._TOOL_ICON_NAMES):
+        pixmap = ui_icons.tool_icon(icon_key).pixmap(16, 16)
+        assert not pixmap.isNull(), icon_key
 
 
 def test_quarantine_database_renames_with_timestamp_and_collision_suffix(tmp_path: Path) -> None:
@@ -638,6 +648,76 @@ def test_thread_detail_view_expands_tool_event_detail(monkeypatch, tmp_path: Pat
         window.close()
 
 
+def test_thread_detail_view_removes_connection_retry_after_recovery(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=True)
+    try:
+        view = window._thread_detail_view
+        view.clear_messages()
+        retry_detail = [
+            {
+                "type": "llm_connection_retry",
+                "retry_events": [
+                    {
+                        "attempt_number": 2,
+                        "max_attempts": 5,
+                        "error_code": "llm_tool_arguments_invalid_json",
+                        "error_summary": "Tool call arguments are not valid JSON.",
+                    }
+                ],
+            }
+        ]
+        view.apply_chatbot_event(
+            ChatbotEvent(
+                id="provider-request:connection",
+                kind=ChatbotEventKind.CONNECTION,
+                turn_id="turn",
+                sequence_index=0,
+                author=ChatbotEventAuthor.ASSISTANT,
+                status=ChatbotEventStatus.IN_PROGRESS,
+                icon_key="connection",
+                summary="llm_connection_retry",
+                detail_blocks=retry_detail,
+            )
+        )
+        app.processEvents()
+
+        item = view._event_widgets_by_id["provider-request:connection"]
+        assert item.objectName() == "chatConnectionRetryItem"
+        assert item._summary_label.text() == "Connecting (2/5)"
+        assert item._icon_label.pixmap() is not None
+        assert not item._icon_label.pixmap().isNull()
+        assert item._detail_browser.isHidden()
+
+        item._chevron_button.click()
+        app.processEvents()
+
+        assert item._detail_browser.isVisible()
+        assert "llm_tool_arguments_invalid_json" in item._detail_browser.toPlainText()
+
+        view.apply_chatbot_event(
+            ChatbotEvent(
+                id="provider-request:connection",
+                kind=ChatbotEventKind.CONNECTION,
+                turn_id="turn",
+                sequence_index=0,
+                author=ChatbotEventAuthor.ASSISTANT,
+                status=ChatbotEventStatus.COMPLETED,
+                icon_key="connection",
+                summary="llm_connection_retry",
+                detail_blocks=retry_detail,
+            )
+        )
+        app.processEvents()
+
+        assert "provider-request:connection" not in view._event_widgets_by_id
+    finally:
+        window.close()
+
+
 def test_thread_detail_view_renders_tool_image_artifact_preview(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     artifact_path = tmp_path / "tool-chart.svg"
@@ -1013,11 +1093,10 @@ def test_main_window_stop_cancels_active_agent_run(monkeypatch, tmp_path: Path) 
         window._thread_detail_view.set_running(True)
         window._thread_detail_view.apply_chatbot_event(
             ChatbotEvent(
-                id="run-to-stop:thinking",
-                kind=ChatbotEventKind.THINKING,
+                id="run-to-stop:activity:1",
+                kind=ChatbotEventKind.ACTIVITY,
                 author=ChatbotEventAuthor.ASSISTANT,
                 status=ChatbotEventStatus.IN_PROGRESS,
-                content_blocks=[{"type": "thinking", "text": "Thinking..."}],
             )
         )
         window._thread_detail_view._send_button.click()
@@ -1176,7 +1255,7 @@ def test_thread_detail_view_model_picker_updates_current_thread_only(monkeypatch
         window.close()
 
 
-def test_thread_detail_view_thinking_event_is_bottom_temporary_message(monkeypatch, tmp_path: Path) -> None:
+def test_thread_detail_view_activity_event_is_bottom_temporary_message(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
@@ -1188,12 +1267,11 @@ def test_thread_detail_view_thinking_event_is_bottom_temporary_message(monkeypat
         view.add_message("You", [{"type": "text", "text": "Analyze this."}])
         view.apply_chatbot_event(
             ChatbotEvent(
-                id="thinking-event",
-                kind=ChatbotEventKind.THINKING,
+                id="activity-event",
+                kind=ChatbotEventKind.ACTIVITY,
                 turn_id="turn",
                 author=ChatbotEventAuthor.ASSISTANT,
                 status=ChatbotEventStatus.IN_PROGRESS,
-                content_blocks=[{"type": "thinking", "text": "Thinking..."}],
             )
         )
         app.processEvents()
@@ -1205,11 +1283,12 @@ def test_thread_detail_view_thinking_event_is_bottom_temporary_message(monkeypat
 
         view.apply_chatbot_event(
             ChatbotEvent(
-                id="thinking-event",
-                kind=ChatbotEventKind.THINKING,
+                id="assistant-event",
+                kind=ChatbotEventKind.TEXT,
                 turn_id="turn",
                 author=ChatbotEventAuthor.ASSISTANT,
                 status=ChatbotEventStatus.COMPLETED,
+                content_blocks=[{"type": "markdown", "text": "Done."}],
             )
         )
         app.processEvents()
@@ -1248,12 +1327,11 @@ def test_main_window_keeps_thinking_indicator_during_non_final_snapshot(monkeypa
                 thread_id=thread_id,
                 run_id="run-thinking",
                 chatbot_event=ChatbotEvent(
-                    id="run-thinking:thinking",
-                    kind=ChatbotEventKind.THINKING,
+                    id="run-thinking:activity:1",
+                    kind=ChatbotEventKind.ACTIVITY,
                     turn_id="turn-thinking",
                     author=ChatbotEventAuthor.ASSISTANT,
                     status=ChatbotEventStatus.IN_PROGRESS,
-                    content_blocks=[{"type": "thinking", "text": "Thinking..."}],
                 ),
             )
             while not release_stream:

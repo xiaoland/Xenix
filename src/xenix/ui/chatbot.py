@@ -878,14 +878,9 @@ class ToolCallItem(QFrame):
         if not has_detail:
             self._expanded = False
         self._chevron_button.setIcon(chevron_icon(expanded=self._expanded))
-        if event.kind is ChatbotEventKind.CONNECTION:
-            self._chevron_button.setToolTip(
-                self.tr("Hide details") if self._expanded else self.tr("Show details")
-            )
-        else:
-            self._chevron_button.setToolTip(
-                self.tr("Hide result") if self._expanded else self.tr("Show result")
-            )
+        self._chevron_button.setToolTip(
+            self.tr("Hide result") if self._expanded else self.tr("Show result")
+        )
         self._detail_browser.setHtml(
             render_chat_markdown(self._detail_markdown(event), inline_artifact_images=False)
         )
@@ -919,18 +914,105 @@ class ToolCallItem(QFrame):
             self.action_requested.emit(action)
 
     def _summary_text(self, event: ChatbotEvent) -> str:
-        if event.kind is ChatbotEventKind.CONNECTION:
-            attempt_number, max_attempts = _connection_attempt_counts(event.detail_blocks)
-            return self.tr("Connecting ({attempt}/{max})").format(
-                attempt=attempt_number,
-                max=max_attempts,
-            )
         return _translate_tool_summary(event.summary or "")
 
     def _detail_markdown(self, event: ChatbotEvent) -> str:
-        if event.kind is ChatbotEventKind.CONNECTION:
-            return self._connection_detail_markdown(event.detail_blocks)
         return _render_content_blocks(event.detail_blocks)
+
+
+class ConnectionRetryItem(QFrame):
+    def __init__(
+        self,
+        event: ChatbotEvent,
+        *,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.setObjectName("chatConnectionRetryItem")
+        self._card = self
+        self._event = event
+        self._expanded = False
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        layout = QVBoxLayout(self)
+        layout.setObjectName("chatConnectionRetryItemLayout")
+        layout.setContentsMargins(10, 7, 10, 7)
+        layout.setSpacing(6)
+
+        header = QWidget(self)
+        header_layout = QHBoxLayout(header)
+        header_layout.setObjectName("chatConnectionRetryHeaderLayout")
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(8)
+
+        self._icon_label = QLabel()
+        self._icon_label.setObjectName("chatConnectionRetryIcon")
+        self._icon_label.setFixedWidth(22)
+        self._icon_label.setAlignment(Qt.AlignCenter)
+
+        self._summary_label = QLabel()
+        self._summary_label.setObjectName("chatConnectionRetrySummary")
+        self._summary_label.setWordWrap(True)
+
+        self._chevron_button = QToolButton()
+        self._chevron_button.setObjectName("chatConnectionRetryChevron")
+        self._chevron_button.setFixedSize(28, 24)
+        self._chevron_button.setAutoRaise(True)
+        self._chevron_button.setArrowType(Qt.NoArrow)
+        self._chevron_button.setIconSize(QSize(16, 16))
+        self._chevron_button.clicked.connect(self._toggle_detail)
+
+        header_layout.addWidget(self._icon_label, 0, Qt.AlignVCenter)
+        header_layout.addWidget(self._summary_label, 1, Qt.AlignVCenter)
+        header_layout.addWidget(self._chevron_button, 0, Qt.AlignVCenter)
+        layout.addWidget(header)
+
+        self._detail_browser = AutoHeightTextBrowser()
+        self._detail_browser.setObjectName("chatConnectionRetryDetail")
+        self._detail_browser.setFrameShape(QFrame.NoFrame)
+        layout.addWidget(self._detail_browser)
+
+        self.set_event(event)
+
+    def set_event(self, event: ChatbotEvent) -> None:
+        self._event = event
+        self._icon_label.setPixmap(tool_icon(event.icon_key).pixmap(QSize(16, 16)))
+        attempt_number, max_attempts = _connection_attempt_counts(event.detail_blocks)
+        self._summary_label.setText(
+            self.tr("Connecting ({attempt}/{max})").format(
+                attempt=attempt_number,
+                max=max_attempts,
+            )
+        )
+        has_detail = bool(event.detail_blocks)
+        self._chevron_button.setVisible(has_detail)
+        self._chevron_button.setEnabled(has_detail)
+        if not has_detail:
+            self._expanded = False
+        self._chevron_button.setIcon(chevron_icon(expanded=self._expanded))
+        self._chevron_button.setToolTip(
+            self.tr("Hide details") if self._expanded else self.tr("Show details")
+        )
+        self._detail_browser.setHtml(
+            render_chat_markdown(
+                self._connection_detail_markdown(event.detail_blocks),
+                inline_artifact_images=False,
+            )
+        )
+        self._detail_browser.setVisible(has_detail and self._expanded)
+        _propagate_geometry_change(self)
+
+    def retranslate_ui(self) -> None:
+        self.set_event(self._event)
+
+    def set_available_width(self, width: int) -> None:
+        self.setMaximumWidth(UNBOUNDED_WIDGET_WIDTH)
+
+    def _toggle_detail(self) -> None:
+        if not self._event.detail_blocks:
+            return
+        self._expanded = not self._expanded
+        self.set_event(self._event)
 
     def _connection_detail_markdown(self, detail_blocks: list[dict[str, Any]]) -> str:
         retry_events = _connection_retry_events(detail_blocks)
@@ -1317,10 +1399,14 @@ class ThreadDetailView(QWidget):
         self.add_message("You", blocks, auto_scroll=auto_scroll)
 
     def add_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> QWidget:
+        if event.kind is ChatbotEventKind.ACTIVITY:
+            return self.add_activity_event(event, auto_scroll=auto_scroll)
         if event.kind is ChatbotEventKind.THINKING:
             return self.add_thinking_event(event, auto_scroll=auto_scroll)
-        if event.kind in {ChatbotEventKind.TOOL, ChatbotEventKind.CONNECTION}:
+        if event.kind is ChatbotEventKind.TOOL:
             return self.add_tool_event(event, auto_scroll=auto_scroll)
+        if event.kind is ChatbotEventKind.CONNECTION:
+            return self.add_connection_event(event, auto_scroll=auto_scroll)
         if event.kind is ChatbotEventKind.USAGE:
             return self.add_usage_event(event, auto_scroll=auto_scroll)
         return self.add_message(
@@ -1342,6 +1428,15 @@ class ThreadDetailView(QWidget):
             self._scroll_to_latest()
         return item
 
+    def add_connection_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> ConnectionRetryItem:
+        item = ConnectionRetryItem(event, parent=self)
+        item.set_available_width(self._message_column.width())
+        self._message_layout.insertWidget(self._message_insert_index(), item)
+        self._event_widgets_by_id[event.id] = item
+        if auto_scroll:
+            self._scroll_to_latest()
+        return item
+
     def add_usage_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> UsageOverviewItem:
         item = UsageOverviewItem(event, parent=self)
         item.set_available_width(self._message_column.width())
@@ -1352,9 +1447,20 @@ class ThreadDetailView(QWidget):
         return item
 
     def add_thinking_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> ChatMessageBubble:
+        return self._add_activity_indicator(event, auto_scroll=auto_scroll)
+
+    def add_activity_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> ChatMessageBubble:
+        return self._add_activity_indicator(event, auto_scroll=auto_scroll)
+
+    def _activity_blocks(self, event: ChatbotEvent) -> list[dict[str, Any]]:
+        if event.content_blocks:
+            return list(event.content_blocks)
+        return [{"type": "thinking", "text": "Thinking..."}]
+
+    def _add_activity_indicator(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> ChatMessageBubble:
         bubble = ChatMessageBubble(
             author=self._event_author_label(event.author),
-            blocks=event.content_blocks,
+            blocks=self._activity_blocks(event),
             artifact_resolver=self._artifact_resolver,
             parent=self,
         )
@@ -1372,6 +1478,8 @@ class ThreadDetailView(QWidget):
             return
         if message.kind in {AgentMessageKind.TOOL_CALL, AgentMessageKind.TOOL_CALL_RESULT}:
             return
+        if message.kind is AgentMessageKind.ASSISTANT:
+            self.hide_thinking_indicator()
         existing = self._message_bubbles_by_id.get(message.id)
         if existing is not None:
             existing.set_blocks(message.content_blocks)
@@ -1386,11 +1494,26 @@ class ThreadDetailView(QWidget):
         )
 
     def apply_chatbot_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> None:
+        if event.kind is ChatbotEventKind.ACTIVITY:
+            if event.status is ChatbotEventStatus.IN_PROGRESS:
+                if self._thinking_bubble is not None:
+                    for event_id, widget in list(self._event_widgets_by_id.items()):
+                        if widget is self._thinking_bubble:
+                            self._event_widgets_by_id.pop(event_id, None)
+                    self._thinking_bubble.set_blocks(self._activity_blocks(event))
+                    self._event_widgets_by_id[event.id] = self._thinking_bubble
+                    if auto_scroll:
+                        self._scroll_to_latest()
+                    return
+                self.add_activity_event(event, auto_scroll=auto_scroll)
+                return
+            self._remove_event_widget(event.id)
+            return
         if event.kind is ChatbotEventKind.THINKING:
             if event.status is ChatbotEventStatus.IN_PROGRESS:
                 existing = self._event_widgets_by_id.get(event.id)
                 if isinstance(existing, ChatMessageBubble):
-                    existing.set_blocks(event.content_blocks)
+                    existing.set_blocks(self._activity_blocks(event))
                     self._thinking_bubble = existing
                     if auto_scroll:
                         self._scroll_to_latest()
@@ -1399,9 +1522,15 @@ class ThreadDetailView(QWidget):
                 return
             self._remove_event_widget(event.id)
             return
+        if event.kind is ChatbotEventKind.CONNECTION and event.status is ChatbotEventStatus.COMPLETED:
+            self._remove_event_widget(event.id)
+            return
+        self.hide_thinking_indicator()
         existing = self._event_widgets_by_id.get(event.id)
         if existing is not None:
             if isinstance(existing, ToolCallItem):
+                existing.set_event(event)
+            elif isinstance(existing, ConnectionRetryItem):
                 existing.set_event(event)
             elif isinstance(existing, UsageOverviewItem):
                 existing.set_event(event)
@@ -1786,7 +1915,7 @@ class ThreadDetailView(QWidget):
         for index in range(self._message_layout.count()):
             item = self._message_layout.itemAt(index)
             widget = item.widget()
-            if isinstance(widget, (ChatMessageBubble, ToolCallItem, UsageOverviewItem)):
+            if isinstance(widget, (ChatMessageBubble, ToolCallItem, ConnectionRetryItem, UsageOverviewItem)):
                 widget.set_available_width(width)
 
     def _scroll_to_latest(self, *, settle_ticks: int = 4, force: bool = False) -> None:

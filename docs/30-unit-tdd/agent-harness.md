@@ -113,7 +113,7 @@ Agent Harness exposes Chatbot timeline changes as ChatbotEvent-shaped stream eve
 - `message_finalized`: a persisted in-progress `Message` reached a terminal lifecycle state and may carry the corresponding Chatbot Event.
 - `step_confirmation_required`: control state for user approval after the step budget is exhausted; the corresponding system Message is still persisted and emitted as a message event.
 
-The Harness emits `THINKING` Chatbot Events around each provider request. The start event is emitted when the provider request boundary is entered; the completed event is emitted when the first provider stream event arrives, before rendering the first assistant delta or tool response. If the request fails or is cancelled before any provider event arrives, the failed or cancelled event clears the same transient thinking item. LLM Service retry telemetry is projected as a separate `CONNECTION` Chatbot Event with `Connecting (n/max)` summary text and expandable retry details; it is not folded into `THINKING`. The Harness converts provider text chunks into updates on one assistant Message and one assistant Chatbot Event. Tool-call and tool-result records are one-shot persisted Messages, but project to one logical tool Chatbot Event. `AgentToolCallRow` remains execution metadata.
+The Harness emits Chatbot-domain `ACTIVITY` events when the assistant turn is advancing but no new user-visible assistant text or tool event is available yet. `ACTIVITY` does not expose provider request identity, step-loop internals, or tool scheduler state, and it is not a command to create or remove a specific UI widget. Chatbot UI owns the transient thinking indicator derived from these activity events and from later visible Chatbot Events. LLM Service retry telemetry is projected as a separate `CONNECTION` Chatbot Event with `Connecting (n/max)` summary text and expandable retry details; it is not folded into `ACTIVITY` and it is not a tool event. The live `CONNECTION` item is transient: when the provider request recovers, a completed connection event removes the visible item; only failed or cancelled provider requests can be restored from snapshot retry telemetry. The Harness converts provider text chunks into updates on one assistant Message and one assistant Chatbot Event. Tool-call and tool-result records are one-shot persisted Messages, but project to one logical tool Chatbot Event. `AgentToolCallRow` remains execution metadata.
 
 ## System Prompt
 
@@ -240,6 +240,7 @@ Contract tests should cover:
 - assistant streaming as message create/update/finalize events on a single persisted assistant Message
 - ChatbotEvent projection for user, assistant, request-only tool, completed tool, failed tool, and cancelled tool states
 - tool-call and tool-result message events before final turn snapshot, each carrying the appropriate Chatbot Event when visible
+- activity events before assistant work windows without exposing provider request ids to Chatbot UI
 - tool-call and tool-result persistence
 - step-budget pause, resume, stop, and maximum total limit
 - cancellation during provider and tool execution

@@ -27,6 +27,7 @@ class ChatbotEventKind(StrEnum):
     TEXT = "text"
     TOOL = "tool"
     CONNECTION = "connection"
+    ACTIVITY = "activity"
     THINKING = "thinking"
     USAGE = "usage"
 
@@ -70,6 +71,27 @@ def thinking_chatbot_event_id(run_id: str) -> str:
     return f"{run_id}:thinking"
 
 
+def activity_chatbot_event_id(run_id: str, sequence_index: int) -> str:
+    return f"{run_id}:activity:{sequence_index}"
+
+
+def build_activity_chatbot_event(
+    *,
+    run_id: str,
+    turn_id: str | None,
+    sequence_index: int,
+) -> ChatbotEvent:
+    return ChatbotEvent(
+        id=activity_chatbot_event_id(run_id, sequence_index),
+        kind=ChatbotEventKind.ACTIVITY,
+        turn_id=turn_id,
+        sequence_index=sequence_index,
+        author=ChatbotEventAuthor.ASSISTANT,
+        status=ChatbotEventStatus.IN_PROGRESS,
+        summary="assistant_activity",
+    )
+
+
 def build_thinking_chatbot_event(
     *,
     run_id: str,
@@ -100,9 +122,6 @@ def build_llm_connection_chatbot_event(
     retry_events: list[dict[str, Any]],
     status: ChatbotEventStatus = ChatbotEventStatus.IN_PROGRESS,
 ) -> ChatbotEvent:
-    last_event = retry_events[-1] if retry_events else {}
-    attempt_number = _usage_int(last_event, "attempt_number") or 1
-    max_attempts = _usage_int(last_event, "max_attempts") or attempt_number
     return ChatbotEvent(
         id=llm_connection_chatbot_event_id(provider_request_id),
         kind=ChatbotEventKind.CONNECTION,
@@ -268,6 +287,9 @@ def project_turn_connection_events(
 ) -> list[ChatbotEvent]:
     events: list[ChatbotEvent] = []
     for provider_request in provider_requests:
+        provider_request_status = _chatbot_status_for_provider_request(provider_request)
+        if provider_request_status is ChatbotEventStatus.COMPLETED:
+            continue
         usage_payload = provider_request.usage_payload
         if not isinstance(usage_payload, dict):
             continue
@@ -286,7 +308,7 @@ def project_turn_connection_events(
                 provider_request_id=provider_request.id,
                 turn_id=turn_id,
                 retry_events=safe_retry_events,
-                status=_chatbot_status_for_provider_request(provider_request),
+                status=provider_request_status,
             )
         )
     return events

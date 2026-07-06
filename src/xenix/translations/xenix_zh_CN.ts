@@ -183,6 +183,44 @@ This route will stay available after model selection is connected.</source>
     </message>
 </context>
 <context>
+    <name>ConnectionRetryItem</name>
+    <message>
+        <location filename="../ui/chatbot.py" line="982"/>
+        <source>Connecting ({attempt}/{max})</source>
+        <translation>正在连接（{attempt}/{max}）</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="994"/>
+        <source>Hide details</source>
+        <translation>隐藏详情</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="994"/>
+        <source>Show details</source>
+        <translation>显示详情</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="1021"/>
+        <source>LLM connection retry</source>
+        <translation>LLM 连接重试</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="1028"/>
+        <source>Attempt {attempt}/{max}</source>
+        <translation>第 {attempt}/{max} 次尝试</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="1034"/>
+        <source>Attempt</source>
+        <translation>尝试</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="1038"/>
+        <source>Error code: `{code}`</source>
+        <translation>错误代码：`{code}`</translation>
+    </message>
+</context>
+<context>
     <name>DatasetSummaryWidget</name>
     <message>
         <location filename="../ui/widgets/dataset_summary.py" line="54"/>
@@ -824,55 +862,55 @@ This route will stay available after model selection is connected.</source>
         <translation>已请求</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1244"/>
+        <location filename="../ui/chatbot.py" line="1326"/>
         <source>Message Xenix</source>
         <translation>给 Xenix 发消息</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1245"/>
-        <location filename="../ui/chatbot.py" line="1579"/>
-        <location filename="../ui/chatbot.py" line="1590"/>
+        <location filename="../ui/chatbot.py" line="1327"/>
+        <location filename="../ui/chatbot.py" line="1677"/>
+        <location filename="../ui/chatbot.py" line="1688"/>
         <source>Attach files</source>
         <translation>添加文件</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1246"/>
+        <location filename="../ui/chatbot.py" line="1328"/>
         <source>Model for the next turn</source>
         <translation>下一轮使用的模型</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1247"/>
+        <location filename="../ui/chatbot.py" line="1329"/>
         <source>Continue</source>
         <translation>继续</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1248"/>
-        <location filename="../ui/chatbot.py" line="1524"/>
+        <location filename="../ui/chatbot.py" line="1330"/>
+        <location filename="../ui/chatbot.py" line="1622"/>
         <source>Stop</source>
         <translation>停止</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1249"/>
+        <location filename="../ui/chatbot.py" line="1331"/>
         <source>Drop files to attach</source>
         <translation>拖放文件以添加附件</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1250"/>
+        <location filename="../ui/chatbot.py" line="1332"/>
         <source>Release here to add them to the next message</source>
         <translation>松开后添加到下一条消息</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1251"/>
+        <location filename="../ui/chatbot.py" line="1333"/>
         <source>Scroll to bottom</source>
         <translation>滚动到底部</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1530"/>
+        <location filename="../ui/chatbot.py" line="1628"/>
         <source>Send</source>
         <translation>发送</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1581"/>
+        <location filename="../ui/chatbot.py" line="1679"/>
         <source>Data files (*.csv *.xlsx *.xls)</source>
         <translation>数据文件 (*.csv *.xlsx *.xls)</translation>
     </message>
@@ -1206,39 +1244,32 @@ This route will stay available after model selection is connected.</source>
         <translation>打开工具调用详情</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="883"/>
         <source>Hide details</source>
-        <translation>隐藏详情</translation>
+        <translation type="vanished">隐藏详情</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="883"/>
         <source>Show details</source>
-        <translation>显示详情</translation>
+        <translation type="vanished">显示详情</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="924"/>
         <source>Connecting ({attempt}/{max})</source>
-        <translation>正在连接（{attempt}/{max}）</translation>
+        <translation type="vanished">正在连接（{attempt}/{max}）</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="939"/>
         <source>LLM connection retry</source>
-        <translation>LLM 连接重试</translation>
+        <translation type="vanished">LLM 连接重试</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="946"/>
         <source>Attempt {attempt}/{max}</source>
-        <translation>第 {attempt}/{max} 次尝试</translation>
+        <translation type="vanished">第 {attempt}/{max} 次尝试</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="952"/>
         <source>Attempt</source>
-        <translation>尝试</translation>
+        <translation type="vanished">尝试</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="956"/>
         <source>Error code: `{code}`</source>
-        <translation>错误代码：`{code}`</translation>
+        <translation type="vanished">错误代码：`{code}`</translation>
     </message>
     <message>
         <source>Cancel</source>
@@ -1261,12 +1292,12 @@ This route will stay available after model selection is connected.</source>
         <translation type="vanished">预测运行已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="887"/>
+        <location filename="../ui/chatbot.py" line="882"/>
         <source>Hide result</source>
         <translation>隐藏结果</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="887"/>
+        <location filename="../ui/chatbot.py" line="882"/>
         <source>Show result</source>
         <translation>显示结果</translation>
     </message>

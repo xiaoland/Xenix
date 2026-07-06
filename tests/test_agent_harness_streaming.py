@@ -23,6 +23,7 @@ from xenix.services.agent import (
     DatasetAttachmentInput,
     SubmitUserTurnInput,
 )
+from xenix.services.agent.chatbot_events import project_turn_connection_events
 from xenix.services.agent.providers import AgentToolSpec
 from xenix.services.agent.tools import ToolExecutionContext, ToolExecutionResult
 from xenix.services.llm import LLMRequestMetadata, LLMRetryEvent
@@ -31,6 +32,7 @@ from xenix.exceptions import ValidationError
 from xenix.services.storage.models import (
     AgentMessageKind,
     AgentMessageStatus,
+    AgentProviderRequestRow,
     AgentProviderRequestStatus,
     AgentRunStatus,
     AgentToolCallStatus,
@@ -118,6 +120,75 @@ class HiddenToolCallStreamingProvider:
                         arguments={},
                     )
                 ],
+            )
+        )
+
+
+class BlockingToolCallDeltaStreamingProvider:
+    def __init__(self) -> None:
+        self.calls = 0
+        self.tool_delta_seen = threading.Event()
+        self.release_tool_call_stream = threading.Event()
+
+    def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
+        raise AssertionError("Streaming path expected.")
+
+    def stream(self, messages: list[Any], tools: list[Any]):
+        self.calls += 1
+        if self.calls == 1:
+            yield ProviderStreamEvent(tool_call_delta=True)
+            self.tool_delta_seen.set()
+            assert self.release_tool_call_stream.wait(timeout=2)
+            yield ProviderStreamEvent(
+                response=ProviderResponse(
+                    tool_calls=[
+                        ProviderToolCall(
+                            provider_call_id="call-dummy",
+                            tool_name="dummy.step",
+                            arguments={},
+                        )
+                    ],
+                )
+            )
+            return
+        yield ProviderStreamEvent(delta_text="Done.")
+        yield ProviderStreamEvent(
+            response=ProviderResponse(
+                assistant_content_blocks=[{"type": "markdown", "text": "Done."}],
+            )
+        )
+
+
+class BlockingSecondActivityStreamingProvider:
+    def __init__(self) -> None:
+        self.calls = 0
+        self.second_stream_entered = threading.Event()
+        self.release_second_stream = threading.Event()
+
+    def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
+        raise AssertionError("Streaming path expected.")
+
+    def stream(self, messages: list[Any], tools: list[Any]):
+        self.calls += 1
+        if self.calls == 1:
+            yield ProviderStreamEvent(
+                response=ProviderResponse(
+                    tool_calls=[
+                        ProviderToolCall(
+                            provider_call_id="call-dummy",
+                            tool_name="dummy.step",
+                            arguments={},
+                        )
+                    ],
+                )
+            )
+            return
+        self.second_stream_entered.set()
+        assert self.release_second_stream.wait(timeout=2)
+        yield ProviderStreamEvent(delta_text="Done.")
+        yield ProviderStreamEvent(
+            response=ProviderResponse(
+                assistant_content_blocks=[{"type": "markdown", "text": "Done."}],
             )
         )
 
@@ -638,6 +709,7 @@ def test_openai_compatible_provider_streams_sse_text_and_tool_calls(monkeypatch)
         {"role": "user", "content": "Hello"},
     ]
     assert "".join(event.delta_text for event in events if event.is_delta) == "Hello"
+    assert sum(1 for event in events if event.is_tool_call_delta) == 2
     final_response = [event.response for event in events if event.is_complete][0]
     assert final_response is not None
     assert final_response.assistant_content_blocks == [{"type": "markdown", "text": "Hello"}]
@@ -821,21 +893,18 @@ def test_agent_harness_streams_assistant_as_message_events(monkeypatch, tmp_path
         for event in message_events
         if event.message is not None and event.message.kind is AgentMessageKind.ASSISTANT
     ]
-    thinking_events = [
+    activity_events = [
         event.chatbot_event
         for event in events
         if event.kind == "chatbot_event"
         and event.chatbot_event is not None
-        and event.chatbot_event.kind is ChatbotEventKind.THINKING
+        and event.chatbot_event.kind is ChatbotEventKind.ACTIVITY
     ]
     snapshot = events[-1].snapshot
 
-    assert [event.status for event in thinking_events] == [
-        ChatbotEventStatus.IN_PROGRESS,
-        ChatbotEventStatus.COMPLETED,
-    ]
-    assert thinking_events[0].content_blocks == [{"type": "thinking", "text": "Thinking..."}]
-    assert events.index(next(event for event in events if event.chatbot_event is thinking_events[-1])) < events.index(
+    assert [event.status for event in activity_events] == [ChatbotEventStatus.IN_PROGRESS]
+    assert activity_events[0].content_blocks == []
+    assert events.index(next(event for event in events if event.chatbot_event is activity_events[0])) < events.index(
         assistant_events[0]
     )
     assert [event.kind for event in assistant_events][0] == "message_created"
@@ -869,6 +938,120 @@ def test_agent_harness_streams_assistant_as_message_events(monkeypatch, tmp_path
     assert provider_request.input_message_ids == [snapshot.messages[0].id, snapshot.messages[1].id]
     assert provider_request.output_message_ids == [snapshot.messages[2].id]
     assert provider_request.usage_payload == usage_payload
+
+
+def test_agent_harness_keeps_thinking_during_tool_call_delta_stream(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home-tool-delta"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    provider = BlockingToolCallDeltaStreamingProvider()
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=provider,
+        tool_registry=DummyToolRegistry(),
+        conversation_store=ConversationStore(context.session_factory),
+    )
+
+    stream = harness.submit_user_turn_stream(SubmitUserTurnInput(text="run a tool"))
+    first_event = next(stream)
+    activity_started = next(stream)
+    pulled_events: list[Any] = []
+    pull_errors: list[BaseException] = []
+
+    def pull_next_event() -> None:
+        try:
+            pulled_events.append(next(stream))
+        except BaseException as exc:
+            pull_errors.append(exc)
+
+    puller = threading.Thread(target=pull_next_event, daemon=True)
+    puller.start()
+    try:
+        assert provider.tool_delta_seen.wait(timeout=1)
+        time.sleep(0.05)
+        assert first_event.kind == "snapshot"
+        assert activity_started.chatbot_event is not None
+        assert activity_started.chatbot_event.kind is ChatbotEventKind.ACTIVITY
+        assert activity_started.chatbot_event.status is ChatbotEventStatus.IN_PROGRESS
+        assert pulled_events == []
+        assert pull_errors == []
+
+        provider.release_tool_call_stream.set()
+        puller.join(timeout=1)
+        assert pull_errors == []
+        assert len(pulled_events) == 1
+        tool_event = pulled_events[0]
+        assert tool_event.chatbot_event is not None
+        assert tool_event.chatbot_event.kind is ChatbotEventKind.TOOL
+        assert tool_event.chatbot_event.status is ChatbotEventStatus.PENDING
+
+        remaining_events = list(stream)
+        assert remaining_events[-1].is_final is True
+        snapshot = remaining_events[-1].snapshot
+        assert snapshot is not None
+        assert [tool.tool_name for tool in snapshot.tool_calls] == ["dummy.step"]
+    finally:
+        provider.release_tool_call_stream.set()
+
+
+def test_agent_harness_emits_activity_again_after_visible_tool_result(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home-second-activity"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    provider = BlockingSecondActivityStreamingProvider()
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=provider,
+        tool_registry=DummyToolRegistry(),
+        conversation_store=ConversationStore(context.session_factory),
+    )
+
+    stream = harness.submit_user_turn_stream(SubmitUserTurnInput(text="run a two-step tool flow"))
+    first_event = next(stream)
+    first_activity = next(stream)
+    tool_pending = next(stream)
+    tool_completed = next(stream)
+    second_activity = next(stream)
+    pulled_events: list[Any] = []
+    pull_errors: list[BaseException] = []
+
+    def pull_next_event() -> None:
+        try:
+            pulled_events.append(next(stream))
+        except BaseException as exc:
+            pull_errors.append(exc)
+
+    puller = threading.Thread(target=pull_next_event, daemon=True)
+    puller.start()
+    try:
+        assert first_event.kind == "snapshot"
+        assert first_activity.chatbot_event is not None
+        assert first_activity.chatbot_event.kind is ChatbotEventKind.ACTIVITY
+        assert tool_pending.chatbot_event is not None
+        assert tool_pending.chatbot_event.kind is ChatbotEventKind.TOOL
+        assert tool_pending.chatbot_event.status is ChatbotEventStatus.PENDING
+        assert tool_completed.chatbot_event is not None
+        assert tool_completed.chatbot_event.kind is ChatbotEventKind.TOOL
+        assert tool_completed.chatbot_event.status is ChatbotEventStatus.COMPLETED
+        assert second_activity.chatbot_event is not None
+        assert second_activity.chatbot_event.kind is ChatbotEventKind.ACTIVITY
+        assert second_activity.chatbot_event.status is ChatbotEventStatus.IN_PROGRESS
+        assert second_activity.chatbot_event.id != first_activity.chatbot_event.id
+
+        assert provider.second_stream_entered.wait(timeout=1)
+        time.sleep(0.05)
+        assert pulled_events == []
+        assert pull_errors == []
+
+        provider.release_second_stream.set()
+        puller.join(timeout=1)
+        assert pull_errors == []
+        assert pulled_events
+        assert pulled_events[0].kind == "message_created"
+        assert pulled_events[0].chatbot_event is not None
+        assert pulled_events[0].chatbot_event.kind is ChatbotEventKind.TEXT
+    finally:
+        provider.release_second_stream.set()
 
 
 def test_agent_harness_stream_filters_tools_by_thread_files(monkeypatch, tmp_path: Path) -> None:
@@ -1599,11 +1782,48 @@ def test_agent_harness_projects_llm_retry_connection_event(monkeypatch, tmp_path
         for event in harness.project_chatbot_events(final_snapshot)
         if event.kind is ChatbotEventKind.CONNECTION
     ]
-    assert len(projected_connection) == 1
-    assert projected_connection[0].summary == "llm_connection_retry"
-    assert projected_connection[0].detail_blocks[0]["retry_events"][0]["error_code"] == (
+    assert projected_connection == []
+    provider_request = final_snapshot.provider_requests[0]
+    assert provider_request.usage_payload is not None
+    assert provider_request.usage_payload["retry_events"][0]["error_code"] == (
         "llm_tool_arguments_invalid_json"
     )
+
+
+def test_connection_retry_snapshot_projection_keeps_failed_request_only() -> None:
+    retry_events = [
+        {
+            "attempt_number": 2,
+            "max_attempts": 5,
+            "error_code": "llm_network_error",
+            "error_summary": "Network dropped.",
+        }
+    ]
+    succeeded_request = AgentProviderRequestRow(
+        id="provider-success",
+        thread_id="thread",
+        turn_id="turn",
+        status=AgentProviderRequestStatus.SUCCEEDED,
+        usage_payload={"retry_events": retry_events},
+    )
+    failed_request = AgentProviderRequestRow(
+        id="provider-failed",
+        thread_id="thread",
+        turn_id="turn",
+        status=AgentProviderRequestStatus.FAILED,
+        usage_payload={"retry_events": retry_events},
+    )
+
+    events = project_turn_connection_events(
+        turn_id="turn",
+        provider_requests=[succeeded_request, failed_request],
+    )
+
+    assert len(events) == 1
+    assert events[0].id == "provider-failed:connection"
+    assert events[0].kind is ChatbotEventKind.CONNECTION
+    assert events[0].status is ChatbotEventStatus.FAILED
+    assert events[0].detail_blocks[0]["retry_events"][0]["error_code"] == "llm_network_error"
 
 
 def test_agent_harness_cancel_run_stops_active_tool_call(monkeypatch, tmp_path: Path) -> None:

@@ -48,12 +48,17 @@ class ProviderResponse(SQLModel):
 @dataclass(frozen=True)
 class ProviderStreamEvent:
     delta_text: str = ""
+    tool_call_delta: bool = False
     response: ProviderResponse | None = None
     raw_payload: dict[str, Any] = field(default_factory=dict)
 
     @property
     def is_delta(self) -> bool:
         return bool(self.delta_text)
+
+    @property
+    def is_tool_call_delta(self) -> bool:
+        return self.tool_call_delta
 
     @property
     def is_complete(self) -> bool:
@@ -174,7 +179,10 @@ class OpenAICompatibleChatProvider:
                 if isinstance(content, str) and content:
                     text_parts.append(content)
                     yield ProviderStreamEvent(delta_text=content, raw_payload=chunk)
-                self._accumulate_tool_call_deltas(tool_call_accumulator, delta.get("tool_calls") or [])
+                tool_call_deltas = delta.get("tool_calls") or []
+                if tool_call_deltas:
+                    self._accumulate_tool_call_deltas(tool_call_accumulator, tool_call_deltas)
+                    yield ProviderStreamEvent(tool_call_delta=True, raw_payload=chunk)
 
         text = "".join(text_parts)
         tool_calls = self._build_tool_calls(tool_call_accumulator, tools)

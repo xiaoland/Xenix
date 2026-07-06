@@ -23,6 +23,7 @@ _EXPORTS = {
     "ChatbotEventAuthor": ".chatbot_events",
     "ChatbotEventKind": ".chatbot_events",
     "ChatbotEventStatus": ".chatbot_events",
+    "build_activity_chatbot_event": ".chatbot_events",
     "build_thinking_chatbot_event": ".chatbot_events",
     "project_chatbot_events": ".chatbot_events",
     "thinking_chatbot_event_id": ".chatbot_events",

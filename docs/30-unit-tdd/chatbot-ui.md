@@ -29,7 +29,7 @@ The central thread detail view stretches to consume remaining horizontal space. 
 - step-budget confirmation controls
 
 The ThreadDetailView EventList renders projected Chatbot Events emitted by Agent Harness. System messages are hidden from the normal EventList unless Agent Harness exposes a dedicated control event.
-Transient thinking state is owned by Agent Harness events for the active Agent processing window. MainWindow and ThreadDetailView must not create local Thinking placeholders or infer thinking lifetime from assistant message arrival. `THINKING` with `IN_PROGRESS` inserts or updates the temporary thinking item, while a terminal `THINKING` event with the same id removes it.
+Transient thinking state is a ThreadDetailView projection of Chatbot activity semantics. Agent Harness may emit Chatbot-domain `ACTIVITY` events to say the assistant turn is still advancing without exposing provider-loop internals, but it does not command thinking widget lifetime. ThreadDetailView reduces `ACTIVITY` plus subsequent visible text, tool, connection, usage, snapshot, and error events into local transient indicator state.
 
 ## Event Rendering
 
@@ -82,6 +82,9 @@ During a running turn:
 - non-final snapshots initialize or resume the running turn without releasing the composer
 - Chatbot Events create, update, or finalize visible EventList items by event id
 - assistant streaming updates one persisted assistant Message and one projected assistant text event; no provider-delta UI event or temporary assistant bubble is part of the Chatbot contract
+- streamed provider tool-call argument deltas are progress-only and do not render raw JSON as assistant content
+- Chatbot `ACTIVITY` events are UI-domain progress facts; ThreadDetailView projects them into a temporary thinking indicator until visible assistant text, tool progress, connection progress, final snapshot, cancellation, or error state supersedes them
+- LLM retry connection events use a dedicated connection retry item. The item may look close to a tool call row, but it is not backed by tool-call state and disappears when a completed connection event reports recovery.
 - tool-call events appear as soon as their request Message is created, and result Messages update the same logical tool event
 - final snapshot replaces incremental state with the authoritative persisted timeline and releases the running state
 - EventList follows the latest visible item only while the user is already at or near the bottom

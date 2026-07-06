@@ -118,6 +118,44 @@
     </message>
 </context>
 <context>
+    <name>ConnectionRetryItem</name>
+    <message>
+        <location filename="../ui/chatbot.py" line="982"/>
+        <source>Connecting ({attempt}/{max})</source>
+        <translation>Connecting ({attempt}/{max})</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="994"/>
+        <source>Hide details</source>
+        <translation>Hide details</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="994"/>
+        <source>Show details</source>
+        <translation>Show details</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="1021"/>
+        <source>LLM connection retry</source>
+        <translation>LLM connection retry</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="1028"/>
+        <source>Attempt {attempt}/{max}</source>
+        <translation>Attempt {attempt}/{max}</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="1034"/>
+        <source>Attempt</source>
+        <translation>Attempt</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="1038"/>
+        <source>Error code: `{code}`</source>
+        <translation>Error code: `{code}`</translation>
+    </message>
+</context>
+<context>
     <name>DatasetSummaryWidget</name>
     <message>
         <location filename="../ui/widgets/dataset_summary.py" line="54"/>
@@ -1383,55 +1421,55 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1244"/>
+        <location filename="../ui/chatbot.py" line="1326"/>
         <source>Message Xenix</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1245"/>
-        <location filename="../ui/chatbot.py" line="1579"/>
-        <location filename="../ui/chatbot.py" line="1590"/>
+        <location filename="../ui/chatbot.py" line="1327"/>
+        <location filename="../ui/chatbot.py" line="1677"/>
+        <location filename="../ui/chatbot.py" line="1688"/>
         <source>Attach files</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1246"/>
+        <location filename="../ui/chatbot.py" line="1328"/>
         <source>Model for the next turn</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1247"/>
+        <location filename="../ui/chatbot.py" line="1329"/>
         <source>Continue</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1248"/>
-        <location filename="../ui/chatbot.py" line="1524"/>
+        <location filename="../ui/chatbot.py" line="1330"/>
+        <location filename="../ui/chatbot.py" line="1622"/>
         <source>Stop</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1249"/>
+        <location filename="../ui/chatbot.py" line="1331"/>
         <source>Drop files to attach</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1250"/>
+        <location filename="../ui/chatbot.py" line="1332"/>
         <source>Release here to add them to the next message</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1251"/>
+        <location filename="../ui/chatbot.py" line="1333"/>
         <source>Scroll to bottom</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1530"/>
+        <location filename="../ui/chatbot.py" line="1628"/>
         <source>Send</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1581"/>
+        <location filename="../ui/chatbot.py" line="1679"/>
         <source>Data files (*.csv *.xlsx *.xls)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1753,49 +1791,42 @@
         <translation>Open tool call details</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="883"/>
         <source>Hide details</source>
-        <translation>Hide details</translation>
+        <translation type="vanished">Hide details</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="883"/>
         <source>Show details</source>
-        <translation>Show details</translation>
+        <translation type="vanished">Show details</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="887"/>
+        <location filename="../ui/chatbot.py" line="882"/>
         <source>Hide result</source>
         <translation>Hide result</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="887"/>
+        <location filename="../ui/chatbot.py" line="882"/>
         <source>Show result</source>
         <translation>Show result</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="924"/>
         <source>Connecting ({attempt}/{max})</source>
-        <translation>Connecting ({attempt}/{max})</translation>
+        <translation type="vanished">Connecting ({attempt}/{max})</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="939"/>
         <source>LLM connection retry</source>
-        <translation>LLM connection retry</translation>
+        <translation type="vanished">LLM connection retry</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="946"/>
         <source>Attempt {attempt}/{max}</source>
-        <translation>Attempt {attempt}/{max}</translation>
+        <translation type="vanished">Attempt {attempt}/{max}</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="952"/>
         <source>Attempt</source>
-        <translation>Attempt</translation>
+        <translation type="vanished">Attempt</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="956"/>
         <source>Error code: `{code}`</source>
-        <translation>Error code: `{code}`</translation>
+        <translation type="vanished">Error code: `{code}`</translation>
     </message>
 </context>
 <context>

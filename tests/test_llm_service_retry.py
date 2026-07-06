@@ -1,4 +1,5 @@
 import json
+import threading
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,8 @@ from xenix.services.llm import (
     LLMSettings,
     LLMSettingsService,
     ProviderMessage,
+    ProviderResponse,
+    ProviderStreamEvent,
 )
 
 
@@ -123,3 +126,57 @@ def test_llm_service_does_not_retry_non_retryable_validation_error(monkeypatch, 
         )
 
     assert retry_events == []
+
+
+def test_llm_service_yields_tool_call_delta_progress_before_buffered_completion(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    settings_service = _settings_service(monkeypatch, tmp_path)
+    settings_service.save(
+        LLMSettings(
+            providers=[
+                LLMProviderConfig(
+                    key="mock",
+                    base_url="http://mock.local",
+                    api_key="secret",
+                    models=["chat"],
+                )
+            ],
+            default_fq_model_key="mock/chat",
+            retry_attempts=1,
+        )
+    )
+    llm_service = LLMService(settings_service)
+    release_completion = threading.Event()
+
+    class FakeStreamingProvider:
+        def stream(self, messages, tools):
+            yield ProviderStreamEvent(tool_call_delta=True)
+            assert release_completion.wait(timeout=2)
+            yield ProviderStreamEvent(delta_text="Visible text.")
+            yield ProviderStreamEvent(
+                response=ProviderResponse(
+                    assistant_content_blocks=[{"type": "markdown", "text": "Visible text."}],
+                )
+            )
+
+    monkeypatch.setattr(
+        llm_service,
+        "_build_provider_from_settings",
+        lambda _settings, _fq_model_key: FakeStreamingProvider(),
+    )
+
+    stream = llm_service.stream(
+        messages=[ProviderMessage(role="user", content="draw")],
+        tools=[],
+    )
+
+    first_event = next(stream)
+    assert first_event.is_tool_call_delta
+    assert not release_completion.is_set()
+
+    release_completion.set()
+    remaining_events = list(stream)
+    assert "".join(event.delta_text for event in remaining_events if event.is_delta) == "Visible text."
+    assert remaining_events[-1].is_complete

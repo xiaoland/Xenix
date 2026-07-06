@@ -95,6 +95,14 @@ Resolved unrelated test mismatch:
   - the city-level chart is actually generated as Vega `arc` marks, and each arc path is zero-area, e.g. `M0,-160L0,0Z`
   - direct pre-normalization `vlc.vega_to_svg(...)` output for the same prepared specs already has the same zero-area mark paths
   - the bar spec is missing `x2: {scale: "x", value: 0}` or `width`; the pie spec computes `startAngle` and `endAngle` from the same value instead of using pie-transform-generated angle fields
+- Tool-call streaming visibility diagnosis:
+  - `OpenAICompatibleChatProvider.stream(...)` yields visible provider stream events only for `delta.content`.
+  - `delta.tool_calls[*].function.arguments` chunks are accumulated internally and only become final `ProviderResponse.tool_calls` after the provider stream ends.
+  - `_run_provider_loop_stream(...)` currently hides the temporary thinking event as soon as any provider stream event arrives.
+  - For a long tool-call arguments stream with no assistant text, the first provider event can hide thinking while creating no assistant message and no tool event yet.
+  - In the normal App path, `LLMService.stream(...)` previously buffered successful provider stream events until the provider stream completed, so a provider-side progress signal must be yielded live through that layer as well.
+  - UI `apply_message_event(...)` intentionally ignores raw `TOOL_CALL` / `TOOL_CALL_RESULT` messages; tool calls are only shown after they are persisted and projected as `ChatbotEventKind.TOOL`.
+  - Therefore a long streamed tool-call message can create a visible idle gap: no thinking bubble, no assistant text, and no tool item until the full tool call finishes streaming and is parsed.
 
 ## Decisions
 
@@ -125,6 +133,10 @@ Resolved unrelated test mismatch:
   - change `analysis.graph.spec` back from the Xenix Vega profile to Vega-Lite
   - downgrade `vl-convert-python` from `2.0.0rc1` to stable `1.9.0.post1`
   - keep the SVG empty-path normalization unless new evidence shows stable Vega-Lite output no longer needs it; prior diagnosis showed `vl-convert-python==1.9.0.post1` can still output empty `d=""` paths
+- Follow-up decision after explicit start:
+  - preserve thinking visibility while provider output is streaming only tool-call deltas
+  - ordinary assistant text deltas should still replace thinking with the visible assistant message stream
+  - the fix should model tool-call delta progress explicitly at the provider/harness boundary rather than displaying raw JSON arguments as user-facing content
 
 ## Vega-Lite Rollback Implementation
 
@@ -157,6 +169,44 @@ Verification after rollback:
 - Added test assertion that generated Vega-Lite bar paths are non-zero width.
 - Direct generated Vega-Lite bar smoke with runtime `vl-convert 1.9.0` produced non-zero-width bar paths and `QSvgRenderer` emitted no `Invalid path data` messages.
 
+## Tool-Call Streaming Visibility Implementation
+
+- `ProviderStreamEvent` now has `tool_call_delta` / `is_tool_call_delta` as a progress-only signal.
+- `OpenAICompatibleChatProvider.stream(...)` emits a progress event when SSE chunks contain `delta.tool_calls`, while still accumulating arguments into the final `ProviderResponse.tool_calls`.
+- `LLMService.stream(...)` continues buffering assistant text/completion events for retry safety, but yields pure tool-call progress events live so the Harness can keep thinking visible through long argument streams.
+- `_run_provider_loop_stream(...)` no longer hides thinking on arbitrary provider events:
+  - assistant text deltas hide thinking immediately before the assistant message stream appears
+  - visible projected tool events hide thinking immediately before the tool item appears
+  - provider stream failure hides thinking with failed status
+  - responses with no assistant content and no tool calls hide thinking with completed status
+  - tool calls that are intentionally not projected do not clear thinking before their hidden execution path
+- `docs/30-unit-tdd/chatbot-ui.md` now documents tool-call argument deltas as progress-only streaming that keeps the Harness-owned thinking item visible.
+
+Verification after tool-call streaming fix:
+
+- `pdm run pytest tests/test_agent_harness_streaming.py::test_openai_compatible_provider_streams_sse_text_and_tool_calls tests/test_agent_harness_streaming.py::test_agent_harness_streams_assistant_as_message_events tests/test_agent_harness_streaming.py::test_agent_harness_keeps_thinking_during_tool_call_delta_stream -q`
+- `pdm run pytest tests/test_llm_service_retry.py::test_llm_service_yields_tool_call_delta_progress_before_buffered_completion -q`
+- `pdm run python -m compileall -q src/xenix/services/llm/providers.py src/xenix/services/llm/service.py src/xenix/services/agent/harness_service.py tests/test_agent_harness_streaming.py tests/test_llm_service_retry.py`
+- `pdm run pytest tests/test_agent_harness_streaming.py -q`
+- `pdm run pytest tests/test_llm_service_retry.py -q`
+- `pdm run pytest tests/test_main.py::test_main_window_keeps_thinking_indicator_during_non_final_snapshot tests/test_main.py::test_thread_detail_view_thinking_event_is_bottom_temporary_message -q`
+
+## Connection Icon Crash Diagnosis and Fix
+
+- Runtime log `C:\Users\yyh\AppData\Local\Xenix\logs\xenix.log` recorded three unhandled exceptions at `2026-07-06 11:54:42Z`, `11:55:19Z`, and `11:55:49Z`.
+- The triggering turn had an `analysis.graph` provider retry because the first streamed tool-call arguments were invalid JSON (`llm_tool_arguments_invalid_json`).
+- The retry projected a `ChatbotEventKind.CONNECTION` event with `icon_key="connection"`.
+- `src/xenix/ui/icons.py` mapped `connection` to `ph.plugs-connected`, but the current QtAwesome Phosphor charmap does not contain `plugs-connected`.
+- The crash happened while rendering the retry connection event, not while executing `analysis.graph`; the subsequent `analysis.graph` tool calls persisted as `SUCCEEDED`.
+- Fixed the mapping to `ph.link`, which is present in the current QtAwesome Phosphor font.
+- Added a Qt boundary regression test that creates a QApplication and verifies every semantic tool icon key resolves to a non-null pixmap.
+
+Verification after connection icon fix:
+
+- `pdm run pytest tests/test_main.py::test_tool_icon_semantic_names_resolve_to_pixmaps -q`
+- `pdm run pytest tests/test_agent_harness_streaming.py::test_agent_harness_projects_llm_retry_connection_event -q`
+- `pdm run python -m compileall -q src/xenix/ui/icons.py tests/test_main.py`
+
 ## Next Step
 
-Ready for user review. Commit the Vega-Lite rollback separately if accepted.
+Ready for user review. Commit only after explicit user command.

@@ -30,6 +30,8 @@ Current verification run:
 - `pdm run pytest tests\test_main.py`
 - `pdm run pytest tests\test_agent_harness_foundation.py tests\test_agent_harness_first_slice.py`
 - `pdm run pytest tests\test_agent_ai_observability.py`
+- `pdm run pytest tests/test_agent_harness_streaming.py::test_agent_harness_projects_llm_retry_connection_event tests/test_agent_harness_streaming.py::test_connection_retry_snapshot_projection_keeps_failed_request_only tests/test_main.py::test_thread_detail_view_removes_connection_retry_after_recovery tests/test_i18n.py -q`
+- `pdm run pytest tests/test_agent_harness_streaming.py tests/test_main.py tests/test_i18n.py -q`
 
 ## Current Understanding
 
@@ -41,10 +43,11 @@ Current verification run:
 - `docs/20-product-tdd/runtime-boundaries.md` already says LLM Service sits between Agent Harness and provider adapters, but `docs/30-unit-tdd/agent-harness.md` and code still expose provider construction to Harness.
 - `MainWindow._reload_agent_provider()` currently rebuilds providers through `LLMService.build_provider()` and injects them into Harness; this is a visible old-boundary coupling point.
 - User explicitly rejected reusing `ChatbotEventKind.THINKING`. LLM retry should be a new Chatbot event, visually closer to a tool-call item, with summary text shaped as `Connecting (n/max)` and expandable retry details.
+- User clarified the visual similarity does not mean reusing `ToolCallItem`. `CONNECTION` needs a dedicated UI implementation, and a recovered connection must remove the live connecting item instead of leaving a completed row in the chat history.
 - User clarified retry count is global LLM settings state, not per-provider state. Settings UI should place it in the global AI/LLM configuration area.
 - `AgentProviderRequestRow` has no retry-attempt columns. Retry telemetry can initially remain transient UI/observability state, while the final provider request row records the logical request outcome and token usage.
 - No retry dependency exists in `pyproject.toml`; a small standard-library retry loop is the conservative default.
-- Implementation stores retry telemetry in provider request `usage_payload.retry_events`, so final snapshot projection can restore `CONNECTION` events without a schema migration.
+- Implementation stores retry telemetry in provider request `usage_payload.retry_events`, so failed/cancelled provider requests can restore `CONNECTION` events without a schema migration. Successful recovered requests keep telemetry for observability but do not project a historical connection item.
 
 ## Next Step
 

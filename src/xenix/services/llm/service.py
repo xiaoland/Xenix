@@ -277,7 +277,12 @@ class LLMService:
             try:
                 stream = getattr(provider, "stream", None)
                 if callable(stream):
-                    buffered_events = list(stream(messages, tools))
+                    buffered_events = []
+                    for event in stream(messages, tools):
+                        if self._is_live_tool_call_progress(event):
+                            yield event
+                            continue
+                        buffered_events.append(event)
                 else:
                     buffered_events = [ProviderStreamEvent(response=provider.complete(messages, tools))]
                 yield from buffered_events
@@ -286,6 +291,9 @@ class LLMService:
                 if not self._should_retry(exc, attempt_number=attempt_number, max_attempts=max_attempts):
                     raise
                 previous_error = exc
+
+    def _is_live_tool_call_progress(self, event: ProviderStreamEvent) -> bool:
+        return event.is_tool_call_delta and not event.delta_text and event.response is None
 
     def request_metadata(self, fq_model_key: str | None = None) -> LLMRequestMetadata:
         settings = self.load_settings()

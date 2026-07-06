@@ -119,11 +119,10 @@ def test_main_window_language_switch_updates_chat_shell(
         error_bubble = chat_view._message_layout.itemAt(0).widget()
         chat_view.apply_chatbot_event(
             ChatbotEvent(
-                id="run-i18n:thinking",
-                kind=ChatbotEventKind.THINKING,
+                id="run-i18n:activity:1",
+                kind=ChatbotEventKind.ACTIVITY,
                 author=ChatbotEventAuthor.ASSISTANT,
                 status=ChatbotEventStatus.IN_PROGRESS,
-                content_blocks=[{"type": "thinking", "text": "Thinking..."}],
             ),
             auto_scroll=False,
         )

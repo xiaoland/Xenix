@@ -53,8 +53,8 @@ from .completion_guard import (
 from .chatbot_events import (
     ChatbotEvent,
     ChatbotEventStatus,
+    build_activity_chatbot_event,
     build_llm_connection_chatbot_event,
-    build_thinking_chatbot_event,
     project_chatbot_events,
     project_text_message_event,
     project_tool_chatbot_event,
@@ -352,13 +352,6 @@ class AgentHarnessService:
             chatbot_events=self.project_chatbot_events(snapshot),
             is_final=False,
         )
-        yield self._thinking_event(
-            thread_id=thread_id,
-            turn_id=turn_id,
-            run_id=run_id,
-            status=ChatbotEventStatus.IN_PROGRESS,
-        )
-
         try:
             outcome = yield from self._run_provider_loop_stream(
                 thread_id=thread_id,
@@ -367,7 +360,6 @@ class AgentHarnessService:
                 step_state=self._initial_step_state(),
                 fq_model_key=fq_model_key,
                 provider=provider,
-                thinking_active=True,
             )
             if isinstance(outcome, StepBudgetPause):
                 self._record_agent_turn("awaiting_confirmation")
@@ -445,13 +437,6 @@ class AgentHarnessService:
             chatbot_events=self.project_chatbot_events(snapshot),
             is_final=False,
         )
-        yield self._thinking_event(
-            thread_id=input_data.thread_id,
-            turn_id=input_data.turn_id,
-            run_id=input_data.run_id,
-            status=ChatbotEventStatus.IN_PROGRESS,
-        )
-
         try:
             outcome = yield from self._run_provider_loop_stream(
                 thread_id=input_data.thread_id,
@@ -460,7 +445,6 @@ class AgentHarnessService:
                 step_state=step_state,
                 fq_model_key=fq_model_key,
                 provider=provider,
-                thinking_active=True,
             )
             if isinstance(outcome, StepBudgetPause):
                 yield self._step_confirmation_event(outcome)
@@ -662,6 +646,7 @@ class AgentHarnessService:
                 self._complete_provider_request(
                     provider_request,
                     status=AgentProviderRequestStatus.CANCELLED,
+                    usage_payload=self._provider_request_usage_payload(None, retry_events),
                 )
                 raise
             except Exception:
@@ -677,6 +662,7 @@ class AgentHarnessService:
                 self._complete_provider_request(
                     provider_request,
                     status=AgentProviderRequestStatus.CANCELLED,
+                    usage_payload=self._provider_request_usage_payload(None, retry_events),
                 )
                 raise
             provider_output_message_ids: list[str] = []
@@ -802,11 +788,16 @@ class AgentHarnessService:
         step_state: dict[str, int],
         fq_model_key: str | None,
         provider: AgentProvider | None,
-        thinking_active: bool = False,
     ):
         while step_state["used_steps"] < step_state["granted_steps"]:
             step_state["used_steps"] += 1
             self._raise_if_cancelled(run_id)
+            yield self._activity_event(
+                thread_id=thread_id,
+                turn_id=turn_id,
+                run_id=run_id,
+                sequence_index=step_state["used_steps"],
+            )
             snapshot = self._conversation_store.get_thread_snapshot(thread_id)
             provider_messages = self._provider_messages_for_request(snapshot)
             dataset_ids = self._dataset_ids_for_thread(snapshot)
@@ -855,14 +846,6 @@ class AgentHarnessService:
                         if first_event_ms is None:
                             first_event_ms = elapsed_ms
                         self._raise_if_cancelled(run_id)
-                        if thinking_active:
-                            thinking_active = False
-                            yield self._thinking_event(
-                                thread_id=thread_id,
-                                turn_id=turn_id,
-                                run_id=run_id,
-                                status=ChatbotEventStatus.COMPLETED,
-                            )
                         if stream_event.delta_text:
                             if first_text_ms is None:
                                 first_text_ms = elapsed_ms
@@ -927,19 +910,12 @@ class AgentHarnessService:
                 self._complete_provider_request(
                     provider_request,
                     status=AgentProviderRequestStatus.CANCELLED,
+                    usage_payload=self._provider_request_usage_payload(None, retry_events),
                 )
                 if retry_events:
                     yield self._llm_connection_event(
                         provider_request=provider_request,
                         retry_events=retry_events,
-                        status=ChatbotEventStatus.CANCELLED,
-                    )
-                if thinking_active:
-                    thinking_active = False
-                    yield self._thinking_event(
-                        thread_id=thread_id,
-                        turn_id=turn_id,
-                        run_id=run_id,
                         status=ChatbotEventStatus.CANCELLED,
                     )
                 if assistant_message is not None:
@@ -963,14 +939,6 @@ class AgentHarnessService:
                         retry_events=retry_events,
                         status=ChatbotEventStatus.FAILED,
                     )
-                if thinking_active:
-                    thinking_active = False
-                    yield self._thinking_event(
-                        thread_id=thread_id,
-                        turn_id=turn_id,
-                        run_id=run_id,
-                        status=ChatbotEventStatus.FAILED,
-                    )
                 if assistant_message is not None:
                     assistant_message = self._conversation_store.update_message(
                         UpdateAgentMessageInput(
@@ -980,14 +948,6 @@ class AgentHarnessService:
                     )
                     yield self._message_event("message_finalized", assistant_message, run_id)
                 raise
-            if thinking_active:
-                thinking_active = False
-                yield self._thinking_event(
-                    thread_id=thread_id,
-                    turn_id=turn_id,
-                    run_id=run_id,
-                    status=ChatbotEventStatus.COMPLETED,
-                )
 
             if provider_response is None:
                 if assistant_message is not None:
@@ -1051,13 +1011,14 @@ class AgentHarnessService:
                 )
                 provider_output_message_ids.append(request_message.id)
                 persisted_tool_calls.append((tool_call, arguments, request_message, persisted_tool_call))
-                yield self._tool_event(
+                tool_event = self._tool_event(
                     "message_created",
                     request_message,
                     run_id,
                     tool_call=persisted_tool_call,
                     request_message=request_message,
                 )
+                yield tool_event
 
             self._complete_provider_request(
                 provider_request,
@@ -1435,23 +1396,23 @@ class AgentHarnessService:
             chatbot_event=chatbot_event,
         )
 
-    def _thinking_event(
+    def _activity_event(
         self,
         *,
         thread_id: str,
         turn_id: str,
         run_id: str,
-        status: ChatbotEventStatus,
+        sequence_index: int,
     ) -> AgentHarnessStreamEvent:
         return AgentHarnessStreamEvent(
             kind="chatbot_event",
             thread_id=thread_id,
             turn_id=turn_id,
             run_id=run_id,
-            chatbot_event=build_thinking_chatbot_event(
+            chatbot_event=build_activity_chatbot_event(
                 run_id=run_id,
                 turn_id=turn_id,
-                status=status,
+                sequence_index=sequence_index,
             ),
         )
 
