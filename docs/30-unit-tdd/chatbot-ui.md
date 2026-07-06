@@ -84,7 +84,9 @@ During a running turn:
 - assistant streaming updates one persisted assistant Message and one projected assistant text event; no provider-delta UI event or temporary assistant bubble is part of the Chatbot contract
 - tool-call events appear as soon as their request Message is created, and result Messages update the same logical tool event
 - final snapshot replaces incremental state with the authoritative persisted timeline and releases the running state
-- EventList scrolls to the latest visible item
+- EventList follows the latest visible item only while the user is already at or near the bottom
+- when the user scrolls away from the bottom during streaming, new EventList items and updates preserve the user's scroll position
+- when the user is away from the bottom and more content exists below, EventList exposes a bottom-center floating icon button that scrolls back to the latest item and re-enables follow behavior
 
 ## Test Obligations
 

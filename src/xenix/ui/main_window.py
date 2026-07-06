@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from PySide6.QtCore import QEvent, QPoint, Qt, QUrl, Signal
+from PySide6.QtCore import QEvent, QPoint, QSize, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
@@ -40,6 +40,7 @@ from ..services.dataset_service import DatasetService, RegisterDatasetInput
 from ..services.llm import LLMService, LLMSettingsService
 from ..services.ml.worker_settings import MLWorkerSettingsService
 from .chatbot import ComposerAttachmentStatus, ThreadDetailView
+from .icons import plus_icon
 from .layout_debug import dump_layout_if_enabled
 from .native_widgets import emphasize_label
 from .settings_dialog import SettingsDialog
@@ -125,6 +126,8 @@ class MainWindow(QMainWindow):
         self._new_thread_button = QPushButton(parent=self._history_sidebar)
         self._new_thread_button.setObjectName("newThreadButton")
         self._new_thread_button.setFixedSize(28, 28)
+        self._new_thread_button.setIcon(plus_icon())
+        self._new_thread_button.setIconSize(QSize(14, 14))
         self._new_thread_button.clicked.connect(self._create_agent_thread)
         self._history_list = QListWidget(parent=self._history_sidebar)
         self._history_list.itemClicked.connect(self._open_history_thread)
@@ -211,7 +214,7 @@ class MainWindow(QMainWindow):
         self._title_label.setText(self.tr("Xenix"))
         self._settings_button.setText(self.tr("Settings"))
         self._history_label.setText(self.tr("History"))
-        self._new_thread_button.setText("+")
+        self._new_thread_button.setText("")
         self._new_thread_button.setToolTip(self.tr("New thread"))
         self._thread_detail_view.retranslate_ui()
         if self._settings_dialog is not None:

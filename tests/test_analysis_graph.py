@@ -2,6 +2,8 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 
 import pytest
+from PySide6.QtCore import qInstallMessageHandler
+from PySide6.QtSvg import QSvgRenderer
 
 import xenix.services.analysis_graph as analysis_graph_module
 from xenix.config import ensure_app_dirs, get_app_paths
@@ -289,7 +291,28 @@ def test_analysis_graph_service_writes_svg_from_vega_profile_spec(monkeypatch, t
     assert result.graph_metadata["referenced_fields"] == ["amount", "region"]
     assert result.graph_metadata["row_count"] == 4
     assert result.graph_metadata["truncated"] is False
-    assert "<svg" in output_path.read_text(encoding="utf-8")
+    svg = output_path.read_text(encoding="utf-8")
+    root = ET.fromstring(svg)
+    empty_paths = [
+        element
+        for element in root.iter(f"{{{analysis_graph_module._SVG_NS}}}path")
+        if not str(element.attrib.get("d") or "").strip()
+    ]
+    qt_messages: list[str] = []
+
+    def collect_qt_message(_mode, _context, message: str) -> None:
+        qt_messages.append(message)
+
+    previous_handler = qInstallMessageHandler(collect_qt_message)
+    try:
+        renderer = QSvgRenderer(str(output_path))
+    finally:
+        qInstallMessageHandler(previous_handler)
+
+    assert "<svg" in svg
+    assert empty_paths == []
+    assert renderer.isValid()
+    assert not any("Invalid path data" in message for message in qt_messages)
 
 
 def test_analysis_graph_service_renders_wordcloud_from_wordcloud_spec(monkeypatch, tmp_path: Path) -> None:

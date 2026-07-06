@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from PySide6.QtCore import QCoreApplication, QEvent, QPoint, QRectF, QSize, QTimer, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QImage, QPainter, QPalette, QPixmap, QTextDocument, QTextOption
+from PySide6.QtGui import QColor, QFont, QIcon, QImage, QPainter, QPalette, QPixmap, QTextDocument, QTextOption
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QComboBox,
@@ -34,7 +34,15 @@ from ..services.agent import (
     project_chatbot_events,
 )
 from ..services.storage.models import AgentMessageAuthor, AgentMessageKind
-from .icons import attach_file_icon, chevron_icon, remove_icon, tool_icon
+from .icons import (
+    attach_file_icon,
+    chevron_icon,
+    remove_icon,
+    scroll_to_bottom_icon,
+    spinner_icon,
+    status_error_icon,
+    tool_icon,
+)
 from .markdown_renderer import render_chat_markdown
 
 USER_MESSAGE_BACKGROUND = QColor("#000000")
@@ -54,6 +62,7 @@ _ARTIFACT_PREVIEW_MIN_WIDTH = 160
 _ARTIFACT_PREVIEW_MAX_WIDTH = 720
 _ARTIFACT_PREVIEW_MAX_HEIGHT = 360
 _ARTIFACT_PREVIEW_BACKGROUND = QColor("#ffffff")
+_SCROLL_FOLLOW_THRESHOLD = 24
 
 
 class ComposerAttachmentStatus(StrEnum):
@@ -945,6 +954,7 @@ class AttachmentChip(QFrame):
         status_label = QLabel()
         status_label.setObjectName("attachmentChipStatus")
         status_label.setFixedWidth(16)
+        status_label.setAlignment(Qt.AlignCenter)
         remove_button = QToolButton()
         remove_button.setObjectName("attachmentChipRemoveButton")
         remove_button.setFixedSize(18, 18)
@@ -961,11 +971,14 @@ class AttachmentChip(QFrame):
     def set_state(self, state: ComposerAttachmentState) -> None:
         self.path = state.path
         if state.status is ComposerAttachmentStatus.PENDING:
-            self._status_label.setText("...")
+            self._status_label.clear()
+            self._status_label.setPixmap(spinner_icon().pixmap(QSize(12, 12)))
         elif state.status is ComposerAttachmentStatus.FAILED:
-            self._status_label.setText("!")
+            self._status_label.clear()
+            self._status_label.setPixmap(status_error_icon().pixmap(QSize(12, 12)))
         else:
             self._status_label.clear()
+            self._status_label.setPixmap(QPixmap())
         self._status_label.setProperty("attachmentStatus", state.status.value)
         self.setProperty("attachmentStatus", state.status.value)
         self._status_label.setToolTip(state.error or "")
@@ -995,6 +1008,9 @@ class ThreadDetailView(QWidget):
         self._message_bubbles_by_id: dict[str, ChatMessageBubble] = {}
         self._model_options: list[tuple[str, str]] = []
         self._artifact_resolver: ArtifactResolver | None = None
+        self._auto_follow_latest = True
+        self._scroll_to_latest_token = 0
+        self._scrollbar_adjusting = False
 
         self._message_container = QWidget()
         self._message_container.setObjectName("chatMessageContainer")
@@ -1018,6 +1034,18 @@ class ThreadDetailView(QWidget):
         self._scroll.setWidgetResizable(True)
         self._scroll.setWidget(self._message_container)
         self._scroll.setFrameShape(QFrame.NoFrame)
+        scrollbar = self._scroll.verticalScrollBar()
+        scrollbar.valueChanged.connect(self._handle_scroll_value_changed)
+        scrollbar.rangeChanged.connect(self._handle_scroll_range_changed)
+
+        self._scroll_to_bottom_button = QToolButton(self)
+        self._scroll_to_bottom_button.setObjectName("scrollToBottomButton")
+        self._scroll_to_bottom_button.setFixedSize(36, 36)
+        self._scroll_to_bottom_button.setIcon(scroll_to_bottom_icon())
+        self._scroll_to_bottom_button.setIconSize(QSize(18, 18))
+        self._scroll_to_bottom_button.setAutoRaise(True)
+        self._scroll_to_bottom_button.clicked.connect(self._handle_scroll_to_bottom_clicked)
+        self._scroll_to_bottom_button.hide()
 
         self._composer = QFrame()
         self._composer.setObjectName("chatComposer")
@@ -1138,6 +1166,8 @@ class ThreadDetailView(QWidget):
         self.retranslate_ui()
         self._refresh_attachment_chips()
         self._sync_composer_drop_overlay_geometry()
+        self._sync_scroll_to_bottom_button_geometry()
+        self._sync_scroll_to_bottom_button_visibility()
 
     def retranslate_ui(self) -> None:
         self._editor.setPlaceholderText(self.tr("Message Xenix"))
@@ -1147,6 +1177,7 @@ class ThreadDetailView(QWidget):
         self._step_stop_button.setText(self.tr("Stop"))
         self._composer_drop_title.setText(self.tr("Drop files to attach"))
         self._composer_drop_hint.setText(self.tr("Release here to add them to the next message"))
+        self._scroll_to_bottom_button.setToolTip(self.tr("Scroll to bottom"))
         self._sync_send_button_text()
         for index in range(self._message_layout.count()):
             item = self._message_layout.itemAt(index)
@@ -1171,7 +1202,8 @@ class ThreadDetailView(QWidget):
         self.clear_messages()
         for event in events:
             self.add_event(event, auto_scroll=False)
-        self._scroll_to_latest()
+        self._auto_follow_latest = True
+        self._scroll_to_latest(force=True)
 
     def clear_messages(self) -> None:
         self._thinking_bubble = None
@@ -1343,6 +1375,7 @@ class ThreadDetailView(QWidget):
         super().resizeEvent(event)
         self._resize_user_messages()
         self._sync_composer_drop_overlay_geometry()
+        self._sync_scroll_to_bottom_button_geometry()
 
     def eventFilter(self, watched, event) -> bool:  # type: ignore[override]
         if watched is self._composer_shell and event.type() == QEvent.Resize:
@@ -1415,10 +1448,13 @@ class ThreadDetailView(QWidget):
             self.model_selected.emit(fq_model_key)
 
     def _sync_send_button_text(self) -> None:
+        self._send_button.setIcon(QIcon())
         if self._running:
             send_text = self.tr("Stop")
         elif self._has_pending_attachments():
-            send_text = "..."
+            send_text = ""
+            self._send_button.setIcon(spinner_icon())
+            self._send_button.setIconSize(QSize(16, 16))
         else:
             send_text = self.tr("Send")
         self._send_button.setText(send_text)
@@ -1682,20 +1718,77 @@ class ThreadDetailView(QWidget):
             if isinstance(widget, (ChatMessageBubble, ToolCallItem, UsageOverviewItem)):
                 widget.set_available_width(width)
 
-    def _scroll_to_latest(self, *, settle_ticks: int = 4) -> None:
-        self._scroll_to_latest_after_layout(max(0, settle_ticks))
+    def _scroll_to_latest(self, *, settle_ticks: int = 4, force: bool = False) -> None:
+        if not force and not self._auto_follow_latest:
+            self._sync_scroll_to_bottom_button_visibility()
+            return
+        self._auto_follow_latest = True
+        self._scroll_to_latest_token += 1
+        self._scroll_to_latest_after_layout(max(0, settle_ticks), self._scroll_to_latest_token)
 
-    def _scroll_to_latest_after_layout(self, remaining_ticks: int) -> None:
+    def _scroll_to_latest_after_layout(self, remaining_ticks: int, token: int) -> None:
         if not self._is_scroll_target_alive():
+            return
+        if token != self._scroll_to_latest_token:
             return
         if remaining_ticks == 0:
             scrollbar = self._scroll.verticalScrollBar()
-            scrollbar.setValue(scrollbar.maximum())
+            self._scrollbar_adjusting = True
+            try:
+                scrollbar.setValue(scrollbar.maximum())
+            finally:
+                self._scrollbar_adjusting = False
+            self._auto_follow_latest = True
+            self._sync_scroll_to_bottom_button_visibility()
             return
-        QTimer.singleShot(0, lambda: self._scroll_to_latest_after_layout(remaining_ticks - 1))
+        QTimer.singleShot(0, lambda: self._scroll_to_latest_after_layout(remaining_ticks - 1, token))
+
+    def _handle_scroll_value_changed(self, _value: int) -> None:
+        if self._scrollbar_adjusting:
+            self._sync_scroll_to_bottom_button_visibility()
+            return
+        self._auto_follow_latest = self._is_scroll_at_bottom()
+        if not self._auto_follow_latest:
+            self._cancel_pending_scroll_to_latest()
+        self._sync_scroll_to_bottom_button_visibility()
+
+    def _handle_scroll_range_changed(self, _minimum: int, _maximum: int) -> None:
+        if self._auto_follow_latest:
+            self._scroll_to_latest(settle_ticks=0, force=True)
+            return
+        self._sync_scroll_to_bottom_button_visibility()
+
+    def _handle_scroll_to_bottom_clicked(self) -> None:
+        self._scroll_to_latest(force=True)
+
+    def _cancel_pending_scroll_to_latest(self) -> None:
+        self._scroll_to_latest_token += 1
+
+    def _is_scroll_at_bottom(self) -> bool:
+        scrollbar = self._scroll.verticalScrollBar()
+        return scrollbar.value() >= scrollbar.maximum() - _SCROLL_FOLLOW_THRESHOLD
+
+    def _sync_scroll_to_bottom_button_visibility(self) -> None:
+        if not self._is_scroll_target_alive():
+            return
+        scrollbar = self._scroll.verticalScrollBar()
+        visible = scrollbar.maximum() > 0 and not self._is_scroll_at_bottom()
+        self._scroll_to_bottom_button.setVisible(visible)
+        if visible:
+            self._sync_scroll_to_bottom_button_geometry()
+            self._scroll_to_bottom_button.raise_()
+
+    def _sync_scroll_to_bottom_button_geometry(self) -> None:
+        if not self._is_scroll_target_alive():
+            return
+        button = self._scroll_to_bottom_button
+        scroll_geometry = self._scroll.geometry()
+        x = scroll_geometry.x() + max(0, (scroll_geometry.width() - button.width()) // 2)
+        y = scroll_geometry.y() + max(0, scroll_geometry.height() - button.height() - 14)
+        button.move(x, y)
 
     def _is_scroll_target_alive(self) -> bool:
         try:
-            return isValid(self) and isValid(self._scroll)
+            return isValid(self) and isValid(self._scroll) and isValid(self._scroll_to_bottom_button)
         except RuntimeError:
             return False

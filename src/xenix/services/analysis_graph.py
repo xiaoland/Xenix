@@ -722,7 +722,27 @@ class AnalysisGraphService:
             raise ValidationError("analysis.graph renderer did not return a valid SVG image.")
         if "ERROR" in svg:
             raise ValidationError("analysis.graph renderer returned a Vega error SVG. Simplify the spec and retry.")
-        return svg
+        return self._normalize_vega_svg_for_qt(svg)
+
+    def _normalize_vega_svg_for_qt(self, svg: str) -> str:
+        try:
+            root = ET.fromstring(svg)
+        except ET.ParseError as exc:
+            raise ValidationError("analysis.graph renderer did not return a valid SVG image.") from exc
+        self._remove_empty_path_elements(root)
+        return ET.tostring(root, encoding="unicode")
+
+    def _remove_empty_path_elements(self, parent: ET.Element) -> None:
+        for child in list(parent):
+            self._remove_empty_path_elements(child)
+            if self._is_empty_path_element(child):
+                parent.remove(child)
+
+    def _is_empty_path_element(self, element: ET.Element) -> bool:
+        tag_name = element.tag.rsplit("}", 1)[-1]
+        if tag_name != "path":
+            return False
+        return not str(element.attrib.get("d") or "").strip()
 
     def _render_wordcloud_svg(self, prepared: _PreparedWordcloud) -> str:
         font_path = self._resolve_wordcloud_font_path(prepared.contains_cjk)

@@ -9,6 +9,7 @@ DEFAULT_CHEVRON_COLOR = "#374151"
 
 _TOOL_ICON_NAMES: dict[str, str] = {
     "table": "ph.table",
+    "text": "ph.text-aa",
     "merge": "ph.git-merge",
     "analysis": "ph.chart-bar",
     "sparkles": "ph.sparkle",
@@ -38,6 +39,22 @@ def chevron_icon(*, expanded: bool, color: QColor | str = DEFAULT_CHEVRON_COLOR)
 
 def attach_file_icon(*, color: QColor | str = DEFAULT_ICON_COLOR) -> QIcon:
     return icon("ph.paperclip", color=color)
+
+
+def plus_icon(*, color: QColor | str = DEFAULT_ICON_COLOR) -> QIcon:
+    return icon("ph.plus", color=color)
+
+
+def spinner_icon(*, color: QColor | str = DEFAULT_ICON_COLOR) -> QIcon:
+    return icon("ph.spinner", color=color)
+
+
+def status_error_icon(*, color: QColor | str = "#b91c1c") -> QIcon:
+    return icon("ph.warning-circle", color=color)
+
+
+def scroll_to_bottom_icon(*, color: QColor | str = DEFAULT_ICON_COLOR) -> QIcon:
+    return icon("ph.arrow-down", color=color)
 
 
 def remove_icon(*, color: QColor | str = DEFAULT_ICON_COLOR) -> QIcon:

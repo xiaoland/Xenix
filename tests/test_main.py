@@ -438,9 +438,15 @@ def test_main_window_keeps_settings_entry_on_thread_detail_view_shell(monkeypatc
         assert window._settings_dialog is not None
         assert window._settings_dialog.isVisible()
         assert window._settings_dialog._aimock_card.isHidden() is True
-        assert window._settings_dialog._build_commit_value.text() == BUILD_COMMIT_DISPLAY
+        window._settings_dialog._open_about_dialog()
+        app.processEvents()
+
+        assert window._settings_dialog._about_dialog is not None
+        assert window._settings_dialog._about_dialog._build_commit_value.text() == BUILD_COMMIT_DISPLAY
     finally:
         if window._settings_dialog is not None:
+            if window._settings_dialog._about_dialog is not None:
+                window._settings_dialog._about_dialog.close()
             window._settings_dialog.close()
         window.close()
 
@@ -766,6 +772,9 @@ def test_main_window_new_thread_button_creates_and_selects_empty_thread(monkeypa
     try:
         app.processEvents()
         initial_count = window._history_list.count()
+
+        assert window._new_thread_button.text() == ""
+        assert not window._new_thread_button.icon().isNull()
 
         window._new_thread_button.click()
         app.processEvents()
@@ -1690,6 +1699,73 @@ def test_thread_detail_view_scrolls_to_latest_message_after_append(monkeypatch, 
 
         assert scrollbar.maximum() > 0
         assert scrollbar.value() == scrollbar.maximum()
+        assert view._scroll_to_bottom_button.isHidden()
+    finally:
+        window.close()
+
+
+def test_thread_detail_view_preserves_user_scroll_during_streaming_update(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=True)
+    try:
+        view = window._thread_detail_view
+        scrollbar = view._scroll.verticalScrollBar()
+        view.clear_messages()
+        view.add_message(
+            "Xenix",
+            [
+                {
+                    "type": "markdown",
+                    "text": "\n\n".join(f"Streaming analysis line {index}" for index in range(80)),
+                }
+            ],
+            message_id="assistant-message",
+        )
+        for _ in range(12):
+            app.processEvents()
+        assert scrollbar.maximum() > 0
+        assert scrollbar.value() == scrollbar.maximum()
+
+        scrollbar.setValue(0)
+        for _ in range(3):
+            app.processEvents()
+        scrolled_value = scrollbar.value()
+        assert scrolled_value == 0
+        assert view._scroll_to_bottom_button.isVisible()
+
+        view.apply_message_event(
+            AgentMessageRow(
+                id="assistant-message",
+                thread_id="thread",
+                turn_id="turn",
+                sequence_index=0,
+                kind=AgentMessageKind.ASSISTANT,
+                ui_author=AgentMessageAuthor.ASSISTANT,
+                content_blocks=[
+                    {
+                        "type": "markdown",
+                        "text": "\n\n".join(f"Expanded streaming line {index}" for index in range(110)),
+                    }
+                ],
+                status=AgentMessageStatus.IN_PROGRESS,
+            )
+        )
+        for _ in range(12):
+            app.processEvents()
+
+        assert scrollbar.maximum() > 0
+        assert scrollbar.value() == scrolled_value
+        assert view._scroll_to_bottom_button.isVisible()
+
+        view._scroll_to_bottom_button.click()
+        for _ in range(12):
+            app.processEvents()
+
+        assert scrollbar.value() == scrollbar.maximum()
+        assert view._scroll_to_bottom_button.isHidden()
     finally:
         window.close()
 
