@@ -208,7 +208,7 @@ class ThreadSnapshot(SQLModel):
             if message.kind is AgentMessageKind.TOOL_CALL_RESULT:
                 tool_call = tool_calls_by_result_message_id.get(message.id)
                 if tool_call is not None:
-                    content = _tool_result_to_text(tool_call)
+                    content = _tool_result_to_text(tool_call, message.provider_payload)
             rows.append(
                 ProviderMessage(
                     role=role,
@@ -737,11 +737,16 @@ def _dataset_block_to_text(block: dict[str, Any]) -> str:
     return parts[0] + " (" + "; ".join(parts[1:]) + ")" if len(parts) > 1 else parts[0]
 
 
-def _tool_result_to_text(tool_call: AgentToolCallRow) -> str:
+def _tool_result_to_text(tool_call: AgentToolCallRow, provider_payload: dict[str, Any] | None = None) -> str:
+    provider_result = None
+    if isinstance(provider_payload, dict):
+        raw_provider_result = provider_payload.get("tool_result")
+        if isinstance(raw_provider_result, dict):
+            provider_result = raw_provider_result
     payload = {
         "tool_name": tool_call.tool_name,
         "status": tool_call.status.value,
-        "result": dict(tool_call.result_payload or {}),
+        "result": provider_result if provider_result is not None else dict(tool_call.result_payload or {}),
     }
     if tool_call.error_summary:
         payload["error_summary"] = tool_call.error_summary

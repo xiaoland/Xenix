@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from xenix.exceptions import ValidationError
@@ -67,6 +68,19 @@ def _tool_context(conversation_store: ConversationStore, tool_name: str, argumen
         tool_call_id=tool_call.id,
         dataset_ids=[],
     )
+
+
+def _write_report_xlsx(tmp_path: Path) -> Path:
+    source = tmp_path / "report.xlsx"
+    pd.DataFrame(
+        [
+            ["品项销售明细", None, None],
+            ["营业日期【2026/04/01-2026/04/30】", None, None],
+            ["城市", "销售数量", "销售金额(元)"],
+            ["佛山市", 1, 118],
+        ]
+    ).to_excel(source, header=False, index=False)
+    return source
 
 
 def _write_mixed_csv(tmp_path: Path) -> Path:
@@ -207,6 +221,30 @@ def test_data_peek_tool_can_skip_profile(monkeypatch, tmp_path: Path) -> None:
 
     assert result.payload["analysis"] == {"enabled": False}
     assert "# Dataset profile: Sales" not in result.content_blocks[0]["text"]
+
+
+def test_data_peek_tool_returns_structure_dsl_for_messy_xlsx(monkeypatch, tmp_path: Path) -> None:
+    dataset_service, _artifact_service, registry, conversation_store = _build_runtime(monkeypatch, tmp_path)
+    source = _write_report_xlsx(tmp_path)
+    dataset = dataset_service.register_dataset(RegisterDatasetInput(source_path=str(source.resolve()), name="Report"))
+    arguments = {"dataset_id": dataset.id, "analysis": False}
+
+    result = registry.execute(
+        "data.peek",
+        arguments,
+        _tool_context(conversation_store, "data.peek", arguments),
+    )
+
+    structure = result.payload["structure"]
+    assert structure["format"] == "xlsx"
+    assert structure["coordinate_system"]["rows"] == "spreadsheet_1_based"
+    assert structure["columns"][1]["tool_name"] == "column_2"
+    assert structure["columns"][1]["name_source"] == "generated_loader_placeholder"
+    assert structure["row_windows"][2]["row"] == 3
+    assert structure["row_windows"][2]["cells"][:3] == ["城市", "销售数量", "销售金额(元)"]
+    assert result.provider_payload is not None
+    assert result.provider_payload["structure"]["columns"][1]["tool_name"] == "column_2"
+    assert result.provider_payload["analysis"] == {"enabled": False}
 
 
 def test_data_peek_tool_schema_owns_profile_controls(monkeypatch, tmp_path: Path) -> None:

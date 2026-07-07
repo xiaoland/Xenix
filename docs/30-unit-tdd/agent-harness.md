@@ -101,6 +101,14 @@ Projection rules:
 
 Tool result text may also be projected into provider-facing tool content. UI-only chrome such as chevron state remains Qt UI-owned.
 
+## Provider-Facing Tool Results
+
+Provider-facing tool result content is an LLM lookup and next-call planning surface. It should carry compact executable facts, stable ids, bounded evidence, and repairable error details. It should not package human-facing explanation, Markdown tables, or duplicated report prose for the model.
+
+Tools may persist a richer `result_payload` for audit, UI detail, or local debugging. When the provider needs a smaller or more operational view, the tool returns a compact provider projection and Harness replays that projection instead of serializing the full persisted payload. The projection must preserve executable references such as dataset ids, artifact ids, canonical column names, task ids, and structured errors. Large analysis markdown, frequency tables, raw samples beyond bounded evidence, and UI-only presentation text stay out of provider-facing tool results unless they are the specific tool output needed for the next call.
+
+If a user needs a Markdown table or narrative explanation, the LLM composes it in an assistant Message from tool evidence. Agent Harness does not pre-render human-facing responses inside tool-result content.
+
 ## Streaming Contract
 
 Agent Harness exposes Chatbot timeline changes as ChatbotEvent-shaped stream events. Provider deltas remain internal Harness input.
@@ -242,6 +250,7 @@ Contract tests should cover:
 - tool-call and tool-result message events before final turn snapshot, each carrying the appropriate Chatbot Event when visible
 - activity events before assistant work windows without exposing provider request ids to Chatbot UI
 - tool-call and tool-result persistence
+- provider-facing tool result projection using compact tool-owned payloads when available, without replaying human-facing Markdown
 - step-budget pause, resume, stop, and maximum total limit
 - cancellation during provider and tool execution
 - model metadata schema and model key normalization

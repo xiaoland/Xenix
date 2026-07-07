@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
@@ -15,8 +16,9 @@ from sqlmodel import SQLModel
 from ..config import AppPaths
 from ..exceptions import ValidationError
 from ..observability import record_counter, record_histogram, start_span
-from .dataset_inspection import detect_source_format, load_dataframe
+from .dataset_inspection import detect_source_format
 from .storage.models import DatasetSourceFormat
+from .tabular import load_pandas_frame_with_schema, load_tabular_frame, resolve_tabular_schema
 
 
 _MAX_SQL_LENGTH = 20_000
@@ -303,11 +305,12 @@ class DataQueryTransformService:
             validation_summary = self._validator.validate(input_data.sql, bindings)
             limit = self._normalize_limit(input_data.limit)
             sql = self._validator.normalize_sql(input_data.sql)
-            with duckdb.connect(database=":memory:") as connection:
-                self._register_bindings(connection, bindings)
-                frame = connection.execute(
-                    f"SELECT * FROM ({sql}) AS xenix_query_result LIMIT {limit + 1}"
-                ).fetchdf()
+            with tempfile.TemporaryDirectory() as temp_dir:
+                with duckdb.connect(database=":memory:") as connection:
+                    self._register_bindings(connection, bindings, temp_dir=Path(temp_dir))
+                    frame = connection.execute(
+                        f"SELECT * FROM ({sql}) AS xenix_query_result LIMIT {limit + 1}"
+                    ).fetchdf()
             truncated = int(len(frame.index)) > limit
             if truncated:
                 frame = frame.head(limit)
@@ -332,9 +335,10 @@ class DataQueryTransformService:
             if not name:
                 raise ValidationError("Transform output name cannot be empty.")
             sql = self._validator.normalize_sql(input_data.sql)
-            with duckdb.connect(database=":memory:") as connection:
-                self._register_bindings(connection, bindings)
-                frame = connection.execute(sql).fetchdf()
+            with tempfile.TemporaryDirectory() as temp_dir:
+                with duckdb.connect(database=":memory:") as connection:
+                    self._register_bindings(connection, bindings, temp_dir=Path(temp_dir))
+                    frame = connection.execute(sql).fetchdf()
 
             output_dir = self._paths.artifacts / "datasets" / "transformed"
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -370,10 +374,43 @@ class DataQueryTransformService:
             unit="ms",
         )
 
-    def _register_bindings(self, connection, bindings: list[DatasetSqlBinding]) -> None:
+    def _register_bindings(self, connection, bindings: list[DatasetSqlBinding], *, temp_dir: Path) -> None:
         for binding in bindings:
-            frame = self._load_frame(Path(binding.source_path).expanduser())
-            connection.register(binding.alias, frame)
+            self._register_binding(connection, binding, temp_dir=temp_dir)
+
+    def _register_binding(self, connection, binding: DatasetSqlBinding, *, temp_dir: Path) -> None:
+        path = Path(binding.source_path).expanduser()
+        source_format = detect_source_format(path)
+        if source_format in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}:
+            self._register_excel_binding(connection, binding, path, source_format, temp_dir=temp_dir)
+            return
+        frame = self._load_frame(path)
+        connection.register(binding.alias, frame)
+
+    def _register_excel_binding(
+        self,
+        connection,
+        binding: DatasetSqlBinding,
+        path: Path,
+        source_format: DatasetSourceFormat,
+        *,
+        temp_dir: Path,
+    ) -> None:
+        frame = load_tabular_frame(path, source_format)
+        schema = resolve_tabular_schema(frame.columns)
+        frame = frame.rename(
+            {
+                original_name: column.tool_name
+                for original_name, column in zip(frame.columns, schema.columns, strict=True)
+            }
+        )
+        csv_path = temp_dir / f"{binding.alias}.csv"
+        frame.write_csv(csv_path)
+        connection.execute(
+            f'CREATE TEMP TABLE "{binding.alias}" AS '
+            "SELECT * FROM read_csv(?, header=true, all_varchar=true)",
+            [str(csv_path)],
+        )
 
     def _validate_bindings(self, bindings: list[DatasetSqlBinding]) -> list[DatasetSqlBinding]:
         normalized: list[DatasetSqlBinding] = []
@@ -404,7 +441,7 @@ class DataQueryTransformService:
         source_format = detect_source_format(path)
         if source_format is DatasetSourceFormat.UNKNOWN:
             raise ValidationError("Only .csv, .xlsx, and .xls dataset files are supported.")
-        return load_dataframe(path, source_format)
+        return load_pandas_frame_with_schema(path, source_format).frame
 
     def _normalize_limit(self, limit: int) -> int:
         try:

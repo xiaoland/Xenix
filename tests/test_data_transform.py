@@ -81,6 +81,21 @@ def _register_csv(dataset_service: DatasetService, tmp_path: Path, name: str, co
     )
 
 
+def _register_report_xlsx(dataset_service: DatasetService, tmp_path: Path):
+    source = tmp_path / "report.xlsx"
+    pd.DataFrame(
+        [
+            ["品项销售明细", None, None],
+            ["营业日期【2026/04/01-2026/04/30】", None, None],
+            ["城市", "销售数量", "销售金额(元)"],
+            ["佛山市", 1, 118],
+        ]
+    ).to_excel(source, header=False, index=False)
+    return dataset_service.register_dataset(
+        RegisterDatasetInput(source_path=str(source.resolve()), name="Report")
+    )
+
+
 def test_data_integrate_tool_uses_dataset_ids_and_registers_generated_artifact(monkeypatch, tmp_path: Path) -> None:
     _paths, dataset_service, _service, artifact_service, registry, store = _build_runtime(
         monkeypatch,
@@ -247,6 +262,28 @@ def test_data_query_tool_returns_bounded_rows(monkeypatch, tmp_path: Path) -> No
     ]
     assert result.payload["bindings"] == [{"alias": "input", "dataset_id": dataset.id}]
     assert "Query returned 2 row(s)" in result.content_blocks[0]["text"]
+
+
+def test_data_query_tool_accepts_canonical_names_for_messy_xlsx(monkeypatch, tmp_path: Path) -> None:
+    _paths, dataset_service, _service, _artifact_service, registry, store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    dataset = _register_report_xlsx(dataset_service, tmp_path)
+    arguments = {
+        "dataset_id": dataset.id,
+        "sql": 'SELECT "column_2" FROM input LIMIT 3',
+        "limit": 3,
+    }
+
+    result = registry.execute("data.query", arguments, _tool_context(store, "data.query", arguments))
+
+    assert result.payload["columns"] == [{"name": "column_2", "type": "str"}]
+    assert result.payload["rows"] == [
+        {"column_2": None},
+        {"column_2": "销售数量"},
+        {"column_2": "1"},
+    ]
 
 
 def test_data_transform_tool_registers_derived_dataset_and_artifact(monkeypatch, tmp_path: Path) -> None:

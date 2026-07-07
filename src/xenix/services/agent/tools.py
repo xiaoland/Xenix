@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -7,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import openpyxl
 from pydantic import BaseModel, Field, ValidationError as PydanticValidationError
 
 from ...config import AppPaths
@@ -41,6 +43,7 @@ from ..ml_service import (
 )
 from ..storage.models import (
     ArtifactKind,
+    DatasetSourceFormat,
     MLTaskArtifactKind,
     MLTaskRow,
     MLTaskStatus,
@@ -48,6 +51,7 @@ from ..storage.models import (
     ProblemKind,
     TrainedModelRow,
 )
+from ..tabular import TabularSchema, resolve_tabular_schema, tabular_schema_payload
 from ..llm import AgentToolSpec
 from .tool_presentations import DEFAULT_TOOL_PRESENTATION, ToolPresentation, tool_presentation_for_name
 
@@ -84,6 +88,7 @@ class ToolExecutionContext:
 class ToolExecutionResult(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
     content_blocks: list[dict[str, Any]] = Field(default_factory=list)
+    provider_payload: dict[str, Any] | None = None
 
 ToolHandler = Callable[[dict[str, Any], ToolExecutionContext], ToolExecutionResult]
 
@@ -851,6 +856,8 @@ class AgentToolRegistry:
             "dataset_id": dataset.id,
             "inspection": self._inspection_payload(inspection),
         }
+        structure = self._structure_payload(Path(dataset.source_path).expanduser(), inspection)
+        payload["structure"] = structure
         markdown_text = (
             f"Dataset `{dataset.name}` is ready.\n\n"
             f"Rows: {inspection.row_count}; columns: {', '.join(inspection.preview_columns)}"
@@ -877,9 +884,11 @@ class AgentToolRegistry:
             markdown_text = f"{markdown_text}\n\n{profile_result.markdown}"
         else:
             payload["analysis"] = {"enabled": False}
+        provider_payload = self._data_peek_provider_payload(payload)
         return ToolExecutionResult(
             payload=payload,
             content_blocks=[{"type": "markdown", "text": markdown_text}],
+            provider_payload=provider_payload,
         )
 
     def _data_integrate(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
@@ -1663,6 +1672,177 @@ class AgentToolRegistry:
 
     def _inspection_payload(self, inspection: DatasetInspection) -> dict[str, Any]:
         return inspection.model_dump(mode="json", exclude={"source_path"})
+
+    def _structure_payload(self, source_path: Path, inspection: DatasetInspection) -> dict[str, Any]:
+        schema = resolve_tabular_schema(inspection.preview_columns)
+        row_windows, declared_dimensions = self._structure_row_windows(source_path, inspection.source_format)
+        layout_evidence = self._layout_evidence(row_windows, declared_dimensions)
+        return {
+            "format": inspection.source_format.value,
+            "sheet": self._structure_sheet(source_path, inspection.source_format),
+            "coordinate_system": {
+                "rows": (
+                    "spreadsheet_1_based"
+                    if inspection.source_format in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}
+                    else "file_1_based"
+                ),
+                "columns": "position_0_based",
+            },
+            "declared_dimensions": declared_dimensions,
+            "observed_dimensions": {
+                "rows": inspection.row_count + 1,
+                "columns": inspection.column_count,
+            },
+            "layout_evidence": layout_evidence,
+            "row_windows": row_windows,
+            "columns": self._structure_columns(schema, row_windows),
+        }
+
+    def _structure_row_windows(
+        self,
+        source_path: Path,
+        source_format: DatasetSourceFormat,
+        *,
+        max_rows: int = 5,
+        max_columns: int = 50,
+    ) -> tuple[list[dict[str, Any]], dict[str, int | None] | None]:
+        if source_format is DatasetSourceFormat.CSV:
+            return self._csv_structure_row_windows(source_path, max_rows=max_rows, max_columns=max_columns), None
+        if source_format in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}:
+            return self._xlsx_structure_row_windows(source_path, max_rows=max_rows, max_columns=max_columns)
+        return [], None
+
+    def _csv_structure_row_windows(
+        self,
+        source_path: Path,
+        *,
+        max_rows: int,
+        max_columns: int,
+    ) -> list[dict[str, Any]]:
+        windows: list[dict[str, Any]] = []
+        with source_path.open("r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.reader(handle)
+            for row_number, row in enumerate(reader, start=1):
+                if row_number > max_rows:
+                    break
+                windows.append(self._row_window_payload(row_number, row[:max_columns]))
+        return windows
+
+    def _xlsx_structure_row_windows(
+        self,
+        source_path: Path,
+        *,
+        max_rows: int,
+        max_columns: int,
+    ) -> tuple[list[dict[str, Any]], dict[str, int | None]]:
+        workbook = openpyxl.load_workbook(source_path, read_only=True, data_only=True)
+        try:
+            worksheet = workbook.active
+            declared_dimensions = {
+                "rows": int(worksheet.max_row or 0) if worksheet.max_row is not None else None,
+                "columns": int(worksheet.max_column or 0) if worksheet.max_column is not None else None,
+            }
+            reset_dimensions = getattr(worksheet, "reset_dimensions", None)
+            if callable(reset_dimensions):
+                reset_dimensions()
+            windows = []
+            for row_number, row in enumerate(
+                worksheet.iter_rows(max_row=max_rows, max_col=max_columns, values_only=True),
+                start=1,
+            ):
+                windows.append(self._row_window_payload(row_number, list(row)))
+            return windows, declared_dimensions
+        finally:
+            workbook.close()
+
+    def _structure_sheet(self, source_path: Path, source_format: DatasetSourceFormat) -> dict[str, Any] | None:
+        if source_format not in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}:
+            return None
+        workbook = openpyxl.load_workbook(source_path, read_only=True, data_only=True)
+        try:
+            return {"index": 0, "name": workbook.active.title}
+        finally:
+            workbook.close()
+
+    def _row_window_payload(self, row_number: int, cells: list[Any]) -> dict[str, Any]:
+        formatted = [self._structure_cell(value) for value in cells]
+        observed_width = 0
+        for index in range(len(formatted) - 1, -1, -1):
+            if formatted[index].strip():
+                observed_width = index + 1
+                break
+        return {
+            "row": row_number,
+            "non_empty_count": sum(1 for value in formatted if value.strip()),
+            "observed_width": observed_width,
+            "cells": formatted[:observed_width or 1],
+        }
+
+    def _structure_cell(self, value: Any, *, max_length: int = 160) -> str:
+        if value is None:
+            return ""
+        text = str(value).replace("\r", " ").replace("\n", " ").strip()
+        if len(text) <= max_length:
+            return text
+        return text[: max_length - 3] + "..."
+
+    def _layout_evidence(
+        self,
+        row_windows: list[dict[str, Any]],
+        declared_dimensions: dict[str, int | None] | None,
+    ) -> list[str]:
+        evidence: list[str] = []
+        if declared_dimensions and (
+            (declared_dimensions.get("rows") or 0) <= 1
+            or (declared_dimensions.get("columns") or 0) <= 1
+        ):
+            evidence.append("declared_dimension_mismatch")
+        widths = [int(row.get("observed_width") or 0) for row in row_windows]
+        if len(widths) >= 2 and widths[0] <= 1:
+            evidence.append("leading_sparse_rows")
+        if widths and max(widths) > max(widths[0], 1):
+            evidence.append("dense_rows_after_sparse_rows")
+        return evidence
+
+    def _structure_columns(self, schema: TabularSchema, row_windows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        payload = tabular_schema_payload(schema)
+        columns: list[dict[str, Any]] = []
+        for column in payload["columns"]:
+            index = int(column["index"])
+            samples = []
+            for row in row_windows:
+                cells = row.get("cells")
+                if isinstance(cells, list) and index < len(cells):
+                    samples.append(cells[index])
+            columns.append({**column, "sample_values": samples[:5]})
+        return columns
+
+    def _data_peek_provider_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        provider_payload = {
+            "dataset_id": payload.get("dataset_id"),
+            "inspection": payload.get("inspection"),
+            "structure": payload.get("structure"),
+        }
+        analysis = payload.get("analysis")
+        if isinstance(analysis, dict):
+            provider_payload["analysis"] = self._compact_analysis_payload(analysis)
+        return provider_payload
+
+    def _compact_analysis_payload(self, analysis: dict[str, Any]) -> dict[str, Any]:
+        if not analysis.get("enabled"):
+            return {"enabled": False}
+        profile = analysis.get("profile")
+        if not isinstance(profile, dict):
+            return {"enabled": True}
+        compact = {
+            "enabled": True,
+            "basic_info": profile.get("basic_info"),
+            "field_type_summary": profile.get("field_type_summary"),
+        }
+        limits = profile.get("limits")
+        if isinstance(limits, dict):
+            compact["limits"] = limits
+        return compact
 
     def _register_dataset_artifact(
         self,

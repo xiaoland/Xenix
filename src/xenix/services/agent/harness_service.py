@@ -756,13 +756,16 @@ class AgentHarnessService:
                         status = AgentToolCallStatus.FAILED
                         error_summary = str(exc)
 
+                provider_payload = {"tool_call_id": tool_call.provider_call_id}
+                if result.provider_payload is not None:
+                    provider_payload["tool_result"] = result.provider_payload
                 _result_message, _completed = self._conversation_store.complete_tool_call(
                     CompleteToolCallInput(
                         tool_call_id=persisted_tool_call.id,
                         status=status,
                         result_payload=result.payload,
                         error_summary=error_summary,
-                        provider_payload={"tool_call_id": tool_call.provider_call_id},
+                        provider_payload=provider_payload,
                     )
                 )
                 self._record_tool_call(
@@ -1079,13 +1082,16 @@ class AgentHarnessService:
                         status = AgentToolCallStatus.FAILED
                         error_summary = str(exc)
 
+                provider_payload = {"tool_call_id": tool_call.provider_call_id}
+                if result.provider_payload is not None:
+                    provider_payload["tool_result"] = result.provider_payload
                 result_message, completed_tool_call = self._conversation_store.complete_tool_call(
                     CompleteToolCallInput(
                         tool_call_id=persisted_tool_call.id,
                         status=status,
                         result_payload=result.payload,
                         error_summary=error_summary,
-                        provider_payload={"tool_call_id": tool_call.provider_call_id},
+                        provider_payload=provider_payload,
                     )
                 )
                 self._record_tool_call(

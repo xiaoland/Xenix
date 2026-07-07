@@ -153,6 +153,55 @@ def test_conversation_store_persists_thread_turn_messages_and_tool_calls(monkeyp
     }
 
 
+def test_conversation_store_replays_compact_provider_tool_result(monkeypatch, tmp_path: Path) -> None:
+    conversations, _artifacts = _build_services(monkeypatch, tmp_path)
+    thread = conversations.create_thread(CreateAgentThreadInput(title="Compact tool result"))
+    turn, _user_message = conversations.start_turn(
+        StartTurnInput(
+            thread_id=thread.id,
+            user_content_blocks=[{"type": "text", "text": "Inspect"}],
+        )
+    )
+    _request_message, tool_call = conversations.create_tool_call(
+        CreateToolCallInput(
+            thread_id=thread.id,
+            turn_id=turn.id,
+            tool_name="data.peek",
+            arguments_payload={"dataset_id": "dataset-1"},
+            provider_payload={"tool_call_id": "call-data-peek", "provider_name": "data_peek"},
+        )
+    )
+    conversations.complete_tool_call(
+        CompleteToolCallInput(
+            tool_call_id=tool_call.id,
+            result_payload={
+                "dataset_id": "dataset-1",
+                "analysis": {"markdown": "# Large human report"},
+            },
+            provider_payload={
+                "tool_call_id": "call-data-peek",
+                "tool_result": {
+                    "dataset_id": "dataset-1",
+                    "structure": {"columns": [{"tool_name": "column_2"}]},
+                },
+            },
+        )
+    )
+
+    provider_messages = conversations.get_thread_snapshot(thread.id).provider_messages()
+    tool_result_content = json.loads(provider_messages[-1].content)
+
+    assert tool_result_content == {
+        "tool_name": "data.peek",
+        "status": "succeeded",
+        "result": {
+            "dataset_id": "dataset-1",
+            "structure": {"columns": [{"tool_name": "column_2"}]},
+        },
+    }
+    assert "# Large human report" not in provider_messages[-1].content
+
+
 def test_conversation_store_formats_default_system_prompt_with_interface_locale(
     monkeypatch,
     tmp_path: Path,
