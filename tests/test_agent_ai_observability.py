@@ -170,7 +170,6 @@ class StaticRegistry:
         if tool_name == "data.peek":
             return ToolExecutionResult(
                 payload={"dataset_id": "dataset-1", "secret_result": "not exported"},
-                content_blocks=[{"type": "markdown", "text": "Dataset ready."}],
             )
         raise AssertionError(f"Unexpected tool execution: {tool_name}")
 

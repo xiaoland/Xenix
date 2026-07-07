@@ -335,15 +335,17 @@ class DataQueryTransformService:
             if not name:
                 raise ValidationError("Transform output name cannot be empty.")
             sql = self._validator.normalize_sql(input_data.sql)
+            output_dir = self._paths.artifacts / "datasets" / "transformed"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_path = output_dir / f"{self._slug(name)}-{uuid4().hex[:12]}.csv"
             with tempfile.TemporaryDirectory() as temp_dir:
                 with duckdb.connect(database=":memory:") as connection:
                     self._register_bindings(connection, bindings, temp_dir=Path(temp_dir))
                     frame = connection.execute(sql).fetchdf()
-
-            output_dir = self._paths.artifacts / "datasets" / "transformed"
-            output_dir.mkdir(parents=True, exist_ok=True)
-            output_path = output_dir / f"{self._slug(name)}-{uuid4().hex[:12]}.csv"
-            frame.to_csv(output_path, index=False)
+                temp_output_path = Path(temp_dir) / "transform-output.csv"
+                frame.to_csv(temp_output_path, index=False)
+                self._validate_transform_output(temp_output_path)
+                temp_output_path.replace(output_path)
             transform_report = {
                 "row_count": int(len(frame.index)),
                 "columns": self._columns(frame),
@@ -363,6 +365,11 @@ class DataQueryTransformService:
             )
             self._record_operation("data.transform", "succeeded", started_at)
             return result
+
+    def _validate_transform_output(self, output_path: Path) -> None:
+        frame = load_tabular_frame(output_path, DatasetSourceFormat.CSV)
+        if frame.width == 0:
+            raise ValidationError("Transform output must contain at least one column.")
 
     def _record_operation(self, operation: str, status: str, started_at: float) -> None:
         attributes = {"data.operation": operation, "status": status}

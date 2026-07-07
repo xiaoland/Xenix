@@ -161,10 +161,10 @@ def test_data_peek_tool_profiles_by_default(monkeypatch, tmp_path: Path) -> None
     assert result.payload["inspection"]["row_count"] == 5
     assert "source_path" not in result.payload["inspection"]
     assert result.payload["analysis"]["enabled"] is True
-    assert "# Dataset profile: Sales" in result.payload["analysis"]["markdown"]
-    assert result.payload["analysis"]["profile"]["target_group_statistics"]
-    assert result.content_blocks[0]["type"] == "markdown"
-    assert "# Dataset profile: Sales" in result.content_blocks[0]["text"]
+    assert "markdown" not in result.payload["analysis"]
+    assert "profile" not in result.payload["analysis"]
+    assert result.payload["analysis"]["basic_info"]["row_count"] == 5
+    assert not hasattr(result, "content_blocks")
     assert artifact_service.list_thread_artifacts(context.thread_id) == []
 
 
@@ -220,7 +220,7 @@ def test_data_peek_tool_can_skip_profile(monkeypatch, tmp_path: Path) -> None:
     )
 
     assert result.payload["analysis"] == {"enabled": False}
-    assert "# Dataset profile: Sales" not in result.content_blocks[0]["text"]
+    assert not hasattr(result, "content_blocks")
 
 
 def test_data_peek_tool_returns_structure_dsl_for_messy_xlsx(monkeypatch, tmp_path: Path) -> None:
@@ -235,16 +235,26 @@ def test_data_peek_tool_returns_structure_dsl_for_messy_xlsx(monkeypatch, tmp_pa
         _tool_context(conversation_store, "data.peek", arguments),
     )
 
-    structure = result.payload["structure"]
-    assert structure["format"] == "xlsx"
-    assert structure["coordinate_system"]["rows"] == "spreadsheet_1_based"
-    assert structure["columns"][1]["tool_name"] == "column_2"
-    assert structure["columns"][1]["name_source"] == "generated_loader_placeholder"
-    assert structure["row_windows"][2]["row"] == 3
-    assert structure["row_windows"][2]["cells"][:3] == ["城市", "销售数量", "销售金额(元)"]
-    assert result.provider_payload is not None
-    assert result.provider_payload["structure"]["columns"][1]["tool_name"] == "column_2"
-    assert result.provider_payload["analysis"] == {"enabled": False}
+    inspection = result.payload["inspection"]
+    assert "format" not in inspection
+    assert "sheet" not in inspection
+    assert "layout_evidence" not in inspection
+    assert inspection["coordinate_system"] == "rows are spreadsheet_1_based; columns are position_0_based"
+
+    column_schema = inspection["columns"]["_schema"]
+    column_rows = inspection["columns"]["data"]
+    assert column_rows[1][column_schema["tool_name"]] == "column_2"
+    assert column_rows[1][column_schema["position"]] == 1
+    assert "source_name" not in column_schema
+    assert "loader_name" not in column_schema
+    assert "name_source" not in column_schema
+
+    window_schema = inspection["row_windows"]["_schema"]
+    window_rows = inspection["row_windows"]["data"]
+    assert window_rows[2][window_schema["row"]] == 3
+    assert window_rows[2][window_schema["cells"]][:3] == ["城市", "销售数量", "销售金额(元)"]
+    assert not hasattr(result, "provider_payload")
+    assert result.payload["analysis"] == {"enabled": False}
 
 
 def test_data_peek_tool_schema_owns_profile_controls(monkeypatch, tmp_path: Path) -> None:

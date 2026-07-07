@@ -454,7 +454,6 @@ class BudgetedRegistry:
         if tool_name == "dummy.step":
             return ToolExecutionResult(
                 payload={"dummy_step": True},
-                content_blocks=[{"type": "markdown", "text": "Dummy step completed."}],
             )
         raise AssertionError(f"Unexpected tool execution: {tool_name}")
 
@@ -563,7 +562,6 @@ class DummyToolRegistry:
         if tool_name == "dummy.step":
             return ToolExecutionResult(
                 payload={"ok": True},
-                content_blocks=[{"type": "markdown", "text": "Dummy step completed."}],
             )
         raise AssertionError(f"Unexpected tool execution: {tool_name}")
 

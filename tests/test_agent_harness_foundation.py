@@ -153,7 +153,7 @@ def test_conversation_store_persists_thread_turn_messages_and_tool_calls(monkeyp
     }
 
 
-def test_conversation_store_replays_compact_provider_tool_result(monkeypatch, tmp_path: Path) -> None:
+def test_conversation_store_replays_canonical_tool_result(monkeypatch, tmp_path: Path) -> None:
     conversations, _artifacts = _build_services(monkeypatch, tmp_path)
     thread = conversations.create_thread(CreateAgentThreadInput(title="Compact tool result"))
     turn, _user_message = conversations.start_turn(
@@ -176,15 +176,9 @@ def test_conversation_store_replays_compact_provider_tool_result(monkeypatch, tm
             tool_call_id=tool_call.id,
             result_payload={
                 "dataset_id": "dataset-1",
-                "analysis": {"markdown": "# Large human report"},
+                "inspection": {"columns": {"_schema": {"tool_name": 0}, "data": [["column_2"]]}},
             },
-            provider_payload={
-                "tool_call_id": "call-data-peek",
-                "tool_result": {
-                    "dataset_id": "dataset-1",
-                    "structure": {"columns": [{"tool_name": "column_2"}]},
-                },
-            },
+            provider_payload={"tool_call_id": "call-data-peek"},
         )
     )
 
@@ -196,10 +190,10 @@ def test_conversation_store_replays_compact_provider_tool_result(monkeypatch, tm
         "status": "succeeded",
         "result": {
             "dataset_id": "dataset-1",
-            "structure": {"columns": [{"tool_name": "column_2"}]},
+            "inspection": {"columns": {"_schema": {"tool_name": 0}, "data": [["column_2"]]}},
         },
     }
-    assert "# Large human report" not in provider_messages[-1].content
+    assert "tool_result" not in provider_messages[-1].provider_payload
 
 
 def test_conversation_store_formats_default_system_prompt_with_interface_locale(

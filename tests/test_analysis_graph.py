@@ -573,7 +573,7 @@ def test_analysis_graph_tool_registers_image_artifact(monkeypatch, tmp_path: Pat
 
     assert result.payload["dataset_id"] == dataset.id
     assert "artifact_link" not in result.payload
-    assert result.content_blocks == []
+    assert not hasattr(result, "content_blocks")
     assert resolved.kind is ArtifactKind.IMAGE
     assert resolved.mime_type == "image/svg+xml"
     assert resolved.title == "Revenue by region"

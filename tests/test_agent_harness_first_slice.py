@@ -835,9 +835,10 @@ def test_agent_harness_train_returns_background_receipt_after_grace(monkeypatch,
     )
 
     assert result.payload["async_state"] == "running_background"
+    assert result.payload["operation"] == "fit"
     assert result.payload["task_ids"]
     assert "can_cancel_task_ids" not in result.payload
-    assert result.content_blocks[0]["text"] == "Model training running in background"
+    assert not hasattr(result, "content_blocks")
     assert query_result.payload["tasks"][0]["task_id"] == result.payload["task_ids"][0]
     assert "logs" in query_result.payload["tasks"][0]
 
@@ -899,7 +900,7 @@ def test_agent_harness_task_query_summarizes_completed_evaluation(monkeypatch, t
     )
 
     assert result.payload["async_state"] == "completed"
-    assert "evaluation: r2=" in result.content_blocks[0]["text"]
+    assert not hasattr(result, "content_blocks")
     evaluation = query_result.payload["tasks"][0]["result"]["evaluation"]
     assert {
         "r2",
@@ -911,10 +912,7 @@ def test_agent_harness_task_query_summarizes_completed_evaluation(monkeypatch, t
         "residual_mean",
         "residual_std",
     }.issubset(evaluation["metrics"])
-    markdown = query_result.content_blocks[0]["text"]
-    assert "Primary metric: r2=" in markdown
-    assert "Key metrics: r2=" in markdown
-    assert "rmse=" in markdown
+    assert not hasattr(query_result, "content_blocks")
 
 
 def test_agent_harness_first_slice_runs_from_file_to_apply_result(monkeypatch, tmp_path: Path) -> None:

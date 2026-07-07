@@ -1,3 +1,4 @@
+import sqlite3
 from pathlib import Path
 
 import pandas as pd
@@ -199,6 +200,44 @@ def test_data_transform_service_materializes_csv(monkeypatch, tmp_path: Path) ->
     assert result.transform_report["bindings"] == [{"alias": "input", "dataset_id": "customers-id"}]
 
 
+def test_data_transform_tool_does_not_leave_dataset_or_csv_when_output_validation_fails(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    paths, dataset_service, service, _artifact_service, registry, store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    dataset = _register_csv(
+        dataset_service,
+        tmp_path,
+        "orders",
+        "order_id,amount\n1,10\n2,20\n",
+    )
+
+    def fail_validation(_output_path: Path) -> None:
+        raise ValidationError("Synthetic output validation failure.")
+
+    monkeypatch.setattr(service, "_validate_transform_output", fail_validation)
+    arguments = {
+        "dataset_id": dataset.id,
+        "sql": "SELECT * FROM input",
+        "name": "Broken transform",
+    }
+
+    with pytest.raises(ValidationError, match="Synthetic output validation failure"):
+        registry.execute("data.transform", arguments, _tool_context(store, "data.transform", arguments))
+
+    transformed_dir = paths.artifacts / "datasets" / "transformed"
+    assert not list(transformed_dir.glob("broken-transform-*.csv"))
+    with sqlite3.connect(paths.state / "xenix.db") as connection:
+        derived_count = connection.execute(
+            "SELECT COUNT(*) FROM dataset WHERE derived_from_dataset_id = ?",
+            (dataset.id,),
+        ).fetchone()[0]
+    assert derived_count == 0
+
+
 def test_duckdb_sql_validator_rejects_mutation_and_file_scans(monkeypatch, tmp_path: Path) -> None:
     _paths, _dataset_service, service, _artifact_service, _registry, _store = _build_runtime(
         monkeypatch,
@@ -261,7 +300,7 @@ def test_data_query_tool_returns_bounded_rows(monkeypatch, tmp_path: Path) -> No
         {"order_id": 2, "amount": 20},
     ]
     assert result.payload["bindings"] == [{"alias": "input", "dataset_id": dataset.id}]
-    assert "Query returned 2 row(s)" in result.content_blocks[0]["text"]
+    assert not hasattr(result, "content_blocks")
 
 
 def test_data_query_tool_accepts_canonical_names_for_messy_xlsx(monkeypatch, tmp_path: Path) -> None:

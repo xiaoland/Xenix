@@ -20,7 +20,6 @@ from ..artifact_service import (
     ArtifactService,
     RegisterArtifactInput,
     build_artifact_uri,
-    build_artifact_markdown_link,
 )
 from ..data_cleaning import CleanDatasetInput, DataCleaningService, cleaning_operation_metadata
 from ..data_tokenization import DataTokenizationService, TokenizeDatasetInput
@@ -51,7 +50,7 @@ from ..storage.models import (
     ProblemKind,
     TrainedModelRow,
 )
-from ..tabular import TabularSchema, resolve_tabular_schema, tabular_schema_payload
+from ..tabular import TabularSchema, resolve_tabular_schema
 from ..llm import AgentToolSpec
 from .tool_presentations import DEFAULT_TOOL_PRESENTATION, ToolPresentation, tool_presentation_for_name
 
@@ -87,8 +86,6 @@ class ToolExecutionContext:
 
 class ToolExecutionResult(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
-    content_blocks: list[dict[str, Any]] = Field(default_factory=list)
-    provider_payload: dict[str, Any] | None = None
 
 ToolHandler = Callable[[dict[str, Any], ToolExecutionContext], ToolExecutionResult]
 
@@ -854,14 +851,8 @@ class AgentToolRegistry:
         )
         payload: dict[str, Any] = {
             "dataset_id": dataset.id,
-            "inspection": self._inspection_payload(inspection),
+            "inspection": self._peek_inspection_payload(Path(dataset.source_path).expanduser(), inspection),
         }
-        structure = self._structure_payload(Path(dataset.source_path).expanduser(), inspection)
-        payload["structure"] = structure
-        markdown_text = (
-            f"Dataset `{dataset.name}` is ready.\n\n"
-            f"Rows: {inspection.row_count}; columns: {', '.join(inspection.preview_columns)}"
-        )
         if analysis_enabled:
             profile_result = self._analysis_profile_service.profile_dataset(
                 ProfileDatasetInput(
@@ -876,20 +867,15 @@ class AgentToolRegistry:
                     ),
                 )
             )
-            payload["analysis"] = {
-                "enabled": True,
-                "profile": profile_result.profile,
-                "markdown": profile_result.markdown,
-            }
-            markdown_text = f"{markdown_text}\n\n{profile_result.markdown}"
+            payload["analysis"] = self._compact_analysis_payload(
+                {
+                    "enabled": True,
+                    "profile": profile_result.profile,
+                }
+            )
         else:
             payload["analysis"] = {"enabled": False}
-        provider_payload = self._data_peek_provider_payload(payload)
-        return ToolExecutionResult(
-            payload=payload,
-            content_blocks=[{"type": "markdown", "text": markdown_text}],
-            provider_payload=provider_payload,
-        )
+        return ToolExecutionResult(payload=payload)
 
     def _data_integrate(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
@@ -1052,11 +1038,7 @@ class AgentToolRegistry:
             "artifacts": artifact_payloads,
             "dataset_ids": [dataset.dataset_id for dataset in datasets],
         }
-        content_blocks = []
-        markdown = output.get("markdown")
-        if isinstance(markdown, str) and markdown.strip():
-            content_blocks.append({"type": "markdown", "text": markdown})
-        return ToolExecutionResult(payload=payload, content_blocks=content_blocks)
+        return ToolExecutionResult(payload=payload)
 
     def _data_clean(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
@@ -1086,12 +1068,6 @@ class AgentToolRegistry:
                     "cleaning_report": report,
                     "message": "No cleaning operations were requested. Nothing happened.",
                 },
-                content_blocks=[
-                    {
-                        "type": "markdown",
-                        "text": "No cleaning operations were requested. Nothing happened; the source dataset was left unchanged.",
-                    }
-                ],
             )
         try:
             clean_input = CleanDatasetInput(
@@ -1124,16 +1100,7 @@ class AgentToolRegistry:
             raise ValidationError("data.clean.metadata does not accept: " + ", ".join(unsupported_keys))
         groups = self._optional_string_list(arguments, "groups")
         payload = cleaning_operation_metadata(groups)
-        group_names = ", ".join(payload["group_names"])
-        return ToolExecutionResult(
-            payload=payload,
-            content_blocks=[
-                {
-                    "type": "markdown",
-                    "text": f"Available data.clean operation groups: {group_names}.",
-                }
-            ],
-        )
+        return ToolExecutionResult(payload=payload)
 
     def _data_tokenize(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
@@ -1186,10 +1153,7 @@ class AgentToolRegistry:
             {"alias": binding.alias, "dataset_id": binding.dataset_id}
             for binding in bindings
         ]
-        return ToolExecutionResult(
-            payload=payload,
-            content_blocks=[{"type": "markdown", "text": self._query_result_markdown(payload)}],
-        )
+        return ToolExecutionResult(payload=payload)
 
     def _data_transform(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
@@ -1248,15 +1212,6 @@ class AgentToolRegistry:
                 "model_family": binding.model_family,
                 "model_task_kind": binding.model_task_kind,
             },
-            content_blocks=[
-                {
-                    "type": "markdown",
-                    "text": (
-                        f"Binding id: `{binding.id}`\n\n"
-                        f"Bound roles: {', '.join(str(item.get('role')) for item in binding.role_bindings)}"
-                    ),
-                }
-            ],
         )
 
     def _model_metadata(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
@@ -1340,10 +1295,7 @@ class AgentToolRegistry:
             "model_keys": [model["model_key"] for model in models],
             "models": models,
         }
-        return ToolExecutionResult(
-            payload=payload,
-            content_blocks=[{"type": "markdown", "text": self._model_metadata_markdown(models)}],
-        )
+        return ToolExecutionResult(payload=payload)
 
     def _model_train(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
@@ -1390,10 +1342,7 @@ class AgentToolRegistry:
             "ml_tasks": [self._ml_task_payload(task) for task in tasks],
             "trained_models": [self._trained_model_payload(model) for model in trained_models],
         }
-        return ToolExecutionResult(
-            payload=payload,
-            content_blocks=[{"type": "markdown", "text": self._training_summary_markdown(payload)}],
-        )
+        return ToolExecutionResult(payload=payload)
 
     def _model_hyper_train(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
@@ -1440,10 +1389,7 @@ class AgentToolRegistry:
             "ml_tasks": [self._ml_task_payload(task) for task in tasks],
             "trained_models": [self._trained_model_payload(model) for model in trained_models],
         }
-        return ToolExecutionResult(
-            payload=payload,
-            content_blocks=[{"type": "markdown", "text": self._training_summary_markdown(payload)}],
-        )
+        return ToolExecutionResult(payload=payload)
 
     def _model_apply(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
@@ -1493,7 +1439,6 @@ class AgentToolRegistry:
                 metadata_payload={"ml_task_id": task.id, "dataset_id": task.dataset_id},
             )
         )
-        link = build_artifact_markdown_link(generic_artifact)
         return ToolExecutionResult(
             payload={
                 "async_state": "completed",
@@ -1505,7 +1450,6 @@ class AgentToolRegistry:
                 "artifact_id": generic_artifact.id,
                 "row_count": details.task.result_payload.get("row_count") if details.task.result_payload else None,
             },
-            content_blocks=[{"type": "markdown", "text": f"Apply results are ready: {link}"}],
         )
 
     def _resolve_apply_input_sources(self, input_sources: list[str]) -> list[str]:
@@ -1554,10 +1498,7 @@ class AgentToolRegistry:
             "task_ids": task_ids,
             "tasks": tasks,
         }
-        return ToolExecutionResult(
-            payload=payload,
-            content_blocks=[{"type": "markdown", "text": self._model_task_query_markdown(tasks)}],
-        )
+        return ToolExecutionResult(payload=payload)
 
     def _resolve_sql_bindings(self, arguments: dict[str, Any], *, tool_name: str) -> list[DatasetSqlBinding]:
         raw_bindings = arguments.get("bindings")
@@ -1640,62 +1581,92 @@ class AgentToolRegistry:
         derived_from_dataset_id: str | None = None,
         metadata_payload: dict[str, Any] | None = None,
     ) -> ToolExecutionResult:
+        resolved_output_path = output_path.resolve()
+        inspection = self._dataset_service.inspect_source_file(
+            InspectDatasetInput(source_path=str(resolved_output_path))
+        )
+        inspection_payload = self._inspection_payload(inspection)
         dataset = self._dataset_service.register_dataset(
             RegisterDatasetInput(
-                source_path=str(output_path.resolve()),
+                source_path=str(resolved_output_path),
                 name=name,
                 derived_from_dataset_id=derived_from_dataset_id,
             )
         )
-        inspection = self._dataset_service.inspect_source_file(InspectDatasetInput(source_path=dataset.source_path))
-        inspection_payload = self._inspection_payload(inspection)
         artifact_metadata = dict(metadata_payload or {})
         if derived_from_dataset_id:
             artifact_metadata["derived_from_dataset_id"] = derived_from_dataset_id
-        artifact = self._register_dataset_artifact(
-            context,
-            title=dataset.name,
-            path=Path(dataset.source_path),
-            dataset_id=dataset.id,
-            preview_payload=inspection_payload,
-            metadata_payload=artifact_metadata,
-        )
-        link = build_artifact_markdown_link(artifact)
+        try:
+            artifact = self._register_dataset_artifact(
+                context,
+                title=dataset.name,
+                path=Path(dataset.source_path),
+                dataset_id=dataset.id,
+                preview_payload=inspection_payload,
+                metadata_payload=artifact_metadata,
+            )
+        except Exception:
+            self._dataset_service.discard_unreferenced_dataset(dataset.id)
+            raise
         return ToolExecutionResult(
             payload={
                 "dataset_id": dataset.id,
                 "artifact_id": artifact.id,
+                "artifact_uri": build_artifact_uri(artifact.id),
+                "summary": summary,
                 "inspection": inspection_payload,
             },
-            content_blocks=[{"type": "markdown", "text": f"{summary} {link}"}],
         )
 
     def _inspection_payload(self, inspection: DatasetInspection) -> dict[str, Any]:
         return inspection.model_dump(mode="json", exclude={"source_path"})
 
-    def _structure_payload(self, source_path: Path, inspection: DatasetInspection) -> dict[str, Any]:
+    def _peek_inspection_payload(self, source_path: Path, inspection: DatasetInspection) -> dict[str, Any]:
         schema = resolve_tabular_schema(inspection.preview_columns)
-        row_windows, declared_dimensions = self._structure_row_windows(source_path, inspection.source_format)
-        layout_evidence = self._layout_evidence(row_windows, declared_dimensions)
+        row_windows, _declared_dimensions = self._structure_row_windows(source_path, inspection.source_format)
         return {
-            "format": inspection.source_format.value,
-            "sheet": self._structure_sheet(source_path, inspection.source_format),
-            "coordinate_system": {
-                "rows": (
-                    "spreadsheet_1_based"
-                    if inspection.source_format in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}
-                    else "file_1_based"
-                ),
-                "columns": "position_0_based",
-            },
-            "declared_dimensions": declared_dimensions,
-            "observed_dimensions": {
-                "rows": inspection.row_count + 1,
-                "columns": inspection.column_count,
-            },
-            "layout_evidence": layout_evidence,
-            "row_windows": row_windows,
-            "columns": self._structure_columns(schema, row_windows),
+            "row_count": inspection.row_count,
+            "column_count": inspection.column_count,
+            "coordinate_system": self._coordinate_system_text(inspection.source_format),
+            "columns": self._peek_columns(schema, row_windows),
+            "row_windows": self._peek_row_windows(row_windows),
+        }
+
+    def _coordinate_system_text(self, source_format: DatasetSourceFormat) -> str:
+        row_system = (
+            "spreadsheet_1_based"
+            if source_format in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}
+            else "file_1_based"
+        )
+        return f"rows are {row_system}; columns are position_0_based"
+
+    def _peek_columns(self, schema: TabularSchema, row_windows: list[dict[str, Any]]) -> dict[str, Any]:
+        rows: list[list[Any]] = []
+        for column in schema.columns:
+            samples = []
+            for row in row_windows:
+                cells = row.get("cells")
+                if isinstance(cells, list) and column.index < len(cells):
+                    samples.append(cells[column.index])
+            rows.append([column.tool_name, column.index, samples[:5]])
+        return self._compact_table(["tool_name", "position", "samples"], rows)
+
+    def _peek_row_windows(self, row_windows: list[dict[str, Any]]) -> dict[str, Any]:
+        rows = [
+            [
+                row.get("row"),
+                row.get("non_empty_count"),
+                row.get("observed_width"),
+                row.get("cells") if isinstance(row.get("cells"), list) else [],
+            ]
+            for row in row_windows
+        ]
+        return self._compact_table(["row", "non_empty", "width", "cells"], rows)
+
+    def _compact_table(self, keys: list[str], rows: list[list[Any]]) -> dict[str, Any]:
+        return {
+            "_schema": {key: index for index, key in enumerate(keys)},
+            "data": rows,
         }
 
     def _structure_row_windows(
@@ -1755,15 +1726,6 @@ class AgentToolRegistry:
         finally:
             workbook.close()
 
-    def _structure_sheet(self, source_path: Path, source_format: DatasetSourceFormat) -> dict[str, Any] | None:
-        if source_format not in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}:
-            return None
-        workbook = openpyxl.load_workbook(source_path, read_only=True, data_only=True)
-        try:
-            return {"index": 0, "name": workbook.active.title}
-        finally:
-            workbook.close()
-
     def _row_window_payload(self, row_number: int, cells: list[Any]) -> dict[str, Any]:
         formatted = [self._structure_cell(value) for value in cells]
         observed_width = 0
@@ -1785,48 +1747,6 @@ class AgentToolRegistry:
         if len(text) <= max_length:
             return text
         return text[: max_length - 3] + "..."
-
-    def _layout_evidence(
-        self,
-        row_windows: list[dict[str, Any]],
-        declared_dimensions: dict[str, int | None] | None,
-    ) -> list[str]:
-        evidence: list[str] = []
-        if declared_dimensions and (
-            (declared_dimensions.get("rows") or 0) <= 1
-            or (declared_dimensions.get("columns") or 0) <= 1
-        ):
-            evidence.append("declared_dimension_mismatch")
-        widths = [int(row.get("observed_width") or 0) for row in row_windows]
-        if len(widths) >= 2 and widths[0] <= 1:
-            evidence.append("leading_sparse_rows")
-        if widths and max(widths) > max(widths[0], 1):
-            evidence.append("dense_rows_after_sparse_rows")
-        return evidence
-
-    def _structure_columns(self, schema: TabularSchema, row_windows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        payload = tabular_schema_payload(schema)
-        columns: list[dict[str, Any]] = []
-        for column in payload["columns"]:
-            index = int(column["index"])
-            samples = []
-            for row in row_windows:
-                cells = row.get("cells")
-                if isinstance(cells, list) and index < len(cells):
-                    samples.append(cells[index])
-            columns.append({**column, "sample_values": samples[:5]})
-        return columns
-
-    def _data_peek_provider_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
-        provider_payload = {
-            "dataset_id": payload.get("dataset_id"),
-            "inspection": payload.get("inspection"),
-            "structure": payload.get("structure"),
-        }
-        analysis = payload.get("analysis")
-        if isinstance(analysis, dict):
-            provider_payload["analysis"] = self._compact_analysis_payload(analysis)
-        return provider_payload
 
     def _compact_analysis_payload(self, analysis: dict[str, Any]) -> dict[str, Any]:
         if not analysis.get("enabled"):
@@ -2047,18 +1967,7 @@ class AgentToolRegistry:
             "ml_tasks": [self._ml_task_payload(task) for task in tasks],
             "trained_models": [self._trained_model_payload(model) for model in trained_models],
         }
-        summary = (
-            "Model tuning running in background"
-            if tool_name == "model.hyper_train"
-            else "Model training running in background"
-        )
-        return ToolExecutionResult(
-            payload=payload,
-            content_blocks=[
-                {"type": "tool_event_summary", "text": summary},
-                {"type": "markdown", "text": self._task_receipt_markdown(payload)},
-            ],
-        )
+        return ToolExecutionResult(payload=payload)
 
     def _single_task_receipt(
         self,
@@ -2077,14 +1986,7 @@ class AgentToolRegistry:
             "dataset_id": task.dataset_id,
             "ml_tasks": [self._ml_task_payload(task)],
         }
-        summary = "Model apply running in background" if tool_name == "model.apply" else "ML task running in background"
-        return ToolExecutionResult(
-            payload=payload,
-            content_blocks=[
-                {"type": "tool_event_summary", "text": summary},
-                {"type": "markdown", "text": self._task_receipt_markdown(payload)},
-            ],
-        )
+        return ToolExecutionResult(payload=payload)
 
     def _task_receipt_markdown(self, payload: dict[str, Any]) -> str:
         task_ids = [str(task_id) for task_id in payload.get("task_ids", [])]

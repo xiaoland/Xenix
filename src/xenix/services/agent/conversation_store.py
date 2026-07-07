@@ -738,15 +738,10 @@ def _dataset_block_to_text(block: dict[str, Any]) -> str:
 
 
 def _tool_result_to_text(tool_call: AgentToolCallRow, provider_payload: dict[str, Any] | None = None) -> str:
-    provider_result = None
-    if isinstance(provider_payload, dict):
-        raw_provider_result = provider_payload.get("tool_result")
-        if isinstance(raw_provider_result, dict):
-            provider_result = raw_provider_result
     payload = {
         "tool_name": tool_call.tool_name,
         "status": tool_call.status.value,
-        "result": provider_result if provider_result is not None else dict(tool_call.result_payload or {}),
+        "result": dict(tool_call.result_payload or {}),
     }
     if tool_call.error_summary:
         payload["error_summary"] = tool_call.error_summary

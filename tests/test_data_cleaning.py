@@ -432,7 +432,8 @@ def test_data_clean_tool_no_ops_reports_nothing_happened(monkeypatch, tmp_path: 
     assert result.payload["cleaning_report"]["no_op"] is True
     assert "artifact_id" not in result.payload
     assert artifact_service.list_thread_artifacts(context.thread_id) == []
-    assert "Nothing happened" in result.content_blocks[0]["text"]
+    assert "Nothing happened" in result.payload["message"]
+    assert not hasattr(result, "content_blocks")
 
 
 def test_data_clean_tool_rejects_legacy_policy_fields(monkeypatch, tmp_path: Path) -> None:

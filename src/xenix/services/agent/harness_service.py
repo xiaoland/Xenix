@@ -756,16 +756,13 @@ class AgentHarnessService:
                         status = AgentToolCallStatus.FAILED
                         error_summary = str(exc)
 
-                provider_payload = {"tool_call_id": tool_call.provider_call_id}
-                if result.provider_payload is not None:
-                    provider_payload["tool_result"] = result.provider_payload
                 _result_message, _completed = self._conversation_store.complete_tool_call(
                     CompleteToolCallInput(
                         tool_call_id=persisted_tool_call.id,
                         status=status,
                         result_payload=result.payload,
                         error_summary=error_summary,
-                        provider_payload=provider_payload,
+                        provider_payload={"tool_call_id": tool_call.provider_call_id},
                     )
                 )
                 self._record_tool_call(
@@ -1082,16 +1079,13 @@ class AgentHarnessService:
                         status = AgentToolCallStatus.FAILED
                         error_summary = str(exc)
 
-                provider_payload = {"tool_call_id": tool_call.provider_call_id}
-                if result.provider_payload is not None:
-                    provider_payload["tool_result"] = result.provider_payload
                 result_message, completed_tool_call = self._conversation_store.complete_tool_call(
                     CompleteToolCallInput(
                         tool_call_id=persisted_tool_call.id,
                         status=status,
                         result_payload=result.payload,
                         error_summary=error_summary,
-                        provider_payload=provider_payload,
+                        provider_payload={"tool_call_id": tool_call.provider_call_id},
                     )
                 )
                 self._record_tool_call(
@@ -1681,12 +1675,6 @@ class AgentHarnessService:
         payload = self._skill_catalog.activate(skill_name)
         return ToolExecutionResult(
             payload=payload,
-            content_blocks=[
-                {
-                    "type": "agent_skill_activation",
-                    "skill_name": payload["skill_name"],
-                }
-            ],
         )
 
     def _execute_skill_resource_read(self, tool_name: str, arguments: dict[str, Any], *, resource_kind: str):
@@ -1708,14 +1696,6 @@ class AgentHarnessService:
             raise ValidationError(f"Unknown Agent Skill resource tool: {tool_name}")
         return ToolExecutionResult(
             payload=payload,
-            content_blocks=[
-                {
-                    "type": "agent_skill_resource",
-                    "resource_kind": resource_kind,
-                    "skill_name": payload["skill_name"],
-                    "path": payload["path"],
-                }
-            ],
         )
 
     def _tool_available_for_context(self, tool_name: str, context: _ToolAvailabilityContext) -> bool:
@@ -1948,7 +1928,6 @@ class AgentHarnessService:
 
         return ToolExecutionResult(
             payload=payload,
-            content_blocks=[{"type": "markdown", "text": f"Tool failed: {exc}"}],
         )
 
     def _tool_cancelled_result(self):
@@ -1956,7 +1935,6 @@ class AgentHarnessService:
 
         return ToolExecutionResult(
             payload={"cancelled": True},
-            content_blocks=[{"type": "tool_call_result", "status": "cancelled", "error_summary": "Cancelled by user."}],
         )
 
     def _user_content_blocks(

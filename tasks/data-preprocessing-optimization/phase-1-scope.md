@@ -2,8 +2,8 @@
 
 Phase 1 should include these together because they form one contract boundary:
 
-1. `data.peek` provider-facing JSON DSL for structural evidence.
-2. Agent Harness provider-facing tool-result compaction.
+1. `data.peek` compact JSON result for executable inspection/schema evidence.
+2. Agent Harness tool-result replay convergence around canonical `result_payload`.
 3. Column-name/loading consistency between `data.peek`, `data.query`, and `data.transform`.
 
 ## Rationale
@@ -19,10 +19,12 @@ Phase 1 should therefore make query/transform registration use the same schema p
 ## Out Of Phase 1
 
 - Semantic header selection by the tool.
+- Publishing a `candidate_header_row` claim as tool-owned truth.
 - Automatic promotion of a spreadsheet row into business column names.
 - Expanding the data-cleaning operation catalog.
 - Persisting schema snapshots to storage tables.
 - Human-facing Markdown/table rendering by Harness or tool handlers.
+- A broad LLM service/provider DTO rename or architecture cleanup unless it directly blocks tool-result convergence.
 
 ## Durable Docs Follow-Up
 

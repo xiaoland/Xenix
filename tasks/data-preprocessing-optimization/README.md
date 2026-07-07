@@ -44,4 +44,4 @@ Hypothesis: the first valuable slice is not a larger cleaning catalog. It is a s
 
 ## Next Step
 
-Phase 1 implementation is in progress. Current verified slice covers canonical column projection, `data.peek` structure DSL, query/transform canonical XLSX execution, and compact Harness provider replay.
+2026-07-07 follow-up diagnosis found that the verified Phase 1 slice is not enough for messy report-style spreadsheets. The next implementation slice should tighten the provider-facing schema/operation contract, make `data.peek` publish a smaller executable projection for ambiguous header rows, and move tool-result provider projection ownership out of ad hoc tool-handler payloads. Also inspect `data.transform` side-effect ordering because failed transforms can leave derived CSV/dataset rows.
