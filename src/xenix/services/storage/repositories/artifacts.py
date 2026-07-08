@@ -39,3 +39,10 @@ class ArtifactRepository:
         )
         return list(session.exec(statement))
 
+    def list_by_kind(self, session: Session, kind) -> list[ArtifactRow]:
+        statement = (
+            select(ArtifactRow)
+            .where(ArtifactRow.kind == kind)
+            .order_by(ArtifactRow.created_at.desc())
+        )
+        return list(session.exec(statement))

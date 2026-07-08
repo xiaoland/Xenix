@@ -6,8 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from PySide6.QtCore import QEvent, QPoint, QSize, Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import QEvent, QPoint, QSize, Qt, Signal
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -37,6 +36,7 @@ from ..services.agent import (
 )
 from ..services.artifact_service import ArtifactService
 from ..services.dataset_service import DatasetService, RegisterDatasetInput
+from ..services.link_router import LinkRouter
 from ..services.llm import LLMService, LLMSettingsService
 from ..services.ml.worker_settings import MLWorkerSettingsService
 from .chatbot import ComposerAttachmentStatus, ThreadDetailView
@@ -54,7 +54,7 @@ if TYPE_CHECKING:
 class _AttachmentPreflightSucceeded:
     preflight_id: str
     path: str
-    attachment: DatasetAttachmentInput
+    attachments: list[DatasetAttachmentInput]
 
 
 @dataclass(frozen=True)
@@ -64,11 +64,24 @@ class _AttachmentPreflightFailed:
     message: str
 
 
+@dataclass(frozen=True)
+class _ServiceLinkActivationSucceeded:
+    activation_id: str
+    uri: str
+
+
+@dataclass(frozen=True)
+class _ServiceLinkActivationFailed:
+    activation_id: str
+    uri: str
+    message: str
+
+
 @dataclass
 class _ComposerAttachmentRecord:
     path: str
     preflight_id: str
-    attachment: DatasetAttachmentInput | None = None
+    attachments: list[DatasetAttachmentInput] | None = None
 
 
 class MainWindow(QMainWindow):
@@ -78,6 +91,8 @@ class MainWindow(QMainWindow):
     _attachment_preflight_failed = Signal(object)
     _thread_title_generated = Signal(str, str)
     _thread_title_generation_failed = Signal(str, str)
+    _service_link_activation_succeeded = Signal(object)
+    _service_link_activation_failed = Signal(object)
 
     def __init__(
         self,
@@ -90,6 +105,7 @@ class MainWindow(QMainWindow):
         llm_settings_service: LLMSettingsService,
         ml_worker_settings_service: MLWorkerSettingsService,
         artifact_service: ArtifactService,
+        link_router: LinkRouter,
         dataset_service: DatasetService,
         ml_service: MLService,
     ) -> None:
@@ -103,6 +119,7 @@ class MainWindow(QMainWindow):
         self._llm_settings_service = llm_settings_service
         self._ml_worker_settings_service = ml_worker_settings_service
         self._artifact_service = artifact_service
+        self._link_router = link_router
         self._dataset_service = dataset_service
         self._ml_service = ml_service
         self._agent_thread_id: str | None = None
@@ -114,6 +131,8 @@ class MainWindow(QMainWindow):
         self._settings_dialog: SettingsDialog | None = None
         self._tool_call_detail_views: list[ToolCallDetailView] = []
         self._thread_title_progress_dialog: QProgressDialog | None = None
+        self._service_link_progress_dialog: QProgressDialog | None = None
+        self._active_service_link_activation_ids: set[str] = set()
 
         self._title_label = QLabel(parent=self)
         self._settings_button = QPushButton(parent=self)
@@ -141,7 +160,7 @@ class MainWindow(QMainWindow):
         self._thread_detail_view.files_attached.connect(self._start_attachment_preflights)
         self._thread_detail_view.attachment_removed.connect(self._discard_composer_attachment)
         self._thread_detail_view.model_selected.connect(self._update_thread_model)
-        self._thread_detail_view.artifact_link_activated.connect(self._open_artifact_link)
+        self._thread_detail_view.service_link_activated.connect(self._open_service_link)
         self._thread_detail_view.tool_action_requested.connect(self._handle_tool_action)
         self._thread_detail_view.stop_requested.connect(self._request_harness_stop)
         self._thread_detail_view.step_budget_continue_requested.connect(self._continue_step_budget)
@@ -152,6 +171,8 @@ class MainWindow(QMainWindow):
         self._attachment_preflight_failed.connect(self._fail_attachment_preflight)
         self._thread_title_generated.connect(self._finish_generated_thread_title)
         self._thread_title_generation_failed.connect(self._fail_generated_thread_title)
+        self._service_link_activation_succeeded.connect(self._finish_service_link_activation)
+        self._service_link_activation_failed.connect(self._fail_service_link_activation)
 
         self.resize(1080, 760)
         self._setup_ui()
@@ -219,6 +240,7 @@ class MainWindow(QMainWindow):
         self._thread_detail_view.retranslate_ui()
         if self._settings_dialog is not None:
             self._settings_dialog.retranslate_ui()
+        self._retranslate_service_link_progress()
         self._sync_model_picker_options()
 
     def changeEvent(self, event: QEvent) -> None:
@@ -279,7 +301,7 @@ class MainWindow(QMainWindow):
         self._pending_step_confirmation = None
         self._thread_detail_view.clear_step_confirmation()
         dataset_attachments = self._ready_composer_attachments(file_paths)
-        if len(dataset_attachments) != len(file_paths):
+        if dataset_attachments is None:
             return
 
         self._start_harness_submission(
@@ -326,7 +348,7 @@ class MainWindow(QMainWindow):
                 _AttachmentPreflightSucceeded(
                     preflight_id=preflight_id,
                     path=normalized_path,
-                    attachment=attachment,
+                    attachments=attachment,
                 )
             )
 
@@ -337,13 +359,13 @@ class MainWindow(QMainWindow):
             return
         if result.preflight_id in self._cancelled_attachment_preflight_ids:
             self._cancelled_attachment_preflight_ids.discard(result.preflight_id)
-            self._discard_registered_attachment(result.attachment)
+            self._discard_registered_attachments(result.attachments)
             return
         record = self._composer_attachments.get(result.path)
         if record is None or record.preflight_id != result.preflight_id:
-            self._discard_registered_attachment(result.attachment)
+            self._discard_registered_attachments(result.attachments)
             return
-        record.attachment = result.attachment
+        record.attachments = result.attachments
         self._thread_detail_view.set_attachment_status(
             result.path,
             ComposerAttachmentStatus.READY,
@@ -403,44 +425,51 @@ class MainWindow(QMainWindow):
 
         threading.Thread(target=run_harness, name="xenix-agent-harness", daemon=True).start()
 
-    def _register_composer_dataset(self, file_path: str) -> DatasetAttachmentInput:
+    def _register_composer_dataset(self, file_path: str) -> list[DatasetAttachmentInput]:
         source_path = Path(file_path).expanduser().resolve()
         attachment = self._dataset_service.register_dataset_attachment(
             RegisterDatasetInput(source_path=str(source_path), name=source_path.stem)
         )
-        return DatasetAttachmentInput(
-            dataset_id=attachment.dataset_id,
-            name=attachment.name,
-            file_name=attachment.file_name,
-            source_format=attachment.source_format,
-            row_count=attachment.row_count,
-            column_count=attachment.column_count,
-            preview_columns=attachment.preview_columns,
-        )
+        return [
+            DatasetAttachmentInput(
+                dataset_id=item.dataset_id,
+                name=item.name,
+                file_name=item.file_name,
+                source_format=item.source_format,
+                row_count=item.row_count,
+                column_count=item.column_count,
+                preview_columns=item.preview_columns,
+            )
+            for item in attachment.datasets
+        ]
 
-    def _ready_composer_attachments(self, file_paths: list[str]) -> list[DatasetAttachmentInput]:
+    def _ready_composer_attachments(self, file_paths: list[str]) -> list[DatasetAttachmentInput] | None:
         attachments: list[DatasetAttachmentInput] = []
         for file_path in file_paths:
             record = self._composer_attachments.get(str(Path(file_path).resolve()))
-            if record is None or record.attachment is None:
-                continue
-            attachments.append(record.attachment)
+            if record is None or record.attachments is None:
+                return None
+            attachments.extend(record.attachments)
         return attachments
 
     def _discard_composer_attachment(self, file_path: str) -> None:
         record = self._composer_attachments.pop(str(Path(file_path).resolve()), None)
         if record is None:
             return
-        if record.attachment is None:
+        if record.attachments is None:
             self._cancelled_attachment_preflight_ids.add(record.preflight_id)
             return
-        self._discard_registered_attachment(record.attachment)
+        self._discard_registered_attachments(record.attachments)
 
     def _discard_registered_attachment(self, attachment: DatasetAttachmentInput) -> None:
         try:
             self._dataset_service.discard_unreferenced_dataset(attachment.dataset_id)
         except Exception as exc:
             self._thread_detail_view.show_error(str(exc))
+
+    def _discard_registered_attachments(self, attachments: list[DatasetAttachmentInput]) -> None:
+        for attachment in attachments:
+            self._discard_registered_attachment(attachment)
 
     def _render_harness_snapshot(self, snapshot: ThreadSnapshot) -> None:
         self._agent_thread_id = snapshot.thread.id
@@ -492,27 +521,76 @@ class MainWindow(QMainWindow):
         self._thread_detail_view.show_error(message)
         self._thread_detail_view.set_running(False)
 
-    def _open_artifact_link(self, uri: str) -> None:
-        url = QUrl(uri)
-        if url.scheme() != "artifact":
-            opened = QDesktopServices.openUrl(url)
-            if not opened:
-                self._thread_detail_view.show_error(self.tr("Could not open link: {uri}").format(uri=uri))
+    def _open_service_link(self, uri: str) -> None:
+        activation_id = uuid4().hex
+        self._active_service_link_activation_ids.add(activation_id)
+        self._show_service_link_progress()
+
+        def run_activation() -> None:
+            try:
+                self._link_router.activate(uri, thread_id=self._agent_thread_id)
+            except Exception as exc:
+                self._service_link_activation_failed.emit(
+                    _ServiceLinkActivationFailed(
+                        activation_id=activation_id,
+                        uri=uri,
+                        message=str(exc),
+                    )
+                )
+                return
+            self._service_link_activation_succeeded.emit(
+                _ServiceLinkActivationSucceeded(
+                    activation_id=activation_id,
+                    uri=uri,
+                )
+            )
+
+        threading.Thread(target=run_activation, name="xenix-service-link-activation", daemon=True).start()
+
+    def _show_service_link_progress(self) -> None:
+        if self._service_link_progress_dialog is not None:
             return
-        try:
-            artifact = self._artifact_service.resolve_uri(uri)
-        except Exception as exc:
-            self._thread_detail_view.show_error(str(exc))
+        dialog = QProgressDialog(
+            self.tr("Opening link..."),
+            "",
+            0,
+            0,
+            self,
+        )
+        dialog.setObjectName("serviceLinkProgressDialog")
+        dialog.setWindowModality(Qt.NonModal)
+        dialog.setMinimumDuration(0)
+        dialog.setCancelButton(None)
+        self._service_link_progress_dialog = dialog
+        self._retranslate_service_link_progress()
+        dialog.show()
+
+    def _retranslate_service_link_progress(self) -> None:
+        if self._service_link_progress_dialog is None:
             return
-        if not artifact.ready_to_open:
-            self._thread_detail_view.show_error(self.tr("Artifact is not ready to open."))
+        self._service_link_progress_dialog.setLabelText(self.tr("Opening link..."))
+        self._service_link_progress_dialog.setWindowTitle(self.tr("Open Link"))
+
+    def _close_service_link_progress_if_idle(self) -> None:
+        if self._active_service_link_activation_ids or self._service_link_progress_dialog is None:
             return
-        if not artifact.exists:
-            self._thread_detail_view.show_error(self.tr("Artifact file is missing: {path}").format(path=artifact.absolute_path))
+        dialog = self._service_link_progress_dialog
+        self._service_link_progress_dialog = None
+        dialog.close()
+        dialog.deleteLater()
+
+    def _finish_service_link_activation(self, result: object) -> None:
+        if not isinstance(result, _ServiceLinkActivationSucceeded):
             return
-        opened = QDesktopServices.openUrl(QUrl.fromLocalFile(artifact.absolute_path))
-        if not opened:
-            self._thread_detail_view.show_error(self.tr("Could not open artifact: {path}").format(path=artifact.absolute_path))
+        self._active_service_link_activation_ids.discard(result.activation_id)
+        self._close_service_link_progress_if_idle()
+
+    def _fail_service_link_activation(self, result: object) -> None:
+        if not isinstance(result, _ServiceLinkActivationFailed):
+            return
+        self._active_service_link_activation_ids.discard(result.activation_id)
+        self._close_service_link_progress_if_idle()
+        self._thread_detail_view.show_error(result.message)
 
     def _handle_tool_action(self, action: object) -> None:
         if not isinstance(action, dict):

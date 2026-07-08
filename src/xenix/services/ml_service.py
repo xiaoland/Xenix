@@ -758,7 +758,7 @@ class MLService:
             for missing, matches in suggestions.items():
                 lines.append(f"- `{missing}` -> {_format_column_names(matches)}")
         lines.append(f"Available columns: {_format_column_names(available_columns)}.")
-        lines.append("Use the exact column names returned by data.peek, data.query, or dataset inspection.")
+        lines.append("Use the exact column names returned by data.query or dataset inspection.")
         return "\n".join(lines)
 
     def _update_trained_model_metadata_with_evaluation(

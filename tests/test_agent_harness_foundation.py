@@ -76,9 +76,9 @@ def test_conversation_store_persists_thread_turn_messages_and_tool_calls(monkeyp
         CreateToolCallInput(
             thread_id=thread.id,
             turn_id=turn.id,
-            tool_name="data.peek",
-            arguments_payload={"name": "First analysis"},
-            provider_payload={"tool_call_id": "call-data-peek", "provider_name": "data_peek"},
+            tool_name="data.query",
+            arguments_payload={"dataset_id": "dataset-1", "sql": "SELECT * FROM input LIMIT 3"},
+            provider_payload={"tool_call_id": "call-data-query", "provider_name": "data_query"},
         )
     )
     result_message, completed_tool_call = conversations.complete_tool_call(
@@ -86,7 +86,7 @@ def test_conversation_store_persists_thread_turn_messages_and_tool_calls(monkeyp
             tool_call_id=tool_call.id,
             status=AgentToolCallStatus.SUCCEEDED,
             result_payload={"dataset_id": "dataset-1"},
-            provider_payload={"tool_call_id": "call-data-peek"},
+            provider_payload={"tool_call_id": "call-data-query"},
         )
     )
     final_assistant_message = conversations.append_message(
@@ -120,8 +120,8 @@ def test_conversation_store_persists_thread_turn_messages_and_tool_calls(monkeyp
     assert result_message.content_blocks == []
     assert snapshot.messages[2].id == assistant_message.id
     assert snapshot.messages[5].id == final_assistant_message.id
-    assert snapshot.tool_calls[0].tool_name == "data.peek"
-    assert snapshot.tool_calls[0].arguments_payload == {"name": "First analysis"}
+    assert snapshot.tool_calls[0].tool_name == "data.query"
+    assert snapshot.tool_calls[0].arguments_payload == {"dataset_id": "dataset-1", "sql": "SELECT * FROM input LIMIT 3"}
     assert provider_messages[0].role == "system"
     assert provider_messages[0].content == DEFAULT_AGENT_THREAD_SYSTEM_PROMPT
     assert provider_messages[0].source_message_id == snapshot.messages[0].id
@@ -136,18 +136,18 @@ def test_conversation_store_persists_thread_turn_messages_and_tool_calls(monkeyp
     assert provider_messages[2].provider_payload["reasoning_content"] == "Need to inspect the dataset first."
     assert provider_messages[2].provider_payload["tool_calls"] == [
         {
-            "id": "call-data-peek",
-            "type": "function",
-            "function": {
-                "name": "data_peek",
-                "arguments": "{\"name\": \"First analysis\"}",
-            },
-        }
-    ]
-    assert provider_messages[3].provider_payload["tool_call_id"] == "call-data-peek"
+                "id": "call-data-query",
+                "type": "function",
+                "function": {
+                    "name": "data_query",
+                    "arguments": "{\"dataset_id\": \"dataset-1\", \"sql\": \"SELECT * FROM input LIMIT 3\"}",
+                },
+            }
+        ]
+    assert provider_messages[3].provider_payload["tool_call_id"] == "call-data-query"
     tool_result_content = json.loads(provider_messages[3].content)
     assert tool_result_content == {
-        "tool_name": "data.peek",
+            "tool_name": "data.query",
         "status": "succeeded",
         "result": {"dataset_id": "dataset-1"},
     }
@@ -166,9 +166,9 @@ def test_conversation_store_replays_canonical_tool_result(monkeypatch, tmp_path:
         CreateToolCallInput(
             thread_id=thread.id,
             turn_id=turn.id,
-            tool_name="data.peek",
-            arguments_payload={"dataset_id": "dataset-1"},
-            provider_payload={"tool_call_id": "call-data-peek", "provider_name": "data_peek"},
+            tool_name="data.query",
+            arguments_payload={"dataset_id": "dataset-1", "sql": "SELECT * FROM input LIMIT 3"},
+                provider_payload={"tool_call_id": "call-data-query", "provider_name": "data_query"},
         )
     )
     conversations.complete_tool_call(
@@ -178,7 +178,7 @@ def test_conversation_store_replays_canonical_tool_result(monkeypatch, tmp_path:
                 "dataset_id": "dataset-1",
                 "inspection": {"columns": {"_schema": {"tool_name": 0}, "data": [["column_2"]]}},
             },
-            provider_payload={"tool_call_id": "call-data-peek"},
+                provider_payload={"tool_call_id": "call-data-query"},
         )
     )
 
@@ -186,7 +186,7 @@ def test_conversation_store_replays_canonical_tool_result(monkeypatch, tmp_path:
     tool_result_content = json.loads(provider_messages[-1].content)
 
     assert tool_result_content == {
-        "tool_name": "data.peek",
+            "tool_name": "data.query",
         "status": "succeeded",
         "result": {
             "dataset_id": "dataset-1",
@@ -323,8 +323,8 @@ def test_chatbot_event_projection_pairs_tool_call_messages(monkeypatch, tmp_path
         CreateToolCallInput(
             thread_id=thread.id,
             turn_id=turn.id,
-            tool_name="data.peek",
-            arguments_payload={"dataset_id": "dataset-1"},
+                tool_name="data.query",
+                arguments_payload={"dataset_id": "dataset-1", "sql": "SELECT * FROM input LIMIT 3"},
         )
     )
 
@@ -334,7 +334,7 @@ def test_chatbot_event_projection_pairs_tool_call_messages(monkeypatch, tmp_path
     assert [event.id for event in pending_events] == [user_message.id, tool_call.id]
     assert len(pending_tool_events) == 1
     assert pending_tool_events[0].status is ChatbotEventStatus.PENDING
-    assert pending_tool_events[0].summary == "Inspecting dataset..."
+    assert pending_tool_events[0].summary == "Querying dataset..."
     assert pending_tool_events[0].source_message_ids == [request_message.id]
 
     result_message, completed_tool_call = conversations.complete_tool_call(
@@ -353,7 +353,7 @@ def test_chatbot_event_projection_pairs_tool_call_messages(monkeypatch, tmp_path
     assert [event.id for event in final_events] == [user_message.id, tool_call.id]
     assert len(final_tool_events) == 1
     assert final_tool_events[0].status is ChatbotEventStatus.FAILED
-    assert final_tool_events[0].summary == "Failed to inspect dataset"
+    assert final_tool_events[0].summary == "Failed to query dataset"
     assert final_tool_events[0].detail_blocks
     detail_text = final_tool_events[0].detail_blocks[0]["text"]
     assert "Status: `failed`" in detail_text
@@ -602,8 +602,8 @@ def test_conversation_store_renames_and_deletes_thread_records(monkeypatch, tmp_
         CreateToolCallInput(
             thread_id=thread.id,
             turn_id=turn.id,
-            tool_name="data.peek",
-            arguments_payload={"dataset_id": "dataset-1"},
+            tool_name="data.query",
+            arguments_payload={"dataset_id": "dataset-1", "sql": "SELECT * FROM input LIMIT 3"},
         )
     )
     artifact_path = tmp_path / "result.csv"

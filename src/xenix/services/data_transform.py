@@ -69,6 +69,26 @@ _DISALLOWED_KEYWORDS = {
     "update",
     "vacuum",
 }
+_TRANSFORM_DISALLOWED_KEYWORDS = {
+    "alter",
+    "attach",
+    "call",
+    "checkpoint",
+    "copy",
+    "detach",
+    "drop",
+    "export",
+    "force",
+    "import",
+    "install",
+    "load",
+    "merge",
+    "pragma",
+    "reset",
+    "set",
+    "truncate",
+    "vacuum",
+}
 _DISALLOWED_FUNCTIONS = {
     "arrow_scan",
     "delta_scan",
@@ -191,6 +211,44 @@ class DuckDbSqlValidator:
             "referenced_bindings": referenced_aliases,
         }
 
+    def validate_transform(self, sql: str, bindings: list[DatasetSqlBinding]) -> dict[str, Any]:
+        normalized_sql = sql.strip()
+        if not normalized_sql:
+            raise ValidationError("SQL cannot be empty.")
+        if len(normalized_sql) > _MAX_SQL_LENGTH:
+            raise ValidationError(f"SQL cannot exceed {_MAX_SQL_LENGTH} characters.")
+        aliases = self._validate_aliases(bindings)
+        tokens = self._tokens(normalized_sql)
+        significant = [token for token in tokens if token.kind in {"word", "identifier", "string", "symbol"}]
+        word_tokens = [token for token in significant if token.kind == "word"]
+        if not word_tokens:
+            raise ValidationError("SQL must contain a transformation statement.")
+        first_word = word_tokens[0].lower
+        if first_word not in {"select", "with", "create", "insert", "update", "delete"}:
+            raise ValidationError("SQL must start with SELECT, WITH, CREATE TEMP, INSERT, UPDATE, or DELETE.")
+        disallowed = sorted({token.lower for token in word_tokens if token.lower in _TRANSFORM_DISALLOWED_KEYWORDS})
+        if disallowed:
+            raise ValidationError(f"SQL contains unsupported statement keyword: {disallowed[0]}.")
+        self._validate_no_file_authority(significant)
+        self._validate_temporary_creates(significant)
+        referenced_aliases = sorted(
+            {
+                token.lower
+                for token in word_tokens
+                if token.lower in {alias.lower() for alias in aliases}
+            }
+        )
+        if not referenced_aliases:
+            raise ValidationError("SQL must reference at least one registered dataset binding.")
+        return {
+            "statement": first_word,
+            "read_only": False,
+            "single_statement": False,
+            "requires_output_relation": "output",
+            "bindings": aliases,
+            "referenced_bindings": referenced_aliases,
+        }
+
     def normalize_sql(self, sql: str) -> str:
         normalized = sql.strip()
         while normalized.endswith(";"):
@@ -232,6 +290,32 @@ class DuckDbSqlValidator:
             if token.kind == "word":
                 return token.lower
         return None
+
+    def _validate_no_file_authority(self, tokens: list[_SqlToken]) -> None:
+        for index, token in enumerate(tokens):
+            if token.kind == "word" and token.lower in _DISALLOWED_FUNCTIONS:
+                next_token = tokens[index + 1] if index + 1 < len(tokens) else None
+                if next_token is None or next_token.value == "(":
+                    raise ValidationError(f"SQL cannot call DuckDB file scan function '{token.value}'.")
+            if token.kind == "string" and self._previous_word(tokens, index) in {"from", "join"}:
+                raise ValidationError("SQL cannot read direct file paths; use registered dataset bindings.")
+
+    def _validate_temporary_creates(self, tokens: list[_SqlToken]) -> None:
+        for index, token in enumerate(tokens):
+            if token.kind != "word" or token.lower != "create":
+                continue
+            next_words: list[str] = []
+            for candidate in tokens[index + 1 :]:
+                if candidate.value == ";":
+                    break
+                if candidate.kind == "word":
+                    next_words.append(candidate.lower)
+                if len(next_words) >= 4:
+                    break
+            if "table" not in next_words and "view" not in next_words:
+                raise ValidationError("SQL CREATE statements must create TEMP TABLE or TEMP VIEW.")
+            if "temp" not in next_words and "temporary" not in next_words:
+                raise ValidationError("SQL CREATE statements must create TEMP TABLE or TEMP VIEW.")
 
     def _tokens(self, sql: str) -> list[_SqlToken]:
         tokens: list[_SqlToken] = []
@@ -330,20 +414,34 @@ class DataQueryTransformService:
         started_at = perf_counter()
         with start_span("data.transform"):
             bindings = self._validate_bindings(input_data.bindings)
-            validation_summary = self._validator.validate(input_data.sql, bindings)
+            validation_summary = self._validator.validate_transform(input_data.sql, bindings)
             name = input_data.name.strip()
             if not name:
                 raise ValidationError("Transform output name cannot be empty.")
             sql = self._validator.normalize_sql(input_data.sql)
-            output_dir = self._paths.artifacts / "datasets" / "transformed"
+            output_dir = self._paths.temp / "datasets" / "transformed"
             output_dir.mkdir(parents=True, exist_ok=True)
-            output_path = output_dir / f"{self._slug(name)}-{uuid4().hex[:12]}.csv"
+            output_path = output_dir / f"{self._slug(name)}-{uuid4().hex[:12]}.parquet"
             with tempfile.TemporaryDirectory() as temp_dir:
                 with duckdb.connect(database=":memory:") as connection:
                     self._register_bindings(connection, bindings, temp_dir=Path(temp_dir))
-                    frame = connection.execute(sql).fetchdf()
-                temp_output_path = Path(temp_dir) / "transform-output.csv"
-                frame.to_csv(temp_output_path, index=False)
+                    if validation_summary["statement"] in {"select", "with"}:
+                        connection.execute(f"CREATE TEMP TABLE output AS {sql}")
+                    else:
+                        connection.execute(sql)
+                    try:
+                        frame = connection.execute("SELECT * FROM output").fetchdf()
+                    except duckdb.CatalogException as exc:
+                        raise ValidationError(
+                            "Transform SQL scripts must leave a final relation named output."
+                        ) from exc
+                temp_output_path = Path(temp_dir) / "transform-output.parquet"
+                with duckdb.connect(database=":memory:") as output_connection:
+                    output_connection.register("output_frame", frame)
+                    output_connection.execute(
+                        "COPY output_frame TO ? (FORMAT PARQUET)",
+                        [str(temp_output_path)],
+                    )
                 self._validate_transform_output(temp_output_path)
                 temp_output_path.replace(output_path)
             transform_report = {
@@ -367,7 +465,7 @@ class DataQueryTransformService:
             return result
 
     def _validate_transform_output(self, output_path: Path) -> None:
-        frame = load_tabular_frame(output_path, DatasetSourceFormat.CSV)
+        frame = load_tabular_frame(output_path, DatasetSourceFormat.PARQUET)
         if frame.width == 0:
             raise ValidationError("Transform output must contain at least one column.")
 
@@ -388,6 +486,12 @@ class DataQueryTransformService:
     def _register_binding(self, connection, binding: DatasetSqlBinding, *, temp_dir: Path) -> None:
         path = Path(binding.source_path).expanduser()
         source_format = detect_source_format(path)
+        if source_format is DatasetSourceFormat.PARQUET:
+            connection.execute(
+                f'CREATE TEMP VIEW "{binding.alias}" AS '
+                f"SELECT * FROM read_parquet({self._sql_string(str(path))})",
+            )
+            return
         if source_format in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}:
             self._register_excel_binding(connection, binding, path, source_format, temp_dir=temp_dir)
             return
@@ -415,8 +519,7 @@ class DataQueryTransformService:
         frame.write_csv(csv_path)
         connection.execute(
             f'CREATE TEMP TABLE "{binding.alias}" AS '
-            "SELECT * FROM read_csv(?, header=true, all_varchar=true)",
-            [str(csv_path)],
+            f"SELECT * FROM read_csv({self._sql_string(str(csv_path))}, header=true, all_varchar=true)",
         )
 
     def _validate_bindings(self, bindings: list[DatasetSqlBinding]) -> list[DatasetSqlBinding]:
@@ -447,7 +550,7 @@ class DataQueryTransformService:
     def _load_frame(self, path: Path) -> pd.DataFrame:
         source_format = detect_source_format(path)
         if source_format is DatasetSourceFormat.UNKNOWN:
-            raise ValidationError("Only .csv, .xlsx, and .xls dataset files are supported.")
+            raise ValidationError("Only .csv, .parquet, .xlsx, and .xls dataset files are supported.")
         return load_pandas_frame_with_schema(path, source_format).frame
 
     def _normalize_limit(self, limit: int) -> int:
@@ -469,3 +572,6 @@ class DataQueryTransformService:
     def _slug(self, value: str) -> str:
         normalized = "".join(char.lower() if char.isalnum() else "-" for char in value).strip("-")
         return normalized or "dataset"
+
+    def _sql_string(self, value: str) -> str:
+        return "'" + value.replace("'", "''") + "'"

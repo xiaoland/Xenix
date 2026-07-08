@@ -398,15 +398,14 @@ def test_data_clean_tool_registers_derived_dataset_and_artifact(monkeypatch, tmp
 
     result = registry.execute("data.clean", arguments, context)
     derived_dataset = dataset_service.get_dataset(result.payload["dataset_id"])
-    resolved_artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
 
     assert derived_dataset.derived_from_dataset_id == source_dataset.id
     assert derived_dataset.project_id == source_dataset.project_id
+    assert result.payload["dataset_uri"] == f"dataset://{derived_dataset.id}"
+    assert "artifact_id" not in result.payload
     assert result.payload["row_count_before"] == 3
     assert result.payload["row_count_after"] == 2
     assert result.payload["cleaning_report"]["operations"][0]["operation"] == "duplicate.key_columns"
-    assert resolved_artifact.metadata_payload["dataset_id"] == derived_dataset.id
-    assert resolved_artifact.metadata_payload["derived_from_dataset_id"] == source_dataset.id
     assert "artifact_link" not in result.payload
 
 
@@ -507,9 +506,10 @@ def test_data_clean_tool_schema_stays_compact(monkeypatch, tmp_path: Path) -> No
     )
     specs = {spec.name: spec for spec in registry.list_specs()}
 
-    assert "project_id" not in specs["data.peek"].parameters_schema["properties"]
+    assert "data.peek" not in specs
+    assert "project_id" not in specs["data.query"].parameters_schema["properties"]
     assert "project_id" not in specs["data.integrate"].parameters_schema["properties"]
-    assert "source_path" not in specs["data.peek"].parameters_schema["properties"]
+    assert "source_path" not in specs["data.query"].parameters_schema["properties"]
     assert "source_paths" not in specs["data.integrate"].parameters_schema["properties"]
     assert specs["data.integrate"].parameters_schema["required"] == ["dataset_ids"]
     assert "profile" not in specs["data.clean"].parameters_schema["properties"]

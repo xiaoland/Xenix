@@ -8,14 +8,13 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-import openpyxl
 from pydantic import BaseModel, Field, ValidationError as PydanticValidationError
 
 from ...config import AppPaths
 from ...exceptions import NotFoundError, ValidationError
 from ..analysis_graph import AnalysisGraphService, GraphDatasetInput
 from ..analysis_lambda import AnalysisLambdaDataset, AnalysisLambdaInput, AnalysisLambdaService
-from ..analysis_profile import AnalysisProfileService, ProfileDatasetInput
+from ..analysis_profile import AnalysisProfileService
 from ..artifact_service import (
     ArtifactService,
     RegisterArtifactInput,
@@ -30,6 +29,7 @@ from ..data_transform import (
     DatasetSqlBinding,
 )
 from ..dataset_inspection import DatasetInspection, InspectDatasetInput, detect_source_format, load_dataframe
+from ..dataset_export_service import build_dataset_uri
 from ..dataset_service import DatasetService, RegisterDatasetInput
 from ..ml.registry import get_model_catalog_entry, list_model_catalog, list_model_keys
 from ..ml.types import EvaluationKind, ModelFamily, ModelTaskKind
@@ -42,7 +42,6 @@ from ..ml_service import (
 )
 from ..storage.models import (
     ArtifactKind,
-    DatasetSourceFormat,
     MLTaskArtifactKind,
     MLTaskRow,
     MLTaskStatus,
@@ -50,7 +49,6 @@ from ..storage.models import (
     ProblemKind,
     TrainedModelRow,
 )
-from ..tabular import TabularSchema, resolve_tabular_schema
 from ..llm import AgentToolSpec
 from .tool_presentations import DEFAULT_TOOL_PRESENTATION, ToolPresentation, tool_presentation_for_name
 
@@ -126,7 +124,6 @@ class AgentToolRegistry:
         self._tools = {
             tool.spec.name: tool
             for tool in (
-                self._build_data_peek_tool(),
                 self._build_data_integrate_tool(),
                 self._build_analysis_graph_tool(),
                 # analysis.lambda is intentionally retained in code but not registered
@@ -169,38 +166,12 @@ class AgentToolRegistry:
         self._raise_if_cancelled(context)
         return result
 
-    def _build_data_peek_tool(self) -> AgentTool:
-        return AgentTool(
-            spec=AgentToolSpec(
-                name="data.peek",
-                provider_name="data_peek",
-                description=(
-                    "Inspect a registered dataset by dataset_id and by default "
-                    "run bounded common descriptive analysis. Set analysis to false to inspect only."
-                ),
-                parameters_schema={
-                    "type": "object",
-                    "properties": {
-                        "dataset_id": {"type": "string"},
-                        "analysis": {"type": "boolean", "default": True},
-                        "target_columns": {"type": "array", "items": {"type": "string"}},
-                        "top_n": {"type": "integer", "minimum": 1, "maximum": 20},
-                        "correlation_column_limit": {"type": "integer", "minimum": 2, "maximum": 12},
-                    },
-                    "required": ["dataset_id"],
-                    "additionalProperties": False,
-                },
-            ),
-            handler=self._data_peek,
-            presentation=tool_presentation_for_name("data.peek"),
-        )
-
     def _build_data_integrate_tool(self) -> AgentTool:
         return AgentTool(
             spec=AgentToolSpec(
                 name="data.integrate",
                 provider_name="data_integrate",
-                description="Combine two or more registered datasets into a generated dataset artifact.",
+                description="Combine two or more registered datasets into a generated derived dataset.",
                 parameters_schema={
                     "type": "object",
                     "properties": {
@@ -221,8 +192,8 @@ class AgentToolRegistry:
                 name="analysis.graph",
                 provider_name="analysis_graph",
                 description=(
-                    "Draw one bounded static SVG artifact for a registered dataset. Use exactly one of `spec` "
-                    "or `wordcloud_spec`. `spec` is for ordinary Vega-Lite charts. "
+                    "Draw one bounded static SVG artifact for a registered dataset. Pass exactly one graph mode: "
+                    "`spec` for ordinary Vega-Lite charts, or `wordcloud_spec` for the dedicated word-cloud path. "
                     "`wordcloud_spec` is the dedicated word-cloud path and expects an upstream chart-ready "
                     "frequency table from data.query or data.transform."
                 ),
@@ -354,10 +325,6 @@ class AgentToolRegistry:
                         },
                     },
                     "required": ["dataset_id"],
-                    "oneOf": [
-                        {"required": ["spec"]},
-                        {"required": ["wordcloud_spec"]},
-                    ],
                     "additionalProperties": False,
                 },
             ),
@@ -516,20 +483,28 @@ class AgentToolRegistry:
                 provider_name="data_query",
                 description=(
                     "Run a read-only SELECT/CTE query over registered datasets. "
-                    "Use dataset_id for one input aliased as input, or bindings for multiple inputs. "
-                    "Returns bounded rows and does not create a dataset artifact."
+                    "Pass either dataset_id for one input aliased as input, or bindings for explicit SQL aliases. "
+                    "At least one input source is required. If both are present, bindings wins. "
+                    "Returns bounded rows and does not create a derived dataset or artifact."
                 ),
                 parameters_schema={
                     "type": "object",
                     "properties": {
                         "dataset_id": {
                             "type": "string",
-                            "description": "Use for one input dataset, which will be available in SQL as input.",
+                            "description": (
+                                "Use for one input dataset, which will be available in SQL as input. "
+                                "Pass either dataset_id or bindings; if both are present, bindings wins."
+                            ),
                         },
                         "bindings": {
                             "type": "array",
                             "items": binding_schema,
-                            "description": "Use for multiple input datasets with explicit SQL aliases.",
+                            "minItems": 1,
+                            "description": (
+                                "Highest-priority input source. Use for one or more registered datasets "
+                                "with explicit SQL aliases."
+                            ),
                         },
                         "sql": {
                             "type": "string",
@@ -569,24 +544,37 @@ class AgentToolRegistry:
                 name="data.transform",
                 provider_name="data_transform",
                 description=(
-                    "Create a new derived dataset artifact from a SELECT/CTE query over registered datasets. "
-                    "Use dataset_id for one input aliased as input, or bindings for multiple inputs."
+                    "Create a new derived dataset from bounded DuckDB SQL over registered datasets. "
+                    "Use dataset_id for one input aliased as input, or bindings for explicit aliases. "
+                    "At least one input source is required. If both are present, bindings wins. "
+                    "For multi-statement scripts, create or leave a final TEMP relation named output; "
+                    "Xenix materializes SELECT * FROM output."
                 ),
                 parameters_schema={
                     "type": "object",
                     "properties": {
                         "dataset_id": {
                             "type": "string",
-                            "description": "Use for one input dataset, which will be available in SQL as input.",
+                            "description": (
+                                "Use for one input dataset, which will be available in SQL as input. "
+                                "Pass either dataset_id or bindings; if both are present, bindings wins."
+                            ),
                         },
                         "bindings": {
                             "type": "array",
                             "items": binding_schema,
-                            "description": "Use for multiple input datasets with explicit SQL aliases.",
+                            "minItems": 1,
+                            "description": (
+                                "Highest-priority input source. Use for one or more registered datasets "
+                                "with explicit SQL aliases."
+                            ),
                         },
                         "sql": {
                             "type": "string",
-                            "description": "SELECT or CTE query whose result becomes the generated dataset.",
+                            "description": (
+                                "DuckDB SQL script. It may use SELECT/CTE or bounded temporary-table steps, "
+                                "but must leave a final relation named output."
+                            ),
                         },
                         "name": {
                             "type": "string",
@@ -830,52 +818,6 @@ class AgentToolRegistry:
             handler=self._model_task_query,
             presentation=tool_presentation_for_name("model.task.query"),
         )
-
-    def _data_peek(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
-        self._raise_if_cancelled(context)
-        supported_keys = {
-            "dataset_id",
-            "analysis",
-            "target_columns",
-            "top_n",
-            "correlation_column_limit",
-        }
-        unsupported_keys = sorted(set(arguments) - supported_keys)
-        if unsupported_keys:
-            raise ValidationError("data.peek does not accept: " + ", ".join(unsupported_keys))
-        analysis_enabled = self._optional_boolean(arguments, "analysis", default=True)
-        dataset_id = self._require_string(arguments, "dataset_id")
-        dataset = self._dataset_service.get_dataset(dataset_id)
-        inspection = self._dataset_service.inspect_source_file(
-            InspectDatasetInput(source_path=dataset.source_path)
-        )
-        payload: dict[str, Any] = {
-            "dataset_id": dataset.id,
-            "inspection": self._peek_inspection_payload(Path(dataset.source_path).expanduser(), inspection),
-        }
-        if analysis_enabled:
-            profile_result = self._analysis_profile_service.profile_dataset(
-                ProfileDatasetInput(
-                    source_path=dataset.source_path,
-                    dataset_name=dataset.name,
-                    target_columns=self._optional_string_list(arguments, "target_columns"),
-                    top_n=self._optional_integer(arguments, "top_n", default=10),
-                    correlation_column_limit=self._optional_integer(
-                        arguments,
-                        "correlation_column_limit",
-                        default=8,
-                    ),
-                )
-            )
-            payload["analysis"] = self._compact_analysis_payload(
-                {
-                    "enabled": True,
-                    "profile": profile_result.profile,
-                }
-            )
-        else:
-            payload["analysis"] = {"enabled": False}
-        return ToolExecutionResult(payload=payload)
 
     def _data_integrate(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
@@ -1139,7 +1081,11 @@ class AgentToolRegistry:
 
     def _data_query(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
-        bindings = self._resolve_sql_bindings(arguments, tool_name="data.query")
+        bindings = self._resolve_sql_bindings(
+            arguments,
+            tool_name="data.query",
+            bindings_take_precedence=True,
+        )
         query_result = self._data_transform_service.query(
             DataQueryInput(
                 bindings=bindings,
@@ -1147,17 +1093,21 @@ class AgentToolRegistry:
                 limit=self._optional_integer(arguments, "limit", default=50),
             )
         )
-        payload = query_result.model_dump(mode="json")
-        payload["input_dataset_ids"] = [binding.dataset_id for binding in bindings]
-        payload["bindings"] = [
-            {"alias": binding.alias, "dataset_id": binding.dataset_id}
-            for binding in bindings
-        ]
+        payload = {
+            "columns": self._query_columns_payload(query_result.columns),
+            "rows": self._query_rows_payload(query_result.rows, query_result.columns),
+            "returned_row_count": query_result.returned_row_count,
+            "truncated": query_result.truncated,
+        }
         return ToolExecutionResult(payload=payload)
 
     def _data_transform(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
-        bindings = self._resolve_sql_bindings(arguments, tool_name="data.transform")
+        bindings = self._resolve_sql_bindings(
+            arguments,
+            tool_name="data.transform",
+            bindings_take_precedence=True,
+        )
         input_dataset_ids = [binding.dataset_id for binding in bindings]
         default_name = "Transformed dataset"
         if len(bindings) == 1:
@@ -1500,11 +1450,17 @@ class AgentToolRegistry:
         }
         return ToolExecutionResult(payload=payload)
 
-    def _resolve_sql_bindings(self, arguments: dict[str, Any], *, tool_name: str) -> list[DatasetSqlBinding]:
+    def _resolve_sql_bindings(
+        self,
+        arguments: dict[str, Any],
+        *,
+        tool_name: str,
+        bindings_take_precedence: bool = False,
+    ) -> list[DatasetSqlBinding]:
         raw_bindings = arguments.get("bindings")
         raw_dataset_id = str(arguments.get("dataset_id") or "").strip()
         if raw_bindings:
-            if raw_dataset_id:
+            if raw_dataset_id and not bindings_take_precedence:
                 raise ValidationError(f"{tool_name} accepts dataset_id for one input or bindings for multiple inputs.")
             if not isinstance(raw_bindings, list):
                 raise ValidationError(f"{tool_name} bindings must be a list.")
@@ -1536,40 +1492,28 @@ class AgentToolRegistry:
             )
         ]
 
-    def _query_result_markdown(self, payload: dict[str, Any]) -> str:
-        returned = int(payload.get("returned_row_count") or 0)
-        limit = int(payload.get("limit") or 0)
-        suffix = " (truncated)" if payload.get("truncated") else ""
-        lines = [f"Query returned {returned} row(s) with limit {limit}{suffix}."]
-        rows = payload.get("rows")
-        columns = payload.get("columns")
-        if not isinstance(rows, list) or not rows:
-            return "\n".join(lines)
-        if not isinstance(columns, list) or not columns:
-            return "\n".join(lines)
-        column_names = [str(column.get("name")) for column in columns if isinstance(column, dict)]
-        preview_rows = rows[:10]
-        lines.extend(
+    def _query_columns_payload(self, columns: list[dict[str, str]]) -> dict[str, Any]:
+        rows = [
             [
-                "",
-                "| " + " | ".join(self._markdown_cell(column) for column in column_names) + " |",
-                "| " + " | ".join("---" for _column in column_names) + " |",
+                str(column.get("name") or ""),
+                str(column.get("type") or ""),
+                index,
             ]
-        )
-        for row in preview_rows:
-            if not isinstance(row, dict):
-                continue
-            lines.append(
-                "| "
-                + " | ".join(self._markdown_cell(row.get(column)) for column in column_names)
-                + " |"
-            )
-        return "\n".join(lines)
+            for index, column in enumerate(columns)
+        ]
+        return self._compact_table(["name", "type", "index"], rows)
 
-    def _markdown_cell(self, value: Any) -> str:
-        if value is None:
-            return ""
-        return str(value).replace("\n", " ").replace("|", "\\|")
+    def _query_rows_payload(
+        self,
+        rows: list[dict[str, Any]],
+        columns: list[dict[str, str]],
+    ) -> dict[str, Any]:
+        column_names = [str(column.get("name") or "") for column in columns]
+        data = [[row.get(column_name) for column_name in column_names] for row in rows]
+        return {
+            "_schema": {column_name: index for index, column_name in enumerate(column_names)},
+            "data": data,
+        }
 
     def _register_generated_dataset_result(
         self,
@@ -1593,26 +1537,10 @@ class AgentToolRegistry:
                 derived_from_dataset_id=derived_from_dataset_id,
             )
         )
-        artifact_metadata = dict(metadata_payload or {})
-        if derived_from_dataset_id:
-            artifact_metadata["derived_from_dataset_id"] = derived_from_dataset_id
-        try:
-            artifact = self._register_dataset_artifact(
-                context,
-                title=dataset.name,
-                path=Path(dataset.source_path),
-                dataset_id=dataset.id,
-                preview_payload=inspection_payload,
-                metadata_payload=artifact_metadata,
-            )
-        except Exception:
-            self._dataset_service.discard_unreferenced_dataset(dataset.id)
-            raise
         return ToolExecutionResult(
             payload={
                 "dataset_id": dataset.id,
-                "artifact_id": artifact.id,
-                "artifact_uri": build_artifact_uri(artifact.id),
+                "dataset_uri": build_dataset_uri(dataset.id),
                 "summary": summary,
                 "inspection": inspection_payload,
             },
@@ -1621,172 +1549,11 @@ class AgentToolRegistry:
     def _inspection_payload(self, inspection: DatasetInspection) -> dict[str, Any]:
         return inspection.model_dump(mode="json", exclude={"source_path"})
 
-    def _peek_inspection_payload(self, source_path: Path, inspection: DatasetInspection) -> dict[str, Any]:
-        schema = resolve_tabular_schema(inspection.preview_columns)
-        row_windows, _declared_dimensions = self._structure_row_windows(source_path, inspection.source_format)
-        return {
-            "row_count": inspection.row_count,
-            "column_count": inspection.column_count,
-            "coordinate_system": self._coordinate_system_text(inspection.source_format),
-            "columns": self._peek_columns(schema, row_windows),
-            "row_windows": self._peek_row_windows(row_windows),
-        }
-
-    def _coordinate_system_text(self, source_format: DatasetSourceFormat) -> str:
-        row_system = (
-            "spreadsheet_1_based"
-            if source_format in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}
-            else "file_1_based"
-        )
-        return f"rows are {row_system}; columns are position_0_based"
-
-    def _peek_columns(self, schema: TabularSchema, row_windows: list[dict[str, Any]]) -> dict[str, Any]:
-        rows: list[list[Any]] = []
-        for column in schema.columns:
-            samples = []
-            for row in row_windows:
-                cells = row.get("cells")
-                if isinstance(cells, list) and column.index < len(cells):
-                    samples.append(cells[column.index])
-            rows.append([column.tool_name, column.index, samples[:5]])
-        return self._compact_table(["tool_name", "position", "samples"], rows)
-
-    def _peek_row_windows(self, row_windows: list[dict[str, Any]]) -> dict[str, Any]:
-        rows = [
-            [
-                row.get("row"),
-                row.get("non_empty_count"),
-                row.get("observed_width"),
-                row.get("cells") if isinstance(row.get("cells"), list) else [],
-            ]
-            for row in row_windows
-        ]
-        return self._compact_table(["row", "non_empty", "width", "cells"], rows)
-
     def _compact_table(self, keys: list[str], rows: list[list[Any]]) -> dict[str, Any]:
         return {
             "_schema": {key: index for index, key in enumerate(keys)},
             "data": rows,
         }
-
-    def _structure_row_windows(
-        self,
-        source_path: Path,
-        source_format: DatasetSourceFormat,
-        *,
-        max_rows: int = 5,
-        max_columns: int = 50,
-    ) -> tuple[list[dict[str, Any]], dict[str, int | None] | None]:
-        if source_format is DatasetSourceFormat.CSV:
-            return self._csv_structure_row_windows(source_path, max_rows=max_rows, max_columns=max_columns), None
-        if source_format in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}:
-            return self._xlsx_structure_row_windows(source_path, max_rows=max_rows, max_columns=max_columns)
-        return [], None
-
-    def _csv_structure_row_windows(
-        self,
-        source_path: Path,
-        *,
-        max_rows: int,
-        max_columns: int,
-    ) -> list[dict[str, Any]]:
-        windows: list[dict[str, Any]] = []
-        with source_path.open("r", encoding="utf-8-sig", newline="") as handle:
-            reader = csv.reader(handle)
-            for row_number, row in enumerate(reader, start=1):
-                if row_number > max_rows:
-                    break
-                windows.append(self._row_window_payload(row_number, row[:max_columns]))
-        return windows
-
-    def _xlsx_structure_row_windows(
-        self,
-        source_path: Path,
-        *,
-        max_rows: int,
-        max_columns: int,
-    ) -> tuple[list[dict[str, Any]], dict[str, int | None]]:
-        workbook = openpyxl.load_workbook(source_path, read_only=True, data_only=True)
-        try:
-            worksheet = workbook.active
-            declared_dimensions = {
-                "rows": int(worksheet.max_row or 0) if worksheet.max_row is not None else None,
-                "columns": int(worksheet.max_column or 0) if worksheet.max_column is not None else None,
-            }
-            reset_dimensions = getattr(worksheet, "reset_dimensions", None)
-            if callable(reset_dimensions):
-                reset_dimensions()
-            windows = []
-            for row_number, row in enumerate(
-                worksheet.iter_rows(max_row=max_rows, max_col=max_columns, values_only=True),
-                start=1,
-            ):
-                windows.append(self._row_window_payload(row_number, list(row)))
-            return windows, declared_dimensions
-        finally:
-            workbook.close()
-
-    def _row_window_payload(self, row_number: int, cells: list[Any]) -> dict[str, Any]:
-        formatted = [self._structure_cell(value) for value in cells]
-        observed_width = 0
-        for index in range(len(formatted) - 1, -1, -1):
-            if formatted[index].strip():
-                observed_width = index + 1
-                break
-        return {
-            "row": row_number,
-            "non_empty_count": sum(1 for value in formatted if value.strip()),
-            "observed_width": observed_width,
-            "cells": formatted[:observed_width or 1],
-        }
-
-    def _structure_cell(self, value: Any, *, max_length: int = 160) -> str:
-        if value is None:
-            return ""
-        text = str(value).replace("\r", " ").replace("\n", " ").strip()
-        if len(text) <= max_length:
-            return text
-        return text[: max_length - 3] + "..."
-
-    def _compact_analysis_payload(self, analysis: dict[str, Any]) -> dict[str, Any]:
-        if not analysis.get("enabled"):
-            return {"enabled": False}
-        profile = analysis.get("profile")
-        if not isinstance(profile, dict):
-            return {"enabled": True}
-        compact = {
-            "enabled": True,
-            "basic_info": profile.get("basic_info"),
-            "field_type_summary": profile.get("field_type_summary"),
-        }
-        limits = profile.get("limits")
-        if isinstance(limits, dict):
-            compact["limits"] = limits
-        return compact
-
-    def _register_dataset_artifact(
-        self,
-        context: ToolExecutionContext,
-        *,
-        title: str,
-        path: Path,
-        dataset_id: str,
-        preview_payload: dict[str, Any],
-        metadata_payload: dict[str, Any] | None = None,
-    ):
-        return self._artifact_service.register_artifact(
-            RegisterArtifactInput(
-                thread_id=context.thread_id,
-                turn_id=context.turn_id,
-                tool_call_id=context.tool_call_id,
-                kind=ArtifactKind.DATASET,
-                title=title,
-                absolute_path=str(path.resolve()),
-                mime_type="text/csv" if path.suffix.lower() == ".csv" else None,
-                preview_payload=preview_payload,
-                metadata_payload={"dataset_id": dataset_id, **(metadata_payload or {})},
-            )
-        )
 
     def _lambda_artifact_kind(self, raw_kind: str) -> ArtifactKind:
         value = str(raw_kind or "").strip()
@@ -1819,7 +1586,7 @@ class AgentToolRegistry:
     def _load_frame(self, path: Path) -> pd.DataFrame:
         source_format = detect_source_format(path)
         if source_format.value == "unknown":
-            raise ValidationError("Only .csv, .xlsx, and .xls dataset files are supported.")
+            raise ValidationError("Only .csv, .parquet, .xlsx, and .xls dataset files are supported.")
         return load_dataframe(path, source_format)
 
     def _wait_for_training_models_or_none(

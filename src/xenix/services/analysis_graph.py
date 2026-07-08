@@ -286,7 +286,7 @@ class AnalysisGraphService:
     def _load_frame(self, source_path: Path) -> pd.DataFrame:
         source_format = detect_source_format(source_path)
         if source_format is DatasetSourceFormat.UNKNOWN:
-            raise ValidationError("Only .csv, .xlsx, and .xls dataset files are supported.")
+            raise ValidationError("Only .csv, .parquet, .xlsx, and .xls dataset files are supported.")
         frame = load_dataframe(source_path, source_format).rename(columns=str)
         if len(frame.columns) == 0:
             raise ValidationError("Dataset file must contain at least one column.")

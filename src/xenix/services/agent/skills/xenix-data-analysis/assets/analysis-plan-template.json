@@ -28,7 +28,6 @@
     "reason": ""
   },
   "tool_plan": {
-    "data_peek": [],
     "data_query": [],
     "data_transform": [],
     "analysis_graph": []

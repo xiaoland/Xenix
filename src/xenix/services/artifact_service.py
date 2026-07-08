@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -45,6 +48,22 @@ class ResolvedArtifact(SQLModel):
     preview_payload: dict[str, Any] | None = None
     metadata_payload: dict[str, Any] = Field(default_factory=dict)
     view: str | None = None
+
+
+class ActivatedArtifact(SQLModel):
+    artifact_id: str
+    title: str
+    absolute_path: str
+    opened: bool
+
+
+def _open_file_with_os(path: Path) -> bool:
+    if sys.platform == "win32":
+        os.startfile(str(path))  # type: ignore[attr-defined]
+        return True
+    if sys.platform == "darwin":
+        return subprocess.run(["open", str(path)], check=False).returncode == 0
+    return subprocess.run(["xdg-open", str(path)], check=False).returncode == 0
 
 
 def build_artifact_uri(artifact_id: str, *, view: str | None = None) -> str:
@@ -133,6 +152,25 @@ class ArtifactService:
                 metadata_payload=dict(row.metadata_payload),
                 view=view,
             )
+
+    def activate_uri(self, uri: str) -> ActivatedArtifact:
+        artifact = self.resolve_uri(uri)
+        if not artifact.ready_to_open:
+            raise ValidationError("Artifact is not ready to open.")
+        if not artifact.exists:
+            raise NotFoundError(f"Artifact file is missing: {artifact.absolute_path}")
+        try:
+            opened = _open_file_with_os(Path(artifact.absolute_path))
+        except OSError as exc:
+            raise ValidationError(f"Could not open artifact: {artifact.absolute_path}") from exc
+        if not opened:
+            raise ValidationError(f"Could not open artifact: {artifact.absolute_path}")
+        return ActivatedArtifact(
+            artifact_id=artifact.artifact_id,
+            title=artifact.title,
+            absolute_path=artifact.absolute_path,
+            opened=True,
+        )
 
     def list_thread_artifacts(self, thread_id: str) -> list[ArtifactRow]:
         with self._session_factory() as session:

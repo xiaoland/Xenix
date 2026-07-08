@@ -1,6 +1,6 @@
 # DuckDB SQL Recipes for `data.query`
 
-Use this file before writing `data.query` or `data.transform` calls. These are templates. Replace `{{column}}` placeholders with exact column names from `data.peek`.
+Use this file before writing `data.query` or `data.transform` calls. These are templates. Replace `{{column}}` placeholders with exact column names observed through `data.query`.
 
 For SQL table names, follow the tool contract:
 
@@ -13,7 +13,7 @@ For SQL table names, follow the tool contract:
 - Use read-only `SELECT` queries and CTEs.
 - Quote unusual column names with double quotes: `"月收入"`.
 - Never quote string values with double quotes; use single quotes.
-- Do not use `SELECT *` except for tiny previews handled by `data.peek`.
+- Use `SELECT *` only for tiny bounded previews through `data.query`.
 - Use `TRY_CAST` for uncertain numeric/date fields.
 - Normalize blank strings when checking missingness: `NULLIF(TRIM(CAST("col" AS VARCHAR)), '')`.
 - Return chart-ready result tables: small, aggregated, named columns.

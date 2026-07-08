@@ -1385,13 +1385,16 @@ def test_storage_bootstrap_uses_ai_first_baseline_without_work_item_schema(monke
             for row in connection.exec_driver_sql("PRAGMA table_info(agent_provider_request)").all()
         }
 
-    assert CURRENT_SCHEMA_VERSION == 13
+    assert CURRENT_SCHEMA_VERSION == 14
     assert "work_item" not in table_names
     assert "dataset_column_selection" not in table_names
     assert "dataset_column_binding" in table_names
+    assert "dataset_import" in table_names
+    assert "dataset_workbook" in table_names
     assert "agent_turn_completion_guard" in table_names
     assert "agent_provider_request" in table_names
     assert "derived_from_dataset_id" in dataset_columns
+    assert {"import_id", "workbook_id", "sheet_name", "sheet_index"}.issubset(dataset_columns)
     assert {
         "dataset_id",
         "role_bindings",

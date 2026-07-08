@@ -43,21 +43,26 @@ class FirstSliceProvider:
         self._apply_rows = apply_rows
 
     def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
-        dataset_id = self._find_payload_value(messages, "dataset_id")
         attached_dataset_id = self._find_content_block_value(messages, "dataset_id")
+        dataset_id = self._find_payload_value(messages, "dataset_id") or attached_dataset_id
+        inspected = self._has_query_result(messages)
         binding_id = self._find_payload_value(messages, "binding_id")
         trained_model_id = self._find_trained_model_id(messages)
         apply_artifact_id = self._find_apply_artifact_id(messages)
-        if dataset_id is None:
+        if not inspected:
             if attached_dataset_id is None:
                 raise AssertionError("FirstSliceProvider requires an attached dataset id.")
             return ProviderResponse(
                 assistant_content_blocks=[{"type": "markdown", "text": "I will inspect the uploaded dataset."}],
                 tool_calls=[
                     ProviderToolCall(
-                        provider_call_id="call-peek",
-                        tool_name="data.peek",
-                        arguments={"dataset_id": attached_dataset_id},
+                        provider_call_id="call-query",
+                        tool_name="data.query",
+                        arguments={
+                            "dataset_id": attached_dataset_id,
+                            "sql": "SELECT * FROM input LIMIT 3",
+                            "limit": 3,
+                        },
                     )
                 ],
             )
@@ -134,6 +139,12 @@ class FirstSliceProvider:
             if isinstance(payload.get(key), str):
                 return payload[key]
         return None
+
+    def _has_query_result(self, messages: list[Any]) -> bool:
+        return any(
+            payload.get("returned_row_count") is not None and isinstance(payload.get("rows"), dict)
+            for payload in self._tool_result_payloads(messages)
+        )
 
     def _find_content_block_value(self, messages: list[Any], key: str) -> str | None:
         for message in reversed(messages):
@@ -262,7 +273,7 @@ class HiddenToolCallProvider:
         )
 
 
-class PeekFromThreadFilesProvider:
+class QueryFromThreadFilesProvider:
     def __init__(self) -> None:
         self.tools_by_call: list[list[str]] = []
 
@@ -279,9 +290,13 @@ class PeekFromThreadFilesProvider:
         return ProviderResponse(
             tool_calls=[
                 ProviderToolCall(
-                    provider_call_id="call-peek-previous-file",
-                    tool_name="data.peek",
-                    arguments={"dataset_id": dataset_id},
+                    provider_call_id="call-query-previous-file",
+                    tool_name="data.query",
+                    arguments={
+                        "dataset_id": dataset_id,
+                        "sql": "SELECT * FROM input LIMIT 3",
+                        "limit": 3,
+                    },
                 )
             ],
         )
@@ -340,7 +355,7 @@ def _persisted_tool_context(context) -> ToolExecutionContext:
         CreateToolCallInput(
             thread_id=thread.id,
             turn_id=turn.id,
-            tool_name="data.peek",
+            tool_name="data.query",
             arguments_payload={},
         )
     )
@@ -422,7 +437,7 @@ def test_agent_harness_exposes_data_tools_when_file_is_attached(monkeypatch, tmp
     )
 
     tool_names = provider.tools_by_call[0]
-    assert "data.peek" in tool_names
+    assert "data.peek" not in tool_names
     assert "data.integrate" not in tool_names
     assert "analysis.profile" not in tool_names
     assert "analysis.graph" in tool_names
@@ -440,7 +455,17 @@ def test_agent_harness_exposes_data_tools_when_file_is_attached(monkeypatch, tmp
 
 def test_agent_harness_exposes_dataset_tools_after_dataset_payload(monkeypatch, tmp_path: Path) -> None:
     context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
-    thread_id = _seed_tool_payload(context, "data.peek", {"dataset_id": "dataset-1"})
+    thread_id = _seed_tool_payload(
+        context,
+        "data.query",
+        {
+            "columns": {"_schema": {"name": 0, "type": 1, "index": 2}, "data": [["value", "int64", 0]]},
+            "rows": {"_schema": {"value": 0}, "data": [[1]]},
+            "returned_row_count": 1,
+            "truncated": False,
+            "dataset_id": "dataset-1",
+        },
+    )
     provider = ToolCaptureProvider()
     harness = AgentHarnessService(
         session_factory=context.session_factory,
@@ -452,7 +477,7 @@ def test_agent_harness_exposes_dataset_tools_after_dataset_payload(monkeypatch, 
     harness.submit_user_turn(SubmitUserTurnInput(thread_id=thread_id, text="analyze it"))
 
     tool_names = provider.tools_by_call[0]
-    assert "data.peek" in tool_names
+    assert "data.peek" not in tool_names
     assert "data.integrate" not in tool_names
     assert "data.clean" in tool_names
     assert "data.clean.metadata" in tool_names
@@ -485,7 +510,7 @@ def test_agent_harness_exposes_and_uses_data_tools_after_prior_thread_file(
             dataset_attachments=[attachment],
         )
     )
-    provider = PeekFromThreadFilesProvider()
+    provider = QueryFromThreadFilesProvider()
     harness.set_provider(provider)
 
     second_snapshot = harness.submit_user_turn(
@@ -496,7 +521,7 @@ def test_agent_harness_exposes_and_uses_data_tools_after_prior_thread_file(
     )
 
     first_tool_list = provider.tools_by_call[0]
-    assert "data.peek" in first_tool_list
+    assert "data.peek" not in first_tool_list
     assert "data.integrate" not in first_tool_list
     assert "analysis.profile" not in first_tool_list
     assert "analysis.graph" in first_tool_list
@@ -507,9 +532,9 @@ def test_agent_harness_exposes_and_uses_data_tools_after_prior_thread_file(
     assert "data.query" in first_tool_list
     assert "data.transform" in first_tool_list
     assert "data.feature.select" in first_tool_list
-    assert second_snapshot.tool_calls[-1].tool_name == "data.peek"
+    assert second_snapshot.tool_calls[-1].tool_name == "data.query"
     assert second_snapshot.tool_calls[-1].status.value == "succeeded"
-    assert "source_path" not in second_snapshot.tool_calls[-1].result_payload["inspection"]
+    assert "source_path" not in second_snapshot.tool_calls[-1].result_payload
 
 
 def test_agent_harness_exposes_training_tools_after_selection_payload(monkeypatch, tmp_path: Path) -> None:
@@ -586,7 +611,7 @@ def test_agent_harness_model_metadata_exposes_contract_without_train_enums(monke
     assert "analysis.profile" not in specs
     assert "analysis.graph" in specs
     assert "analysis.lambda" not in specs
-    assert "data.peek" in specs
+    assert "data.peek" not in specs
     assert "data.clean.metadata" in specs
     assert "data.tokenize" in specs
     assert "data.feature.select" in specs
@@ -595,7 +620,8 @@ def test_agent_harness_model_metadata_exposes_contract_without_train_enums(monke
     assert "model.apply" in specs
     graph_schema = specs["analysis.graph"].parameters_schema
     assert graph_schema["required"] == ["dataset_id"]
-    assert graph_schema["oneOf"] == [{"required": ["spec"]}, {"required": ["wordcloud_spec"]}]
+    assert "oneOf" not in graph_schema
+    assert "exactly one graph mode" in specs["analysis.graph"].description
     assert "spec" in graph_schema["properties"]
     assert "wordcloud_spec" in graph_schema["properties"]
     assert "operation" not in graph_schema["properties"]
@@ -623,7 +649,12 @@ def test_agent_harness_model_metadata_exposes_contract_without_train_enums(monke
     assert "Only use with model_key" in model_metadata_schema["properties"]["include_param_grid_schema"]["description"]
     data_query_schema = specs["data.query"].parameters_schema
     assert "additionalProperties" not in data_query_schema
+    assert "anyOf" not in data_query_schema
+    assert "At least one input source is required" in specs["data.query"].description
     assert "Use for one input dataset" in data_query_schema["properties"]["dataset_id"]["description"]
+    assert "bindings wins" in data_query_schema["properties"]["dataset_id"]["description"]
+    assert data_query_schema["properties"]["bindings"]["minItems"] == 1
+    assert "Highest-priority input source" in data_query_schema["properties"]["bindings"]["description"]
     assert "Read-only SELECT or CTE query" in data_query_schema["properties"]["sql"]["description"]
     assert "additionalProperties" not in data_query_schema["properties"]["bindings"]["items"]
     data_transform_schema = specs["data.transform"].parameters_schema
@@ -750,12 +781,12 @@ def test_agent_harness_model_metadata_detail_query_returns_default_param_schema(
 def test_agent_tool_registry_owns_tool_presentation(monkeypatch, tmp_path: Path) -> None:
     _context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
 
-    data_presentation = registry.tool_presentation("data.peek")
+    data_presentation = registry.tool_presentation("data.query")
     unknown_presentation = registry.tool_presentation("unknown.tool")
 
-    assert data_presentation.icon_key == "table"
-    assert data_presentation.pending_summary == "Inspecting dataset..."
-    assert data_presentation.summary_for("failed") == "Failed to inspect dataset"
+    assert data_presentation.icon_key == "table-search"
+    assert data_presentation.pending_summary == "Querying dataset..."
+    assert data_presentation.summary_for("failed") == "Failed to query dataset"
     assert unknown_presentation.icon_key == "tool"
 
 
@@ -798,15 +829,10 @@ def test_agent_harness_train_returns_background_receipt_after_grace(monkeypatch,
         encoding="utf-8",
     )
     attachment = _dataset_attachment(registry, training_file)
-    dataset_result = registry.execute(
-        "data.peek",
-        {"dataset_id": attachment.dataset_id},
-        tool_context,
-    )
     binding_result = registry.execute(
         "data.feature.select",
         {
-            "dataset_id": dataset_result.payload["dataset_id"],
+            "dataset_id": attachment.dataset_id,
             "model_key": "regression.linear",
             "role_bindings": [
                 {"role": "feature", "columns": ["feature_a", "feature_b"]},
@@ -862,15 +888,10 @@ def test_agent_harness_task_query_summarizes_completed_evaluation(monkeypatch, t
         encoding="utf-8",
     )
     attachment = _dataset_attachment(registry, training_file)
-    dataset_result = registry.execute(
-        "data.peek",
-        {"dataset_id": attachment.dataset_id},
-        tool_context,
-    )
     binding_result = registry.execute(
         "data.feature.select",
         {
-            "dataset_id": dataset_result.payload["dataset_id"],
+            "dataset_id": attachment.dataset_id,
             "model_key": "regression.linear",
             "role_bindings": [
                 {"role": "feature", "columns": ["feature_a", "feature_b"]},
@@ -956,7 +977,7 @@ def test_agent_harness_first_slice_runs_from_file_to_apply_result(monkeypatch, t
     assert len(snapshot.turns) == 1
     assert snapshot.turns[0].status.value == "ended"
     assert [tool.tool_name for tool in snapshot.tool_calls] == [
-        "data.peek",
+        "data.query",
         "data.feature.select",
         "model.train",
         "model.apply",
@@ -997,11 +1018,10 @@ def test_agent_harness_model_apply_accepts_artifact_uri_or_dataset_id_input_file
         RegisterDatasetInput(source_path=str(apply_file.resolve()), name="Future rows")
     )
     attachment = _dataset_attachment(registry, training_file)
-    dataset_result = registry.execute("data.peek", {"dataset_id": attachment.dataset_id}, tool_context)
     binding_result = registry.execute(
         "data.feature.select",
         {
-            "dataset_id": dataset_result.payload["dataset_id"],
+            "dataset_id": attachment.dataset_id,
             "model_key": "regression.linear",
             "role_bindings": [
                 {"role": "feature", "columns": ["feature_a", "feature_b"]},
@@ -1053,7 +1073,7 @@ def test_agent_harness_model_apply_accepts_artifact_uri_or_dataset_id_input_file
 
     assert dataset_apply_result.payload["async_state"] == "completed"
     dataset_apply_task = registry._ml_service.get_task_details(dataset_apply_result.payload["ml_task_id"]).task
-    assert dataset_apply_task.request_payload["input_files"][0]["absolute_path"] == str(apply_file.resolve())
+    assert dataset_apply_task.request_payload["input_files"][0]["absolute_path"] == apply_dataset.source_path
 
 
 def test_agent_harness_first_slice_runs_inline_rows_to_apply_result(monkeypatch, tmp_path: Path) -> None:
@@ -1097,7 +1117,7 @@ def test_agent_harness_first_slice_runs_inline_rows_to_apply_result(monkeypatch,
     assert len(snapshot.turns) == 1
     assert snapshot.turns[0].status.value == "ended"
     assert [tool.tool_name for tool in snapshot.tool_calls] == [
-        "data.peek",
+        "data.query",
         "data.feature.select",
         "model.train",
         "model.apply",

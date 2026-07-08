@@ -58,7 +58,7 @@ Record which product concepts remain in the native edition and which are intenti
 - First-slice working context is represented by Thread messages, tool-call records, tool-result records, and artifact metadata.
 - The test-build startup lock is a local distribution gate, not an entitlement service. It can make ordinary local state edits evident and block startup, but durable license activation belongs to a future activation boundary.
 - Data cleaning tools operate on registered datasets and create new derived datasets when cleaning operations are applied; source datasets remain intact.
-- Query tools read registered datasets and return bounded results without creating dataset artifacts by default.
+- Query tools read registered datasets and return bounded results without creating derived datasets or artifacts by default.
 - Analysis profiling tools read registered datasets and return bounded descriptive statistics directly in the tool result without creating artifacts by default.
 - Analysis graph tools read registered datasets and produce service-managed image artifacts from Vega-Lite chart specifications.
 - Analysis lambda tools run one-off Python analysis functions over registered datasets in a local subprocess, return any JSON-serializable dictionary through `result.output`, and may create service-managed artifacts through a constrained artifact API.

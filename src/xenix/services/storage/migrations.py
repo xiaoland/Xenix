@@ -9,7 +9,7 @@ from sqlmodel import SQLModel
 from ...exceptions import ValidationError
 from . import models  # noqa: F401
 
-CURRENT_SCHEMA_VERSION = 13
+CURRENT_SCHEMA_VERSION = 14
 
 
 def get_user_version(engine: Engine) -> int:
@@ -662,6 +662,82 @@ def migrate_v12_to_v13(engine: Engine) -> int:
     return 13
 
 
+def migrate_v13_to_v14(engine: Engine) -> int:
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE IF NOT EXISTS dataset_import (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                project_id VARCHAR NOT NULL,
+                original_path VARCHAR NOT NULL,
+                original_file_name VARCHAR NOT NULL,
+                source_format VARCHAR NOT NULL,
+                status VARCHAR NOT NULL,
+                created_at DATETIME NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES project (id)
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_dataset_import_project_id "
+            "ON dataset_import (project_id)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_dataset_import_source_format "
+            "ON dataset_import (source_format)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_dataset_import_status "
+            "ON dataset_import (status)"
+        )
+
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE IF NOT EXISTS dataset_workbook (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                import_id VARCHAR NOT NULL,
+                sheet_count INTEGER NOT NULL,
+                engine VARCHAR,
+                metadata_payload JSON NOT NULL,
+                created_at DATETIME NOT NULL,
+                FOREIGN KEY(import_id) REFERENCES dataset_import (id)
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_dataset_workbook_import_id "
+            "ON dataset_workbook (import_id)"
+        )
+
+        table_names = {
+            str(row[0])
+            for row in connection.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'").all()
+        }
+        if "dataset" in table_names:
+            dataset_columns = {
+                str(row[1])
+                for row in connection.exec_driver_sql("PRAGMA table_info(dataset)").all()
+            }
+            new_columns = {
+                "import_id": "VARCHAR",
+                "workbook_id": "VARCHAR",
+                "sheet_name": "VARCHAR",
+                "sheet_index": "INTEGER",
+            }
+            for column_name, column_type in new_columns.items():
+                if column_name not in dataset_columns:
+                    connection.exec_driver_sql(
+                        f"ALTER TABLE dataset ADD COLUMN {column_name} {column_type}"
+                    )
+            for column_name in new_columns:
+                connection.exec_driver_sql(
+                    f"CREATE INDEX IF NOT EXISTS ix_dataset_{column_name} "
+                    f"ON dataset ({column_name})"
+                )
+        connection.exec_driver_sql("PRAGMA user_version=14")
+    return 14
+
+
 def run_migrations(engine: Engine) -> int:
     current_version = get_user_version(engine)
     if current_version == 0:
@@ -690,6 +766,8 @@ def run_migrations(engine: Engine) -> int:
         current_version = migrate_v11_to_v12(engine)
     if current_version == 12:
         current_version = migrate_v12_to_v13(engine)
+    if current_version == 13:
+        current_version = migrate_v13_to_v14(engine)
     if current_version == CURRENT_SCHEMA_VERSION:
         return current_version
     raise ValidationError(

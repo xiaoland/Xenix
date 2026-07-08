@@ -33,13 +33,6 @@ DEFAULT_TOOL_PRESENTATION = ToolPresentation(
 
 
 TOOL_PRESENTATIONS: dict[str, ToolPresentation] = {
-    "data.peek": ToolPresentation(
-        icon_key="table",
-        pending_summary="Inspecting dataset...",
-        success_summary="Inspected dataset",
-        failure_action="inspect dataset",
-        cancellation_summary="Cancelled dataset inspection",
-    ),
     "data.integrate": ToolPresentation(
         icon_key="merge",
         pending_summary="Integrating data...",

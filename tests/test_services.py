@@ -8,7 +8,9 @@ import pytest
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import InvalidStateTransitionError, NotFoundError, ValidationError
-from xenix.services.dataset_inspection import InspectDatasetInput
+from xenix.services.artifact_service import ArtifactService, build_artifact_uri
+from xenix.services.dataset_export_service import DatasetExportService
+from xenix.services.dataset_inspection import InspectDatasetInput, load_dataframe
 from xenix.services.dataset_service import (
     DatasetService,
     ExportDatasetCopyInput,
@@ -16,10 +18,11 @@ from xenix.services.dataset_service import (
     RegisterDatasetInput,
 )
 from xenix.services.tabular import TabularRuntimeError
+from xenix.services.link_router import LinkRouter
 from xenix.services.ml_task_service import CompleteMLTaskInput, CreateMLTaskInput, MLTaskService
 from xenix.services.project_service import CreateProjectInput, ProjectService
 from xenix.services.storage import StorageBootstrapService
-from xenix.services.storage.models import MLTaskType
+from xenix.services.storage.models import DatasetSourceFormat, MLTaskType
 
 
 def _build_services(monkeypatch, tmp_path: Path) -> tuple[ProjectService, DatasetService, MLTaskService]:
@@ -257,6 +260,49 @@ def test_dataset_service_registers_xlsx_attachment_with_stale_dimension_metadata
     assert attachment.preview_columns == ["name", "value"]
 
 
+def test_dataset_service_registers_workbook_sheets_as_app_owned_parquet_datasets(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _project_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
+    dataset_file = tmp_path / "sales.xlsx"
+    with pd.ExcelWriter(dataset_file) as writer:
+        pd.DataFrame([{"region": "north", "amount": 10}, {"region": "south", "amount": 5}]).to_excel(
+            writer,
+            sheet_name="April",
+            index=False,
+        )
+        pd.DataFrame([{"region": "east", "amount": 7}]).to_excel(
+            writer,
+            sheet_name="May",
+            index=False,
+        )
+
+    attachment = dataset_service.register_dataset_attachment(
+        RegisterDatasetInput(source_path=str(dataset_file.resolve()), name="Sales")
+    )
+
+    assert attachment.file_name == "sales.xlsx"
+    assert attachment.source_format == "xlsx"
+    assert [item.name for item in attachment.datasets] == ["Sales - April", "Sales - May"]
+    assert [item.row_count for item in attachment.datasets] == [2, 1]
+
+    first = dataset_service.get_dataset(attachment.datasets[0].dataset_id)
+    second = dataset_service.get_dataset(attachment.datasets[1].dataset_id)
+    assert first.source_format is DatasetSourceFormat.PARQUET
+    assert second.source_format is DatasetSourceFormat.PARQUET
+    assert Path(first.source_path).suffix == ".parquet"
+    assert Path(second.source_path).suffix == ".parquet"
+    assert first.import_id == second.import_id
+    assert first.workbook_id == second.workbook_id
+    assert [first.sheet_name, second.sheet_name] == ["April", "May"]
+    assert [first.sheet_index, second.sheet_index] == [0, 1]
+    assert load_dataframe(Path(first.source_path), first.source_format).to_dict(orient="records") == [
+        {"region": "north", "amount": 10},
+        {"region": "south", "amount": 5},
+    ]
+
+
 def test_dataset_service_discards_unreferenced_dataset(monkeypatch, tmp_path: Path) -> None:
     _project_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
     dataset_file = tmp_path / "customers.csv"
@@ -341,6 +387,12 @@ def test_dataset_service_exports_csv_with_selected_encoding_and_xlsx(monkeypatch
     dataset_file.write_text("城市,prediction\n上海,1\n苏州,0\n", encoding="utf-8")
     dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Predictions")
 
+    def fail_pandas_export(*_args, **_kwargs):
+        raise AssertionError("Dataset export should use Polars, not Pandas.")
+
+    monkeypatch.setattr(pd.DataFrame, "to_csv", fail_pandas_export)
+    monkeypatch.setattr(pd.DataFrame, "to_excel", fail_pandas_export)
+
     bom_export = dataset_service.export_dataset_copy(
         ExportDatasetCopyInput(
             dataset_id=dataset.id,
@@ -354,9 +406,21 @@ def test_dataset_service_exports_csv_with_selected_encoding_and_xlsx(monkeypatch
             destination_path=str((tmp_path / "exports" / "predictions.xlsx").resolve()),
         )
     )
+    gbk_export = dataset_service.export_dataset_copy(
+        ExportDatasetCopyInput(
+            dataset_id=dataset.id,
+            destination_path=str((tmp_path / "exports" / "predictions-gbk.csv").resolve()),
+            csv_encoding="gbk",
+        )
+    )
 
     assert bom_export.read_bytes().startswith(b"\xef\xbb\xbf")
     assert bom_export.read_text(encoding="utf-8-sig").splitlines() == [
+        "城市,prediction",
+        "上海,1",
+        "苏州,0",
+    ]
+    assert gbk_export.read_text(encoding="gbk").splitlines() == [
         "城市,prediction",
         "上海,1",
         "苏州,0",
@@ -365,6 +429,55 @@ def test_dataset_service_exports_csv_with_selected_encoding_and_xlsx(monkeypatch
     assert exported_frame.to_dict(orient="records") == [
         {"城市": "上海", "prediction": 1},
         {"城市": "苏州", "prediction": 0},
+    ]
+
+
+def test_link_router_lazily_exports_dataset_to_workbook_artifact(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    dataset_service = DatasetService(context.session_factory, paths)
+    artifact_service = ArtifactService(context.session_factory)
+    export_service = DatasetExportService(
+        paths=paths,
+        session_factory=context.session_factory,
+        dataset_service=dataset_service,
+        artifact_service=artifact_service,
+    )
+    router = LinkRouter(
+        artifact_service=artifact_service,
+        dataset_export_service=export_service,
+    )
+    dataset_file = tmp_path / "customers.csv"
+    dataset_file.write_text("name,value\nAcme,12\nContoso,18\n", encoding="utf-8")
+    dataset = dataset_service.register_dataset(
+        RegisterDatasetInput(source_path=str(dataset_file.resolve()), name="Customers")
+    )
+    opened_paths: list[Path] = []
+
+    def fake_open_file(path: Path) -> bool:
+        opened_paths.append(path)
+        return True
+
+    monkeypatch.setattr("xenix.services.artifact_service._open_file_with_os", fake_open_file)
+
+    first = router.activate(f"dataset://{dataset.id}")
+    second = router.activate(f"dataset://{dataset.id}")
+
+    assert first.dataset_id == dataset.id
+    assert first.artifact_id == second.artifact_id
+    assert opened_paths[0].suffix == ".xlsx"
+    assert opened_paths[0].exists()
+    assert opened_paths == [opened_paths[0], opened_paths[0]]
+    resolved = artifact_service.resolve_uri(build_artifact_uri(first.artifact_id or ""))
+    assert resolved.metadata_payload["dataset_export"] == {
+        "dataset_id": dataset.id,
+        "format": "xlsx",
+        "source_path": dataset.source_path,
+    }
+    assert pd.read_excel(opened_paths[0]).to_dict(orient="records") == [
+        {"name": "Acme", "value": 12},
+        {"name": "Contoso", "value": 18},
     ]
 
 

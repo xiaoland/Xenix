@@ -27,7 +27,7 @@ This skill guides Xenix Agent for modeling workflows over tabular business data:
 
 Xenix Agent has no script execution environment. Use only available Xenix tools:
 
-- `data.peek` and `data.query` for target and feature profiling.
+- `data.query` for target and feature profiling.
 - `data.tokenize` only after activating `xenix-data-preprocessing`, when raw Chinese text must become a tokenized derived dataset before text-analysis models.
 - `data.feature.select` to create a role-binding snapshot before training.
 - `model.metadata` when candidate model choices, supported tasks, role schemas, or parameters are unclear.
@@ -50,7 +50,7 @@ Xenix Agent has no script execution environment. Use only available Xenix tools:
 ## Default workflow
 
 1. Clarify or infer the modeling objective: classification, regression, scoring, ranking, semi-supervised labeling, text analysis, or model application.
-2. Use `data.peek` and `data.query` to profile target distribution, feature availability, missingness, outliers, class balance, and leakage risks.
+2. Use `data.query` to profile target distribution, feature availability, missingness, outliers, class balance, and leakage risks.
 3. If the task is text classification, text clustering, topic modeling, or similarity retrieval, require a tokenized text dataset first; activate `xenix-data-preprocessing` if the source still contains raw Chinese sentences.
 4. Ask for confirmation when multiple targets are plausible, the target semantics are unclear, missing labels may mean either “negative” or “unlabeled”, or the business threshold is sensitive.
 5. Use `data.feature.select` to bind roles: target, partial_target when applicable, text/text_id when applicable, features, and excluded fields with reasons.

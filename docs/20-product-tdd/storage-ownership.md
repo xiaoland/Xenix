@@ -34,8 +34,9 @@ SQLite stays limited to metadata and excludes:
 
 The filesystem is the source of truth for large or user-openable artifacts:
 
-- User-selected external dataset files
-- App-managed dataset artifacts under service-managed dataset artifact directories
+- User-selected external import files
+- App-owned materialized dataset files under service-managed state directories
+- Lazy dataset export artifacts under service-managed artifact directories
 - Trained model artifacts
 - Model apply outputs and exported reports
 - Application logs
@@ -57,17 +58,18 @@ Current app-managed runtime layout includes:
 - Services coordinate both stores through persistence interfaces and keep references consistent.
 - Agent Harness owns Thread, Turn, Message, tool-call, tool-result, and run semantics.
 - Storage provides persistence interfaces for Agent Harness records.
-- UI code consumes resolved paths from services instead of constructing storage layouts itself.
-- Source dataset registration stores the external source path and stable naming metadata. Composer data attachments enter storage through this source-dataset path at message send time, not through artifact registration.
-- Derived dataset registration stores the generated artifact path and an explicit `derived_from_dataset_id` when one source dataset owns the lineage.
+- UI code activates links through LinkRouter instead of constructing storage layouts, resolving paths, or opening local files itself.
+- Dataset registration stores app-owned materialized dataset paths plus stable naming metadata. Composer data attachments enter storage through dataset registration and source import provenance, not through artifact registration.
+- Derived dataset registration stores the generated app-owned dataset path and an explicit `derived_from_dataset_id` when one source dataset owns the lineage.
 - Query results returned by `data.query` are tool-result payloads by default and do not create dataset rows or artifact rows.
-- `data.transform` stores transformed output files under app-managed dataset artifact directories and registers them as derived datasets.
-- Multi-input transforms record input dataset ids in artifact metadata until storage has a first-class multi-parent lineage field.
+- `data.transform` stores transformed output files under app-owned dataset state directories and registers them as derived datasets.
+- Multi-input transforms return input dataset ids in tool results until storage has a first-class multi-parent lineage field.
 - `copied_from` is retained for compatibility copy semantics; data cleaning and transformation use derived lineage.
 - Dataset inspection metadata such as row counts, inferred column kinds, and previews is runtime-derived and should not be persisted by default.
 - Dataset column role binding is stored as immutable metadata. Model outputs and apply outputs are represented by service-owned metadata and artifact records.
-- Artifacts are produced durable outputs such as derived datasets, reports, images, models, apply outputs, and other generated files. User-supplied Composer datasets are referenced by dataset ids rather than artifact ids.
-- Artifact links resolve through `ArtifactService`; Chatbot receives an artifact id and view hint, while filesystem access stays behind services.
+- Artifacts are produced durable user-openable outputs such as workbook exports, reports, images, models, apply outputs, and other generated files. Registered datasets are referenced by dataset ids and opened through lazy dataset export artifacts.
+- Dataset export artifacts are materialized from app-owned datasets on demand. The export path uses Polars to read app-owned Parquet and write interchange files; XLSX writing depends on `xlsxwriter`.
+- Artifact links activate through `LinkRouter` and `ArtifactService`; dataset links activate through `LinkRouter`, `DatasetExportService`, and then `ArtifactService`. Filesystem access stays behind services.
 - LLM-facing Agent content, tool schemas, and tool result payloads use dataset ids for registered datasets. Dataset `source_path` values remain internal persistence facts resolved by services.
 - Trained-model registration rows are durable metadata pointers to canonical model artifacts.
 - Task working files such as `request.json`, `result.json`, `logs.jsonl`, and holdout artifacts are execution-scoped ML task files.
@@ -76,7 +78,7 @@ Current app-managed runtime layout includes:
 ## Deletion Rules
 
 - Deleting a SQLite row leaves user-managed dataset files in place.
-- Deleting an app-managed dataset artifact leaves the original external source file in place.
+- Deleting an app-owned dataset file leaves the original import file in place.
 - Deleting a derived dataset row leaves its source dataset row and source file in place.
 - Deleting an app-managed artifact should update SQLite metadata in the same service operation.
 - Cache cleanup may remove reproducible files. Canonical datasets, models, and exports stay under their owning services.

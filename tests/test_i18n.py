@@ -113,6 +113,10 @@ def test_main_window_language_switch_updates_chat_shell(
         assert window.tr("Generate title...") == "Generate title..."
         assert window.tr("Copy thread ID") == "Copy thread ID"
         assert window.tr("Generating thread title...") == "Generating thread title..."
+        window._show_service_link_progress()
+        assert window._service_link_progress_dialog is not None
+        assert window._service_link_progress_dialog.windowTitle() == "Open Link"
+        assert window._service_link_progress_dialog.labelText() == "Opening link..."
         chat_view = window._thread_detail_view
         chat_view.clear_messages()
         chat_view.show_error("Stopped.")
@@ -132,11 +136,11 @@ def test_main_window_language_switch_updates_chat_shell(
                 kind=ChatbotEventKind.TOOL,
                 author=ChatbotEventAuthor.TOOL,
                 status=ChatbotEventStatus.PENDING,
-                summary="Inspecting dataset...",
+                summary="Querying dataset...",
                 detail_blocks=[
                     {
                         "type": "tool_call_result",
-                        "tool_name": "data.peek",
+                        "tool_name": "data.query",
                         "status": "completed",
                     }
                 ],
@@ -189,11 +193,11 @@ def test_main_window_language_switch_updates_chat_shell(
         assert chat_view._composer_drop_hint.text() == "Release here to add them to the next message"
         assert error_bubble._browser.toPlainText() == "Error: Stopped."
         assert chat_view._thinking_bubble._browser.toPlainText() == "Thinking..."
-        assert tool_item._summary_label.text() == "Inspecting dataset..."
+        assert tool_item._summary_label.text() == "Querying dataset..."
         assert profile_tool_item._summary_label.text() == "Profiling dataset..."
         assert graph_tool_item._summary_label.text() == "Drew graph"
         assert tool_item._chevron_button.toolTip() == "Show result"
-        assert "data.peek" in tool_item._detail_browser.toPlainText()
+        assert "data.query" in tool_item._detail_browser.toPlainText()
         assert "completed" in tool_item._detail_browser.toPlainText()
         assert usage_item._label.text() == "↑ 9.8k (1.9k cached) · ↓ 2.6k"
 
@@ -220,6 +224,10 @@ def test_main_window_language_switch_updates_chat_shell(
         assert window.tr("Generate title...") == "生成标题..."
         assert window.tr("Copy thread ID") == "复制线程 ID"
         assert window.tr("Generating thread title...") == "正在生成线程标题..."
+        assert window.tr("Open Link") == "打开链接"
+        assert window.tr("Opening link...") == "正在打开链接..."
+        assert window._service_link_progress_dialog.windowTitle() == "打开链接"
+        assert window._service_link_progress_dialog.labelText() == "正在打开链接..."
         assert chat_view._editor.placeholderText() == "给 Xenix 发消息"
         assert chat_view._send_button.text() == "发送"
         assert chat_view._attach_button.toolTip() == "添加文件"
@@ -230,11 +238,11 @@ def test_main_window_language_switch_updates_chat_shell(
         assert chat_view._composer_drop_hint.text() == "松开后添加到下一条消息"
         assert error_bubble._browser.toPlainText() == "错误：Stopped."
         assert chat_view._thinking_bubble._browser.toPlainText() == "思考中..."
-        assert tool_item._summary_label.text() == "正在检查数据集..."
+        assert tool_item._summary_label.text() == "正在查询数据集..."
         assert profile_tool_item._summary_label.text() == "正在分析数据集..."
         assert graph_tool_item._summary_label.text() == "图表已绘制"
         assert tool_item._chevron_button.toolTip() == "显示结果"
-        assert "data.peek" in tool_item._detail_browser.toPlainText()
+        assert "data.query" in tool_item._detail_browser.toPlainText()
         assert "已完成" in tool_item._detail_browser.toPlainText()
         assert usage_item._label.text() == "↑ 9.8k（1.9k 缓存命中） · ↓ 2.6k"
         assert read_saved_locale(paths) == "zh_CN"
@@ -259,18 +267,23 @@ def test_main_window_language_switch_updates_chat_shell(
         assert window.tr("Generate title...") == "Generate title..."
         assert window.tr("Copy thread ID") == "Copy thread ID"
         assert window.tr("Generating thread title...") == "Generating thread title..."
+        assert window.tr("Open Link") == "Open Link"
+        assert window.tr("Opening link...") == "Opening link..."
+        assert window._service_link_progress_dialog.windowTitle() == "Open Link"
+        assert window._service_link_progress_dialog.labelText() == "Opening link..."
         assert chat_view._editor.placeholderText() == "Message Xenix"
         assert chat_view._send_button.text() == "Send"
         assert chat_view._attach_button.toolTip() == "Attach files"
         assert chat_view._model_picker.toolTip() == "Model for the next turn"
         assert error_bubble._browser.toPlainText() == "Error: Stopped."
         assert chat_view._thinking_bubble._browser.toPlainText() == "Thinking..."
-        assert tool_item._summary_label.text() == "Inspecting dataset..."
+        assert tool_item._summary_label.text() == "Querying dataset..."
         assert profile_tool_item._summary_label.text() == "Profiling dataset..."
         assert graph_tool_item._summary_label.text() == "Drew graph"
         assert usage_item._label.text() == "↑ 9.8k (1.9k cached) · ↓ 2.6k"
         assert read_saved_locale(paths) == "en_US"
     finally:
+        window._close_service_link_progress_if_idle()
         if window._settings_dialog is not None:
             if window._settings_dialog._about_dialog is not None:
                 window._settings_dialog._about_dialog.close()

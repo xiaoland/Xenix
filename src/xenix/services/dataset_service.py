@@ -3,35 +3,40 @@ from __future__ import annotations
 import csv
 import codecs
 import logging
+import shutil
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-import pandas as pd
+import polars as pl
 from sqlalchemy.orm import sessionmaker
-from sqlmodel import SQLModel, select
+from sqlmodel import Field, SQLModel, select
 
 from ..config import AppPaths
 from ..exceptions import NotFoundError, ValidationError
 from .dataset_inspection import (
     DatasetAttachmentMetadata,
+    DatasetColumnKind,
     DatasetInspection,
+    DatasetColumnMetadata,
     InspectDatasetInput,
     detect_source_format,
     inspect_attachment_metadata_file,
     inspect_dataset_file,
-    load_dataframe,
 )
 from .storage.models import (
     DatasetColumnBindingRow,
+    DatasetImportRow,
     DatasetRow,
     DatasetSourceFormat,
+    DatasetWorkbookRow,
     MLTaskRow,
     ProjectRow,
     TrainedModelRow,
 )
 from .storage.repositories import DatasetRepository, ProjectRepository
-from .tabular import TabularRuntimeError
+from .tabular import TabularRuntimeError, load_tabular_frame, resolve_tabular_schema
 
 
 def _utc_now() -> datetime:
@@ -39,6 +44,16 @@ def _utc_now() -> datetime:
 
 
 LOGGER = logging.getLogger("xenix.services.dataset")
+
+
+@dataclass(frozen=True)
+class _MaterializedDataset:
+    row: DatasetRow
+    original_file_name: str
+    original_source_format: DatasetSourceFormat
+    row_count: int
+    column_count: int
+    preview_columns: list[str]
 
 
 class RegisterDatasetInput(SQLModel):
@@ -64,7 +79,7 @@ class ExportDatasetCopyInput(SQLModel):
     csv_encoding: str = "utf-8"
 
 
-class RegisteredDatasetAttachment(SQLModel):
+class RegisteredDatasetAttachmentItem(SQLModel):
     dataset_id: str
     name: str
     file_name: str
@@ -72,6 +87,10 @@ class RegisteredDatasetAttachment(SQLModel):
     row_count: int
     column_count: int
     preview_columns: list[str]
+
+
+class RegisteredDatasetAttachment(RegisteredDatasetAttachmentItem):
+    datasets: list[RegisteredDatasetAttachmentItem] = Field(default_factory=list)
 
 
 class DatasetService:
@@ -82,6 +101,9 @@ class DatasetService:
         self._datasets = DatasetRepository()
 
     def register_dataset(self, input_data: RegisterDatasetInput) -> DatasetRow:
+        return self._register_materialized_datasets(input_data)[0].row
+
+    def _register_materialized_datasets(self, input_data: RegisterDatasetInput) -> list[_MaterializedDataset]:
         source_path = Path(input_data.source_path).expanduser()
         if not source_path.is_absolute():
             raise ValidationError("Dataset source path must be absolute.")
@@ -90,11 +112,15 @@ class DatasetService:
 
         source_format = detect_source_format(source_path)
         if source_format is DatasetSourceFormat.UNKNOWN:
-            raise ValidationError("Only .csv, .xlsx, and .xls dataset files are supported.")
+            raise ValidationError("Only .csv, .parquet, .xlsx, and .xls dataset files are supported.")
 
         name = input_data.name.strip() if input_data.name else source_path.stem
         if not name:
             raise ValidationError("Dataset name cannot be empty.")
+
+        frame_specs = self._load_import_frames(source_path, source_format)
+        if not frame_specs:
+            raise ValidationError("Dataset file must contain at least one non-empty table.")
 
         with self._session_factory() as session:
             derived_from = None
@@ -110,21 +136,82 @@ class DatasetService:
                 derived_from=derived_from,
             )
             now = _utc_now()
-            row = DatasetRow(
-                project_id=project_id,
-                name=name,
-                source_path=str(source_path),
-                source_format=source_format,
-                copied_from=None,
-                copied_at=None,
-                derived_from_dataset_id=derived_from.id if derived_from else None,
-                ml_task_id=None,
-                created_at=now,
-                updated_at=now,
-            )
-            self._datasets.create(session, row)
-            session.commit()
-            return row
+            import_row: DatasetImportRow | None = None
+            workbook_row: DatasetWorkbookRow | None = None
+            if derived_from is None:
+                import_row = DatasetImportRow(
+                    project_id=project_id,
+                    original_path=str(source_path.resolve()),
+                    original_file_name=source_path.name,
+                    source_format=source_format,
+                    status="succeeded",
+                    created_at=now,
+                )
+                session.add(import_row)
+                session.flush()
+                if source_format in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}:
+                    workbook_row = DatasetWorkbookRow(
+                        import_id=import_row.id,
+                        sheet_count=len(frame_specs),
+                        engine="polars-calamine",
+                        metadata_payload={
+                            "sheet_names": [str(spec["sheet_name"]) for spec in frame_specs],
+                        },
+                        created_at=now,
+                    )
+                    session.add(workbook_row)
+                    session.flush()
+            materialized: list[_MaterializedDataset] = []
+            written_paths: list[Path] = []
+            try:
+                for index, spec in enumerate(frame_specs):
+                    dataset_id = uuid4().hex
+                    sheet_name = str(spec["sheet_name"]) if spec.get("sheet_name") is not None else None
+                    dataset_name = name
+                    if len(frame_specs) > 1 and sheet_name:
+                        dataset_name = f"{name} - {sheet_name}"
+                    output_path = self._dataset_storage_path(
+                        dataset_id,
+                        derived=derived_from is not None,
+                    )
+                    frame = spec["frame"]
+                    frame.write_parquet(output_path)
+                    written_paths.append(output_path)
+                    row = DatasetRow(
+                        id=dataset_id,
+                        project_id=project_id,
+                        name=dataset_name,
+                        source_path=str(output_path),
+                        source_format=DatasetSourceFormat.PARQUET,
+                        import_id=import_row.id if import_row is not None else None,
+                        workbook_id=workbook_row.id if workbook_row is not None else None,
+                        sheet_name=sheet_name,
+                        sheet_index=int(spec["sheet_index"]) if spec.get("sheet_index") is not None else None,
+                        copied_from=None,
+                        copied_at=None,
+                        derived_from_dataset_id=derived_from.id if derived_from else None,
+                        ml_task_id=None,
+                        created_at=now,
+                        updated_at=now,
+                    )
+                    self._datasets.create(session, row)
+                    materialized.append(
+                        _MaterializedDataset(
+                            row=row,
+                            original_file_name=source_path.name,
+                            original_source_format=source_format,
+                            row_count=int(frame.height),
+                            column_count=int(frame.width),
+                            preview_columns=[str(column) for column in frame.columns],
+                        )
+                    )
+                session.commit()
+            except Exception:
+                session.rollback()
+                for path in written_paths:
+                    path.unlink(missing_ok=True)
+                raise
+            return materialized
 
     def inspect_source_file(self, input_data: InspectDatasetInput) -> DatasetInspection:
         source_path = Path(input_data.source_path).expanduser()
@@ -163,20 +250,29 @@ class DatasetService:
             ) from exc
 
     def register_dataset_attachment(self, input_data: RegisterDatasetInput) -> RegisteredDatasetAttachment:
-        dataset = self.register_dataset(input_data)
-        try:
-            metadata = self.inspect_attachment_metadata(InspectDatasetInput(source_path=dataset.source_path))
-        except Exception:
-            self.discard_unreferenced_dataset(dataset.id)
-            raise
+        materialized = self._register_materialized_datasets(input_data)
+        items = [
+            RegisteredDatasetAttachmentItem(
+                dataset_id=item.row.id,
+                name=item.row.name,
+                file_name=item.original_file_name,
+                source_format=item.original_source_format.value,
+                row_count=item.row_count,
+                column_count=item.column_count,
+                preview_columns=item.preview_columns,
+            )
+            for item in materialized
+        ]
+        first = items[0]
         return RegisteredDatasetAttachment(
-            dataset_id=dataset.id,
-            name=dataset.name,
-            file_name=metadata.file_name,
-            source_format=metadata.source_format.value,
-            row_count=metadata.row_count,
-            column_count=metadata.column_count,
-            preview_columns=metadata.preview_columns,
+            dataset_id=first.dataset_id,
+            name=first.name,
+            file_name=first.file_name,
+            source_format=first.source_format,
+            row_count=first.row_count,
+            column_count=first.column_count,
+            preview_columns=first.preview_columns,
+            datasets=items,
         )
 
     def discard_unreferenced_dataset(self, dataset_id: str) -> bool:
@@ -286,12 +382,18 @@ class DatasetService:
             raise ValidationError("Export destination must end with .csv or .xlsx.")
 
         source_format = self._resolve_export_source_format(source_path, dataset.source_format)
-        dataframe = self._load_export_dataframe(source_path, source_format)
-        if destination_suffix == ".csv":
-            csv_encoding = self._normalize_csv_encoding(input_data.csv_encoding)
-            dataframe.to_csv(destination_path, index=False, encoding=csv_encoding)
-        else:
-            dataframe.to_excel(destination_path, index=False)
+        frame = self._load_export_frame(source_path, source_format)
+        temp_destination_path = self._temporary_export_path(destination_path)
+        try:
+            if destination_suffix == ".csv":
+                csv_encoding = self._normalize_csv_encoding(input_data.csv_encoding)
+                self._write_export_csv(frame, temp_destination_path, csv_encoding)
+            else:
+                frame.write_excel(temp_destination_path)
+            temp_destination_path.replace(destination_path)
+        except Exception:
+            temp_destination_path.unlink(missing_ok=True)
+            raise
         return destination_path
 
     def _resolve_export_source_format(self, source_path: Path, dataset_format: DatasetSourceFormat) -> DatasetSourceFormat:
@@ -302,9 +404,9 @@ class DatasetService:
             raise ValidationError("Dataset source file format is not supported for export.")
         return dataset_format
 
-    def _load_export_dataframe(self, source_path: Path, source_format: DatasetSourceFormat) -> pd.DataFrame:
+    def _load_export_frame(self, source_path: Path, source_format: DatasetSourceFormat) -> pl.DataFrame:
         try:
-            return load_dataframe(source_path, source_format)
+            return load_tabular_frame(source_path, source_format)
         except Exception as exc:  # pragma: no cover - exercised by failure surface
             raise self._dataset_read_failure(
                 source_path=source_path,
@@ -312,6 +414,28 @@ class DatasetService:
                 exc=exc,
                 message="Unable to read dataset file for export.",
             ) from exc
+
+    def _write_export_csv(self, frame: pl.DataFrame, destination_path: Path, csv_encoding: str) -> None:
+        if csv_encoding == "utf-8":
+            frame.write_csv(destination_path)
+            return
+        if csv_encoding == "utf-8-sig":
+            frame.write_csv(destination_path, include_bom=True)
+            return
+
+        utf8_path = self._temporary_export_path(destination_path)
+        try:
+            frame.write_csv(utf8_path)
+            with utf8_path.open("r", encoding="utf-8", newline="") as source:
+                with destination_path.open("w", encoding=csv_encoding, newline="") as target:
+                    shutil.copyfileobj(source, target)
+        finally:
+            utf8_path.unlink(missing_ok=True)
+
+    def _temporary_export_path(self, destination_path: Path) -> Path:
+        return destination_path.with_name(
+            f".{destination_path.stem}.{uuid4().hex}{destination_path.suffix}"
+        )
 
     def _dataset_read_failure(
         self,
@@ -357,6 +481,63 @@ class DatasetService:
             return codecs.lookup(normalized).name
         except LookupError as exc:
             raise ValidationError(f"CSV export encoding '{encoding_name}' is not supported.") from exc
+
+    def _load_import_frames(
+        self,
+        source_path: Path,
+        source_format: DatasetSourceFormat,
+    ) -> list[dict[str, object]]:
+        if source_format is DatasetSourceFormat.CSV:
+            frame = pl.read_csv(source_path, try_parse_dates=False, infer_schema_length=None)
+            return [self._frame_spec(frame, sheet_name=None, sheet_index=None)]
+        if source_format is DatasetSourceFormat.PARQUET:
+            frame = pl.read_parquet(source_path)
+            return [self._frame_spec(frame, sheet_name=None, sheet_index=None)]
+        if source_format in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}:
+            workbook = pl.read_excel(
+                source_path,
+                engine="calamine",
+                sheet_id=0,
+                raise_if_empty=False,
+            )
+            if isinstance(workbook, pl.DataFrame):
+                return [self._frame_spec(workbook, sheet_name=None, sheet_index=0)]
+            specs: list[dict[str, object]] = []
+            for index, (sheet_name, frame) in enumerate(workbook.items()):
+                if frame.width == 0 or frame.height == 0:
+                    continue
+                specs.append(self._frame_spec(frame, sheet_name=str(sheet_name), sheet_index=index))
+            return specs
+        raise ValidationError("Only .csv, .parquet, .xlsx, and .xls dataset files are supported.")
+
+    def _frame_spec(
+        self,
+        frame: pl.DataFrame,
+        *,
+        sheet_name: str | None,
+        sheet_index: int | None,
+    ) -> dict[str, object]:
+        if frame.width == 0:
+            raise ValidationError("Dataset file must contain at least one column.")
+        if frame.height == 0:
+            raise ValidationError("Dataset file must contain at least one data row.")
+        schema = resolve_tabular_schema(frame.columns)
+        renamed = frame.rename(
+            {
+                original_name: column.tool_name
+                for original_name, column in zip(frame.columns, schema.columns, strict=True)
+            }
+        )
+        return {
+            "frame": renamed,
+            "sheet_name": sheet_name,
+            "sheet_index": sheet_index,
+        }
+
+    def _dataset_storage_path(self, dataset_id: str, *, derived: bool) -> Path:
+        directory = self._paths.state / "datasets" / ("derived" if derived else "imported")
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory / f"{dataset_id}.parquet"
 
     def _resolve_project_id(
         self,

@@ -12,6 +12,7 @@ from xenix.services.artifact_service import ArtifactService
 from xenix.services.data_cleaning import DataCleaningService
 from xenix.services.data_tokenization import DataTokenizationService, TokenizeDatasetInput
 from xenix.services.data_transform import DataQueryTransformService
+from xenix.services.dataset_inspection import detect_source_format, load_dataframe
 from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
 from xenix.services.ml_service import MLService
 from xenix.services.ml_task_service import MLTaskService
@@ -73,6 +74,11 @@ def _tool_context(
         tool_call_id=tool_call.id,
         dataset_ids=[],
     )
+
+
+def _read_dataset_frame(path: str | Path) -> pd.DataFrame:
+    source_path = Path(path)
+    return load_dataframe(source_path, detect_source_format(source_path))
 
 
 def test_data_tokenization_service_creates_token_text_dataset(monkeypatch, tmp_path: Path) -> None:
@@ -183,17 +189,15 @@ def test_data_tokenize_tool_registers_derived_dataset_and_artifact(monkeypatch, 
 
     result = registry.execute("data.tokenize", arguments, context)
     derived_dataset = dataset_service.get_dataset(result.payload["dataset_id"])
-    resolved_artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
-    tokenized_frame = pd.read_csv(derived_dataset.source_path, keep_default_na=False)
+    tokenized_frame = _read_dataset_frame(derived_dataset.source_path).fillna("")
 
     assert derived_dataset.derived_from_dataset_id == source_dataset.id
     assert derived_dataset.project_id == source_dataset.project_id
+    assert result.payload["dataset_uri"] == f"dataset://{derived_dataset.id}"
+    assert "artifact_id" not in result.payload
     assert tokenized_frame.columns.tolist() == ["review_id", "review_text", "token_text", "token_count"]
     assert result.payload["row_count"] == 2
     assert result.payload["tokenization_report"]["output"] == "token_text"
-    assert resolved_artifact.metadata_payload["dataset_id"] == derived_dataset.id
-    assert resolved_artifact.metadata_payload["derived_from_dataset_id"] == source_dataset.id
-    assert resolved_artifact.metadata_payload["tokenization_report"]["tokenizer_profile"] == "zh_business_v1"
     assert "artifact_link" not in result.payload
 
 

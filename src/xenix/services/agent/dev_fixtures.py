@@ -66,22 +66,26 @@ def _create_message_rendering_fixture(store: ConversationStore) -> None:
             ],
         )
     )
-    _peek_message, peek_call = store.create_tool_call(
+    _query_message, query_call = store.create_tool_call(
         CreateToolCallInput(
             thread_id=thread.id,
             turn_id=first_turn.id,
-            tool_name="data.peek",
-            arguments_payload={"dataset_id": "mock_dataset_sales"},
+            tool_name="data.query",
+            arguments_payload={
+                "dataset_id": "mock_dataset_sales",
+                "sql": "SELECT COUNT(*) AS row_count FROM input",
+            },
         )
     )
     store.complete_tool_call(
         CompleteToolCallInput(
-            tool_call_id=peek_call.id,
+            tool_call_id=query_call.id,
             status=AgentToolCallStatus.SUCCEEDED,
             result_payload={
-                "dataset_id": "mock_dataset_sales",
-                "row_count": 128,
-                "column_count": 5,
+                "columns": {"_schema": {"name": 0, "type": 1, "index": 2}, "data": [["row_count", "int64", 0]]},
+                "rows": {"_schema": {"row_count": 0}, "data": [[128]]},
+                "returned_row_count": 1,
+                "truncated": False,
             },
         )
     )

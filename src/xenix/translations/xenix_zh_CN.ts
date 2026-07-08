@@ -297,122 +297,129 @@ This route will stay available after model selection is connected.</source>
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../ui/main_window.py" line="213"/>
+        <location filename="../ui/main_window.py" line="234"/>
         <source>Xenix Native</source>
         <translation>Xenix 原生版</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="214"/>
+        <location filename="../ui/main_window.py" line="235"/>
         <source>Xenix</source>
         <translation>Xenix</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="215"/>
+        <location filename="../ui/main_window.py" line="236"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="216"/>
+        <location filename="../ui/main_window.py" line="237"/>
         <source>History</source>
         <translation>历史</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="218"/>
+        <location filename="../ui/main_window.py" line="239"/>
         <source>New thread</source>
         <translation>新建线程</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="500"/>
         <source>Could not open link: {uri}</source>
-        <translation>无法打开链接：{uri}</translation>
+        <translation type="vanished">无法打开链接：{uri}</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="508"/>
         <source>Artifact is not ready to open.</source>
-        <translation>产物尚未准备好打开。</translation>
+        <translation type="vanished">产物尚未准备好打开。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="511"/>
         <source>Artifact file is missing: {path}</source>
-        <translation>产物文件缺失：{path}</translation>
+        <translation type="vanished">产物文件缺失：{path}</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="515"/>
         <source>Could not open artifact: {path}</source>
-        <translation>无法打开产物：{path}</translation>
+        <translation type="vanished">无法打开产物：{path}</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.py" line="554"/>
         <location filename="../ui/main_window.py" line="571"/>
+        <source>Opening link...</source>
+        <translation>正在打开链接...</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="572"/>
+        <source>Open Link</source>
+        <translation>打开链接</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="649"/>
         <source>Step budget used: {used}/{max}. Continue with up to {steps} more steps?</source>
         <translation>步骤预算已使用：{used}/{max}。是否继续最多 {steps} 个步骤？</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="684"/>
+        <location filename="../ui/main_window.py" line="762"/>
         <source>Rename</source>
         <translation>重命名</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="685"/>
+        <location filename="../ui/main_window.py" line="763"/>
         <source>Generate title...</source>
         <translation>生成标题...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="686"/>
+        <location filename="../ui/main_window.py" line="764"/>
         <source>Copy thread ID</source>
         <translation>复制线程 ID</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="687"/>
+        <location filename="../ui/main_window.py" line="765"/>
         <source>Delete</source>
         <translation>删除</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="712"/>
+        <location filename="../ui/main_window.py" line="790"/>
         <source>Rename Thread</source>
         <translation>重命名线程</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="713"/>
-        <location filename="../ui/main_window.py" line="780"/>
+        <location filename="../ui/main_window.py" line="791"/>
+        <location filename="../ui/main_window.py" line="858"/>
         <source>Thread name</source>
         <translation>线程名称</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="729"/>
-        <location filename="../ui/main_window.py" line="760"/>
-        <location filename="../ui/main_window.py" line="790"/>
-        <location filename="../ui/main_window.py" line="800"/>
+        <location filename="../ui/main_window.py" line="807"/>
+        <location filename="../ui/main_window.py" line="838"/>
+        <location filename="../ui/main_window.py" line="868"/>
+        <location filename="../ui/main_window.py" line="878"/>
         <source>Generate Thread Title</source>
         <translation>生成线程标题</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="730"/>
+        <location filename="../ui/main_window.py" line="808"/>
         <source>Thread title model is not configured.</source>
         <translation>未配置线程标题模型。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="753"/>
+        <location filename="../ui/main_window.py" line="831"/>
         <source>Generating thread title...</source>
         <translation>正在生成线程标题...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="779"/>
+        <location filename="../ui/main_window.py" line="857"/>
         <source>Apply Generated Title</source>
         <translation>应用生成的标题</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="812"/>
-        <location filename="../ui/main_window.py" line="820"/>
+        <location filename="../ui/main_window.py" line="890"/>
+        <location filename="../ui/main_window.py" line="898"/>
         <source>Delete Thread</source>
         <translation>删除线程</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="813"/>
+        <location filename="../ui/main_window.py" line="891"/>
         <source>Stop the current run before deleting this thread.</source>
         <translation>删除此线程前请先停止当前运行。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="821"/>
+        <location filename="../ui/main_window.py" line="899"/>
         <source>Delete &quot;{title}&quot;? This action cannot be undone.</source>
         <translation>删除“{title}”？此操作无法撤销。</translation>
     </message>
@@ -868,8 +875,8 @@ This route will stay available after model selection is connected.</source>
     </message>
     <message>
         <location filename="../ui/chatbot.py" line="1327"/>
-        <location filename="../ui/chatbot.py" line="1677"/>
-        <location filename="../ui/chatbot.py" line="1688"/>
+        <location filename="../ui/chatbot.py" line="1708"/>
+        <location filename="../ui/chatbot.py" line="1719"/>
         <source>Attach files</source>
         <translation>添加文件</translation>
     </message>
@@ -885,7 +892,7 @@ This route will stay available after model selection is connected.</source>
     </message>
     <message>
         <location filename="../ui/chatbot.py" line="1330"/>
-        <location filename="../ui/chatbot.py" line="1622"/>
+        <location filename="../ui/chatbot.py" line="1653"/>
         <source>Stop</source>
         <translation>停止</translation>
     </message>
@@ -905,12 +912,12 @@ This route will stay available after model selection is connected.</source>
         <translation>滚动到底部</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1628"/>
+        <location filename="../ui/chatbot.py" line="1659"/>
         <source>Send</source>
         <translation>发送</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1679"/>
+        <location filename="../ui/chatbot.py" line="1710"/>
         <source>Data files (*.csv *.xlsx *.xls)</source>
         <translation>数据文件 (*.csv *.xlsx *.xls)</translation>
     </message>
@@ -1401,12 +1408,12 @@ Reason: {reason}</source>
         <translation>前往购买</translation>
     </message>
     <message>
-        <location filename="../app.py" line="682"/>
+        <location filename="../app.py" line="697"/>
         <source>Unable to start Xenix</source>
         <translation>无法启动 Xenix</translation>
     </message>
     <message>
-        <location filename="../app.py" line="683"/>
+        <location filename="../app.py" line="698"/>
         <source>Xenix could not finish startup.
 
 {error}</source>

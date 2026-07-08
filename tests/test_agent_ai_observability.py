@@ -130,8 +130,8 @@ class ToolThenDoneProvider:
             return ProviderResponse(
                 tool_calls=[
                     ProviderToolCall(
-                        provider_call_id="call-peek",
-                        tool_name="data.peek",
+                        provider_call_id="call-query",
+                        tool_name="data.query",
                         arguments={"name": "secret dataset label"},
                     )
                 ],
@@ -147,9 +147,9 @@ class StaticRegistry:
     def list_specs(self) -> list[AgentToolSpec]:
         return [
             AgentToolSpec(
-                name="data.peek",
-                provider_name="data_peek",
-                description="Inspect a dataset.",
+                name="data.query",
+                provider_name="data_query",
+                description="Query a dataset.",
                 parameters_schema={"type": "object", "properties": {"name": {"type": "string"}}},
             ),
             AgentToolSpec(
@@ -167,7 +167,7 @@ class StaticRegistry:
         ]
 
     def execute(self, tool_name: str, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
-        if tool_name == "data.peek":
+        if tool_name == "data.query":
             return ToolExecutionResult(
                 payload={"dataset_id": "dataset-1", "secret_result": "not exported"},
             )
@@ -253,7 +253,7 @@ def test_tool_call_span_keeps_parent_provider_context(monkeypatch, tmp_path: Pat
     assert provider_spans[1].attributes["xenix.ai.request.message.tool_count"] == 1
     assert tool_span.attributes["openinference.span.kind"] == "TOOL"
     assert tool_span.attributes["gen_ai.operation.name"] == "execute_tool"
-    assert tool_span.attributes["gen_ai.tool.name"] == "data.peek"
+    assert tool_span.attributes["gen_ai.tool.name"] == "data.query"
     assert tool_span.attributes["xenix.ai.tool.category"] == "data"
     assert tool_span.attributes["xenix.ai.provider_request.id_hash"] == first_provider_hash
     assert tool_span.attributes["xenix.ai.loop.step_index"] == 1

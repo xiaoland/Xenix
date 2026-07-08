@@ -18,6 +18,7 @@ from xenix.services.data_transform import (
     DatasetSqlBinding,
 )
 from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
+from xenix.services.dataset_inspection import detect_source_format, load_dataframe
 from xenix.services.ml_service import MLService
 from xenix.services.ml_task_service import MLTaskService
 from xenix.services.storage import StorageBootstrapService
@@ -97,8 +98,13 @@ def _register_report_xlsx(dataset_service: DatasetService, tmp_path: Path):
     )
 
 
-def test_data_integrate_tool_uses_dataset_ids_and_registers_generated_artifact(monkeypatch, tmp_path: Path) -> None:
-    _paths, dataset_service, _service, artifact_service, registry, store = _build_runtime(
+def _read_dataset_frame(path: str | Path) -> pd.DataFrame:
+    source_path = Path(path)
+    return load_dataframe(source_path, detect_source_format(source_path))
+
+
+def test_data_integrate_tool_uses_dataset_ids_and_returns_dataset_uri(monkeypatch, tmp_path: Path) -> None:
+    _paths, dataset_service, _service, _artifact_service, registry, store = _build_runtime(
         monkeypatch,
         tmp_path,
     )
@@ -113,10 +119,10 @@ def test_data_integrate_tool_uses_dataset_ids_and_registers_generated_artifact(m
     )
 
     derived_dataset = dataset_service.get_dataset(result.payload["dataset_id"])
-    resolved_artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
-    assert pd.read_csv(derived_dataset.source_path)["order_id"].tolist() == [1, 2]
+    assert _read_dataset_frame(derived_dataset.source_path)["order_id"].tolist() == [1, 2]
     assert result.payload["input_dataset_ids"] == [orders.id, more_orders.id]
-    assert resolved_artifact.metadata_payload["input_dataset_ids"] == [orders.id, more_orders.id]
+    assert result.payload["dataset_uri"] == f"dataset://{derived_dataset.id}"
+    assert "artifact_id" not in result.payload
     assert "source_path" not in result.payload["inspection"]
 
 
@@ -162,7 +168,7 @@ def test_data_query_service_runs_read_only_select(monkeypatch, tmp_path: Path) -
     assert result.validation_summary["bindings"] == ["orders"]
 
 
-def test_data_transform_service_materializes_csv(monkeypatch, tmp_path: Path) -> None:
+def test_data_transform_service_materializes_parquet(monkeypatch, tmp_path: Path) -> None:
     _paths, _dataset_service, service, _artifact_service, _registry, _store = _build_runtime(
         monkeypatch,
         tmp_path,
@@ -190,7 +196,7 @@ def test_data_transform_service_materializes_csv(monkeypatch, tmp_path: Path) ->
         )
     )
 
-    frame = pd.read_csv(result.output_path)
+    frame = _read_dataset_frame(result.output_path)
     assert frame.to_dict(orient="records") == [
         {"customer_id": 1, "total_amount": 25.0},
         {"customer_id": 2, "total_amount": 5.0},
@@ -200,7 +206,7 @@ def test_data_transform_service_materializes_csv(monkeypatch, tmp_path: Path) ->
     assert result.transform_report["bindings"] == [{"alias": "input", "dataset_id": "customers-id"}]
 
 
-def test_data_transform_tool_does_not_leave_dataset_or_csv_when_output_validation_fails(
+def test_data_transform_tool_does_not_leave_dataset_or_output_when_output_validation_fails(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -228,9 +234,40 @@ def test_data_transform_tool_does_not_leave_dataset_or_csv_when_output_validatio
     with pytest.raises(ValidationError, match="Synthetic output validation failure"):
         registry.execute("data.transform", arguments, _tool_context(store, "data.transform", arguments))
 
-    transformed_dir = paths.artifacts / "datasets" / "transformed"
-    assert not list(transformed_dir.glob("broken-transform-*.csv"))
+    transformed_dir = paths.temp / "datasets" / "transformed"
+    assert not list(transformed_dir.glob("broken-transform-*.parquet"))
     with sqlite3.connect(paths.state / "xenix.db") as connection:
+        derived_count = connection.execute(
+            "SELECT COUNT(*) FROM dataset WHERE derived_from_dataset_id = ?",
+            (dataset.id,),
+        ).fetchone()[0]
+    assert derived_count == 0
+
+
+def test_data_transform_tool_requires_output_relation_for_multi_statement_scripts(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _paths, dataset_service, _service, _artifact_service, registry, store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    dataset = _register_csv(
+        dataset_service,
+        tmp_path,
+        "orders",
+        "order_id,amount\n1,10\n2,20\n",
+    )
+    arguments = {
+        "dataset_id": dataset.id,
+        "sql": "CREATE TEMP TABLE stage AS SELECT * FROM input",
+        "name": "No output",
+    }
+
+    with pytest.raises(ValidationError, match="must leave a final relation named output"):
+        registry.execute("data.transform", arguments, _tool_context(store, "data.transform", arguments))
+
+    with sqlite3.connect(_paths.state / "xenix.db") as connection:
         derived_count = connection.execute(
             "SELECT COUNT(*) FROM dataset WHERE derived_from_dataset_id = ?",
             (dataset.id,),
@@ -295,12 +332,49 @@ def test_data_query_tool_returns_bounded_rows(monkeypatch, tmp_path: Path) -> No
 
     assert result.payload["returned_row_count"] == 2
     assert result.payload["truncated"] is True
-    assert result.payload["rows"] == [
-        {"order_id": 3, "amount": 30},
-        {"order_id": 2, "amount": 20},
-    ]
-    assert result.payload["bindings"] == [{"alias": "input", "dataset_id": dataset.id}]
+    assert list(result.payload) == ["columns", "rows", "returned_row_count", "truncated"]
+    assert result.payload["columns"] == {
+        "_schema": {"name": 0, "type": 1, "index": 2},
+        "data": [["order_id", "int64", 0], ["amount", "int64", 1]],
+    }
+    assert result.payload["rows"] == {
+        "_schema": {"order_id": 0, "amount": 1},
+        "data": [[3, 30], [2, 20]],
+    }
+    assert "bindings" not in result.payload
+    assert "input_dataset_ids" not in result.payload
+    assert "limit" not in result.payload
+    assert "validation_summary" not in result.payload
     assert not hasattr(result, "content_blocks")
+
+
+def test_data_query_tool_uses_bindings_when_dataset_id_is_also_present(monkeypatch, tmp_path: Path) -> None:
+    _paths, dataset_service, _service, _artifact_service, registry, store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    ignored = _register_csv(
+        dataset_service,
+        tmp_path,
+        "ignored",
+        "order_id,amount\n1,10\n",
+    )
+    orders = _register_csv(
+        dataset_service,
+        tmp_path,
+        "orders",
+        "order_id,amount\n2,20\n",
+    )
+    arguments = {
+        "dataset_id": ignored.id,
+        "bindings": [{"alias": "orders", "dataset_id": orders.id}],
+        "sql": "SELECT order_id, amount FROM orders",
+    }
+
+    result = registry.execute("data.query", arguments, _tool_context(store, "data.query", arguments))
+
+    assert result.payload["rows"]["_schema"] == {"order_id": 0, "amount": 1}
+    assert result.payload["rows"]["data"] == [[2, 20]]
 
 
 def test_data_query_tool_accepts_canonical_names_for_messy_xlsx(monkeypatch, tmp_path: Path) -> None:
@@ -317,16 +391,18 @@ def test_data_query_tool_accepts_canonical_names_for_messy_xlsx(monkeypatch, tmp
 
     result = registry.execute("data.query", arguments, _tool_context(store, "data.query", arguments))
 
-    assert result.payload["columns"] == [{"name": "column_2", "type": "str"}]
-    assert result.payload["rows"] == [
-        {"column_2": None},
-        {"column_2": "销售数量"},
-        {"column_2": "1"},
-    ]
+    assert result.payload["columns"] == {
+        "_schema": {"name": 0, "type": 1, "index": 2},
+        "data": [["column_2", "str", 0]],
+    }
+    assert result.payload["rows"] == {
+        "_schema": {"column_2": 0},
+        "data": [[None], ["销售数量"], ["1"]],
+    }
 
 
-def test_data_transform_tool_registers_derived_dataset_and_artifact(monkeypatch, tmp_path: Path) -> None:
-    _paths, dataset_service, _service, artifact_service, registry, store = _build_runtime(
+def test_data_transform_tool_registers_derived_dataset_and_returns_dataset_uri(monkeypatch, tmp_path: Path) -> None:
+    _paths, dataset_service, _service, _artifact_service, registry, store = _build_runtime(
         monkeypatch,
         tmp_path,
     )
@@ -348,23 +424,24 @@ def test_data_transform_tool_registers_derived_dataset_and_artifact(monkeypatch,
         _tool_context(store, "data.transform", arguments),
     )
     derived_dataset = dataset_service.get_dataset(result.payload["dataset_id"])
-    resolved_artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
-    frame = pd.read_csv(derived_dataset.source_path)
+    frame = _read_dataset_frame(derived_dataset.source_path)
 
     assert derived_dataset.derived_from_dataset_id == dataset.id
+    assert result.payload["dataset_uri"] == f"dataset://{derived_dataset.id}"
+    assert "artifact_id" not in result.payload
     assert result.payload["row_count"] == 2
     assert frame.to_dict(orient="records") == [
         {"customer_id": 1, "total_amount": 25.0},
         {"customer_id": 2, "total_amount": 5.0},
     ]
-    assert resolved_artifact.metadata_payload["dataset_id"] == derived_dataset.id
-    assert resolved_artifact.metadata_payload["derived_from_dataset_id"] == dataset.id
-    assert resolved_artifact.metadata_payload["input_dataset_ids"] == [dataset.id]
-    assert resolved_artifact.metadata_payload["transform_report"]["validation_summary"]["read_only"] is True
+    assert (
+        result.payload["transform_report"]["validation_summary"]["requires_output_relation"]
+        == "output"
+    )
 
 
-def test_data_transform_tool_records_multi_input_lineage_in_artifact_metadata(monkeypatch, tmp_path: Path) -> None:
-    _paths, dataset_service, _service, artifact_service, registry, store = _build_runtime(
+def test_data_transform_tool_records_multi_input_lineage_in_result(monkeypatch, tmp_path: Path) -> None:
+    _paths, dataset_service, _service, _artifact_service, registry, store = _build_runtime(
         monkeypatch,
         tmp_path,
     )
@@ -399,8 +476,7 @@ def test_data_transform_tool_records_multi_input_lineage_in_artifact_metadata(mo
         _tool_context(store, "data.transform", arguments),
     )
     derived_dataset = dataset_service.get_dataset(result.payload["dataset_id"])
-    resolved_artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
 
     assert derived_dataset.derived_from_dataset_id is None
-    assert resolved_artifact.metadata_payload["input_dataset_ids"] == [orders.id, customers.id]
     assert result.payload["input_dataset_ids"] == [orders.id, customers.id]
+    assert result.payload["dataset_uri"] == f"dataset://{derived_dataset.id}"

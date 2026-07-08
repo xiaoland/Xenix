@@ -371,7 +371,6 @@ class StaticSpecRegistry:
                 "model.metadata",
                 "model.task.query",
                 "analysis.graph",
-                "data.peek",
                 "data.integrate",
                 "data.clean",
                 "data.clean.metadata",
@@ -631,10 +630,10 @@ def test_openai_compatible_provider_streams_sse_text_and_tool_calls(monkeypatch)
                                 "tool_calls": [
                                     {
                                         "index": 0,
-                                            "id": "call_data_peek",
+                                            "id": "call_data_query",
                                             "type": "function",
                                             "function": {
-                                                "name": "data_peek",
+                                                "name": "data_query",
                                                 "arguments": "{\"name\": \"",
                                             },
                                     }
@@ -687,9 +686,9 @@ def test_openai_compatible_provider_streams_sse_text_and_tool_calls(monkeypatch)
             ],
             [
                 AgentToolSpec(
-                    name="data.peek",
-                    provider_name="data_peek",
-                    description="Inspect a dataset.",
+                    name="data.query",
+                    provider_name="data_query",
+                    description="Query a dataset.",
                     parameters_schema={
                         "type": "object",
                         "properties": {"name": {"type": "string"}},
@@ -711,7 +710,7 @@ def test_openai_compatible_provider_streams_sse_text_and_tool_calls(monkeypatch)
     final_response = [event.response for event in events if event.is_complete][0]
     assert final_response is not None
     assert final_response.assistant_content_blocks == [{"type": "markdown", "text": "Hello"}]
-    assert final_response.tool_calls[0].tool_name == "data.peek"
+    assert final_response.tool_calls[0].tool_name == "data.query"
     assert final_response.tool_calls[0].arguments == {"name": "sample"}
     assert final_response.usage_payload == {
         "input_tokens": 1240,
@@ -780,7 +779,7 @@ def test_openai_compatible_provider_serializes_assistant_tool_calls_before_tool_
     captured_payload: dict[str, Any] = {}
     tool_result_json = json.dumps(
         {
-            "tool_name": "data.peek",
+            "tool_name": "data.query",
             "status": "succeeded",
             "result": {"dataset_id": "dataset-1"},
         },
@@ -819,11 +818,11 @@ def test_openai_compatible_provider_serializes_assistant_tool_calls_before_tool_
                     "reasoning_content": "Need to inspect the dataset first.",
                     "tool_calls": [
                         {
-                            "id": "call-data-peek",
+                            "id": "call-data-query",
                             "type": "function",
                             "function": {
-                                "name": "data_peek",
-                                "arguments": "{\"name\": \"First analysis\"}",
+                                "name": "data_query",
+                                "arguments": "{\"dataset_id\": \"dataset-1\", \"sql\": \"SELECT * FROM input LIMIT 3\"}",
                             },
                         }
                     ]
@@ -832,7 +831,7 @@ def test_openai_compatible_provider_serializes_assistant_tool_calls_before_tool_
             ProviderMessage(
                 role="tool",
                 content=tool_result_json,
-                provider_payload={"tool_call_id": "call-data-peek"},
+                provider_payload={"tool_call_id": "call-data-query"},
             ),
         ],
         [],
@@ -846,11 +845,11 @@ def test_openai_compatible_provider_serializes_assistant_tool_calls_before_tool_
             "reasoning_content": "Need to inspect the dataset first.",
             "tool_calls": [
                 {
-                    "id": "call-data-peek",
+                    "id": "call-data-query",
                     "type": "function",
                     "function": {
-                        "name": "data_peek",
-                        "arguments": "{\"name\": \"First analysis\"}",
+                        "name": "data_query",
+                        "arguments": "{\"dataset_id\": \"dataset-1\", \"sql\": \"SELECT * FROM input LIMIT 3\"}",
                     },
                 }
             ],
@@ -858,7 +857,7 @@ def test_openai_compatible_provider_serializes_assistant_tool_calls_before_tool_
         {
             "role": "tool",
             "content": tool_result_json,
-            "tool_call_id": "call-data-peek",
+            "tool_call_id": "call-data-query",
         },
     ]
 
@@ -1098,7 +1097,7 @@ def test_agent_harness_stream_filters_tools_by_thread_files(monkeypatch, tmp_pat
     )
 
     tool_names = provider.tools_by_call[0]
-    assert "data.peek" in tool_names
+    assert "data.peek" not in tool_names
     assert "data.integrate" not in tool_names
     assert "analysis.profile" not in tool_names
     assert "analysis.graph" in tool_names
@@ -1121,7 +1120,7 @@ def test_agent_harness_stream_filters_tools_by_thread_files(monkeypatch, tmp_pat
     )
 
     tool_names = provider.tools_by_call[1]
-    assert "data.peek" in tool_names
+    assert "data.peek" not in tool_names
     assert "data.integrate" not in tool_names
     assert "analysis.profile" not in tool_names
     assert "analysis.graph" in tool_names

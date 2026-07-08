@@ -516,7 +516,7 @@ class DataCleaningService:
 
             source_format = detect_source_format(source_path)
             if source_format is DatasetSourceFormat.UNKNOWN:
-                raise ValidationError("Only .csv, .xlsx, and .xls dataset files are supported.")
+                raise ValidationError("Only .csv, .parquet, .xlsx, and .xls dataset files are supported.")
 
             frame = load_dataframe(source_path, source_format)
             if len(frame.columns) == 0:

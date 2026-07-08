@@ -78,7 +78,7 @@ class DataTokenizationService:
 
             source_format = detect_source_format(source_path)
             if source_format is DatasetSourceFormat.UNKNOWN:
-                raise ValidationError("Only .csv, .xlsx, and .xls dataset files are supported.")
+                raise ValidationError("Only .csv, .parquet, .xlsx, and .xls dataset files are supported.")
 
             output_mode = self._normalize_output(input_data.output)
             tokenizer_profile = self._normalize_profile(input_data.tokenizer_profile)

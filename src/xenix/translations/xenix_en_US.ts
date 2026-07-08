@@ -804,122 +804,113 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../ui/main_window.py" line="213"/>
+        <location filename="../ui/main_window.py" line="234"/>
         <source>Xenix Native</source>
         <translation>Xenix Native</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="214"/>
+        <location filename="../ui/main_window.py" line="235"/>
         <source>Xenix</source>
         <translation type="unfinished">Xenix</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="215"/>
+        <location filename="../ui/main_window.py" line="236"/>
         <source>Settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="216"/>
+        <location filename="../ui/main_window.py" line="237"/>
         <source>History</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="218"/>
+        <location filename="../ui/main_window.py" line="239"/>
         <source>New thread</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="500"/>
-        <source>Could not open link: {uri}</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/main_window.py" line="508"/>
-        <source>Artifact is not ready to open.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/main_window.py" line="511"/>
-        <source>Artifact file is missing: {path}</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ui/main_window.py" line="515"/>
-        <source>Could not open artifact: {path}</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
+        <location filename="../ui/main_window.py" line="554"/>
         <location filename="../ui/main_window.py" line="571"/>
+        <source>Opening link...</source>
+        <translation>Opening link...</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="572"/>
+        <source>Open Link</source>
+        <translation>Open Link</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="649"/>
         <source>Step budget used: {used}/{max}. Continue with up to {steps} more steps?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="684"/>
+        <location filename="../ui/main_window.py" line="762"/>
         <source>Rename</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="685"/>
+        <location filename="../ui/main_window.py" line="763"/>
         <source>Generate title...</source>
         <translation>Generate title...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="686"/>
+        <location filename="../ui/main_window.py" line="764"/>
         <source>Copy thread ID</source>
         <translation>Copy thread ID</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="687"/>
+        <location filename="../ui/main_window.py" line="765"/>
         <source>Delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="712"/>
+        <location filename="../ui/main_window.py" line="790"/>
         <source>Rename Thread</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="713"/>
-        <location filename="../ui/main_window.py" line="780"/>
+        <location filename="../ui/main_window.py" line="791"/>
+        <location filename="../ui/main_window.py" line="858"/>
         <source>Thread name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="729"/>
-        <location filename="../ui/main_window.py" line="760"/>
-        <location filename="../ui/main_window.py" line="790"/>
-        <location filename="../ui/main_window.py" line="800"/>
+        <location filename="../ui/main_window.py" line="807"/>
+        <location filename="../ui/main_window.py" line="838"/>
+        <location filename="../ui/main_window.py" line="868"/>
+        <location filename="../ui/main_window.py" line="878"/>
         <source>Generate Thread Title</source>
         <translation>Generate Thread Title</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="730"/>
+        <location filename="../ui/main_window.py" line="808"/>
         <source>Thread title model is not configured.</source>
         <translation>Thread title model is not configured.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="753"/>
+        <location filename="../ui/main_window.py" line="831"/>
         <source>Generating thread title...</source>
         <translation>Generating thread title...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="779"/>
+        <location filename="../ui/main_window.py" line="857"/>
         <source>Apply Generated Title</source>
         <translation>Apply Generated Title</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="812"/>
-        <location filename="../ui/main_window.py" line="820"/>
+        <location filename="../ui/main_window.py" line="890"/>
+        <location filename="../ui/main_window.py" line="898"/>
         <source>Delete Thread</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="813"/>
+        <location filename="../ui/main_window.py" line="891"/>
         <source>Stop the current run before deleting this thread.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="821"/>
+        <location filename="../ui/main_window.py" line="899"/>
         <source>Delete &quot;{title}&quot;? This action cannot be undone.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1427,8 +1418,8 @@
     </message>
     <message>
         <location filename="../ui/chatbot.py" line="1327"/>
-        <location filename="../ui/chatbot.py" line="1677"/>
-        <location filename="../ui/chatbot.py" line="1688"/>
+        <location filename="../ui/chatbot.py" line="1708"/>
+        <location filename="../ui/chatbot.py" line="1719"/>
         <source>Attach files</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1444,7 +1435,7 @@
     </message>
     <message>
         <location filename="../ui/chatbot.py" line="1330"/>
-        <location filename="../ui/chatbot.py" line="1622"/>
+        <location filename="../ui/chatbot.py" line="1653"/>
         <source>Stop</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1464,12 +1455,12 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1628"/>
+        <location filename="../ui/chatbot.py" line="1659"/>
         <source>Send</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1679"/>
+        <location filename="../ui/chatbot.py" line="1710"/>
         <source>Data files (*.csv *.xlsx *.xls)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1912,12 +1903,12 @@ State file: {state_path}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app.py" line="682"/>
+        <location filename="../app.py" line="697"/>
         <source>Unable to start Xenix</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app.py" line="683"/>
+        <location filename="../app.py" line="698"/>
         <source>Xenix could not finish startup.
 
 {error}</source>

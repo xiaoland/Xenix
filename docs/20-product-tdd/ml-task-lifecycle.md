@@ -20,7 +20,7 @@ SQLite is the default store for ML task metadata.
 
 ML tasks remain individually addressed records. User-facing tool-call details and Agent follow-up use explicit task ids and existing request/result payload references; the lifecycle contract does not introduce a `task_group_id`.
 
-Dataset inspection is not an ML task. It belongs to DatasetService and data-facing Agent tools such as `data.peek`.
+Dataset inspection is not an ML task. It belongs to DatasetService and data-facing Agent tools such as `data.query`.
 
 Current AI-first service contracts are dataset-scoped and analyzer-scoped. A model is a reusable analyzer: a service-owned artifact trained from declared input roles and later applied to compatible input roles.
 
@@ -111,13 +111,13 @@ ML tasks surfaced after the originating Chatbot turn closes, such as apply resul
 
 Result ownership rules:
 
-- Source dataset registrations may point to user-managed files.
+- Source dataset registrations point to app-owned registered dataset files; original import files are provenance, not the execution source of truth.
 - ML task requests carry expanded dataset, role binding, model selection, parameters, and artifact output owner inputs from service contracts.
-- App-managed dataset artifacts used by ML tasks are registered through service-owned artifact metadata.
+- App-managed datasets used by ML tasks are registered dataset records. User-openable dataset exports are separate lazy workbook artifacts.
 - Generated models, exports, and reports live in service-managed directories on the local filesystem.
 - ML task working directories live under `artifacts/ml-tasks/<ml-task-id>/`.
 - An ML task reaches `succeeded` only after every declared output path exists.
-- Chatbot result presentation flows through markdown summaries and `artifact://...` links registered by services.
+- Chatbot result presentation flows through markdown summaries, `dataset://...` links for registered datasets, and `artifact://...` links for already materialized user-openable artifacts.
 - Remote worker directories are execution/cache state only. Remote result files must be downloaded and rewritten to local task paths before normal task finalization copies them into canonical local artifact locations.
 
 ## Failure Contract

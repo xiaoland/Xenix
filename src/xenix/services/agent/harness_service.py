@@ -1699,8 +1699,6 @@ class AgentHarnessService:
         )
 
     def _tool_available_for_context(self, tool_name: str, context: _ToolAvailabilityContext) -> bool:
-        if tool_name == "data.peek":
-            return context.has_dataset
         if tool_name == "data.integrate":
             return len(context.dataset_ids) >= 2
         if tool_name.startswith("data."):

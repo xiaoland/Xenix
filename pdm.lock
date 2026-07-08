@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:492cf874408ec40934c3f84fa91ecd8957e077ca1f066a1dca4a87e5d2d276a1"
+content_hash = "sha256:e94271f1a9382dca28d8212cd9fa97fb323e94c98d0ad05c9a5069d370e50b56"
 
 [[metadata.targets]]
 requires_python = ">=3.12,<3.15"
@@ -1975,4 +1975,15 @@ files = [
     {file = "xgboost-3.3.0-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:f59edaf28eccd1c519788607c72ed907ee6cedfa933d706620bc1612d24b354e"},
     {file = "xgboost-3.3.0-py3-none-win_amd64.whl", hash = "sha256:b06057f6a018fc04e6b3e0c15568ca636b8151a5b5f333478e500fcaf4fc7594"},
     {file = "xgboost-3.3.0.tar.gz", hash = "sha256:58bcb8a4cace648cdab7b94fa4f16d2c9ff26d90dd4d26907168106fa06d8746"},
+]
+
+[[package]]
+name = "xlsxwriter"
+version = "3.2.9"
+requires_python = ">=3.8"
+summary = "A Python module for creating Excel XLSX files."
+groups = ["default"]
+files = [
+    {file = "xlsxwriter-3.2.9-py3-none-any.whl", hash = "sha256:9a5db42bc5dff014806c58a20b9eae7322a134abb6fce3c92c181bfb275ec5b3"},
+    {file = "xlsxwriter-3.2.9.tar.gz", hash = "sha256:254b1c37a368c444eac6e2f867405cc9e461b0ed97a3233b2ac1e574efb4140c"},
 ]

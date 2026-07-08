@@ -4,22 +4,12 @@ Use this file before mapping data preparation work to Xenix tools. Xenix Agent h
 
 ## Tool Responsibilities
 
-### `data.peek`
-
-Use for first inspection:
-
-- schema and inferred field types;
-- row and column counts when available;
-- preview rows and small samples;
-- candidate identifiers, timestamps, categorical fields, numeric fields, text fields, and target-like fields;
-- existing tool-produced summaries.
-
-Use `data.peek` before writing SQL when table names, column names, or field types are unknown.
-
 ### `data.query`
 
-Use for read-only quality checks:
+Use for read-only inspection and quality checks:
 
+- schema projection and preview rows;
+- row and column counts;
 - missingness;
 - duplicate counts;
 - cardinality and distinct ratios;
@@ -107,14 +97,13 @@ Do not include identifiers, post-outcome fields, target duplicates, or sensitive
 
 ## Planning Pattern
 
-1. `data.peek` to inspect the dataset.
-2. `data.query` to profile quality and candidate roles.
-3. `data.clean.metadata` to confirm supported cleaning operations.
-4. `data.clean` for explicit atomic cleaning.
-5. `data.tokenize` when raw Chinese text must be segmented into a stable derived dataset.
-6. `data.transform` for derived features, joins, grain changes, and chart/model-ready datasets.
-7. `data.feature.select` when handing off to modeling.
-8. `data.peek` or `data.query` to validate the result.
+1. `data.query` to inspect schema, preview rows, quality, and candidate roles.
+2. `data.clean.metadata` to confirm supported cleaning operations.
+3. `data.clean` for explicit atomic cleaning.
+4. `data.tokenize` when raw Chinese text must be segmented into a stable derived dataset.
+5. `data.transform` for derived features, joins, grain changes, and chart/model-ready datasets.
+6. `data.feature.select` when handing off to modeling.
+7. `data.query` to validate the result.
 
 ## Output Discipline
 

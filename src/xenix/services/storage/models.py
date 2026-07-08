@@ -28,7 +28,7 @@ State the evidence boundary for every finding. Make clear that correlation is no
 
 Final outputs must land in business meaning, action recommendations, risk notes, and process trace. Do not stop at charts, metrics, or model names without explaining what they mean for the user's decision.
 
-Tool results may include artifact_id values for service-managed files, tables, charts, models, or apply outputs. Reference artifacts through artifact:// URIs only; never invent local filesystem paths. Use [label](artifact://<artifact_id>) for ordinary artifacts, and use Markdown image syntax such as ![descriptive alt](artifact://<artifact_id>) for image artifacts that should be shown inline.
+Tool results may include dataset_id values for registered datasets and dataset_uri values such as dataset://<dataset_id> for user-openable dataset activation. Use dataset_uri when linking a dataset result. Tool results may also include artifact_id values for service-managed files, charts, models, reports, or apply outputs. Reference artifacts through artifact:// URIs only when you have an artifact_id; never put a dataset_id inside artifact://. Never invent local filesystem paths. Use [label](artifact://<artifact_id>) for ordinary artifacts, use [label](dataset://<dataset_id>) for datasets when dataset_uri is provided, and use Markdown image syntax such as ![descriptive alt](artifact://<artifact_id>) for image artifacts that should be shown inline.
 
 Ask concise follow-up questions when you need further user input to continue."""
 
@@ -68,6 +68,7 @@ class MLTaskStatus(StrEnum):
 
 class DatasetSourceFormat(StrEnum):
     CSV = "csv"
+    PARQUET = "parquet"
     XLSX = "xlsx"
     XLS = "xls"
     UNKNOWN = "unknown"
@@ -175,12 +176,42 @@ class DatasetRow(SQLModel, table=True):
     name: str = Field(index=True)
     source_path: str
     source_format: DatasetSourceFormat = Field(default=DatasetSourceFormat.UNKNOWN, index=True)
+    import_id: str | None = Field(default=None, foreign_key="dataset_import.id", index=True)
+    workbook_id: str | None = Field(default=None, foreign_key="dataset_workbook.id", index=True)
+    sheet_name: str | None = Field(default=None, index=True)
+    sheet_index: int | None = Field(default=None, index=True)
     copied_from: str | None = Field(default=None, foreign_key="dataset.id", index=True)
     copied_at: datetime | None = None
     derived_from_dataset_id: str | None = Field(default=None, foreign_key="dataset.id", index=True)
     ml_task_id: str | None = Field(default=None, foreign_key="ml_task.id", index=True, unique=True)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+
+class DatasetImportRow(SQLModel, table=True):
+    __tablename__ = "dataset_import"
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    project_id: str = Field(foreign_key="project.id", index=True)
+    original_path: str
+    original_file_name: str
+    source_format: DatasetSourceFormat = Field(default=DatasetSourceFormat.UNKNOWN, index=True)
+    status: str = Field(default="succeeded", index=True)
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class DatasetWorkbookRow(SQLModel, table=True):
+    __tablename__ = "dataset_workbook"
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    import_id: str = Field(foreign_key="dataset_import.id", index=True)
+    sheet_count: int = 0
+    engine: str | None = None
+    metadata_payload: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=utc_now)
 
 
 class DatasetColumnBindingRow(SQLModel, table=True):

@@ -25,7 +25,7 @@
 
 ## 4. 分析任务与方法
 
-说明选择的分析任务类型、未选择其他任务的原因，以及实际使用的 Xenix 工具，例如 `data.peek`、`data.query`、`data.transform`、`analysis.graph`。如果本报告引用了其他技能产出的建模或预处理结果，应注明来源。
+说明选择的分析任务类型、未选择其他任务的原因，以及实际使用的 Xenix 工具，例如 `data.query`、`data.transform`、`analysis.graph`。如果本报告引用了其他技能产出的建模或预处理结果，应注明来源。
 
 ## 5. 主要发现
 

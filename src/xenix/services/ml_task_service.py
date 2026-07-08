@@ -9,7 +9,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
 from typing import Any
+from uuid import uuid4
 
+import duckdb
 from opentelemetry import context as otel_context
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import Field, SQLModel
@@ -617,11 +619,17 @@ class MLTaskService:
         dataset = self._datasets.get(session, row.dataset_id) if row.dataset_id is not None else None
         if dataset is None:
             raise NotFoundError(f"Dataset '{row.dataset_id}' was not found.")
+        result_dataset_id = uuid4().hex
+        result_dataset_path = self._materialize_apply_result_dataset(
+            source_csv_path=canonical_path,
+            dataset_id=result_dataset_id,
+        )
         dataset_row = DatasetRow(
+            id=result_dataset_id,
             project_id=row.project_id,
             name=f"{dataset.name} apply results",
-            source_path=str(canonical_path),
-            source_format=DatasetSourceFormat.CSV,
+            source_path=str(result_dataset_path),
+            source_format=DatasetSourceFormat.PARQUET,
             copied_from=None,
             copied_at=None,
             derived_from_dataset_id=row.dataset_id,
@@ -642,6 +650,20 @@ class MLTaskService:
             )
         ]
         return payload, artifacts
+
+    def _materialize_apply_result_dataset(self, *, source_csv_path: Path, dataset_id: str) -> Path:
+        output_dir = self._paths.state / "datasets" / "derived"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / f"{dataset_id}.parquet"
+        duckdb.connect(database=":memory:").execute(
+            "COPY (SELECT * FROM read_csv_auto("
+            f"{self._sql_string(str(source_csv_path))})) "
+            f"TO {self._sql_string(str(output_path))} (FORMAT PARQUET)"
+        )
+        return output_path
+
+    def _sql_string(self, value: str) -> str:
+        return "'" + value.replace("'", "''") + "'"
 
     def _finalize_failure(self, ml_task_id: str, return_code: int) -> MLTaskRow:
         result_path = task_result_path(self._paths, ml_task_id)

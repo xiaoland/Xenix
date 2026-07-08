@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import duckdb
 import pandas as pd
 
 from ...exceptions import ValidationError
@@ -11,6 +12,11 @@ def load_dataset(path: Path) -> pd.DataFrame:
     suffix = path.suffix.lower()
     if suffix == ".csv":
         return pd.read_csv(path)
+    if suffix == ".parquet":
+        return duckdb.connect(database=":memory:").execute(
+            "SELECT * FROM read_parquet(?)",
+            [str(path)],
+        ).fetchdf()
     if suffix in {".xlsx", ".xls"}:
         return pd.read_excel(path)
     raise ValidationError(f"Unsupported dataset format '{path.suffix}'.")

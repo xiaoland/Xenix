@@ -139,33 +139,12 @@ def test_analysis_profile_service_builds_bounded_markdown_report(tmp_path: Path)
     assert "## Target group statistics" in result.markdown
 
 
-def test_data_peek_tool_profiles_by_default(monkeypatch, tmp_path: Path) -> None:
-    dataset_service, artifact_service, registry, conversation_store = _build_runtime(monkeypatch, tmp_path)
-    source = _write_mixed_csv(tmp_path)
-    dataset = dataset_service.register_dataset(RegisterDatasetInput(source_path=str(source.resolve()), name="Sales"))
-    arguments = {
-        "dataset_id": dataset.id,
-        "target_columns": ["amount"],
-        "top_n": 2,
-    }
-    context = _tool_context(conversation_store, "data.peek", arguments)
+def test_profile_tools_are_not_agent_exposed(monkeypatch, tmp_path: Path) -> None:
+    _dataset_service, _artifact_service, registry, _conversation_store = _build_runtime(monkeypatch, tmp_path)
+    specs = {spec.name: spec for spec in registry.list_specs()}
 
-    result = registry.execute(
-        "data.peek",
-        arguments,
-        context,
-    )
-
-    assert result.payload["dataset_id"]
-    assert result.payload["dataset_id"] == dataset.id
-    assert result.payload["inspection"]["row_count"] == 5
-    assert "source_path" not in result.payload["inspection"]
-    assert result.payload["analysis"]["enabled"] is True
-    assert "markdown" not in result.payload["analysis"]
-    assert "profile" not in result.payload["analysis"]
-    assert result.payload["analysis"]["basic_info"]["row_count"] == 5
-    assert not hasattr(result, "content_blocks")
-    assert artifact_service.list_thread_artifacts(context.thread_id) == []
+    assert "data.peek" not in specs
+    assert "analysis.profile" not in specs
 
 
 def test_analysis_profile_service_surfaces_structured_runtime_error(
@@ -203,71 +182,41 @@ def test_analysis_profile_service_surfaces_structured_runtime_error(
     assert exc_info.value.error_code == "tabular_runtime_unavailable"
     assert exc_info.value.error_details["operation"] == "analysis.profile"
     assert exc_info.value.error_details["tabular"]["package_versions"]["polars-runtime-32"] == "1.41.2"
-    assert any("analysis=false" in hint for hint in exc_info.value.repair_hints)
+    assert any("data.query" in hint for hint in exc_info.value.repair_hints)
     assert exc_info.value.retryable is True
 
 
-def test_data_peek_tool_can_skip_profile(monkeypatch, tmp_path: Path) -> None:
-    dataset_service, _artifact_service, registry, _conversation_store = _build_runtime(monkeypatch, tmp_path)
-    source = _write_mixed_csv(tmp_path)
-    dataset = dataset_service.register_dataset(RegisterDatasetInput(source_path=str(source.resolve()), name="Sales"))
-    arguments = {"dataset_id": dataset.id, "analysis": False}
-
-    result = registry.execute(
-        "data.peek",
-        arguments,
-        _tool_context(_conversation_store, "data.peek", arguments),
-    )
-
-    assert result.payload["analysis"] == {"enabled": False}
-    assert not hasattr(result, "content_blocks")
-
-
-def test_data_peek_tool_returns_structure_dsl_for_messy_xlsx(monkeypatch, tmp_path: Path) -> None:
+def test_data_query_uses_canonical_names_for_messy_xlsx(monkeypatch, tmp_path: Path) -> None:
     dataset_service, _artifact_service, registry, conversation_store = _build_runtime(monkeypatch, tmp_path)
     source = _write_report_xlsx(tmp_path)
     dataset = dataset_service.register_dataset(RegisterDatasetInput(source_path=str(source.resolve()), name="Report"))
-    arguments = {"dataset_id": dataset.id, "analysis": False}
+    arguments = {
+        "dataset_id": dataset.id,
+        "sql": 'SELECT "column_2" FROM input LIMIT 3',
+        "limit": 3,
+    }
 
     result = registry.execute(
-        "data.peek",
+        "data.query",
         arguments,
-        _tool_context(conversation_store, "data.peek", arguments),
+        _tool_context(conversation_store, "data.query", arguments),
     )
 
-    inspection = result.payload["inspection"]
-    assert "format" not in inspection
-    assert "sheet" not in inspection
-    assert "layout_evidence" not in inspection
-    assert inspection["coordinate_system"] == "rows are spreadsheet_1_based; columns are position_0_based"
-
-    column_schema = inspection["columns"]["_schema"]
-    column_rows = inspection["columns"]["data"]
-    assert column_rows[1][column_schema["tool_name"]] == "column_2"
-    assert column_rows[1][column_schema["position"]] == 1
-    assert "source_name" not in column_schema
-    assert "loader_name" not in column_schema
-    assert "name_source" not in column_schema
-
-    window_schema = inspection["row_windows"]["_schema"]
-    window_rows = inspection["row_windows"]["data"]
-    assert window_rows[2][window_schema["row"]] == 3
-    assert window_rows[2][window_schema["cells"]][:3] == ["城市", "销售数量", "销售金额(元)"]
-    assert not hasattr(result, "provider_payload")
-    assert result.payload["analysis"] == {"enabled": False}
+    assert result.payload["columns"]["data"] == [["column_2", "str", 0]]
+    assert result.payload["rows"]["data"] == [[None], ["销售数量"], ["1"]]
 
 
-def test_data_peek_tool_schema_owns_profile_controls(monkeypatch, tmp_path: Path) -> None:
+def test_data_query_schema_does_not_expose_profile_controls(monkeypatch, tmp_path: Path) -> None:
     _dataset_service, _artifact_service, registry, _conversation_store = _build_runtime(monkeypatch, tmp_path)
     specs = {spec.name: spec for spec in registry.list_specs()}
 
     assert "analysis.profile" not in specs
-    schema = specs["data.peek"].parameters_schema
-    assert schema["required"] == ["dataset_id"]
-    assert schema["properties"]["analysis"] == {"type": "boolean", "default": True}
+    assert "data.peek" not in specs
+    schema = specs["data.query"].parameters_schema
+    assert schema["required"] == ["sql"]
     assert "dataset_id" in schema["properties"]
     assert "source_path" not in schema["properties"]
-    assert "target_columns" in schema["properties"]
-    assert "top_n" in schema["properties"]
-    assert "correlation_column_limit" in schema["properties"]
+    assert "target_columns" not in schema["properties"]
+    assert "top_n" not in schema["properties"]
+    assert "correlation_column_limit" not in schema["properties"]
     assert "rows" not in schema["properties"]

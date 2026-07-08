@@ -615,7 +615,8 @@ def test_analysis_graph_tool_schema_is_dataset_scoped(monkeypatch, tmp_path: Pat
     assert "analysis.graph" in specs
     schema = specs["analysis.graph"].parameters_schema
     assert schema["required"] == ["dataset_id"]
-    assert schema["oneOf"] == [{"required": ["spec"]}, {"required": ["wordcloud_spec"]}]
+    assert "oneOf" not in schema
+    assert "exactly one graph mode" in specs["analysis.graph"].description
     assert "dataset_id" in schema["properties"]
     assert "spec" in schema["properties"]
     assert "wordcloud_spec" in schema["properties"]

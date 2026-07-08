@@ -9,9 +9,9 @@ This guidance applies to AI-first service boundaries under `src/xenix/services/`
 - Agent Harness is a service under `src/xenix/services/agent/`.
 - Agent Harness owns Thread, Turn, Message, tool-call, tool-result, run recording, provider interaction, and tool execution.
 - Storage provides persistence interfaces for service-owned records.
-- Keep source dataset registrations pointed at user-managed source files.
-- Data services may register app-managed dataset artifacts under runtime artifacts.
-- Persist both source-dataset metadata and app-managed dataset-artifact metadata through service-owned records.
+- Keep registered datasets pointed at app-owned materialized dataset files; user-managed source files are import provenance, not execution authority.
+- Data services may create app-owned datasets under runtime state. User-openable dataset exports are lazy artifacts under runtime artifacts.
+- Persist source import provenance, app-owned dataset metadata, and user-openable artifact metadata through their service-owned records.
 - The target generalized ML lifecycle represents dataset inputs as immutable column role-binding records. The older feature/target column-selection records are migration inputs only.
 - Keep dataset inspection metadata ephemeral and runtime-derived.
 - Validate column role bindings through service code, not UI-only checks.
@@ -23,7 +23,9 @@ This guidance applies to AI-first service boundaries under `src/xenix/services/`
 
 ## Boundaries
 
-- `DatasetService` owns source dataset registration, source-file inspection, and dataset export helpers.
-- Artifact service owns artifact registration and artifact link resolution.
+- `DatasetService` owns dataset registration, source-file inspection, and explicit dataset export helpers.
+- `DatasetExportService` owns lazy dataset activation/export to workbook artifacts.
+- `ArtifactService` owns artifact registration, artifact link resolution, and artifact file activation/open.
+- `LinkRouter` owns UI-triggered link activation and dispatches service-owned URI schemes to the owning service.
 - ML service training APIs should accept immutable role-binding ids, model selections, and artifact output owner inputs. ML task payloads should expand to explicit dataset id and role-binding snapshots before execution.
 - `WorkItemService` exits the target AI-first service topology.

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import duckdb
 
 from ..exceptions import ValidationError
 from .storage.models import DatasetSourceFormat
@@ -72,7 +73,9 @@ def load_tabular_frame(path: Path, source_format: DatasetSourceFormat):
 
     try:
         if source_format is DatasetSourceFormat.CSV:
-            return pl.read_csv(path, try_parse_dates=False)
+            return pl.read_csv(path, try_parse_dates=False, infer_schema_length=None)
+        if source_format is DatasetSourceFormat.PARQUET:
+            return pl.read_parquet(path)
         if source_format in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}:
             return pl.read_excel(path, engine="calamine")
     except Exception as exc:  # pragma: no cover - depends on local runtime state
@@ -86,7 +89,7 @@ def load_tabular_frame(path: Path, source_format: DatasetSourceFormat):
             ),
         ) from exc
 
-    raise ValidationError("Only .csv, .xlsx, and .xls dataset files are supported.")
+    raise ValidationError("Only .csv, .parquet, .xlsx, and .xls dataset files are supported.")
 
 
 def load_pandas_frame_with_schema(path: Path, source_format: DatasetSourceFormat) -> LoadedPandasFrame:
@@ -192,9 +195,14 @@ def format_column(value: Any, index: int) -> str:
 def _load_pandas_frame_for_tools(path: Path, source_format: DatasetSourceFormat) -> pd.DataFrame:
     if source_format is DatasetSourceFormat.CSV:
         return pd.read_csv(path)
+    if source_format is DatasetSourceFormat.PARQUET:
+        return duckdb.connect(database=":memory:").execute(
+            "SELECT * FROM read_parquet(?)",
+            [str(path)],
+        ).fetchdf()
     if source_format in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}:
         return pd.read_excel(path, dtype=str, keep_default_na=False)
-    raise ValidationError("Only .csv, .xlsx, and .xls dataset files are supported.")
+    raise ValidationError("Only .csv, .parquet, .xlsx, and .xls dataset files are supported.")
 
 
 def _inspect_column_name(value: Any, index: int) -> dict[str, Any]:

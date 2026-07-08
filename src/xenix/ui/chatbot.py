@@ -1141,7 +1141,7 @@ class ThreadDetailView(QWidget):
     message_submitted = Signal(str, list, str)
     files_attached = Signal(list)
     attachment_removed = Signal(str)
-    artifact_link_activated = Signal(str)
+    service_link_activated = Signal(str)
     tool_action_requested = Signal(object)
     stop_requested = Signal()
     step_budget_continue_requested = Signal()
@@ -1383,7 +1383,7 @@ class ThreadDetailView(QWidget):
             artifact_resolver=self._artifact_resolver,
             parent=self,
         )
-        bubble.link_activated.connect(self.artifact_link_activated.emit)
+        bubble.link_activated.connect(self.service_link_activated.emit)
         bubble.set_available_width(self._message_column.width())
         self._message_layout.insertWidget(self._message_insert_index(), bubble)
         widget_id = event_id or message_id
@@ -1419,7 +1419,7 @@ class ThreadDetailView(QWidget):
 
     def add_tool_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> ToolCallItem:
         item = ToolCallItem(event, artifact_resolver=self._artifact_resolver, parent=self)
-        item.link_activated.connect(self.artifact_link_activated.emit)
+        item.link_activated.connect(self.service_link_activated.emit)
         item.action_requested.connect(self.tool_action_requested.emit)
         item.set_available_width(self._message_column.width())
         self._message_layout.insertWidget(self._message_insert_index(), item)
@@ -1464,7 +1464,7 @@ class ThreadDetailView(QWidget):
             artifact_resolver=self._artifact_resolver,
             parent=self,
         )
-        bubble.link_activated.connect(self.artifact_link_activated.emit)
+        bubble.link_activated.connect(self.service_link_activated.emit)
         bubble.set_available_width(self._message_column.width())
         self._message_layout.insertWidget(self._message_insert_index(), bubble)
         self._event_widgets_by_id[event.id] = bubble

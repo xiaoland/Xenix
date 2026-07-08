@@ -595,7 +595,7 @@ def test_main_window_renders_tool_calls(monkeypatch, tmp_path: Path) -> None:
         assert tool_items
         assert all(item.width() == window._thread_detail_view._message_column.width() for item in tool_items)
         summaries = [item._summary_label.text() for item in tool_items]
-        assert "Inspected dataset" in summaries
+        assert "Queried dataset" in summaries
         assert "Trained model" in summaries
         assert "Applied model" in summaries
     finally:
@@ -620,9 +620,9 @@ def test_thread_detail_view_expands_tool_event_detail(monkeypatch, tmp_path: Pat
                 author=ChatbotEventAuthor.TOOL,
                 status=ChatbotEventStatus.FAILED,
                 tool_call_id="tool-call",
-                tool_name="data.peek",
-                icon_key="table",
-                summary="Failed to inspect dataset",
+                tool_name="data.query",
+                icon_key="table-search",
+                summary="Failed to query dataset",
                 detail_blocks=[{"type": "markdown", "text": "Source file is missing."}],
             )
         )
@@ -630,7 +630,7 @@ def test_thread_detail_view_expands_tool_event_detail(monkeypatch, tmp_path: Pat
 
         item = view._event_widgets_by_id["tool-event"]
         assert item.objectName() == "chatToolCallItem"
-        assert item._summary_label.text() == "Failed to inspect dataset"
+        assert item._summary_label.text() == "Failed to query dataset"
         assert item._icon_label.pixmap() is not None
         assert not item._icon_label.pixmap().isNull()
         assert item._detail_browser.isHidden()
@@ -729,13 +729,13 @@ def test_thread_detail_view_renders_tool_image_artifact_preview(monkeypatch, tmp
         "</svg>",
         encoding="utf-8",
     )
-    opened_urls = []
+    opened_paths: list[Path] = []
 
-    def fake_open_url(url):
-        opened_urls.append(url)
+    def fake_open_file(path: Path) -> bool:
+        opened_paths.append(path)
         return True
 
-    monkeypatch.setattr("xenix.ui.main_window.QDesktopServices.openUrl", fake_open_url)
+    monkeypatch.setattr("xenix.services.artifact_service._open_file_with_os", fake_open_file)
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
 
@@ -791,7 +791,7 @@ def test_thread_detail_view_renders_tool_image_artifact_preview(monkeypatch, tmp
         item._detail_browser.anchorClicked.emit(QUrl(rendered_uri))
         app.processEvents()
 
-        assert [Path(url.toLocalFile()) for url in opened_urls] == [artifact_path.resolve()]
+        assert opened_paths == [artifact_path.resolve()]
     finally:
         window.close()
 
@@ -996,6 +996,86 @@ def test_main_window_generate_thread_title_applies_edited_proposal(monkeypatch, 
         assert current_item is not None
         assert current_item.text() == "Edited generated title"
     finally:
+        window.close()
+
+
+def test_main_window_opens_service_link_off_ui_thread(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=False)
+    activation_started = threading.Event()
+    release_activation = threading.Event()
+    activated: list[tuple[str, str | None]] = []
+    try:
+        def fake_activate(uri: str, *, thread_id: str | None = None):
+            activation_started.set()
+            activated.append((uri, thread_id))
+            assert release_activation.wait(timeout=2.0)
+            return object()
+
+        monkeypatch.setattr(window._link_router, "activate", fake_activate)
+
+        started_at = time.perf_counter()
+        window._open_service_link("dataset://dataset-1")
+        elapsed = time.perf_counter() - started_at
+
+        assert elapsed < 0.5
+        assert activation_started.wait(timeout=1.0)
+        assert window._service_link_progress_dialog is not None
+        assert window._service_link_progress_dialog.windowModality() == Qt.NonModal
+        assert window._service_link_progress_dialog.isModal() is False
+        assert activated == [("dataset://dataset-1", window._agent_thread_id)]
+
+        release_activation.set()
+        for _ in range(80):
+            app.processEvents()
+            if window._service_link_progress_dialog is None:
+                break
+            time.sleep(0.01)
+
+        assert window._service_link_progress_dialog is None
+        assert window._active_service_link_activation_ids == set()
+    finally:
+        release_activation.set()
+        window.close()
+
+
+def test_main_window_service_link_activation_failure_closes_progress(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=False)
+    activation_started = threading.Event()
+    release_activation = threading.Event()
+    errors: list[str] = []
+    try:
+        def fake_activate(_uri: str, *, thread_id: str | None = None):
+            activation_started.set()
+            assert release_activation.wait(timeout=2.0)
+            raise RuntimeError("export failed")
+
+        monkeypatch.setattr(window._link_router, "activate", fake_activate)
+        monkeypatch.setattr(window._thread_detail_view, "show_error", lambda message: errors.append(message))
+
+        window._open_service_link("dataset://dataset-1")
+        assert activation_started.wait(timeout=1.0)
+        assert window._service_link_progress_dialog is not None
+
+        release_activation.set()
+        for _ in range(80):
+            app.processEvents()
+            if errors:
+                break
+            time.sleep(0.01)
+
+        assert errors == ["export failed"]
+        assert window._service_link_progress_dialog is None
+        assert window._active_service_link_activation_ids == set()
+    finally:
+        release_activation.set()
         window.close()
 
 
@@ -1413,7 +1493,7 @@ def test_main_window_submit_chat_message_uses_ready_dataset_attachments(monkeypa
         for _ in range(40):
             app.processEvents()
             record = window._composer_attachments.get(resolved_path)
-            if record is not None and record.attachment is not None:
+            if record is not None and record.attachments is not None:
                 break
             time.sleep(0.01)
 
@@ -1456,15 +1536,17 @@ def test_main_window_attach_file_runs_dataset_preflight_off_ui_thread(
             preflight_started.set()
             assert file_path == str(data_file.resolve())
             assert release_preflight.wait(timeout=2.0)
-            return DatasetAttachmentInput(
-                dataset_id="dataset-1",
-                name="customers",
-                file_name="customers.csv",
-                source_format="csv",
-                row_count=1,
-                column_count=2,
-                preview_columns=["name", "value"],
-            )
+            return [
+                DatasetAttachmentInput(
+                    dataset_id="dataset-1",
+                    name="customers",
+                    file_name="customers.csv",
+                    source_format="csv",
+                    row_count=1,
+                    column_count=2,
+                    preview_columns=["name", "value"],
+                )
+            ]
 
         monkeypatch.setattr(window, "_register_composer_dataset", fake_register)
 
@@ -1481,11 +1563,11 @@ def test_main_window_attach_file_runs_dataset_preflight_off_ui_thread(
         for _ in range(40):
             app.processEvents()
             record = window._composer_attachments.get(resolved_path)
-            if record is not None and record.attachment is not None:
+            if record is not None and record.attachments is not None:
                 break
             time.sleep(0.01)
 
-        assert window._composer_attachments[resolved_path].attachment is not None
+        assert window._composer_attachments[resolved_path].attachments is not None
         assert window._thread_detail_view._send_button.isEnabled() is True
     finally:
         release_preflight.set()
@@ -1511,15 +1593,17 @@ def test_main_window_remove_pending_attachment_aborts_preflight_and_discards_dat
             preflight_started.set()
             assert file_path == str(data_file.resolve())
             assert release_preflight.wait(timeout=2.0)
-            return DatasetAttachmentInput(
-                dataset_id="dataset-removed",
-                name="customers",
-                file_name="customers.csv",
-                source_format="csv",
-                row_count=1,
-                column_count=2,
-                preview_columns=["name", "value"],
-            )
+            return [
+                DatasetAttachmentInput(
+                    dataset_id="dataset-removed",
+                    name="customers",
+                    file_name="customers.csv",
+                    source_format="csv",
+                    row_count=1,
+                    column_count=2,
+                    preview_columns=["name", "value"],
+                )
+            ]
 
         monkeypatch.setattr(window, "_register_composer_dataset", fake_register)
         monkeypatch.setattr(
@@ -1897,13 +1981,13 @@ def test_thread_detail_view_artifact_link_resolves_and_opens_file(monkeypatch, t
     runtime_home = tmp_path / "xenix-home"
     artifact_path = tmp_path / "predictions.csv"
     artifact_path.write_text("prediction\n42\n", encoding="utf-8")
-    opened_urls = []
+    opened_paths: list[Path] = []
 
-    def fake_open_url(url):
-        opened_urls.append(url)
+    def fake_open_file(path: Path) -> bool:
+        opened_paths.append(path)
         return True
 
-    monkeypatch.setattr("xenix.ui.main_window.QDesktopServices.openUrl", fake_open_url)
+    monkeypatch.setattr("xenix.services.artifact_service._open_file_with_os", fake_open_file)
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
 
@@ -1940,7 +2024,7 @@ def test_thread_detail_view_artifact_link_resolves_and_opens_file(monkeypatch, t
         bubble.link_activated.emit(rendered_uri)
         app.processEvents()
 
-        assert [Path(url.toLocalFile()) for url in opened_urls] == [artifact_path.resolve()]
+        assert opened_paths == [artifact_path.resolve()]
     finally:
         window.close()
 
@@ -1957,10 +2041,10 @@ def test_thread_detail_view_renders_inline_image_artifact_preview(monkeypatch, t
         "</svg>",
         encoding="utf-8",
     )
-    opened_urls = []
+    opened_paths: list[Path] = []
 
-    def fake_open_url(url):
-        opened_urls.append(url)
+    def fake_open_file(path: Path) -> bool:
+        opened_paths.append(path)
         return True
 
     rendered_svg: dict[str, object] = {}
@@ -1974,7 +2058,7 @@ def test_thread_detail_view_renders_inline_image_artifact_preview(monkeypatch, t
         rendered_svg["pixmap"] = sentinel
         return sentinel
 
-    monkeypatch.setattr("xenix.ui.main_window.QDesktopServices.openUrl", fake_open_url)
+    monkeypatch.setattr("xenix.services.artifact_service._open_file_with_os", fake_open_file)
     monkeypatch.setattr("xenix.ui.chatbot._render_svg_preview_pixmap", fake_render_svg_preview)
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
@@ -2021,7 +2105,7 @@ def test_thread_detail_view_renders_inline_image_artifact_preview(monkeypatch, t
         QTest.mouseClick(bubble._browser.viewport(), Qt.LeftButton, Qt.NoModifier, QPoint(20, 20))
         app.processEvents()
 
-        assert [Path(url.toLocalFile()) for url in opened_urls] == [artifact_path.resolve()]
+        assert opened_paths == [artifact_path.resolve()]
     finally:
         window.close()
 

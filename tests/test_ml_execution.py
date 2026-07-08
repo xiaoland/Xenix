@@ -1,10 +1,12 @@
 import time
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import ValidationError
+from xenix.services.dataset_inspection import detect_source_format, load_dataframe
 from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
 from xenix.services.ml_service import (
     BulkTuneWithEvaluateInput,
@@ -48,6 +50,11 @@ def _register_dataset(
     return dataset_service.register_dataset(
         RegisterDatasetInput(project_id=project_id, source_path=str(dataset_path.resolve()), name=name)
     )
+
+
+def _read_dataset_frame(path: str | Path) -> pd.DataFrame:
+    source_path = Path(path)
+    return load_dataframe(source_path, detect_source_format(source_path))
 
 
 def _create_binding(
@@ -269,12 +276,12 @@ def test_dataset_scoped_fit_evaluate_and_apply_run(monkeypatch, tmp_path: Path) 
     assert apply_details.task.task_type is MLTaskType.APPLY
     assert "apply_model" in apply_details.task.request_payload
     assert result_dataset is not None
-    assert "prediction" in Path(result_dataset.source_path).read_text(encoding="utf-8").splitlines()[0]
+    assert "prediction" in _read_dataset_frame(result_dataset.source_path).columns
     assert inline_apply_details.task.task_type is MLTaskType.APPLY
     assert inline_input_payload["source_kind"] == "manual_csv"
     assert inline_input_lines == ["feature_a,feature_b", "11,9", "12,10"]
     assert inline_result_dataset is not None
-    assert "prediction" in Path(inline_result_dataset.source_path).read_text(encoding="utf-8").splitlines()[0]
+    assert "prediction" in _read_dataset_frame(inline_result_dataset.source_path).columns
     assert [artifact.artifact_kind for artifact in apply_details.artifacts] == [MLTaskArtifactKind.APPLY_RESULT]
 
 
@@ -355,8 +362,7 @@ def test_clustering_fit_runs_without_follow_up_evaluate_and_persists_export_arti
     assert apply_details.task.task_type is MLTaskType.APPLY
     assert apply_details.task.result_payload["prediction_column_name"] == "cluster_id"
     assert result_dataset is not None
-    result_lines = Path(result_dataset.source_path).read_text(encoding="utf-8").splitlines()
-    assert "cluster_id" in result_lines[0]
+    assert "cluster_id" in _read_dataset_frame(result_dataset.source_path).columns
     assert [artifact.artifact_kind for artifact in apply_details.artifacts] == [MLTaskArtifactKind.APPLY_RESULT]
 
 
@@ -482,9 +488,10 @@ def test_association_rules_train_and_apply_run(monkeypatch, tmp_path: Path) -> N
     assert metadata.model_task_kind == "rule_miner"
     assert [role["name"] for role in metadata.apply_role_schema["roles"]] == ["item"]
     assert apply_result_dataset is not None
-    result_lines = Path(apply_result_dataset.source_path).read_text(encoding="utf-8").splitlines()
-    assert result_lines[0].split(",")[:4] == ["source_file", "input_row_number", "input_items", "rank"]
-    assert "recommended_items" in result_lines[0]
+    result_frame = _read_dataset_frame(apply_result_dataset.source_path)
+    result_columns = list(result_frame.columns)
+    assert result_columns[:4] == ["source_file", "input_row_number", "input_items", "rank"]
+    assert "recommended_items" in result_columns
 
 
 def test_recommendation_train_and_apply_run(monkeypatch, tmp_path: Path) -> None:
@@ -554,9 +561,9 @@ def test_recommendation_train_and_apply_run(monkeypatch, tmp_path: Path) -> None
     assert metadata.model_task_kind == "recommender"
     assert [role["name"] for role in metadata.apply_role_schema["roles"]] == ["item"]
     assert apply_result_dataset is not None
-    result_lines = Path(apply_result_dataset.source_path).read_text(encoding="utf-8").splitlines()
-    assert result_lines[0].split(",")[:4] == ["source_file", "input_row_number", "base_item", "rank"]
-    assert "recommended_item" in result_lines[0]
+    result_columns = list(_read_dataset_frame(apply_result_dataset.source_path).columns)
+    assert result_columns[:4] == ["source_file", "input_row_number", "base_item", "rank"]
+    assert "recommended_item" in result_columns
 
 
 def test_text_classification_train_evaluate_and_apply_run(monkeypatch, tmp_path: Path) -> None:
@@ -632,8 +639,11 @@ def test_text_classification_train_evaluate_and_apply_run(monkeypatch, tmp_path:
     assert metadata.evaluation_kind == "classification"
     assert [role["name"] for role in metadata.apply_role_schema["roles"]] == ["text"]
     assert apply_result_dataset is not None
-    result_lines = Path(apply_result_dataset.source_path).read_text(encoding="utf-8").splitlines()
-    assert result_lines[0].split(",") == ["token_text", "prediction", "prediction_score"]
+    assert list(_read_dataset_frame(apply_result_dataset.source_path).columns) == [
+        "token_text",
+        "prediction",
+        "prediction_score",
+    ]
 
 
 def test_text_clustering_train_and_apply_run(monkeypatch, tmp_path: Path) -> None:
@@ -696,8 +706,7 @@ def test_text_clustering_train_and_apply_run(monkeypatch, tmp_path: Path) -> Non
     assert metadata.model_task_kind == "segmenter"
     assert [role["name"] for role in metadata.apply_role_schema["roles"]] == ["text"]
     assert apply_result_dataset is not None
-    result_lines = Path(apply_result_dataset.source_path).read_text(encoding="utf-8").splitlines()
-    assert "cluster_id" in result_lines[0]
+    assert "cluster_id" in _read_dataset_frame(apply_result_dataset.source_path).columns
 
 
 def test_text_topic_modeling_train_and_apply_run(monkeypatch, tmp_path: Path) -> None:
@@ -760,9 +769,9 @@ def test_text_topic_modeling_train_and_apply_run(monkeypatch, tmp_path: Path) ->
     assert metadata.model_task_kind == "segmenter"
     assert [role["name"] for role in metadata.apply_role_schema["roles"]] == ["text"]
     assert apply_result_dataset is not None
-    result_lines = Path(apply_result_dataset.source_path).read_text(encoding="utf-8").splitlines()
-    assert "dominant_topic" in result_lines[0]
-    assert "topic_score" in result_lines[0]
+    result_columns = list(_read_dataset_frame(apply_result_dataset.source_path).columns)
+    assert "dominant_topic" in result_columns
+    assert "topic_score" in result_columns
 
 
 def test_text_similarity_train_and_apply_run(monkeypatch, tmp_path: Path) -> None:
@@ -824,11 +833,17 @@ def test_text_similarity_train_and_apply_run(monkeypatch, tmp_path: Path) -> Non
     assert metadata.model_task_kind == "recommender"
     assert [role["name"] for role in metadata.apply_role_schema["roles"]] == ["text"]
     assert apply_result_dataset is not None
-    result_lines = Path(apply_result_dataset.source_path).read_text(encoding="utf-8").splitlines()
-    assert result_lines[0].split(",")[:4] == ["source_file", "input_row_number", "query_text", "rank"]
-    assert "matched_text_id" in result_lines[0]
-    assert any(",r2," in line for line in result_lines[1:])
-    assert any(",r3," in line for line in result_lines[1:])
+    result_frame = _read_dataset_frame(apply_result_dataset.source_path)
+    result_columns = list(result_frame.columns)
+    assert result_columns[:4] == [
+        "source_file",
+        "input_row_number",
+        "query_text",
+        "rank",
+    ]
+    assert "matched_text_id" in result_columns
+    assert "r2" in set(result_frame["matched_text_id"].astype(str))
+    assert "r3" in set(result_frame["matched_text_id"].astype(str))
 
 
 def test_bulk_tuning_creates_one_tuning_task_per_model_and_follow_up_evaluations(
@@ -1045,7 +1060,7 @@ def test_column_binding_error_names_missing_columns_and_suggestions(monkeypatch,
     assert "Missing columns for role 'feature': `Last Month's Trading Commission (Yuan)`." in message
     assert "`Last Month's Trading Commission (Yuan)` -> `Last Month’s Trading Commission (Yuan)`" in message
     assert "Available columns:" in message
-    assert "Use the exact column names returned by data.peek" in message
+    assert "Use the exact column names returned by data.query or dataset inspection." in message
 
 
 def test_apply_rejects_input_files_missing_required_features(monkeypatch, tmp_path: Path) -> None:

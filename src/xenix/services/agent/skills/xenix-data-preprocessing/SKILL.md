@@ -25,8 +25,7 @@ This skill guides Xenix Agent when the task is to prepare data safely before ana
 
 Xenix Agent has no script execution environment. Use only available Xenix tools:
 
-- `data.peek` for schema, preview rows, inferred types, and field summaries.
-- `data.query` for read-only profiling and validation checks.
+- `data.query` for schema projection, preview rows, read-only profiling, and validation checks.
 - `data.integrate` when multiple registered datasets need to be vertically appended.
 - `data.clean.metadata` to inspect supported cleaning operations.
 - `data.clean` to apply explicit predefined cleaning operations to one dataset.
@@ -46,8 +45,7 @@ Xenix Agent has no script execution environment. Use only available Xenix tools:
 
 ## Default Workflow
 
-1. Use `data.peek` to inspect schema, row/column count, sample rows, inferred types, and obvious field roles.
-2. Use `data.query` to profile missingness, duplicates, cardinality, numeric ranges, category variants, date parseability, and candidate target/feature quality.
+1. Use `data.query` to inspect schema, sample rows, row/column counts, missingness, duplicates, cardinality, numeric ranges, category variants, date parseability, and candidate target/feature quality.
 3. Classify issues by impact:
    - blockers: impossible type, missing target, duplicate keys, invalid unit of analysis, severe leakage;
    - quality risks: missingness, outliers, category inconsistencies, high-cardinality text;
@@ -57,7 +55,7 @@ Xenix Agent has no script execution environment. Use only available Xenix tools:
 6. Use `data.tokenize` when raw Chinese text must become a stable derived dataset for word clouds, text clustering, text classification, topic modeling, or similarity retrieval.
 7. Use `data.transform` for SQL-derived features, filtering, joins, aggregation, reshaping, or durable chart/model-ready derived datasets. Use it, not `data.integrate`, for horizontal joins.
 8. Use `data.feature.select` when a modeling task needs explicit target/features/exclusions.
-9. Validate the result with `data.peek` or `data.query`.
+9. Validate the result with `data.query`.
 10. Hand off to `xenix-data-analysis` or `xenix-data-modeling` only after the prepared dataset or role binding is clear.
 
 ## Optional References

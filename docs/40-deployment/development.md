@@ -36,7 +36,7 @@ The delivered workflow includes:
 
 - conversation plus file drag-and-drop
 - Agent Harness tool calls for data inspection, integration, cleaning, read-only querying, transformation, role binding, training, hyperparameter training, and model apply
-- markdown summaries with `artifact://...` links
+- markdown summaries with `dataset://...` links for registered datasets and `artifact://...` links for materialized artifacts
 - Chatbot previews for generated datasets, reports, metrics, models, images, and apply result files
 - local persistence for conversations, messages, tool calls, tool results, artifacts, ML task metadata, and logs
 
@@ -264,7 +264,7 @@ Smoke verification should confirm that these directories are created in a fresh 
 - If DuckDB-backed tools fail only in the packaged app, rerun `pdm run smoke-package` and inspect whether PyInstaller collected DuckDB's package metadata and native library.
 - If an ML/data-science dependency fails only in the packaged app, inspect `build/xenix/COLLECT-00.toc` and `dist/xenix/_internal/` for package-local native files. Compare them with `PyInstaller.utils.hooks.collect_dynamic_libs("<package>")` and package metadata/data requirements. Do not assume that a successful Python-module import during analysis means the package's DLLs, `.pyd` files, BLAS/OpenMP runtimes, or package data were collected.
 - If the packaged app fails at startup with `unknown feature flag: 'sse3'`, verify that `_polars_runtime_compat` is present under `dist/xenix/_internal/` and that the release environment was synced after the `polars[calamine,rtcompat]` dependency change. Do not use `POLARS_SKIP_CPU_CHECK` as the packaged fix; it can defer the failure into an illegal CPU instruction crash.
-- If dataset inspection or `data.peek` reports `tabular_runtime_unavailable`, verify that `polars` and `polars-runtime-*` resolve to the same version in the active environment. Close running Xenix/Python processes that may keep old binaries loaded, then run `pdm sync -d --clean` and retry.
+- If dataset import, dataset inspection, or `data.query` reports `tabular_runtime_unavailable`, verify that `polars` and `polars-runtime-*` resolve to the same version in the active environment. Close running Xenix/Python processes that may keep old binaries loaded, then run `pdm sync -d --clean` and retry.
 - If `analysis.graph` fails only in the PyInstaller windowed package, separate the renderer path first: Vega-Lite charts still go through `vl-convert-python`, while `wordcloud_spec` goes through `wordcloud` plus a real font file. Local minimal packaging tests showed that `vl_convert` SVG conversion can work in a console bundle but hang or fail with `oneshot canceled` in a windowed bundle that has no Windows console. Xenix allocates a temporary hidden console around the Vega-Lite converter call in frozen Windows builds, then releases it after rendering. Keep `smoke-package` covering both Vega-Lite rendering and dedicated word-cloud rendering so this boundary does not regress.
 - If an SSH worker setup fails, inspect `config/ml_workers.json`, the Xenix-managed `Host xenix.*` block in `~/.ssh/config`, and the remote root permissions. Do not add passwords, passphrases, or private-key material to Xenix config.
 - If you need an isolated local run, set `XENIX_APP_HOME` to an empty directory or use the VSCode workspace-home launch profile.

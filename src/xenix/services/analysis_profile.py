@@ -127,7 +127,7 @@ class AnalysisProfileService:
     def _load_frame(self, source_path: Path) -> pl.DataFrame:
         source_format = detect_source_format(source_path)
         if source_format is DatasetSourceFormat.UNKNOWN:
-            raise ValidationError("Only .csv, .xlsx, and .xls dataset files are supported.")
+            raise ValidationError("Only .csv, .parquet, .xlsx, and .xls dataset files are supported.")
         if pl is None:
             raise self._tabular_runtime_validation_error(
                 source_path=source_path,
@@ -172,11 +172,11 @@ class AnalysisProfileService:
         if phase:
             details["phase"] = phase
         return ValidationError(
-            "data.peek analysis profile is unavailable because the Polars runtime could not load this dataset.",
+            "Dataset analysis profile is unavailable because the Polars runtime could not load this dataset.",
             error_code="tabular_runtime_unavailable",
             error_details=details,
             repair_hints=[
-                "Retry data.peek with `analysis=false` when you only need schema and preview rows.",
+                "Use data.query for a smaller schema or preview query when you only need basic evidence.",
                 "Repair the local environment so `polars` and `polars-runtime-*` are the same version, then retry.",
             ],
             retryable=True,

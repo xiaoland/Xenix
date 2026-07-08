@@ -24,8 +24,7 @@ This skill guides Xenix Agent for business-facing tabular analysis: data underst
 
 Xenix Agent has no script execution environment. Do not rely on Python, shell, local files, validators, or ad-hoc code. Use only available Xenix tools:
 
-- `data.peek` for schema, preview rows, field summaries, and small samples.
-- `data.query` for full-data computation through read-only DuckDB SQL.
+- `data.query` for schema inspection, preview rows, field summaries, small samples, and full-data computation through read-only DuckDB SQL.
 - `data.transform` when a chart or report needs a durable derived table.
 - `data.tokenize` only after activating `xenix-data-preprocessing`, when raw Chinese text must be segmented upstream for word clouds.
 - `analysis.graph` for bounded charts or word clouds from chart-ready datasets.
@@ -45,8 +44,8 @@ The language model is the orchestration and interpretation layer. The tools are 
 ## Default workflow
 
 1. Understand the user's business intent. If the user says “帮我看看这个数据”, proceed with automatic data understanding and task planning.
-2. Start with `data.peek`: inspect schema, sample rows, field names, inferred types, row count if available, and candidate semantic fields.
-3. Use `data.query` for profiling: row count, missingness, cardinality, numeric ranges, categorical distributions, date ranges, duplicates, target distribution, and entity-item structure where relevant.
+2. Start with `data.query`: inspect schema, sample rows, field names, row count, and candidate semantic fields.
+3. Use `data.query` for profiling: missingness, cardinality, numeric ranges, categorical distributions, date ranges, duplicates, target distribution, and entity-item structure where relevant.
 4. Identify the likely business scene, unit of analysis, key metrics, time fields, subject-item candidates, and data quality blockers.
 5. If data quality blocks interpretation, activate `xenix-data-preprocessing`; if prediction/modeling is the true task, activate `xenix-data-modeling`.
 6. For word clouds, prepare a chart-ready frequency table first. If the source is raw Chinese text, activate `xenix-data-preprocessing` so `data.tokenize` can segment upstream before `data.query` or `data.transform` aggregates `word` and `count`.

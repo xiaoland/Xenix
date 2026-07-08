@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 import polars as pl
+import duckdb
 from pydantic import BaseModel, Field
 
 from ..exceptions import ValidationError
@@ -60,6 +61,8 @@ def detect_source_format(path: Path) -> DatasetSourceFormat:
     suffix = path.suffix.lower()
     if suffix == ".csv":
         return DatasetSourceFormat.CSV
+    if suffix == ".parquet":
+        return DatasetSourceFormat.PARQUET
     if suffix == ".xlsx":
         return DatasetSourceFormat.XLSX
     if suffix == ".xls":
@@ -70,9 +73,14 @@ def detect_source_format(path: Path) -> DatasetSourceFormat:
 def load_dataframe(path: Path, source_format: DatasetSourceFormat) -> pd.DataFrame:
     if source_format is DatasetSourceFormat.CSV:
         return pd.read_csv(path)
+    if source_format is DatasetSourceFormat.PARQUET:
+        return duckdb.connect(database=":memory:").execute(
+            "SELECT * FROM read_parquet(?)",
+            [str(path)],
+        ).fetchdf()
     if source_format in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}:
         return pd.read_excel(path)
-    raise ValidationError("Only .csv, .xlsx, and .xls dataset files are supported.")
+    raise ValidationError("Only .csv, .parquet, .xlsx, and .xls dataset files are supported.")
 
 
 def infer_column_kind(series: pl.Series) -> DatasetColumnKind:
@@ -94,7 +102,7 @@ def infer_column_kind(series: pl.Series) -> DatasetColumnKind:
 def inspect_dataset_file(source_path: Path) -> DatasetInspection:
     source_format = detect_source_format(source_path)
     if source_format is DatasetSourceFormat.UNKNOWN:
-        raise ValidationError("Only .csv, .xlsx, and .xls dataset files are supported.")
+        raise ValidationError("Only .csv, .parquet, .xlsx, and .xls dataset files are supported.")
 
     dataframe = load_tabular_frame(source_path, source_format)
     if dataframe.width == 0:
@@ -126,7 +134,7 @@ def inspect_dataset_file(source_path: Path) -> DatasetInspection:
 def inspect_attachment_metadata_file(source_path: Path) -> DatasetAttachmentMetadata:
     source_format = detect_source_format(source_path)
     if source_format is DatasetSourceFormat.UNKNOWN:
-        raise ValidationError("Only .csv, .xlsx, and .xls dataset files are supported.")
+        raise ValidationError("Only .csv, .parquet, .xlsx, and .xls dataset files are supported.")
     if source_format is DatasetSourceFormat.CSV:
         return _inspect_csv_attachment_metadata(source_path, source_format)
     if source_format is DatasetSourceFormat.XLSX:

@@ -276,6 +276,8 @@ def _load_runtime_imports() -> SimpleNamespace:
     conversation_store = load_module("xenix.services.agent.conversation_store")
     lazy_tools = load_module("xenix.services.agent.lazy_tools")
     artifact_service = load_module("xenix.services.artifact_service")
+    dataset_export_service = load_module("xenix.services.dataset_export_service")
+    link_router = load_module("xenix.services.link_router")
     lazy_ml_service = load_module("xenix.services.lazy_ml_service")
     lazy_services = load_module("xenix.services.lazy_services")
     llm = load_module("xenix.services.llm")
@@ -290,7 +292,9 @@ def _load_runtime_imports() -> SimpleNamespace:
         AgentToolRegistry=lazy_tools.LazyAgentToolRegistry,
         ArtifactService=artifact_service.ArtifactService,
         ConversationStore=conversation_store.ConversationStore,
+        DatasetExportService=dataset_export_service.DatasetExportService,
         LazyServiceProxy=lazy_services.LazyServiceProxy,
+        LinkRouter=link_router.LinkRouter,
         LLMService=llm.LLMService,
         LLMSettingsService=llm.LLMSettingsService,
         MLService=lazy_ml_service.LazyMLService,
@@ -490,6 +494,16 @@ def build_main_window(
             ml_task_service=ml_task_service,
         )
         artifact_service = runtime.ArtifactService(context.session_factory)
+        dataset_export_service = runtime.DatasetExportService(
+            paths=paths,
+            session_factory=context.session_factory,
+            dataset_service=dataset_service,
+            artifact_service=artifact_service,
+        )
+        link_router = runtime.LinkRouter(
+            artifact_service=artifact_service,
+            dataset_export_service=dataset_export_service,
+        )
         conversation_store = runtime.ConversationStore(context.session_factory)
         llm_settings_service = runtime.LLMSettingsService(paths)
         llm_service = runtime.LLMService(llm_settings_service)
@@ -521,6 +535,7 @@ def build_main_window(
             llm_settings_service=llm_settings_service,
             ml_worker_settings_service=ml_worker_settings_service,
             artifact_service=artifact_service,
+            link_router=link_router,
             dataset_service=dataset_service,
             ml_service=ml_service,
         )
