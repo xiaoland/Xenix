@@ -2,11 +2,15 @@
 
 ## Dashboard
 
-Objective: make Xenix's Agent-facing data preprocessing reliable on messy business spreadsheets by replacing bundled inspection shortcuts with atomic query/transform tools, app-owned Parquet datasets, lazy dataset export, and clear link activation boundaries.
+Objective: make Xenix's Agent-facing data preprocessing reliable on messy business spreadsheets by replacing bundled inspection shortcuts with atomic query/transform tools, app-owned Parquet datasets, explicit export artifacts, and clear link activation boundaries.
 
 Latest implementation commit: `542561f Refine dataset tools and lazy exports`.
 
+Current uncommitted slice: `08-eager-derived-export-artifacts` removes lazy dataset links and creates export artifacts during dataset-producing tool completion.
+
 Current mode: ongoing program workspace. The main implementation slice is committed; future work should be tracked as focused sub-tasks under `workstreams/`.
+
+Important target change after commit `9d0de57`: lazy dataset export is no longer the desired product behavior. The current local implementation removes lazy dataset activation and replaces derived dataset completion with eager export artifact creation; this slice is not committed yet.
 
 ## Current State
 
@@ -16,8 +20,8 @@ Current mode: ongoing program workspace. The main implementation slice is commit
 - Imported and derived registered datasets are app-owned Parquet tables under AppData state.
 - Workbook imports can split non-empty sheets into separate dataset rows.
 - Internal dataset consumers, including ML loaders, can consume Parquet-backed registered datasets.
-- Dataset-producing tools return `dataset_id` and `dataset_uri`, not eager artifact links to internal Parquet files.
-- `dataset://` activation goes through `LinkRouter -> DatasetExportService -> ArtifactService`, materializes/reuses a workbook artifact lazily, and opens through `ArtifactService`.
+- Current local code: generated dataset-producing tools create the corresponding workbook export artifact before returning, then return `dataset_id` plus `artifact_id`.
+- Tools do not return `artifact_uri`; the System Prompt owns the `artifact://<artifact_id>` link format and explains that artifacts are user-openable/previewable business outputs.
 - Service-owned link activation runs off the Qt UI thread with a non-modal, i18n-aware progress surface.
 
 ## Control Files
@@ -42,17 +46,19 @@ Current mode: ongoing program workspace. The main implementation slice is commit
 | `02-parquet-dataset-storage` | verified | Materialize imports and derived datasets as app-owned Parquet. |
 | `03-transform-sql-contract` | verified | Support bounded multi-statement transform scripts with atomic registration. |
 | `04-ml-parquet-consumption` | verified with follow-up risk | Move registered-dataset ML paths to Parquet without a permanent CSV bridge. |
-| `05-lazy-export-link-router` | verified | Separate dataset activation from artifact activation and use lazy workbook export. |
+| `05-lazy-export-link-router` | superseded | Historical committed slice: LinkRouter plus lazy `dataset://` export. |
 | `06-ui-service-link-progress` | verified | Keep dataset/artifact activation off the UI thread with non-modal progress. |
 | `07-docs-skills-fixtures` | verified, ongoing | Keep durable docs, skills, fixtures, and i18n aligned with the new contract. |
+| `08-eager-derived-export-artifacts` | implemented, focused verification passed | Globally remove `dataset://` and create synchronous export artifacts for derived datasets. |
 
 ## Latest Verification
 
 - `pdm run python -m pytest -q`: 304 passed, 3 sklearn warnings in 271.21s.
 - `git commit`: `542561f Refine dataset tools and lazy exports`.
+- Current uncommitted slice verification: `compileall` passed and 100 affected tests passed; see `ledger/verification.md`.
 
 See `ledger/verification.md` for details and historical runs.
 
 ## Next Step
 
-Use `protocol.md` before starting any new sub-task. Create or update a dedicated `workstreams/<nn-name>/packet.md`, link consumed decisions, define verification, then execute.
+Run broader regression if needed, then prepare a focused commit only after explicit commit instruction.

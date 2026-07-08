@@ -193,8 +193,17 @@ def test_data_tokenize_tool_registers_derived_dataset_and_artifact(monkeypatch, 
 
     assert derived_dataset.derived_from_dataset_id == source_dataset.id
     assert derived_dataset.project_id == source_dataset.project_id
-    assert result.payload["dataset_uri"] == f"dataset://{derived_dataset.id}"
-    assert "artifact_id" not in result.payload
+    assert "dataset_uri" not in result.payload
+    assert "artifact_uri" not in result.payload
+    artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
+    assert artifact.metadata_payload["dataset_id"] == derived_dataset.id
+    assert artifact.metadata_payload["dataset_export"]["dataset_id"] == derived_dataset.id
+    assert pd.read_excel(artifact.absolute_path).columns.tolist() == [
+        "review_id",
+        "review_text",
+        "token_text",
+        "token_count",
+    ]
     assert tokenized_frame.columns.tolist() == ["review_id", "review_text", "token_text", "token_count"]
     assert result.payload["row_count"] == 2
     assert result.payload["tokenization_report"]["output"] == "token_text"

@@ -8,7 +8,7 @@ import pytest
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import InvalidStateTransitionError, NotFoundError, ValidationError
-from xenix.services.artifact_service import ArtifactService, build_artifact_uri
+from xenix.services.artifact_service import ArtifactService
 from xenix.services.dataset_export_service import DatasetExportService
 from xenix.services.dataset_inspection import InspectDatasetInput, load_dataframe
 from xenix.services.dataset_service import (
@@ -310,11 +310,13 @@ def test_dataset_service_discards_unreferenced_dataset(monkeypatch, tmp_path: Pa
     dataset = dataset_service.register_dataset(
         RegisterDatasetInput(source_path=str(dataset_file.resolve()), name="Customers")
     )
+    materialized_path = Path(dataset.source_path)
 
     assert dataset_service.discard_unreferenced_dataset(dataset.id) is True
 
     with pytest.raises(NotFoundError):
         dataset_service.get_dataset(dataset.id)
+    assert not materialized_path.exists()
 
 
 def test_dataset_service_rejects_discard_when_dataset_is_referenced(
@@ -432,7 +434,7 @@ def test_dataset_service_exports_csv_with_selected_encoding_and_xlsx(monkeypatch
     ]
 
 
-def test_link_router_lazily_exports_dataset_to_workbook_artifact(monkeypatch, tmp_path: Path) -> None:
+def test_dataset_export_service_materializes_workbook_artifact(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
@@ -440,45 +442,42 @@ def test_link_router_lazily_exports_dataset_to_workbook_artifact(monkeypatch, tm
     artifact_service = ArtifactService(context.session_factory)
     export_service = DatasetExportService(
         paths=paths,
-        session_factory=context.session_factory,
         dataset_service=dataset_service,
         artifact_service=artifact_service,
-    )
-    router = LinkRouter(
-        artifact_service=artifact_service,
-        dataset_export_service=export_service,
     )
     dataset_file = tmp_path / "customers.csv"
     dataset_file.write_text("name,value\nAcme,12\nContoso,18\n", encoding="utf-8")
     dataset = dataset_service.register_dataset(
         RegisterDatasetInput(source_path=str(dataset_file.resolve()), name="Customers")
     )
-    opened_paths: list[Path] = []
 
-    def fake_open_file(path: Path) -> bool:
-        opened_paths.append(path)
-        return True
+    artifact = export_service.materialize_dataset_export_artifact(dataset.id)
 
-    monkeypatch.setattr("xenix.services.artifact_service._open_file_with_os", fake_open_file)
-
-    first = router.activate(f"dataset://{dataset.id}")
-    second = router.activate(f"dataset://{dataset.id}")
-
-    assert first.dataset_id == dataset.id
-    assert first.artifact_id == second.artifact_id
-    assert opened_paths[0].suffix == ".xlsx"
-    assert opened_paths[0].exists()
-    assert opened_paths == [opened_paths[0], opened_paths[0]]
-    resolved = artifact_service.resolve_uri(build_artifact_uri(first.artifact_id or ""))
+    assert artifact.dataset_id == dataset.id
+    assert artifact.export_format == "xlsx"
+    assert Path(artifact.absolute_path).suffix == ".xlsx"
+    assert Path(artifact.absolute_path).exists()
+    resolved = artifact_service.resolve_uri(f"artifact://{artifact.artifact_id}")
     assert resolved.metadata_payload["dataset_export"] == {
         "dataset_id": dataset.id,
         "format": "xlsx",
         "source_path": dataset.source_path,
     }
-    assert pd.read_excel(opened_paths[0]).to_dict(orient="records") == [
+    assert pd.read_excel(artifact.absolute_path).to_dict(orient="records") == [
         {"name": "Acme", "value": 12},
         {"name": "Contoso", "value": 18},
     ]
+
+
+def test_link_router_rejects_dataset_scheme(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    artifact_service = ArtifactService(context.session_factory)
+    router = LinkRouter(artifact_service=artifact_service)
+
+    with pytest.raises(ValidationError, match="Dataset URI scheme is not supported"):
+        router.activate("dataset:" + "//dataset-1")
 
 
 def test_ml_task_service_rejects_invalid_state_transition(monkeypatch, tmp_path: Path) -> None:

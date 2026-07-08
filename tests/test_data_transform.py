@@ -103,8 +103,8 @@ def _read_dataset_frame(path: str | Path) -> pd.DataFrame:
     return load_dataframe(source_path, detect_source_format(source_path))
 
 
-def test_data_integrate_tool_uses_dataset_ids_and_returns_dataset_uri(monkeypatch, tmp_path: Path) -> None:
-    _paths, dataset_service, _service, _artifact_service, registry, store = _build_runtime(
+def test_data_integrate_tool_uses_dataset_ids_and_returns_artifact_id(monkeypatch, tmp_path: Path) -> None:
+    _paths, dataset_service, _service, artifact_service, registry, store = _build_runtime(
         monkeypatch,
         tmp_path,
     )
@@ -121,8 +121,13 @@ def test_data_integrate_tool_uses_dataset_ids_and_returns_dataset_uri(monkeypatc
     derived_dataset = dataset_service.get_dataset(result.payload["dataset_id"])
     assert _read_dataset_frame(derived_dataset.source_path)["order_id"].tolist() == [1, 2]
     assert result.payload["input_dataset_ids"] == [orders.id, more_orders.id]
-    assert result.payload["dataset_uri"] == f"dataset://{derived_dataset.id}"
-    assert "artifact_id" not in result.payload
+    assert "dataset_uri" not in result.payload
+    assert "artifact_uri" not in result.payload
+    artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
+    assert artifact.metadata_payload["dataset_id"] == derived_dataset.id
+    assert artifact.metadata_payload["dataset_export"]["dataset_id"] == derived_dataset.id
+    assert Path(artifact.absolute_path).suffix == ".xlsx"
+    assert pd.read_excel(artifact.absolute_path)["order_id"].tolist() == [1, 2]
     assert "source_path" not in result.payload["inspection"]
 
 
@@ -242,6 +247,47 @@ def test_data_transform_tool_does_not_leave_dataset_or_output_when_output_valida
             (dataset.id,),
         ).fetchone()[0]
     assert derived_count == 0
+
+
+def test_data_transform_tool_discards_dataset_when_export_artifact_fails(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    paths, dataset_service, _service, _artifact_service, registry, store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    dataset = _register_csv(
+        dataset_service,
+        tmp_path,
+        "orders",
+        "order_id,amount\n1,10\n2,20\n",
+    )
+
+    def fail_export(*_args, **_kwargs) -> None:
+        raise RuntimeError("Synthetic export artifact failure.")
+
+    monkeypatch.setattr(
+        registry._dataset_export_service,
+        "materialize_dataset_export_artifact",
+        fail_export,
+    )
+    arguments = {
+        "dataset_id": dataset.id,
+        "sql": "SELECT * FROM input",
+        "name": "Broken export",
+    }
+
+    with pytest.raises(RuntimeError, match="Synthetic export artifact failure"):
+        registry.execute("data.transform", arguments, _tool_context(store, "data.transform", arguments))
+
+    with sqlite3.connect(paths.state / "xenix.db") as connection:
+        derived_count = connection.execute(
+            "SELECT COUNT(*) FROM dataset WHERE derived_from_dataset_id = ?",
+            (dataset.id,),
+        ).fetchone()[0]
+    assert derived_count == 0
+    assert not list((paths.state / "datasets" / "derived").glob("*.parquet"))
 
 
 def test_data_transform_tool_requires_output_relation_for_multi_statement_scripts(
@@ -401,8 +447,8 @@ def test_data_query_tool_accepts_canonical_names_for_messy_xlsx(monkeypatch, tmp
     }
 
 
-def test_data_transform_tool_registers_derived_dataset_and_returns_dataset_uri(monkeypatch, tmp_path: Path) -> None:
-    _paths, dataset_service, _service, _artifact_service, registry, store = _build_runtime(
+def test_data_transform_tool_registers_derived_dataset_and_returns_artifact_id(monkeypatch, tmp_path: Path) -> None:
+    _paths, dataset_service, _service, artifact_service, registry, store = _build_runtime(
         monkeypatch,
         tmp_path,
     )
@@ -427,8 +473,15 @@ def test_data_transform_tool_registers_derived_dataset_and_returns_dataset_uri(m
     frame = _read_dataset_frame(derived_dataset.source_path)
 
     assert derived_dataset.derived_from_dataset_id == dataset.id
-    assert result.payload["dataset_uri"] == f"dataset://{derived_dataset.id}"
-    assert "artifact_id" not in result.payload
+    assert "dataset_uri" not in result.payload
+    assert "artifact_uri" not in result.payload
+    artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
+    assert artifact.metadata_payload["dataset_id"] == derived_dataset.id
+    assert artifact.metadata_payload["dataset_export"]["source_path"] == derived_dataset.source_path
+    assert pd.read_excel(artifact.absolute_path).to_dict(orient="records") == [
+        {"customer_id": 1, "total_amount": 25},
+        {"customer_id": 2, "total_amount": 5},
+    ]
     assert result.payload["row_count"] == 2
     assert frame.to_dict(orient="records") == [
         {"customer_id": 1, "total_amount": 25.0},
@@ -441,7 +494,7 @@ def test_data_transform_tool_registers_derived_dataset_and_returns_dataset_uri(m
 
 
 def test_data_transform_tool_records_multi_input_lineage_in_result(monkeypatch, tmp_path: Path) -> None:
-    _paths, dataset_service, _service, _artifact_service, registry, store = _build_runtime(
+    _paths, dataset_service, _service, artifact_service, registry, store = _build_runtime(
         monkeypatch,
         tmp_path,
     )
@@ -479,4 +532,6 @@ def test_data_transform_tool_records_multi_input_lineage_in_result(monkeypatch, 
 
     assert derived_dataset.derived_from_dataset_id is None
     assert result.payload["input_dataset_ids"] == [orders.id, customers.id]
-    assert result.payload["dataset_uri"] == f"dataset://{derived_dataset.id}"
+    assert "dataset_uri" not in result.payload
+    artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
+    assert artifact.metadata_payload["input_dataset_ids"] == [orders.id, customers.id]

@@ -496,13 +496,11 @@ def build_main_window(
         artifact_service = runtime.ArtifactService(context.session_factory)
         dataset_export_service = runtime.DatasetExportService(
             paths=paths,
-            session_factory=context.session_factory,
             dataset_service=dataset_service,
             artifact_service=artifact_service,
         )
         link_router = runtime.LinkRouter(
             artifact_service=artifact_service,
-            dataset_export_service=dataset_export_service,
         )
         conversation_store = runtime.ConversationStore(context.session_factory)
         llm_settings_service = runtime.LLMSettingsService(paths)
@@ -514,6 +512,7 @@ def build_main_window(
             data_transform_service=data_transform_service,
             ml_service=ml_service,
             artifact_service=artifact_service,
+            dataset_export_service=dataset_export_service,
         )
         agent_harness_service = runtime.AgentHarnessService(
             session_factory=context.session_factory,

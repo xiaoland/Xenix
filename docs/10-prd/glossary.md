@@ -15,8 +15,7 @@ This glossary defines product-facing terms used by Xenix Native.
 - Provider request: one Agent Harness call to an LLM provider. It records the persisted input Messages, output Messages created from the provider response, provider kind, lifecycle status, and token usage when the provider reports it.
 - Tool call: a persisted Agent Harness record for a single LLM-requested function call against a registered Xenix tool.
 - Tool result: a structured record produced after Agent Harness executes a service-backed tool call.
-- Dataset: a registered app-owned tabular table used by data tools and ML services. Current internal storage is usually Parquet.
-- Dataset link: a markdown link whose target uses the `dataset://<dataset_id>` scheme. Activating it opens the dataset's default user view by lazily materializing a workbook export artifact.
+- Dataset: a registered app-owned tabular table used by data tools and ML services. Current internal storage is usually Parquet. A dataset id is a tool/input identity, not a user-openable link authority.
 - Artifact: a service-registered local user-openable output such as a workbook export, model, metrics report, image, or model apply output, usually surfaced through an `artifact://...` link.
 - Artifact link: a markdown link whose target uses the `artifact://<artifact_id>` scheme so Chatbot can resolve and preview service-owned outputs.
 - Dataset registration: a durable app-owned tabular dataset record, with original import-file provenance stored separately when relevant.

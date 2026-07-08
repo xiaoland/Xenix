@@ -283,12 +283,15 @@ class DatasetService:
             row = self._datasets.get(session, normalized)
             if row is None:
                 return False
-            if not self._is_discardable_source_dataset(row):
+            if not self._is_discardable_dataset(row):
                 raise ValidationError("Dataset is already owned by another workflow and cannot be discarded.")
             if self._has_dataset_references(session, row.id):
                 raise ValidationError("Dataset is already referenced and cannot be discarded.")
+            source_path = Path(row.source_path)
             self._datasets.delete(session, row)
             session.commit()
+            if self._is_service_owned_dataset_path(source_path):
+                source_path.unlink(missing_ok=True)
             return True
 
     def rename_dataset(self, input_data: RenameDatasetInput) -> DatasetRow:
@@ -562,8 +565,15 @@ class DatasetService:
         self._projects.create(session, row)
         return row.id
 
-    def _is_discardable_source_dataset(self, row: DatasetRow) -> bool:
-        return row.copied_from is None and row.derived_from_dataset_id is None and row.ml_task_id is None
+    def _is_discardable_dataset(self, row: DatasetRow) -> bool:
+        return row.copied_from is None and row.ml_task_id is None
+
+    def _is_service_owned_dataset_path(self, path: Path) -> bool:
+        try:
+            path.resolve().relative_to((self._paths.state / "datasets").resolve())
+        except ValueError:
+            return False
+        return True
 
     def _has_dataset_references(self, session, dataset_id: str) -> bool:
         reference_statements = [

@@ -39,6 +39,7 @@
 ## Blast Radius
 
 - Existing runtime DB rows may have legacy dataset semantics. This is tracked by OQ-001.
+- The lazy `dataset://` path committed in `542561f` is now superseded locally. The current slice updates `LinkRouter`, dataset-producing tool payloads, System Prompt, durable docs, UI tests, and artifact-link tests together.
 - Packaging now depends on `xlsxwriter` for Polars XLSX export. This is tracked by OQ-005.
 - Remote ML worker staging may need explicit Parquet-path verification. This is tracked by OQ-006.
 - Future Agent behavior depends on skills and prompt guidance avoiding stale `data.peek` recipes.
@@ -48,5 +49,5 @@
 - Tools must not expose raw local filesystem paths as user-facing links.
 - LLM-authored SQL must use aliases, not service-owned file paths.
 - Internal app-owned Parquet files are not user-openable artifacts by default.
-- Dataset activation may create/reuse an artifact; artifact activation must not perform dataset lookup fallback.
+- User-visible dataset result links should point at export artifacts, not dataset ids. Tool payloads should carry `dataset_id` and `artifact_id`, while the System Prompt teaches the model to form `artifact://<artifact_id>` links. Artifact activation must not perform dataset lookup fallback.
 - Failed transforms must not create half-success durable datasets.

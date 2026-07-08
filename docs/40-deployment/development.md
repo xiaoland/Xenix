@@ -36,7 +36,7 @@ The delivered workflow includes:
 
 - conversation plus file drag-and-drop
 - Agent Harness tool calls for data inspection, integration, cleaning, read-only querying, transformation, role binding, training, hyperparameter training, and model apply
-- markdown summaries with `dataset://...` links for registered datasets and `artifact://...` links for materialized artifacts
+- markdown summaries with `artifact://...` links for materialized user-openable artifacts, including dataset export artifacts
 - Chatbot previews for generated datasets, reports, metrics, models, images, and apply result files
 - local persistence for conversations, messages, tool calls, tool results, artifacts, ML task metadata, and logs
 

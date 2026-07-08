@@ -45,7 +45,7 @@ Transient thinking state is a ThreadDetailView projection of Chatbot activity se
 - Tool event result detail stays collapsed until the user opens it with the chevron; image previews inside tool detail do not auto-expand the item.
 - Tool event actions such as opening Tool Call Details come from Agent Harness projection; Tool Call Item renders those actions and emits UI signals without parsing tool result payloads. Tool Call Item does not expose per-task cancellation; active run cancellation is owned by the Composer stop control.
 - Tool icons and chevrons use QtAwesome icons resolved in the Qt UI layer. The UI maps semantic `icon_key` values to concrete icon names; tool definitions and Harness projection do not depend on QtAwesome names.
-- Artifact and dataset links inside markdown emit `service_link_activated` and are activated through `LinkRouter`; UI does not resolve service-owned links or open local paths directly. Link activation runs off the Qt UI thread so lazy dataset export cannot freeze conversation rendering; `MainWindow` owns only the pending progress dialog and completion/error projection.
+- Artifact links inside markdown emit `service_link_activated` and are activated through `LinkRouter`; UI does not resolve service-owned links or open local paths directly. Link activation runs off the Qt UI thread so OS file opening cannot freeze conversation rendering; `MainWindow` owns only the pending progress dialog and completion/error projection.
 - Markdown image artifact links using `![alt](artifact://<artifact_id>)` render inline inside normal message markdown. Chatbot renders them as linked images, resolves the `artifact://...` image resource through `ArtifactService`, and clicking the image opens the same artifact file. Ordinary markdown artifact links remain clickable/openable and do not become image previews. Tool detail markdown downgrades image syntax to an ordinary artifact link instead of rendering inline images.
 - Tool Call Detail View is a standalone task-scoped window opened from a Tool Call Item. It may query service-owned ML task details, logs, and artifacts for the explicit task ids attached to task-producing tool calls. It is not a global ML task list. `model.task.query` Tool Call Items do not expose this action because their result is already the task detail surface.
 
@@ -107,7 +107,7 @@ Qt boundary coverage should protect:
 - Tool Call Item action rendering and signal propagation for task details
 - Tool Call Detail View task refresh, log display, artifact opening, and timer shutdown
 - artifact link activation and resolution
-- dataset link activation without blocking the Qt UI thread while lazy export is pending
+- artifact link activation without blocking the Qt UI thread while OS file opening is pending
 - inline image artifact resource rendering
 - ML worker setup wizard validation states, language switching, and credential-boundary UI
 - composer auto-grow layout switch

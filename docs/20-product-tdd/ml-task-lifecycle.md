@@ -113,11 +113,11 @@ Result ownership rules:
 
 - Source dataset registrations point to app-owned registered dataset files; original import files are provenance, not the execution source of truth.
 - ML task requests carry expanded dataset, role binding, model selection, parameters, and artifact output owner inputs from service contracts.
-- App-managed datasets used by ML tasks are registered dataset records. User-openable dataset exports are separate lazy workbook artifacts.
+- App-managed datasets used by ML tasks are registered dataset records. User-openable dataset exports are separate artifact records materialized by the operation that owns the exported output.
 - Generated models, exports, and reports live in service-managed directories on the local filesystem.
 - ML task working directories live under `artifacts/ml-tasks/<ml-task-id>/`.
 - An ML task reaches `succeeded` only after every declared output path exists.
-- Chatbot result presentation flows through markdown summaries, `dataset://...` links for registered datasets, and `artifact://...` links for already materialized user-openable artifacts.
+- Chatbot result presentation flows through markdown summaries and `artifact://...` links for materialized user-openable artifacts. Dataset ids remain internal tool/input identities.
 - Remote worker directories are execution/cache state only. Remote result files must be downloaded and rewritten to local task paths before normal task finalization copies them into canonical local artifact locations.
 
 ## Failure Contract

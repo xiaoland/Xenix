@@ -401,8 +401,15 @@ def test_data_clean_tool_registers_derived_dataset_and_artifact(monkeypatch, tmp
 
     assert derived_dataset.derived_from_dataset_id == source_dataset.id
     assert derived_dataset.project_id == source_dataset.project_id
-    assert result.payload["dataset_uri"] == f"dataset://{derived_dataset.id}"
-    assert "artifact_id" not in result.payload
+    assert "dataset_uri" not in result.payload
+    assert "artifact_uri" not in result.payload
+    artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
+    assert artifact.metadata_payload["dataset_id"] == derived_dataset.id
+    assert artifact.metadata_payload["dataset_export"]["dataset_id"] == derived_dataset.id
+    assert pd.read_excel(artifact.absolute_path).fillna("").to_dict(orient="records") == [
+        {"customer_id": 1, "amount": 10, "segment": "A"},
+        {"customer_id": 2, "amount": "", "segment": "B"},
+    ]
     assert result.payload["row_count_before"] == 3
     assert result.payload["row_count_after"] == 2
     assert result.payload["cleaning_report"]["operations"][0]["operation"] == "duplicate.key_columns"

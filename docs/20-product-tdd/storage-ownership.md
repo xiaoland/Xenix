@@ -67,9 +67,9 @@ Current app-managed runtime layout includes:
 - `copied_from` is retained for compatibility copy semantics; data cleaning and transformation use derived lineage.
 - Dataset inspection metadata such as row counts, inferred column kinds, and previews is runtime-derived and should not be persisted by default.
 - Dataset column role binding is stored as immutable metadata. Model outputs and apply outputs are represented by service-owned metadata and artifact records.
-- Artifacts are produced durable user-openable outputs such as workbook exports, reports, images, models, apply outputs, and other generated files. Registered datasets are referenced by dataset ids and opened through lazy dataset export artifacts.
-- Dataset export artifacts are materialized from app-owned datasets on demand. The export path uses Polars to read app-owned Parquet and write interchange files; XLSX writing depends on `xlsxwriter`.
-- Artifact links activate through `LinkRouter` and `ArtifactService`; dataset links activate through `LinkRouter`, `DatasetExportService`, and then `ArtifactService`. Filesystem access stays behind services.
+- Artifacts are produced durable user-openable outputs such as workbook exports, reports, images, models, apply outputs, and other generated files. Registered datasets are referenced by dataset ids for tool and service inputs, while user-openable dataset outputs are artifact rows.
+- Dataset export artifacts are materialized from app-owned datasets by the operation that owns the exported output. The export path uses Polars to read app-owned Parquet and write interchange files; XLSX writing depends on `xlsxwriter`.
+- Artifact links activate through `LinkRouter` and `ArtifactService`. Filesystem access stays behind services.
 - LLM-facing Agent content, tool schemas, and tool result payloads use dataset ids for registered datasets. Dataset `source_path` values remain internal persistence facts resolved by services.
 - Trained-model registration rows are durable metadata pointers to canonical model artifacts.
 - Task working files such as `request.json`, `result.json`, `logs.jsonl`, and holdout artifacts are execution-scoped ML task files.

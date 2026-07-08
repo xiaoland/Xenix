@@ -29,7 +29,7 @@ from ..data_transform import (
     DatasetSqlBinding,
 )
 from ..dataset_inspection import DatasetInspection, InspectDatasetInput, detect_source_format, load_dataframe
-from ..dataset_export_service import build_dataset_uri
+from ..dataset_export_service import DatasetExportService
 from ..dataset_service import DatasetService, RegisterDatasetInput
 from ..ml.registry import get_model_catalog_entry, list_model_catalog, list_model_keys
 from ..ml.types import EvaluationKind, ModelFamily, ModelTaskKind
@@ -105,6 +105,7 @@ class AgentToolRegistry:
         data_transform_service: DataQueryTransformService,
         ml_service: MLService,
         artifact_service: ArtifactService,
+        dataset_export_service: DatasetExportService | None = None,
         data_tokenization_service: DataTokenizationService | None = None,
         analysis_profile_service: AnalysisProfileService | None = None,
         analysis_graph_service: AnalysisGraphService | None = None,
@@ -120,6 +121,11 @@ class AgentToolRegistry:
         self._analysis_lambda_service = analysis_lambda_service or AnalysisLambdaService(paths)
         self._ml_service = ml_service
         self._artifact_service = artifact_service
+        self._dataset_export_service = dataset_export_service or DatasetExportService(
+            paths=paths,
+            dataset_service=dataset_service,
+            artifact_service=artifact_service,
+        )
         self._model_key_aliases = self._build_model_key_aliases()
         self._tools = {
             tool.spec.name: tool
@@ -1537,10 +1543,24 @@ class AgentToolRegistry:
                 derived_from_dataset_id=derived_from_dataset_id,
             )
         )
+        try:
+            export_artifact = self._dataset_export_service.materialize_dataset_export_artifact(
+                dataset.id,
+                thread_id=context.thread_id,
+                turn_id=context.turn_id,
+                tool_call_id=context.tool_call_id,
+                metadata_payload=metadata_payload,
+            )
+        except Exception:
+            try:
+                self._dataset_service.discard_unreferenced_dataset(dataset.id)
+            except Exception:
+                pass
+            raise
         return ToolExecutionResult(
             payload={
                 "dataset_id": dataset.id,
-                "dataset_uri": build_dataset_uri(dataset.id),
+                "artifact_id": export_artifact.artifact_id,
                 "summary": summary,
                 "inspection": inspection_payload,
             },

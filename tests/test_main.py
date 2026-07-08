@@ -1018,7 +1018,7 @@ def test_main_window_opens_service_link_off_ui_thread(monkeypatch, tmp_path: Pat
         monkeypatch.setattr(window._link_router, "activate", fake_activate)
 
         started_at = time.perf_counter()
-        window._open_service_link("dataset://dataset-1")
+        window._open_service_link("artifact://artifact-1")
         elapsed = time.perf_counter() - started_at
 
         assert elapsed < 0.5
@@ -1026,7 +1026,7 @@ def test_main_window_opens_service_link_off_ui_thread(monkeypatch, tmp_path: Pat
         assert window._service_link_progress_dialog is not None
         assert window._service_link_progress_dialog.windowModality() == Qt.NonModal
         assert window._service_link_progress_dialog.isModal() is False
-        assert activated == [("dataset://dataset-1", window._agent_thread_id)]
+        assert activated == [("artifact://artifact-1", window._agent_thread_id)]
 
         release_activation.set()
         for _ in range(80):
@@ -1060,7 +1060,7 @@ def test_main_window_service_link_activation_failure_closes_progress(monkeypatch
         monkeypatch.setattr(window._link_router, "activate", fake_activate)
         monkeypatch.setattr(window._thread_detail_view, "show_error", lambda message: errors.append(message))
 
-        window._open_service_link("dataset://dataset-1")
+        window._open_service_link("artifact://artifact-1")
         assert activation_started.wait(timeout=1.0)
         assert window._service_link_progress_dialog is not None
 

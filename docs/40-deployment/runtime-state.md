@@ -47,7 +47,7 @@ Current runtime files and subdirectories:
 6. Inspect `config/ml_workers.json` for configured local and SSH ML workers. SSH credentials are not stored there; the file stores connection metadata, remote roots, Python command paths, and last setup/validation summaries.
 7. Inspect `config/telemetry.json` for the randomly generated persistent anonymous install id used to correlate public-beta diagnostics.
 8. Inspect `state/trial_lock.json` for the signed first-run and last-run timestamps used by build-time limited test builds. Editing the file invalidates its signature and locks the test build; deleting all local runtime state can still reset purely local trial state because this is not a license activation service.
-9. Inspect `state/xenix.db` for metadata, `state/datasets/` for app-owned materialized datasets, `artifacts/datasets/exports/` for lazy workbook export artifacts, `artifacts/ml-tasks/` for per-ML-task working directories, and `artifacts/models/` for canonical trained-model files.
+9. Inspect `state/xenix.db` for metadata, `state/datasets/` for app-owned materialized datasets, `artifacts/datasets/exports/` for workbook export artifacts, `artifacts/ml-tasks/` for per-ML-task working directories, and `artifacts/models/` for canonical trained-model files.
 
 `logs/xenix.log` is JSON Lines. Log records are correlated with active
 OpenTelemetry spans through trace/span fields when a span is active.
@@ -126,5 +126,5 @@ Issue `#94` adds optional SSH worker execution. Remote task directories mirror l
 
 ## Backup Guidance
 
-- Back up `state/xenix.db` together with app-owned datasets under `state/datasets/`, lazy export artifacts under `artifacts/datasets/exports/`, model artifacts, apply outputs, reports, or ML task working directories you need to preserve.
+- Back up `state/xenix.db` together with app-owned datasets under `state/datasets/`, dataset export artifacts under `artifacts/datasets/exports/`, model artifacts, apply outputs, reports, or ML task working directories you need to preserve.
 - User-managed source datasets should be backed up by normal user filesystem practices, not by app reset flows.
