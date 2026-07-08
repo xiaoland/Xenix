@@ -62,6 +62,8 @@ Downstream services own:
 
 Downstream services should not inspect raw loader naming conventions. LLM-facing tool results should normally expose only the executable Xenix column name, column position, and bounded samples. Loader names, source names, and name-generation reasons are internal diagnostics unless a specific repair path proves the LLM needs them.
 
+Historical note: this memo was first written while `data.peek` still existed. Current consumers are import materialization, `data.query`, `data.transform`, data cleaning/tokenization, analysis services, and ML registered-dataset loading.
+
 ## Polars/Pandas Notes
 
 Polars provides stable controls that can support wrapper-owned naming:

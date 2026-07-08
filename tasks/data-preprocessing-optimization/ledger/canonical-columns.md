@@ -1,10 +1,10 @@
 # Canonical Column References
 
-## Decision Direction
+## Current Decision
 
-- Do not store canonical column names directly on `dataset` table in Phase 1.
-- Dataset inspection metadata is currently ephemeral runtime-derived state, and source datasets may point at user-managed files that can change outside Xenix.
-- Make canonical column names a deterministic projection from a shared thin tabular schema resolver used by `data.peek`, `data.query`, and `data.transform`.
+- Do not store canonical column names directly on `dataset` table in the current slice.
+- Registered datasets now point at app-owned materialized tables, but schema metadata is still a runtime-derived projection unless a later workstream deliberately introduces immutable schema snapshots.
+- Make canonical column names a deterministic projection from a shared thin tabular schema resolver used by import, `data.query`, `data.transform`, cleaning/tokenization, and ML-facing registered-dataset loading.
 - If persistence is later needed for performance or immutability, introduce a separate schema snapshot/cache with source fingerprint and resolver version rather than expanding `dataset` row semantics.
 
 ## Column Index
@@ -83,6 +83,8 @@ Unstable names:
 ## Boundary Rule
 
 The logic that recognizes pandas/Polars placeholder conventions is loader-specific and must stay in the thin loader wrapper. Downstream services should only see `tool_name`, `source_name`, `loader_name`, `index`, and explicit `name_source` facts.
+
+LLM-facing results should normally expose only executable names, indexes, and bounded samples. Loader names and `name_source` are internal diagnostics unless a specific repair flow proves they need to be surfaced.
 
 ## Authority
 

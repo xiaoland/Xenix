@@ -1,5 +1,7 @@
 # Evidence
 
+This file is raw diagnosis evidence. It contains historical observations from before `data.peek` was removed. Current decisions live in `../ledger/decisions.md`.
+
 ## Case Inputs
 
 Primary evidence file:

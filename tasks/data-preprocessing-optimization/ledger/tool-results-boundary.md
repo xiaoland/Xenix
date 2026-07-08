@@ -25,7 +25,7 @@ For this task:
 - no duplicate markdown/profile payload should be persisted or replayed to the provider;
 - if the user asks for a Markdown table or explanation, the LLM should compose that in an assistant message from the DSL and tool evidence.
 
-## Current Issue
+## Historical Issue
 
 `ConversationStore._tool_result_to_text()` currently serializes the entire `AgentToolCallRow.result_payload` as provider-facing JSON.
 
@@ -35,13 +35,15 @@ Observed impact from the case thread:
 - the next provider request input is 18,175 tokens;
 - the provider sees both structured profile and `analysis.markdown`, duplicating content.
 
+Current state after commit `542561f`: ordinary tool replay is converged around canonical compact `result_payload`; `data.peek` is removed from the Agent-facing surface; ordinary `ToolExecutionResult` no longer carries separate provider payload/content blocks as a normal result path.
+
 ## Desired Direction
 
 Do not maintain separate persisted and provider-facing tool result truths by default. The persisted tool `result_payload` should itself be compact, operation-oriented, and suitable for provider replay.
 
 `AgentToolCallRow` is still not just a result store. It remains the execution ledger for a tool invocation: tool name, arguments, status, request/result message pairing, error summary, observability correlation, artifact lineage, and UI timeline projection. Removing the persisted/provider-facing result split does not by itself imply deleting `agent_tool_call`.
 
-`ToolExecutionResult` should be only the in-process return envelope from a tool handler to Agent Harness. It should not be a second result truth. Its normal payload field should become or map directly to the canonical `result_payload`; separate provider payloads and normal `content_blocks` should disappear from ordinary tool execution.
+`ToolExecutionResult` should be only the in-process return envelope from a tool handler to Agent Harness. It should not be a second result truth. Its normal payload field should map directly to canonical `result_payload`; separate provider payloads and normal `content_blocks` should not reappear in ordinary tool execution.
 
 The canonical tool result should preserve:
 
