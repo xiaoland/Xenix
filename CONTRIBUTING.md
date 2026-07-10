@@ -2,39 +2,34 @@
 
 ## Workflow
 
-1. Start from the issue scope and confirm whether the change is bootstrap, UI, service, persistence, or ML work.
-2. For ambiguous, non-trivial, diagnosis-first, or reference-sensitive work, start in an agent-owned task packet under `tasks/` and keep the compact current state, evidence, and verification there until requirements become stable.
-3. Read the relevant durable docs before changing code:
-   - `docs/10-prd/`
-   - `docs/20-product-tdd/`
-   - `docs/40-deployment/`
-   - `docs/20-product-tdd/adr/`
-4. Use the pre-execution restatement format in `AGENTS.md` for reference-sensitive or logic-altering changes.
-5. For non-trivial code design or implementation changes, load `docs/00-meta/implementation-taste.md` and keep authority, data shape, naming, and complexity tradeoffs explicit.
-6. Keep the native shell code-first and Qt Widgets based. Do not introduce QML unless the issue explicitly asks for it.
-7. Prefer small, explicit changes in `src/xenix/main.py`, `src/xenix/app.py`, and `src/xenix/ui/`.
-8. Update docs when the change affects architecture boundaries, guarantees, operations, or local-state evolution.
+1. Follow the repository [`AGENTS.md`](AGENTS.md) and the nearest local `AGENTS.md` for the files being changed.
+2. Identify the canonical owner through the [documentation index](docs/README.md) before changing product, architecture, unit, or runtime truth.
+3. Load [implementation taste](docs/00-meta/implementation-taste.md) only for non-trivial code changes that shape boundaries, data, authority, naming, abstraction, or complexity.
+4. Keep changes explicit and local to the owning surface. Update durable docs when a verified contract, guarantee, operation, or recovery path changes.
 
-## Development Checklist
+## Development Commands
 
-- Install dependencies with `pdm install`.
-- Run the app with `pdm run dev` when the change affects the desktop flow.
-- Run `pdm run test`.
-- Run `pdm run check`.
-- For ordinary source or durable-doc searches, exclude task workspaces, generated output, dependencies, virtual environments, and caches unless the task explicitly targets them.
-- If runtime paths or packaging behavior changed, review `docs/40-deployment/development.md`.
+- `pdm install` installs project dependencies.
+- `pdm run dev` runs the desktop application.
+- `pdm run test` runs the test suite.
+- `pdm run check` compiles the source tree to catch syntax errors.
+- `pdm run i18n-extract` and `pdm run i18n-compile` update Qt translations.
+- `pdm run package` builds the Windows bundle.
+- `pdm run smoke-package` verifies the packaged executable.
 
-## Review Checklist
+Use the smallest verification set that proves the affected contract. Run `pdm run test` and `pdm run check` when the change has repository-wide or uncertain impact.
 
-- UI code does not call ML scripts directly.
-- UI code talks to services through stable request/result objects or methods documented in `docs/20-product-tdd/runtime-boundaries.md`.
-- SQLite is only used for metadata and ML task bookkeeping; datasets, models, exports, and logs remain on the filesystem unless an ADR says otherwise.
-- Single-user local mode assumptions still hold. Do not reintroduce multi-user, remote deployment, or web-only concepts without an ADR.
-- New ML task states, result formats, or storage locations are documented before merge.
+## Change-Specific Review
+
+- UI changes follow the nearest UI guidance. Interaction or rendering-contract changes are reviewed against [Chatbot UI Unit TDD](docs/30-unit-tdd/chatbot-ui.md).
+- Service-boundary changes are reviewed against [Runtime Boundaries](docs/20-product-tdd/runtime-boundaries.md).
+- Storage changes are reviewed against [Storage Ownership](docs/20-product-tdd/storage-ownership.md); migrations also follow [Local State Evolution](docs/40-deployment/local-state-evolution.md).
+- Runtime or packaging changes follow the [Development Runbook](docs/40-deployment/development.md) and the relevant packaged smoke verification.
+- New ML states, result formats, or storage locations update the owning lifecycle or runtime document before merge.
 
 ## Testing Intent
 
 - Avoid adding a narrow regression test for every fixed bug. A past failure is evidence to inspect the durable contract, not by itself a reason to preserve a tiny test forever.
 - Prefer high-signal tests that protect stable behavior: golden tests for deterministic payloads, projections, migrations, and artifact shapes; integrated tests for UI/service/storage/ML adapter boundaries; and E2E or smoke tests for critical user workflows.
-- Add lower-level unit or boundary tests only when they protect a stable contract, isolate high-risk logic, shorten feedback for expensive failures, or cover config resolution, logging, resource loading, ML task orchestration, storage boundaries, migrations, or data-loss risks.
+- Add lower-level unit or boundary tests when they protect a stable contract, isolate high-risk logic, shorten feedback for expensive failures, or cover config resolution, logging, resource loading, ML task orchestration, storage boundaries, migrations, or data-loss risks.
 - Do not add tests that only restate facts already guaranteed by source definitions, type contracts, enum membership, schema definitions, data models, or incidental implementation details.

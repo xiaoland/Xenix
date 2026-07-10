@@ -1,16 +1,13 @@
 # Native Docs
 
-This repository follows a local single-repo application of SVC v9.8.
-This `docs/` tree stores only project-local durable knowledge. It does not vendor or mirror the upstream SVC framework text.
-Routing starts in the repository root `AGENTS.md`, which sends each truth to its correct local owner.
+This tree stores project-local durable knowledge. Repository routing and working posture have one owner: the root [`AGENTS.md`](../AGENTS.md).
 
-Canonical durable owners:
+## Durable Owners
 
-- `00-meta/`
-- `10-prd/`
-- `15-alignment/`
-- `20-product-tdd/`
-- `30-unit-tdd/`
-- `40-deployment/`
+- [Product requirements and vocabulary](10-prd/README.md)
+- [Cross-unit technical contracts and ADRs](20-product-tdd/README.md)
+- [Complex unit design memory](30-unit-tdd/README.md)
+- [Runtime, deployment, migration, and recovery](40-deployment/README.md)
+- [On-demand implementation taste](00-meta/implementation-taste.md)
 
-Volatile planning, investigation, evidence, artifacts, and collaboration state live in agent-owned task workspaces under `tasks/`.
+Volatile reasoning, evidence, and temporary artifacts belong in `tasks/`. Task entries are disposable and are not durable documentation.

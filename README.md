@@ -1,9 +1,8 @@
 # Xenix Native
 
-PySide6 desktop bootstrap for the `native` branch of Xenix.
+PySide6 desktop application for the Xenix Native product line.
 
-This branch is intentionally focused on the Native desktop application line. The web monorepo remains on `web` (previous `master`, read [docs/40-deployment/branch-governance.md](docs/40-deployment/branch-governance.md) for more information)
-Repository governance follows a local single-repo application of SVC v9.8.
+Repository routing and knowledge ownership start in [AGENTS.md](AGENTS.md).
 
 ## Quick Start
 
@@ -12,7 +11,7 @@ pdm install
 pdm run dev
 ```
 
-Use Python `3.12` to `3.14`. The initial toolchain is pinned below `3.15` because the current `PySide6` and `PyInstaller` releases do not resolve against a `>=3.15` target range.
+The authoritative Python and dependency constraints are declared in [pyproject.toml](pyproject.toml).
 
 ## Commands
 
@@ -28,35 +27,18 @@ Use Python `3.12` to `3.14`. The initial toolchain is pinned below `3.15` becaus
 - `src/xenix` contains the application package, bootstrap code, UI, runtime config, storage services, logging, and exception handling.
 - `tests` contains unit tests for config, storage bootstrap, repositories, services, logging, and resource resolution.
 - `scripts` contains developer helpers used by `pdm run`.
-- `ml` keeps the existing Python model scripts that will be integrated into the native workflow later.
+- `ml` contains legacy model scripts; native ML implementation lives under `src/xenix/services/ml`.
 - `docs` stores canonical durable documentation layers.
-- `tasks` stores agent-owned task-local workspaces, reusable templates, and archived records.
+- `tasks` stores disposable agent workspaces whose latest recursive modification is within the previous seven days.
 - `xenix.spec` is the canonical Windows PyInstaller `onedir` spec.
 
 ## Documentation Model
 
-- Meta: [docs/00-meta/README.md](docs/00-meta/README.md)
+- Implementation taste: [docs/00-meta/implementation-taste.md](docs/00-meta/implementation-taste.md)
 - PRD: [docs/10-prd/README.md](docs/10-prd/README.md)
-- Alignment: [docs/15-alignment/README.md](docs/15-alignment/README.md)
 - Product TDD: [docs/20-product-tdd/README.md](docs/20-product-tdd/README.md)
 - Unit TDD: [docs/30-unit-tdd/README.md](docs/30-unit-tdd/README.md)
 - Deployment: [docs/40-deployment/README.md](docs/40-deployment/README.md)
-- Task layer: [tasks/README.md](tasks/README.md)
 - Contributor workflow: [CONTRIBUTING.md](CONTRIBUTING.md)
 
-## Runtime Conventions
-
-- App state defaults to `%LOCALAPPDATA%/Xenix` on Windows.
-- Override the base directory with `XENIX_APP_HOME` during development or testing.
-- Logs are written to `logs/xenix.log` under the resolved app home.
-- SQLite metadata is stored in `state/xenix.db`.
-- Work-item dataset copies live under `artifacts/datasets/work-items/`.
-- App-managed artifacts and ML task working directories live under `artifacts/`.
-
-## Packaging
-
-- The packaged executable is built at `dist/xenix/xenix.exe`.
-- Startup smoke validation is available in both source and packaged forms through the shared `--smoke-test` CLI.
-- VSCode launch/task entries are provided for debugger startup, smoke startup, packaging, and packaged smoke verification.
-
-See [docs/40-deployment/development.md](docs/40-deployment/development.md) for local workflow details.
+For development, packaging, and verification, see the [Development Runbook](docs/40-deployment/development.md). For resolved application paths, persisted state, and recovery, see the [Runtime State Runbook](docs/40-deployment/runtime-state.md).

@@ -73,12 +73,12 @@ Use this guidance while editing concrete code surfaces to check:
 - whether assertions, tests, or observability can prove the intended authority, boundary, and behavior
 - whether repository idioms are preserved unless the change intentionally renegotiates them
 
-Implementation shape taste should stay close to the code surface being changed. Promote stable lessons only after they pass the normal promotion test.
+Implementation shape taste should stay close to the code surface being changed. When verified work changes a durable contract, update its single owning document in the same change instead of preserving a parallel summary.
 
 ## Application Path
 
 1. Load this file through the root `AGENTS.md` entry point for non-trivial implementation work.
 2. Use design formation taste to expose authority, trust, naming, and complexity pressure.
-3. Use the current route and mode guidance for verification timing and feedback loops.
+3. Use the root routing and working model for ownership, verification timing, and feedback loops.
 4. Use implementation shape taste while editing concrete code surfaces.
-5. If a verified lesson is stable and expensive to rediscover, promote it to Product TDD, Unit TDD, local AGENTS, Deployment, or Meta Engine.
+5. If the change alters durable truth, update Product TDD, Unit TDD, Deployment, PRD, or local seam guidance according to the root owner map.

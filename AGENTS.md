@@ -1,123 +1,103 @@
 # Xenix Native
 
-Xenis is a non-technical user friendly business-directed machine-learning workbench.
+Xenix Native is a desktop machine-learning workbench for non-technical business users. Product scope and vocabulary are owned by `docs/10-prd/`.
 
-## Repository Layout (crucial only)
+## Repository Map
 
-- `src/xenix/`: native application package
-- `src/xenix/ui/`: Qt Widgets UI layer
-- `src/xenix/services/`: service layer and orchestration boundaries
-- `src/xenix/services/ml/`: native ML execution, registry, and model adapters
-- `src/xenix/services/storage/`: SQLite models, repositories, migrations, and storage layout logic
-- `tests/`: unit and boundary tests
+- `src/xenix/ui/`: Qt Widgets UI
+- `src/xenix/services/`: service and orchestration boundaries
+- `src/xenix/services/storage/`: SQLite models, repositories, migrations, and storage layout
+- `src/xenix/services/ml/`: native ML execution, registry, and adapters
+- `tests/`: automated verification
+- `scripts/`: development and packaging helpers
 - `docs/`: durable project knowledge
-- `tasks/`: agent-owned task-local workspaces for volatile reasoning, evidence, artifacts, migration notes, and collaboration state
-- `scripts/`: developer and packaging helpers
-- `ml/`: legacy model scripts kept intact unless a task explicitly targets migration or deletion
+- `tasks/`: disposable agent workspaces
+- `ml/`: legacy model scripts; leave intact unless a task explicitly targets migration or deletion
 
-## Technical Overview
+Dependency and Python-version constraints are authoritative in `pyproject.toml`. Runtime paths, packaging, and recovery procedures are owned by `docs/40-deployment/`.
 
-- Language runtime: Python `3.12+`
-- Desktop UI: `PySide6` with Qt Widgets
-- Data and persistence: `SQLModel`, SQLite, filesystem-managed artifacts
-- Data processing: `pandas`, `openpyxl`
-- ML: `scikit-learn`, `joblib`
-- Packaging: `PyInstaller`
-- Project tooling: `PDM`
-- Testing: `pytest`
+## Instruction Scope
 
-## Documentation
+- This file applies to the whole repository.
+- A nearer `AGENTS.md` adds rules for its physical subtree. It does not silently cancel parent rules.
+- Local guidance must not claim sibling or out-of-tree scope. Put shared guidance at the nearest common ancestor or in the owning durable document.
+- Local `AGENTS.md` files own current editing constraints, seam hazards, and required verification. They do not duplicate product, architecture, or runtime truth.
+- If parent and child guidance conflict, stop and resolve the conflict before mutation.
 
-Read following documents for the current work when needed and keep them current.
+## Knowledge Owners
 
-- `docs/00-meta/`: typed input routes, mode SOPs, implementation taste, and framework concepts.
-- `docs/00-meta/concepts.md`: load only when boundary language or owner terminology is unclear.
-- `docs/00-meta/implementation-taste.md`: load for non-trivial code design or implementation changes that shape structure, boundaries, data shape, authority flow, durable naming, abstraction, or complexity budget.
-- `docs/10-prd/`: product what/why, user-visible workflows, rules, scope, and business vocabulary.
-- `docs/15-alignment/`: load only when MVT is not enough to constrain mutation safely.
-- `docs/20-product-tdd/`: cross-unit technical realization and authority boundaries.
-- `docs/30-unit-tdd/`: open only when a named hard-unit doc exists and is relevant.
-- `docs/40-deployment/`: runtime, rollout, observability, and recovery truth.
-- `CONTRIBUTING.md`: contributor workflow, review expectations, and testing intent.
-- `tasks/`: active entropy buffer for non-trivial work. Every non-trivial task packet should preserve a compact control surface with `Objective & Hypothesis`, `Guardrails Touched`, `Verification`, current understanding, and next step.
-- Nearer `**/AGENTS.md`: local constraints are additive and should be checked before edits in that subtree.
+Each durable claim has one canonical owner. Other documents should link to that owner instead of copying the claim.
 
-## Operating Model
+| Concern | Canonical owner |
+| --- | --- |
+| Product behavior, scope, and business vocabulary | [`docs/10-prd/`](docs/10-prd/README.md) |
+| Cross-unit architecture, authority, and technical contracts | [`docs/20-product-tdd/`](docs/20-product-tdd/README.md) |
+| Accepted or superseded product-level technical decisions | [`docs/20-product-tdd/adr/`](docs/20-product-tdd/adr/README.md) |
+| Expensive-to-rediscover invariants of a complex local unit | [`docs/30-unit-tdd/`](docs/30-unit-tdd/README.md) |
+| Runtime, packaging, observability, migration operations, and recovery | [`docs/40-deployment/`](docs/40-deployment/README.md) |
+| Human contributor workflow and testing policy | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
+| Non-trivial implementation judgment | [`docs/00-meta/implementation-taste.md`](docs/00-meta/implementation-taste.md) |
+| Volatile reasoning, evidence, and temporary artifacts | `tasks/<task-slug>/` |
 
-1. Classify the incoming request as `Intent`, `Constraint`, `Reality`, or `Artifact`.
-2. Identify the durable owner and blast radius before choosing how to work.
-3. For non-trivial work, open or update an agent-owned task packet under `tasks/`.
-4. Keep the task packet current when discussion, exploration, implementation friction, or verification changes the working state.
-5. Choose the active mode for the current slice: `Explore`, `Solidify`, `Execute`, or `Diagnose`.
-6. Load only the route doc, mode SOP, and governing anchors needed for that slice.
-7. For non-trivial code design or implementation changes, load `docs/00-meta/implementation-taste.md`.
-8. Search source and durable docs with volatile workspaces excluded by default.
-9. Expand into alignment substrate fields only when references, boundaries, state, evidence, or blast radius are still ambiguous.
-10. Execute with explicit verification.
-11. Re-enter a different mode if evidence or clarity changes.
-12. Promote only stable truths after verification.
+Fast-changing versions, enumerations, configuration defaults, and schema identifiers should be authoritative in source, configuration, or tests. Durable docs explain their contract and operational meaning without creating parallel snapshots.
 
-### Typed Input Guide
+### High-Risk Entry Points
 
-- `Intent`: the business wants new behavior, scope, or policy. Update PRD first.
-- `Constraint`: product behavior stays the same, but technical, dependency, or environment boundaries changed. Update Product TDD or Unit TDD.
-- `Reality`: observed runtime behavior diverges from expectation. Gather evidence first, then fix and add recurrence guards if needed.
-- `Artifact`: the requested deliverable is a bounded script, analysis, migration helper, or one-off output. Keep it tactical unless reuse is proven.
+| Surface | Required entry |
+| --- | --- |
+| Storage models, repositories, or migrations | nearest service guidance, [`local-state-evolution.md`](docs/40-deployment/local-state-evolution.md), then storage source and migration tests |
+| Packaging, runtime resources, or app-home behavior | [`development.md`](docs/40-deployment/development.md) and, when state layout changes, [`runtime-state.md`](docs/40-deployment/runtime-state.md) |
+| Agent Harness, tool schemas, provider loop, or message lifecycle | nearest service guidance and [`agent-harness.md`](docs/30-unit-tdd/agent-harness.md) |
+| ML task lifecycle or worker placement | nearest ML guidance and [`ml-task-lifecycle.md`](docs/20-product-tdd/ml-task-lifecycle.md); load ADR 0005 only when changing the SSH-worker decision |
+| Chatbot interaction or rendering contract | nearest UI guidance and [`chatbot-ui.md`](docs/30-unit-tdd/chatbot-ui.md) when behavior, not presentation alone, changes |
 
-### Mode Guide
+## Working Model
 
-- `Explore`: map unknowns, alternatives, and assumptions.
-- `Solidify`: restate findings into explicit claims, contracts, or decisions.
-- `Execute`: implement a clear, verified change.
-- `Diagnose`: investigate mismatches between expected and observed reality.
+Use the input labels as lenses, not mutually exclusive buckets:
 
-Mode guidance:
+- `Intent`: desired product behavior, scope, or policy. Settle the PRD claim before downstream realization.
+- `Constraint`: a technical, dependency, governance, packaging, performance, or environment boundary. Route it to the affected technical, deployment, or repository owner without rewriting product intent.
+- `Reality`: observed behavior differs from expectation. Gather evidence before mutation, then update the owner revealed by the cause.
+- `Artifact`: the requested result is a bounded script, report, helper, or other one-off output. Keep it local unless the request also changes durable truth.
 
-- do not assume one task equals one mode
-- creative engineering is non-linear; design formation, verification preparation, execution, and diagnosis may reshape each other
-- prepare verification shape as soon as a design claim is stable enough to act on
-- switch modes when evidence or clarity changes
-- mode selection never overrides durable ownership
+Choose the posture for the current slice:
 
-### Task Packet Guidance
+- `Explore`: map unknowns and alternatives; durable surfaces stay unchanged.
+- `Solidify`: settle claims, owner, scope, invariants, and verification before execution.
+- `Execute`: make a bounded change whose owner and verification are clear.
+- `Diagnose`: gather discriminating evidence for a Reality mismatch before fixing it.
 
-- Task packets are agent-owned inside their own task boundary, but code, durable docs, public configuration, and generated release artifacts keep their normal ownership rules.
-- Keep each packet readable, inspectable, and steerable by the human.
-- Split a packet into multiple files only when collaboration pressure makes the compact control surface hard to scan.
-- Keep volatile packet content out of durable docs until it passes the promotion test.
+A task may change lenses and postures as evidence changes. Ownership always takes precedence over posture.
 
-### Search Guidance
+## Execution Rules
 
-- For ordinary source and durable-doc search, exclude `tasks/`, generated output, dependency folders, virtual environments, and tool caches by default.
-- Search volatile workspaces only when the task explicitly targets them, when recovering task state, or when reviewing task evidence.
+1. Identify the affected surface, dominant input lens, durable owner, and blast radius.
+2. Read this file, the nearest local `AGENTS.md`, and only the governing documents needed for the change.
+3. For non-trivial code design or implementation that shapes boundaries, data, authority, naming, abstraction, or complexity, load `docs/00-meta/implementation-taste.md`.
+4. Use a task packet for non-trivial, multi-step, or cross-turn work. Keep at least the objective, touched guardrails, verification, current understanding, and next step.
+5. Search source and durable docs with `tasks/`, generated output, dependencies, virtual environments, and caches excluded unless the task explicitly targets them.
+6. Update the canonical owner in the same change when verified work changes durable truth; do not leave a parallel truth in a task packet or local guidance.
+7. Execute with explicit verification and re-enter Explore, Solidify, or Diagnose if evidence invalidates the planned owner or change shape.
 
-### Development Guidelines
+### Task Retention
 
-- Prefer solving ambiguity by making the underlying contract explicit. Avoid stacking fallback heuristics when a durable invariant or projection boundary can be defined instead.
-- Preserve a single source of truth for durable facts, state, relationships, and decisions.
-- Treat cross-boundary values by provenance: authority fact, stable reference, command or proposal, user-authored value, or derived projection.
-- Name durable semantics directly and consistently.
-- Shape data and authority boundaries before adding clever control flow or generalized machinery.
-- Spend complexity only for clear return; measure before optimizing and avoid premature abstraction.
-- For Qt Widgets UI debugging, prefer using GammaRay when available to inspect widget hierarchy, properties, layout geometry, visibility, and event behavior. Treat it as the Qt-side equivalent of a browser DOM inspector.
+- `tasks/` is disposable scratch space and never a canonical owner.
+- A top-level task entry is retained only while its latest recursive filesystem modification is within the rolling previous `7 x 24` hours.
+- Delete older entries immediately. Do not maintain `tasks/archive/` and do not require a promotion review before deletion.
 
-### Impact Handshake
+## Mutation Gate
 
-Before mutating durable truth after alignment expansion, or when blast radius is not obviously local, pause and restate:
+Before mutating durable truth when the blast radius is not obviously local, restate:
 
-- Address and Object: what exact files, anchors, or symbols will change
-- State Diff: `From -> To`
-- Blast Radius Forecast: what downstream files, modules, or surfaces could be affected
-- Invariants Check: what must remain unchanged
-- Verification: what concrete proof will bound side effects
+- Address and object: exact files, anchors, or symbols
+- State diff: `From -> To`
+- Blast radius: downstream modules and surfaces
+- Invariants: what must remain unchanged
+- Verification: concrete proof that bounds side effects
 
-If evidence is missing or the durable owner is still unclear, return to `Explore` or `Diagnose` instead of guessing.
+Pause for human confirmation when:
 
-### Negotiation Triggers
-
-Pause and ask for human confirmation when:
-
-- the requested change conflicts with an existing product claim or technical contract
-- blast radius crosses multiple durable owners and the correct owner is unclear
-- a shortcut would damage maintainability, readability, simplicity, or an explicit guardrail
+- the requested change conflicts with a product claim or technical contract
+- the blast radius crosses multiple durable owners and the correct owner is unclear
 - evidence is insufficient for a bug fix or architectural decision
+- the proposed shortcut would violate an explicit guardrail or materially damage maintainability
