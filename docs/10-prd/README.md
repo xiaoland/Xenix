@@ -4,5 +4,7 @@ This layer holds product truth: what the product is, why it exists, user-visible
 
 Current canonical documents:
 
-- `product-scope.md`
-- `glossary.md`
+- [Product scope and user-visible commitments](product-scope.md)
+- [Business vocabulary](glossary.md)
+
+These are contentful splits of the minimal product-truth owner. Add another PRD file only when it has a distinct consumer or change cadence and real content exists.

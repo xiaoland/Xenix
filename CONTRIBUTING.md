@@ -2,7 +2,7 @@
 
 ## Workflow
 
-1. Follow the repository [`AGENTS.md`](AGENTS.md) and the nearest local `AGENTS.md` for the files being changed.
+1. Follow the repository [`AGENTS.md`](AGENTS.md), the [working protocol](docs/00-meta/working-protocol.md) for non-trivial work, and the nearest local `AGENTS.md` for the files being changed.
 2. Identify the canonical owner through the [documentation index](docs/README.md) before changing product, architecture, unit, or runtime truth.
 3. Load [implementation taste](docs/00-meta/implementation-taste.md) only for non-trivial code changes that shape boundaries, data, authority, naming, abstraction, or complexity.
 4. Keep changes explicit and local to the owning surface. Update durable docs when a verified contract, guarantee, operation, or recovery path changes.

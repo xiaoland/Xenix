@@ -1,6 +1,6 @@
 # Native Docs
 
-This tree stores project-local durable knowledge. Repository routing and working posture have one owner: the root [`AGENTS.md`](../AGENTS.md).
+This tree stores project-local durable knowledge. Root [`AGENTS.md`](../AGENTS.md) owns repository-specific entry points; the [working protocol](00-meta/working-protocol.md) owns task posture, mutation permission, and verification behavior.
 
 ## Durable Owners
 
@@ -8,6 +8,7 @@ This tree stores project-local durable knowledge. Repository routing and working
 - [Cross-unit technical contracts and ADRs](20-product-tdd/README.md)
 - [Complex unit design memory](30-unit-tdd/README.md)
 - [Runtime, deployment, migration, and recovery](40-deployment/README.md)
+- [Working protocol](00-meta/working-protocol.md)
 - [On-demand implementation taste](00-meta/implementation-taste.md)
 
-Volatile reasoning, evidence, and temporary artifacts belong in `tasks/`. Task entries are disposable and are not durable documentation.
+Volatile reasoning, evidence, and temporary artifacts belong in `tasks/`; retention is defined by root `AGENTS.md`.

@@ -1,33 +1,18 @@
 # Implementation Taste
 
-Implementation taste is the framework-level judgment surface for non-trivial code design and implementation changes.
+Implementation taste guides non-trivial code design and implementation. It is language- and stack-neutral, not a style guide, pattern catalog, or mandatory phase.
 
-It is language- and tech-stack-neutral. It is not a style guide, a pattern catalog, or a mandatory design phase.
+Load it when a change shapes structure, boundaries, data, state, authority, durable naming, abstraction, performance, or complexity. Skip it for mechanical edits whose owner and verification are already clear.
 
-## Role
+## Preserve One Authority
 
-Use this guidance when work shapes implementation structure, boundary shape, data shape, state flow, authority flow, durable naming, abstraction, dependency use, or complexity budget.
+Every durable fact, state, relationship, and decision needs one authority. Treat replicas, caches, views, client state, denormalized fields, and generated output as references or projections unless they are explicitly authoritative.
 
-Do not load it for purely mechanical edits whose owner, surface, and verification are already obvious.
+When two surfaces appear to own the same truth, resolve authority before adding synchronization logic.
 
-Implementation taste has two layers:
+## Respect Provenance and Trust
 
-1. Design formation taste: asks what model, boundary, authority, naming, and complexity tradeoff should exist.
-2. Implementation shape taste: projects those principles onto concrete code surfaces such as APIs, request/result objects, component props, commands, events, state shape, control flow, tests, assertions, and observability.
-
-## Design Formation
-
-### Preserve SSoT
-
-Every durable fact, state, relationship, or decision should have one authority.
-
-Replicas, caches, views, client state, derived data, and denormalized fields are references, projections, or performance artifacts unless explicitly promoted to authority.
-
-When two surfaces appear to own the same truth, resolve authority before implementation.
-
-### Respect Trust and Provenance
-
-Values crossing a boundary must be classified by provenance:
+Classify values crossing a boundary as one of:
 
 - authority fact
 - stable reference
@@ -35,50 +20,41 @@ Values crossing a boundary must be classified by provenance:
 - user-authored value
 - derived projection
 
-Passing an id or command is often better than passing detail when the receiver can resolve authoritative state itself.
+Pass the smallest value that preserves the contract. A reference or command is often safer than copied detail because the receiver can resolve current authority.
 
-User-authored values are authoritative for user input, expression, preference, or intent, but not for application-owned facts such as permission, existing entity state, storage state, or computed model result state.
+Users are authoritative for their own input, expression, preference, or intent. They are not authoritative for server- or business-owned facts such as permissions, price, inventory, eligibility, or existing entity state.
 
-### Name Durable Semantics Directly
+## Name Durable Semantics Directly
 
-Durable model fields, cross-boundary fields, commands, events, and business operations should be direct, searchable, and consistent.
+Durable models, cross-boundary fields, commands, events, and business operations should use direct, searchable names. Use the same name for the same semantic unless an explicit boundary translation exists.
 
-Use the same name for the same semantic unless an explicit boundary translation is being modeled.
+If naming is difficult, test whether two concepts or authority states have been collapsed prematurely.
 
-### Shape Data Before Clever Flow
+## Shape Data and Boundaries First
 
-Data shape often determines implementation shape.
+Before adding clever flow, retries, fallback heuristics, orchestration, or generalized machinery, inspect the data shape, ownership path, state representation, and boundary contract.
 
-Before adding clever control flow, complex algorithms, or orchestration machinery, ask whether the data structure, authority boundary, ownership path, or state representation is wrong or underspecified.
+Prefer shapes that make valid behavior obvious and invalid behavior hard to express. Solve ambiguity with an explicit invariant or authority boundary rather than layers of guesses.
 
-Prefer data and boundary shapes that make valid behavior obvious and invalid behavior hard to express.
+## Spend Complexity for Return
 
-### Spend Complexity for Return
+Each abstraction, layer, state holder, protocol, switch, dependency, and indirection must earn its cost through behavior, reliability, clarity, maintainability, or evolvability.
 
-Complexity is an input. Useful behavior, reliability, clarity, maintainability, and evolvability are outputs.
+Measure before optimizing. Prefer simple algorithms and data structures until evidence shows a material bottleneck or correctness need. Consider marginal return: the next unit of complexity should still pay for itself.
 
-Each abstraction, layer, state holder, protocol, configuration switch, indirection, dependency, and design pattern must explain what it earns.
+Use patterns and object models when they clarify ownership or stable variation, not because a pattern name is available. Avoid premature generalization from one implementation.
 
-Do not guess performance pressure. Measure before optimizing, and optimize only when the measured bottleneck is material enough to justify the added complexity.
+## Project the Design into Code
 
-Prefer simple algorithms and simple data structures until scale, evidence, or correctness pressure proves they are no longer enough.
+APIs, DTOs, props, commands, events, state, control flow, tests, assertions, and observability should expose the chosen authority and boundary model. Tests should protect the contract rather than mirror incidental implementation.
 
-## Implementation Shape
+When implementation friction repeatedly contradicts the design, return to evidence and revise the model or proof shape; do not bury the mismatch in adapters or exceptions.
 
-Use this guidance while editing concrete code surfaces to check:
+## Review Questions
 
-- whether a boundary receives a fact, reference, command, proposal, or user-authored value
-- whether names expose durable semantics instead of hiding them behind generic containers
-- whether local structure matches real complexity
-- whether assertions, tests, or observability can prove the intended authority, boundary, and behavior
-- whether repository idioms are preserved unless the change intentionally renegotiates them
-
-Implementation shape taste should stay close to the code surface being changed. When verified work changes a durable contract, update its single owning document in the same change instead of preserving a parallel summary.
-
-## Application Path
-
-1. Load this file through the root `AGENTS.md` entry point for non-trivial implementation work.
-2. Use design formation taste to expose authority, trust, naming, and complexity pressure.
-3. Use the root routing and working model for ownership, verification timing, and feedback loops.
-4. Use implementation shape taste while editing concrete code surfaces.
-5. If the change alters durable truth, update Product TDD, Unit TDD, Deployment, PRD, or local seam guidance according to the root owner map.
+- Where is the authority, and are all other copies clearly projections?
+- What provenance and trust cross each boundary?
+- Does the data shape make the intended behavior simpler?
+- Do names expose the durable semantic?
+- What measurable return pays for each added complexity?
+- Which test, assertion, or observation proves the contract?
