@@ -191,7 +191,16 @@ def _render_content_blocks(blocks: list[dict[str, Any]]) -> str:
         elif block_type == "file":
             file_path = Path(str(block.get("path", "")))
             parts.append(f"`{file_path.name}`")
+        elif block_type == "source_attachment":
+            file_name = str(block.get("file_name") or "").strip()
+            artifact_id = str(block.get("artifact_id") or "").strip()
+            if artifact_id and file_name:
+                parts.append(f"[{_escape_markdown_link_label(file_name)}](artifact://{artifact_id})")
+            elif file_name:
+                parts.append(f"`{file_name}`")
         elif block_type == "dataset":
+            if block.get("visible") is False:
+                continue
             name = str(block.get("name") or block.get("file_name") or "")
             dataset_id = str(block.get("dataset_id") or "")
             if dataset_id:
@@ -232,6 +241,10 @@ def _render_content_blocks(blocks: list[dict[str, Any]]) -> str:
                 text = f"{text} {error_summary}"
             parts.append(text)
     return "\n\n".join(part for part in parts if part)
+
+
+def _escape_markdown_link_label(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
 
 
 def _translate_tool_status(status: str) -> str:

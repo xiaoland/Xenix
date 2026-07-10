@@ -70,14 +70,15 @@ User text message bubbles own their black background as one custom-painted visua
 - Changing the model picker during a running turn must not change the provider already locked for that turn.
 - ML worker setup belongs in Settings, not in Agent tool messages or Composer controls. The setup wizard may show connection, environment setup, and validation state, but Chatbot tools do not expose worker selection.
 - Dragging local files over any child of the composer shell keeps the hover overlay visible.
-- Attached dataset files are preflighted before send. Attachment chips show pending, ready, or failed state and expose removal. Pending or failed attachments block send; removing a pending attachment aborts its preflight logically and removing an unsent registered attachment discards the unreferenced dataset record.
+- Attached dataset files are registered as source artifacts before send. Attachment chips show pending, ready, or failed artifact-registration state and expose removal. The UI does not import attachments into datasets during Composer interaction; Agent Harness owns source artifact import after Send and before the first provider request.
 
 ## Streaming Contract
 
 During a running turn:
 
 - user message appears immediately
-- when attachments are present, the user message appears only after all attached datasets are ready; pending or failed attachments remain in the Composer
+- when attachments are present, the visible user message shows workbook/file-level source attachments only; imported worksheet datasets are not displayed as user-message attachments
+- if post-Send attachment import fails before an AgentRun starts, the optimistic user message is rolled back, the original text and source attachments return to the Composer, and an error item is shown in the message list
 - send button becomes stop
 - non-final snapshots initialize or resume the running turn without releasing the composer
 - Chatbot Events create, update, or finalize visible EventList items by event id

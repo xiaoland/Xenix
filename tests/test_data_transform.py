@@ -1,6 +1,7 @@
 import sqlite3
 from pathlib import Path
 
+import duckdb
 import pandas as pd
 import pytest
 
@@ -17,11 +18,14 @@ from xenix.services.data_transform import (
     DataTransformInput,
     DatasetSqlBinding,
 )
+from xenix.services.dataset_export_service import DatasetExportService
 from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
 from xenix.services.dataset_inspection import detect_source_format, load_dataframe
 from xenix.services.ml_service import MLService
 from xenix.services.ml_task_service import MLTaskService
+from xenix.services.preprocessing_worker import InlinePreprocessingWorkerRunner
 from xenix.services.storage import StorageBootstrapService
+import xenix.services.data_transform as data_transform_module
 
 
 def _build_runtime(monkeypatch, tmp_path: Path):
@@ -29,8 +33,9 @@ def _build_runtime(monkeypatch, tmp_path: Path):
     paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
     dataset_service = DatasetService(context.session_factory, paths)
-    data_cleaning_service = DataCleaningService(paths)
-    data_transform_service = DataQueryTransformService(paths)
+    worker_runner = InlinePreprocessingWorkerRunner()
+    data_cleaning_service = DataCleaningService(paths, worker_runner=worker_runner)
+    data_transform_service = DataQueryTransformService(paths, worker_runner=worker_runner)
     ml_task_service = MLTaskService(context.session_factory, paths)
     ml_service = MLService(
         paths,
@@ -46,6 +51,7 @@ def _build_runtime(monkeypatch, tmp_path: Path):
         data_transform_service=data_transform_service,
         ml_service=ml_service,
         artifact_service=artifact_service,
+        preprocessing_worker_runner=worker_runner,
     )
     conversation_store = ConversationStore(context.session_factory)
     return paths, dataset_service, data_transform_service, artifact_service, registry, conversation_store
@@ -168,6 +174,7 @@ def test_data_query_service_runs_read_only_select(monkeypatch, tmp_path: Path) -
         {"region": "south", "total_amount": 5.0},
     ]
     assert result.returned_row_count == 2
+    assert result.total_row_count == 2
     assert result.truncated is False
     assert result.validation_summary["read_only"] is True
     assert result.validation_summary["bindings"] == ["orders"]
@@ -207,8 +214,71 @@ def test_data_transform_service_materializes_parquet(monkeypatch, tmp_path: Path
         {"customer_id": 2, "total_amount": 5.0},
     ]
     assert result.row_count == 2
+    assert Path(result.output_path).suffix == ".parquet"
     assert result.transform_report["sql"].startswith("SELECT customer_id")
     assert result.transform_report["bindings"] == [{"alias": "input", "dataset_id": "customers-id"}]
+
+
+def test_data_transform_service_does_not_fetch_full_output_dataframe(monkeypatch, tmp_path: Path) -> None:
+    _paths, _dataset_service, service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "orders.csv"
+    source.write_text("order_id,amount\n1,10\n2,20\n", encoding="utf-8")
+    real_connect = duckdb.connect
+
+    class CursorProxy:
+        def __init__(self, cursor, sql: object) -> None:
+            self._cursor = cursor
+            self._sql = str(sql)
+
+        def fetchdf(self):
+            normalized = " ".join(self._sql.split()).lower()
+            if normalized == "select * from output":
+                raise AssertionError("transform must not fetch the full output relation into pandas")
+            return self._cursor.fetchdf()
+
+        def __getattr__(self, name: str):
+            return getattr(self._cursor, name)
+
+    class ConnectionProxy:
+        def __init__(self, connection) -> None:
+            self._connection = connection
+
+        def __enter__(self):
+            self._connection.__enter__()
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return self._connection.__exit__(exc_type, exc, tb)
+
+        def execute(self, sql, *args, **kwargs):
+            return CursorProxy(self._connection.execute(sql, *args, **kwargs), sql)
+
+        def __getattr__(self, name: str):
+            return getattr(self._connection, name)
+
+    def connect_proxy(*args, **kwargs):
+        return ConnectionProxy(real_connect(*args, **kwargs))
+
+    monkeypatch.setattr(data_transform_module.duckdb, "connect", connect_proxy)
+
+    result = service.transform(
+        DataTransformInput(
+            bindings=[
+                DatasetSqlBinding(
+                    alias="input",
+                    dataset_id="orders-id",
+                    source_path=str(source.resolve()),
+                )
+            ],
+            sql="SELECT * FROM input ORDER BY order_id",
+            name="Orders copy",
+        )
+    )
+
+    assert _read_dataset_frame(result.output_path)["amount"].tolist() == [10, 20]
 
 
 def test_data_transform_tool_does_not_leave_dataset_or_output_when_output_validation_fails(
@@ -226,10 +296,10 @@ def test_data_transform_tool_does_not_leave_dataset_or_output_when_output_valida
         "order_id,amount\n1,10\n2,20\n",
     )
 
-    def fail_validation(_output_path: Path) -> None:
+    def fail_validation(_self, _output_path: Path) -> None:
         raise ValidationError("Synthetic output validation failure.")
 
-    monkeypatch.setattr(service, "_validate_transform_output", fail_validation)
+    monkeypatch.setattr(DataQueryTransformService, "_validate_transform_output", fail_validation)
     arguments = {
         "dataset_id": dataset.id,
         "sql": "SELECT * FROM input",
@@ -264,14 +334,10 @@ def test_data_transform_tool_discards_dataset_when_export_artifact_fails(
         "order_id,amount\n1,10\n2,20\n",
     )
 
-    def fail_export(*_args, **_kwargs) -> None:
+    def fail_export(_self, *_args, **_kwargs) -> None:
         raise RuntimeError("Synthetic export artifact failure.")
 
-    monkeypatch.setattr(
-        registry._dataset_export_service,
-        "materialize_dataset_export_artifact",
-        fail_export,
-    )
+    monkeypatch.setattr(DatasetExportService, "materialize_dataset_export_artifact", fail_export)
     arguments = {
         "dataset_id": dataset.id,
         "sql": "SELECT * FROM input",
@@ -377,8 +443,9 @@ def test_data_query_tool_returns_bounded_rows(monkeypatch, tmp_path: Path) -> No
     result = registry.execute("data.query", arguments, _tool_context(store, "data.query", arguments))
 
     assert result.payload["returned_row_count"] == 2
+    assert result.payload["total_row_count"] == 3
     assert result.payload["truncated"] is True
-    assert list(result.payload) == ["columns", "rows", "returned_row_count", "truncated"]
+    assert list(result.payload) == ["columns", "rows", "returned_row_count", "total_row_count", "truncated"]
     assert result.payload["columns"] == {
         "_schema": {"name": 0, "type": 1, "index": 2},
         "data": [["order_id", "int64", 0], ["amount", "int64", 1]],
@@ -421,6 +488,7 @@ def test_data_query_tool_uses_bindings_when_dataset_id_is_also_present(monkeypat
 
     assert result.payload["rows"]["_schema"] == {"order_id": 0, "amount": 1}
     assert result.payload["rows"]["data"] == [[2, 20]]
+    assert result.payload["total_row_count"] == 1
 
 
 def test_data_query_tool_accepts_canonical_names_for_messy_xlsx(monkeypatch, tmp_path: Path) -> None:
@@ -445,6 +513,7 @@ def test_data_query_tool_accepts_canonical_names_for_messy_xlsx(monkeypatch, tmp
         "_schema": {"column_2": 0},
         "data": [[None], ["销售数量"], ["1"]],
     }
+    assert result.payload["total_row_count"] == 3
 
 
 def test_data_transform_tool_registers_derived_dataset_and_returns_artifact_id(monkeypatch, tmp_path: Path) -> None:

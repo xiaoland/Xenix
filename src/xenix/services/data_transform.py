@@ -17,6 +17,7 @@ from ..config import AppPaths
 from ..exceptions import ValidationError
 from ..observability import record_counter, record_histogram, start_span
 from .dataset_inspection import detect_source_format
+from .preprocessing_worker import LocalPreprocessingWorkerRunner, PreprocessingWorkerRunner
 from .storage.models import DatasetSourceFormat
 from .tabular import load_pandas_frame_with_schema, load_tabular_frame, resolve_tabular_schema
 
@@ -134,6 +135,7 @@ class DataQueryResult(SQLModel):
     rows: list[dict[str, Any]] = Field(default_factory=list)
     columns: list[dict[str, str]] = Field(default_factory=list)
     returned_row_count: int = 0
+    total_row_count: int = 0
     limit: int = _DEFAULT_QUERY_LIMIT
     truncated: bool = False
     validation_summary: dict[str, Any] = Field(default_factory=dict)
@@ -378,9 +380,15 @@ class DuckDbSqlValidator:
 
 
 class DataQueryTransformService:
-    def __init__(self, paths: AppPaths) -> None:
+    def __init__(
+        self,
+        paths: AppPaths,
+        *,
+        worker_runner: PreprocessingWorkerRunner | None = None,
+    ) -> None:
         self._paths = paths
         self._validator = DuckDbSqlValidator()
+        self._worker_runner = worker_runner or LocalPreprocessingWorkerRunner()
 
     def query(self, input_data: DataQueryInput) -> DataQueryResult:
         started_at = perf_counter()
@@ -392,25 +400,36 @@ class DataQueryTransformService:
             with tempfile.TemporaryDirectory() as temp_dir:
                 with duckdb.connect(database=":memory:") as connection:
                     self._register_bindings(connection, bindings, temp_dir=Path(temp_dir))
+                    total_row_count = int(
+                        connection.execute(
+                            f"SELECT COUNT(*) AS total_rows FROM ({sql}) AS xenix_query_result_count"
+                        ).fetchone()[0]
+                    )
                     frame = connection.execute(
-                        f"SELECT * FROM ({sql}) AS xenix_query_result LIMIT {limit + 1}"
+                        f"SELECT * FROM ({sql}) AS xenix_query_result LIMIT {limit}"
                     ).fetchdf()
-            truncated = int(len(frame.index)) > limit
-            if truncated:
-                frame = frame.head(limit)
             rows = self._records(frame)
             result = DataQueryResult(
                 rows=rows,
                 columns=self._columns(frame),
                 returned_row_count=int(len(rows)),
+                total_row_count=total_row_count,
                 limit=limit,
-                truncated=truncated,
+                truncated=total_row_count > int(len(rows)),
                 validation_summary=validation_summary,
             )
             self._record_operation("data.query", "succeeded", started_at)
             return result
 
     def transform(self, input_data: DataTransformInput) -> DataTransformResult:
+        payload = self._worker_runner.run(
+            "data.transform",
+            {"input": input_data.model_dump(mode="json")},
+            paths=self._paths,
+        )
+        return DataTransformResult.model_validate(payload)
+
+    def _transform_in_process(self, input_data: DataTransformInput) -> DataTransformResult:
         started_at = perf_counter()
         with start_span("data.transform"):
             bindings = self._validate_bindings(input_data.bindings)
@@ -423,6 +442,7 @@ class DataQueryTransformService:
             output_dir.mkdir(parents=True, exist_ok=True)
             output_path = output_dir / f"{self._slug(name)}-{uuid4().hex[:12]}.parquet"
             with tempfile.TemporaryDirectory() as temp_dir:
+                temp_output_path = Path(temp_dir) / "transform-output.parquet"
                 with duckdb.connect(database=":memory:") as connection:
                     self._register_bindings(connection, bindings, temp_dir=Path(temp_dir))
                     if validation_summary["statement"] in {"select", "with"}:
@@ -430,23 +450,21 @@ class DataQueryTransformService:
                     else:
                         connection.execute(sql)
                     try:
-                        frame = connection.execute("SELECT * FROM output").fetchdf()
+                        columns = self._output_columns(connection)
+                        row_count = self._output_row_count(connection)
+                        connection.execute(
+                            "COPY (SELECT * FROM output) TO ? (FORMAT PARQUET)",
+                            [str(temp_output_path)],
+                        )
                     except duckdb.CatalogException as exc:
                         raise ValidationError(
                             "Transform SQL scripts must leave a final relation named output."
                         ) from exc
-                temp_output_path = Path(temp_dir) / "transform-output.parquet"
-                with duckdb.connect(database=":memory:") as output_connection:
-                    output_connection.register("output_frame", frame)
-                    output_connection.execute(
-                        "COPY output_frame TO ? (FORMAT PARQUET)",
-                        [str(temp_output_path)],
-                    )
                 self._validate_transform_output(temp_output_path)
                 temp_output_path.replace(output_path)
             transform_report = {
-                "row_count": int(len(frame.index)),
-                "columns": self._columns(frame),
+                "row_count": row_count,
+                "columns": columns,
                 "sql": sql,
                 "bindings": [
                     {"alias": binding.alias, "dataset_id": binding.dataset_id}
@@ -456,13 +474,20 @@ class DataQueryTransformService:
             }
             result = DataTransformResult(
                 output_path=str(output_path.resolve()),
-                row_count=int(len(frame.index)),
-                columns=self._columns(frame),
+                row_count=row_count,
+                columns=columns,
                 validation_summary=validation_summary,
                 transform_report=transform_report,
             )
             self._record_operation("data.transform", "succeeded", started_at)
             return result
+
+    def _output_columns(self, connection) -> list[dict[str, str]]:
+        frame = connection.execute("SELECT * FROM output LIMIT 1").fetchdf()
+        return self._columns(frame)
+
+    def _output_row_count(self, connection) -> int:
+        return int(connection.execute("SELECT COUNT(*) FROM output").fetchone()[0])
 
     def _validate_transform_output(self, output_path: Path) -> None:
         frame = load_tabular_frame(output_path, DatasetSourceFormat.PARQUET)

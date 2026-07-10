@@ -28,9 +28,9 @@ from ..data_transform import (
     DataTransformInput,
     DatasetSqlBinding,
 )
-from ..dataset_inspection import DatasetInspection, InspectDatasetInput, detect_source_format, load_dataframe
+from ..dataset_inspection import detect_source_format, load_dataframe
 from ..dataset_export_service import DatasetExportService
-from ..dataset_service import DatasetService, RegisterDatasetInput
+from ..dataset_service import DatasetService
 from ..ml.registry import get_model_catalog_entry, list_model_catalog, list_model_keys
 from ..ml.types import EvaluationKind, ModelFamily, ModelTaskKind
 from ..ml_service import (
@@ -40,6 +40,7 @@ from ..ml_service import (
     MLService,
     TuneWithEvaluateInput,
 )
+from ..preprocessing_worker import LocalPreprocessingWorkerRunner, PreprocessingWorkerRunner
 from ..storage.models import (
     ArtifactKind,
     MLTaskArtifactKind,
@@ -106,6 +107,7 @@ class AgentToolRegistry:
         ml_service: MLService,
         artifact_service: ArtifactService,
         dataset_export_service: DatasetExportService | None = None,
+        preprocessing_worker_runner: PreprocessingWorkerRunner | None = None,
         data_tokenization_service: DataTokenizationService | None = None,
         analysis_profile_service: AnalysisProfileService | None = None,
         analysis_graph_service: AnalysisGraphService | None = None,
@@ -121,11 +123,8 @@ class AgentToolRegistry:
         self._analysis_lambda_service = analysis_lambda_service or AnalysisLambdaService(paths)
         self._ml_service = ml_service
         self._artifact_service = artifact_service
-        self._dataset_export_service = dataset_export_service or DatasetExportService(
-            paths=paths,
-            dataset_service=dataset_service,
-            artifact_service=artifact_service,
-        )
+        _ = dataset_export_service
+        self._preprocessing_worker_runner = preprocessing_worker_runner or LocalPreprocessingWorkerRunner()
         self._model_key_aliases = self._build_model_key_aliases()
         self._tools = {
             tool.spec.name: tool
@@ -1103,6 +1102,7 @@ class AgentToolRegistry:
             "columns": self._query_columns_payload(query_result.columns),
             "rows": self._query_rows_payload(query_result.rows, query_result.columns),
             "returned_row_count": query_result.returned_row_count,
+            "total_row_count": query_result.total_row_count,
             "truncated": query_result.truncated,
         }
         return ToolExecutionResult(payload=payload)
@@ -1532,42 +1532,23 @@ class AgentToolRegistry:
         metadata_payload: dict[str, Any] | None = None,
     ) -> ToolExecutionResult:
         resolved_output_path = output_path.resolve()
-        inspection = self._dataset_service.inspect_source_file(
-            InspectDatasetInput(source_path=str(resolved_output_path))
-        )
-        inspection_payload = self._inspection_payload(inspection)
-        dataset = self._dataset_service.register_dataset(
-            RegisterDatasetInput(
-                source_path=str(resolved_output_path),
-                name=name,
-                derived_from_dataset_id=derived_from_dataset_id,
-            )
-        )
-        try:
-            export_artifact = self._dataset_export_service.materialize_dataset_export_artifact(
-                dataset.id,
-                thread_id=context.thread_id,
-                turn_id=context.turn_id,
-                tool_call_id=context.tool_call_id,
-                metadata_payload=metadata_payload,
-            )
-        except Exception:
-            try:
-                self._dataset_service.discard_unreferenced_dataset(dataset.id)
-            except Exception:
-                pass
-            raise
-        return ToolExecutionResult(
-            payload={
-                "dataset_id": dataset.id,
-                "artifact_id": export_artifact.artifact_id,
+        payload = self._preprocessing_worker_runner.run(
+            "data.register_generated_dataset",
+            {
+                "output_path": str(resolved_output_path),
+                "name": name,
                 "summary": summary,
-                "inspection": inspection_payload,
+                "derived_from_dataset_id": derived_from_dataset_id,
+                "metadata_payload": dict(metadata_payload or {}),
+                "thread_id": context.thread_id,
+                "turn_id": context.turn_id,
+                "tool_call_id": context.tool_call_id,
             },
+            paths=self._paths,
         )
-
-    def _inspection_payload(self, inspection: DatasetInspection) -> dict[str, Any]:
-        return inspection.model_dump(mode="json", exclude={"source_path"})
+        return ToolExecutionResult(
+            payload=payload,
+        )
 
     def _compact_table(self, keys: list[str], rows: list[list[Any]]) -> dict[str, Any]:
         return {

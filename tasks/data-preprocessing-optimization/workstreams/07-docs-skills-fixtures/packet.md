@@ -18,9 +18,9 @@ verified, ongoing
 
 ## State Diff
 
-From: docs and skills described source-file datasets, eager artifact links, and `data.peek`-first workflows.
+From: docs and skills described source-file datasets, stale artifact-link behavior, and `data.peek`-first workflows.
 
-To: docs and skills describe query-first probing, Parquet-backed app-owned datasets, `dataset://` activation, lazy workbook export, and compact tool results.
+To: docs and skills describe query-first probing, Parquet-backed app-owned datasets, artifact-owned user-openable outputs, source-file attachment import through AgentHarness, and compact tool results.
 
 ## Invariants
 

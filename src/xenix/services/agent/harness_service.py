@@ -54,12 +54,15 @@ from .chatbot_events import (
     ChatbotEvent,
     ChatbotEventStatus,
     build_activity_chatbot_event,
+    build_thinking_chatbot_event,
     build_llm_connection_chatbot_event,
     project_chatbot_events,
     project_text_message_event,
     project_tool_chatbot_event,
     should_project_agent_skill_tools,
 )
+from ..artifact_service import ArtifactService, build_artifact_uri
+from ..dataset_service import DatasetService, RegisterDatasetInput
 from ..llm import (
     AgentProvider,
     AgentToolSpec,
@@ -95,10 +98,17 @@ class DatasetAttachmentInput(SQLModel):
     preview_columns: list[str] = Field(default_factory=list)
 
 
+class SourceAttachmentInput(SQLModel):
+    artifact_id: str
+    file_name: str
+    source_format: str
+
+
 class SubmitUserTurnInput(SQLModel):
     thread_id: str | None = None
     text: str
     dataset_attachments: list[DatasetAttachmentInput] = Field(default_factory=list)
+    source_attachments: list[SourceAttachmentInput] = Field(default_factory=list)
     fq_model_key: str | None = None
     interface_locale: str | None = None
 
@@ -168,6 +178,8 @@ class AgentHarnessService:
         tool_registry: AgentToolRegistry,
         provider: AgentProvider | None = None,
         llm_service: LLMService | None = None,
+        dataset_service: DatasetService | None = None,
+        artifact_service: ArtifactService | None = None,
         turn_completion_guard_provider: AgentProvider | None = None,
         thread_title_provider: AgentProvider | None = None,
         conversation_store: ConversationStore | None = None,
@@ -181,6 +193,8 @@ class AgentHarnessService:
         self._session_factory = session_factory
         self._provider = provider
         self._llm_service = llm_service
+        self._dataset_service = dataset_service
+        self._artifact_service = artifact_service
         self._turn_completion_guard = (
             TurnCompletionGuard(turn_completion_guard_provider)
             if turn_completion_guard_provider is not None
@@ -288,7 +302,13 @@ class AgentHarnessService:
 
     def submit_user_turn(self, input_data: SubmitUserTurnInput) -> ThreadSnapshot:
         with start_span("agent.turn") as span:
-            thread_id, turn_id, run_id, fq_model_key, provider = self._start_user_turn(input_data)
+            self._validate_turn_submission_before_materialization(input_data)
+            imported_source_attachments = self._materialize_source_attachments(input_data)
+            thread_id, turn_id, fq_model_key, provider = self._start_user_turn(
+                input_data,
+                imported_source_attachments=imported_source_attachments,
+            )
+            run_id = self._start_agent_run(thread_id, turn_id, fq_model_key=fq_model_key, provider=provider)
             set_span_attributes(span, ai_observability.turn_span_attributes(thread_id=thread_id, turn_id=turn_id, run_id=run_id))
 
             try:
@@ -330,7 +350,13 @@ class AgentHarnessService:
 
     def submit_user_turn_stream(self, input_data: SubmitUserTurnInput):
         with start_span("agent.turn") as span:
-            thread_id, turn_id, run_id, fq_model_key, provider = self._start_user_turn(input_data)
+            self._validate_turn_submission_before_materialization(input_data)
+            imported_source_attachments = self._materialize_source_attachments(input_data)
+            thread_id, turn_id, fq_model_key, provider = self._start_user_turn(
+                input_data,
+                imported_source_attachments=imported_source_attachments,
+            )
+            run_id = self._start_agent_run(thread_id, turn_id, fq_model_key=fq_model_key, provider=provider)
             set_span_attributes(span, ai_observability.turn_span_attributes(thread_id=thread_id, turn_id=turn_id, run_id=run_id))
             yield from self._submit_user_turn_stream_started(thread_id, turn_id, run_id, fq_model_key, provider)
 
@@ -518,11 +544,27 @@ class AgentHarnessService:
         )
         return self._conversation_store.get_thread_snapshot(input_data.thread_id)
 
-    def _start_user_turn(self, input_data: SubmitUserTurnInput) -> tuple[str, str, str, str | None, AgentProvider | None]:
+    def _validate_turn_submission_before_materialization(self, input_data: SubmitUserTurnInput) -> None:
+        text = input_data.text.strip()
+        if not text and not input_data.dataset_attachments and not input_data.source_attachments:
+            raise ValidationError("A turn needs a user message or at least one attachment.")
+        if input_data.thread_id is None:
+            self._resolve_fq_model_key(input_data.fq_model_key, None)
+            return
+        snapshot = self._conversation_store.get_thread_snapshot(input_data.thread_id)
+        self._resolve_fq_model_key(input_data.fq_model_key, snapshot.thread.selected_fq_model_key)
+
+    def _start_user_turn(
+        self,
+        input_data: SubmitUserTurnInput,
+        *,
+        imported_source_attachments: list[DatasetAttachmentInput] | None = None,
+    ) -> tuple[str, str, str | None, AgentProvider | None]:
         text = input_data.text.strip()
         dataset_attachments = list(input_data.dataset_attachments)
-        if not text and not dataset_attachments:
-            raise ValidationError("A turn needs a user message or at least one dataset.")
+        source_attachments = list(input_data.source_attachments)
+        if not text and not dataset_attachments and not source_attachments:
+            raise ValidationError("A turn needs a user message or at least one attachment.")
 
         thread_id = input_data.thread_id
         should_auto_title_existing_thread = False
@@ -530,7 +572,7 @@ class AgentHarnessService:
             selected_fq_model_key = self._resolve_fq_model_key(input_data.fq_model_key, None)
             thread_id = self._conversation_store.create_thread(
                 CreateAgentThreadInput(
-                    title=self._title_from_first_message(text, dataset_attachments),
+                    title=self._title_from_first_message(text, dataset_attachments, source_attachments),
                     interface_locale=input_data.interface_locale,
                     selected_fq_model_key=selected_fq_model_key,
                 )
@@ -552,6 +594,8 @@ class AgentHarnessService:
         provider = self._provider_for_fq_model_key(selected_fq_model_key) if self._llm_service is None else None
 
         content_blocks = self._user_content_blocks(text, dataset_attachments)
+        content_blocks.extend(self._source_attachment_blocks(source_attachments))
+        content_blocks.extend(self._hidden_dataset_blocks(imported_source_attachments or []))
         turn, _user_message = self._conversation_store.start_turn(
             StartTurnInput(
                 thread_id=thread_id,
@@ -562,23 +606,32 @@ class AgentHarnessService:
             self._conversation_store.rename_thread(
                 RenameAgentThreadInput(
                     thread_id=thread_id,
-                    title=self._title_from_first_message(text, dataset_attachments),
+                    title=self._title_from_first_message(text, dataset_attachments, source_attachments),
                 )
             )
+        return thread_id, turn.id, selected_fq_model_key, provider
+
+    def _start_agent_run(
+        self,
+        thread_id: str,
+        turn_id: str,
+        *,
+        fq_model_key: str | None,
+        provider: AgentProvider | None,
+    ) -> str:
         run = self._conversation_store.start_run(
             StartAgentRunInput(
                 thread_id=thread_id,
-                turn_id=turn.id,
-                provider_name=self._target_provider_name(provider=provider, fq_model_key=selected_fq_model_key),
+                turn_id=turn_id,
+                provider_name=self._target_provider_name(provider=provider, fq_model_key=fq_model_key),
                 usage_payload=self._usage_payload(
                     self._initial_step_state(),
-                    fq_model_key=selected_fq_model_key,
+                    fq_model_key=fq_model_key,
                 ),
             )
         )
         self._register_cancel_event(run.id)
-        return thread_id, turn.id, run.id, selected_fq_model_key, provider
-
+        return run.id
 
     def _run_provider_loop(
         self,
@@ -1935,6 +1988,44 @@ class AgentHarnessService:
             payload={"cancelled": True},
         )
 
+    def _materialize_source_attachments(self, input_data: SubmitUserTurnInput) -> list[DatasetAttachmentInput]:
+        source_attachments = list(input_data.source_attachments)
+        if not source_attachments:
+            return []
+        return self._import_source_attachments(source_attachments)
+
+    def _import_source_attachments(self, source_attachments: list[SourceAttachmentInput]) -> list[DatasetAttachmentInput]:
+        if self._dataset_service is None or self._artifact_service is None:
+            raise ValidationError("Source attachment import requires dataset and artifact services.")
+
+        imported: list[DatasetAttachmentInput] = []
+        for source in source_attachments:
+            artifact = self._artifact_service.resolve_uri(build_artifact_uri(source.artifact_id))
+            if not artifact.ready_to_open:
+                raise ValidationError(f"Attachment '{source.file_name}' is not ready to open.")
+            if not artifact.exists:
+                raise ValidationError(f"Attachment file is missing: {source.file_name}")
+            source_path = Path(artifact.absolute_path).expanduser().resolve()
+            registered = self._dataset_service.register_dataset_attachment(
+                RegisterDatasetInput(
+                    source_path=str(source_path),
+                    name=source_path.stem,
+                )
+            )
+            imported.extend(
+                DatasetAttachmentInput(
+                    dataset_id=item.dataset_id,
+                    name=item.name,
+                    file_name=item.file_name,
+                    source_format=item.source_format,
+                    row_count=item.row_count,
+                    column_count=item.column_count,
+                    preview_columns=list(item.preview_columns),
+                )
+                for item in registered.datasets
+            )
+        return imported
+
     def _user_content_blocks(
         self,
         text: str,
@@ -1947,6 +2038,18 @@ class AgentHarnessService:
             blocks.append({"type": "dataset", **attachment.model_dump(mode="json")})
         return blocks
 
+    def _source_attachment_blocks(self, source_attachments: list[SourceAttachmentInput]) -> list[dict[str, Any]]:
+        return [
+            {"type": "source_attachment", **attachment.model_dump(mode="json")}
+            for attachment in source_attachments
+        ]
+
+    def _hidden_dataset_blocks(self, dataset_attachments: list[DatasetAttachmentInput]) -> list[dict[str, Any]]:
+        return [
+            {"type": "dataset", "visible": False, **attachment.model_dump(mode="json")}
+            for attachment in dataset_attachments
+        ]
+
     def _title_from_text(self, text: str) -> str | None:
         return self._fallback_thread_title(text, [])
 
@@ -1954,25 +2057,27 @@ class AgentHarnessService:
         self,
         text: str,
         dataset_attachments: list[DatasetAttachmentInput],
+        source_attachments: list[SourceAttachmentInput] | None = None,
     ) -> str:
         if self.has_thread_title_provider():
             try:
-                generated = self._llm_thread_title(text, dataset_attachments)
+                generated = self._llm_thread_title(text, dataset_attachments, source_attachments or [])
                 if generated is not None:
                     return generated
             except Exception as exc:
                 LOGGER.warning("Thread title model failed; using deterministic fallback: %s", exc)
-        return self._fallback_thread_title(text, dataset_attachments)
+        return self._fallback_thread_title(text, dataset_attachments, source_attachments or [])
 
     def _llm_thread_title(
         self,
         text: str,
         dataset_attachments: list[DatasetAttachmentInput],
+        source_attachments: list[SourceAttachmentInput],
     ) -> str | None:
         response = self._complete_thread_title(
             messages=[
                 ProviderMessage(role="system", content=THREAD_TITLE_SYSTEM_PROMPT),
-                ProviderMessage(role="user", content=self._thread_title_prompt(text, dataset_attachments)),
+                ProviderMessage(role="user", content=self._thread_title_prompt(text, dataset_attachments, source_attachments)),
             ]
         )
         return _sanitize_thread_title(_assistant_text(response.assistant_content_blocks))
@@ -2004,6 +2109,7 @@ class AgentHarnessService:
         self,
         text: str,
         dataset_attachments: list[DatasetAttachmentInput],
+        source_attachments: list[SourceAttachmentInput] | None = None,
     ) -> str:
         lines = ["Create a short title for this first user message."]
         if text:
@@ -2015,6 +2121,13 @@ class AgentHarnessService:
         ]
         if dataset_names:
             lines.extend(["", "Attached datasets:", ", ".join(dataset_names)])
+        source_names = [
+            attachment.file_name.strip()
+            for attachment in (source_attachments or [])
+            if attachment.file_name.strip()
+        ]
+        if source_names:
+            lines.extend(["", "Attached files:", ", ".join(source_names)])
         return "\n".join(lines)
 
     def _thread_title_snapshot_prompt(self, snapshot: ThreadSnapshot) -> str:
@@ -2041,12 +2154,21 @@ class AgentHarnessService:
             f"{json.dumps(payload, ensure_ascii=False)}"
         )
 
-    def _fallback_thread_title(self, text: str, dataset_attachments: list[DatasetAttachmentInput]) -> str:
+    def _fallback_thread_title(
+        self,
+        text: str,
+        dataset_attachments: list[DatasetAttachmentInput],
+        source_attachments: list[SourceAttachmentInput] | None = None,
+    ) -> str:
         title = _sanitize_thread_title(text)
         if title is not None:
             return title
         for attachment in dataset_attachments:
             title = _sanitize_thread_title(attachment.name or Path(attachment.file_name).stem or attachment.file_name)
+            if title is not None:
+                return title
+        for attachment in source_attachments or []:
+            title = _sanitize_thread_title(Path(attachment.file_name).stem or attachment.file_name)
             if title is not None:
                 return title
         return "New analysis"
@@ -2066,6 +2188,12 @@ def _assistant_text(blocks: list[dict[str, Any]]) -> str:
 
 
 def _provider_safe_content_block(block: dict[str, Any]) -> dict[str, Any]:
+    if block.get("type") == "source_attachment":
+        return {
+            "type": "source_attachment",
+            "file_name": block.get("file_name"),
+            "source_format": block.get("source_format"),
+        }
     if block.get("type") != "file":
         return dict(block)
     return {

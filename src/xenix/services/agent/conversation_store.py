@@ -29,6 +29,7 @@ from ..storage.models import (
 )
 from ..storage.repositories import AgentConversationRepository, ArtifactRepository
 from ..llm import ProviderMessage, extract_reasoning_content
+from .xenix_table_text import render_xenix_table_tool_result
 
 
 def _utc_now() -> datetime:
@@ -705,6 +706,8 @@ def _content_blocks_to_text(blocks: list[dict[str, Any]]) -> str:
             lines.append("Legacy local file attachment omitted; reattach it as a dataset to use it.")
         elif block_type == "dataset":
             lines.append(_dataset_block_to_text(block))
+        elif block_type == "source_attachment":
+            continue
         elif block_type == "step_confirmation":
             lines.append(str(block.get("text", "")))
         elif block_type == "tool_event_summary":
@@ -738,6 +741,14 @@ def _dataset_block_to_text(block: dict[str, Any]) -> str:
 
 
 def _tool_result_to_text(tool_call: AgentToolCallRow, provider_payload: dict[str, Any] | None = None) -> str:
+    table_text = render_xenix_table_tool_result(
+        tool_name=tool_call.tool_name,
+        status=tool_call.status.value,
+        payload=dict(tool_call.result_payload or {}),
+        error_summary=tool_call.error_summary,
+    )
+    if table_text is not None:
+        return table_text
     payload = {
         "tool_name": tool_call.tool_name,
         "status": tool_call.status.value,

@@ -29,16 +29,19 @@ from ..i18n import TranslationManager
 from ..services.agent import (
     AgentHarnessService,
     AgentHarnessStreamEvent,
+    ChatbotEventStatus,
     ContinueStepBudgetInput,
-    DatasetAttachmentInput,
+    SourceAttachmentInput,
     SubmitUserTurnInput,
     ThreadSnapshot,
+    build_thinking_chatbot_event,
 )
-from ..services.artifact_service import ArtifactService
-from ..services.dataset_service import DatasetService, RegisterDatasetInput
+from ..services.artifact_service import ArtifactService, RegisterArtifactInput
+from ..services.dataset_service import DatasetService
 from ..services.link_router import LinkRouter
 from ..services.llm import LLMService, LLMSettingsService
 from ..services.ml.worker_settings import MLWorkerSettingsService
+from ..services.storage.models import ArtifactKind
 from .chatbot import ComposerAttachmentStatus, ThreadDetailView
 from .icons import plus_icon
 from .layout_debug import dump_layout_if_enabled
@@ -48,20 +51,6 @@ from .tool_call_detail_view import ToolCallDetailView
 
 if TYPE_CHECKING:
     from ..services.ml_service import MLService
-
-
-@dataclass(frozen=True)
-class _AttachmentPreflightSucceeded:
-    preflight_id: str
-    path: str
-    attachments: list[DatasetAttachmentInput]
-
-
-@dataclass(frozen=True)
-class _AttachmentPreflightFailed:
-    preflight_id: str
-    path: str
-    message: str
 
 
 @dataclass(frozen=True)
@@ -80,15 +69,19 @@ class _ServiceLinkActivationFailed:
 @dataclass
 class _ComposerAttachmentRecord:
     path: str
-    preflight_id: str
-    attachments: list[DatasetAttachmentInput] | None = None
+    attachment_id: str
+    attachment: SourceAttachmentInput
+
+
+@dataclass
+class _PendingSubmissionRestore:
+    text: str
+    file_paths: list[str]
 
 
 class MainWindow(QMainWindow):
     _harness_failed = Signal(str)
     _harness_stream_event = Signal(object)
-    _attachment_preflight_succeeded = Signal(object)
-    _attachment_preflight_failed = Signal(object)
     _thread_title_generated = Signal(str, str)
     _thread_title_generation_failed = Signal(str, str)
     _service_link_activation_succeeded = Signal(object)
@@ -125,7 +118,7 @@ class MainWindow(QMainWindow):
         self._agent_thread_id: str | None = None
         self._active_agent_run_id: str | None = None
         self._composer_attachments: dict[str, _ComposerAttachmentRecord] = {}
-        self._cancelled_attachment_preflight_ids: set[str] = set()
+        self._pending_submission_restore: _PendingSubmissionRestore | None = None
         self._pending_step_confirmation: AgentHarnessStreamEvent | None = None
         self._cancelled_agent_run_ids: set[str] = set()
         self._settings_dialog: SettingsDialog | None = None
@@ -157,7 +150,7 @@ class MainWindow(QMainWindow):
         self._thread_detail_view = ThreadDetailView(parent=self)
         self._thread_detail_view.set_artifact_resolver(self._artifact_service.resolve_uri)
         self._thread_detail_view.message_submitted.connect(self._submit_chat_message)
-        self._thread_detail_view.files_attached.connect(self._start_attachment_preflights)
+        self._thread_detail_view.files_attached.connect(self._register_source_attachments)
         self._thread_detail_view.attachment_removed.connect(self._discard_composer_attachment)
         self._thread_detail_view.model_selected.connect(self._update_thread_model)
         self._thread_detail_view.service_link_activated.connect(self._open_service_link)
@@ -167,8 +160,6 @@ class MainWindow(QMainWindow):
         self._thread_detail_view.step_budget_stop_requested.connect(self._stop_step_budget)
         self._harness_failed.connect(self._render_harness_error)
         self._harness_stream_event.connect(self._render_harness_stream_event)
-        self._attachment_preflight_succeeded.connect(self._finish_attachment_preflight)
-        self._attachment_preflight_failed.connect(self._fail_attachment_preflight)
         self._thread_title_generated.connect(self._finish_generated_thread_title)
         self._thread_title_generation_failed.connect(self._fail_generated_thread_title)
         self._service_link_activation_succeeded.connect(self._finish_service_link_activation)
@@ -300,98 +291,59 @@ class MainWindow(QMainWindow):
     def _submit_chat_message(self, text: str, file_paths: list[str], fq_model_key: str) -> None:
         self._pending_step_confirmation = None
         self._thread_detail_view.clear_step_confirmation()
-        dataset_attachments = self._ready_composer_attachments(file_paths)
-        if dataset_attachments is None:
+        source_attachments = self._ready_source_attachments(file_paths)
+        if source_attachments is None:
             return
 
         self._start_harness_submission(
             text=text,
-            dataset_attachments=dataset_attachments,
+            source_attachments=source_attachments,
+            file_paths=file_paths,
             fq_model_key=fq_model_key,
             interface_locale=self._translation_manager.current_locale(),
         )
         for file_path in file_paths:
             self._composer_attachments.pop(str(Path(file_path).resolve()), None)
 
-    def _start_attachment_preflights(self, file_paths: list[str]) -> None:
+    def _register_source_attachments(self, file_paths: list[str]) -> None:
         for file_path in file_paths:
-            self._start_attachment_preflight(file_path)
+            self._register_source_attachment(file_path)
 
-    def _start_attachment_preflight(self, file_path: str) -> None:
+    def _register_source_attachment(self, file_path: str) -> None:
         source_path = Path(file_path).expanduser().resolve()
         normalized_path = str(source_path)
         if normalized_path in self._composer_attachments:
             return
-        preflight_id = uuid4().hex
-        self._composer_attachments[normalized_path] = _ComposerAttachmentRecord(
-            path=normalized_path,
-            preflight_id=preflight_id,
-        )
         self._thread_detail_view.set_attachment_status(
             normalized_path,
             ComposerAttachmentStatus.PENDING,
         )
-
-        def run_preflight() -> None:
-            try:
-                attachment = self._register_composer_dataset(normalized_path)
-            except Exception as exc:
-                self._attachment_preflight_failed.emit(
-                    _AttachmentPreflightFailed(
-                        preflight_id=preflight_id,
-                        path=normalized_path,
-                        message=str(exc),
-                    )
-                )
-                return
-            self._attachment_preflight_succeeded.emit(
-                _AttachmentPreflightSucceeded(
-                    preflight_id=preflight_id,
-                    path=normalized_path,
-                    attachments=attachment,
-                )
+        try:
+            attachment = self._register_source_attachment_artifact(normalized_path)
+        except Exception as exc:
+            self._thread_detail_view.set_attachment_status(
+                normalized_path,
+                ComposerAttachmentStatus.FAILED,
+                error=str(exc),
             )
-
-        threading.Thread(target=run_preflight, name="xenix-attachment-preflight", daemon=True).start()
-
-    def _finish_attachment_preflight(self, result: object) -> None:
-        if not isinstance(result, _AttachmentPreflightSucceeded):
+            self._thread_detail_view.show_error(str(exc))
             return
-        if result.preflight_id in self._cancelled_attachment_preflight_ids:
-            self._cancelled_attachment_preflight_ids.discard(result.preflight_id)
-            self._discard_registered_attachments(result.attachments)
-            return
-        record = self._composer_attachments.get(result.path)
-        if record is None or record.preflight_id != result.preflight_id:
-            self._discard_registered_attachments(result.attachments)
-            return
-        record.attachments = result.attachments
+        self._composer_attachments[normalized_path] = _ComposerAttachmentRecord(
+            path=normalized_path,
+            attachment_id=attachment.artifact_id,
+            attachment=attachment,
+        )
         self._thread_detail_view.set_attachment_status(
-            result.path,
+            normalized_path,
             ComposerAttachmentStatus.READY,
         )
-
-    def _fail_attachment_preflight(self, result: object) -> None:
-        if not isinstance(result, _AttachmentPreflightFailed):
-            return
-        if result.preflight_id in self._cancelled_attachment_preflight_ids:
-            self._cancelled_attachment_preflight_ids.discard(result.preflight_id)
-            return
-        record = self._composer_attachments.get(result.path)
-        if record is None or record.preflight_id != result.preflight_id:
-            return
-        self._thread_detail_view.set_attachment_status(
-            result.path,
-            ComposerAttachmentStatus.FAILED,
-            error=result.message,
-        )
-        self._thread_detail_view.show_error(result.message)
 
     def _start_harness_submission(
         self,
         *,
         text: str,
-        dataset_attachments: list[DatasetAttachmentInput],
+        source_attachments: list[SourceAttachmentInput],
+        file_paths: list[str],
         fq_model_key: str,
         interface_locale: str,
     ) -> None:
@@ -399,7 +351,7 @@ class MainWindow(QMainWindow):
             submit_input = SubmitUserTurnInput(
                 thread_id=self._agent_thread_id,
                 text=text,
-                dataset_attachments=dataset_attachments,
+                source_attachments=source_attachments,
                 fq_model_key=fq_model_key or None,
                 interface_locale=interface_locale,
             )
@@ -411,10 +363,21 @@ class MainWindow(QMainWindow):
         user_blocks = []
         if text:
             user_blocks.append({"type": "text", "text": text})
-        for attachment in dataset_attachments:
-            user_blocks.append({"type": "dataset", **attachment.model_dump(mode="json")})
+        for attachment in source_attachments:
+            user_blocks.append({"type": "source_attachment", **attachment.model_dump(mode="json")})
         self._thread_detail_view.add_user_message(user_blocks)
+        self._thread_detail_view.add_thinking_event(
+            build_thinking_chatbot_event(
+                run_id=f"local:{uuid4().hex}",
+                turn_id=None,
+                status=ChatbotEventStatus.IN_PROGRESS,
+            )
+        )
         self._thread_detail_view.set_running(True)
+        self._pending_submission_restore = _PendingSubmissionRestore(
+            text=text,
+            file_paths=[str(Path(file_path).resolve()) for file_path in file_paths],
+        )
 
         def run_harness() -> None:
             try:
@@ -425,51 +388,59 @@ class MainWindow(QMainWindow):
 
         threading.Thread(target=run_harness, name="xenix-agent-harness", daemon=True).start()
 
-    def _register_composer_dataset(self, file_path: str) -> list[DatasetAttachmentInput]:
+    def _register_source_attachment_artifact(self, file_path: str) -> SourceAttachmentInput:
         source_path = Path(file_path).expanduser().resolve()
-        attachment = self._dataset_service.register_dataset_attachment(
-            RegisterDatasetInput(source_path=str(source_path), name=source_path.stem)
-        )
-        return [
-            DatasetAttachmentInput(
-                dataset_id=item.dataset_id,
-                name=item.name,
-                file_name=item.file_name,
-                source_format=item.source_format,
-                row_count=item.row_count,
-                column_count=item.column_count,
-                preview_columns=item.preview_columns,
+        source_format = self._source_format_for_path(source_path)
+        artifact = self._artifact_service.register_artifact(
+            RegisterArtifactInput(
+                kind=ArtifactKind.FILE,
+                title=source_path.name,
+                absolute_path=str(source_path),
+                mime_type=self._mime_type_for_source_format(source_format),
+                metadata_payload={
+                    "source_attachment": {
+                        "file_name": source_path.name,
+                        "source_format": source_format,
+                    },
+                },
             )
-            for item in attachment.datasets
-        ]
+        )
+        return SourceAttachmentInput(
+            artifact_id=artifact.id,
+            file_name=source_path.name,
+            source_format=source_format,
+        )
 
-    def _ready_composer_attachments(self, file_paths: list[str]) -> list[DatasetAttachmentInput] | None:
-        attachments: list[DatasetAttachmentInput] = []
+    def _source_format_for_path(self, source_path: Path) -> str:
+        suffix = source_path.suffix.lower()
+        if suffix == ".csv":
+            return "csv"
+        if suffix == ".xlsx":
+            return "xlsx"
+        if suffix == ".xls":
+            return "xls"
+        return suffix.lstrip(".") or "unknown"
+
+    def _mime_type_for_source_format(self, source_format: str) -> str | None:
+        if source_format == "csv":
+            return "text/csv"
+        if source_format == "xlsx":
+            return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        if source_format == "xls":
+            return "application/vnd.ms-excel"
+        return None
+
+    def _ready_source_attachments(self, file_paths: list[str]) -> list[SourceAttachmentInput] | None:
+        attachments: list[SourceAttachmentInput] = []
         for file_path in file_paths:
             record = self._composer_attachments.get(str(Path(file_path).resolve()))
-            if record is None or record.attachments is None:
+            if record is None:
                 return None
-            attachments.extend(record.attachments)
+            attachments.append(record.attachment)
         return attachments
 
     def _discard_composer_attachment(self, file_path: str) -> None:
-        record = self._composer_attachments.pop(str(Path(file_path).resolve()), None)
-        if record is None:
-            return
-        if record.attachments is None:
-            self._cancelled_attachment_preflight_ids.add(record.preflight_id)
-            return
-        self._discard_registered_attachments(record.attachments)
-
-    def _discard_registered_attachment(self, attachment: DatasetAttachmentInput) -> None:
-        try:
-            self._dataset_service.discard_unreferenced_dataset(attachment.dataset_id)
-        except Exception as exc:
-            self._thread_detail_view.show_error(str(exc))
-
-    def _discard_registered_attachments(self, attachments: list[DatasetAttachmentInput]) -> None:
-        for attachment in attachments:
-            self._discard_registered_attachment(attachment)
+        self._composer_attachments.pop(str(Path(file_path).resolve()), None)
 
     def _render_harness_snapshot(self, snapshot: ThreadSnapshot) -> None:
         self._agent_thread_id = snapshot.thread.id
@@ -485,6 +456,8 @@ class MainWindow(QMainWindow):
     def _render_harness_stream_event(self, event) -> None:
         if event.run_id in self._cancelled_agent_run_ids and event.kind != "snapshot":
             return
+        if event.run_id is not None:
+            self._pending_submission_restore = None
         if event.kind == "snapshot" and event.snapshot is not None:
             if event.is_final:
                 if event.run_id is not None:
@@ -518,8 +491,25 @@ class MainWindow(QMainWindow):
         self._pending_step_confirmation = None
         self._thread_detail_view.clear_step_confirmation()
         self._thread_detail_view.hide_thinking_indicator()
+        if self._pending_submission_restore is not None and self._active_agent_run_id is None:
+            pending = self._pending_submission_restore
+            self._pending_submission_restore = None
+            self._restore_stable_message_view()
+            self._thread_detail_view.restore_composer(pending.text, pending.file_paths)
+            self._register_source_attachments(pending.file_paths)
         self._thread_detail_view.show_error(message)
         self._thread_detail_view.set_running(False)
+
+    def _restore_stable_message_view(self) -> None:
+        if self._agent_thread_id is None:
+            self._thread_detail_view.clear_messages()
+            return
+        try:
+            snapshot = self._agent_harness_service.get_thread_snapshot(self._agent_thread_id)
+        except Exception:
+            self._thread_detail_view.clear_messages()
+            return
+        self._thread_detail_view.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
 
     def _open_service_link(self, uri: str) -> None:
         activation_id = uuid4().hex
@@ -622,6 +612,9 @@ class MainWindow(QMainWindow):
             self._tool_call_detail_views.remove(view)
 
     def _request_harness_stop(self) -> None:
+        if self._pending_submission_restore is not None and self._active_agent_run_id is None:
+            self._thread_detail_view.show_error(self.tr("The submitted message is being prepared and cannot be stopped."))
+            return
         if self._active_agent_run_id is not None:
             self._agent_harness_service.cancel_run(self._active_agent_run_id)
             self._cancelled_agent_run_ids.add(self._active_agent_run_id)

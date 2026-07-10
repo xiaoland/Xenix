@@ -196,6 +196,107 @@ def test_conversation_store_replays_canonical_tool_result(monkeypatch, tmp_path:
     assert "tool_result" not in provider_messages[-1].provider_payload
 
 
+def test_conversation_store_replays_data_query_as_xenix_table_text(monkeypatch, tmp_path: Path) -> None:
+    conversations, _artifacts = _build_services(monkeypatch, tmp_path)
+    thread = conversations.create_thread(CreateAgentThreadInput(title="Table replay"))
+    turn, _user_message = conversations.start_turn(
+        StartTurnInput(
+            thread_id=thread.id,
+            user_content_blocks=[{"type": "text", "text": "Inspect"}],
+        )
+    )
+    _request_message, tool_call = conversations.create_tool_call(
+        CreateToolCallInput(
+            thread_id=thread.id,
+            turn_id=turn.id,
+            tool_name="data.query",
+            arguments_payload={"dataset_id": "dataset-1", "sql": "SELECT * FROM input LIMIT 2"},
+            provider_payload={"tool_call_id": "call-data-query", "provider_name": "data_query"},
+        )
+    )
+    conversations.complete_tool_call(
+        CompleteToolCallInput(
+            tool_call_id=tool_call.id,
+            result_payload={
+                "columns": {
+                    "_schema": {"name": 0, "type": 1, "index": 2},
+                    "data": [["order_id", "int64", 0], ["amount", "int64", 1]],
+                },
+                "rows": {
+                    "_schema": {"order_id": 0, "amount": 1},
+                    "data": [[3, 30], [2, 20]],
+                },
+                "returned_row_count": 2,
+                "total_row_count": 3,
+                "truncated": True,
+            },
+            provider_payload={"tool_call_id": "call-data-query"},
+        )
+    )
+
+    provider_messages = conversations.get_thread_snapshot(thread.id).provider_messages()
+    tool_result_content = provider_messages[-1].content
+
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(tool_result_content)
+    assert tool_result_content.startswith("shape: 2 rows × 2 columns\n")
+    assert "total_rows: 3" in tool_result_content
+    assert "| # | order_id | amount |" in tool_result_content
+    assert provider_messages[-1].provider_payload["tool_call_id"] == "call-data-query"
+
+
+def test_conversation_store_replays_generated_dataset_preview_as_xenix_table_text(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    conversations, _artifacts = _build_services(monkeypatch, tmp_path)
+    thread = conversations.create_thread(CreateAgentThreadInput(title="Generated preview"))
+    turn, _user_message = conversations.start_turn(
+        StartTurnInput(
+            thread_id=thread.id,
+            user_content_blocks=[{"type": "text", "text": "Transform"}],
+        )
+    )
+    _request_message, tool_call = conversations.create_tool_call(
+        CreateToolCallInput(
+            thread_id=thread.id,
+            turn_id=turn.id,
+            tool_name="data.transform",
+            arguments_payload={"dataset_id": "dataset-1", "sql": "SELECT * FROM input"},
+            provider_payload={"tool_call_id": "call-data-transform", "provider_name": "data_transform"},
+        )
+    )
+    conversations.complete_tool_call(
+        CompleteToolCallInput(
+            tool_call_id=tool_call.id,
+            result_payload={
+                "dataset_id": "dataset-2",
+                "artifact_id": "artifact-1",
+                "summary": "Transformed dataset created. Rows: 2.",
+                "inspection": {
+                    "row_count": 2,
+                    "column_count": 2,
+                    "columns": [
+                        {"name": "region", "kind": "text", "nullable": False},
+                        {"name": "amount", "kind": "numeric", "nullable": False},
+                    ],
+                    "preview_columns": ["region", "amount"],
+                    "preview_rows": [["north", "30"], ["south", "5"]],
+                },
+            },
+            provider_payload={"tool_call_id": "call-data-transform"},
+        )
+    )
+
+    tool_result_content = conversations.get_thread_snapshot(thread.id).provider_messages()[-1].content
+
+    assert tool_result_content.startswith(
+        "tool: data.transform\ndataset_id: dataset-2\nartifact_id: artifact-1\n"
+    )
+    assert "shape: 2 rows × 2 columns" in tool_result_content
+    assert "| 1 | north | 30 |" in tool_result_content
+
+
 def test_conversation_store_formats_default_system_prompt_with_interface_locale(
     monkeypatch,
     tmp_path: Path,

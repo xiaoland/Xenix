@@ -12,8 +12,10 @@ from xenix.services.artifact_service import ArtifactService
 from xenix.services.data_cleaning import CleanDatasetInput, DataCleaningService
 from xenix.services.data_transform import DataQueryTransformService
 from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
+from xenix.services.dataset_inspection import detect_source_format, load_dataframe
 from xenix.services.ml_service import MLService
 from xenix.services.ml_task_service import MLTaskService
+from xenix.services.preprocessing_worker import InlinePreprocessingWorkerRunner
 from xenix.services.storage import StorageBootstrapService
 
 
@@ -22,8 +24,9 @@ def _build_runtime(monkeypatch, tmp_path: Path):
     paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
     dataset_service = DatasetService(context.session_factory, paths)
-    data_cleaning_service = DataCleaningService(paths)
-    data_transform_service = DataQueryTransformService(paths)
+    worker_runner = InlinePreprocessingWorkerRunner()
+    data_cleaning_service = DataCleaningService(paths, worker_runner=worker_runner)
+    data_transform_service = DataQueryTransformService(paths, worker_runner=worker_runner)
     ml_task_service = MLTaskService(context.session_factory, paths)
     ml_service = MLService(
         paths,
@@ -39,9 +42,15 @@ def _build_runtime(monkeypatch, tmp_path: Path):
         data_transform_service=data_transform_service,
         ml_service=ml_service,
         artifact_service=artifact_service,
+        preprocessing_worker_runner=worker_runner,
     )
     conversation_store = ConversationStore(context.session_factory)
     return paths, dataset_service, data_cleaning_service, artifact_service, registry, conversation_store
+
+
+def _read_dataset_frame(path: str | Path) -> pd.DataFrame:
+    source_path = Path(path)
+    return load_dataframe(source_path, detect_source_format(source_path))
 
 
 def _tool_context(
@@ -139,7 +148,7 @@ def test_data_cleaning_service_applies_atomic_operations(monkeypatch, tmp_path: 
         )
     )
 
-    frame = pd.read_csv(result.output_path)
+    frame = _read_dataset_frame(result.output_path)
     assert frame.to_dict(orient="records") == [
         {"order_id": 1, "amount": 10.0, "region": "north", "active": True},
         {"order_id": 3, "amount": 0.0, "region": "south", "active": True},
@@ -186,7 +195,7 @@ def test_data_cleaning_service_normalizes_column_names(monkeypatch, tmp_path: Pa
         )
     )
 
-    frame = pd.read_csv(result.output_path)
+    frame = _read_dataset_frame(result.output_path)
     assert frame.columns.tolist() == ["产品_价格_元", "product_price", "金额", "金额_2", "column_5"]
     operation_report = result.report["operations"][0]
     assert operation_report["operation"] == "schema.normalize_column_names"
@@ -222,7 +231,7 @@ def test_data_cleaning_service_drops_high_missing_columns(monkeypatch, tmp_path:
         )
     )
 
-    frame = pd.read_csv(result.output_path)
+    frame = _read_dataset_frame(result.output_path)
     assert frame.columns.tolist() == ["id", "sometimes_missing", "kept"]
     operation_report = result.report["operations"][0]
     assert operation_report["dropped_columns"] == ["mostly_missing"]
@@ -249,7 +258,7 @@ def test_data_cleaning_service_clips_iqr_outliers(monkeypatch, tmp_path: Path) -
         )
     )
 
-    frame = pd.read_csv(result.output_path)
+    frame = _read_dataset_frame(result.output_path)
     summary = result.report["operations"][0]["columns_summary"][0]
     assert frame["amount"].max() == summary["upper_bound"]
     assert summary["cells_clipped"] == 1
@@ -281,7 +290,7 @@ def test_data_cleaning_service_one_hot_encodes_columns(monkeypatch, tmp_path: Pa
         )
     )
 
-    frame = pd.read_csv(result.output_path)
+    frame = _read_dataset_frame(result.output_path)
     assert frame.to_dict(orient="records") == [
         {"id": 1, "segment_a": 1, "segment_b": 0},
         {"id": 2, "segment_a": 0, "segment_b": 1},
@@ -316,7 +325,7 @@ def test_data_cleaning_service_one_hot_skips_high_cardinality_columns(monkeypatc
         )
     )
 
-    frame = pd.read_csv(result.output_path)
+    frame = _read_dataset_frame(result.output_path)
     assert frame.columns.tolist() == ["id", "segment"]
     operation_report = result.report["operations"][0]
     assert operation_report["encoded_columns"] == []
@@ -356,7 +365,7 @@ def test_data_cleaning_service_scales_numeric_columns(monkeypatch, tmp_path: Pat
         )
     )
 
-    frame = pd.read_csv(result.output_path)
+    frame = _read_dataset_frame(result.output_path)
     assert frame["amount"].tolist() == [0.0, 0.5, 1.0]
     assert frame["score"].tolist() == pytest.approx([-1.2247448714, 0.0, 1.2247448714])
     assert frame["const"].tolist() == [5, 5, 5]

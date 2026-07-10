@@ -9,6 +9,7 @@
 - Agent Harness result replay:
   - `src/xenix/services/agent/harness_service.py`
   - conversation/tool-call storage surfaces
+  - provider-facing tool-result text projection
 - Dataset service and storage:
   - `src/xenix/services/dataset_service.py`
   - `src/xenix/services/dataset_inspection.py`
@@ -43,6 +44,12 @@
 - Packaging now depends on `xlsxwriter` for Polars XLSX export. This is tracked by OQ-005.
 - Remote ML worker staging may need explicit Parquet-path verification. This is tracked by OQ-006.
 - Future Agent behavior depends on skills and prompt guidance avoiding stale `data.peek` recipes.
+- Deferred attachment import crosses the UI/Harness boundary: Chatbot UI owns source artifact registration and optimistic rendering, while AgentHarness owns source artifact import, durable user-turn creation after successful import, provider gating, and ready dataset block projection.
+- UserMessage rendering for attachments should stay workbook/file-level; dataset rows created from workbook sheets should not become visible UserMessage chips.
+- Composer attachment adds should register source workbook/file artifacts through `ArtifactService` for later UserMessage click/open behavior.
+- Large preprocessing execution is a cross-boundary concern: `data.transform`, `data.clean`, dataset registration, dataset export, AgentHarness streaming, UI event projection, and observability all participate in the user-visible stall surface. Treat it as a runtime-boundary change, not a local UI rendering bug.
+- The first runtime-isolation slice moves `data.transform`, `data.clean`, generated dataset registration, and eager workbook export artifact materialization into a local preprocessing worker subprocess. `data.query` stays in-process because it is bounded and creates no dataset/artifact.
+- Xenix Table Text changes the provider-facing representation of tabular tool results. The primary implementation blast radius is AgentHarness provider-message replay, `data.query`, generated dataset inspection previews from `data.integrate` / `data.transform` / `data.clean` / `data.tokenize`, shared result formatting, tests that parse tool result JSON, and durable Agent Harness docs/skills that describe tool-result shape.
 
 ## Invariants
 
@@ -51,3 +58,10 @@
 - Internal app-owned Parquet files are not user-openable artifacts by default.
 - User-visible dataset result links should point at export artifacts, not dataset ids. Tool payloads should carry `dataset_id` and `artifact_id`, while the System Prompt teaches the model to form `artifact://<artifact_id>` links. Artifact activation must not perform dataset lookup fallback.
 - Failed transforms must not create half-success durable datasets.
+- Local file attachment paths must not reach provider-facing content; after deferred import, provider requests may include only ready dataset blocks.
+- Once Send is accepted, the attachment import stage is not cancellable.
+- AgentRun rows for source-attachment turns are created only after attachment import succeeds.
+- Import failure must restore the submitted text and source attachments to Composer, roll back the optimistic user message to the previous stable message view, avoid durable half-turns, and project an error item in the message list.
+- Large preprocessing must not monopolize the Qt application process. A background Python thread is not a sufficient isolation boundary for full-table materialization, Pandas-heavy cleaning, DuckDB result export, or workbook export creation.
+- `data.transform` must not fetch the full output relation into Pandas before writing Parquet.
+- Service-layer query/transform result objects and tool `result_payload` objects should remain structured and testable. Xenix Table Text belongs to AgentHarness provider-facing tool-result projection, not core tabular execution and not tool implementation output.

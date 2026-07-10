@@ -19,7 +19,7 @@ Use for read-only inspection and quality checks:
 - target/feature profiling before role binding;
 - validation after cleaning or transformation.
 
-Do not use destructive SQL. Prefer CTEs. Return compact evidence tables.
+Do not use destructive SQL. Prefer CTEs. `data.query` results are replayed as Xenix Table Text: read the metadata first, then the preview table or records block.
 
 ### `data.integrate`
 

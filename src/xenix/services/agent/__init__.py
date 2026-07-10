@@ -16,6 +16,7 @@ _EXPORTS = {
     "RenameAgentThreadInput": ".conversation_store",
     "StartAgentRunInput": ".conversation_store",
     "StartTurnInput": ".conversation_store",
+    "SourceAttachmentInput": ".harness_service",
     "ThreadSnapshot": ".conversation_store",
     "UpdateAgentMessageInput": ".conversation_store",
     "UpdateAgentThreadModelInput": ".conversation_store",

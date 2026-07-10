@@ -20,7 +20,6 @@ from xenix.services.agent import (
     ChatbotEventAuthor,
     ChatbotEventKind,
     ChatbotEventStatus,
-    DatasetAttachmentInput,
 )
 from xenix.services.agent.dev_fixtures import MESSAGE_RENDERING_FIXTURE_TITLE, ensure_mock_conversation_history
 from xenix.services.artifact_service import RegisterArtifactInput
@@ -36,6 +35,7 @@ from xenix.services.storage.models import (
 from xenix.trial_lock import TrialLockCheck, TrialLockReason
 from xenix.ui import icons as ui_icons
 from xenix.ui.chatbot import _format_token_count, _render_svg_preview_pixmap
+from xenix.ui.main_window import _PendingSubmissionRestore
 from xenix.ui.startup_splash import StartupSplash, StartupStage
 
 
@@ -1473,7 +1473,7 @@ def test_main_window_submit_chat_message_injects_interface_locale(monkeypatch, t
         window.close()
 
 
-def test_main_window_submit_chat_message_uses_ready_dataset_attachments(monkeypatch, tmp_path: Path) -> None:
+def test_main_window_submit_chat_message_uses_registered_source_attachments(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     data_file = tmp_path / "customers.csv"
     data_file.write_text("name,value\nAcme,12\n", encoding="utf-8")
@@ -1493,7 +1493,7 @@ def test_main_window_submit_chat_message_uses_ready_dataset_attachments(monkeypa
         for _ in range(40):
             app.processEvents()
             record = window._composer_attachments.get(resolved_path)
-            if record is not None and record.attachments is not None:
+            if record is not None:
                 break
             time.sleep(0.01)
 
@@ -1507,18 +1507,19 @@ def test_main_window_submit_chat_message_uses_ready_dataset_attachments(monkeypa
 
         assert len(captured_inputs) == 1
         submitted = captured_inputs[0]
-        assert len(submitted.dataset_attachments) == 1
-        attachment = submitted.dataset_attachments[0]
+        assert submitted.dataset_attachments == []
+        assert len(submitted.source_attachments) == 1
+        attachment = submitted.source_attachments[0]
         assert attachment.file_name == "customers.csv"
         assert attachment.source_format == "csv"
-        assert attachment.row_count == 1
-        assert attachment.preview_columns == ["name", "value"]
+        resolved_artifact = window._artifact_service.resolve_uri(f"artifact://{attachment.artifact_id}")
+        assert resolved_artifact.absolute_path == resolved_path
         assert not hasattr(submitted, "file_paths")
     finally:
         window.close()
 
 
-def test_main_window_attach_file_runs_dataset_preflight_off_ui_thread(
+def test_main_window_attach_file_registers_source_artifact(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -1529,52 +1530,31 @@ def test_main_window_attach_file_runs_dataset_preflight_off_ui_thread(
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
 
     app, window = build_main_window(show=False)
-    preflight_started = threading.Event()
-    release_preflight = threading.Event()
     try:
-        def fake_register(file_path):
-            preflight_started.set()
-            assert file_path == str(data_file.resolve())
-            assert release_preflight.wait(timeout=2.0)
-            return [
-                DatasetAttachmentInput(
-                    dataset_id="dataset-1",
-                    name="customers",
-                    file_name="customers.csv",
-                    source_format="csv",
-                    row_count=1,
-                    column_count=2,
-                    preview_columns=["name", "value"],
-                )
-            ]
-
-        monkeypatch.setattr(window, "_register_composer_dataset", fake_register)
-
         started_at = time.perf_counter()
-        window._thread_detail_view._add_local_files([str(data_file.resolve())])
+        resolved_path = str(data_file.resolve())
+        window._thread_detail_view._add_local_files([resolved_path])
         elapsed = time.perf_counter() - started_at
 
         assert elapsed < 0.5
-        assert preflight_started.wait(timeout=1.0)
-        assert window._thread_detail_view._send_button.isEnabled() is False
-
-        release_preflight.set()
-        resolved_path = str(data_file.resolve())
         for _ in range(40):
             app.processEvents()
             record = window._composer_attachments.get(resolved_path)
-            if record is not None and record.attachments is not None:
+            if record is not None:
                 break
             time.sleep(0.01)
 
-        assert window._composer_attachments[resolved_path].attachments is not None
+        record = window._composer_attachments[resolved_path]
+        assert record.attachment.file_name == "customers.csv"
+        assert record.attachment.source_format == "csv"
+        resolved_artifact = window._artifact_service.resolve_uri(f"artifact://{record.attachment.artifact_id}")
+        assert resolved_artifact.absolute_path == resolved_path
         assert window._thread_detail_view._send_button.isEnabled() is True
     finally:
-        release_preflight.set()
         window.close()
 
 
-def test_main_window_remove_pending_attachment_aborts_preflight_and_discards_dataset(
+def test_main_window_pre_run_harness_error_restores_composer_source_attachments(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -1585,52 +1565,47 @@ def test_main_window_remove_pending_attachment_aborts_preflight_and_discards_dat
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
 
     app, window = build_main_window(show=False)
-    preflight_started = threading.Event()
-    release_preflight = threading.Event()
-    discarded_dataset_ids = []
     try:
-        def fake_register(file_path):
-            preflight_started.set()
-            assert file_path == str(data_file.resolve())
-            assert release_preflight.wait(timeout=2.0)
-            return [
-                DatasetAttachmentInput(
-                    dataset_id="dataset-removed",
-                    name="customers",
-                    file_name="customers.csv",
-                    source_format="csv",
-                    row_count=1,
-                    column_count=2,
-                    preview_columns=["name", "value"],
-                )
-            ]
-
-        monkeypatch.setattr(window, "_register_composer_dataset", fake_register)
-        monkeypatch.setattr(
-            window._dataset_service,
-            "discard_unreferenced_dataset",
-            lambda dataset_id: discarded_dataset_ids.append(dataset_id) or True,
-        )
-
         resolved_path = str(data_file.resolve())
-        window._thread_detail_view._add_local_files([resolved_path])
-        assert preflight_started.wait(timeout=1.0)
+        window._pending_submission_restore = _PendingSubmissionRestore(
+            text="Analyze this.",
+            file_paths=[resolved_path],
+        )
+        window._active_agent_run_id = None
+        window._thread_detail_view.add_user_message(
+            [
+                {"type": "text", "text": "Analyze this."},
+                {
+                    "type": "source_attachment",
+                    "artifact_id": "optimistic-artifact",
+                    "file_name": "customers.csv",
+                    "source_format": "csv",
+                },
+            ]
+        )
+        window._thread_detail_view.add_thinking_event(
+            ChatbotEvent(
+                id="optimistic-thinking",
+                kind=ChatbotEventKind.THINKING,
+                author=ChatbotEventAuthor.ASSISTANT,
+                status=ChatbotEventStatus.IN_PROGRESS,
+                content_blocks=[{"type": "thinking", "text": "Thinking..."}],
+            )
+        )
+        window._thread_detail_view.restore_composer("", [])
+        window._composer_attachments.clear()
 
-        window._thread_detail_view._remove_attached_file(resolved_path)
-        assert resolved_path not in window._thread_detail_view._attached_files
-        assert resolved_path not in window._composer_attachments
+        window._render_harness_error("Import failed")
+        app.processEvents()
 
-        release_preflight.set()
-        for _ in range(40):
-            app.processEvents()
-            if discarded_dataset_ids:
-                break
-            time.sleep(0.01)
-
-        assert discarded_dataset_ids == ["dataset-removed"]
-        assert resolved_path not in window._composer_attachments
+        assert window._thread_detail_view._editor.toPlainText() == "Analyze this."
+        assert window._thread_detail_view._attached_files == [resolved_path]
+        assert window._thread_detail_view._message_layout.count() == 2
+        record = window._composer_attachments[resolved_path]
+        assert record.attachment.file_name == "customers.csv"
+        assert record.attachment.source_format == "csv"
+        assert window._thread_detail_view._send_button.isEnabled() is True
     finally:
-        release_preflight.set()
         window.close()
 
 

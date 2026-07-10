@@ -519,6 +519,8 @@ def build_main_window(
             tool_registry=agent_tool_registry,
             llm_service=llm_service,
             conversation_store=conversation_store,
+            dataset_service=dataset_service,
+            artifact_service=artifact_service,
             skill_catalog=runtime.AgentSkillCatalog.from_default_catalog(),
         )
         _emit_startup_timing("services.construct", step_start)

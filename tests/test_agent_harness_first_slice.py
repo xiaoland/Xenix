@@ -4,6 +4,7 @@ import time
 from typing import Any
 
 import pytest
+from sqlmodel import select
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import ValidationError
@@ -18,6 +19,7 @@ from xenix.services.agent import (
     ProviderResponse,
     ProviderToolCall,
     StartTurnInput,
+    SourceAttachmentInput,
     SubmitUserTurnInput,
 )
 from xenix.services.agent.providers import AgentProvider
@@ -29,8 +31,9 @@ from xenix.services.dataset_inspection import InspectDatasetInput
 from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
 from xenix.services.ml_service import MLService
 from xenix.services.ml_task_service import MLTaskService
+from xenix.services.preprocessing_worker import InlinePreprocessingWorkerRunner
 from xenix.services.storage import StorageBootstrapService
-from xenix.services.storage.models import ArtifactKind
+from xenix.services.storage.models import AgentRunRow, ArtifactKind
 
 
 class FirstSliceProvider:
@@ -141,6 +144,8 @@ class FirstSliceProvider:
         return None
 
     def _has_query_result(self, messages: list[Any]) -> bool:
+        if any(_is_xenix_table_text(str(getattr(message, "content", "") or "")) for message in messages):
+            return True
         return any(
             payload.get("returned_row_count") is not None and isinstance(payload.get("rows"), dict)
             for payload in self._tool_result_payloads(messages)
@@ -173,6 +178,10 @@ class FirstSliceProvider:
         for message in reversed(messages):
             raw_content = str(getattr(message, "content", "") or "")
             if raw_content:
+                xenix_table_payload = _xenix_table_text_payload(raw_content)
+                if xenix_table_payload:
+                    payloads.append(xenix_table_payload)
+                    continue
                 try:
                     parsed = json.loads(raw_content)
                 except json.JSONDecodeError:
@@ -210,8 +219,9 @@ def _build_first_slice_runtime(monkeypatch, tmp_path: Path, *, worker_runner=Non
     paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
     dataset_service = DatasetService(context.session_factory, paths)
-    data_cleaning_service = DataCleaningService(paths)
-    data_transform_service = DataQueryTransformService(paths)
+    preprocessing_worker_runner = InlinePreprocessingWorkerRunner()
+    data_cleaning_service = DataCleaningService(paths, worker_runner=preprocessing_worker_runner)
+    data_transform_service = DataQueryTransformService(paths, worker_runner=preprocessing_worker_runner)
     ml_task_service = MLTaskService(context.session_factory, paths, worker_runner=worker_runner)
     ml_service = MLService(
         paths,
@@ -227,6 +237,7 @@ def _build_first_slice_runtime(monkeypatch, tmp_path: Path, *, worker_runner=Non
         data_transform_service=data_transform_service,
         ml_service=ml_service,
         artifact_service=artifact_service,
+        preprocessing_worker_runner=preprocessing_worker_runner,
     )
     return context, registry
 
@@ -251,8 +262,10 @@ def _dataset_attachment(registry: AgentToolRegistry, source_path: Path) -> Datas
 class ToolCaptureProvider:
     def __init__(self) -> None:
         self.tools_by_call: list[list[str]] = []
+        self.messages_by_call: list[list[Any]] = []
 
     def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
+        self.messages_by_call.append(messages)
         self.tools_by_call.append([tool.name for tool in tools])
         return ProviderResponse(
             assistant_content_blocks=[{"type": "markdown", "text": "Ready."}],
@@ -319,6 +332,10 @@ class QueryFromThreadFilesProvider:
         for message in reversed(messages):
             raw_content = str(getattr(message, "content", "") or "")
             if raw_content:
+                xenix_table_payload = _xenix_table_text_payload(raw_content)
+                if xenix_table_payload:
+                    payloads.append(xenix_table_payload)
+                    continue
                 try:
                     parsed = json.loads(raw_content)
                 except json.JSONDecodeError:
@@ -340,6 +357,31 @@ def _tool_context() -> ToolExecutionContext:
         tool_call_id="tool-call-id",
         dataset_ids=[],
     )
+
+
+def _is_xenix_table_text(text: str) -> bool:
+    return "shape:" in text and "schema:" in text and ("data:" in text or "records:" in text)
+
+
+def _xenix_table_text_payload(text: str) -> dict[str, Any]:
+    if not _is_xenix_table_text(text):
+        return {}
+    payload: dict[str, Any] = {"xenix_table_text": True}
+    for line in text.splitlines():
+        if not line or line.startswith("  ") or line.startswith("|") or line.startswith("["):
+            continue
+        if ":" not in line:
+            continue
+        key, raw_value = line.split(":", 1)
+        value = raw_value.strip()
+        if key == "returned_rows":
+            try:
+                payload["returned_row_count"] = int(value)
+            except ValueError:
+                pass
+        elif key in {"dataset_id", "artifact_id"} and value:
+            payload[key] = value
+    return payload
 
 
 def _persisted_tool_context(context) -> ToolExecutionContext:
@@ -451,6 +493,99 @@ def test_agent_harness_exposes_data_tools_when_file_is_attached(monkeypatch, tmp
     assert "model.train" not in tool_names
     assert "model.hyper_train" not in tool_names
     assert "model.apply" not in tool_names
+
+
+def test_agent_harness_imports_source_artifact_before_provider_request(monkeypatch, tmp_path: Path) -> None:
+    context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
+    provider = ToolCaptureProvider()
+    source_file = tmp_path / "source.csv"
+    source_file.write_text("value\n1\n", encoding="utf-8")
+    source_artifact = registry._artifact_service.register_artifact(
+        RegisterArtifactInput(
+            title="source.csv",
+            absolute_path=str(source_file.resolve()),
+            kind=ArtifactKind.FILE,
+        )
+    )
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=provider,
+        tool_registry=registry,
+        conversation_store=ConversationStore(context.session_factory),
+        dataset_service=registry._dataset_service,
+        artifact_service=registry._artifact_service,
+    )
+
+    snapshot = harness.submit_user_turn(
+        SubmitUserTurnInput(
+            text="inspect this file",
+            source_attachments=[
+                SourceAttachmentInput(
+                    artifact_id=source_artifact.id,
+                    file_name="source.csv",
+                    source_format="csv",
+                )
+            ],
+        )
+    )
+
+    user_messages = [message for message in snapshot.messages if message.ui_author.value == "user"]
+    assert len(user_messages) == 1
+    content_blocks = user_messages[0].content_blocks
+    assert [block.get("type") for block in content_blocks] == ["text", "source_attachment", "dataset"]
+    assert content_blocks[1]["artifact_id"] == source_artifact.id
+    assert content_blocks[2]["visible"] is False
+    assert content_blocks[2]["file_name"] == "source.csv"
+    assert "data.query" in provider.tools_by_call[0]
+    provider_user_messages = [message for message in provider.messages_by_call[0] if message.role == "user"]
+    assert "Attached dataset" in provider_user_messages[-1].content
+    assert "dataset_id:" in provider_user_messages[-1].content
+    assert f"artifact://{source_artifact.id}" not in provider_user_messages[-1].content
+
+
+def test_agent_harness_source_import_failure_does_not_start_run(monkeypatch, tmp_path: Path) -> None:
+    context, registry = _build_first_slice_runtime(monkeypatch, tmp_path)
+    provider = ToolCaptureProvider()
+    source_file = tmp_path / "missing-source.csv"
+    source_file.write_text("value\n1\n", encoding="utf-8")
+    source_artifact = registry._artifact_service.register_artifact(
+        RegisterArtifactInput(
+            title="missing-source.csv",
+            absolute_path=str(source_file.resolve()),
+            kind=ArtifactKind.FILE,
+        )
+    )
+    source_file.unlink()
+    harness = AgentHarnessService(
+        session_factory=context.session_factory,
+        provider=provider,
+        tool_registry=registry,
+        conversation_store=ConversationStore(context.session_factory),
+        dataset_service=registry._dataset_service,
+        artifact_service=registry._artifact_service,
+    )
+    thread = harness.create_thread("Source import failure")
+
+    with pytest.raises(ValidationError, match="Attachment file is missing"):
+        harness.submit_user_turn(
+            SubmitUserTurnInput(
+                thread_id=thread.thread.id,
+                text="inspect this file",
+                source_attachments=[
+                    SourceAttachmentInput(
+                        artifact_id=source_artifact.id,
+                        file_name="missing-source.csv",
+                        source_format="csv",
+                    )
+                ],
+            )
+        )
+
+    snapshot = harness.get_thread_snapshot(thread.thread.id)
+    assert snapshot.provider_requests == []
+    assert provider.tools_by_call == []
+    with context.session_factory() as session:
+        assert session.exec(select(AgentRunRow)).all() == []
 
 
 def test_agent_harness_exposes_dataset_tools_after_dataset_payload(monkeypatch, tmp_path: Path) -> None:

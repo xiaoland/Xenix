@@ -18,6 +18,7 @@ from xenix.services.data_transform import DataQueryTransformService
 from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
 from xenix.services.ml_service import MLService
 from xenix.services.ml_task_service import MLTaskService
+from xenix.services.preprocessing_worker import InlinePreprocessingWorkerRunner
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import ArtifactKind
 
@@ -27,8 +28,9 @@ def _build_runtime(monkeypatch, tmp_path: Path):
     paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
     dataset_service = DatasetService(context.session_factory, paths)
-    data_cleaning_service = DataCleaningService(paths)
-    data_transform_service = DataQueryTransformService(paths)
+    worker_runner = InlinePreprocessingWorkerRunner()
+    data_cleaning_service = DataCleaningService(paths, worker_runner=worker_runner)
+    data_transform_service = DataQueryTransformService(paths, worker_runner=worker_runner)
     ml_task_service = MLTaskService(context.session_factory, paths)
     ml_service = MLService(
         paths,
@@ -44,6 +46,7 @@ def _build_runtime(monkeypatch, tmp_path: Path):
         data_transform_service=data_transform_service,
         ml_service=ml_service,
         artifact_service=artifact_service,
+        preprocessing_worker_runner=worker_runner,
     )
     conversation_store = ConversationStore(context.session_factory)
     return paths, dataset_service, artifact_service, registry, conversation_store

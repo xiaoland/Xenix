@@ -17,6 +17,7 @@ from ..config import AppPaths
 from ..exceptions import ValidationError
 from ..observability import record_counter, record_histogram, start_span
 from .dataset_inspection import detect_source_format, load_dataframe
+from .preprocessing_worker import LocalPreprocessingWorkerRunner, PreprocessingWorkerRunner
 from .storage.models import DatasetSourceFormat
 
 
@@ -502,10 +503,24 @@ class CleanDatasetResult(SQLModel):
 
 
 class DataCleaningService:
-    def __init__(self, paths: AppPaths) -> None:
+    def __init__(
+        self,
+        paths: AppPaths,
+        *,
+        worker_runner: PreprocessingWorkerRunner | None = None,
+    ) -> None:
         self._paths = paths
+        self._worker_runner = worker_runner or LocalPreprocessingWorkerRunner()
 
     def clean_dataset(self, input_data: CleanDatasetInput) -> CleanDatasetResult:
+        payload = self._worker_runner.run(
+            "data.clean",
+            {"input": input_data.model_dump(mode="json")},
+            paths=self._paths,
+        )
+        return CleanDatasetResult.model_validate(payload)
+
+    def _clean_dataset_in_process(self, input_data: CleanDatasetInput) -> CleanDatasetResult:
         started_at = perf_counter()
         with start_span("data.clean"):
             source_path = Path(input_data.source_path).expanduser()
@@ -541,14 +556,24 @@ class DataCleaningService:
 
             output_dir = self._paths.artifacts / "datasets" / "cleaned"
             output_dir.mkdir(parents=True, exist_ok=True)
-            output_path = output_dir / f"{self._slug(input_data.name)}-{uuid4().hex[:12]}.csv"
-            frame.to_csv(output_path, index=False)
+            output_path = output_dir / f"{self._slug(input_data.name)}-{uuid4().hex[:12]}.parquet"
+            self._write_parquet(frame, output_path)
 
             report["row_count_after"] = int(len(frame.index))
             report["rows_removed"] = int(report["row_count_before"] - report["row_count_after"])
             report["no_op"] = False
             self._record_operation(started_at)
             return CleanDatasetResult(output_path=str(output_path.resolve()), report=report)
+
+    def _write_parquet(self, frame: pd.DataFrame, output_path: Path) -> None:
+        import duckdb
+
+        with duckdb.connect(database=":memory:") as connection:
+            connection.register("cleaned_frame", frame)
+            connection.execute(
+                "COPY cleaned_frame TO ? (FORMAT PARQUET)",
+                [str(output_path)],
+            )
 
     def _record_operation(self, started_at: float) -> None:
         attributes = {"data.operation": "data.clean", "status": "succeeded"}
