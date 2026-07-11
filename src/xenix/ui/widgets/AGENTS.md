@@ -2,13 +2,13 @@
 
 ## Scope
 
-This guidance applies to `src/xenix/ui/widgets/`.
+Adds widget-specific rules for `src/xenix/ui/widgets/`; inherit the parent UI guidance.
 
-## Rules
+## Tripwires
 
-- Shared widgets must stay policy-light. Avoid baking old predefined-workflow assumptions into widgets that can serve Chatbot renderers or technical views.
-- When a specific view needs stricter behavior, prefer an explicit constructor flag or narrow adapter over a forked widget copy.
-- Widgets may manage local selection or presentation state, but they must not call services or own filesystem business logic.
-- User-visible strings must participate in `retranslate_ui()` and respond to `QEvent.LanguageChange`.
-- Preserve deterministic value ordering when widgets return selected columns or rows; downstream services and tests rely on stable ordering.
-- If a widget begins carrying view-specific workflow logic, move that logic back into the parent dialog or a service instead of growing the widget contract.
+- Keep shared widgets policy-light. Use a narrow option or adapter when one view needs stricter presentation behavior.
+- Widgets may own local selection and presentation state, but not services, filesystem business logic, or cross-view workflow.
+- Preserve deterministic ordering when returning selected values or rows.
+- Move view-specific workflow into the parent dialog or owning service before it expands the shared widget contract.
+
+Verify the focused widget test and the consuming view test for changed behavior.

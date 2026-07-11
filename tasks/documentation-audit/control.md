@@ -15,11 +15,10 @@ Audit authorization is not implementation authorization. Approval is slice-speci
 
 ## Planned Slice Order
 
-1. SVC minimal-kernel repair and unsupported repo-skill removal — current prerequisite slice.
-2. Root `AGENTS.md` correction in Xenix.
-3. `[4,5]` — PRD, ADR, and Product TDD.
-4. `[6,3]` — Unit TDD and local `AGENTS.md` files.
-5. `[7]` — Deployment and runtime truth.
+1. SVC minimal-kernel repair and unsupported repo-skill removal — complete.
+2. Root `AGENTS.md` correction in Xenix — complete.
+3. `[4,5]` — PRD, ADR, and Product TDD — complete.
+4. `[6,3]` plus `[7]` — Unit TDD, the bounded local-owner handshake, and Deployment — Apply complete; Verify current.
 
 ## Global Documentation Quality Constraint
 
@@ -31,12 +30,16 @@ Audit authorization is not implementation authorization. Approval is slice-speci
 
 ## Current Gate
 
-- Phase: Verify complete — Xenix root plus minimal SVC adoption; awaiting Sir's review or explicit commit command.
-- Completed surface: the approved SVC canonical kernel, templates, entry docs, unsupported repo skills, Codex agent definitions/installer, monolith validation, tests, and Unreleased release notes.
-- Durable mutation: the explicitly approved root/meta/index surfaces are applied. No further durable scope or commit is implied.
-- Confirmed scope: work directly in the clean `F:\CODING\svc` worktree; delete the repo skills and installable Codex agent surface without replacement; perform the atomic minimal-kernel cutover and Unreleased closure.
-- Excluded: Xenix durable docs, a numbered SVC release, commit, push, and unrelated task history.
-- Exit condition: met. SVC commit `4e06dd9` passed verification and the SVC worktree is clean.
+- Phase: Verify complete — Sir approved the settled `[6,7]` design and its bounded local-owner handshake; durable documentation changes are applied and verified but uncommitted.
+- Durable mutation: authorized and applied only for the addresses in `slice-6-7-design.md`; commit still requires a separate explicit command.
+- Confirmed calibration: current source, configuration, scripts, and tests define implemented behavior; SVC admission and one-owner rules govern retention.
+- Applied scope: `docs/30-unit-tdd/`, `docs/40-deployment/`, direct root/docs/contributor routes, and the approved Agent/storage/ML/UI local-instruction handshake.
+- Excluded: source, tests, dependencies, configuration, `.vscode`, credentials, runtime state, generated packages, SSH defect repair, and commit.
+- Settled design anchors: no Deployment VS Code content; ignored local credentials excluded from action; Qt custom-paint seam moves to UI local `AGENTS.md`; stale branch governance is deleted; Agent/UI event mechanics stay in source/tests; diagnostic bundles are local sensitive support artifacts with manual-sharing review.
+- Sub-agent constraint: every future sub-agent must use `gpt-5.3-codex-spark`. Because the current collaboration API exposes no model selector, do not delegate unless that model can be guaranteed.
+- Design correction: local-owner review found required downward moves for Agent, storage, ML, and UI tripwires plus wrong-owner claims that must leave broad local guidance. The design now includes this bounded number-3 handshake.
+- Exit condition: report the uncommitted Apply result; further edits or commit require Sir's next direction.
+- Final acceptance: Sir treats rolling task expiry as ongoing maintenance rather than a blocker and approved closing the task after correcting the ML local-instruction scope. The correction is verified; this authorized commit closes the audit.
 
 ## Settled Xenix Root Slice
 
@@ -56,3 +59,11 @@ Audit authorization is not implementation authorization. Approval is slice-speci
 - Blast Radius: repository cold start, task/mutation behavior, contributor discovery, and later documentation slices; no product or implementation behavior changes.
 - Invariants: existing product truth, ADR/TDD/Deployment ownership, local `AGENTS.md` scope, PDM command behavior, runtime paths, and unrelated dirty task work remain unchanged.
 - Verification: four kernel documents exist and are non-placeholder; protocol/taste preserve committed SVC semantics without SVC-repo-only asset links; root required headings and debug entries exist; old protocol headings are absent; local links and declared commands resolve; word budgets and `git diff --check` pass.
+
+## Current Audit Scope `[4,5]`
+
+- `docs/10-prd/`: product truth and business vocabulary.
+- `docs/20-product-tdd/adr/`: accepted/superseded technical decisions, rationale, status, and current realization.
+- Remaining `docs/20-product-tdd/`: cross-unit authority, topology, lifecycle, artifact, and storage contracts.
+- Source, configuration, and tests are read-only evidence used to distinguish durable claims from stale snapshots or implementation-owned facts.
+- Excluded: Unit TDD/local `AGENTS.md` repair, Deployment repair, source-code mutation, and any fix proposal beyond evidence-backed audit findings.

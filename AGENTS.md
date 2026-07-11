@@ -20,7 +20,7 @@ Xenix Native is a desktop machine-learning workbench for non-technical business 
 - Non-trivial implementation judgment: [`docs/00-meta/implementation-taste.md`](docs/00-meta/implementation-taste.md)
 - Product behavior, scope, and business language: [`docs/10-prd/`](docs/10-prd/README.md)
 - Cross-unit contracts and technical decisions: [`docs/20-product-tdd/`](docs/20-product-tdd/README.md) and its [`adr/`](docs/20-product-tdd/adr/README.md)
-- Complex unit design and local seam guidance: [`docs/30-unit-tdd/`](docs/30-unit-tdd/README.md) and the nearest local `AGENTS.md`
+- Agent Harness internal design and local seam guidance: [`docs/30-unit-tdd/`](docs/30-unit-tdd/README.md) and the nearest local `AGENTS.md`
 - Runtime, packaging, migration, observability, and recovery: [`docs/40-deployment/`](docs/40-deployment/README.md)
 - Contributor workflow and testing policy: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Mechanically enforceable facts: source, configuration, schemas, tests, assertions, or automation
@@ -36,7 +36,7 @@ High-risk storage, runtime, packaging, Agent Harness, ML lifecycle, and Chatbot 
 - Diagnostics: `pdm run diagnostic-bundle`; use GammaRay when available for widget hierarchy, properties, geometry, visibility, and events.
 - Windows runtime home: `%LOCALAPPDATA%\Xenix` (normally `%USERPROFILE%\AppData\Local\Xenix`), overridden by `XENIX_APP_HOME`.
 - Primary debug files: `state\xenix.db`, `logs\xenix.log`, `config\agent_settings.json`, and `config\ml_workers.json` under the runtime home.
-- Detailed launch, VS Code, telemetry, packaging, and recovery procedures: [`docs/40-deployment/development.md`](docs/40-deployment/development.md) and [`runtime-state.md`](docs/40-deployment/runtime-state.md).
+- Detailed packaging, runtime-state, observability, migration, and recovery procedures: [`docs/40-deployment/`](docs/40-deployment/README.md).
 
 ## Execution Rules
 

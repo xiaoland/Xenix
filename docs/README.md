@@ -6,8 +6,8 @@ This tree stores project-local durable knowledge. Root [`AGENTS.md`](../AGENTS.m
 
 - [Product requirements and vocabulary](10-prd/README.md)
 - [Cross-unit technical contracts and ADRs](20-product-tdd/README.md)
-- [Complex unit design memory](30-unit-tdd/README.md)
-- [Runtime, deployment, migration, and recovery](40-deployment/README.md)
+- [Agent Harness internal design memory](30-unit-tdd/README.md)
+- [Trigger-routed packaging, runtime, observability, migration, and recovery](40-deployment/README.md)
 - [Working protocol](00-meta/working-protocol.md)
 - [On-demand implementation taste](00-meta/implementation-taste.md)
 

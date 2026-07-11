@@ -35,4 +35,4 @@ Contributor, test, translation, and packaging commands are owned by [CONTRIBUTIN
 - Deployment: [docs/40-deployment/README.md](docs/40-deployment/README.md)
 - Contributor workflow: [CONTRIBUTING.md](CONTRIBUTING.md)
 
-For development, packaging, and verification, see the [Development Runbook](docs/40-deployment/development.md). For resolved application paths, persisted state, and recovery, see the [Runtime State Runbook](docs/40-deployment/runtime-state.md).
+For packaged delivery, see [Packaging](docs/40-deployment/packaging.md). For resolved application paths, persisted state, and recovery, see [Runtime State](docs/40-deployment/runtime-state.md).
