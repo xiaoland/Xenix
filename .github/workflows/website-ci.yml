@@ -7,7 +7,7 @@ on:
       - ".github/workflows/website-*.yml"
   push:
     branches:
-      - native-ai-first
+      - main
     paths:
       - "website/**"
       - ".github/workflows/website-*.yml"
