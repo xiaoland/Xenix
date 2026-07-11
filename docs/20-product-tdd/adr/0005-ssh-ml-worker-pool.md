@@ -2,6 +2,8 @@
 
 - Status: accepted
 - Date: 2026-05-23
+- Related: [ADR 0004](0004-native-architecture-separate-from-web.md),
+  [ADR 0007](0007-remote-integrations-remain-adapters.md)
 
 ## Context
 
@@ -29,3 +31,14 @@ Local SQLite rows, local task directories, local canonical model artifacts, and 
 - Worker pool configuration lives in local JSON config, not SQLite.
 - ML task states do not change. A selected-worker failure fails the task; v1 does not retry or fail over to another worker.
 - Tests should cover settings validation, worker selection, path rewriting, OpenSSH config block updates, and local lifecycle invariants.
+
+## Implementation Status
+
+As of 2026-07-11, the accepted decision is only partially realized:
+
+- Fresh-worker dependency setup omits the required DuckDB package.
+- The worker bundle uses a static `source-v1` marker, so an existing remote marker can
+  suppress upload after worker source changes.
+
+These are known implementation gaps. They do not weaken the decision or make remote
+state authoritative.

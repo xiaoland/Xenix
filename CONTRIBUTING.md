@@ -22,10 +22,13 @@ Use the smallest verification set that proves the affected contract. Run `pdm ru
 ## Change-Specific Review
 
 - UI changes follow the nearest UI guidance. Interaction or rendering-contract changes are reviewed against [Chatbot UI Unit TDD](docs/30-unit-tdd/chatbot-ui.md).
-- Service-boundary changes are reviewed against [Runtime Boundaries](docs/20-product-tdd/runtime-boundaries.md).
+- Cross-service authority or topology changes are reviewed against
+  [Product TDD](docs/20-product-tdd/README.md).
 - Storage changes are reviewed against [Storage Ownership](docs/20-product-tdd/storage-ownership.md); migrations also follow [Local State Evolution](docs/40-deployment/local-state-evolution.md).
 - Runtime or packaging changes follow the [Development Runbook](docs/40-deployment/development.md) and the relevant packaged smoke verification.
-- New ML states, result formats, or storage locations update the owning lifecycle or runtime document before merge.
+- New cross-unit ML states or result semantics update the
+  [ML Task Lifecycle](docs/20-product-tdd/ml-task-lifecycle.md); runtime locations
+  remain Deployment or source truth.
 
 ## Testing Intent
 

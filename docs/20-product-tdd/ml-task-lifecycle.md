@@ -1,130 +1,62 @@
 # ML Task Lifecycle
 
-## Purpose
+## Admission
 
-Define the minimum contract for persisted ML task execution such as training, hyperparameter tuning, evaluation, and model apply.
+Agent tools, ML services, persistence, execution workers, and UI projections depend
+on one task identity, lifecycle, placement, and finalization contract. Losing it can
+make status, results, or canonical ownership disagree across units.
 
-This document governs `MLTask` lifecycle semantics. It does not govern task packets under `tasks/<task-slug>/`.
+This contract governs persisted ML work, not task packets under `tasks/`.
 
-## ML Task Identity
+## Identity and Authority
 
-Each persisted ML task must have:
+- Each accepted operation has a stable task id and individually addressable state.
+- Training inputs use an immutable dataset role-binding snapshot. Services expand
+  stable references into the execution request before dispatch.
+- A trained analyzer is the aggregate for its canonical apply artifact, role
+  contract, evaluation work, and final metrics. Consumers do not reconstruct that
+  relationship by scanning unrelated dataset tasks.
+- For supervised work, holdout evidence belongs to the split-trained evaluation
+  artifact. The canonical apply artifact may be refit on all eligible rows and must
+  not inherit an unsupported holdout-performance claim.
 
-- A stable ML task id
-- An ML task type: `fit`, `hyperparameter_tuning`, `evaluate`, or `apply`
-- A created timestamp
-- A current status
-- A finished timestamp once the ML task reaches a terminal state
+Exact task fields, operation enums, model taxonomy, and persistence shapes are owned
+by source, schemas, and tests.
 
-SQLite is the default store for ML task metadata.
+## Lifecycle and Placement
 
-ML tasks remain individually addressed records. User-facing tool-call details and Agent follow-up use explicit task ids and existing request/result payload references; the lifecycle contract does not introduce a `task_group_id`.
+The shared semantic progression is:
 
-Dataset inspection is not an ML task. It belongs to DatasetService and data-facing Agent tools such as `data.query`.
+```text
+pending -> running -> succeeded | failed | cancelled
+pending -> cancelled
+```
 
-Current AI-first service contracts are dataset-scoped and analyzer-scoped. A model is a reusable analyzer: a service-owned artifact trained from declared input roles and later applied to compatible input roles.
+- `succeeded` means every declared canonical output is locally present and ready.
+- `failed` means the operation did not produce all required outputs.
+- `cancelled` means cancellation control stopped accepted work before success.
+- Services choose the local or SSH worker. Agent tool inputs do not select workers,
+  and placement does not change task identity or lifecycle states.
+- Worker or remote-command failure fails the task. Automatic failover is outside the
+  current contract.
 
-ML task placement is service-owned. A configured ML worker pool may dispatch a task to the local worker or to an SSH worker, but worker selection is not part of Agent tool inputs and does not change the persisted task identity.
+## Result and Failure Contract
 
-Column-role binding is first persisted as an immutable binding snapshot. Training and hyperparameter training tools pass `binding_id`; ML task requests expand that reference into explicit dataset id, role bindings, model selection, parameters, and run name inputs before execution. Supervised feature/target labels are derived from role bindings when needed for display or adapter compatibility, but they are not a second persistent contract.
+- Remote directories are execution/cache state. Results become authoritative only
+  after they are downloaded, normalized, finalized locally, and registered by the
+  owning service.
+- Terminal metadata preserves enough identity, status, result references, and error
+  summary for later review after the originating conversation turn closes.
+- User-relevant task logs remain available through the ML task service. Log file
+  layout and application-log rotation belong to source and Deployment.
+- Failure detail is actionable and may include bounded worker/setup diagnostics,
+  but never SSH credentials or private-key material.
+- User-openable outputs follow the [artifact link contract](artifact-links.md);
+  storage medium and deletion follow [storage ownership](storage-ownership.md).
 
-The trained model is the aggregate boundary for post-training evaluation. A successful `fit` or `hyperparameter_tuning` task creates a `trained_model` row; any follow-up `evaluate` task references that `trained_model_id`, and the trained-model metadata records the evaluation task id and final metrics. Agent and UI follow-up must use this trained-model relation rather than inferring related work by scanning dataset task history.
+## Verification
 
-For supervised fit and hyperparameter-tuning tasks, the model artifact used for apply is distinct from the model artifact used to produce holdout evidence. The evaluation model is trained on the training split and is the only artifact evaluated against holdout rows. The canonical trained-model artifact is a final apply model refit on all eligible training rows with the accepted parameters or best parameters. Trained-model metadata records this scope distinction so evaluation metrics remain holdout evidence rather than a claim that the final all-row model was independently tested. Older task payloads that lack an explicit evaluation-model artifact may fall back to evaluating the canonical artifact.
-
-`ProblemKind` is retained only as nullable legacy compatibility metadata for existing regression, classification, clustering, and anomaly rows. Evaluation-policy behavior is owned by `EvaluationKind`; analyzer product grouping is owned by `ModelFamily`; apply behavior is owned by `ModelTaskKind`. Association-rule and recommendation analyzers do not receive a synthetic problem kind.
-
-Apply tasks use the trained model metadata as the apply-role contract. New service and Agent contracts use `apply`, not `inference`. Legacy persisted task rows or tests that use `inference` are migration inputs only.
-
-## Role Binding Contract
-
-Dataset column role bindings must be persisted as service-owned records before training starts.
-
-Each binding record must include:
-
-- A stable binding id
-- Dataset id
-- Role binding payload
-- Optional model key
-- Optional model family
-- Optional model task kind
-- Schema version
-- Created timestamp
-
-The canonical storage table is `dataset_column_binding`. The old `dataset_column_selection` table is a migration source and must not be used as the forward contract.
-
-Role binding rules:
-
-- Every bound column must exist in the registered dataset inspection.
-- Required roles must be present before a model can train.
-- Single-column roles bind exactly one column.
-- Many-column roles bind one or more columns unless the role schema marks them optional.
-- Model catalog metadata owns the train-role schema and apply-role schema used for validation.
-
-## Status Contract
-
-Allowed status values:
-
-- `pending`: accepted by the service and waiting to start
-- `running`: actively executing
-- `succeeded`: finished and produced the declared outputs
-- `failed`: finished without producing all required outputs
-- `cancelled`: stopped by the user or shutdown flow before completion
-
-State transition rules:
-
-- `pending -> running`
-- `running -> succeeded`
-- `running -> failed`
-- `pending -> cancelled`
-- `running -> cancelled`
-
-Any other transition requires an ADR or a contract update.
-
-Worker placement does not add lifecycle states. A task selected for a remote SSH worker still transitions through `pending`, `running`, and one terminal state. If the selected worker or remote command fails, the task fails normally; v1 does not automatically retry on another worker or perform failover.
-
-## Logging Contract
-
-Each ML task must write user-relevant execution logs to the application log sink under `paths.logs`.
-
-Minimum guarantees:
-
-- The application log remains append-only for a single process run.
-- ML task log entries include the ML task id.
-- Failure paths include a human-actionable message, not only a stack trace.
-
-Detailed per-ML-task logs may later use separate files, but the canonical location stays under the runtime `logs/` directory.
-
-When ML task subprocess execution exists, each ML task may also write detailed process logs under `artifacts/ml-tasks/<ml-task-id>/`. Those per-ML-task logs are supplementary. The canonical application log remains under `paths.logs`.
-
-## Result Artifact Contract
-
-ML tasks that produce artifacts must return result metadata that includes:
-
-- Result kind
-- Artifact kind
-- Absolute filesystem path when the artifact is file-backed
-- Preview kind when the artifact can be previewed in Chatbot
-- Whether the file or directory is ready to open
-
-ML tasks surfaced after the originating Chatbot turn closes, such as apply results shown in history, must preserve enough terminal metadata for later review and export.
-
-Result ownership rules:
-
-- Source dataset registrations point to app-owned registered dataset files; original import files are provenance, not the execution source of truth.
-- ML task requests carry expanded dataset, role binding, model selection, parameters, and artifact output owner inputs from service contracts.
-- App-managed datasets used by ML tasks are registered dataset records. User-openable dataset exports are separate artifact records materialized by the operation that owns the exported output.
-- Generated models, exports, and reports live in service-managed directories on the local filesystem.
-- ML task working directories live under `artifacts/ml-tasks/<ml-task-id>/`.
-- An ML task reaches `succeeded` only after every declared output path exists.
-- Chatbot result presentation flows through markdown summaries and `artifact://...` links for materialized user-openable artifacts. Dataset ids remain internal tool/input identities.
-- Remote worker directories are execution/cache state only. Remote result files must be downloaded and rewritten to local task paths before normal task finalization copies them into canonical local artifact locations.
-
-## Failure Contract
-
-On failure, services must preserve enough information for local troubleshooting:
-
-- Final ML task status is `failed`
-- The last error summary is persisted in ML task metadata
-- The main application log contains the matching error context
-- Worker selection, SSH command failures, setup validation failures, and remote logs should be preserved in local task logs or diagnostic metadata without storing SSH credentials.
+Lifecycle and placement coverage lives in `tests/test_services.py`,
+`tests/test_ml_execution.py`, `tests/test_ml_workers.py`, and the ML paths in the
+Agent Harness test suites. Persistence mechanics are covered by repository and
+migration tests.

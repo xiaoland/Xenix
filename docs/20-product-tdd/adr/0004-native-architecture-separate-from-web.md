@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-03-09
+- Clarified by: [ADR 0007](0007-remote-integrations-remain-adapters.md)
 
 ## Context
 

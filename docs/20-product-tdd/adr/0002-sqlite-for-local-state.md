@@ -1,6 +1,6 @@
 # ADR 0002: Use SQLite for local metadata and task state
 
-- Status: accepted
+- Status: superseded by [ADR 0006](0006-bounded-sqlite-application-state.md)
 - Date: 2026-03-09
 
 ## Context
