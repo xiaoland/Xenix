@@ -49,6 +49,7 @@ nul
 
 # Temp
 .codex-test-tmp
+.pytest-tmp
 
 # Special
 tasks/packaged-startup-latency/artifacts
