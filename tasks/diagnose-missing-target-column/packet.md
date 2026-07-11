@@ -57,3 +57,22 @@ If this turns into a product/code change, likely owner is the agent decision/exp
 - Added a focused harness test assertion for the new prompt contract.
 - Updated the agent harness unit TDD summary to reflect the new prompt contract.
 - Verification: `pdm run pytest tests/test_agent_harness_foundation.py::test_conversation_store_formats_default_system_prompt_with_interface_locale` passed.
+
+# Follow-up Diagnosis: Reported "too many links / self interruption"
+
+- Likely thread: `09662f315c0049c89ea4e6d2bb1e9460`, title `基于这些数据，能不能帮我对人群进行分类？如何划分？分多少类`.
+- Most likely failing turn: `b8b7502d2a764e8596978d1b94ce3c12`, user text `基于你的计算，每类人群，可以有什么具体的建议。`
+- Evidence:
+  - The turn remains `OPEN`.
+  - Run `3393f7123e354225b888298c7e3416bf` ended `FAILED`.
+  - Run error: `[WinError 10054] 远程主机强迫关闭了一个现有的连接。`
+  - Final provider request in that run is `failed`, with no usage payload and no output message ids.
+  - Assistant message `ad1a734a0bb845a291595eef05fef8c1` is `failed` and contains only a partial streamed answer.
+  - The failed answer contains 1 artifact link, not many visible links.
+  - The previous turn in the same thread had 27 tool calls, 6 artifacts, a step-budget-exhausted system message, and provider inputs grew to about 28k-30k tokens.
+  - The failed turn's provider requests used 46, 49, then 51 input messages; the last failed request had a long accumulated context and was closed remotely during streaming.
+  - The user's immediate retry `每类人群，具体有什么建议？` succeeded in turn `b9ffa8a43cd14e1cb01bbd5bd484ba99` with a no-artifact final answer.
+- Working diagnosis:
+  - "链接太多" is probably not literal visible markdown/artifact links. The DB shows only 1 visible artifact link in the failed partial answer.
+  - The failure is more consistent with a long multi-step agent chain accumulating many provider input messages/tool records and a large context, then the trial provider/network closing the streaming connection.
+  - A secondary contributor is tool churn: an initial `data.query` used unsupported `STDEV`, then retried with `STDDEV`, increasing steps/context before the long final answer.
