@@ -12,13 +12,13 @@ Xenix writes JSON Lines to `logs/xenix.log` under the active runtime home. The f
 
 ## OTLP Enablement
 
-Standard OpenTelemetry endpoint, protocol, and header variables configure transport. Signal-specific values take precedence over global values.
+Standard OpenTelemetry endpoint, protocol, and header variables configure transport. Signal-specific values take precedence over global values. Source runs read them from the developer process. Formal packaging reads them once and embeds them in the frozen release configuration; an installed client ignores ambient `XENIX_OTEL_*`, `OTEL_SDK_DISABLED`, and `OTEL_EXPORTER_*` values.
 
 - Traces and metrics enable when their signal endpoint is set, or when the global OTLP endpoint is set, unless their `XENIX_OTEL_EXPORT_*` override disables them.
 - Remote log export is off by default. It requires both `XENIX_OTEL_EXPORT_LOGS=true` and a log or global endpoint.
 - `OTEL_SDK_DISABLED=true` disables the SDK path.
 
-Prefer signal-specific endpoints and headers when backends or credentials differ. Remote log export deserves separate review because it can transmit application diagnostic detail.
+Prefer signal-specific endpoints and headers when backends or credentials differ. Remote log export deserves separate review because it can transmit application diagnostic detail. Every embedded header/token is extractable from the client and must not be treated as a server-side secret.
 
 ## Verify and Degrade
 
@@ -26,4 +26,4 @@ After enabling a signal, perform one identifiable application action and confirm
 
 Interactive startup uses batch processing and does not synchronously flush after showing the main window. A slow or unreachable backend should not block Qt input; process-exit smoke and diagnostics may flush for deterministic evidence.
 
-If a signal causes noise or exporter failures, disable that signal with its Xenix override, or remove its endpoint. Disable remote logs independently before disabling traces or metrics. Restart, confirm normal interaction, confirm the failing exporter messages stop, and verify that intended remaining signals still arrive.
+For source diagnosis, disable a signal with its Xenix override or remove its endpoint and restart. For an installed release, change the protected candidate build configuration and publish a new version; changing the user's process environment is intentionally not a supported remote reconfiguration path. Disable remote logs independently before traces or metrics, confirm normal interaction, confirm exporter failures stop, and verify intended remaining signals still arrive.

@@ -301,7 +301,9 @@ class AgentHarnessService:
             cancel_event.set()
 
     def submit_user_turn(self, input_data: SubmitUserTurnInput) -> ThreadSnapshot:
-        with start_span("agent.turn") as span:
+        from ..runtime_activity import activity_coordinator
+
+        with activity_coordinator.work("agent"), start_span("agent.turn") as span:
             self._validate_turn_submission_before_materialization(input_data)
             imported_source_attachments = self._materialize_source_attachments(input_data)
             thread_id, turn_id, fq_model_key, provider = self._start_user_turn(
@@ -349,7 +351,9 @@ class AgentHarnessService:
                 self._clear_cancel_event(run_id)
 
     def submit_user_turn_stream(self, input_data: SubmitUserTurnInput):
-        with start_span("agent.turn") as span:
+        from ..runtime_activity import activity_coordinator
+
+        with activity_coordinator.work("agent"), start_span("agent.turn") as span:
             self._validate_turn_submission_before_materialization(input_data)
             imported_source_attachments = self._materialize_source_attachments(input_data)
             thread_id, turn_id, fq_model_key, provider = self._start_user_turn(

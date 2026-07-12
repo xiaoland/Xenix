@@ -31,10 +31,14 @@ dependencies = [
     "structlog>=26.1.0",
     "polars[calamine,rtcompat]==1.42.1",
     "xlsxwriter>=3.2.0",
+    "velopack==1.2.0",
 ]
 
 [dependency-groups]
 dev = ["pyinstaller>=6.16.0", "pytest>=8.4.0", "PyYAML>=6.0.0"]
+release = [
+    "oss2==2.19.1",
+]
 
 [tool.pdm]
 distribution = false
@@ -48,6 +52,10 @@ i18n-compile = "python scripts/compile_translations.py"
 package = { composite = ["agent-skills-generate", "agent-skills-check", "python scripts/package_app.py"] }
 smoke = { composite = ["agent-skills-generate", "python scripts/run_dev.py --smoke-test"] }
 smoke-package = "python scripts/verify_packaged_smoke.py"
+velopack = "python scripts/package_velopack.py"
+release-manifest = "python scripts/write_release_manifest.py"
+release-identity = "python scripts/verify_release_identity.py"
+release-candidate = { composite = ["package", "smoke-package", "velopack", "release-manifest"] }
 dist = "python scripts/build_distribution_zip.py"
 pytest = "python scripts/run_pytest.py"
 test = "python scripts/run_pytest.py"

@@ -47,8 +47,7 @@ a = Analysis(
     + xgboost_datas
     + polars_datas,
     hiddenimports=[
-        "xenix._generated_trial_lock",
-        "xenix._generated_trial_llm",
+        "xenix._generated_release_config",
         "xenix.services.agent.chatbot_events",
         "xenix.services.agent.completion_guard",
         "xenix.services.agent.conversation_store",
@@ -99,11 +98,12 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name="xenix",
+    version=str(project_root / "build" / "xenix-version-info.txt"),
     icon=str(project_root / "logo.ico"),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     console=False,
     disable_windowed_traceback=False,
 )
@@ -113,7 +113,7 @@ coll = COLLECT(
     a.binaries,
     a.datas,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     name="xenix",
 )

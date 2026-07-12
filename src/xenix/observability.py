@@ -20,8 +20,9 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-from .build_info import BUILD_COMMIT
+from .build_info import APP_VERSION, BUILD_COMMIT
 from .config import AppPaths
+from .release_config import apply_frozen_otel_environment
 
 INSTALL_ID_FILE_NAME = "telemetry.json"
 SERVICE_NAME = "xenix-native"
@@ -66,6 +67,7 @@ def load_or_create_install_id(paths: AppPaths) -> str:
 def setup_observability(paths: AppPaths) -> ObservabilityContext:
     global _configured, _logging_instrumented, _meter_provider, _tracer_provider
 
+    apply_frozen_otel_environment()
     install_id = load_or_create_install_id(paths)
     trace_export_enabled = _trace_export_enabled()
     metric_export_enabled = _metric_export_enabled()
@@ -210,6 +212,7 @@ def _resource_attributes(paths: AppPaths, install_id: str) -> dict[str, str]:
         "service.name": SERVICE_NAME,
         "service.version": _service_version(),
         "xenix.build.commit": BUILD_COMMIT,
+        "xenix.version": APP_VERSION,
         "xenix.install.id": install_id,
         "xenix.package_mode": "packaged" if getattr(sys, "frozen", False) else "source",
         "xenix.runtime.home_class": "custom" if os.getenv("XENIX_APP_HOME") else "default",

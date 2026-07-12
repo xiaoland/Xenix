@@ -1,0 +1,12 @@
+[application]
+pack_id = "dev.lanzhijiang.xenix"
+title = "Xenix"
+authors = "Xenix"
+main_exe = "xenix.exe"
+channel = "win-x64-stable"
+runtime = "win10.0.17763-x64"
+
+[toolchain]
+python = "3.14.6"
+pdm = "2.26.6"
+velopack = "1.2.0"

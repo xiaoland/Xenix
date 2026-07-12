@@ -35,14 +35,14 @@ def _enabled_config() -> PackagedTrialLockConfig:
     )
 
 
-def test_trial_purchase_url_defaults_to_empty_string(monkeypatch) -> None:
-    monkeypatch.delenv("TRIAL_PURCHASE_URL", raising=False)
+def test_source_trial_purchase_url_defaults_to_empty_string(monkeypatch) -> None:
+    monkeypatch.delenv("XENIX_TRIAL_PURCHASE_URL", raising=False)
 
     assert trial_purchase_url() == ""
 
 
-def test_trial_purchase_url_reads_environment_variable(monkeypatch) -> None:
-    monkeypatch.setenv("TRIAL_PURCHASE_URL", " https://example.test/buy ")
+def test_source_trial_purchase_url_reads_build_environment(monkeypatch) -> None:
+    monkeypatch.setenv("XENIX_TRIAL_PURCHASE_URL", " https://example.test/buy ")
 
     assert trial_purchase_url() == "https://example.test/buy"
 

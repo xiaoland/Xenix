@@ -52,7 +52,7 @@ pnpm exec wrangler d1 migrations apply "$XENIX_D1_DATABASE_NAME" --remote --conf
 ## Checks
 
 ```sh
-XENIX_DOWNLOAD_URL="https://r2.lanzhijiang.dev/xenix-latest.zip" pnpm run check
+XENIX_DOWNLOAD_URL="https://downloads.example.cn/Xenix-Setup.exe" pnpm run check
 ```
 
 The check command fails if `XENIX_DOWNLOAD_URL` is missing.

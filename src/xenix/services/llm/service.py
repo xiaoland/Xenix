@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-from importlib import import_module
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Callable, Iterator
@@ -11,6 +10,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from ...config import AppPaths
 from ...exceptions import NotFoundError, ValidationError
+from ...release_config import load_release_config
 from .providers import (
     AgentToolSpec,
     LLMRequestMetadata,
@@ -485,27 +485,11 @@ def _read_environment() -> XenixEnvironment:
 
 
 def load_packaged_trial_llm_config() -> PackagedTrialLLMConfig:
-    try:
-        generated_trial_llm = import_module("xenix._generated_trial_llm")
-    except ModuleNotFoundError as exc:
-        if exc.name != "xenix._generated_trial_llm":
-            raise
-        return PackagedTrialLLMConfig(
-            base_url=TRIAL_LLM_BASE_URL_FALLBACK,
-            api_key="",
-            model=TRIAL_LLM_MODEL_FALLBACK,
-        )
+    release_config = load_release_config()
     return PackagedTrialLLMConfig(
-        base_url=str(
-            getattr(generated_trial_llm, "TRIAL_LLM_BASE_URL", TRIAL_LLM_BASE_URL_FALLBACK)
-            or TRIAL_LLM_BASE_URL_FALLBACK
-        ).rstrip("/"),
-        api_key=str(getattr(generated_trial_llm, "TRIAL_LLM_API_KEY", "") or ""),
-        model=str(
-            getattr(generated_trial_llm, "TRIAL_LLM_MODEL", TRIAL_LLM_MODEL_FALLBACK)
-            or TRIAL_LLM_MODEL_FALLBACK
-        ).strip()
-        or TRIAL_LLM_MODEL_FALLBACK,
+        base_url=release_config.trial_llm_base_url or TRIAL_LLM_BASE_URL_FALLBACK,
+        api_key=release_config.trial_llm_api_key,
+        model=release_config.trial_llm_model or TRIAL_LLM_MODEL_FALLBACK,
     )
 
 

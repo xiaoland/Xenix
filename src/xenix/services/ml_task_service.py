@@ -315,12 +315,15 @@ class MLTaskService:
             ).start()
 
     def _run_queued_task(self, ml_task_id: str) -> None:
+        from .runtime_activity import activity_coordinator
+
         carrier = self._trace_carriers.pop(ml_task_id, {})
         token = otel_context.attach(extract_context(carrier)) if carrier else None
         try:
-            finished_task = self._run_task(ml_task_id)
-            if finished_task is not None:
-                self._notify_callbacks(finished_task)
+            with activity_coordinator.work(f"ml:{ml_task_id}"):
+                finished_task = self._run_task(ml_task_id)
+                if finished_task is not None:
+                    self._notify_callbacks(finished_task)
         finally:
             if token is not None:
                 otel_context.detach(token)

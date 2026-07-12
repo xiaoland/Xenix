@@ -1,0 +1,14 @@
+{
+  "Version": "1",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["oss:GetObject", "oss:PutObject", "oss:ListObjects"],
+      "Resource": [
+        "acs:oss:*:*:REPLACE_RELEASE_BUCKET",
+        "acs:oss:*:*:REPLACE_RELEASE_BUCKET/candidates/*",
+        "acs:oss:*:*:REPLACE_RELEASE_BUCKET/published/*"
+      ]
+    }
+  ]
+}

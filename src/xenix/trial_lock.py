@@ -3,23 +3,19 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-import os
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
-from importlib import import_module
 from pathlib import Path
 from typing import Any
 
 from .config import AppPaths
+from .release_config import load_release_config
 
 TRIAL_LOCK_STATE_FILE_NAME = "trial_lock.json"
 TRIAL_LOCK_SCHEMA_VERSION = 1
-TRIAL_PURCHASE_URL_ENV = "TRIAL_PURCHASE_URL"
-
-
 def trial_purchase_url() -> str:
-    return os.environ.get(TRIAL_PURCHASE_URL_ENV, "").strip()
+    return load_release_config().trial_purchase_url
 
 
 class TrialLockReason(StrEnum):
@@ -75,17 +71,12 @@ def trial_lock_state_path(paths: AppPaths) -> Path:
 
 
 def load_packaged_trial_lock_config() -> PackagedTrialLockConfig:
-    try:
-        generated_trial_lock = import_module("xenix._generated_trial_lock")
-    except ModuleNotFoundError as exc:
-        if exc.name != "xenix._generated_trial_lock":
-            raise
-        return PackagedTrialLockConfig()
-
-    days = int(getattr(generated_trial_lock, "TRIAL_LOCK_DAYS", 0) or 0)
-    state_secret = str(getattr(generated_trial_lock, "TRIAL_LOCK_STATE_SECRET", "") or "")
-    build_id = str(getattr(generated_trial_lock, "TRIAL_LOCK_BUILD_ID", "") or "development")
-    return PackagedTrialLockConfig(days=days, state_secret=state_secret, build_id=build_id)
+    config = load_release_config()
+    return PackagedTrialLockConfig(
+        days=config.trial_lock_days,
+        state_secret=config.trial_lock_state_secret,
+        build_id=config.trial_lock_build_id,
+    )
 
 
 def check_trial_lock(

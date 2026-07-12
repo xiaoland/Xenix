@@ -16,7 +16,7 @@ pdm run dist
 
 `package` produces the Windows bundle. `smoke-package` exercises the packaged executable and selected delayed native/data paths. `dist` creates the distributable archive. Do not distribute if any stage fails.
 
-Packaging embeds build-time inputs: the Git commit, optional trial provider settings, and optional trial-lock settings. Treat embedded provider secrets and lock secrets as release credentials. Keep inputs consistent across one release wave and let `scripts/package_app.py` own their exact names, validation, and generated modules.
+Packaging embeds build-time inputs: Git commit plus the Pydantic-validated release URL, trial provider, trial lock, purchase URL, and supplied OpenTelemetry settings. Formal candidates require the complete trial configuration; public candidates also require HTTPS `RELEASES_OSS_PUBLIC_URL`. Treat embedded provider secrets, lock secrets, and OTLP headers as extractable release credentials. `xenix.release_config.ReleaseConfig` owns names and validation; `scripts/package_app.py` generates one temporary frozen projection and removes it after packaging.
 
 Packaging success proves assembly, not usability. The smoke gate proves only the paths currently exercised by `scripts/verify_packaged_smoke.py`; it is not a guarantee for every optional dependency or workflow. Add the smallest meaningful packaged exercise when a first-party path begins depending on a new compiled extension, native library, metadata file, or package data file.
 

@@ -1,13 +1,30 @@
 from __future__ import annotations
 
+from pathlib import Path
+import tomllib
+
+from .release_config import load_release_config
+
 DEVELOPMENT_BUILD_COMMIT = "development"
 
+
+def _development_version() -> str:
+    pyproject_path = Path(__file__).resolve().parents[2] / "pyproject.toml"
+    try:
+        project = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))["project"]
+        return str(project["version"])
+    except (OSError, KeyError, TypeError, tomllib.TOMLDecodeError):
+        return "0.0.0"
+
 try:
-    from ._generated_build_info import BUILD_COMMIT as _RAW_BUILD_COMMIT
+    from ._generated_build_info import APP_VERSION, BUILD_COMMIT as _RAW_BUILD_COMMIT
 except ModuleNotFoundError as exc:
     if exc.name != "xenix._generated_build_info":
         raise
     _RAW_BUILD_COMMIT = DEVELOPMENT_BUILD_COMMIT
+    APP_VERSION = _development_version()
+
+APP_UPDATE_FEED_URL = load_release_config().update_feed_url
 
 
 def _normalize_build_commit(value: object) -> str:

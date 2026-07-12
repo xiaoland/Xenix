@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from PySide6.QtCore import QEvent, QPoint, QSize, Qt, Signal
+from PySide6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -51,6 +51,7 @@ from .tool_call_detail_view import ToolCallDetailView
 
 if TYPE_CHECKING:
     from ..services.ml_service import MLService
+    from ..services.update_service import UpdateService
 
 
 @dataclass(frozen=True)
@@ -101,6 +102,7 @@ class MainWindow(QMainWindow):
         link_router: LinkRouter,
         dataset_service: DatasetService,
         ml_service: MLService,
+        update_service: UpdateService | None = None,
     ) -> None:
         super().__init__()
         self._paths = paths
@@ -115,6 +117,7 @@ class MainWindow(QMainWindow):
         self._link_router = link_router
         self._dataset_service = dataset_service
         self._ml_service = ml_service
+        self._update_service = update_service
         self._agent_thread_id: str | None = None
         self._active_agent_run_id: str | None = None
         self._composer_attachments: dict[str, _ComposerAttachmentRecord] = {}
@@ -169,6 +172,17 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self.retranslate_ui()
         self._sync_model_picker_options()
+        if self._update_service is not None and self._update_service.status.state.value != "unavailable":
+            QTimer.singleShot(1000, self._check_updates_in_background)
+
+    def _check_updates_in_background(self) -> None:
+        if self._update_service is None:
+            return
+        threading.Thread(
+            target=self._update_service.check,
+            name="xenix-update-auto-check",
+            daemon=True,
+        ).start()
 
     def _setup_ui(self) -> None:
         root = QWidget(self)
@@ -281,6 +295,7 @@ class MainWindow(QMainWindow):
                 llm_service=self._llm_service,
                 llm_settings_service=self._llm_settings_service,
                 ml_worker_settings_service=self._ml_worker_settings_service,
+                update_service=self._update_service,
                 parent=self,
             )
             self._settings_dialog.agent_settings_saved.connect(self._reload_agent_provider)

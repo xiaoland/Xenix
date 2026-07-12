@@ -3,7 +3,9 @@ from pathlib import Path
 
 import pytest
 
+from xenix import __version__
 from xenix.build_info import DEVELOPMENT_BUILD_COMMIT, _display_build_commit
+from xenix.release_config import ReleaseConfig
 
 
 def _load_package_app_module():
@@ -24,6 +26,10 @@ def test_build_commit_display_uses_twelve_character_hash() -> None:
     assert _display_build_commit(DEVELOPMENT_BUILD_COMMIT) == DEVELOPMENT_BUILD_COMMIT
 
 
+def test_source_version_is_project_version() -> None:
+    assert __version__ == package_app._resolve_app_version(Path(__file__).resolve().parents[1])
+
+
 def test_package_build_commit_can_be_supplied_from_environment(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_BUILD_COMMIT", "ABCDEF123456")
 
@@ -40,107 +46,48 @@ def test_package_build_commit_rejects_non_hash_environment_value(monkeypatch, tm
 def test_package_build_info_file_embeds_commit_and_is_removable(tmp_path: Path) -> None:
     commit = package_app._validate_build_commit("ABCDEF1234567890")
 
-    build_info_path = package_app._write_generated_build_info(tmp_path, commit)
+    build_info_path = package_app._write_generated_build_info(tmp_path, "1.0.0", commit)
 
     assert build_info_path == tmp_path / "src" / "xenix" / "_generated_build_info.py"
-    assert f'BUILD_COMMIT = "{commit}"' in build_info_path.read_text(encoding="utf-8")
+    content = build_info_path.read_text(encoding="utf-8")
+    assert 'APP_VERSION = "1.0.0"' in content
+    assert f'BUILD_COMMIT = "{commit}"' in content
 
     package_app._remove_generated_build_info(tmp_path)
 
     assert not build_info_path.exists()
 
 
-def test_package_trial_llm_file_embeds_environment_values_and_is_removable(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    monkeypatch.setenv("XENIX_TRIAL_LLM_BASE_URL", "https://trial.example.test")
-    monkeypatch.setenv("XENIX_TRIAL_LLM_API_KEY", "trial-secret")
-    monkeypatch.setenv("XENIX_TRIAL_LLM_MODEL", "vendor-real-model")
+def test_windows_version_info_projects_semver(tmp_path: Path) -> None:
+    path = package_app._write_windows_version_info(tmp_path, "1.2.3")
+    content = path.read_text(encoding="utf-8")
 
-    trial_llm_path = package_app._write_generated_trial_llm(tmp_path)
-
-    assert trial_llm_path == tmp_path / "src" / "xenix" / "_generated_trial_llm.py"
-    content = trial_llm_path.read_text(encoding="utf-8")
-    assert "TRIAL_LLM_BASE_URL = 'https://trial.example.test'" in content
-    assert "TRIAL_LLM_API_KEY = 'trial-secret'" in content
-    assert "TRIAL_LLM_MODEL = 'vendor-real-model'" in content
-
-    package_app._remove_generated_trial_llm(tmp_path)
-
-    assert not trial_llm_path.exists()
+    assert "filevers=(1, 2, 3, 0)" in content
+    assert "StringStruct('ProductVersion', '1.2.3')" in content
 
 
-def test_package_trial_llm_file_allows_missing_api_key(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.delenv("XENIX_TRIAL_LLM_API_KEY", raising=False)
+def test_package_release_config_file_embeds_one_payload_and_is_removable(tmp_path: Path) -> None:
+    config = ReleaseConfig(
+        releases_oss_public_url="https://downloads.example.test/published",
+        trial_llm_base_url="https://trial.example.test/v1",
+        trial_llm_api_key="trial-secret",
+        trial_llm_model="vendor-real-model",
+        trial_lock_days=14,
+        trial_lock_state_secret="stable-secret",
+        trial_lock_build_id="abcdef123456",
+        trial_purchase_url="https://example.test/purchase",
+        otel_environment={"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": "https://otel.example.test/v1/traces"},
+    )
 
-    trial_llm_path = package_app._write_generated_trial_llm(tmp_path)
-    content = trial_llm_path.read_text(encoding="utf-8")
+    path = package_app._write_generated_release_config(tmp_path, config)
+    content = path.read_text(encoding="utf-8")
 
-    assert "TRIAL_LLM_API_KEY = ''" in content
+    assert path == tmp_path / "src" / "xenix" / "_generated_release_config.py"
+    assert "RELEASE_CONFIG =" in content
+    assert "https://downloads.example.test/published" in content
+    assert "trial-secret" in content
+    assert "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT" in content
 
+    package_app._remove_generated_release_config(tmp_path)
 
-def test_package_trial_lock_days_defaults_to_disabled(monkeypatch) -> None:
-    monkeypatch.delenv("XENIX_TRIAL_LOCK_DAYS", raising=False)
-
-    assert package_app._resolve_trial_lock_days() == 0
-
-
-def test_package_trial_lock_days_rejects_invalid_values(monkeypatch) -> None:
-    monkeypatch.setenv("XENIX_TRIAL_LOCK_DAYS", "three")
-
-    with pytest.raises(ValueError, match="XENIX_TRIAL_LOCK_DAYS"):
-        package_app._resolve_trial_lock_days()
-
-    monkeypatch.setenv("XENIX_TRIAL_LOCK_DAYS", "-1")
-
-    with pytest.raises(ValueError, match="XENIX_TRIAL_LOCK_DAYS"):
-        package_app._resolve_trial_lock_days()
-
-
-def test_package_trial_lock_file_embeds_days_secret_and_build_id(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    monkeypatch.setenv("XENIX_TRIAL_LOCK_DAYS", "14")
-    monkeypatch.delenv("XENIX_TRIAL_LOCK_STATE_SECRET", raising=False)
-
-    trial_lock_path = package_app._write_generated_trial_lock(tmp_path, "abcdef123456")
-
-    assert trial_lock_path == tmp_path / "src" / "xenix" / "_generated_trial_lock.py"
-    content = trial_lock_path.read_text(encoding="utf-8")
-    assert "TRIAL_LOCK_DAYS = 14" in content
-    assert "TRIAL_LOCK_STATE_SECRET = ''" not in content
-    assert "TRIAL_LOCK_BUILD_ID = 'abcdef123456'" in content
-
-    package_app._remove_generated_trial_lock(tmp_path)
-
-    assert not trial_lock_path.exists()
-
-
-def test_package_trial_lock_file_uses_fixed_state_secret(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    monkeypatch.setenv("XENIX_TRIAL_LOCK_DAYS", "60")
-    monkeypatch.setenv("XENIX_TRIAL_LOCK_STATE_SECRET", "stable-secret-for-test-wave")
-
-    trial_lock_path = package_app._write_generated_trial_lock(tmp_path, "abcdef123456")
-    content = trial_lock_path.read_text(encoding="utf-8")
-
-    assert "TRIAL_LOCK_DAYS = 60" in content
-    assert "TRIAL_LOCK_STATE_SECRET = 'stable-secret-for-test-wave'" in content
-
-
-def test_package_trial_lock_disabled_file_omits_state_secret(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    monkeypatch.setenv("XENIX_TRIAL_LOCK_DAYS", "0")
-    monkeypatch.setenv("XENIX_TRIAL_LOCK_STATE_SECRET", "unused-secret")
-
-    trial_lock_path = package_app._write_generated_trial_lock(tmp_path, "abcdef123456")
-    content = trial_lock_path.read_text(encoding="utf-8")
-
-    assert "TRIAL_LOCK_DAYS = 0" in content
-    assert "TRIAL_LOCK_STATE_SECRET = ''" in content
+    assert not path.exists()

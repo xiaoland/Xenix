@@ -461,6 +461,12 @@ def build_main_window(
                 initial_error=exc,
             )
 
+        def shutdown_runtime() -> None:
+            context.engine.dispose()
+            flush_observability()
+
+        app.aboutToQuit.connect(shutdown_runtime)
+
         _update_startup_stage(app, splash, StartupStage.LOADING_WORKBENCH)
         step_start = time.perf_counter()
         dataset_service = runtime.LazyServiceProxy(
@@ -523,6 +529,9 @@ def build_main_window(
             artifact_service=artifact_service,
             skill_catalog=runtime.AgentSkillCatalog.from_default_catalog(),
         )
+        from .services.update_service import UpdateService
+
+        update_service = UpdateService(paths, runtime.database_path(paths))
         _emit_startup_timing("services.construct", step_start)
 
         step_start = time.perf_counter()
@@ -539,6 +548,7 @@ def build_main_window(
             link_router=link_router,
             dataset_service=dataset_service,
             ml_service=ml_service,
+            update_service=update_service,
         )
         _emit_startup_timing("main_window.construct", step_start)
 
