@@ -58,7 +58,7 @@ release-identity = "python scripts/verify_release_identity.py"
 release-candidate = { composite = ["package", "smoke-package", "velopack", "release-manifest"] }
 dist = "python scripts/build_distribution_zip.py"
 pytest = "python scripts/run_pytest.py"
-test = "python scripts/run_pytest.py"
+test = { composite = ["i18n-compile", "python scripts/run_pytest.py"] }
 check = { composite = ["agent-skills-generate", "agent-skills-check", "python -m compileall src tests scripts"] }
 diagnostic-bundle = "python scripts/create_diagnostic_bundle.py"
 
