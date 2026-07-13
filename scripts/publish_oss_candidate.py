@@ -11,6 +11,7 @@ import requests
 
 
 FEED_NAMES = {"assets.win-x64-stable.json", "releases.win-x64-stable.json", "RELEASES-win-x64-stable"}
+ASSETS_FEED_NAME = "assets.win-x64-stable.json"
 
 
 def digest(data: bytes) -> str:
@@ -34,6 +35,20 @@ def object_digest(bucket, key: str) -> str:
     return value.hexdigest()
 
 
+def public_feed_data(name: str, candidate_data: bytes, artifact_names: set[str]) -> bytes:
+    if name != ASSETS_FEED_NAME:
+        return candidate_data
+    assets = json.loads(candidate_data)
+    retained = [
+        asset
+        for asset in assets
+        if str(asset.get("RelativeFileName") or "") in artifact_names
+    ]
+    if retained == assets:
+        return candidate_data
+    return json.dumps(retained, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", required=True)
@@ -50,11 +65,8 @@ def main() -> int:
     manifest = json.loads(manifest_bytes)
     if manifest["version"] != args.version or not manifest["unsigned"]:
         raise RuntimeError("Manifest identity or unsigned boundary is invalid.")
-    immutable = [
-        item
-        for item in manifest["artifacts"]
-        if item["name"] not in FEED_NAMES and "Setup" not in item["name"]
-    ]
+    artifact_names = {item["name"] for item in manifest["artifacts"]}
+    immutable = [item for item in manifest["artifacts"] if item["name"] not in FEED_NAMES]
     feeds = [item for item in manifest["artifacts"] if item["name"] in FEED_NAMES]
     setups = [item for item in manifest["artifacts"] if "Setup" in item["name"]]
     for item in immutable:
@@ -89,23 +101,35 @@ def main() -> int:
                 f"{published_prefix}/publication-history/{stamp}/{item['name']}", previous,
                 headers={"x-oss-forbid-overwrite": "true"},
             )
-        data = bucket.get_object(f"{candidate_prefix}/{item['name']}").read()
-        if digest(data) != item["sha256"]:
+        candidate_data = bucket.get_object(f"{candidate_prefix}/{item['name']}").read()
+        if digest(candidate_data) != item["sha256"]:
             raise RuntimeError(f"Candidate feed hash mismatch: {item['name']}")
+        data = public_feed_data(item["name"], candidate_data, artifact_names)
+        public_hash = digest(data)
         if previous_hash is not None and object_digest(bucket, key) != previous_hash:
             raise RuntimeError(f"Live feed changed during publication: {item['name']}")
         bucket.put_object(key, data, headers={"Cache-Control": "no-cache"})
-        if remote_digest(f"{origin}/{item['name']}") != item["sha256"]:
+        if remote_digest(f"{origin}/{item['name']}") != public_hash:
             raise RuntimeError(f"Published feed URL hash mismatch: {item['name']}")
+        if public_hash != item["sha256"]:
+            print(f"public_feed_sha256 name={item['name']} sha256={public_hash}")
     for item in setups:
         bucket.copy_object(
             bucket.bucket_name,
             f"{candidate_prefix}/{item['name']}",
             f"{published_prefix}/Xenix-Setup.exe",
-            headers={"Cache-Control": "no-cache"},
+            headers={
+                "x-oss-metadata-directive": "REPLACE",
+                "Cache-Control": "no-cache",
+                "Content-Type": "application/octet-stream",
+            },
         )
         if remote_digest(f"{origin}/Xenix-Setup.exe") != item["sha256"]:
             raise RuntimeError("Stable Setup alias hash mismatch.")
+        alias_response = requests.head(f"{origin}/Xenix-Setup.exe", timeout=30)
+        alias_response.raise_for_status()
+        if "no-cache" not in alias_response.headers.get("Cache-Control", "").lower():
+            raise RuntimeError("Stable Setup alias cache metadata is invalid.")
     print(f"published_version={args.version}")
     print(f"rollback_history={published_prefix}/publication-history/{stamp}/")
     return 0

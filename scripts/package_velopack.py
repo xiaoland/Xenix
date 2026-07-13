@@ -1,9 +1,25 @@
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import tomllib
 from pathlib import Path
+
+
+def prune_missing_assets(output: Path) -> None:
+    artifact_names = {path.name for path in output.iterdir() if path.is_file()}
+    for assets_path in output.glob("assets.*.json"):
+        assets = json.loads(assets_path.read_text(encoding="utf-8"))
+        retained = [
+            asset
+            for asset in assets
+            if str(asset.get("RelativeFileName") or "") in artifact_names
+        ]
+        assets_path.write_text(
+            json.dumps(retained, ensure_ascii=False, separators=(",", ":")),
+            encoding="utf-8",
+        )
 
 
 def main() -> int:
@@ -36,6 +52,7 @@ def main() -> int:
     subprocess.run(command, cwd=root, check=True)
     for portable in output.glob("*-Portable.*"):
         portable.unlink()
+    prune_missing_assets(output)
     return 0
 
 
