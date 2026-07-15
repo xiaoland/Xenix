@@ -8,6 +8,14 @@ Developers and support operators use this runbook to inspect local logs, enable 
 
 Xenix writes JSON Lines to `logs/xenix.log` under the active runtime home. The file rotates at approximately 1 MB and retains three backups. Logs may contain local paths and diagnostic context; handle them as sensitive support evidence.
 
+LLM token usage has a separate `logs/llm-usage.jsonl` journal with the same
+bounded rotation. It contains only normalized token counts plus hashed
+correlation keys, so the UI can reproject a retained usage overview after a
+Thread is reopened. It contains no prompt, raw provider payload, raw Thread or
+Message id, Tool Result, or replay state. Missing or rotated journal data hides
+that overview only; it must never repair conversation state, Tool execution, or
+provider history.
+
 `config/telemetry.json` stores a randomly generated persistent install id. It is not derived from machine identity, but it correlates activity across runs and therefore remains sensitive.
 
 ## OTLP Enablement

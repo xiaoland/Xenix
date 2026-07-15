@@ -8,13 +8,14 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
+from pydantic import ConfigDict
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import Field, SQLModel
 
 from ..exceptions import NotFoundError, ValidationError
 from ..observability import record_counter, start_span
 from .storage.models import ArtifactKind, ArtifactRow
-from .storage.repositories import AgentConversationRepository, ArtifactRepository
+from .storage.repositories import ArtifactRepository
 
 
 def _utc_now() -> datetime:
@@ -22,13 +23,11 @@ def _utc_now() -> datetime:
 
 
 class RegisterArtifactInput(SQLModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: str
     absolute_path: str
     kind: ArtifactKind = ArtifactKind.OTHER
-    thread_id: str | None = None
-    turn_id: str | None = None
-    message_id: str | None = None
-    tool_call_id: str | None = None
     mime_type: str | None = None
     summary: str | None = None
     preview_payload: dict[str, Any] | None = Field(default=None)
@@ -84,7 +83,6 @@ class ArtifactService:
     def __init__(self, session_factory: sessionmaker) -> None:
         self._session_factory = session_factory
         self._artifacts = ArtifactRepository()
-        self._conversations = AgentConversationRepository()
 
     def register_artifact(self, input_data: RegisterArtifactInput) -> ArtifactRow:
         attributes = {"artifact.kind": input_data.kind.value}
@@ -101,10 +99,6 @@ class ArtifactService:
 
             now = _utc_now()
             row = ArtifactRow(
-                thread_id=input_data.thread_id,
-                turn_id=input_data.turn_id,
-                message_id=input_data.message_id,
-                tool_call_id=input_data.tool_call_id,
                 kind=input_data.kind,
                 title=title,
                 absolute_path=str(path),
@@ -117,7 +111,6 @@ class ArtifactService:
             )
 
             with self._session_factory() as session:
-                self._validate_links(session, input_data)
                 self._artifacts.create(session, row)
                 session.commit()
                 record_counter("xenix.artifact.register.count", attributes={**attributes, "status": "succeeded"})
@@ -171,38 +164,3 @@ class ArtifactService:
             absolute_path=artifact.absolute_path,
             opened=True,
         )
-
-    def list_thread_artifacts(self, thread_id: str) -> list[ArtifactRow]:
-        with self._session_factory() as session:
-            if self._conversations.get_thread(session, thread_id) is None:
-                raise NotFoundError(f"Thread '{thread_id}' was not found.")
-            return self._artifacts.list_by_thread(session, thread_id)
-
-    def _validate_links(self, session, input_data: RegisterArtifactInput) -> None:
-        if input_data.thread_id is not None and self._conversations.get_thread(session, input_data.thread_id) is None:
-            raise NotFoundError(f"Thread '{input_data.thread_id}' was not found.")
-
-        if input_data.turn_id is not None:
-            turn = self._conversations.get_turn(session, input_data.turn_id)
-            if turn is None:
-                raise NotFoundError(f"Turn '{input_data.turn_id}' was not found.")
-            if input_data.thread_id is not None and turn.thread_id != input_data.thread_id:
-                raise ValidationError("Artifact turn does not belong to the provided thread.")
-
-        if input_data.message_id is not None:
-            message = self._conversations.get_message(session, input_data.message_id)
-            if message is None:
-                raise NotFoundError(f"Message '{input_data.message_id}' was not found.")
-            if input_data.thread_id is not None and message.thread_id != input_data.thread_id:
-                raise ValidationError("Artifact message does not belong to the provided thread.")
-            if input_data.turn_id is not None and message.turn_id != input_data.turn_id:
-                raise ValidationError("Artifact message does not belong to the provided turn.")
-
-        if input_data.tool_call_id is not None:
-            tool_call = self._conversations.get_tool_call(session, input_data.tool_call_id)
-            if tool_call is None:
-                raise NotFoundError(f"Tool call '{input_data.tool_call_id}' was not found.")
-            if input_data.thread_id is not None and tool_call.thread_id != input_data.thread_id:
-                raise ValidationError("Artifact tool call does not belong to the provided thread.")
-            if input_data.turn_id is not None and tool_call.turn_id != input_data.turn_id:
-                raise ValidationError("Artifact tool call does not belong to the provided turn.")

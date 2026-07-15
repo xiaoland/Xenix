@@ -50,7 +50,7 @@ from ..storage.models import (
     ProblemKind,
     TrainedModelRow,
 )
-from ..llm import AgentToolSpec
+from ..llm.tooling import AgentToolSpec, ToolExecutionContext
 from .tool_presentations import DEFAULT_TOOL_PRESENTATION, ToolPresentation, tool_presentation_for_name
 
 
@@ -72,15 +72,6 @@ _MODEL_KEY_ALIAS_OVERRIDES = {
 MODEL_APPLY_GRACE_SECONDS = 30.0
 MODEL_TRAIN_GRACE_SECONDS = 60.0
 MODEL_HYPER_TRAIN_GRACE_SECONDS = 60.0
-
-
-@dataclass(frozen=True)
-class ToolExecutionContext:
-    thread_id: str
-    turn_id: str
-    tool_call_id: str
-    dataset_ids: list[str]
-    cancel_requested: Callable[[], bool] = lambda: False
 
 
 class ToolExecutionResult(BaseModel):
@@ -150,6 +141,19 @@ class AgentToolRegistry:
 
     def list_specs(self) -> list[AgentToolSpec]:
         return [tool.spec for tool in self._tools.values()]
+
+    def register_with_llm(self, registry) -> None:
+        """Inject concrete implementations into the LLM-owned registry.
+
+        This class remains a composition-time factory for domain-backed
+        handlers and UI presentation.  It is not a second dispatch authority.
+        """
+
+        for tool in self._tools.values():
+            def implementation(arguments, context, handler=tool.handler):
+                return handler(arguments, context).payload
+
+            registry.register(tool.spec, implementation)
 
     def tool_presentation(self, tool_name: str) -> ToolPresentation:
         tool = self._tools.get(tool_name)
@@ -878,9 +882,6 @@ class AgentToolRegistry:
         spec_format = str(graph_metadata.get("spec_format") or "graph")
         artifact = self._artifact_service.register_artifact(
             RegisterArtifactInput(
-                thread_id=context.thread_id,
-                turn_id=context.turn_id,
-                tool_call_id=context.tool_call_id,
                 kind=ArtifactKind.IMAGE,
                 title=title,
                 absolute_path=graph_result.output_path,
@@ -953,9 +954,6 @@ class AgentToolRegistry:
             }
             artifact = self._artifact_service.register_artifact(
                 RegisterArtifactInput(
-                    thread_id=context.thread_id,
-                    turn_id=context.turn_id,
-                    tool_call_id=context.tool_call_id,
                     kind=kind,
                     title=descriptor.title,
                     absolute_path=descriptor.absolute_path,
@@ -1385,9 +1383,6 @@ class AgentToolRegistry:
         )
         generic_artifact = self._artifact_service.register_artifact(
             RegisterArtifactInput(
-                thread_id=context.thread_id,
-                turn_id=context.turn_id,
-                tool_call_id=context.tool_call_id,
                 kind=ArtifactKind.FILE,
                 title="Apply results",
                 absolute_path=output_artifact.absolute_path,
@@ -1540,9 +1535,6 @@ class AgentToolRegistry:
                 "summary": summary,
                 "derived_from_dataset_id": derived_from_dataset_id,
                 "metadata_payload": dict(metadata_payload or {}),
-                "thread_id": context.thread_id,
-                "turn_id": context.turn_id,
-                "tool_call_id": context.tool_call_id,
             },
             paths=self._paths,
         )

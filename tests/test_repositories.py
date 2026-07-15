@@ -1,11 +1,16 @@
 from datetime import datetime, timezone
 from pathlib import Path
 
+from sqlalchemy import text
 from sqlmodel import Session
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import (
+    ConversationMessageKind,
+    ConversationMessageRow,
+    ConversationThreadRow,
+    ConversationToolResultStatus,
     DatasetColumnBindingRow,
     DatasetRow,
     DatasetSourceFormat,
@@ -19,6 +24,7 @@ from xenix.services.storage.models import (
     TrainedModelRow,
 )
 from xenix.services.storage.repositories import (
+    ConversationRepository,
     DatasetColumnBindingRepository,
     DatasetRepository,
     MLTaskRepository,
@@ -36,6 +42,53 @@ def _build_session(monkeypatch, tmp_path: Path) -> Session:
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def test_conversation_repository_delete_thread_removes_tool_results_before_calls(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    repository = ConversationRepository()
+    thread = ConversationThreadRow(id="thread-delete-fixed-ids")
+    call = ConversationMessageRow(
+        id="a-call",
+        thread_id=thread.id,
+        sequence_index=0,
+        kind=ConversationMessageKind.TOOL_CALL,
+        tool_id="demo.tool",
+        provider_call_id="provider-call",
+        arguments_payload={},
+    )
+    result = ConversationMessageRow(
+        id="z-result",
+        thread_id=thread.id,
+        sequence_index=1,
+        kind=ConversationMessageKind.TOOL_RESULT,
+        tool_call_message_id=call.id,
+        result_status=ConversationToolResultStatus.SUCCEEDED,
+        value_payload={"ok": True},
+    )
+
+    with _build_session(monkeypatch, tmp_path) as session:
+        session.add(thread)
+        session.flush()
+        session.add(call)
+        session.flush()
+        session.add(result)
+        session.commit()
+
+        deleted = repository.delete_thread(session, thread.id)
+        session.commit()
+
+        remaining_messages = repository.list_messages(session, thread.id)
+        remaining_thread = repository.get_thread(session, thread.id)
+        foreign_key_errors = session.exec(text("PRAGMA foreign_key_check")).all()
+
+    assert deleted is not None
+    assert deleted.id == thread.id
+    assert remaining_thread is None
+    assert remaining_messages == []
+    assert foreign_key_errors == []
 
 
 def _create_project(session: Session) -> ProjectRow:

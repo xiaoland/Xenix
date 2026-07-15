@@ -7,7 +7,8 @@ from pathlib import PurePosixPath
 from typing import Any
 
 from ...exceptions import NotFoundError, ValidationError
-from ..llm import AgentToolSpec, ProviderMessage
+from ..llm.providers import ProviderMessage
+from ..llm.tooling import AgentToolSpec
 
 
 AGENT_SKILL_ACTIVATE_TOOL_NAME = "agent.skill.activate"

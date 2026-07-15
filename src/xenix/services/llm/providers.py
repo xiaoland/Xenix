@@ -5,9 +5,25 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 from urllib import error, request
 
+from pydantic import field_validator
 from sqlmodel import Field, SQLModel
 
 from ...exceptions import ValidationError
+from .messages import (
+    AssistantOutputItem,
+    CanonicalMessageBlock,
+    ProviderOutputItem,
+    ToolCallOutputItem,
+    assistant_text_from_blocks,
+    blocks_to_markdown,
+    normalize_message_blocks,
+    output_items_are_ordered,
+)
+from .tooling import (
+    MAX_TOOL_CALLS,
+    AgentToolSpec as _ToolDefinition,
+    ensure_bounded_json,
+)
 
 
 def _dict_get(value: Any, key: str, default: Any = None) -> Any:
@@ -16,19 +32,30 @@ def _dict_get(value: Any, key: str, default: Any = None) -> Any:
     return default
 
 
-class AgentToolSpec(SQLModel):
-    name: str
-    provider_name: str
-    description: str
-    parameters_schema: dict[str, Any] = Field(default_factory=dict)
-
-
 class ProviderMessage(SQLModel):
     role: str
-    content: str
-    content_blocks: list[dict[str, Any]] = Field(default_factory=list)
+    # ``content`` remains a compatibility projection for scripted/custom
+    # providers.  Wire adapters prefer the typed canonical blocks below and
+    # derive their own provider text from them.
+    content: str = ""
+    content_blocks: list[CanonicalMessageBlock] = Field(default_factory=list)
     provider_payload: dict[str, Any] = Field(default_factory=dict)
     source_message_id: str | None = None
+
+    @field_validator("content_blocks", mode="before")
+    @classmethod
+    def _parse_content_blocks(cls, value: Any) -> list[CanonicalMessageBlock]:
+        return list(normalize_message_blocks(value))
+
+    @property
+    def blocks(self) -> list[CanonicalMessageBlock]:
+        """Alias exposing the canonical transcript shape without mutation."""
+
+        return list(self.content_blocks)
+
+    @property
+    def canonical_blocks(self) -> tuple[CanonicalMessageBlock, ...]:
+        return tuple(self.content_blocks)
 
 
 class ProviderToolCall(SQLModel):
@@ -36,6 +63,7 @@ class ProviderToolCall(SQLModel):
     tool_name: str
     provider_name: str | None = None
     arguments: dict[str, Any] = Field(default_factory=dict)
+    stream_index: int | None = None
 
 
 class ProviderResponse(SQLModel):
@@ -43,6 +71,34 @@ class ProviderResponse(SQLModel):
     tool_calls: list[ProviderToolCall] = Field(default_factory=list)
     usage_payload: dict[str, Any] | None = None
     raw_payload: dict[str, Any] = Field(default_factory=dict)
+    output_items: list[ProviderOutputItem] = Field(default_factory=list)
+
+    def model_post_init(self, __context: Any) -> None:
+        # Scripted providers and older callers may still construct the legacy
+        # parallel fields.  Normalize that shape at the DTO boundary; wire
+        # adapters always populate output_items directly.
+        if self.output_items:
+            if not output_items_are_ordered(self.output_items):
+                raise ValidationError("Provider output items are not ordered.")
+            return
+        items: list[ProviderOutputItem] = []
+        if self.assistant_content_blocks:
+            blocks = normalize_message_blocks(self.assistant_content_blocks)
+            text = assistant_text_from_blocks(blocks)
+            if blocks or text:
+                items.append(AssistantOutputItem(text=text, content_blocks=blocks))
+        items.extend(
+            ToolCallOutputItem(
+                provider_call_id=call.provider_call_id,
+                tool_name=call.tool_name,
+                provider_name=call.provider_name or "",
+                arguments=dict(call.arguments),
+                stream_index=call.stream_index,
+            )
+            for call in self.tool_calls
+        )
+        if items:
+            self.output_items = items
 
 
 @dataclass(frozen=True)
@@ -95,7 +151,7 @@ class AgentProvider(Protocol):
     def complete(
         self,
         messages: list[ProviderMessage],
-        tools: list[AgentToolSpec],
+        tools: list[_ToolDefinition],
     ) -> ProviderResponse:
         ...
 
@@ -107,7 +163,7 @@ class ScriptedAgentProvider:
     def complete(
         self,
         messages: list[ProviderMessage],
-        tools: list[AgentToolSpec],
+        tools: list[_ToolDefinition],
     ) -> ProviderResponse:
         if not self._responses:
             raise ValidationError("Scripted provider has no responses left.")
@@ -143,7 +199,7 @@ class OpenAICompatibleChatProvider:
     def complete(
         self,
         messages: list[ProviderMessage],
-        tools: list[AgentToolSpec],
+        tools: list[_ToolDefinition],
     ) -> ProviderResponse:
         if not self._api_key:
             raise ValidationError("LLM API key is required for the OpenAI-compatible provider.")
@@ -155,7 +211,7 @@ class OpenAICompatibleChatProvider:
     def stream(
         self,
         messages: list[ProviderMessage],
-        tools: list[AgentToolSpec],
+        tools: list[_ToolDefinition],
     ):
         if not self._streaming_enabled:
             yield ProviderStreamEvent(response=self.complete(messages, tools))
@@ -165,40 +221,97 @@ class OpenAICompatibleChatProvider:
 
         payload = self._build_payload(messages, tools, stream=True)
         text_parts: list[str] = []
+        reasoning_parts: list[str] = []
+        refusal_parts: list[str] = []
         raw_chunks: list[dict[str, Any]] = []
         tool_call_accumulator: dict[int, dict[str, Any]] = {}
+        seen_choice = False
         usage_payload: dict[str, Any] | None = None
         for chunk in self._post_stream(payload):
+            if not isinstance(chunk, dict):
+                raise ValidationError("LLM provider stream chunk must be an object.")
             raw_chunks.append(chunk)
             chunk_usage = self._normalize_usage_payload(chunk.get("usage"))
             if chunk_usage is not None:
                 usage_payload = chunk_usage
-            for choice in chunk.get("choices") or []:
-                delta = choice.get("delta") or {}
-                content = delta.get("content")
-                if isinstance(content, str) and content:
-                    text_parts.append(content)
-                    yield ProviderStreamEvent(delta_text=content, raw_payload=chunk)
-                tool_call_deltas = delta.get("tool_calls") or []
-                if tool_call_deltas:
-                    self._accumulate_tool_call_deltas(tool_call_accumulator, tool_call_deltas)
-                    yield ProviderStreamEvent(tool_call_delta=True, raw_payload=chunk)
+            choices = chunk.get("choices")
+            if choices is None:
+                choices = []
+            if not isinstance(choices, list):
+                raise ValidationError("LLM provider stream choices must be an array.")
+            if not choices:
+                # OpenAI's include_usage terminal chunk has no choices.  It is
+                # valid only after at least one selected choice was observed.
+                if not seen_choice:
+                    continue
+                continue
+            if len(choices) != 1:
+                raise ValidationError("LLM provider stream must contain exactly one choice.")
+            choice = choices[0]
+            if not isinstance(choice, dict):
+                raise ValidationError("LLM provider stream choice must be an object.")
+            seen_choice = True
+            delta = choice.get("delta")
+            if not isinstance(delta, dict):
+                raise ValidationError("LLM provider stream delta must be an object.")
+            content = self._optional_text(delta, "content")
+            reasoning = self._optional_text(delta, "reasoning_content")
+            refusal = self._optional_text(delta, "refusal")
+            if content:
+                text_parts.append(content)
+                # The LLMService buffers this event while a request may retry.
+                yield ProviderStreamEvent(delta_text=content, raw_payload=chunk)
+            if reasoning:
+                reasoning_parts.append(reasoning)
+            if refusal:
+                refusal_parts.append(refusal)
+            tool_call_deltas = delta.get("tool_calls")
+            if tool_call_deltas is None:
+                tool_call_deltas = []
+            if not isinstance(tool_call_deltas, list):
+                raise ValidationError("LLM provider stream tool_calls must be an array.")
+            if tool_call_deltas:
+                self._accumulate_tool_call_deltas(tool_call_accumulator, tool_call_deltas)
+                yield ProviderStreamEvent(tool_call_delta=True, raw_payload=chunk)
 
         text = "".join(text_parts)
+        reasoning = "".join(reasoning_parts)
+        refusal = "".join(refusal_parts)
         tool_calls = self._build_tool_calls(tool_call_accumulator, tools)
+        raw_message: dict[str, Any] = {
+            "content": text or None,
+            "reasoning_content": reasoning or None,
+            "refusal": refusal or None,
+            "tool_calls": [
+                {
+                    "index": call.stream_index,
+                    "id": call.provider_call_id,
+                    "type": "function",
+                    "function": {
+                        "name": call.provider_name,
+                        "arguments": json.dumps(call.arguments, ensure_ascii=False),
+                    },
+                }
+                for call in tool_calls
+            ],
+        }
+        normalized = self._parse_chat_completion(
+            {"choices": [{"message": raw_message}]},
+            tools,
+        )
         yield ProviderStreamEvent(
-            response=ProviderResponse(
-                assistant_content_blocks=[{"type": "markdown", "text": text}] if text else [],
-                tool_calls=tool_calls,
-                usage_payload=usage_payload,
-                raw_payload={"chunks": raw_chunks},
+            response=normalized.model_copy(
+                update={
+                    "usage_payload": usage_payload,
+                    "raw_payload": {"chunks": raw_chunks},
+                }
             )
         )
 
     def _build_payload(
         self,
         messages: list[ProviderMessage],
-        tools: list[AgentToolSpec],
+        tools: list[_ToolDefinition],
         *,
         stream: bool,
     ) -> dict[str, Any]:
@@ -321,42 +434,123 @@ class OpenAICompatibleChatProvider:
                 return str(message)
         return body.strip()
 
-    def _parse_chat_completion(self, raw: dict[str, Any], tools: list[AgentToolSpec]) -> ProviderResponse:
+    def _parse_chat_completion(self, raw: dict[str, Any], tools: list[_ToolDefinition]) -> ProviderResponse:
+        if not isinstance(raw, dict):
+            raise ValidationError("LLM provider response must be an object.")
+        choices = raw.get("choices")
+        if not isinstance(choices, list) or len(choices) != 1:
+            raise ValidationError("LLM provider response must contain exactly one choice.")
+        choice = choices[0]
+        if not isinstance(choice, dict) or not isinstance(choice.get("message"), dict):
+            raise ValidationError("LLM provider response choice/message shape is invalid.")
+        message = choice["message"]
+        content = self._optional_text(message, "content")
+        reasoning = self._optional_text(message, "reasoning_content")
+        refusal = self._optional_text(message, "refusal")
         tool_by_provider_name = {tool.provider_name: tool for tool in tools}
-        choice = raw.get("choices", [{}])[0]
-        message = choice.get("message", {})
-        content = message.get("content")
-        content_blocks = [{"type": "markdown", "text": content}] if isinstance(content, str) and content else []
+        raw_tool_calls = message.get("tool_calls")
+        if raw_tool_calls is None:
+            raw_tool_calls = []
+        if not isinstance(raw_tool_calls, list):
+            raise ValidationError("LLM provider tool_calls must be an array.")
+        if len(raw_tool_calls) > MAX_TOOL_CALLS:
+            raise ValidationError(
+                f"LLM provider returned more than {MAX_TOOL_CALLS} tool calls.",
+                error_code="llm_tool_call_limit_exceeded",
+            )
+        seen_ids: set[str] = set()
         tool_calls: list[ProviderToolCall] = []
-        for call in message.get("tool_calls") or []:
-            function = call.get("function") or {}
+        output_items: list[ProviderOutputItem] = []
+        if content or reasoning or refusal:
+            output_items.append(
+                AssistantOutputItem(text=content, reasoning=reasoning, refusal=refusal)
+            )
+        for call in raw_tool_calls:
+            if not isinstance(call, dict):
+                raise ValidationError("LLM provider tool call must be an object.")
+            call_id = call.get("id")
+            if not isinstance(call_id, str) or not call_id.strip():
+                raise ValidationError("LLM provider tool call ID cannot be blank.")
+            call_id = call_id.strip()
+            if call_id in seen_ids:
+                raise ValidationError(f"LLM provider tool call ID '{call_id}' is duplicated.")
+            seen_ids.add(call_id)
+            function = call.get("function")
+            if not isinstance(function, dict):
+                raise ValidationError("LLM provider tool call function must be an object.")
             provider_name = function.get("name")
+            if not isinstance(provider_name, str) or not provider_name.strip():
+                raise ValidationError("LLM provider tool name cannot be blank.")
+            provider_name = provider_name.strip()
             spec = tool_by_provider_name.get(provider_name)
             if spec is None:
-                continue
-            raw_arguments = function.get("arguments") or "{}"
-            try:
-                arguments = json.loads(raw_arguments) if isinstance(raw_arguments, str) else dict(raw_arguments)
-            except json.JSONDecodeError as exc:
                 raise ValidationError(
-                    f"Tool call '{spec.name}' arguments are not valid JSON.",
-                    error_code="llm_tool_arguments_invalid_json",
-                    retryable=True,
-                ) from exc
-            tool_calls.append(
-                ProviderToolCall(
-                    provider_call_id=str(call.get("id") or ""),
+                    f"LLM provider requested an unexposed tool '{provider_name}'.",
+                    error_code="llm_tool_not_exposed",
+                )
+            raw_arguments = function.get("arguments", "{}")
+            arguments = self._parse_arguments(raw_arguments, spec.name)
+            stream_index = call.get("index")
+            if stream_index is not None and (
+                isinstance(stream_index, bool)
+                or not isinstance(stream_index, int)
+                or stream_index < 0
+            ):
+                raise ValidationError("LLM provider tool call index is invalid.")
+            tool_call = ProviderToolCall(
+                provider_call_id=call_id,
+                tool_name=spec.name,
+                provider_name=provider_name,
+                arguments=arguments,
+                stream_index=stream_index,
+            )
+            tool_calls.append(tool_call)
+            output_items.append(
+                ToolCallOutputItem(
+                    provider_call_id=call_id,
                     tool_name=spec.name,
-                    provider_name=str(provider_name or ""),
+                    provider_name=provider_name,
                     arguments=arguments,
+                    stream_index=stream_index,
                 )
             )
+        if not output_items:
+            raise ValidationError(
+                "LLM provider returned an empty assistant output without tool calls.",
+                error_code="llm_empty_output",
+            )
+        content_blocks = [{"type": "markdown", "text": content}] if content else []
         return ProviderResponse(
             assistant_content_blocks=content_blocks,
             tool_calls=tool_calls,
             usage_payload=self._normalize_usage_payload(raw.get("usage")),
             raw_payload=raw,
+            output_items=output_items,
         )
+
+    def _optional_text(self, value: dict[str, Any], key: str) -> str | None:
+        raw = value.get(key)
+        if raw is None:
+            return None
+        if not isinstance(raw, str):
+            raise ValidationError(f"LLM provider field '{key}' must be a string or null.")
+        return raw
+
+    def _parse_arguments(self, raw_arguments: Any, tool_name: str) -> dict[str, Any]:
+        if isinstance(raw_arguments, str):
+            try:
+                arguments = json.loads(raw_arguments or "{}")
+            except json.JSONDecodeError as exc:
+                raise ValidationError(
+                    f"Tool call '{tool_name}' arguments are not valid JSON.",
+                    error_code="llm_tool_arguments_invalid_json",
+                ) from exc
+        elif isinstance(raw_arguments, dict):
+            arguments = raw_arguments
+        else:
+            raise ValidationError(f"Tool call '{tool_name}' arguments must be a JSON object.")
+        ensure_bounded_json(arguments, label=f"Tool call '{tool_name}' arguments")
+        return dict(arguments)
 
     def _normalize_usage_payload(self, raw_usage: Any) -> dict[str, Any] | None:
         if not isinstance(raw_usage, dict):
@@ -404,42 +598,80 @@ class OpenAICompatibleChatProvider:
         tool_call_deltas: list[dict[str, Any]],
     ) -> None:
         for delta in tool_call_deltas:
-            index = int(delta.get("index") or 0)
+            if not isinstance(delta, dict):
+                raise ValidationError("LLM provider stream tool call delta must be an object.")
+            index = delta.get("index")
+            if isinstance(index, bool) or not isinstance(index, int) or index < 0:
+                raise ValidationError("LLM provider stream tool call index is invalid.")
             current = accumulator.setdefault(index, {"id": "", "name": "", "arguments": ""})
-            if delta.get("id"):
-                current["id"] = str(delta["id"])
-            function = delta.get("function") or {}
-            if function.get("name"):
-                current["name"] += str(function["name"])
-            if function.get("arguments"):
-                current["arguments"] += str(function["arguments"])
+            if "id" in delta and delta["id"] is not None:
+                call_id = delta["id"]
+                if not isinstance(call_id, str):
+                    raise ValidationError("LLM provider stream tool call ID must be a string.")
+                call_id = call_id.strip()
+                if call_id and current["id"] and current["id"] != call_id:
+                    raise ValidationError("LLM provider stream tool call ID changed.")
+                if call_id:
+                    current["id"] = call_id
+            function = delta.get("function")
+            if function is None:
+                function = {}
+            if not isinstance(function, dict):
+                raise ValidationError("LLM provider stream tool function must be an object.")
+            if "name" in function and function["name"] is not None:
+                name = function["name"]
+                if not isinstance(name, str):
+                    raise ValidationError("LLM provider stream tool name must be a string.")
+                if name and current["name"] and current["name"] != name:
+                    raise ValidationError("LLM provider stream tool name changed.")
+                if name:
+                    current["name"] = name
+            if "arguments" in function and function["arguments"] is not None:
+                arguments = function["arguments"]
+                if not isinstance(arguments, str):
+                    raise ValidationError("LLM provider stream tool arguments must be text.")
+                current["arguments"] += arguments
 
     def _build_tool_calls(
         self,
         accumulator: dict[int, dict[str, Any]],
-        tools: list[AgentToolSpec],
+        tools: list[_ToolDefinition],
     ) -> list[ProviderToolCall]:
+        indexes = sorted(accumulator)
+        if len(indexes) > MAX_TOOL_CALLS:
+            raise ValidationError(
+                f"LLM provider returned more than {MAX_TOOL_CALLS} tool calls.",
+                error_code="llm_tool_call_limit_exceeded",
+            )
+        if indexes and indexes != list(range(len(indexes))):
+            raise ValidationError(
+                "LLM provider stream tool call indexes must be contiguous from zero."
+            )
         tool_by_provider_name = {tool.provider_name: tool for tool in tools}
         tool_calls: list[ProviderToolCall] = []
-        for index in sorted(accumulator):
+        seen_ids: set[str] = set()
+        for index in indexes:
             current = accumulator[index]
+            call_id = current["id"].strip()
+            if not call_id:
+                raise ValidationError("LLM provider stream tool call ID cannot be blank.")
+            if call_id in seen_ids:
+                raise ValidationError(f"LLM provider tool call ID '{call_id}' is duplicated.")
+            seen_ids.add(call_id)
             spec = tool_by_provider_name.get(current["name"])
             if spec is None:
-                continue
-            try:
-                arguments = json.loads(current["arguments"] or "{}")
-            except json.JSONDecodeError as exc:
                 raise ValidationError(
-                    f"Tool call '{spec.name}' arguments are not valid JSON.",
-                    error_code="llm_tool_arguments_invalid_json",
-                    retryable=True,
-                ) from exc
+                    f"LLM provider requested an unexposed tool '{current['name']}'.",
+                    error_code="llm_tool_not_exposed",
+                )
+            arguments = self._parse_arguments(current["arguments"] or "{}", spec.name)
             tool_calls.append(
                 ProviderToolCall(
-                    provider_call_id=current["id"],
+                    provider_call_id=call_id,
                     tool_name=spec.name,
                     provider_name=current["name"],
                     arguments=arguments,
+                    stream_index=index,
                 )
             )
         return tool_calls
@@ -447,11 +679,20 @@ class OpenAICompatibleChatProvider:
     def _build_messages(self, rows: list[ProviderMessage]) -> list[dict[str, Any]]:
         provider_messages: list[dict[str, Any]] = []
         for row in rows:
-            message = {"role": row.role, "content": row.content}
+            # Chat Completions accepts text content here.  Canonical blocks
+            # are deliberately serialized at this adapter boundary so every
+            # block (including UI-hidden Dataset blocks) reaches the provider.
+            # Structured Tool Call/Result fields remain provider_payload and
+            # are not flattened into this text fallback.
+            content = blocks_to_markdown(row.content_blocks) if row.content_blocks else row.content
+            message = {"role": row.role, "content": content}
             if row.role == "assistant":
                 reasoning_content = row.provider_payload.get("reasoning_content")
                 if isinstance(reasoning_content, str):
                     message["reasoning_content"] = reasoning_content
+                refusal = row.provider_payload.get("refusal")
+                if isinstance(refusal, str):
+                    message["refusal"] = refusal
                 tool_calls = row.provider_payload.get("tool_calls")
                 if isinstance(tool_calls, list) and tool_calls:
                     message["tool_calls"] = tool_calls

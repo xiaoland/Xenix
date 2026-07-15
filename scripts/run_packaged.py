@@ -44,19 +44,12 @@ def main() -> int:
         worker_main(sys.argv[2], sys.argv[3])
         return 0
 
-    from xenix.single_instance import SingleInstanceGuard
-
-    instance_guard = SingleInstanceGuard()
-
     import_start = time.perf_counter()
     from xenix.main import main as application_main
 
     _emit_startup_timing("run_packaged.import_xenix_main", import_start)
     call_start = time.perf_counter()
-    try:
-        exit_code = application_main(sys.argv[1:])
-    finally:
-        instance_guard.close()
+    exit_code = application_main(sys.argv[1:])
     _emit_startup_timing("run_packaged.application_main", call_start)
     return exit_code
 

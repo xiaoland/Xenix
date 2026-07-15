@@ -25,8 +25,12 @@ storage libraries are owned by source, migrations, configuration, and tests.
 ## Identity and Consistency
 
 - Dataset registrations reference service-owned tabular materializations.
-- Importing an attachment first preserves its source-file artifact identity; the
-  Agent intake path may then register one or more datasets from that source.
+- Importing an attachment materializes one or more service-owned datasets and
+  records original-file provenance with the Dataset import. It does not create
+  an Artifact-to-Conversation relationship or make the user-selected source
+  file an Artifact authority. Harness may derive an ephemeral Chatbot source
+  presentation from that provenance; an unavailable original file never makes
+  the canonical Thread unreadable.
 - Data preparation registers derived data separately and retains available lineage
   to its source inputs.
 - User-openable result identity and activation follow the

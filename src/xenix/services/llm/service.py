@@ -12,7 +12,6 @@ from ...config import AppPaths
 from ...exceptions import NotFoundError, ValidationError
 from ...release_config import load_release_config
 from .providers import (
-    AgentToolSpec,
     LLMRequestMetadata,
     LLMRetryEvent,
     OpenAICompatibleChatProvider,
@@ -20,6 +19,7 @@ from .providers import (
     ProviderResponse,
     ProviderStreamEvent,
 )
+from .tooling import AgentToolSpec
 
 SETTINGS_FILE_NAME = "agent_settings.json"
 DEFAULT_PROVIDER_KEY = "openai"

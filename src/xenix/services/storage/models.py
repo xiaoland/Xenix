@@ -5,7 +5,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import Column, Enum as SQLAlchemyEnum, JSON
+from sqlalchemy import Column, Enum as SQLAlchemyEnum, Index, JSON, UniqueConstraint, text
 from sqlmodel import Field, SQLModel
 
 DEFAULT_AGENT_INTERFACE_LOCALE = "en_US"
@@ -91,57 +91,16 @@ class MLTaskArtifactKind(StrEnum):
     OTHER = "other"
 
 
-class AgentTurnStatus(StrEnum):
-    OPEN = "open"
-    ENDED = "ended"
-    CANCELLED = "cancelled"
-
-
-class AgentMessageKind(StrEnum):
-    SYSTEM = "system"
+class ConversationMessageKind(StrEnum):
     USER = "user"
+    CLIENT_CONTROL = "client_control"
     ASSISTANT = "assistant"
     TOOL_CALL = "tool_call"
-    TOOL_CALL_RESULT = "tool_call_result"
+    TOOL_RESULT = "tool_result"
+    PENDING_LLM_SAMPLING = "pending_llm_sampling"
 
 
-class AgentMessageStatus(StrEnum):
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-
-class AgentMessageAuthor(StrEnum):
-    USER = "user"
-    ASSISTANT = "assistant"
-    SYSTEM = "system"
-    TOOL = "tool"
-
-
-class AgentRunStatus(StrEnum):
-    RUNNING = "running"
-    AWAITING_CONFIRMATION = "awaiting_confirmation"
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-
-class AgentToolCallStatus(StrEnum):
-    REQUESTED = "requested"
-    RUNNING = "running"
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-
-class AgentProviderRequestKind(StrEnum):
-    PRIMARY = "primary"
-    GUARD = "guard"
-
-
-class AgentProviderRequestStatus(StrEnum):
-    RUNNING = "running"
+class ConversationToolResultStatus(StrEnum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     CANCELLED = "cancelled"
@@ -291,8 +250,8 @@ class MLTaskArtifactRow(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utc_now)
 
 
-class AgentThreadRow(SQLModel, table=True):
-    __tablename__ = "agent_thread"
+class ConversationThreadRow(SQLModel, table=True):
+    __tablename__ = "conversation_thread"
 
     id: str = Field(default_factory=generate_id, primary_key=True)
     title: str | None = Field(default=None, index=True)
@@ -302,164 +261,77 @@ class AgentThreadRow(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
-class AgentTurnRow(SQLModel, table=True):
-    __tablename__ = "agent_turn"
+class ConversationMessageRow(SQLModel, table=True):
+    __tablename__ = "conversation_message"
+    __table_args__ = (
+        UniqueConstraint("thread_id", "sequence_index", name="uq_conversation_message_thread_sequence"),
+        UniqueConstraint("thread_id", "client_submission_id", name="uq_conversation_message_client_submission"),
+        UniqueConstraint("tool_call_message_id", name="uq_conversation_message_tool_result_call"),
+        Index(
+            "ux_conversation_message_pending_thread",
+            "thread_id",
+            unique=True,
+            sqlite_where=text("kind = 'pending_llm_sampling'"),
+        ),
+    )
 
     id: str = Field(default_factory=generate_id, primary_key=True)
-    thread_id: str = Field(foreign_key="agent_thread.id", index=True)
+    thread_id: str = Field(foreign_key="conversation_thread.id", index=True)
     sequence_index: int = Field(index=True)
-    status: AgentTurnStatus = Field(default=AgentTurnStatus.OPEN, index=True)
-    user_message_id: str | None = Field(default=None, foreign_key="agent_message.id", index=True)
-    created_at: datetime = Field(default_factory=utc_now)
-    ended_at: datetime | None = None
-    updated_at: datetime = Field(default_factory=utc_now)
-
-
-class AgentMessageRow(SQLModel, table=True):
-    __tablename__ = "agent_message"
-
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    thread_id: str = Field(foreign_key="agent_thread.id", index=True)
-    turn_id: str | None = Field(default=None, foreign_key="agent_turn.id", index=True)
-    sequence_index: int = Field(index=True)
-    kind: AgentMessageKind = Field(index=True)
-    ui_author: AgentMessageAuthor = Field(index=True)
-    content_blocks: list[dict[str, Any]] = Field(
-        default_factory=list,
-        sa_column=Column(JSON, nullable=False),
-    )
-    provider_payload: dict[str, Any] = Field(
-        default_factory=dict,
-        sa_column=Column(JSON, nullable=False),
-    )
-    status: AgentMessageStatus = Field(
-        default=AgentMessageStatus.COMPLETED,
+    kind: ConversationMessageKind = Field(
         sa_column=Column(
             SQLAlchemyEnum(
-                AgentMessageStatus,
+                ConversationMessageKind,
                 values_callable=lambda enum_class: [member.value for member in enum_class],
             ),
             nullable=False,
             index=True,
         ),
     )
-    created_at: datetime = Field(default_factory=utc_now)
-    updated_at: datetime = Field(default_factory=utc_now)
-    finalized_at: datetime | None = None
-
-
-class AgentRunRow(SQLModel, table=True):
-    __tablename__ = "agent_run"
-
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    thread_id: str = Field(foreign_key="agent_thread.id", index=True)
-    turn_id: str = Field(foreign_key="agent_turn.id", index=True)
-    status: AgentRunStatus = Field(default=AgentRunStatus.RUNNING, index=True)
-    provider_name: str | None = Field(default=None, index=True)
-    started_at: datetime = Field(default_factory=utc_now)
-    finished_at: datetime | None = None
-    error_summary: str | None = None
-    usage_payload: dict[str, Any] | None = Field(
-        default=None,
-        sa_column=Column(JSON, nullable=True),
-    )
-
-
-class AgentToolCallRow(SQLModel, table=True):
-    __tablename__ = "agent_tool_call"
-
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    thread_id: str = Field(foreign_key="agent_thread.id", index=True)
-    turn_id: str = Field(foreign_key="agent_turn.id", index=True)
-    request_message_id: str = Field(foreign_key="agent_message.id", index=True)
-    result_message_id: str | None = Field(default=None, foreign_key="agent_message.id", index=True)
-    tool_name: str = Field(index=True)
-    status: AgentToolCallStatus = Field(default=AgentToolCallStatus.REQUESTED, index=True)
-    arguments_payload: dict[str, Any] = Field(
+    client_submission_id: str | None = Field(default=None, index=True)
+    content_payload: dict[str, Any] = Field(
         default_factory=dict,
         sa_column=Column(JSON, nullable=False),
     )
-    result_payload: dict[str, Any] | None = Field(
+    text: str | None = None
+    reasoning: str | None = None
+    refusal: str | None = None
+    provider_call_id: str | None = Field(default=None, index=True)
+    tool_id: str | None = Field(default=None, index=True)
+    contract_version: str | None = None
+    arguments_payload: dict[str, Any] | None = Field(
+        default=None,
+        sa_column=Column(JSON, nullable=True),
+    )
+    scope_fingerprint: str | None = None
+    tool_call_message_id: str | None = Field(
+        default=None,
+        foreign_key="conversation_message.id",
+        index=True,
+    )
+    result_status: ConversationToolResultStatus | None = Field(
+        default=None,
+        sa_column=Column(
+            SQLAlchemyEnum(
+                ConversationToolResultStatus,
+                values_callable=lambda enum_class: [member.value for member in enum_class],
+            ),
+            nullable=True,
+            index=True,
+        ),
+    )
+    value_payload: dict[str, Any] | None = Field(
         default=None,
         sa_column=Column(JSON, nullable=True),
     )
     error_summary: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
-    updated_at: datetime = Field(default_factory=utc_now)
-
-
-class AgentTurnCompletionGuardRow(SQLModel, table=True):
-    __tablename__ = "agent_turn_completion_guard"
-
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    turn_id: str = Field(foreign_key="agent_turn.id", index=True)
-    attempt_index: int
-    input: dict[str, Any] = Field(
-        default_factory=dict,
-        sa_column=Column(JSON, nullable=False),
-    )
-    output: dict[str, Any] = Field(
-        default_factory=dict,
-        sa_column=Column(JSON, nullable=False),
-    )
-    created_at: datetime = Field(default_factory=utc_now)
-
-
-class AgentProviderRequestRow(SQLModel, table=True):
-    __tablename__ = "agent_provider_request"
-
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    thread_id: str = Field(foreign_key="agent_thread.id", index=True)
-    turn_id: str = Field(foreign_key="agent_turn.id", index=True)
-    run_id: str | None = Field(default=None, foreign_key="agent_run.id", index=True)
-    provider_name: str | None = Field(default=None, index=True)
-    model: str | None = Field(default=None, index=True)
-    request_kind: AgentProviderRequestKind = Field(
-        default=AgentProviderRequestKind.PRIMARY,
-        sa_column=Column(
-            SQLAlchemyEnum(
-                AgentProviderRequestKind,
-                values_callable=lambda enum_class: [member.value for member in enum_class],
-            ),
-            nullable=False,
-            index=True,
-        ),
-    )
-    status: AgentProviderRequestStatus = Field(
-        default=AgentProviderRequestStatus.RUNNING,
-        sa_column=Column(
-            SQLAlchemyEnum(
-                AgentProviderRequestStatus,
-                values_callable=lambda enum_class: [member.value for member in enum_class],
-            ),
-            nullable=False,
-            index=True,
-        ),
-    )
-    input_message_ids: list[str] = Field(
-        default_factory=list,
-        sa_column=Column(JSON, nullable=False),
-    )
-    output_message_ids: list[str] = Field(
-        default_factory=list,
-        sa_column=Column(JSON, nullable=False),
-    )
-    usage_payload: dict[str, Any] | None = Field(
-        default=None,
-        sa_column=Column(JSON, nullable=True),
-    )
-    created_at: datetime = Field(default_factory=utc_now)
-    completed_at: datetime | None = None
 
 
 class ArtifactRow(SQLModel, table=True):
     __tablename__ = "artifact"
 
     id: str = Field(default_factory=generate_id, primary_key=True)
-    thread_id: str | None = Field(default=None, foreign_key="agent_thread.id", index=True)
-    turn_id: str | None = Field(default=None, foreign_key="agent_turn.id", index=True)
-    message_id: str | None = Field(default=None, foreign_key="agent_message.id", index=True)
-    tool_call_id: str | None = Field(default=None, foreign_key="agent_tool_call.id", index=True)
     kind: ArtifactKind = Field(default=ArtifactKind.OTHER, index=True)
     title: str = Field(index=True)
     absolute_path: str

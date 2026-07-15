@@ -38,9 +38,6 @@ class DatasetExportService:
         self,
         dataset_id: str,
         *,
-        thread_id: str | None = None,
-        turn_id: str | None = None,
-        tool_call_id: str | None = None,
         metadata_payload: dict[str, Any] | None = None,
     ) -> DatasetExportArtifact:
         dataset = self._dataset_service.get_dataset(dataset_id)
@@ -72,9 +69,6 @@ class DatasetExportService:
         try:
             artifact = self._artifact_service.register_artifact(
                 RegisterArtifactInput(
-                    thread_id=thread_id,
-                    turn_id=turn_id,
-                    tool_call_id=tool_call_id,
                     kind=ArtifactKind.DATASET,
                     title=dataset.name,
                     absolute_path=str(destination_path.resolve()),

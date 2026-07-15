@@ -8,8 +8,6 @@ from PySide6.QtSvg import QSvgRenderer
 import xenix.services.analysis_graph as analysis_graph_module
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import ValidationError
-from xenix.services.agent import ConversationStore
-from xenix.services.agent.conversation_store import CreateToolCallInput, StartTurnInput
 from xenix.services.agent.tools import AgentToolRegistry, ToolExecutionContext
 from xenix.services.analysis_graph import AnalysisGraphService, GraphDatasetInput
 from xenix.services.artifact_service import ArtifactService
@@ -48,31 +46,13 @@ def _build_runtime(monkeypatch, tmp_path: Path):
         artifact_service=artifact_service,
         preprocessing_worker_runner=worker_runner,
     )
-    conversation_store = ConversationStore(context.session_factory)
-    return paths, dataset_service, artifact_service, registry, conversation_store
+    return paths, dataset_service, artifact_service, registry, None
 
 
-def _tool_context(conversation_store: ConversationStore, tool_name: str, arguments: dict) -> ToolExecutionContext:
-    thread = conversation_store.create_thread()
-    turn, _message = conversation_store.start_turn(
-        StartTurnInput(
-            thread_id=thread.id,
-            user_content_blocks=[{"type": "text", "text": "Draw this dataset."}],
-        )
-    )
-    _tool_message, tool_call = conversation_store.create_tool_call(
-        CreateToolCallInput(
-            thread_id=thread.id,
-            turn_id=turn.id,
-            tool_name=tool_name,
-            arguments_payload=arguments,
-        )
-    )
+def _tool_context(_conversation_store, tool_name: str, arguments: dict) -> ToolExecutionContext:
     return ToolExecutionContext(
-        thread_id=thread.id,
-        turn_id=turn.id,
-        tool_call_id=tool_call.id,
-        dataset_ids=[],
+        thread_id="tool-test-thread",
+        dataset_ids=(),
     )
 
 

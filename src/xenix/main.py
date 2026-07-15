@@ -5,6 +5,7 @@ from multiprocessing import freeze_support
 from typing import Sequence
 
 from .app import run
+from .single_instance import SingleInstanceGuard
 
 
 def build_argument_parser() -> argparse.ArgumentParser:
@@ -20,7 +21,14 @@ def build_argument_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     freeze_support()
     args = build_argument_parser().parse_args(list(argv) if argv is not None else None)
-    return run(smoke_test=args.smoke_test)
+    # Both development and packaged GUI entry points arrive here.  Workers
+    # branch before this module, so one guard protects the only Conversation
+    # writer without making worker startup part of recovery semantics.
+    guard = SingleInstanceGuard()
+    try:
+        return run(smoke_test=args.smoke_test)
+    finally:
+        guard.close()
 
 
 if __name__ == "__main__":

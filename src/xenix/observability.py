@@ -4,12 +4,15 @@ import json
 import os
 import hashlib
 import sys
+import threading
+from collections.abc import Collection
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from enum import Enum
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 from uuid import uuid4
 
 from opentelemetry import metrics, propagate, trace
@@ -26,6 +29,12 @@ from .release_config import apply_frozen_otel_environment
 
 INSTALL_ID_FILE_NAME = "telemetry.json"
 SERVICE_NAME = "xenix-native"
+LLM_USAGE_JOURNAL_FILE_NAME = "llm-usage.jsonl"
+LLM_USAGE_JOURNAL_MAX_BYTES = 1_000_000
+LLM_USAGE_JOURNAL_BACKUP_COUNT = 3
+MAX_LLM_TOKEN_COUNT = 1_000_000_000
+LLM_USAGE_OPERATIONS = frozenset({"primary", "thread_title"})
+_LLM_USAGE_FIELDS = ("input_tokens", "cached_input_tokens", "output_tokens", "total_tokens")
 
 _configured = False
 _logging_instrumented = False
@@ -42,6 +51,281 @@ class ObservabilityContext:
     trace_export_enabled: bool
     metric_export_enabled: bool
     log_export_enabled: bool
+
+
+@dataclass(frozen=True)
+class LLMTokenUsage:
+    """Safe normalized provider token counts; never carries provider wire data."""
+
+    input_tokens: int
+    cached_input_tokens: int
+    output_tokens: int
+    total_tokens: int
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any] | None) -> LLMTokenUsage | None:
+        if not isinstance(payload, dict):
+            return None
+        parsed: dict[str, int] = {}
+        for field in _LLM_USAGE_FIELDS:
+            if field not in payload:
+                continue
+            count = _usage_count(payload[field])
+            if count is None:
+                # A present but malformed provider field makes the complete
+                # observation unknown; never silently turn it into zero.
+                return None
+            parsed[field] = count
+        if not parsed:
+            return None
+        normalized_input = parsed.get("input_tokens", 0)
+        normalized_output = parsed.get("output_tokens", 0)
+        normalized_total = parsed.get("total_tokens", normalized_input + normalized_output)
+        if normalized_total > MAX_LLM_TOKEN_COUNT:
+            return None
+        return cls(
+            input_tokens=normalized_input,
+            cached_input_tokens=parsed.get("cached_input_tokens", 0),
+            output_tokens=normalized_output,
+            total_tokens=normalized_total,
+        )
+
+    def to_payload(self, *, request_count: int = 1) -> dict[str, int]:
+        return {
+            "request_count": request_count,
+            "input_tokens": self.input_tokens,
+            "cached_input_tokens": self.cached_input_tokens,
+            "output_tokens": self.output_tokens,
+            "total_tokens": self.total_tokens,
+        }
+
+
+@dataclass(frozen=True)
+class LLMUsageObservation:
+    """One provider response observed outside canonical conversation state."""
+
+    operation: str
+    usage: LLMTokenUsage
+    thread_id: str | None = None
+    root_user_message_id: str | None = None
+    frontier_message_id: str | None = None
+    pending_message_id: str | None = None
+    fq_model_key: str | None = None
+    observed_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class LLMUsageAggregate:
+    request_count: int = 0
+    input_tokens: int = 0
+    cached_input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+
+    def add(self, usage: LLMTokenUsage) -> LLMUsageAggregate:
+        return LLMUsageAggregate(
+            request_count=self.request_count + 1,
+            input_tokens=self.input_tokens + usage.input_tokens,
+            cached_input_tokens=self.cached_input_tokens + usage.cached_input_tokens,
+            output_tokens=self.output_tokens + usage.output_tokens,
+            total_tokens=self.total_tokens + usage.total_tokens,
+        )
+
+    def to_payload(self) -> dict[str, int]:
+        return {
+            "request_count": self.request_count,
+            "input_tokens": self.input_tokens,
+            "cached_input_tokens": self.cached_input_tokens,
+            "output_tokens": self.output_tokens,
+            "total_tokens": self.total_tokens,
+        }
+
+
+class LLMUsageObservability(Protocol):
+    """Cross-cutting write/read port; it is never Conversation authority."""
+
+    def record_llm_usage(self, observation: LLMUsageObservation) -> None: ...
+
+    def query_primary_usage(
+        self,
+        *,
+        thread_id: str,
+        root_user_message_ids: Collection[str],
+    ) -> dict[str, LLMUsageAggregate]: ...
+
+
+class NullLLMUsageObservability:
+    """Safe default for narrow tests and compositions without observability."""
+
+    def record_llm_usage(self, observation: LLMUsageObservation) -> None:
+        del observation
+
+    def query_primary_usage(
+        self,
+        *,
+        thread_id: str,
+        root_user_message_ids: Collection[str],
+    ) -> dict[str, LLMUsageAggregate]:
+        del thread_id, root_user_message_ids
+        return {}
+
+
+class LocalLLMUsageObservability:
+    """Bounded local journal for safe LLM token observations.
+
+    The journal stores only normalized counts and hashed correlation keys.  It
+    is an observability read model, not a conversation/execution table: a
+    missing, malformed, rotated, or unwritable journal simply yields less UI
+    telemetry and never affects a canonical Message operation.
+    """
+
+    def __init__(
+        self,
+        path: Path,
+        *,
+        max_bytes: int = LLM_USAGE_JOURNAL_MAX_BYTES,
+        backup_count: int = LLM_USAGE_JOURNAL_BACKUP_COUNT,
+    ) -> None:
+        self._path = path
+        self._max_bytes = max(1, max_bytes)
+        self._backup_count = max(0, backup_count)
+        self._lock = threading.RLock()
+
+    def record_llm_usage(self, observation: LLMUsageObservation) -> None:
+        if not _is_valid_usage_observation(observation):
+            return
+        try:
+            record = self._record_payload(observation)
+            encoded = (json.dumps(record, ensure_ascii=True, separators=(",", ":")) + "\n").encode("utf-8")
+            with self._lock:
+                self._append_locked(encoded)
+            self._record_usage_metrics(observation)
+        except Exception:
+            # Observability is intentionally best effort.  Do not log the
+            # observation itself: its safe journal fields are enough evidence
+            # when persistence succeeds, and a failed logger could recurse.
+            return
+
+    def query_primary_usage(
+        self,
+        *,
+        thread_id: str,
+        root_user_message_ids: Collection[str],
+    ) -> dict[str, LLMUsageAggregate]:
+        requested = {
+            stable_hash(message_id): message_id
+            for message_id in root_user_message_ids
+            if isinstance(message_id, str) and message_id
+        }
+        if not requested:
+            return {}
+        thread_key = stable_hash(thread_id)
+        aggregates: dict[str, LLMUsageAggregate] = {}
+        observed_sampling_keys: set[str] = set()
+        try:
+            with self._lock:
+                records = list(self._iter_records_locked())
+        except Exception:
+            return {}
+        for record in records:
+            if record.get("kind") != "llm_token_usage" or record.get("operation") != "primary":
+                continue
+            if record.get("thread_key") != thread_key:
+                continue
+            root_key = record.get("root_user_key")
+            if not isinstance(root_key, str) or root_key not in requested:
+                continue
+            sampling_key = record.get("sampling_key")
+            if not isinstance(sampling_key, str) or not sampling_key or sampling_key in observed_sampling_keys:
+                continue
+            usage = _usage_from_record(record)
+            if usage is None:
+                continue
+            observed_sampling_keys.add(sampling_key)
+            message_id = requested[root_key]
+            aggregates[message_id] = aggregates.get(message_id, LLMUsageAggregate()).add(usage)
+        return aggregates
+
+    def _record_payload(self, observation: LLMUsageObservation) -> dict[str, Any]:
+        if not _is_valid_usage_observation(observation):
+            raise ValueError("Invalid LLM usage observation.")
+        observed_at = observation.observed_at or datetime.now(timezone.utc)
+        return {
+            "kind": "llm_token_usage",
+            "version": 1,
+            "observed_at": observed_at.isoformat(),
+            "operation": observation.operation,
+            "thread_key": _stable_key(observation.thread_id),
+            "root_user_key": _stable_key(observation.root_user_message_id),
+            "frontier_key": _stable_key(observation.frontier_message_id),
+            "sampling_key": _stable_key(observation.pending_message_id),
+            "model_key": _stable_key(observation.fq_model_key),
+            **observation.usage.to_payload(),
+        }
+
+    def _append_locked(self, encoded: bytes) -> None:
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        if self._path.exists() and self._path.stat().st_size + len(encoded) > self._max_bytes:
+            self._roll_over_locked()
+        with self._path.open("ab") as handle:
+            handle.write(encoded)
+            handle.flush()
+
+    def _roll_over_locked(self) -> None:
+        if self._backup_count <= 0:
+            self._path.unlink(missing_ok=True)
+            return
+        oldest = self._rotated_path(self._backup_count)
+        oldest.unlink(missing_ok=True)
+        for index in range(self._backup_count - 1, 0, -1):
+            source = self._rotated_path(index)
+            if source.exists():
+                source.replace(self._rotated_path(index + 1))
+        if self._path.exists():
+            self._path.replace(self._rotated_path(1))
+
+    def _iter_records_locked(self):
+        paths = [self._path, *(self._rotated_path(index) for index in range(1, self._backup_count + 1))]
+        for path in paths:
+            if not path.exists():
+                continue
+            try:
+                with path.open("r", encoding="utf-8") as handle:
+                    for line in handle:
+                        try:
+                            record = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        if isinstance(record, dict):
+                            yield record
+            except OSError:
+                continue
+
+    def _rotated_path(self, index: int) -> Path:
+        return self._path.with_name(f"{self._path.name}.{index}")
+
+    @staticmethod
+    def _record_usage_metrics(observation: LLMUsageObservation) -> None:
+        attributes: dict[str, Any] = {
+            "gen_ai.operation.name": "chat" if observation.operation == "primary" else observation.operation,
+            "xenix.ai.usage.operation": observation.operation,
+        }
+        if observation.fq_model_key:
+            attributes["xenix.ai.model.hash"] = stable_hash(observation.fq_model_key)
+        record_counter("xenix.llm.usage.request.count", attributes=attributes)
+        for token_type, count in (
+            ("input", observation.usage.input_tokens),
+            ("cached_input", observation.usage.cached_input_tokens),
+            ("output", observation.usage.output_tokens),
+            ("total", observation.usage.total_tokens),
+        ):
+            if count:
+                record_histogram(
+                    "gen_ai.client.token.usage",
+                    count,
+                    attributes={**attributes, "gen_ai.token.type": token_type},
+                    unit="{token}",
+                )
 
 
 def load_or_create_install_id(paths: AppPaths) -> str:
@@ -307,3 +591,37 @@ def _env_truthy(name: str, *, default: bool) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _usage_count(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if 0 <= value <= MAX_LLM_TOKEN_COUNT else None
+    if isinstance(value, float) and value.is_integer():
+        normalized = int(value)
+        return normalized if 0 <= normalized <= MAX_LLM_TOKEN_COUNT else None
+    return None
+
+
+def _is_valid_usage_observation(observation: Any) -> bool:
+    if not isinstance(observation, LLMUsageObservation):
+        return False
+    if observation.operation not in LLM_USAGE_OPERATIONS:
+        return False
+    usage = observation.usage
+    if not isinstance(usage, LLMTokenUsage):
+        return False
+    return all(
+        type(getattr(usage, field)) is int and 0 <= getattr(usage, field) <= MAX_LLM_TOKEN_COUNT
+        for field in _LLM_USAGE_FIELDS
+    )
+
+
+def _stable_key(value: str | None) -> str | None:
+    return stable_hash(value) if isinstance(value, str) and value else None
+
+
+def _usage_from_record(record: dict[str, Any]) -> LLMTokenUsage | None:
+    payload = {field: record[field] for field in _LLM_USAGE_FIELDS if field in record}
+    return LLMTokenUsage.from_payload(payload)

@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+import secrets
+from types import SimpleNamespace
 from typing import Any, Callable
 
 from PySide6.QtCore import QCoreApplication, QEvent, QPoint, QRectF, QSize, QTimer, Qt, Signal
@@ -30,10 +32,8 @@ from ..services.agent import (
     ChatbotEventAuthor,
     ChatbotEventKind,
     ChatbotEventStatus,
-    ThreadSnapshot,
     project_chatbot_events,
 )
-from ..services.storage.models import AgentMessageAuthor, AgentMessageKind
 from .icons import (
     attach_file_icon,
     chevron_icon,
@@ -57,6 +57,7 @@ a {
 """.strip()
 UNBOUNDED_WIDGET_WIDTH = 16777215
 ArtifactResolver = Callable[[str], Any]
+SourceAttachmentTargetResolver = Callable[[dict[str, Any]], str | None]
 SUPPORTED_DATASET_SUFFIXES = {".csv", ".xlsx", ".xls"}
 _ARTIFACT_PREVIEW_MIN_WIDTH = 160
 _ARTIFACT_PREVIEW_MAX_WIDTH = 720
@@ -175,7 +176,11 @@ def _fit_artifact_preview_size(source_size: QSize, *, max_width: int, max_height
     )
 
 
-def _render_content_blocks(blocks: list[dict[str, Any]]) -> str:
+def _render_content_blocks(
+    blocks: list[dict[str, Any]],
+    *,
+    source_attachment_target_resolver: SourceAttachmentTargetResolver | None = None,
+) -> str:
     parts: list[str] = []
     for block in blocks:
         block_type = block.get("type")
@@ -192,21 +197,34 @@ def _render_content_blocks(blocks: list[dict[str, Any]]) -> str:
             file_path = Path(str(block.get("path", "")))
             parts.append(f"`{file_path.name}`")
         elif block_type == "source_attachment":
+            if not _chatbot_block_is_visible(block):
+                continue
             file_name = str(block.get("file_name") or "").strip()
+            if block.get("chatbot_source_projection"):
+                if not file_name:
+                    continue
+                target = None
+                if bool(block.get("is_openable")) and source_attachment_target_resolver is not None:
+                    try:
+                        target = source_attachment_target_resolver(dict(block))
+                    except Exception:
+                        target = None
+                target = _safe_ui_open_target(target)
+                if target:
+                    parts.append(f"[{_escape_markdown_link_label(file_name)}]({target})")
+                else:
+                    parts.append(f"`{file_name}`")
+                continue
             artifact_id = str(block.get("artifact_id") or "").strip()
             if artifact_id and file_name:
                 parts.append(f"[{_escape_markdown_link_label(file_name)}](artifact://{artifact_id})")
             elif file_name:
                 parts.append(f"`{file_name}`")
         elif block_type == "dataset":
-            if block.get("visible") is False:
-                continue
-            name = str(block.get("name") or block.get("file_name") or "")
-            dataset_id = str(block.get("dataset_id") or "")
-            if dataset_id:
-                parts.append(f"`{name}` (`{dataset_id}`)")
-            elif name:
-                parts.append(f"`{name}`")
+            # Canonical DatasetBlocks are provider/context facts, not raw
+            # Chatbot attachments.  Harness enrichment supplies a separate
+            # UI-only source_attachment block when one can be resolved.
+            continue
         elif block_type == "step_confirmation":
             parts.append(str(block.get("text", "")))
         elif block_type == "thinking":
@@ -243,8 +261,88 @@ def _render_content_blocks(blocks: list[dict[str, Any]]) -> str:
     return "\n\n".join(part for part in parts if part)
 
 
+def _chatbot_block_is_visible(block: dict[str, Any]) -> bool:
+    """Apply the Harness/UI-only presentation hint with legacy compatibility."""
+
+    return not (
+        block.get("chatbot_visible") is False
+        or ("chatbot_visible" not in block and block.get("visible") is False)
+    )
+
+
+def _assistant_display_blocks(
+    blocks: list[dict[str, Any]],
+    *,
+    text: str | None = None,
+    refusal: str | None = None,
+) -> list[dict[str, Any]]:
+    """Choose the Assistant content that the current product renders.
+
+    The event projection deliberately carries reasoning and refusal fields
+    unchanged.  Only this UI projection drops reasoning; a refusal is shown as
+    ordinary assistant text until a dedicated refusal treatment exists.
+    """
+
+    display_blocks: list[dict[str, Any]] = []
+    seen_text: set[str] = set()
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        block_type = str(block.get("type") or "").strip().lower()
+        block_text = str(block.get("text") or "").strip()
+        if block_type in {"text", "markdown"} and block_text:
+            display_blocks.append(dict(block))
+            seen_text.add(block_text)
+        elif block_type == "refusal" and block_text:
+            display_blocks.append({"type": "text", "text": block_text})
+            seen_text.add(block_text)
+
+    for value in (text, refusal):
+        normalized = str(value or "").strip()
+        if normalized and normalized not in seen_text:
+            display_blocks.append({"type": "text", "text": normalized})
+            seen_text.add(normalized)
+    return display_blocks
+
+
+def _event_display_blocks(event: ChatbotEvent) -> list[dict[str, Any]]:
+    """Return blocks for one event without changing the event projection."""
+
+    author = getattr(getattr(event, "author", None), "value", getattr(event, "author", None))
+    kind = getattr(getattr(event, "kind", None), "value", getattr(event, "kind", None))
+    blocks = [
+        dict(block)
+        for block in event.content_blocks
+        if isinstance(block, dict)
+        and str(block.get("type") or "").strip().lower() != "dataset"
+        and (
+            str(block.get("type") or "").strip().lower() != "source_attachment"
+            or _chatbot_block_is_visible(block)
+        )
+    ]
+    if str(kind) == ChatbotEventKind.TEXT.value and str(author) == ChatbotEventAuthor.ASSISTANT.value:
+        return _assistant_display_blocks(blocks, text=event.text, refusal=event.refusal)
+    return blocks
+
+
 def _escape_markdown_link_label(value: str) -> str:
     return value.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+
+
+def _safe_ui_open_target(value: Any) -> str | None:
+    """Accept only opaque URI capabilities, never a local path in Markdown."""
+
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    if not value or any(char in value for char in "\r\n"):
+        return None
+    lowered = value.lower()
+    if lowered.startswith("file:") or value.startswith(("/", "\\")):
+        return None
+    if len(value) >= 2 and value[1] == ":" and value[0].isalpha():
+        return None
+    return value
 
 
 def _translate_tool_status(status: str) -> str:
@@ -698,6 +796,7 @@ def _propagate_geometry_change(widget: QWidget) -> None:
 
 class ChatMessageBubble(QFrame):
     link_activated = Signal(str)
+    source_file_activated = Signal(str)
 
     def __init__(
         self,
@@ -711,6 +810,7 @@ class ChatMessageBubble(QFrame):
         self._author = author
         self._author_label: QLabel | None = None
         self._artifact_resolver = artifact_resolver
+        self._source_attachment_targets: dict[str, str] = {}
         self.setObjectName("chatMessageRow")
 
         if author == "You":
@@ -741,7 +841,7 @@ class ChatMessageBubble(QFrame):
             body = UserMessageBody(artifact_resolver=artifact_resolver, parent=card)
             self._browser = body
             body.setObjectName("chatMessageBody")
-            body.link_activated.connect(self.link_activated.emit)
+            body.link_activated.connect(self._handle_link_activated)
             body.setHtml(self._render_blocks(blocks))
             card_layout.addWidget(body)
         else:
@@ -786,7 +886,14 @@ class ChatMessageBubble(QFrame):
         return self._author
 
     def _render_blocks(self, blocks: list[dict[str, Any]]) -> str:
-        return render_chat_markdown(_render_content_blocks(blocks), inline_artifact_images=True)
+        self._source_attachment_targets.clear()
+        return render_chat_markdown(
+            _render_content_blocks(
+                blocks,
+                source_attachment_target_resolver=self._source_attachment_target,
+            ),
+            inline_artifact_images=True,
+        )
 
     def set_available_width(self, width: int) -> None:
         if self._card.objectName() == "chatMessageUser":
@@ -804,8 +911,23 @@ class ChatMessageBubble(QFrame):
             self._author_label.setText(self._display_author())
         self._browser.setHtml(self._render_blocks(self._blocks))
 
+    def _source_attachment_target(self, block: dict[str, Any]) -> str | None:
+        if not bool(block.get("is_openable")):
+            return None
+        file_path = block.get("file_path")
+        if not isinstance(file_path, str) or not file_path.strip():
+            return None
+        token = f"xenix-source://{secrets.token_urlsafe(18)}"
+        self._source_attachment_targets[token] = file_path
+        return token
+
     def _handle_link_activated(self, url) -> None:
-        self.link_activated.emit(url.toString())
+        target = url.toString() if hasattr(url, "toString") else str(url)
+        source_path = self._source_attachment_targets.get(target)
+        if source_path is not None:
+            self.source_file_activated.emit(source_path)
+            return
+        self.link_activated.emit(target)
 
 
 class ToolCallItem(QFrame):
@@ -1155,6 +1277,7 @@ class ThreadDetailView(QWidget):
     files_attached = Signal(list)
     attachment_removed = Signal(str)
     service_link_activated = Signal(str)
+    source_file_activated = Signal(str)
     tool_action_requested = Signal(object)
     stop_requested = Signal()
     step_budget_continue_requested = Signal()
@@ -1357,7 +1480,7 @@ class ThreadDetailView(QWidget):
             self.retranslate_ui()
         super().changeEvent(event)
 
-    def render_snapshot(self, snapshot: ThreadSnapshot) -> None:
+    def render_snapshot(self, snapshot: Any) -> None:
         self.render_events(project_chatbot_events(snapshot))
 
     def set_artifact_resolver(self, resolver: ArtifactResolver | None) -> None:
@@ -1397,6 +1520,7 @@ class ThreadDetailView(QWidget):
             parent=self,
         )
         bubble.link_activated.connect(self.service_link_activated.emit)
+        bubble.source_file_activated.connect(self.source_file_activated.emit)
         bubble.set_available_width(self._message_column.width())
         self._message_layout.insertWidget(self._message_insert_index(), bubble)
         widget_id = event_id or message_id
@@ -1411,7 +1535,7 @@ class ThreadDetailView(QWidget):
     def add_user_message(self, blocks: list[dict[str, Any]], *, auto_scroll: bool = True) -> None:
         self.add_message("You", blocks, auto_scroll=auto_scroll)
 
-    def add_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> QWidget:
+    def add_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> QWidget | None:
         if event.kind is ChatbotEventKind.ACTIVITY:
             return self.add_activity_event(event, auto_scroll=auto_scroll)
         if event.kind is ChatbotEventKind.THINKING:
@@ -1422,9 +1546,15 @@ class ThreadDetailView(QWidget):
             return self.add_connection_event(event, auto_scroll=auto_scroll)
         if event.kind is ChatbotEventKind.USAGE:
             return self.add_usage_event(event, auto_scroll=auto_scroll)
+        blocks = _event_display_blocks(event)
+        if event.kind is ChatbotEventKind.TEXT and not blocks:
+            # A reasoning-only Assistant Message and a user event containing
+            # only UI-hidden attachment blocks remain in the Event stream but
+            # must not allocate an empty visual card.
+            return None
         return self.add_message(
             self._event_author_label(event.author),
-            event.content_blocks,
+            blocks,
             message_id=event.source_message_ids[0] if event.source_message_ids else None,
             event_id=event.id,
             auto_scroll=auto_scroll,
@@ -1478,6 +1608,7 @@ class ThreadDetailView(QWidget):
             parent=self,
         )
         bubble.link_activated.connect(self.service_link_activated.emit)
+        bubble.source_file_activated.connect(self.source_file_activated.emit)
         bubble.set_available_width(self._message_column.width())
         self._message_layout.insertWidget(self._message_insert_index(), bubble)
         self._event_widgets_by_id[event.id] = bubble
@@ -1487,24 +1618,15 @@ class ThreadDetailView(QWidget):
         return bubble
 
     def apply_message_event(self, message, *, auto_scroll: bool = True) -> None:
-        if message.kind is AgentMessageKind.SYSTEM:
-            return
-        if message.kind in {AgentMessageKind.TOOL_CALL, AgentMessageKind.TOOL_CALL_RESULT}:
-            return
-        if message.kind is AgentMessageKind.ASSISTANT:
-            self.hide_thinking_indicator()
-        existing = self._message_bubbles_by_id.get(message.id)
-        if existing is not None:
-            existing.set_blocks(message.content_blocks)
-            if auto_scroll:
-                self._scroll_to_latest()
-            return
-        self.add_message(
-            self._author_label(message.ui_author),
-            message.content_blocks,
-            message_id=message.id,
-            auto_scroll=auto_scroll,
-        )
+        """Compatibility entry point that still follows the Event projection.
+
+        Runtime rendering receives Chatbot Events from the Harness.  Keeping
+        this test/legacy seam on the same route prevents the UI from growing a
+        second Message-to-Bubble serializer.
+        """
+
+        for event in project_chatbot_events(SimpleNamespace(messages=[message])):
+            self.apply_chatbot_event(event, auto_scroll=auto_scroll)
 
     def apply_chatbot_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> None:
         if event.kind is ChatbotEventKind.ACTIVITY:
@@ -1539,6 +1661,13 @@ class ThreadDetailView(QWidget):
             self._remove_event_widget(event.id)
             return
         self.hide_thinking_indicator()
+        display_blocks = _event_display_blocks(event)
+        if event.kind is ChatbotEventKind.TEXT and not display_blocks:
+            self._remove_event_widget(event.id)
+            for source_id in event.source_message_ids:
+                if source_id != event.id:
+                    self._remove_event_widget(source_id)
+            return
         existing = self._event_widgets_by_id.get(event.id)
         if existing is not None:
             if isinstance(existing, ToolCallItem):
@@ -1548,7 +1677,7 @@ class ThreadDetailView(QWidget):
             elif isinstance(existing, UsageOverviewItem):
                 existing.set_event(event)
             elif isinstance(existing, ChatMessageBubble):
-                existing.set_blocks(event.content_blocks)
+                existing.set_blocks(display_blocks)
             if auto_scroll:
                 self._scroll_to_latest()
             return
@@ -1557,7 +1686,15 @@ class ThreadDetailView(QWidget):
     def _remove_event_widget(self, event_id: str) -> None:
         widget = self._event_widgets_by_id.pop(event_id, None)
         if widget is None:
+            widget = self._message_bubbles_by_id.get(event_id)
+        if widget is None:
             return
+        for mapped_id, mapped_widget in list(self._event_widgets_by_id.items()):
+            if mapped_widget is widget:
+                self._event_widgets_by_id.pop(mapped_id, None)
+        for mapped_id, mapped_widget in list(self._message_bubbles_by_id.items()):
+            if mapped_widget is widget:
+                self._message_bubbles_by_id.pop(mapped_id, None)
         if widget is self._thinking_bubble:
             self._thinking_bubble = None
         self._message_layout.removeWidget(widget)
@@ -1907,13 +2044,12 @@ class ThreadDetailView(QWidget):
                 ready_paths.append(path)
         return ready_paths
 
-    def _author_label(self, author: AgentMessageAuthor) -> str:
-        if author is AgentMessageAuthor.USER:
+    def _author_label(self, author) -> str:
+        author_value = getattr(author, "value", author)
+        if author_value == "user":
             return "You"
-        if author is AgentMessageAuthor.TOOL:
+        if author_value == "tool":
             return "Tool"
-        if author is AgentMessageAuthor.SYSTEM:
-            return "System"
         return "Xenix"
 
     def _event_author_label(self, author: ChatbotEventAuthor) -> str:

@@ -4,6 +4,15 @@
 
 This is the master implementation rehearsal for the **entire** LLM Conversation Service / Agent Harness boundary change. It supersedes any interpretation of Artifact provenance removal as an independently deployable slice.
 
+> **Stage 23 supersession (2026-07-15).** The historical rehearsal below says
+> that source intake obtains a Dataset/Artifact pair. The delivered source
+> projection contract no longer does that: intake materializes a Dataset and
+> records original-source provenance in `DatasetImport`; it writes only the
+> Dataset reference into canonical conversation state. Harness derives the
+> temporary source attachment for Chatbot presentation without an Artifact
+> relation. This note corrects the live contract without rewriting the
+> rehearsal evidence.
+
 The delivery unit is one complete source, schema, runtime, UI, and migration cutover. Internal workstreams describe a safe development order only; none is a separately shippable architecture or schema state. Product code remains unchanged until one whole-task Impact Handshake is approved.
 
 The planned storage edge is one forward `v14 -> v15` migration containing the final Conversation model, legacy-aggregate removal, Artifact decoupling, and all required data conversion. There is no preliminary Artifact-only migration.
@@ -45,7 +54,7 @@ The only reverse-looking runtime path is dependency inversion: composition regis
 
 1. Harness asks `LLMConversationService` to claim a Client submission under the per-Thread writer gate, using `thread_id`, the observed final frontier ID, and `client_submission_id`.
 2. The claim is **in-memory only**. It prevents duplicate local attachment materialization while the same process is alive; it is not a stored Turn/Run/message lifecycle.
-3. After the claim succeeds, Harness imports source attachments and obtains stable Dataset/Artifact domain IDs. A crash at this point may leave a domain record without a User Message; that is an accepted pre-conversation side effect.
+3. After the claim succeeds, Harness imports source attachments and obtains stable Dataset domain IDs. A crash at this point may leave a domain record without a User Message; that is an accepted pre-conversation side effect.
 4. Harness asks the service to append the immutable `UserMessage` with bounded domain references. The database uniqueness constraint on `(thread_id, client_submission_id)` handles an acknowledgement-lost duplicate after commit.
 5. On import failure, Harness releases the in-memory claim and no User Message is appended. On a stale/duplicate claim, Harness must not import again.
 

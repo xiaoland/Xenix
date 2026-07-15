@@ -20,7 +20,14 @@ from .config import APP_NAME, APP_ORGANIZATION, ensure_app_dirs, get_app_paths
 from .exceptions import StorageBootstrapError, install_exception_hooks
 from .i18n import TranslationManager
 from .logging import setup_logging
-from .observability import flush_observability, record_counter, setup_observability, start_span
+from .observability import (
+    LLM_USAGE_JOURNAL_FILE_NAME,
+    LocalLLMUsageObservability,
+    flush_observability,
+    record_counter,
+    setup_observability,
+    start_span,
+)
 from .resources import package_resource_path
 from .trial_lock import TrialLockCheck, check_trial_lock, trial_purchase_url
 from .ui.startup_splash import StartupSplash, StartupStage
@@ -273,7 +280,6 @@ def _load_runtime_imports() -> SimpleNamespace:
 
     agent_harness = load_module("xenix.services.agent.harness_service")
     agent_skill_catalog = load_module("xenix.services.agent.skill_catalog")
-    conversation_store = load_module("xenix.services.agent.conversation_store")
     lazy_tools = load_module("xenix.services.agent.lazy_tools")
     artifact_service = load_module("xenix.services.artifact_service")
     dataset_export_service = load_module("xenix.services.dataset_export_service")
@@ -291,7 +297,8 @@ def _load_runtime_imports() -> SimpleNamespace:
         AgentSkillCatalog=agent_skill_catalog.AgentSkillCatalog,
         AgentToolRegistry=lazy_tools.LazyAgentToolRegistry,
         ArtifactService=artifact_service.ArtifactService,
-        ConversationStore=conversation_store.ConversationStore,
+        LLMConversationService=llm.LLMConversationService,
+        LLMToolRegistry=llm.AgentToolRegistry,
         DatasetExportService=dataset_export_service.DatasetExportService,
         LazyServiceProxy=lazy_services.LazyServiceProxy,
         LinkRouter=link_router.LinkRouter,
@@ -302,6 +309,44 @@ def _load_runtime_imports() -> SimpleNamespace:
         StorageBootstrapService=storage.StorageBootstrapService,
         database_path=storage_layout.database_path,
     )
+
+
+def _register_agent_skill_tools(registry, catalog) -> None:
+    """Inject concrete Skill operations into the LLM-owned tool registry.
+
+    The catalog remains an application adapter.  The registry, validation and
+    invocation capability remain inside the LLM boundary.
+    """
+
+    activation = catalog.activation_tool_spec()
+    if activation is not None:
+        registry.register(
+            activation,
+            lambda arguments, _context: catalog.activate(str(arguments["name"])),
+        )
+    all_skill_names = {skill.name for skill in catalog.list_skills()}
+    for spec in catalog.resource_tool_specs(activated_skill_names=all_skill_names):
+        if spec.name.endswith("read_reference"):
+            implementation = lambda arguments, _context: catalog.read_reference(
+                skill_name=str(arguments["skill_name"]), path=str(arguments["path"])
+            )
+        else:
+            implementation = lambda arguments, _context: catalog.read_asset(
+                skill_name=str(arguments["skill_name"]), path=str(arguments["path"])
+            )
+        registry.register(spec, implementation)
+
+
+def _agent_skill_context_messages(catalog, snapshot) -> list:
+    activated: set[str] = set()
+    for message in snapshot.messages:
+        if getattr(message, "tool_id", None) != "agent.skill.activate":
+            continue
+        payload = getattr(message, "value_payload", None)
+        if isinstance(payload, dict) and isinstance(payload.get("skill_name"), str):
+            activated.add(payload["skill_name"])
+    message = catalog.catalog_provider_message(activated_skill_names=activated)
+    return [message] if message is not None else []
 
 
 def _load_runtime_imports_with_events(
@@ -508,10 +553,9 @@ def build_main_window(
         link_router = runtime.LinkRouter(
             artifact_service=artifact_service,
         )
-        conversation_store = runtime.ConversationStore(context.session_factory)
         llm_settings_service = runtime.LLMSettingsService(paths)
         llm_service = runtime.LLMService(llm_settings_service)
-        agent_tool_registry = runtime.AgentToolRegistry(
+        concrete_tool_registry = runtime.AgentToolRegistry(
             paths=paths,
             dataset_service=dataset_service,
             data_cleaning_service=data_cleaning_service,
@@ -520,14 +564,27 @@ def build_main_window(
             artifact_service=artifact_service,
             dataset_export_service=dataset_export_service,
         )
-        agent_harness_service = runtime.AgentHarnessService(
+        llm_tool_registry = runtime.LLMToolRegistry()
+        concrete_tool_registry.register_with_llm(llm_tool_registry)
+        skill_catalog = runtime.AgentSkillCatalog.from_default_catalog()
+        _register_agent_skill_tools(llm_tool_registry, skill_catalog)
+        conversation_service = runtime.LLMConversationService(
             session_factory=context.session_factory,
-            tool_registry=agent_tool_registry,
             llm_service=llm_service,
-            conversation_store=conversation_store,
+            tool_registry=llm_tool_registry,
+            context_messages_provider=lambda snapshot: _agent_skill_context_messages(
+                skill_catalog, snapshot
+            ),
+            usage_observability=LocalLLMUsageObservability(
+                paths.logs / LLM_USAGE_JOURNAL_FILE_NAME
+            ),
+        )
+        conversation_service.discard_stale_pending_messages()
+        agent_harness_service = runtime.AgentHarnessService(
+            conversation_service=conversation_service,
+            tool_presentation_registry=concrete_tool_registry,
+            llm_service=llm_service,
             dataset_service=dataset_service,
-            artifact_service=artifact_service,
-            skill_catalog=runtime.AgentSkillCatalog.from_default_catalog(),
         )
         from .services.update_service import UpdateService
 

@@ -1,28 +1,21 @@
+from __future__ import annotations
+
 import json
+import sqlite3
 from pathlib import Path
+
+from sqlalchemy import inspect
+from sqlmodel import select
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.storage import StorageBootstrapService
-from xenix.services.storage.layout import (
-    artifact_apply_root,
-    artifact_datasets_root,
-    artifact_models_root,
-    artifact_training_root,
-    database_path,
-    ml_task_parent_root,
-)
+from xenix.services.storage.layout import database_path
 from xenix.services.storage.migrations import CURRENT_SCHEMA_VERSION, get_user_version
 from xenix.services.storage.models import (
-    AgentMessageAuthor,
-    AgentMessageKind,
-    AgentMessageRow,
-    AgentMessageStatus,
-    AgentThreadRow,
-    MLTaskArtifactKind,
-    MLTaskArtifactRow,
-    MLTaskRow,
-    MLTaskStatus,
-    MLTaskType,
+    ArtifactKind,
+    ArtifactRow,
+    ConversationMessageKind,
+    ConversationMessageRow,
 )
 
 
@@ -34,1392 +27,221 @@ def _table_columns(context, table_name: str) -> set[str]:
         }
 
 
-def test_storage_bootstrap_creates_database_and_sets_user_version(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-
-    context = StorageBootstrapService().initialize(paths)
-
-    assert context.schema_version == CURRENT_SCHEMA_VERSION
-    assert database_path(paths).exists()
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
-    assert artifact_datasets_root(paths).is_dir()
-    assert artifact_models_root(paths).is_dir()
-    assert artifact_training_root(paths).is_dir()
-    assert artifact_apply_root(paths).is_dir()
-    assert ml_task_parent_root(paths).is_dir()
+def _target_shape(context) -> tuple[set[str], set[str], bool]:
+    inspector = inspect(context.engine)
+    return (
+        _table_columns(context, "conversation_message"),
+        {index["name"] for index in inspector.get_indexes("conversation_message")},
+        not inspector.get_foreign_keys("artifact"),
+    )
 
 
-def test_storage_bootstrap_is_idempotent(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    service = StorageBootstrapService()
-
-    first = service.initialize(paths)
-    second = service.initialize(paths)
-
-    assert get_user_version(first.engine) == CURRENT_SCHEMA_VERSION
-    assert get_user_version(second.engine) == CURRENT_SCHEMA_VERSION
-
-
-def test_storage_bootstrap_migrates_v1_dataset_lineage_schema(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    db_path = database_path(paths)
+def _create_v14_fixture(db_path: Path) -> None:
     db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    import sqlite3
-
     with sqlite3.connect(db_path) as connection:
-        connection.execute(
+        connection.execute("PRAGMA foreign_keys=OFF")
+        connection.executescript(
             """
-            CREATE TABLE dataset (
+            CREATE TABLE agent_thread (
                 id VARCHAR NOT NULL PRIMARY KEY,
-                project_id VARCHAR NOT NULL,
-                name VARCHAR NOT NULL,
-                source_path VARCHAR NOT NULL,
-                source_format VARCHAR,
-                copied_from VARCHAR,
-                copied_at DATETIME,
-                ml_task_id VARCHAR,
+                title VARCHAR,
+                system_prompt VARCHAR NOT NULL,
+                selected_fq_model_key VARCHAR,
                 created_at DATETIME NOT NULL,
                 updated_at DATETIME NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            INSERT INTO dataset (
-                id,
-                project_id,
-                name,
-                source_path,
-                source_format,
-                copied_from,
-                copied_at,
-                ml_task_id,
-                created_at,
-                updated_at
-            )
-            VALUES (
-                'dataset-1',
-                'project-1',
-                'Customers',
-                'C:/data/customers.csv',
-                'csv',
-                NULL,
-                NULL,
-                NULL,
-                '2026-05-17T00:00:00Z',
-                '2026-05-17T00:00:00Z'
-            )
-            """
-        )
-        connection.execute("PRAGMA user_version=1")
-
-    context = StorageBootstrapService().initialize(paths)
-
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
-    assert "derived_from_dataset_id" in _table_columns(context, "dataset")
-    with context.engine.connect() as connection:
-        migrated_row = connection.exec_driver_sql(
-            "SELECT id, derived_from_dataset_id FROM dataset WHERE id='dataset-1'"
-        ).first()
-        indexes = {
-            str(row[1])
-            for row in connection.exec_driver_sql("PRAGMA index_list(dataset)").all()
-        }
-    assert migrated_row == ("dataset-1", None)
-    assert "ix_dataset_derived_from_dataset_id" in indexes
-
-
-def test_storage_bootstrap_migrates_v2_agent_message_lifecycle_schema(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    db_path = database_path(paths)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    import sqlite3
-
-    with sqlite3.connect(db_path) as connection:
-        connection.execute(
-            """
-            CREATE TABLE agent_message (
-                id VARCHAR NOT NULL PRIMARY KEY,
-                thread_id VARCHAR NOT NULL,
-                turn_id VARCHAR,
-                sequence_index INTEGER NOT NULL,
-                kind VARCHAR NOT NULL,
-                ui_author VARCHAR NOT NULL,
-                content_blocks JSON NOT NULL,
-                provider_payload JSON NOT NULL,
-                created_at DATETIME NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            INSERT INTO agent_message (
-                id,
-                thread_id,
-                turn_id,
-                sequence_index,
-                kind,
-                ui_author,
-                content_blocks,
-                provider_payload,
-                created_at
-            )
-            VALUES (
-                'message-1',
-                'thread-1',
-                'turn-1',
-                0,
-                'ASSISTANT',
-                'ASSISTANT',
-                '[]',
-                '{}',
-                '2026-05-17T00:00:00Z'
-            )
-            """
-        )
-        connection.execute("PRAGMA user_version=2")
-
-    context = StorageBootstrapService().initialize(paths)
-
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
-    assert {"status", "updated_at", "finalized_at"}.issubset(_table_columns(context, "agent_message"))
-    with context.engine.connect() as connection:
-        migrated_row = connection.exec_driver_sql(
-            "SELECT status, updated_at, finalized_at FROM agent_message WHERE id='message-1'"
-        ).first()
-    with context.session_factory() as session:
-        orm_row = session.get(AgentMessageRow, "message-1")
-    assert migrated_row == (
-        "completed",
-        "2026-05-17T00:00:00Z",
-        "2026-05-17T00:00:00Z",
-    )
-    assert orm_row is not None
-    assert orm_row.status is AgentMessageStatus.COMPLETED
-
-
-def test_storage_bootstrap_migrates_v3_uppercase_agent_message_status(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    db_path = database_path(paths)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    import sqlite3
-
-    with sqlite3.connect(db_path) as connection:
-        connection.execute(
-            """
-            CREATE TABLE agent_message (
-                id VARCHAR NOT NULL PRIMARY KEY,
-                thread_id VARCHAR NOT NULL,
-                turn_id VARCHAR,
-                sequence_index INTEGER NOT NULL,
-                kind VARCHAR NOT NULL,
-                ui_author VARCHAR NOT NULL,
-                content_blocks JSON NOT NULL,
-                provider_payload JSON NOT NULL,
-                status VARCHAR NOT NULL,
-                created_at DATETIME NOT NULL,
-                updated_at DATETIME NOT NULL,
-                finalized_at DATETIME
-            )
-            """
-        )
-        connection.execute(
-            """
-            INSERT INTO agent_message (
-                id,
-                thread_id,
-                turn_id,
-                sequence_index,
-                kind,
-                ui_author,
-                content_blocks,
-                provider_payload,
-                status,
-                created_at,
-                updated_at,
-                finalized_at
-            )
-            VALUES (
-                'message-1',
-                'thread-1',
-                'turn-1',
-                0,
-                'ASSISTANT',
-                'ASSISTANT',
-                '[]',
-                '{}',
-                'COMPLETED',
-                '2026-05-17T00:00:00Z',
-                '2026-05-17T00:00:00Z',
-                '2026-05-17T00:00:00Z'
-            )
-            """
-        )
-        connection.execute("PRAGMA user_version=3")
-
-    context = StorageBootstrapService().initialize(paths)
-
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
-    with context.engine.connect() as connection:
-        migrated_status = connection.exec_driver_sql(
-            "SELECT status FROM agent_message WHERE id='message-1'"
-        ).scalar_one()
-    with context.session_factory() as session:
-        orm_row = session.get(AgentMessageRow, "message-1")
-    assert migrated_status == "completed"
-    assert orm_row is not None
-    assert orm_row.status is AgentMessageStatus.COMPLETED
-
-
-def test_storage_bootstrap_migrates_v4_column_binding_schema(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    db_path = database_path(paths)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    import sqlite3
-
-    with sqlite3.connect(db_path) as connection:
-        connection.execute(
-            """
-            CREATE TABLE dataset (
-                id VARCHAR NOT NULL PRIMARY KEY,
-                project_id VARCHAR NOT NULL,
-                name VARCHAR NOT NULL,
-                source_path VARCHAR NOT NULL,
-                source_format VARCHAR,
-                copied_from VARCHAR,
-                copied_at DATETIME,
-                derived_from_dataset_id VARCHAR,
-                ml_task_id VARCHAR,
-                created_at DATETIME NOT NULL,
-                updated_at DATETIME NOT NULL
-            )
-            """
-        )
-        connection.execute("PRAGMA user_version=4")
-
-    context = StorageBootstrapService().initialize(paths)
-
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
-    assert {
-        "dataset_id",
-        "role_bindings",
-        "model_key",
-        "model_family",
-        "model_task_kind",
-        "schema_version",
-        "created_at",
-    }.issubset(
-        _table_columns(context, "dataset_column_binding")
-    )
-    with context.engine.connect() as connection:
-        indexes = {
-            str(row[1])
-            for row in connection.exec_driver_sql("PRAGMA index_list(dataset_column_binding)").all()
-        }
-    assert "ix_dataset_column_binding_dataset_id" in indexes
-    assert "ix_dataset_column_binding_model_key" in indexes
-    assert "ix_dataset_column_binding_model_family" in indexes
-    assert "ix_dataset_column_binding_model_task_kind" in indexes
-
-
-def test_storage_bootstrap_migrates_v5_turn_completion_guard_schema(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    db_path = database_path(paths)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    import sqlite3
-
-    with sqlite3.connect(db_path) as connection:
-        connection.execute(
-            """
+            );
             CREATE TABLE agent_turn (
                 id VARCHAR NOT NULL PRIMARY KEY,
-                thread_id VARCHAR NOT NULL,
+                thread_id VARCHAR NOT NULL REFERENCES agent_thread(id),
                 sequence_index INTEGER NOT NULL,
-                status VARCHAR NOT NULL,
-                user_message_id VARCHAR,
+                status VARCHAR,
+                user_message_id VARCHAR REFERENCES agent_message(id),
                 created_at DATETIME NOT NULL,
                 ended_at DATETIME,
                 updated_at DATETIME NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            INSERT INTO agent_turn (
-                id,
-                thread_id,
-                sequence_index,
-                status,
-                user_message_id,
-                created_at,
-                ended_at,
-                updated_at
-            )
-            VALUES (
-                'turn-1',
-                'thread-1',
-                0,
-                'open',
-                NULL,
-                '2026-05-20T00:00:00Z',
-                NULL,
-                '2026-05-20T00:00:00Z'
-            )
-            """
-        )
-        connection.execute("PRAGMA user_version=5")
-
-    context = StorageBootstrapService().initialize(paths)
-
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
-    assert {"turn_id", "attempt_index", "input", "output", "created_at"}.issubset(
-        _table_columns(context, "agent_turn_completion_guard")
-    )
-    with context.engine.connect() as connection:
-        indexes = {
-            str(row[1])
-            for row in connection.exec_driver_sql("PRAGMA index_list(agent_turn_completion_guard)").all()
-        }
-    assert "ix_agent_turn_completion_guard_turn_id" in indexes
-
-
-def test_storage_bootstrap_migrates_v6_column_selection_data_to_role_bindings(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    db_path = database_path(paths)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    import sqlite3
-
-    with sqlite3.connect(db_path) as connection:
-        connection.execute(
-            """
-            CREATE TABLE dataset (
+            );
+            CREATE TABLE agent_message (
                 id VARCHAR NOT NULL PRIMARY KEY,
-                project_id VARCHAR NOT NULL,
-                name VARCHAR NOT NULL,
-                source_path VARCHAR NOT NULL,
-                source_format VARCHAR,
-                copied_from VARCHAR,
-                copied_at DATETIME,
-                derived_from_dataset_id VARCHAR,
-                ml_task_id VARCHAR,
+                thread_id VARCHAR NOT NULL REFERENCES agent_thread(id),
+                turn_id VARCHAR REFERENCES agent_turn(id),
+                sequence_index INTEGER NOT NULL,
+                kind VARCHAR,
+                ui_author VARCHAR,
+                content_blocks JSON NOT NULL,
+                provider_payload JSON NOT NULL,
+                status VARCHAR,
                 created_at DATETIME NOT NULL,
-                updated_at DATETIME NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            CREATE TABLE dataset_column_selection (
+                updated_at DATETIME NOT NULL,
+                finalized_at DATETIME
+            );
+            CREATE TABLE agent_run (
                 id VARCHAR NOT NULL PRIMARY KEY,
-                dataset_id VARCHAR NOT NULL,
-                feature_columns JSON NOT NULL,
-                target_columns JSON NOT NULL,
-                created_at DATETIME NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            INSERT INTO dataset (
-                id,
-                project_id,
-                name,
-                source_path,
-                source_format,
-                copied_from,
-                copied_at,
-                derived_from_dataset_id,
-                ml_task_id,
-                created_at,
-                updated_at
-            )
-            VALUES (
-                'dataset-1',
-                'project-1',
-                'Customers',
-                'C:/data/customers.csv',
-                'csv',
-                NULL,
-                NULL,
-                NULL,
-                NULL,
-                '2026-05-20T00:00:00Z',
-                '2026-05-20T00:00:00Z'
-            )
-            """
-        )
-        connection.execute(
-            """
-            INSERT INTO dataset_column_selection (
-                id,
-                dataset_id,
-                feature_columns,
-                target_columns,
-                created_at
-            )
-            VALUES (
-                'selection-1',
-                'dataset-1',
-                '["age", "income"]',
-                '["label"]',
-                '2026-05-20T00:00:00Z'
-            )
-            """
-        )
-        connection.execute("PRAGMA user_version=6")
-
-    context = StorageBootstrapService().initialize(paths)
-
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
-    with context.engine.connect() as connection:
-        table_names = {
-            str(row[0])
-            for row in connection.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'").all()
-        }
-        migrated_row = connection.exec_driver_sql(
-            """
-            SELECT id, dataset_id, role_bindings, model_key, model_family, model_task_kind, schema_version, created_at
-            FROM dataset_column_binding
-            WHERE id='selection-1'
-            """
-        ).first()
-    assert "dataset_column_selection" not in table_names
-    assert migrated_row is not None
-    assert migrated_row[0] == "selection-1"
-    assert migrated_row[1] == "dataset-1"
-    assert migrated_row[3:7] == (None, None, None, 1)
-    assert migrated_row[7] == "2026-05-20T00:00:00Z"
-    assert '"role": "feature"' in migrated_row[2]
-    assert '"columns": ["age", "income"]' in migrated_row[2]
-    assert '"role": "target"' in migrated_row[2]
-    assert '"role_kind": "single_column"' in migrated_row[2]
-
-
-def test_storage_bootstrap_migrates_v7_inference_values_to_apply(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    db_path = database_path(paths)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    import sqlite3
-
-    with sqlite3.connect(db_path) as connection:
-        connection.execute(
-            """
-            CREATE TABLE ml_task (
+                thread_id VARCHAR NOT NULL REFERENCES agent_thread(id),
+                turn_id VARCHAR NOT NULL REFERENCES agent_turn(id),
+                status VARCHAR,
+                provider_name VARCHAR,
+                started_at DATETIME NOT NULL,
+                finished_at DATETIME,
+                error_summary VARCHAR,
+                usage_payload JSON
+            );
+            CREATE TABLE agent_tool_call (
                 id VARCHAR NOT NULL PRIMARY KEY,
-                project_id VARCHAR NOT NULL,
-                dataset_id VARCHAR,
-                task_type VARCHAR NOT NULL,
-                status VARCHAR NOT NULL,
-                request_payload JSON NOT NULL,
+                thread_id VARCHAR NOT NULL REFERENCES agent_thread(id),
+                turn_id VARCHAR NOT NULL REFERENCES agent_turn(id),
+                request_message_id VARCHAR NOT NULL REFERENCES agent_message(id),
+                result_message_id VARCHAR REFERENCES agent_message(id),
+                tool_name VARCHAR,
+                status VARCHAR,
+                arguments_payload JSON NOT NULL,
                 result_payload JSON,
                 error_summary VARCHAR,
                 created_at DATETIME NOT NULL,
-                started_at DATETIME,
-                finished_at DATETIME,
                 updated_at DATETIME NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            CREATE TABLE ml_task_artifact (
+            );
+            CREATE TABLE agent_turn_completion_guard (
                 id VARCHAR NOT NULL PRIMARY KEY,
-                ml_task_id VARCHAR NOT NULL,
-                artifact_kind VARCHAR NOT NULL,
+                turn_id VARCHAR NOT NULL REFERENCES agent_turn(id),
+                attempt_index INTEGER,
+                input JSON NOT NULL,
+                output JSON NOT NULL,
+                created_at DATETIME NOT NULL
+            );
+            CREATE TABLE agent_provider_request (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                thread_id VARCHAR NOT NULL REFERENCES agent_thread(id),
+                turn_id VARCHAR NOT NULL REFERENCES agent_turn(id),
+                run_id VARCHAR REFERENCES agent_run(id),
+                provider_name VARCHAR,
+                model VARCHAR,
+                request_kind VARCHAR,
+                status VARCHAR,
+                input_message_ids JSON NOT NULL,
+                output_message_ids JSON NOT NULL,
+                usage_payload JSON,
+                created_at DATETIME NOT NULL,
+                completed_at DATETIME
+            );
+            CREATE TABLE artifact (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                thread_id VARCHAR REFERENCES agent_thread(id),
+                turn_id VARCHAR REFERENCES agent_turn(id),
+                message_id VARCHAR REFERENCES agent_message(id),
+                tool_call_id VARCHAR REFERENCES agent_tool_call(id),
+                kind VARCHAR(10) NOT NULL,
+                title VARCHAR NOT NULL,
                 absolute_path VARCHAR NOT NULL,
-                ready_to_open BOOLEAN NOT NULL,
-                created_at DATETIME NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            INSERT INTO ml_task (
-                id,
-                project_id,
-                dataset_id,
-                task_type,
-                status,
-                request_payload,
-                result_payload,
-                error_summary,
-                created_at,
-                started_at,
-                finished_at,
-                updated_at
-            )
-            VALUES (
-                'task-1',
-                'project-1',
-                'dataset-1',
-                'inference',
-                'succeeded',
-                '{}',
-                '{}',
-                NULL,
-                '2026-05-20T00:00:00Z',
-                NULL,
-                '2026-05-20T00:00:00Z',
-                '2026-05-20T00:00:00Z'
-            )
-            """
-        )
-        connection.execute(
-            """
-            INSERT INTO ml_task_artifact (
-                id,
-                ml_task_id,
-                artifact_kind,
-                absolute_path,
-                ready_to_open,
-                created_at
-            )
-            VALUES (
-                'artifact-1',
-                'task-1',
-                'inference_result',
-                'C:/data/predictions.csv',
-                1,
-                '2026-05-20T00:00:00Z'
-            )
-            """
-        )
-        connection.execute("PRAGMA user_version=7")
-
-    context = StorageBootstrapService().initialize(paths)
-
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
-    with context.engine.connect() as connection:
-        task_type = connection.exec_driver_sql(
-            "SELECT task_type FROM ml_task WHERE id='task-1'"
-        ).scalar_one()
-        artifact_kind = connection.exec_driver_sql(
-            "SELECT artifact_kind FROM ml_task_artifact WHERE id='artifact-1'"
-        ).scalar_one()
-    assert task_type == "apply"
-    assert artifact_kind == "apply_result"
-
-
-def test_storage_bootstrap_migrates_v8_evaluation_kind_and_nullable_problem_kind(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    db_path = database_path(paths)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    import sqlite3
-
-    with sqlite3.connect(db_path) as connection:
-        connection.execute(
-            """
-            CREATE TABLE dataset (
-                id VARCHAR NOT NULL PRIMARY KEY,
-                project_id VARCHAR NOT NULL,
-                name VARCHAR NOT NULL,
-                source_path VARCHAR NOT NULL,
-                source_format VARCHAR,
-                copied_from VARCHAR,
-                copied_at DATETIME,
-                derived_from_dataset_id VARCHAR,
-                ml_task_id VARCHAR,
-                created_at DATETIME NOT NULL,
-                updated_at DATETIME NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            CREATE TABLE ml_task (
-                id VARCHAR NOT NULL PRIMARY KEY,
-                project_id VARCHAR NOT NULL,
-                dataset_id VARCHAR,
-                task_type VARCHAR NOT NULL,
-                status VARCHAR NOT NULL,
-                request_payload JSON NOT NULL,
-                result_payload JSON,
-                error_summary VARCHAR,
-                created_at DATETIME NOT NULL,
-                started_at DATETIME,
-                finished_at DATETIME,
-                updated_at DATETIME NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            CREATE TABLE trained_model (
-                id VARCHAR NOT NULL PRIMARY KEY,
-                dataset_id VARCHAR,
-                ml_task_id VARCHAR NOT NULL,
-                model_key VARCHAR NOT NULL,
-                problem_kind VARCHAR NOT NULL,
-                artifact_path VARCHAR NOT NULL,
+                mime_type VARCHAR,
+                summary VARCHAR,
+                preview_payload JSON,
                 metadata_payload JSON NOT NULL,
-                created_at DATETIME NOT NULL,
-                updated_at DATETIME NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            INSERT INTO dataset (
-                id,
-                project_id,
-                name,
-                source_path,
-                source_format,
-                copied_from,
-                copied_at,
-                derived_from_dataset_id,
-                ml_task_id,
-                created_at,
-                updated_at
-            )
-            VALUES (
-                'dataset-1',
-                'project-1',
-                'Baskets',
-                'C:/data/baskets.csv',
-                'csv',
-                NULL,
-                NULL,
-                NULL,
-                NULL,
-                '2026-05-20T00:00:00Z',
-                '2026-05-20T00:00:00Z'
-            )
-            """
-        )
-        connection.execute(
-            """
-            INSERT INTO ml_task (
-                id,
-                project_id,
-                dataset_id,
-                task_type,
-                status,
-                request_payload,
-                result_payload,
-                error_summary,
-                created_at,
-                started_at,
-                finished_at,
-                updated_at
-            )
-            VALUES (
-                'task-1',
-                'project-1',
-                'dataset-1',
-                'fit',
-                'succeeded',
-                '{"problem_kind":"analysis","evaluation_policy":{"problem_kind":"analysis","primary_metric_name":"result_count"}}',
-                '{"problem_kind":"analysis","evaluation_policy":{"problem_kind":"analysis","primary_metric_name":"result_count"}}',
-                NULL,
-                '2026-05-20T00:00:00Z',
-                NULL,
-                '2026-05-20T00:00:00Z',
-                '2026-05-20T00:00:00Z'
-            )
-            """
-        )
-        connection.execute(
-            """
-            INSERT INTO trained_model (
-                id,
-                dataset_id,
-                ml_task_id,
-                model_key,
-                problem_kind,
-                artifact_path,
-                metadata_payload,
-                created_at,
-                updated_at
-            )
-            VALUES (
-                'model-1',
-                'dataset-1',
-                'task-1',
-                'association.apriori_apyori',
-                'analysis',
-                'C:/models/rules.joblib',
-                '{"model_key":"association.apriori_apyori"}',
-                '2026-05-20T00:00:00Z',
-                '2026-05-20T00:00:00Z'
-            )
-            """
-        )
-        connection.execute("PRAGMA user_version=8")
-
-    context = StorageBootstrapService().initialize(paths)
-
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
-    with context.engine.connect() as connection:
-        model_row = connection.exec_driver_sql(
-            "SELECT problem_kind, metadata_payload FROM trained_model WHERE id='model-1'"
-        ).first()
-        task_row = connection.exec_driver_sql(
-            "SELECT request_payload, result_payload FROM ml_task WHERE id='task-1'"
-        ).first()
-        trained_model_info = {
-            str(row[1]): row
-            for row in connection.exec_driver_sql("PRAGMA table_info(trained_model)").all()
-        }
-    assert model_row is not None
-    assert model_row[0] is None
-    assert json.loads(model_row[1])["evaluation_kind"] == "summary"
-    assert task_row is not None
-    migrated_request = json.loads(task_row[0])
-    migrated_result = json.loads(task_row[1])
-    assert "problem_kind" not in migrated_request
-    assert migrated_request["evaluation_kind"] == "summary"
-    assert migrated_request["evaluation_policy"]["evaluation_kind"] == "summary"
-    assert "problem_kind" not in migrated_request["evaluation_policy"]
-    assert migrated_result["evaluation_kind"] == "summary"
-    assert trained_model_info["problem_kind"][3] == 0
-
-
-def test_storage_bootstrap_migrates_v9_ml_task_enum_values(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    db_path = database_path(paths)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    import sqlite3
-
-    with sqlite3.connect(db_path) as connection:
-        connection.execute(
-            """
-            CREATE TABLE dataset (
-                id VARCHAR NOT NULL PRIMARY KEY,
-                project_id VARCHAR NOT NULL,
-                name VARCHAR NOT NULL,
-                source_path VARCHAR NOT NULL,
-                source_format VARCHAR,
-                copied_from VARCHAR,
-                copied_at DATETIME,
-                derived_from_dataset_id VARCHAR,
-                ml_task_id VARCHAR,
-                created_at DATETIME NOT NULL,
-                updated_at DATETIME NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            CREATE TABLE ml_task (
-                id VARCHAR NOT NULL PRIMARY KEY,
-                project_id VARCHAR NOT NULL,
-                dataset_id VARCHAR,
-                task_type VARCHAR NOT NULL,
-                status VARCHAR NOT NULL,
-                request_payload JSON NOT NULL,
-                result_payload JSON,
-                error_summary VARCHAR,
-                created_at DATETIME NOT NULL,
-                started_at DATETIME,
-                finished_at DATETIME,
-                updated_at DATETIME NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            CREATE TABLE ml_task_artifact (
-                id VARCHAR NOT NULL PRIMARY KEY,
-                ml_task_id VARCHAR NOT NULL,
-                artifact_kind VARCHAR NOT NULL,
-                absolute_path VARCHAR NOT NULL,
                 ready_to_open BOOLEAN NOT NULL,
                 created_at DATETIME NOT NULL
-            )
+            );
             """
+        )
+        now = "2026-01-01T00:00:00"
+        connection.execute(
+            "INSERT INTO agent_thread VALUES (?, ?, ?, ?, ?, ?)",
+            ("thread-1", "Legacy", "You are Xenix.", "model-a", now, now),
+        )
+        messages = [
+            ("user-1", "user", "user", [{"type": "text", "text": "start"}], {}, "completed"),
+            ("call-1", "tool_call", "tool", [{"type": "tool_call", "tool_name": "data.query"}], {"tool_call_id": "provider-call-1", "provider_name": "data_query"}, "completed"),
+            ("result-1", "tool_call_result", "tool", [], {}, "completed"),
+            ("call-2", "tool_call", "tool", [{"type": "tool_call", "tool_name": "data.query"}], {"tool_call_id": "provider-call-2"}, "completed"),
+            ("assistant-cut", "assistant", "assistant", [{"type": "text", "text": "must be discarded"}], {}, "completed"),
+            ("user-2", "user", "user", [{"type": "text", "text": "continue"}], {"client_submission_id": "submission-2"}, "completed"),
+        ]
+        for index, (message_id, kind, author, blocks, payload, status) in enumerate(messages):
+            connection.execute(
+                "INSERT INTO agent_message VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (message_id, "thread-1", "turn-1", index, kind, author, json.dumps(blocks), json.dumps(payload), status, now, now, now),
+            )
+        connection.execute(
+            "INSERT INTO agent_turn VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            ("turn-1", "thread-1", 0, "ended", "user-1", now, now, now),
         )
         connection.execute(
-            """
-            INSERT INTO dataset (
-                id,
-                project_id,
-                name,
-                source_path,
-                source_format,
-                copied_from,
-                copied_at,
-                derived_from_dataset_id,
-                ml_task_id,
-                created_at,
-                updated_at
-            )
-            VALUES (
-                'dataset-1',
-                'project-1',
-                'Customers',
-                'C:/data/customers.csv',
-                'csv',
-                NULL,
-                NULL,
-                NULL,
-                'inspect-task',
-                '2026-05-20T00:00:00Z',
-                '2026-05-20T00:00:00Z'
-            )
-            """
+            "INSERT INTO agent_tool_call VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("tool-call-1", "thread-1", "turn-1", "call-1", "result-1", "data.query", "succeeded", '{"rows": 2}', '{"rows": 2}', None, now, now),
         )
-        connection.executemany(
-            """
-            INSERT INTO ml_task (
-                id,
-                project_id,
-                dataset_id,
-                task_type,
-                status,
-                request_payload,
-                result_payload,
-                error_summary,
-                created_at,
-                started_at,
-                finished_at,
-                updated_at
-            )
-            VALUES (?, 'project-1', 'dataset-1', ?, ?, '{}', '{}', NULL, ?, NULL, ?, ?)
-            """,
-            [
-                (
-                    "task-1",
-                    "INFERENCE",
-                    "PENDING",
-                    "2026-05-20T00:00:00Z",
-                    "2026-05-20T00:00:00Z",
-                    "2026-05-20T00:00:00Z",
-                ),
-                (
-                    "task-2",
-                    "HYPERPARAMETER_TUNING",
-                    "SUCCEEDED",
-                    "2026-05-20T00:00:00Z",
-                    "2026-05-20T00:00:00Z",
-                    "2026-05-20T00:00:00Z",
-                ),
-                (
-                    "inspect-task",
-                    "INSPECT_DATASET",
-                    "SUCCEEDED",
-                    "2026-05-20T00:00:00Z",
-                    "2026-05-20T00:00:00Z",
-                    "2026-05-20T00:00:00Z",
-                ),
-            ],
+        connection.execute(
+            "INSERT INTO agent_tool_call VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("tool-call-2", "thread-1", "turn-1", "call-2", None, "data.query", "requested", '{}', None, None, now, now),
         )
-        connection.executemany(
-            """
-            INSERT INTO ml_task_artifact (
-                id,
-                ml_task_id,
-                artifact_kind,
-                absolute_path,
-                ready_to_open,
-                created_at
-            )
-            VALUES (?, ?, ?, ?, 1, '2026-05-20T00:00:00Z')
-            """,
-            [
-                ("artifact-1", "task-1", "INFERENCE_RESULT", "C:/data/predictions.csv"),
-                ("artifact-2", "task-2", "TRAINING_REPORT", "C:/reports/training.json"),
-                ("artifact-3", "inspect-task", "OTHER", "C:/reports/inspect.json"),
-            ],
+        connection.execute(
+            "INSERT INTO artifact VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("artifact-1", "thread-1", "turn-1", "result-1", "tool-call-1", "FILE", "Output", "C:/output.csv", "text/csv", "summary", '{"preview":true}', '{"domain":"fact"}', 1, now),
         )
-        connection.execute("PRAGMA user_version=9")
+        connection.execute("PRAGMA user_version=14")
 
+
+def test_fresh_bootstrap_creates_v15_target_schema(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
 
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
+    assert context.schema_version == CURRENT_SCHEMA_VERSION == 15
+    assert get_user_version(context.engine) == 15
+    inspector = inspect(context.engine)
+    tables = set(inspector.get_table_names())
+    assert {"conversation_thread", "conversation_message", "artifact"}.issubset(tables)
+    assert not tables.intersection({"agent_thread", "agent_turn", "agent_message", "agent_run", "agent_tool_call"})
+    assert _table_columns(context, "artifact") == {
+        "id", "kind", "title", "absolute_path", "mime_type", "summary",
+        "preview_payload", "metadata_payload", "ready_to_open", "created_at",
+    }
+    assert not inspector.get_foreign_keys("artifact")
+    indexes = {index["name"] for index in inspector.get_indexes("conversation_message")}
+    assert "ux_conversation_message_pending_thread" in indexes
     with context.engine.connect() as connection:
-        task_rows = {
-            str(row[0]): (str(row[1]), str(row[2]))
+        triggers = {
+            str(row[0])
             for row in connection.exec_driver_sql(
-                "SELECT id, task_type, status FROM ml_task ORDER BY id"
+                "SELECT name FROM sqlite_master WHERE type='trigger'"
             ).all()
         }
-        artifact_rows = {
-            str(row[0]): str(row[1])
-            for row in connection.exec_driver_sql(
-                "SELECT id, artifact_kind FROM ml_task_artifact ORDER BY id"
-            ).all()
-        }
-        dataset_task_id = connection.exec_driver_sql(
-            "SELECT ml_task_id FROM dataset WHERE id='dataset-1'"
-        ).scalar_one()
-
-    with context.session_factory() as session:
-        task = session.get(MLTaskRow, "task-1")
-        artifact = session.get(MLTaskArtifactRow, "artifact-1")
-
-    assert task_rows == {
-        "task-1": ("apply", "pending"),
-        "task-2": ("hyperparameter_tuning", "succeeded"),
-    }
-    assert artifact_rows == {
-        "artifact-1": "apply_result",
-        "artifact-2": "training_report",
-    }
-    assert dataset_task_id is None
-    assert task is not None
-    assert task.task_type is MLTaskType.APPLY
-    assert task.status is MLTaskStatus.PENDING
-    assert artifact is not None
-    assert artifact.artifact_kind is MLTaskArtifactKind.APPLY_RESULT
+    assert {"conversation_message_tool_result_guard", "conversation_message_final_immutable"}.issubset(triggers)
+    fresh_shape = _target_shape(context)
+    assert "tool_call_message_id" in fresh_shape[0]
+    assert "ux_conversation_message_pending_thread" in fresh_shape[1]
+    assert fresh_shape[2]
 
 
-def test_storage_bootstrap_migrates_v10_provider_request_schema_and_system_message(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
+def test_v14_upgrade_preserves_artifact_and_converts_complete_history(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
-    db_path = database_path(paths)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    import sqlite3
-
-    with sqlite3.connect(db_path) as connection:
-        connection.execute(
-            """
-            CREATE TABLE agent_thread (
-                id VARCHAR NOT NULL PRIMARY KEY,
-                title VARCHAR,
-                system_prompt VARCHAR NOT NULL,
-                created_at DATETIME NOT NULL,
-                updated_at DATETIME NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            CREATE TABLE agent_turn (
-                id VARCHAR NOT NULL PRIMARY KEY,
-                thread_id VARCHAR NOT NULL,
-                sequence_index INTEGER NOT NULL,
-                status VARCHAR,
-                user_message_id VARCHAR,
-                created_at DATETIME NOT NULL,
-                ended_at DATETIME,
-                updated_at DATETIME NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            CREATE TABLE agent_message (
-                id VARCHAR NOT NULL PRIMARY KEY,
-                thread_id VARCHAR NOT NULL,
-                turn_id VARCHAR,
-                sequence_index INTEGER NOT NULL,
-                kind VARCHAR,
-                ui_author VARCHAR,
-                content_blocks JSON NOT NULL,
-                provider_payload JSON NOT NULL,
-                status VARCHAR,
-                created_at DATETIME NOT NULL,
-                updated_at DATETIME NOT NULL,
-                finalized_at DATETIME
-            )
-            """
-        )
-        connection.execute(
-            """
-            INSERT INTO agent_thread (
-                id,
-                title,
-                system_prompt,
-                created_at,
-                updated_at
-            )
-            VALUES (
-                'thread-1',
-                'Analysis',
-                'You are Xenix.',
-                '2026-05-21T00:00:00Z',
-                '2026-05-21T00:00:00Z'
-            )
-            """
-        )
-        connection.execute(
-            """
-            INSERT INTO agent_turn (
-                id,
-                thread_id,
-                sequence_index,
-                status,
-                user_message_id,
-                created_at,
-                ended_at,
-                updated_at
-            )
-            VALUES (
-                'turn-1',
-                'thread-1',
-                0,
-                'ended',
-                'message-user',
-                '2026-05-21T00:01:00Z',
-                '2026-05-21T00:02:00Z',
-                '2026-05-21T00:02:00Z'
-            )
-            """
-        )
-        connection.execute(
-            """
-            INSERT INTO agent_message (
-                id,
-                thread_id,
-                turn_id,
-                sequence_index,
-                kind,
-                ui_author,
-                content_blocks,
-                provider_payload,
-                status,
-                created_at,
-                updated_at,
-                finalized_at
-            )
-            VALUES (
-                'message-user',
-                'thread-1',
-                'turn-1',
-                0,
-                'user',
-                'user',
-                '[{"type":"text","text":"Analyze this file"}]',
-                '{}',
-                'completed',
-                '2026-05-21T00:01:00Z',
-                '2026-05-21T00:01:00Z',
-                '2026-05-21T00:01:00Z'
-            )
-            """
-        )
-        connection.execute("PRAGMA user_version=10")
-
+    _create_v14_fixture(database_path(paths))
     context = StorageBootstrapService().initialize(paths)
 
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
-    assert {
-        "thread_id",
-        "turn_id",
-        "run_id",
-        "provider_name",
-        "model",
-        "request_kind",
-        "status",
-        "input_message_ids",
-        "output_message_ids",
-        "usage_payload",
-        "created_at",
-        "completed_at",
-    }.issubset(_table_columns(context, "agent_provider_request"))
-    with context.engine.connect() as connection:
-        message_rows = connection.exec_driver_sql(
-            """
-            SELECT id, kind, ui_author, turn_id, sequence_index, content_blocks
-            FROM agent_message
-            WHERE thread_id='thread-1'
-            ORDER BY sequence_index
-            """
-        ).all()
-
-    assert [str(row[1]) for row in message_rows] == ["SYSTEM", "USER"]
-    assert [int(row[4]) for row in message_rows] == [0, 1]
-    assert str(message_rows[0][2]) == "SYSTEM"
-    assert str(message_rows[0][3]) == "turn-1"
-    assert json.loads(str(message_rows[0][5])) == [{"type": "text", "text": "You are Xenix."}]
+    assert context.schema_version == 15
     with context.session_factory() as session:
-        system_message = session.get(AgentMessageRow, str(message_rows[0][0]))
-
-    assert system_message is not None
-    assert system_message.kind is AgentMessageKind.SYSTEM
-    assert system_message.ui_author is AgentMessageAuthor.SYSTEM
-    assert system_message.status is AgentMessageStatus.COMPLETED
-
-
-def test_storage_bootstrap_migrates_v12_thread_selected_model_schema(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    db_path = database_path(paths)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    import sqlite3
-
-    with sqlite3.connect(db_path) as connection:
-        connection.execute(
-            """
-            CREATE TABLE agent_thread (
-                id VARCHAR NOT NULL PRIMARY KEY,
-                title VARCHAR,
-                system_prompt VARCHAR NOT NULL,
-                created_at DATETIME NOT NULL,
-                updated_at DATETIME NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            INSERT INTO agent_thread (id, title, system_prompt, created_at, updated_at)
-            VALUES ('thread-1', 'Thread', 'Prompt', '2026-01-01 00:00:00', '2026-01-01 00:00:00')
-            """
-        )
-        connection.execute("PRAGMA user_version=12")
-
-    context = StorageBootstrapService().initialize(paths)
-
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
-    assert "selected_fq_model_key" in _table_columns(context, "agent_thread")
-    with context.engine.connect() as connection:
-        indexes = {
-            str(row[1])
-            for row in connection.exec_driver_sql("PRAGMA index_list(agent_thread)").all()
-        }
-    assert "ix_agent_thread_selected_fq_model_key" in indexes
-    with context.session_factory() as session:
-        thread = session.get(AgentThreadRow, "thread-1")
-
-    assert thread is not None
-    assert thread.selected_fq_model_key is None
-
-
-def test_storage_bootstrap_migrates_v11_message_enum_names(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    db_path = database_path(paths)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    import sqlite3
-
-    with sqlite3.connect(db_path) as connection:
-        connection.execute(
-            """
-            CREATE TABLE agent_message (
-                id VARCHAR NOT NULL PRIMARY KEY,
-                thread_id VARCHAR NOT NULL,
-                turn_id VARCHAR,
-                sequence_index INTEGER NOT NULL,
-                kind VARCHAR,
-                ui_author VARCHAR,
-                content_blocks JSON NOT NULL,
-                provider_payload JSON NOT NULL,
-                status VARCHAR,
-                created_at DATETIME NOT NULL,
-                updated_at DATETIME NOT NULL,
-                finalized_at DATETIME
-            )
-            """
-        )
-        connection.execute(
-            """
-            INSERT INTO agent_message (
-                id,
-                thread_id,
-                turn_id,
-                sequence_index,
-                kind,
-                ui_author,
-                content_blocks,
-                provider_payload,
-                status,
-                created_at,
-                updated_at,
-                finalized_at
-            )
-            VALUES (
-                'message-system',
-                'thread-1',
-                'turn-1',
-                0,
-                'system',
-                'system',
-                '[{"type":"text","text":"You are Xenix."}]',
-                '{}',
-                'completed',
-                '2026-05-21T00:01:00Z',
-                '2026-05-21T00:01:00Z',
-                '2026-05-21T00:01:00Z'
-            )
-            """
-        )
-        connection.execute(
-            """
-            INSERT INTO agent_message (
-                id,
-                thread_id,
-                turn_id,
-                sequence_index,
-                kind,
-                ui_author,
-                content_blocks,
-                provider_payload,
-                status,
-                created_at,
-                updated_at,
-                finalized_at
-            )
-            VALUES (
-                'message-user',
-                'thread-1',
-                'turn-1',
-                1,
-                'user',
-                'user',
-                '[{"type":"text","text":"Analyze this file"}]',
-                '{}',
-                'completed',
-                '2026-05-21T00:01:00Z',
-                '2026-05-21T00:01:00Z',
-                '2026-05-21T00:01:00Z'
-            )
-            """
-        )
-        connection.execute("PRAGMA user_version=11")
-
-    context = StorageBootstrapService().initialize(paths)
-
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
-    with context.engine.connect() as connection:
-        rows = connection.exec_driver_sql(
-            """
-            SELECT id, kind, ui_author, status
-            FROM agent_message
-            ORDER BY sequence_index
-            """
-        ).all()
-
-    assert [(str(row[1]), str(row[2]), str(row[3])) for row in rows] == [
-        ("SYSTEM", "SYSTEM", "completed"),
-        ("USER", "USER", "completed"),
+        artifact = session.get(ArtifactRow, "artifact-1")
+        assert artifact is not None
+        assert artifact.kind is ArtifactKind.FILE
+        assert artifact.metadata_payload == {"domain": "fact"}
+        assert artifact.preview_payload == {"preview": True}
+        messages = session.exec(select(ConversationMessageRow).order_by(ConversationMessageRow.sequence_index)).all()
+    assert [message.id for message in messages] == ["user-1", "call-1", "result-1", "user-2"]
+    assert [message.kind for message in messages] == [
+        ConversationMessageKind.USER,
+        ConversationMessageKind.TOOL_CALL,
+        ConversationMessageKind.TOOL_RESULT,
+        ConversationMessageKind.USER,
     ]
-    with context.session_factory() as session:
-        system_message = session.get(AgentMessageRow, "message-system")
-        user_message = session.get(AgentMessageRow, "message-user")
-
-    assert system_message is not None
-    assert system_message.kind is AgentMessageKind.SYSTEM
-    assert system_message.ui_author is AgentMessageAuthor.SYSTEM
-    assert system_message.status is AgentMessageStatus.COMPLETED
-    assert user_message is not None
-    assert user_message.kind is AgentMessageKind.USER
-    assert user_message.ui_author is AgentMessageAuthor.USER
-
-
-def test_storage_bootstrap_uses_ai_first_baseline_without_work_item_schema(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-
-    context = StorageBootstrapService().initialize(paths)
-
+    assert messages[2].tool_call_message_id == "call-1"
+    assert messages[1].provider_call_id == "provider-call-1"
+    assert messages[1].content_payload == {"tool_name": "data.query", "provider_name": "data_query"}
+    assert messages[-1].client_submission_id == "submission-2"
     with context.engine.connect() as connection:
-        table_names = {
+        names = {
             str(row[0])
             for row in connection.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'").all()
         }
-        ml_task_columns = {
-            str(row[1])
-            for row in connection.exec_driver_sql("PRAGMA table_info(ml_task)").all()
-        }
-        dataset_columns = {
-            str(row[1])
-            for row in connection.exec_driver_sql("PRAGMA table_info(dataset)").all()
-        }
-        trained_model_columns = {
-            str(row[1])
-            for row in connection.exec_driver_sql("PRAGMA table_info(trained_model)").all()
-        }
-        agent_message_columns = {
-            str(row[1])
-            for row in connection.exec_driver_sql("PRAGMA table_info(agent_message)").all()
-        }
-        agent_thread_columns = {
-            str(row[1])
-            for row in connection.exec_driver_sql("PRAGMA table_info(agent_thread)").all()
-        }
-        column_binding_columns = {
-            str(row[1])
-            for row in connection.exec_driver_sql("PRAGMA table_info(dataset_column_binding)").all()
-        }
-        guard_columns = {
-            str(row[1])
-            for row in connection.exec_driver_sql("PRAGMA table_info(agent_turn_completion_guard)").all()
-        }
-        provider_request_columns = {
-            str(row[1])
-            for row in connection.exec_driver_sql("PRAGMA table_info(agent_provider_request)").all()
-        }
-
-    assert CURRENT_SCHEMA_VERSION == 14
-    assert "work_item" not in table_names
-    assert "dataset_column_selection" not in table_names
-    assert "dataset_column_binding" in table_names
-    assert "dataset_import" in table_names
-    assert "dataset_workbook" in table_names
-    assert "agent_turn_completion_guard" in table_names
-    assert "agent_provider_request" in table_names
-    assert "derived_from_dataset_id" in dataset_columns
-    assert {"import_id", "workbook_id", "sheet_name", "sheet_index"}.issubset(dataset_columns)
-    assert {
-        "dataset_id",
-        "role_bindings",
-        "model_key",
-        "model_family",
-        "model_task_kind",
-        "schema_version",
-        "created_at",
-    }.issubset(column_binding_columns)
-    assert {"turn_id", "attempt_index", "input", "output", "created_at"}.issubset(guard_columns)
-    assert {
-        "thread_id",
-        "turn_id",
-        "run_id",
-        "provider_name",
-        "model",
-        "request_kind",
-        "status",
-        "input_message_ids",
-        "output_message_ids",
-        "usage_payload",
-        "created_at",
-        "completed_at",
-    }.issubset(provider_request_columns)
-    assert {"status", "updated_at", "finalized_at"}.issubset(agent_message_columns)
-    assert "selected_fq_model_key" in agent_thread_columns
-    assert "work_item_id" not in ml_task_columns
-    assert "work_item_id" not in trained_model_columns
+    assert "artifact" in names
+    assert not names.intersection({"agent_thread", "agent_turn", "agent_message", "agent_run", "agent_tool_call"})
+    upgraded_shape = _target_shape(context)
+    assert "tool_call_message_id" in upgraded_shape[0]
+    assert "ux_conversation_message_pending_thread" in upgraded_shape[1]
+    assert upgraded_shape[2]

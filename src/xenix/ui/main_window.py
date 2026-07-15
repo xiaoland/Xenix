@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from PySide6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, Signal
+from PySide6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -29,19 +30,14 @@ from ..i18n import TranslationManager
 from ..services.agent import (
     AgentHarnessService,
     AgentHarnessStreamEvent,
-    ChatbotEventStatus,
-    ContinueStepBudgetInput,
     SourceAttachmentInput,
     SubmitUserTurnInput,
-    ThreadSnapshot,
-    build_thinking_chatbot_event,
 )
-from ..services.artifact_service import ArtifactService, RegisterArtifactInput
+from ..services.artifact_service import ArtifactService
 from ..services.dataset_service import DatasetService
 from ..services.link_router import LinkRouter
-from ..services.llm import LLMService, LLMSettingsService
+from ..services.llm import ConversationSnapshot, LLMService, LLMSettingsService
 from ..services.ml.worker_settings import MLWorkerSettingsService
-from ..services.storage.models import ArtifactKind
 from .chatbot import ComposerAttachmentStatus, ThreadDetailView
 from .icons import plus_icon
 from .layout_debug import dump_layout_if_enabled
@@ -70,7 +66,6 @@ class _ServiceLinkActivationFailed:
 @dataclass
 class _ComposerAttachmentRecord:
     path: str
-    attachment_id: str
     attachment: SourceAttachmentInput
 
 
@@ -119,11 +114,10 @@ class MainWindow(QMainWindow):
         self._ml_service = ml_service
         self._update_service = update_service
         self._agent_thread_id: str | None = None
-        self._active_agent_run_id: str | None = None
+        self._active_pending_message_id: str | None = None
         self._composer_attachments: dict[str, _ComposerAttachmentRecord] = {}
         self._pending_submission_restore: _PendingSubmissionRestore | None = None
-        self._pending_step_confirmation: AgentHarnessStreamEvent | None = None
-        self._cancelled_agent_run_ids: set[str] = set()
+        self._cancelled_pending_message_ids: set[str] = set()
         self._settings_dialog: SettingsDialog | None = None
         self._tool_call_detail_views: list[ToolCallDetailView] = []
         self._thread_title_progress_dialog: QProgressDialog | None = None
@@ -157,10 +151,9 @@ class MainWindow(QMainWindow):
         self._thread_detail_view.attachment_removed.connect(self._discard_composer_attachment)
         self._thread_detail_view.model_selected.connect(self._update_thread_model)
         self._thread_detail_view.service_link_activated.connect(self._open_service_link)
+        self._thread_detail_view.source_file_activated.connect(self._open_source_file)
         self._thread_detail_view.tool_action_requested.connect(self._handle_tool_action)
         self._thread_detail_view.stop_requested.connect(self._request_harness_stop)
-        self._thread_detail_view.step_budget_continue_requested.connect(self._continue_step_budget)
-        self._thread_detail_view.step_budget_stop_requested.connect(self._stop_step_budget)
         self._harness_failed.connect(self._render_harness_error)
         self._harness_stream_event.connect(self._render_harness_stream_event)
         self._thread_title_generated.connect(self._finish_generated_thread_title)
@@ -271,7 +264,7 @@ class MainWindow(QMainWindow):
             selected_fq_model_key=selected or self._llm_service.default_fq_model_key(),
         )
 
-    def _sync_thread_model_picker(self, snapshot: ThreadSnapshot) -> None:
+    def _sync_thread_model_picker(self, snapshot: ConversationSnapshot) -> None:
         selected = snapshot.thread.selected_fq_model_key or self._llm_service.default_fq_model_key()
         self._thread_detail_view.set_selected_fq_model_key(selected)
 
@@ -304,8 +297,6 @@ class MainWindow(QMainWindow):
         self._settings_dialog.activateWindow()
 
     def _submit_chat_message(self, text: str, file_paths: list[str], fq_model_key: str) -> None:
-        self._pending_step_confirmation = None
-        self._thread_detail_view.clear_step_confirmation()
         source_attachments = self._ready_source_attachments(file_paths)
         if source_attachments is None:
             return
@@ -334,7 +325,7 @@ class MainWindow(QMainWindow):
             ComposerAttachmentStatus.PENDING,
         )
         try:
-            attachment = self._register_source_attachment_artifact(normalized_path)
+            attachment = self._source_attachment_input(normalized_path)
         except Exception as exc:
             self._thread_detail_view.set_attachment_status(
                 normalized_path,
@@ -345,7 +336,6 @@ class MainWindow(QMainWindow):
             return
         self._composer_attachments[normalized_path] = _ComposerAttachmentRecord(
             path=normalized_path,
-            attachment_id=attachment.artifact_id,
             attachment=attachment,
         )
         self._thread_detail_view.set_attachment_status(
@@ -375,19 +365,6 @@ class MainWindow(QMainWindow):
             self._thread_detail_view.set_running(False)
             return
 
-        user_blocks = []
-        if text:
-            user_blocks.append({"type": "text", "text": text})
-        for attachment in source_attachments:
-            user_blocks.append({"type": "source_attachment", **attachment.model_dump(mode="json")})
-        self._thread_detail_view.add_user_message(user_blocks)
-        self._thread_detail_view.add_thinking_event(
-            build_thinking_chatbot_event(
-                run_id=f"local:{uuid4().hex}",
-                turn_id=None,
-                status=ChatbotEventStatus.IN_PROGRESS,
-            )
-        )
         self._thread_detail_view.set_running(True)
         self._pending_submission_restore = _PendingSubmissionRestore(
             text=text,
@@ -403,47 +380,11 @@ class MainWindow(QMainWindow):
 
         threading.Thread(target=run_harness, name="xenix-agent-harness", daemon=True).start()
 
-    def _register_source_attachment_artifact(self, file_path: str) -> SourceAttachmentInput:
-        source_path = Path(file_path).expanduser().resolve()
-        source_format = self._source_format_for_path(source_path)
-        artifact = self._artifact_service.register_artifact(
-            RegisterArtifactInput(
-                kind=ArtifactKind.FILE,
-                title=source_path.name,
-                absolute_path=str(source_path),
-                mime_type=self._mime_type_for_source_format(source_format),
-                metadata_payload={
-                    "source_attachment": {
-                        "file_name": source_path.name,
-                        "source_format": source_format,
-                    },
-                },
-            )
-        )
-        return SourceAttachmentInput(
-            artifact_id=artifact.id,
-            file_name=source_path.name,
-            source_format=source_format,
-        )
-
-    def _source_format_for_path(self, source_path: Path) -> str:
-        suffix = source_path.suffix.lower()
-        if suffix == ".csv":
-            return "csv"
-        if suffix == ".xlsx":
-            return "xlsx"
-        if suffix == ".xls":
-            return "xls"
-        return suffix.lstrip(".") or "unknown"
-
-    def _mime_type_for_source_format(self, source_format: str) -> str | None:
-        if source_format == "csv":
-            return "text/csv"
-        if source_format == "xlsx":
-            return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        if source_format == "xls":
-            return "application/vnd.ms-excel"
-        return None
+    def _source_attachment_input(self, file_path: str) -> SourceAttachmentInput:
+        source_path = Path(file_path).expanduser().resolve(strict=True)
+        if not source_path.is_file():
+            raise ValueError(self.tr("The selected source path is not a file."))
+        return SourceAttachmentInput(file_path=str(source_path))
 
     def _ready_source_attachments(self, file_paths: list[str]) -> list[SourceAttachmentInput] | None:
         attachments: list[SourceAttachmentInput] = []
@@ -457,30 +398,39 @@ class MainWindow(QMainWindow):
     def _discard_composer_attachment(self, file_path: str) -> None:
         self._composer_attachments.pop(str(Path(file_path).resolve()), None)
 
-    def _render_harness_snapshot(self, snapshot: ThreadSnapshot) -> None:
+    @staticmethod
+    def _open_source_file(file_path: str) -> None:
+        """Open an ephemeral Chatbot source target without treating it as an Artifact."""
+
+        try:
+            source_path = Path(file_path).expanduser().resolve(strict=True)
+        except (OSError, RuntimeError):
+            return
+        if source_path.is_file():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(source_path)))
+
+    def _render_harness_snapshot(self, snapshot: ConversationSnapshot) -> None:
         self._agent_thread_id = snapshot.thread.id
-        self._active_agent_run_id = None
-        self._pending_step_confirmation = None
+        self._active_pending_message_id = None
         self._sync_thread_model_picker(snapshot)
         self._thread_detail_view.hide_thinking_indicator()
         self._thread_detail_view.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
-        self._thread_detail_view.clear_step_confirmation()
         self._thread_detail_view.set_running(False)
         self._refresh_history_sidebar(selected_thread_id=snapshot.thread.id)
 
     def _render_harness_stream_event(self, event) -> None:
-        if event.run_id in self._cancelled_agent_run_ids and event.kind != "snapshot":
+        if event.pending_message_id in self._cancelled_pending_message_ids and event.kind != "snapshot":
             return
-        if event.run_id is not None:
+        if event.pending_message_id is not None:
             self._pending_submission_restore = None
         if event.kind == "snapshot" and event.snapshot is not None:
             if event.is_final:
-                if event.run_id is not None:
-                    self._cancelled_agent_run_ids.discard(event.run_id)
+                if event.pending_message_id is not None:
+                    self._cancelled_pending_message_ids.discard(event.pending_message_id)
                 self._render_harness_snapshot(event.snapshot)
                 return
             self._agent_thread_id = event.snapshot.thread.id
-            self._active_agent_run_id = event.run_id
+            self._active_pending_message_id = event.pending_message_id
             self._sync_thread_model_picker(event.snapshot)
             self._thread_detail_view.render_events(
                 event.chatbot_events
@@ -489,24 +439,13 @@ class MainWindow(QMainWindow):
             )
             self._refresh_history_sidebar(selected_thread_id=event.snapshot.thread.id)
             return
-        if event.kind == "chatbot_event" and event.chatbot_event is not None:
+        if event.kind in {"chatbot_event", "thinking", "activity", "connection"} and event.chatbot_event is not None:
             self._thread_detail_view.apply_chatbot_event(event.chatbot_event)
-            return
-        if event.kind == "step_confirmation_required":
-            self._render_step_confirmation(event)
-            return
-        if event.kind in {"message_created", "message_updated", "message_finalized"}:
-            if event.chatbot_event is not None:
-                self._thread_detail_view.apply_chatbot_event(event.chatbot_event)
-            elif event.message is not None:
-                self._thread_detail_view.apply_message_event(event.message)
             return
 
     def _render_harness_error(self, message: str) -> None:
-        self._pending_step_confirmation = None
-        self._thread_detail_view.clear_step_confirmation()
         self._thread_detail_view.hide_thinking_indicator()
-        if self._pending_submission_restore is not None and self._active_agent_run_id is None:
+        if self._pending_submission_restore is not None and self._active_pending_message_id is None:
             pending = self._pending_submission_restore
             self._pending_submission_restore = None
             self._restore_stable_message_view()
@@ -627,98 +566,21 @@ class MainWindow(QMainWindow):
             self._tool_call_detail_views.remove(view)
 
     def _request_harness_stop(self) -> None:
-        if self._pending_submission_restore is not None and self._active_agent_run_id is None:
+        if self._pending_submission_restore is not None and self._active_pending_message_id is None:
             self._thread_detail_view.show_error(self.tr("The submitted message is being prepared and cannot be stopped."))
             return
-        if self._active_agent_run_id is not None:
-            self._agent_harness_service.cancel_run(self._active_agent_run_id)
-            self._cancelled_agent_run_ids.add(self._active_agent_run_id)
+        if self._active_pending_message_id is not None:
+            self._agent_harness_service.cancel_sampling(self._active_pending_message_id)
+            self._cancelled_pending_message_ids.add(self._active_pending_message_id)
         self._thread_detail_view.hide_thinking_indicator()
         self._thread_detail_view.set_running(False)
         self._thread_detail_view.show_error("Stopped.")
-
-    def _render_step_confirmation(self, event: AgentHarnessStreamEvent) -> None:
-        if event.snapshot is not None:
-            self._agent_thread_id = event.snapshot.thread.id
-            self._sync_thread_model_picker(event.snapshot)
-            self._thread_detail_view.render_events(
-                event.chatbot_events
-                if event.chatbot_events is not None
-                else self._agent_harness_service.project_chatbot_events(event.snapshot)
-            )
-            self._refresh_history_sidebar(selected_thread_id=event.snapshot.thread.id)
-        elif event.thread_id is not None:
-            self._agent_thread_id = event.thread_id
-            self._refresh_history_sidebar(selected_thread_id=event.thread_id)
-        self._pending_step_confirmation = event
-        self._active_agent_run_id = None
-        self._thread_detail_view.set_running(False)
-        self._thread_detail_view.show_step_confirmation(
-            self.tr("Step budget used: {used}/{max}. Continue with up to {steps} more steps?").format(
-                used=str(event.used_steps),
-                max=str(event.max_total_steps),
-                steps=str(event.suggested_steps),
-            )
-        )
-
-    def _continue_step_budget(self) -> None:
-        if self._pending_step_confirmation is None:
-            return
-        pending = self._pending_step_confirmation
-        if pending.thread_id is None or pending.turn_id is None or pending.run_id is None:
-            return
-        self._pending_step_confirmation = None
-        self._active_agent_run_id = pending.run_id
-        self._cancelled_agent_run_ids.discard(pending.run_id)
-        self._thread_detail_view.clear_step_confirmation()
-        self._thread_detail_view.set_running(True)
-
-        def run_harness() -> None:
-            try:
-                for event in self._agent_harness_service.continue_step_budget_stream(
-                    ContinueStepBudgetInput(
-                        thread_id=pending.thread_id,
-                        turn_id=pending.turn_id,
-                        run_id=pending.run_id,
-                        additional_steps=pending.suggested_steps,
-                    )
-                ):
-                    self._harness_stream_event.emit(event)
-            except Exception as exc:
-                self._harness_failed.emit(str(exc))
-
-        threading.Thread(target=run_harness, name="xenix-agent-harness-resume", daemon=True).start()
-
-    def _stop_step_budget(self) -> None:
-        if self._pending_step_confirmation is None:
-            return
-        pending = self._pending_step_confirmation
-        if pending.thread_id is None or pending.turn_id is None or pending.run_id is None:
-            return
-        self._pending_step_confirmation = None
-        self._active_agent_run_id = None
-        self._thread_detail_view.clear_step_confirmation()
-        try:
-            snapshot = self._agent_harness_service.stop_step_budget_confirmation(
-                ContinueStepBudgetInput(
-                    thread_id=pending.thread_id,
-                    turn_id=pending.turn_id,
-                    run_id=pending.run_id,
-                    additional_steps=0,
-                )
-            )
-        except Exception as exc:
-            self._render_harness_error(str(exc))
-            return
-        self._render_harness_snapshot(snapshot)
 
     def _reload_agent_provider(self) -> None:
         self._sync_model_picker_options()
 
     def _create_agent_thread(self) -> None:
-        self._pending_step_confirmation = None
-        self._active_agent_run_id = None
-        self._thread_detail_view.clear_step_confirmation()
+        self._active_pending_message_id = None
         snapshot = self._agent_harness_service.create_thread(
             interface_locale=self._translation_manager.current_locale(),
         )
@@ -755,10 +617,8 @@ class MainWindow(QMainWindow):
         snapshot = self._agent_harness_service.get_thread_snapshot(thread_id)
         self._agent_thread_id = thread_id
         self._sync_thread_model_picker(snapshot)
-        if self._pending_step_confirmation is not None and self._pending_step_confirmation.thread_id != thread_id:
-            self._pending_step_confirmation = None
-            self._active_agent_run_id = None
-            self._thread_detail_view.clear_step_confirmation()
+        if self._active_pending_message_id is not None:
+            self._active_pending_message_id = None
         self._thread_detail_view.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
 
     def _open_history_item_menu(self, position: QPoint) -> None:
@@ -915,9 +775,7 @@ class MainWindow(QMainWindow):
         self._agent_harness_service.delete_thread(thread_id)
         if deleting_current:
             self._agent_thread_id = None
-            self._pending_step_confirmation = None
-            self._active_agent_run_id = None
-            self._thread_detail_view.clear_step_confirmation()
+            self._active_pending_message_id = None
             self._thread_detail_view.clear_messages()
 
         self._refresh_history_sidebar(selected_thread_id=None if deleting_current else self._agent_thread_id)

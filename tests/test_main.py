@@ -4,6 +4,7 @@ import threading
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from PySide6.QtCore import QEvent, QMimeData, QPoint, QPointF, Qt, QUrl
@@ -23,15 +24,9 @@ from xenix.services.agent import (
 )
 from xenix.services.agent.dev_fixtures import MESSAGE_RENDERING_FIXTURE_TITLE, ensure_mock_conversation_history
 from xenix.services.artifact_service import RegisterArtifactInput
-from xenix.services.llm import LLMProviderConfig, LLMSettings, PACKAGED_TRIAL_SECRET_SOURCE
+from xenix.services.llm import LLMProviderConfig, LLMSettings, PACKAGED_TRIAL_SECRET_SOURCE, ProviderResponse
 from xenix.services.storage.migrations import CURRENT_SCHEMA_VERSION
-from xenix.services.storage.models import (
-    AgentMessageAuthor,
-    AgentMessageKind,
-    AgentMessageRow,
-    AgentMessageStatus,
-    ArtifactKind,
-)
+from xenix.services.storage.models import ArtifactKind, ConversationMessageKind, ConversationMessageRow
 from xenix.trial_lock import TrialLockCheck, TrialLockReason
 from xenix.ui import icons as ui_icons
 from xenix.ui.chatbot import _format_token_count, _render_svg_preview_pixmap
@@ -64,7 +59,7 @@ class _FakeFileDropEvent:
 
 
 def _seed_mock_history(window) -> None:
-    ensure_mock_conversation_history(window._agent_harness_service._conversation_store)
+    ensure_mock_conversation_history(window._agent_harness_service)
     window._refresh_history_sidebar()
     current_item = window._history_list.currentItem()
     if current_item is not None:
@@ -595,9 +590,7 @@ def test_main_window_renders_tool_calls(monkeypatch, tmp_path: Path) -> None:
         assert tool_items
         assert all(item.width() == window._thread_detail_view._message_column.width() for item in tool_items)
         summaries = [item._summary_label.text() for item in tool_items]
-        assert "Queried dataset" in summaries
-        assert "Trained model" in summaries
-        assert "Applied model" in summaries
+        assert summaries == ["Ran tool"]
     finally:
         window.close()
 
@@ -615,7 +608,6 @@ def test_thread_detail_view_expands_tool_event_detail(monkeypatch, tmp_path: Pat
             ChatbotEvent(
                 id="tool-event",
                 kind=ChatbotEventKind.TOOL,
-                turn_id="turn",
                 sequence_index=0,
                 author=ChatbotEventAuthor.TOOL,
                 status=ChatbotEventStatus.FAILED,
@@ -674,7 +666,6 @@ def test_thread_detail_view_removes_connection_retry_after_recovery(monkeypatch,
             ChatbotEvent(
                 id="provider-request:connection",
                 kind=ChatbotEventKind.CONNECTION,
-                turn_id="turn",
                 sequence_index=0,
                 author=ChatbotEventAuthor.ASSISTANT,
                 status=ChatbotEventStatus.IN_PROGRESS,
@@ -702,7 +693,6 @@ def test_thread_detail_view_removes_connection_retry_after_recovery(monkeypatch,
             ChatbotEvent(
                 id="provider-request:connection",
                 kind=ChatbotEventKind.CONNECTION,
-                turn_id="turn",
                 sequence_index=0,
                 author=ChatbotEventAuthor.ASSISTANT,
                 status=ChatbotEventStatus.COMPLETED,
@@ -747,7 +737,6 @@ def test_thread_detail_view_renders_tool_image_artifact_preview(monkeypatch, tmp
         assert thread_id is not None
         artifact = window._artifact_service.register_artifact(
             RegisterArtifactInput(
-                thread_id=thread_id,
                 title="Tool chart",
                 absolute_path=str(artifact_path.resolve()),
                 kind=ArtifactKind.IMAGE,
@@ -762,7 +751,6 @@ def test_thread_detail_view_renders_tool_image_artifact_preview(monkeypatch, tmp
             ChatbotEvent(
                 id="tool-image-event",
                 kind=ChatbotEventKind.TOOL,
-                turn_id="turn",
                 sequence_index=0,
                 author=ChatbotEventAuthor.TOOL,
                 status=ChatbotEventStatus.COMPLETED,
@@ -809,7 +797,6 @@ def test_thread_detail_view_renders_turn_usage_overview(monkeypatch, tmp_path: P
             ChatbotEvent(
                 id="turn-usage",
                 kind=ChatbotEventKind.USAGE,
-                turn_id="turn",
                 sequence_index=3,
                 author=ChatbotEventAuthor.ASSISTANT,
                 status=ChatbotEventStatus.COMPLETED,
@@ -866,6 +853,56 @@ def test_main_window_new_thread_button_creates_and_selects_empty_thread(monkeypa
         assert current_item.data(Qt.UserRole) == window._agent_thread_id
         assert current_item.text() == "Untitled conversation"
         assert window._thread_detail_view._message_layout.count() == 1
+    finally:
+        window.close()
+
+
+def test_main_window_first_message_refreshes_history_title(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    class TextProvider:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def complete(self, _messages, _tools) -> ProviderResponse:
+            self.calls += 1
+            return ProviderResponse(assistant_content_blocks=[{"type": "text", "text": "Done."}])
+
+    app, window = build_main_window(show=False)
+    try:
+        provider = TextProvider()
+        window._agent_harness_service.set_provider(provider)
+        window._new_thread_button.click()
+        app.processEvents()
+        thread_id = window._agent_thread_id
+        assert thread_id is not None
+
+        window._submit_chat_message(
+            "Analyze weekly revenue by region.",
+            [],
+            window._thread_detail_view.selected_fq_model_key(),
+        )
+        for _ in range(100):
+            app.processEvents()
+            if not window._thread_detail_view._running:
+                break
+            time.sleep(0.01)
+
+        history_item = next(
+            (
+                window._history_list.item(index)
+                for index in range(window._history_list.count())
+                if window._history_list.item(index).data(Qt.UserRole) == thread_id
+            ),
+            None,
+        )
+        assert window._thread_detail_view._running is False
+        assert provider.calls == 1
+        assert history_item is not None
+        assert history_item.text() == "Analyze weekly revenue by region"
+        assert window._agent_harness_service.get_thread_snapshot(thread_id).thread.title == history_item.text()
     finally:
         window.close()
 
@@ -1101,7 +1138,7 @@ def test_main_window_generated_thread_title_cancel_preserves_title(monkeypatch, 
         window.close()
 
 
-def test_main_window_step_budget_confirmation_can_continue(monkeypatch, tmp_path: Path) -> None:
+def test_main_window_stop_cancels_active_sampling(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
@@ -1109,71 +1146,14 @@ def test_main_window_step_budget_confirmation_can_continue(monkeypatch, tmp_path
     app, window = build_main_window(show=True)
     try:
         assert window._agent_harness_service is not None
-        window._new_thread_button.click()
-        app.processEvents()
-        thread_id = window._agent_thread_id
-        assert thread_id is not None
-        snapshot = window._agent_harness_service.get_thread_snapshot(thread_id)
-        event = AgentHarnessStreamEvent(
-            kind="step_confirmation_required",
-            thread_id=thread_id,
-            turn_id="turn-for-confirmation",
-            run_id="run-for-confirmation",
-            snapshot=snapshot,
-            used_steps=16,
-            suggested_steps=8,
-            max_total_steps=64,
-        )
+        cancelled_pending_ids: list[str] = []
+        monkeypatch.setattr(window._agent_harness_service, "cancel_sampling", lambda value: cancelled_pending_ids.append(value))
 
-        window._render_harness_stream_event(event)
-        app.processEvents()
-
-        assert window._pending_step_confirmation == event
-        assert window._thread_detail_view._step_confirmation_bar.isVisibleTo(window)
-        assert window._thread_detail_view._editor.isEnabled() is False
-        assert "16/64" in window._thread_detail_view._step_confirmation_label.text()
-
-        captured_inputs = []
-
-        def fake_continue(input_data):
-            captured_inputs.append(input_data)
-            yield AgentHarnessStreamEvent(kind="snapshot", thread_id=thread_id, snapshot=snapshot, is_final=True)
-
-        monkeypatch.setattr(window._agent_harness_service, "continue_step_budget_stream", fake_continue)
-        window._thread_detail_view._step_continue_button.click()
-        for _ in range(40):
-            app.processEvents()
-            if captured_inputs and not window._thread_detail_view._running:
-                break
-            time.sleep(0.01)
-
-        assert len(captured_inputs) == 1
-        assert captured_inputs[0].thread_id == thread_id
-        assert captured_inputs[0].turn_id == "turn-for-confirmation"
-        assert captured_inputs[0].run_id == "run-for-confirmation"
-        assert captured_inputs[0].additional_steps == 8
-        assert window._pending_step_confirmation is None
-        assert window._thread_detail_view._step_confirmation_bar.isHidden() is True
-    finally:
-        window.close()
-
-
-def test_main_window_stop_cancels_active_agent_run(monkeypatch, tmp_path: Path) -> None:
-    runtime_home = tmp_path / "xenix-home"
-    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
-    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
-
-    app, window = build_main_window(show=True)
-    try:
-        assert window._agent_harness_service is not None
-        cancelled_run_ids: list[str] = []
-        monkeypatch.setattr(window._agent_harness_service, "cancel_run", lambda run_id: cancelled_run_ids.append(run_id))
-
-        window._active_agent_run_id = "run-to-stop"
+        window._active_pending_message_id = "pending-to-stop"
         window._thread_detail_view.set_running(True)
         window._thread_detail_view.apply_chatbot_event(
             ChatbotEvent(
-                id="run-to-stop:activity:1",
+                id="pending-to-stop:activity:1",
                 kind=ChatbotEventKind.ACTIVITY,
                 author=ChatbotEventAuthor.ASSISTANT,
                 status=ChatbotEventStatus.IN_PROGRESS,
@@ -1182,10 +1162,10 @@ def test_main_window_stop_cancels_active_agent_run(monkeypatch, tmp_path: Path) 
         window._thread_detail_view._send_button.click()
         app.processEvents()
 
-        assert cancelled_run_ids == ["run-to-stop"]
+        assert cancelled_pending_ids == ["pending-to-stop"]
         assert window._thread_detail_view._running is False
         assert window._thread_detail_view._thinking_bubble is None
-        assert "run-to-stop" in window._cancelled_agent_run_ids
+        assert "pending-to-stop" in window._cancelled_pending_message_ids
     finally:
         window.close()
 
@@ -1349,7 +1329,6 @@ def test_thread_detail_view_activity_event_is_bottom_temporary_message(monkeypat
             ChatbotEvent(
                 id="activity-event",
                 kind=ChatbotEventKind.ACTIVITY,
-                turn_id="turn",
                 author=ChatbotEventAuthor.ASSISTANT,
                 status=ChatbotEventStatus.IN_PROGRESS,
             )
@@ -1365,7 +1344,6 @@ def test_thread_detail_view_activity_event_is_bottom_temporary_message(monkeypat
             ChatbotEvent(
                 id="assistant-event",
                 kind=ChatbotEventKind.TEXT,
-                turn_id="turn",
                 author=ChatbotEventAuthor.ASSISTANT,
                 status=ChatbotEventStatus.COMPLETED,
                 content_blocks=[{"type": "markdown", "text": "Done."}],
@@ -1374,6 +1352,204 @@ def test_thread_detail_view_activity_event_is_bottom_temporary_message(monkeypat
         app.processEvents()
 
         assert view._thinking_bubble is None
+    finally:
+        window.close()
+
+
+def test_thread_detail_view_does_not_leave_a_blank_reasoning_only_assistant_bubble(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=True)
+    try:
+        view = window._thread_detail_view
+        view.clear_messages()
+        view.add_thinking_event(
+            ChatbotEvent(
+                id="pending:thinking",
+                kind=ChatbotEventKind.THINKING,
+                author=ChatbotEventAuthor.ASSISTANT,
+                status=ChatbotEventStatus.IN_PROGRESS,
+            )
+        )
+
+        view.apply_message_event(
+            SimpleNamespace(
+                id="reasoning-only",
+                kind=ConversationMessageKind.ASSISTANT,
+                content_payload={},
+                text=None,
+                reasoning="Internal reasoning only.",
+                refusal=None,
+            )
+        )
+        app.processEvents()
+
+        assert view._thinking_bubble is None
+        assert view._message_layout.count() == 1
+    finally:
+        window.close()
+
+
+def test_thread_detail_view_does_not_render_hidden_user_attachment_only_events(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=True)
+    try:
+        view = window._thread_detail_view
+        view.clear_messages()
+        view.render_events(
+            [
+                ChatbotEvent(
+                    id="hidden-dataset",
+                    kind=ChatbotEventKind.TEXT,
+                    author=ChatbotEventAuthor.USER,
+                    content_blocks=[
+                        {
+                            "type": "dataset",
+                            "dataset_id": "dataset-1",
+                            "chatbot_visible": False,
+                        }
+                    ],
+                ),
+                ChatbotEvent(
+                    id="hidden-source",
+                    kind=ChatbotEventKind.TEXT,
+                    author=ChatbotEventAuthor.USER,
+                    content_blocks=[
+                        {
+                            "type": "source_attachment",
+                            "artifact_id": "artifact-1",
+                            "file_name": "input.csv",
+                            "chatbot_visible": False,
+                        }
+                    ],
+                ),
+            ]
+        )
+        app.processEvents()
+
+        assert view._message_layout.count() == 1
+    finally:
+        window.close()
+
+
+def test_thread_detail_view_renders_assistant_text_and_refusal_but_not_reasoning(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=True)
+    try:
+        view = window._thread_detail_view
+        view.render_events(
+            [
+                ChatbotEvent(
+                    id="assistant-text",
+                    kind=ChatbotEventKind.TEXT,
+                    author=ChatbotEventAuthor.ASSISTANT,
+                    content_blocks=[
+                        {"type": "text", "text": "Visible answer."},
+                        {"type": "reasoning", "text": "Internal detail."},
+                    ],
+                    text="Visible answer.",
+                    reasoning="Internal detail.",
+                    source_message_ids=["assistant-text"],
+                ),
+                ChatbotEvent(
+                    id="assistant-refusal",
+                    kind=ChatbotEventKind.TEXT,
+                    author=ChatbotEventAuthor.ASSISTANT,
+                    content_blocks=[
+                        {"type": "reasoning", "text": "Internal detail."},
+                        {"type": "refusal", "text": "I cannot help with that."},
+                    ],
+                    reasoning="Internal detail.",
+                    refusal="I cannot help with that.",
+                    source_message_ids=["assistant-refusal"],
+                ),
+            ]
+        )
+        app.processEvents()
+
+        bubbles = [
+            item.widget()
+            for index in range(view._message_layout.count())
+            if (item := view._message_layout.itemAt(index)) is not None
+            and item.widget() is not None
+            and item.widget().objectName() == "chatMessageRow"
+        ]
+        assert len(bubbles) == 2
+        assert bubbles[0]._blocks == [{"type": "text", "text": "Visible answer."}]
+        assert bubbles[1]._blocks == [{"type": "text", "text": "I cannot help with that."}]
+    finally:
+        window.close()
+
+
+def test_thread_detail_view_projects_source_attachment_without_rendering_its_path(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    source = tmp_path / "customers.csv"
+    source.write_text("customer,value\nAcme,12\n", encoding="utf-8")
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=True)
+    try:
+        view = window._thread_detail_view
+        source_path = str(source.resolve())
+        activated: list[str] = []
+        view.source_file_activated.connect(activated.append)
+
+        view.render_events(
+            [
+                ChatbotEvent(
+                    id="dataset-only",
+                    kind=ChatbotEventKind.TEXT,
+                    author=ChatbotEventAuthor.USER,
+                    content_blocks=[{"type": "dataset", "dataset_id": "dataset-1", "name": "Customers"}],
+                )
+            ]
+        )
+        assert view._message_layout.count() == 1
+
+        event = ChatbotEvent(
+            id="source-projection",
+            kind=ChatbotEventKind.TEXT,
+            author=ChatbotEventAuthor.USER,
+            content_blocks=[
+                {"type": "dataset", "dataset_id": "dataset-1", "name": "Customers"},
+                {
+                    "type": "source_attachment",
+                    "chatbot_source_projection": True,
+                    "file_name": source.name,
+                    "file_path": source_path,
+                    "is_openable": True,
+                },
+            ],
+        )
+        view.render_events([event])
+        app.processEvents()
+
+        bubble = view._event_widgets_by_id[event.id]
+        assert source_path not in bubble._browser.document().toHtml()
+        target = next(iter(bubble._source_attachment_targets))
+        bubble._handle_link_activated(target)
+        assert activated == [source_path]
     finally:
         window.close()
 
@@ -1397,7 +1573,7 @@ def test_main_window_keeps_thinking_indicator_during_non_final_snapshot(monkeypa
             yield AgentHarnessStreamEvent(
                 kind="snapshot",
                 thread_id=thread_id,
-                run_id="run-thinking",
+                pending_message_id="pending-thinking",
                 snapshot=snapshot,
                 chatbot_events=[],
                 is_final=False,
@@ -1405,11 +1581,10 @@ def test_main_window_keeps_thinking_indicator_during_non_final_snapshot(monkeypa
             yield AgentHarnessStreamEvent(
                 kind="chatbot_event",
                 thread_id=thread_id,
-                run_id="run-thinking",
+                pending_message_id="pending-thinking",
                 chatbot_event=ChatbotEvent(
-                    id="run-thinking:activity:1",
+                    id="pending-thinking:activity:1",
                     kind=ChatbotEventKind.ACTIVITY,
-                    turn_id="turn-thinking",
                     author=ChatbotEventAuthor.ASSISTANT,
                     status=ChatbotEventStatus.IN_PROGRESS,
                 ),
@@ -1473,7 +1648,7 @@ def test_main_window_submit_chat_message_injects_interface_locale(monkeypatch, t
         window.close()
 
 
-def test_main_window_submit_chat_message_uses_registered_source_attachments(monkeypatch, tmp_path: Path) -> None:
+def test_main_window_submit_chat_message_uses_transient_source_file_inputs(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     data_file = tmp_path / "customers.csv"
     data_file.write_text("name,value\nAcme,12\n", encoding="utf-8")
@@ -1510,16 +1685,14 @@ def test_main_window_submit_chat_message_uses_registered_source_attachments(monk
         assert submitted.dataset_attachments == []
         assert len(submitted.source_attachments) == 1
         attachment = submitted.source_attachments[0]
-        assert attachment.file_name == "customers.csv"
-        assert attachment.source_format == "csv"
-        resolved_artifact = window._artifact_service.resolve_uri(f"artifact://{attachment.artifact_id}")
-        assert resolved_artifact.absolute_path == resolved_path
+        assert attachment.file_path == resolved_path
+        assert not hasattr(attachment, "artifact_id")
         assert not hasattr(submitted, "file_paths")
     finally:
         window.close()
 
 
-def test_main_window_attach_file_registers_source_artifact(
+def test_main_window_attach_file_keeps_source_input_out_of_artifact_storage(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -1545,10 +1718,8 @@ def test_main_window_attach_file_registers_source_artifact(
             time.sleep(0.01)
 
         record = window._composer_attachments[resolved_path]
-        assert record.attachment.file_name == "customers.csv"
-        assert record.attachment.source_format == "csv"
-        resolved_artifact = window._artifact_service.resolve_uri(f"artifact://{record.attachment.artifact_id}")
-        assert resolved_artifact.absolute_path == resolved_path
+        assert record.attachment.file_path == resolved_path
+        assert not hasattr(record, "attachment_id")
         assert window._thread_detail_view._send_button.isEnabled() is True
     finally:
         window.close()
@@ -1571,7 +1742,7 @@ def test_main_window_pre_run_harness_error_restores_composer_source_attachments(
             text="Analyze this.",
             file_paths=[resolved_path],
         )
-        window._active_agent_run_id = None
+        window._active_pending_message_id = None
         window._thread_detail_view.add_user_message(
             [
                 {"type": "text", "text": "Analyze this."},
@@ -1602,8 +1773,7 @@ def test_main_window_pre_run_harness_error_restores_composer_source_attachments(
         assert window._thread_detail_view._attached_files == [resolved_path]
         assert window._thread_detail_view._message_layout.count() == 2
         record = window._composer_attachments[resolved_path]
-        assert record.attachment.file_name == "customers.csv"
-        assert record.attachment.source_format == "csv"
+        assert record.attachment.file_path == resolved_path
         assert window._thread_detail_view._send_button.isEnabled() is True
     finally:
         window.close()
@@ -1874,20 +2044,17 @@ def test_thread_detail_view_preserves_user_scroll_during_streaming_update(monkey
         assert view._scroll_to_bottom_button.isVisible()
 
         view.apply_message_event(
-            AgentMessageRow(
+            ConversationMessageRow(
                 id="assistant-message",
                 thread_id="thread",
-                turn_id="turn",
                 sequence_index=0,
-                kind=AgentMessageKind.ASSISTANT,
-                ui_author=AgentMessageAuthor.ASSISTANT,
-                content_blocks=[
+                kind=ConversationMessageKind.ASSISTANT,
+                content_payload={"content_blocks": [
                     {
                         "type": "markdown",
                         "text": "\n\n".join(f"Expanded streaming line {index}" for index in range(110)),
                     }
-                ],
-                status=AgentMessageStatus.IN_PROGRESS,
+                ]},
             )
         )
         for _ in range(12):
@@ -1917,27 +2084,21 @@ def test_thread_detail_view_updates_one_assistant_message_by_id(monkeypatch, tmp
         view = window._thread_detail_view
         view.clear_messages()
         view.apply_message_event(
-            AgentMessageRow(
+            ConversationMessageRow(
                 id="assistant-message",
                 thread_id="thread",
-                turn_id="turn",
                 sequence_index=0,
-                kind=AgentMessageKind.ASSISTANT,
-                ui_author=AgentMessageAuthor.ASSISTANT,
-                content_blocks=[{"type": "markdown", "text": "Streaming "}],
-                status=AgentMessageStatus.IN_PROGRESS,
+                kind=ConversationMessageKind.ASSISTANT,
+                content_payload={"content_blocks": [{"type": "markdown", "text": "Streaming "}]},
             )
         )
         view.apply_message_event(
-            AgentMessageRow(
+            ConversationMessageRow(
                 id="assistant-message",
                 thread_id="thread",
-                turn_id="turn",
                 sequence_index=0,
-                kind=AgentMessageKind.ASSISTANT,
-                ui_author=AgentMessageAuthor.ASSISTANT,
-                content_blocks=[{"type": "markdown", "text": "Streaming assistant message."}],
-                status=AgentMessageStatus.COMPLETED,
+                kind=ConversationMessageKind.ASSISTANT,
+                content_payload={"content_blocks": [{"type": "markdown", "text": "Streaming assistant message."}]},
             )
         )
         for _ in range(8):
@@ -1974,7 +2135,6 @@ def test_thread_detail_view_artifact_link_resolves_and_opens_file(monkeypatch, t
         assert thread_id is not None
         artifact = window._artifact_service.register_artifact(
             RegisterArtifactInput(
-                thread_id=thread_id,
                 title="Prediction results",
                 absolute_path=str(artifact_path.resolve()),
                 kind=ArtifactKind.PREDICTION,
@@ -2046,7 +2206,6 @@ def test_thread_detail_view_renders_inline_image_artifact_preview(monkeypatch, t
         assert thread_id is not None
         artifact = window._artifact_service.register_artifact(
             RegisterArtifactInput(
-                thread_id=thread_id,
                 title="Amount distribution",
                 absolute_path=str(artifact_path.resolve()),
                 kind=ArtifactKind.IMAGE,
@@ -2171,7 +2330,7 @@ def test_main_window_uses_aimock_settings_in_development(monkeypatch, tmp_path: 
             and (bubble := item.widget()) is not None
             and getattr(getattr(bubble, "_card", None), "objectName", lambda: "")() == "chatMessageAssistant"
             for block in getattr(bubble, "_blocks", [])
-            if block.get("type") == "markdown"
+                if block.get("type") in {"text", "markdown"}
         ]
 
         assert streamed_text in assistant_texts
