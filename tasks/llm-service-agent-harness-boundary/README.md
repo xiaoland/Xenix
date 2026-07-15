@@ -8,8 +8,8 @@ Establish an evidence-backed boundary between LLM Service, canonical interaction
 
 - Sir authorized investigation and task-packet restructuring on 2026-07-14. Product mutations remain whole-task-specific: the complete cross-owner cutover needs one approved Impact Handshake before it is applied.
 - Do not treat an architecture preference as a defect without a reproduced failure or a violated invariant.
-- Preserve only complete canonical conversation protocol units: a final LLM emission containing Tool Call Messages commits together with its Tool Result Messages. Domain side effects remain outside that SQLite transaction and may be orphaned by an accepted process-loss trade; preserve bounded completion-guard behavior, final-history convergence, and typed Chatbot projection.
-- Keep provider configuration, transport, retry, response normalization, the Thread/Message interface, typed Message algebra, context projection, pending/final LLM Message lifecycle, AgentTool abstraction/registry/invocation, and canonical conversation state at the LLM boundary. Keep import coordination, sampling/tool-call policy, in-process step/guard/cancellation policy, and Chatbot-event projection at the Harness boundary. No third top-level conversation service is in scope.
+- Preserve only complete canonical conversation protocol units: a final LLM emission containing Tool Call Messages commits together with its Tool Result Messages. Domain side effects remain outside that SQLite transaction and may be orphaned by an accepted process-loss trade; preserve final-history convergence and typed Chatbot projection. Legacy completion-guard artifacts are not current connected lifecycle behavior.
+- Keep provider configuration, transport, retry, response normalization, the Thread/Message interface, typed Message algebra, context projection, pending/final LLM Message lifecycle, AgentTool abstraction/registry/invocation, and canonical conversation state at the LLM boundary. Keep import coordination, live sampling/cancellation policy, and Chatbot-event projection at the Harness boundary. No third top-level conversation service is in scope.
 - Observability is cross-cutting, not a third conversation owner: logs, traces, metrics, retry timing, and raw diagnostic wire data may be persisted by observability, but are never a source for conversation replay, tool-outcome reconstruction, or state repair.
 - Tool interface and implementation are different things, but `AgentTool` is LLM-owned. LLM Service owns the Tool protocol, registry, exposed-scope validation, and invocation operation. Concrete adapters implement the LLM protocol and are wired by composition; Harness bootstrap may call the registration interface but never owns registry/lookup/dispatch/lifecycle. LLM Service never imports Harness or concrete/domain tool modules.
 - SQLite remains the authority for bounded local application state. Forward migrations, fresh bootstrap, upgrade, ORM readability, and focused repository behavior must be proven for any schema change.
@@ -47,11 +47,17 @@ Establish an evidence-backed boundary between LLM Service, canonical interaction
   source-provenance authority; Harness derives an ephemeral Chatbot source
   attachment. `data.list` remains explicitly deferred. See
   [23-dataset-block-contract-reduction-stage.md](23-dataset-block-contract-reduction-stage.md).
+- Stage 24 has reconciled durable owners with the delivered boundary: a Product
+  TDD topology/sequence contract and ADR, a corrected Unit TDD, and minimal
+  PRD/observability guidance. It deliberately leaves unresolved
+  Dataset-disposal, legacy guard/step-budget, Artifact-URI, and ToolResult
+  local-path decisions out of the documentation mutation. See
+  [24-durable-documentation-reconciliation-stage.md](24-durable-documentation-reconciliation-stage.md).
 
 ## Next Step
 
-Perform combined manual acceptance for stages 19–23: Dataset context and
-reasoning-only bubbles, automatic initial title, token usage projection,
-Thread deletion/pending rejection, and source attachment projection/reopen.
-`data.list` remains out of scope. No commit is authorized until Sir explicitly
-requests one.
+Sir reviews Stage 24's documentation reconciliation. Combined manual acceptance
+for stages 19–23 remains: Dataset context and reasoning-only bubbles, automatic
+initial title, token usage projection, Thread deletion/pending rejection, and
+source attachment projection/reopen. `data.list` remains out of scope. No
+commit is authorized until Sir explicitly requests one.

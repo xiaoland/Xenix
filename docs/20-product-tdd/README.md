@@ -17,16 +17,21 @@ UI -> services -> adapters and persistence
   state, construct storage paths, or bypass services to operate on persisted data.
 - Services own workflow semantics, validation, orchestration, and the coordination
   of SQLite records with filesystem artifacts.
-- Agent Harness owns conversation and provider/tool orchestration. Data, artifact,
-  and ML services retain their domain authority.
+- `LLMConversationService` owns canonical Thread/Message state, provider-facing
+  context and adapter interaction, and the LLM-owned AgentTool
+  protocol/registry/validation/invocation. Agent Harness owns live intake/import,
+  sampling/cancellation policy, and snapshot-to-Chatbot-event projection. Data,
+  artifact, and ML services retain their domain authority.
 - Adapters own provider, filesystem, database, and ML execution mechanics without
   becoming product-state authorities.
 - SSH workers provide execution and cache capacity. Successful remote work is
   finalized into local service-owned state and artifacts.
 
-Internal invariants of Agent Harness and Chatbot UI belong in
-[Unit TDD](../30-unit-tdd/README.md). Runtime paths, setup, migration,
-observability, and recovery belong in [Deployment](../40-deployment/README.md).
+The [LLM conversation boundary](llm-conversation-boundary.md) owns its
+cross-unit topology and sequence. Fine-grained lifecycle and projection
+invariants belong in [Unit TDD](../30-unit-tdd/README.md). Runtime paths, setup,
+migration, observability, and recovery belong in
+[Deployment](../40-deployment/README.md).
 
 ## Contract Routes
 
@@ -34,6 +39,7 @@ observability, and recovery belong in [Deployment](../40-deployment/README.md).
 | --- | --- | --- |
 | [Storage ownership](storage-ownership.md) | Services, persistence, Agent, data, artifact, and ML | State and bytes acquire competing authorities or unsafe deletion behavior. |
 | [Artifact links](artifact-links.md) | Producing services, Agent Harness, Chatbot UI, LinkRouter, and ArtifactService | Dataset ids, artifact ids, or local paths become interchangeable and unsafe. |
+| [LLM conversation boundary](llm-conversation-boundary.md) | Chatbot UI, Agent Harness, LLMConversationService, providers, Tool implementations, and DatasetService | A reverse dependency, second writer, or persistent execution authority reappears. |
 | [ML task lifecycle](ml-task-lifecycle.md) | Agent tools, ML services, persistence, workers, and UI | Task state, placement, finalization, and result ownership diverge. |
 | [Architecture decisions](adr/README.md) | Units affected by each accepted decision | Rationale and compatibility consequences are lost or silently rewritten. |
 

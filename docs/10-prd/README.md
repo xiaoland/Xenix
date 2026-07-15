@@ -31,14 +31,14 @@ supports, and what uncertainty remains.
 4. Review explanations in the conversation and open generated datasets, charts,
    models, reports, and apply results as local artifacts.
 5. Configure supported LLM providers and choose the LLM model used by the next
-   turn without changing a turn already in progress.
+   assistant response without changing sampling already in progress.
 
 ## Rules and Scope
 
 - Xenix serves one local operator. Accounts, roles, tenancy, and concurrent-user
   coordination are out of scope.
-- User-selected source files remain intact. Cleaning, preparation, and
-  transformation create derived registered data.
+- Xenix does not mutate or delete user-selected source files. Cleaning,
+  preparation, and transformation create derived registered data.
 - Dataset identities are inputs to later work. User-openable outputs are
   service-registered artifacts.
 - Local services, SQLite state, and local canonical artifacts remain authoritative.
@@ -53,7 +53,8 @@ supports, and what uncertainty remains.
 
 - **Dataset**: registered tabular data available to Xenix analysis and model work.
 - **Artifact**: a service-registered result that the user can open or preview.
-- **LLM model**: the provider model selected to conduct a conversation turn.
+- **LLM model**: the provider model selected for a conversation's next assistant
+  response.
 - **Trained analyzer**: a reusable analysis or ML result that can be applied to
   compatible data; UI copy may call it a trained model.
 - **ML worker**: local or SSH-backed execution capacity selected by Xenix services;

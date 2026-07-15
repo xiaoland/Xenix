@@ -16,6 +16,11 @@ Message id, Tool Result, or replay state. Missing or rotated journal data hides
 that overview only; it must never repair conversation state, Tool execution, or
 provider history.
 
+When OTLP metrics are enabled, the same normalized usage counts may also leave
+the device as metrics, tagged with operation and a hashed model key. They still
+contain no prompt, raw provider payload, Thread/Message id, or Tool Result, but
+their retention and access control are owned by the configured telemetry backend.
+
 `config/telemetry.json` stores a randomly generated persistent install id. It is not derived from machine identity, but it correlates activity across runs and therefore remains sensitive.
 
 ## OTLP Enablement
