@@ -16,6 +16,8 @@ _EXPORTS = {
     "thinking_chatbot_event_id": ".chatbot_events",
     "AgentHarnessService": ".harness_service",
     "AgentHarnessStreamEvent": ".harness_service",
+    "AttachmentImportProgress": ".harness_service",
+    "AttachmentImportStatus": ".harness_service",
     "DatasetAttachmentInput": ".harness_service",
     "SubmitUserTurnInput": ".harness_service",
     "OpenAICompatibleChatProvider": ".providers",

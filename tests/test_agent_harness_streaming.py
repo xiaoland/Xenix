@@ -3,9 +3,13 @@ from pathlib import Path
 import threading
 from types import SimpleNamespace
 
+import pytest
+
 from xenix.config import ensure_app_dirs, get_app_paths
+from xenix.exceptions import ValidationError
 from xenix.services.agent import (
     AgentHarnessService,
+    AttachmentImportStatus,
     ChatbotEventKind,
     SourceAttachmentInput,
     SubmitUserTurnInput,
@@ -48,6 +52,27 @@ class RecordingTextProvider:
     def complete(self, messages, _tools):
         self.messages = list(messages)
         return ProviderResponse(assistant_content_blocks=[{"type": "text", "text": "Imported."}])
+
+
+class BlockingImportDatasetService:
+    def __init__(self) -> None:
+        self.started = threading.Event()
+        self.release = threading.Event()
+
+    def register_dataset_attachment(self, _input):
+        self.started.set()
+        if not self.release.wait(timeout=5):
+            raise AssertionError("Dataset import test barrier timed out.")
+        return SimpleNamespace(
+            datasets=[
+                SimpleNamespace(
+                    dataset_id="imported-dataset",
+                    name="blocked-import",
+                    row_count=1,
+                    column_count=2,
+                )
+            ]
+        )
 
 
 def test_thinking_event_is_live_chatbot_event_and_never_persisted(monkeypatch, tmp_path: Path) -> None:
@@ -428,3 +453,175 @@ def test_source_import_persists_only_dataset_context_and_reopens_when_source_is_
     assert unavailable["file_name"] == "customers.csv"
     assert unavailable["file_path"] is None
     assert unavailable["is_openable"] is False
+
+
+def test_source_import_progress_is_path_free_and_precedes_append_ack_and_thinking(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    source = tmp_path / "progress.csv"
+    source.write_text("customer,value\nAcme,12\n", encoding="utf-8")
+    submission_id = "import-progress"
+    harness = AgentHarnessService(
+        conversation_service=LLMConversationService(
+            session_factory=context.session_factory,
+            tool_registry=AgentToolRegistry(),
+        ),
+        provider=RecordingTextProvider(),
+        dataset_service=DatasetService(context.session_factory, paths),
+    )
+
+    events = list(
+        harness.submit_user_turn_stream(
+            SubmitUserTurnInput(
+                text="Analyze this source.",
+                source_attachments=[SourceAttachmentInput(file_path=str(source))],
+                client_submission_id=submission_id,
+            )
+        )
+    )
+
+    import_events = [event for event in events if event.kind == "attachment_import"]
+    assert len(import_events) == 1
+    progress_event = import_events[0]
+    assert progress_event.thread_id is not None
+    assert progress_event.client_submission_id == submission_id
+    assert progress_event.attachment_import is not None
+    assert progress_event.attachment_import.source_index == 0
+    assert progress_event.attachment_import.status is AttachmentImportStatus.PENDING
+    assert progress_event.snapshot is None
+    assert progress_event.chatbot_event is None
+    assert progress_event.chatbot_events is None
+    assert progress_event.is_final is False
+    assert str(source) not in repr(progress_event)
+
+    import_index = events.index(progress_event)
+    append_ack_index = next(
+        index
+        for index, event in enumerate(events)
+        if event.kind == "snapshot" and not event.is_final
+    )
+    thinking_index = next(index for index, event in enumerate(events) if event.kind == "thinking")
+    assert import_index < append_ack_index < thinking_index
+    append_ack = events[append_ack_index]
+    assert append_ack.snapshot is not None
+    assert append_ack.snapshot.messages[0].kind.value == "user"
+
+
+def test_source_import_pending_is_visible_while_materialization_blocks_append_and_sampling(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    source = tmp_path / "blocked.csv"
+    source.write_text("customer,value\nAcme,12\n", encoding="utf-8")
+    importer = BlockingImportDatasetService()
+    provider = RecordingTextProvider()
+    harness = AgentHarnessService(
+        conversation_service=LLMConversationService(
+            session_factory=context.session_factory,
+            tool_registry=AgentToolRegistry(),
+        ),
+        provider=provider,
+        dataset_service=importer,  # type: ignore[arg-type]
+    )
+
+    stream = harness.submit_user_turn_stream(
+        SubmitUserTurnInput(
+            text="Analyze this source.",
+            source_attachments=[SourceAttachmentInput(file_path=str(source))],
+            client_submission_id="blocked-import",
+        )
+    )
+    pending = next(stream)
+
+    assert pending.kind == "attachment_import"
+    assert pending.client_submission_id == "blocked-import"
+    assert pending.attachment_import is not None
+    assert pending.attachment_import.status is AttachmentImportStatus.PENDING
+    assert pending.attachment_import.source_index == 0
+    assert str(source) not in repr(pending)
+    assert not importer.started.is_set()
+
+    outcome: list[object] = []
+    errors: list[Exception] = []
+
+    def consume() -> None:
+        try:
+            outcome.extend(stream)
+        except Exception as exc:  # Surface worker failures in the test thread.
+            errors.append(exc)
+
+    worker = threading.Thread(target=consume, daemon=True)
+    worker.start()
+    assert importer.started.wait(timeout=2)
+    assert pending.thread_id is not None
+    assert harness.get_thread_snapshot(pending.thread_id).messages == []
+    assert provider.messages == []
+    assert not any(event.kind == "thinking" for event in outcome)
+
+    importer.release.set()
+    worker.join(timeout=3)
+
+    assert not worker.is_alive()
+    assert errors == []
+    events = [pending, *outcome]
+    append_ack_index = next(
+        index
+        for index, event in enumerate(events)
+        if event.kind == "snapshot" and not event.is_final
+    )
+    thinking_index = next(index for index, event in enumerate(events) if event.kind == "thinking")
+    assert append_ack_index < thinking_index
+
+
+def test_source_import_failure_emits_path_free_failed_event_without_append_or_thinking(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    context = StorageBootstrapService().initialize(paths)
+    source = tmp_path / "missing.csv"
+    submission_id = "import-failure"
+    harness = AgentHarnessService(
+        conversation_service=LLMConversationService(
+            session_factory=context.session_factory,
+            tool_registry=AgentToolRegistry(),
+        ),
+        provider=TextProvider(),
+        dataset_service=DatasetService(context.session_factory, paths),
+    )
+
+    stream = harness.submit_user_turn_stream(
+        SubmitUserTurnInput(
+            text="Analyze this source.",
+            source_attachments=[SourceAttachmentInput(file_path=str(source))],
+            client_submission_id=submission_id,
+        )
+    )
+    pending = next(stream)
+    failed = next(stream)
+
+    assert pending.kind == failed.kind == "attachment_import"
+    assert pending.thread_id == failed.thread_id
+    assert pending.client_submission_id == failed.client_submission_id == submission_id
+    assert pending.attachment_import is not None
+    assert failed.attachment_import is not None
+    assert pending.attachment_import.status is AttachmentImportStatus.PENDING
+    assert failed.attachment_import.status is AttachmentImportStatus.FAILED
+    assert pending.attachment_import.source_index == failed.attachment_import.source_index == 0
+    assert str(source) not in repr(pending)
+    assert str(source) not in repr(failed)
+
+    with pytest.raises(ValidationError):
+        next(stream)
+
+    assert pending.thread_id is not None
+    snapshot = harness.get_thread_snapshot(pending.thread_id)
+    assert snapshot.messages == []

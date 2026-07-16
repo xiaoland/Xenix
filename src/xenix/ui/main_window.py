@@ -24,12 +24,14 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shiboken6 import isValid
 
 from ..config import AppPaths
 from ..i18n import TranslationManager
 from ..services.agent import (
     AgentHarnessService,
     AgentHarnessStreamEvent,
+    AttachmentImportStatus,
     SourceAttachmentInput,
     SubmitUserTurnInput,
 )
@@ -70,9 +72,11 @@ class _ComposerAttachmentRecord:
 
 
 @dataclass
-class _PendingSubmissionRestore:
+class _PendingComposerSubmission:
+    client_submission_id: str
     text: str
     file_paths: list[str]
+    append_acknowledged: bool = False
 
 
 class MainWindow(QMainWindow):
@@ -116,7 +120,7 @@ class MainWindow(QMainWindow):
         self._agent_thread_id: str | None = None
         self._active_pending_message_id: str | None = None
         self._composer_attachments: dict[str, _ComposerAttachmentRecord] = {}
-        self._pending_submission_restore: _PendingSubmissionRestore | None = None
+        self._pending_composer_submission: _PendingComposerSubmission | None = None
         self._cancelled_pending_message_ids: set[str] = set()
         self._settings_dialog: SettingsDialog | None = None
         self._tool_call_detail_views: list[ToolCallDetailView] = []
@@ -297,6 +301,8 @@ class MainWindow(QMainWindow):
         self._settings_dialog.activateWindow()
 
     def _submit_chat_message(self, text: str, file_paths: list[str], fq_model_key: str) -> None:
+        if self._pending_composer_submission is not None or self._active_pending_message_id is not None:
+            return
         source_attachments = self._ready_source_attachments(file_paths)
         if source_attachments is None:
             return
@@ -307,9 +313,8 @@ class MainWindow(QMainWindow):
             file_paths=file_paths,
             fq_model_key=fq_model_key,
             interface_locale=self._translation_manager.current_locale(),
+            client_submission_id=uuid4().hex,
         )
-        for file_path in file_paths:
-            self._composer_attachments.pop(str(Path(file_path).resolve()), None)
 
     def _register_source_attachments(self, file_paths: list[str]) -> None:
         for file_path in file_paths:
@@ -351,6 +356,7 @@ class MainWindow(QMainWindow):
         file_paths: list[str],
         fq_model_key: str,
         interface_locale: str,
+        client_submission_id: str,
     ) -> None:
         try:
             submit_input = SubmitUserTurnInput(
@@ -359,24 +365,28 @@ class MainWindow(QMainWindow):
                 source_attachments=source_attachments,
                 fq_model_key=fq_model_key or None,
                 interface_locale=interface_locale,
+                client_submission_id=client_submission_id,
             )
         except Exception as exc:
             self._thread_detail_view.show_error(str(exc))
-            self._thread_detail_view.set_running(False)
             return
 
-        self._thread_detail_view.set_running(True)
-        self._pending_submission_restore = _PendingSubmissionRestore(
+        self._pending_composer_submission = _PendingComposerSubmission(
+            client_submission_id=client_submission_id,
             text=text,
             file_paths=[str(Path(file_path).resolve()) for file_path in file_paths],
         )
+        self._thread_detail_view.begin_composer_submission(file_paths)
 
         def run_harness() -> None:
             try:
                 for event in self._agent_harness_service.submit_user_turn_stream(submit_input):
+                    if not isValid(self):
+                        return
                     self._harness_stream_event.emit(event)
             except Exception as exc:
-                self._harness_failed.emit(str(exc))
+                if isValid(self):
+                    self._harness_failed.emit(str(exc))
 
         threading.Thread(target=run_harness, name="xenix-agent-harness", daemon=True).start()
 
@@ -410,6 +420,7 @@ class MainWindow(QMainWindow):
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(source_path)))
 
     def _render_harness_snapshot(self, snapshot: ConversationSnapshot) -> None:
+        self._pending_composer_submission = None
         self._agent_thread_id = snapshot.thread.id
         self._active_pending_message_id = None
         self._sync_thread_model_picker(snapshot)
@@ -419,16 +430,23 @@ class MainWindow(QMainWindow):
         self._refresh_history_sidebar(selected_thread_id=snapshot.thread.id)
 
     def _render_harness_stream_event(self, event) -> None:
+        if event.kind == "attachment_import" and event.attachment_import is not None:
+            self._render_attachment_import_progress(event)
+            return
+        if event.kind == "title" and event.snapshot is not None:
+            # A late title update is metadata-only.  It must not replace the
+            # live event projection or alter the current sampling state.
+            self._refresh_history_sidebar(selected_thread_id=self._agent_thread_id)
+            return
         if event.pending_message_id in self._cancelled_pending_message_ids and event.kind != "snapshot":
             return
-        if event.pending_message_id is not None:
-            self._pending_submission_restore = None
         if event.kind == "snapshot" and event.snapshot is not None:
             if event.is_final:
                 if event.pending_message_id is not None:
                     self._cancelled_pending_message_ids.discard(event.pending_message_id)
                 self._render_harness_snapshot(event.snapshot)
                 return
+            self._acknowledge_composer_submission(event.client_submission_id)
             self._agent_thread_id = event.snapshot.thread.id
             self._active_pending_message_id = event.pending_message_id
             self._sync_thread_model_picker(event.snapshot)
@@ -440,19 +458,53 @@ class MainWindow(QMainWindow):
             self._refresh_history_sidebar(selected_thread_id=event.snapshot.thread.id)
             return
         if event.kind in {"chatbot_event", "thinking", "activity", "connection"} and event.chatbot_event is not None:
+            if event.pending_message_id is not None:
+                self._active_pending_message_id = event.pending_message_id
+                self._pending_composer_submission = None
+                self._thread_detail_view.set_running(True)
             self._thread_detail_view.apply_chatbot_event(event.chatbot_event)
             return
 
     def _render_harness_error(self, message: str) -> None:
         self._thread_detail_view.hide_thinking_indicator()
-        if self._pending_submission_restore is not None and self._active_pending_message_id is None:
-            pending = self._pending_submission_restore
-            self._pending_submission_restore = None
+        pending = self._pending_composer_submission
+        self._pending_composer_submission = None
+        if pending is not None and not pending.append_acknowledged:
+            # No canonical UserMessage exists yet.  The Composer still owns
+            # the captured input, including any per-tag FAILED state.
+            self._thread_detail_view.abort_composer_submission()
+        else:
+            # An append acknowledgement is irreversible from the UI's point
+            # of view.  Re-project canonical state; never offer a resend.
             self._restore_stable_message_view()
-            self._thread_detail_view.restore_composer(pending.text, pending.file_paths)
-            self._register_source_attachments(pending.file_paths)
+            self._thread_detail_view.abort_composer_submission()
+        self._active_pending_message_id = None
         self._thread_detail_view.show_error(message)
         self._thread_detail_view.set_running(False)
+
+    def _acknowledge_composer_submission(self, client_submission_id: str | None) -> None:
+        pending = self._pending_composer_submission
+        if pending is None or client_submission_id != pending.client_submission_id:
+            return
+        pending.append_acknowledged = True
+        for file_path in pending.file_paths:
+            self._composer_attachments.pop(file_path, None)
+        self._thread_detail_view.acknowledge_composer_submission()
+
+    def _render_attachment_import_progress(self, event: AgentHarnessStreamEvent) -> None:
+        progress = event.attachment_import
+        if progress is None:
+            return
+        pending = self._pending_composer_submission
+        if pending is None or event.client_submission_id != pending.client_submission_id:
+            return
+        if progress.source_index < 0 or progress.source_index >= len(pending.file_paths):
+            return
+        path = pending.file_paths[progress.source_index]
+        if progress.status is AttachmentImportStatus.PENDING:
+            self._thread_detail_view.set_attachment_status(path, ComposerAttachmentStatus.PENDING)
+        elif progress.status is AttachmentImportStatus.FAILED:
+            self._thread_detail_view.set_attachment_status(path, ComposerAttachmentStatus.FAILED)
 
     def _restore_stable_message_view(self) -> None:
         if self._agent_thread_id is None:
@@ -566,7 +618,7 @@ class MainWindow(QMainWindow):
             self._tool_call_detail_views.remove(view)
 
     def _request_harness_stop(self) -> None:
-        if self._pending_submission_restore is not None and self._active_pending_message_id is None:
+        if self._pending_composer_submission is not None and self._active_pending_message_id is None:
             self._thread_detail_view.show_error(self.tr("The submitted message is being prepared and cannot be stopped."))
             return
         if self._active_pending_message_id is not None:

@@ -351,3 +351,62 @@ def test_manual_rename_wins_while_title_model_is_running(monkeypatch, tmp_path: 
     assert renamed[0].thread.title == "Manual title"
     assert submitted[0].thread.title == "Manual title"
     assert harness.get_thread_snapshot(thread.thread.id).thread.title == "Manual title"
+
+
+def test_delayed_initial_title_does_not_block_append_ack_or_thinking_and_is_a_late_final_event(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    title_started = threading.Event()
+    release_title = threading.Event()
+    title_gateway = _TitleModelGateway(
+        output="Delayed title",
+        started=title_started,
+        release=release_title,
+    )
+    harness, _conversation, _primary = _harness(monkeypatch, tmp_path, title_gateway)
+    thread = harness.create_thread()
+
+    stream = harness.submit_user_turn_stream(
+        SubmitUserTurnInput(
+            thread_id=thread.thread.id,
+            text="Draft a delayed-title exchange.",
+            client_submission_id="delayed-title-stream",
+        )
+    )
+
+    append_ack = next(stream)
+    assert append_ack.kind == "snapshot"
+    assert append_ack.is_final is False
+    assert append_ack.snapshot is not None
+    assert append_ack.snapshot.thread.title is None
+    assert not title_started.is_set()
+
+    thinking = next(stream)
+    assert thinking.kind == "thinking"
+    assert thinking.pending_message_id is not None
+    assert not title_started.is_set()
+
+    primary_final = next(stream)
+    assert primary_final.kind == "snapshot"
+    assert primary_final.is_final is True
+    assert primary_final.snapshot is not None
+    assert primary_final.snapshot.thread.title is None
+    assert title_started.wait(timeout=2), "The title task should start after Thinking is emitted."
+
+    release_title.set()
+    title_event = next(stream)
+
+    assert title_event.kind == "title"
+    assert title_event.thread_id == thread.thread.id
+    assert title_event.pending_message_id is None
+    assert title_event.client_submission_id is None
+    assert title_event.attachment_import is None
+    assert title_event.chatbot_event is None
+    assert title_event.chatbot_events is None
+    assert title_event.snapshot is not None
+    assert title_event.snapshot.thread.title == "Delayed title"
+    assert title_event.is_final is True
+
+    with pytest.raises(StopIteration):
+        next(stream)

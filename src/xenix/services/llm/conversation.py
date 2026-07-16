@@ -223,23 +223,33 @@ class LLMConversationService:
         *,
         claim: SubmissionClaim,
         first_user_message_id: str,
+        appended_snapshot: ConversationSnapshot | None = None,
     ) -> ConversationSnapshot:
         """Persist metadata for a just-appended first UserMessage when eligible.
 
         The claim captures the pre-append eligibility from canonical state; the
-        caller supplies the first Message identity from the append result.
-        Provider I/O deliberately occurs after the short preflight gate and
-        before the short conditional-write gate, so a manual rename never
-        waits on the title model and always wins the race.
+        caller supplies the first Message identity from the append result.  A
+        Harness may retain that append snapshot while primary sampling begins;
+        using it as the preflight witness avoids a fast Assistant completion
+        changing the definition of the already-eligible initial exchange.
+        Provider I/O remains outside the write gate, so a manual rename never
+        waits on the title model and always wins the conditional write.
         """
 
         thread_id = claim.thread_id
         if not claim.initial_title_eligible:
             return self.get_thread_snapshot(thread_id)
-        with self._gate(thread_id):
-            snapshot = self.get_thread_snapshot(thread_id)
+        if appended_snapshot is not None:
+            if appended_snapshot.thread.id != thread_id:
+                raise ValidationError("The supplied append snapshot belongs to a different Thread.")
+            snapshot = appended_snapshot
             if not self._is_initial_title_target(snapshot, first_user_message_id):
-                return snapshot
+                return self.get_thread_snapshot(thread_id)
+        else:
+            with self._gate(thread_id):
+                snapshot = self.get_thread_snapshot(thread_id)
+                if not self._is_initial_title_target(snapshot, first_user_message_id):
+                    return snapshot
 
         title = self._automatic_initial_thread_title(snapshot)
         with self._gate(thread_id):

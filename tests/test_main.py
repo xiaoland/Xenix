@@ -17,6 +17,8 @@ from xenix.build_info import BUILD_COMMIT_DISPLAY
 from xenix.main import main
 from xenix.services.agent import (
     AgentHarnessStreamEvent,
+    AttachmentImportProgress,
+    AttachmentImportStatus,
     ChatbotEvent,
     ChatbotEventAuthor,
     ChatbotEventKind,
@@ -24,13 +26,19 @@ from xenix.services.agent import (
 )
 from xenix.services.agent.dev_fixtures import MESSAGE_RENDERING_FIXTURE_TITLE, ensure_mock_conversation_history
 from xenix.services.artifact_service import RegisterArtifactInput
-from xenix.services.llm import LLMProviderConfig, LLMSettings, PACKAGED_TRIAL_SECRET_SOURCE, ProviderResponse
+from xenix.services.llm import (
+    AppendUserMessageInput,
+    LLMProviderConfig,
+    LLMSettings,
+    PACKAGED_TRIAL_SECRET_SOURCE,
+    ProviderResponse,
+    TextBlock,
+)
 from xenix.services.storage.migrations import CURRENT_SCHEMA_VERSION
 from xenix.services.storage.models import ArtifactKind, ConversationMessageKind, ConversationMessageRow
 from xenix.trial_lock import TrialLockCheck, TrialLockReason
 from xenix.ui import icons as ui_icons
 from xenix.ui.chatbot import _format_token_count, _render_svg_preview_pixmap
-from xenix.ui.main_window import _PendingSubmissionRestore
 from xenix.ui.startup_splash import StartupSplash, StartupStage
 
 
@@ -886,7 +894,20 @@ def test_main_window_first_message_refreshes_history_title(monkeypatch, tmp_path
         )
         for _ in range(100):
             app.processEvents()
-            if not window._thread_detail_view._running:
+            history_item = next(
+                (
+                    window._history_list.item(index)
+                    for index in range(window._history_list.count())
+                    if window._history_list.item(index).data(Qt.UserRole) == thread_id
+                ),
+                None,
+            )
+            if (
+                provider.calls == 1
+                and not window._thread_detail_view._running
+                and history_item is not None
+                and history_item.text() == "Analyze weekly revenue by region"
+            ):
                 break
             time.sleep(0.01)
 
@@ -1247,7 +1268,10 @@ def test_thread_detail_view_enter_submits_and_shift_enter_inserts_newline(monkey
         app.processEvents()
 
         assert submitted == [("send with enter", [], "openai/gpt-4o-mini")]
-        assert editor.toPlainText() == ""
+        # A bare view has no Harness acknowledgement to consume its input.
+        # Send must therefore not optimistically erase what the user wrote.
+        assert editor.toPlainText() == "send with enter"
+        view.acknowledge_composer_submission()
 
         editor.setFocus()
         QTest.keyClicks(editor, "line one")
@@ -1725,7 +1749,7 @@ def test_main_window_attach_file_keeps_source_input_out_of_artifact_storage(
         window.close()
 
 
-def test_main_window_pre_run_harness_error_restores_composer_source_attachments(
+def test_main_window_keeps_composer_until_append_ack_then_enters_real_sampling(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -1735,46 +1759,214 @@ def test_main_window_pre_run_harness_error_restores_composer_source_attachments(
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
 
-    app, window = build_main_window(show=False)
+    app, window = build_main_window(show=True)
+    import_started = threading.Event()
+    allow_append_ack = threading.Event()
+    append_ack_emitted = threading.Event()
+    allow_thinking = threading.Event()
+    thinking_emitted = threading.Event()
+    finish_stream = threading.Event()
     try:
         resolved_path = str(data_file.resolve())
-        window._pending_submission_restore = _PendingSubmissionRestore(
-            text="Analyze this.",
-            file_paths=[resolved_path],
-        )
-        window._active_pending_message_id = None
-        window._thread_detail_view.add_user_message(
-            [
-                {"type": "text", "text": "Analyze this."},
-                {
-                    "type": "source_attachment",
-                    "artifact_id": "optimistic-artifact",
-                    "file_name": "customers.csv",
-                    "source_format": "csv",
-                },
-            ]
-        )
-        window._thread_detail_view.add_thinking_event(
-            ChatbotEvent(
-                id="optimistic-thinking",
-                kind=ChatbotEventKind.THINKING,
-                author=ChatbotEventAuthor.ASSISTANT,
-                status=ChatbotEventStatus.IN_PROGRESS,
-                content_blocks=[{"type": "thinking", "text": "Thinking..."}],
-            )
-        )
-        window._thread_detail_view.restore_composer("", [])
-        window._composer_attachments.clear()
-
-        window._render_harness_error("Import failed")
+        window._new_thread_button.click()
         app.processEvents()
+        thread_id = window._agent_thread_id
+        assert thread_id is not None
+        user_message_id: str | None = None
 
-        assert window._thread_detail_view._editor.toPlainText() == "Analyze this."
-        assert window._thread_detail_view._attached_files == [resolved_path]
-        assert window._thread_detail_view._message_layout.count() == 2
-        record = window._composer_attachments[resolved_path]
-        assert record.attachment.file_path == resolved_path
-        assert window._thread_detail_view._send_button.isEnabled() is True
+        def fake_submit(input_data):
+            nonlocal user_message_id
+            submission_id = input_data.client_submission_id
+            assert submission_id is not None
+            yield AgentHarnessStreamEvent(
+                kind="attachment_import",
+                thread_id=thread_id,
+                client_submission_id=submission_id,
+                attachment_import=AttachmentImportProgress(
+                    source_index=0,
+                    status=AttachmentImportStatus.PENDING,
+                ),
+            )
+            import_started.set()
+            assert allow_append_ack.wait(timeout=2)
+            snapshot = window._agent_harness_service._conversation_service.append_user_message(
+                AppendUserMessageInput(
+                    thread_id=thread_id,
+                    client_submission_id=submission_id,
+                    content_blocks=[TextBlock("Analyze this.")],
+                )
+            )
+            user_message_id = snapshot.messages[-1].id
+            yield AgentHarnessStreamEvent(
+                kind="snapshot",
+                thread_id=thread_id,
+                client_submission_id=submission_id,
+                snapshot=snapshot,
+                chatbot_events=window._agent_harness_service.project_chatbot_events(snapshot),
+            )
+            append_ack_emitted.set()
+            assert allow_thinking.wait(timeout=2)
+            yield AgentHarnessStreamEvent(
+                kind="thinking",
+                thread_id=thread_id,
+                pending_message_id="real-pending-message",
+                chatbot_event=ChatbotEvent(
+                    id="real-pending-message:thinking",
+                    kind=ChatbotEventKind.THINKING,
+                    author=ChatbotEventAuthor.ASSISTANT,
+                    status=ChatbotEventStatus.IN_PROGRESS,
+                    content_blocks=[{"type": "thinking", "text": "Thinking..."}],
+                ),
+            )
+            thinking_emitted.set()
+            assert finish_stream.wait(timeout=2)
+            yield AgentHarnessStreamEvent(
+                kind="snapshot",
+                thread_id=thread_id,
+                pending_message_id="real-pending-message",
+                snapshot=snapshot,
+                chatbot_events=window._agent_harness_service.project_chatbot_events(snapshot),
+                is_final=True,
+            )
+
+        monkeypatch.setattr(window._agent_harness_service, "submit_user_turn_stream", fake_submit)
+        view = window._thread_detail_view
+        view._add_local_files([resolved_path])
+        for _ in range(40):
+            app.processEvents()
+            if resolved_path in window._composer_attachments:
+                break
+            time.sleep(0.01)
+        view._editor.setPlainText("Analyze this.")
+        view._handle_button_clicked()
+
+        assert import_started.wait(timeout=2)
+        for _ in range(20):
+            app.processEvents()
+            time.sleep(0.01)
+
+        chip = view._attachment_layout.itemAt(0).widget()
+        assert chip is not None
+        assert chip.property("attachmentStatus") == AttachmentImportStatus.PENDING.value
+        assert view._editor.toPlainText() == "Analyze this."
+        assert view._attached_files == [resolved_path]
+        assert view._running is False
+        assert view._send_button.text() != "Stop"
+        assert view._send_button.isEnabled() is False
+        assert chip._remove_button.isEnabled() is False
+        assert view._thinking_bubble is None
+
+        allow_append_ack.set()
+        assert append_ack_emitted.wait(timeout=2)
+        for _ in range(20):
+            app.processEvents()
+            if user_message_id in view._message_bubbles_by_id:
+                break
+            time.sleep(0.01)
+
+        assert user_message_id is not None
+        assert user_message_id in view._message_bubbles_by_id
+        assert view._editor.toPlainText() == ""
+        assert view._attached_files == []
+        assert view._preparing_submission is True
+        assert view._running is False
+        assert view._thinking_bubble is None
+
+        allow_thinking.set()
+        assert thinking_emitted.wait(timeout=2)
+        for _ in range(20):
+            app.processEvents()
+            if view._thinking_bubble is not None:
+                break
+            time.sleep(0.01)
+
+        assert view._running is True
+        assert window._active_pending_message_id == "real-pending-message"
+        assert view._send_button.text() == "Stop"
+        assert view._thinking_bubble is not None
+    finally:
+        allow_append_ack.set()
+        allow_thinking.set()
+        finish_stream.set()
+        for _ in range(5):
+            app.processEvents()
+            time.sleep(0.01)
+        window.close()
+
+
+def test_main_window_import_failure_keeps_composer_and_marks_the_failed_tag(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    data_file = tmp_path / "customers.csv"
+    data_file.write_text("name,value\nAcme,12\n", encoding="utf-8")
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=True)
+    try:
+        resolved_path = str(data_file.resolve())
+        window._new_thread_button.click()
+        app.processEvents()
+        thread_id = window._agent_thread_id
+        assert thread_id is not None
+
+        def fake_submit(input_data):
+            submission_id = input_data.client_submission_id
+            assert submission_id is not None
+            yield AgentHarnessStreamEvent(
+                kind="attachment_import",
+                thread_id=thread_id,
+                client_submission_id=submission_id,
+                attachment_import=AttachmentImportProgress(
+                    source_index=0,
+                    status=AttachmentImportStatus.PENDING,
+                ),
+            )
+            yield AgentHarnessStreamEvent(
+                kind="attachment_import",
+                thread_id=thread_id,
+                client_submission_id=submission_id,
+                attachment_import=AttachmentImportProgress(
+                    source_index=0,
+                    status=AttachmentImportStatus.FAILED,
+                ),
+            )
+            raise RuntimeError("Import failed")
+
+        monkeypatch.setattr(window._agent_harness_service, "submit_user_turn_stream", fake_submit)
+        view = window._thread_detail_view
+        view._add_local_files([resolved_path])
+        for _ in range(40):
+            app.processEvents()
+            if resolved_path in window._composer_attachments:
+                break
+            time.sleep(0.01)
+        view._editor.setPlainText("Analyze this.")
+        view._handle_button_clicked()
+
+        for _ in range(40):
+            app.processEvents()
+            state = view._attachment_states.get(resolved_path)
+            if state is not None and state.status.value == AttachmentImportStatus.FAILED.value:
+                break
+            time.sleep(0.01)
+
+        state = view._attachment_states[resolved_path]
+        assert state.status.value == AttachmentImportStatus.FAILED.value
+        assert view._editor.toPlainText() == "Analyze this."
+        assert view._attached_files == [resolved_path]
+        assert resolved_path in window._composer_attachments
+        assert view._thinking_bubble is None
+        assert window._agent_harness_service.get_thread_snapshot(thread_id).messages == []
+        assert view._send_button.isEnabled() is False
+
+        chip = view._attachment_layout.itemAt(0).widget()
+        assert chip is not None and chip._remove_button.isEnabled() is True
+        view._remove_attached_file(resolved_path)
+        assert resolved_path not in view._attached_files
+        assert resolved_path not in window._composer_attachments
     finally:
         window.close()
 
@@ -2315,7 +2507,7 @@ def test_main_window_uses_aimock_settings_in_development(monkeypatch, tmp_path: 
         window._submit_chat_message("Use AIMock.", [], window._thread_detail_view.selected_fq_model_key())
         for _ in range(100):
             app.processEvents()
-            if not window._thread_detail_view._running:
+            if captured_urls and not window._thread_detail_view._running:
                 break
             time.sleep(0.01)
 

@@ -7,10 +7,13 @@ Result.  It neither persists conversation state nor dispatches tools.
 
 from __future__ import annotations
 
+import logging
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
+from queue import SimpleQueue
 from typing import Any, Iterator
 from uuid import uuid4
 
@@ -28,6 +31,7 @@ from ..llm import (
     DatasetBlock,
     LLMConversationService,
     PendingSampling,
+    SubmissionClaim,
     TextBlock,
     blocks_from_payload,
 )
@@ -46,6 +50,8 @@ from .chatbot_events import (
     project_chatbot_events,
 )
 from .tool_presentations import tool_presentation_for_name
+
+LOGGER = logging.getLogger(__name__)
 
 
 class DatasetAttachmentInput(SQLModel):
@@ -71,11 +77,40 @@ class SubmitUserTurnInput(SQLModel):
     client_submission_id: str | None = None
 
 
+class AttachmentImportStatus(StrEnum):
+    """Transient source-materialization state for one Composer attachment."""
+
+    PENDING = "pending"
+    FAILED = "failed"
+
+
+@dataclass(frozen=True)
+class AttachmentImportProgress:
+    """Path-free source-materialization state within the stream envelope."""
+
+    source_index: int
+    status: AttachmentImportStatus
+
+
+@dataclass(frozen=True)
+class _InitialTitleTask:
+    """A non-durable title side task whose outcome is safe to drop."""
+
+    completed: threading.Event
+    outcomes: SimpleQueue[ConversationSnapshot | None]
+
+    def result(self) -> ConversationSnapshot | None:
+        self.completed.wait()
+        return self.outcomes.get()
+
+
 @dataclass(frozen=True)
 class AgentHarnessStreamEvent:
     kind: str
     thread_id: str | None = None
     pending_message_id: str | None = None
+    client_submission_id: str | None = None
+    attachment_import: AttachmentImportProgress | None = None
     chatbot_event: ChatbotEvent | None = None
     chatbot_events: list[ChatbotEvent] | None = None
     snapshot: ConversationSnapshot | None = None
@@ -216,7 +251,32 @@ class AgentHarnessService:
             client_submission_id=submission_id,
         )
         try:
-            imported = self._import_source_attachments(input_data.source_attachments)
+            imported: list[DatasetAttachmentInput] = []
+            for source_index, source in enumerate(input_data.source_attachments):
+                yield AgentHarnessStreamEvent(
+                    kind="attachment_import",
+                    thread_id=thread_id,
+                    client_submission_id=submission_id,
+                    attachment_import=AttachmentImportProgress(
+                        source_index=source_index,
+                        status=AttachmentImportStatus.PENDING,
+                    ),
+                )
+                try:
+                    imported.extend(self._import_source_attachment(source))
+                except Exception:
+                    # The event is intentionally path-free.  The UI already
+                    # owns the local path and maps this index back to its tag.
+                    yield AgentHarnessStreamEvent(
+                        kind="attachment_import",
+                        thread_id=thread_id,
+                        client_submission_id=submission_id,
+                        attachment_import=AttachmentImportProgress(
+                            source_index=source_index,
+                            status=AttachmentImportStatus.FAILED,
+                        ),
+                    )
+                    raise
             blocks = self._user_content_blocks(
                 input_data.text,
                 [*input_data.dataset_attachments, *imported],
@@ -232,17 +292,41 @@ class AgentHarnessService:
         finally:
             self._conversation_service.release_user_submission_claim(claim)
 
-        if claim.initial_title_eligible:
-            snapshot = self._conversation_service.auto_title_initial_thread(
-                claim=claim,
-                first_user_message_id=snapshot.messages[-1].id,
-            )
-
         yield AgentHarnessStreamEvent(
-            kind="snapshot", thread_id=thread_id, snapshot=snapshot,
+            kind="snapshot",
+            thread_id=thread_id,
+            client_submission_id=submission_id,
+            snapshot=snapshot,
             chatbot_events=self.project_chatbot_events(snapshot),
         )
-        yield from self._sample_until_client_frontier(thread_id, snapshot.messages[-1].id)
+        title_task: _InitialTitleTask | None = None
+        first_user_message_id = snapshot.messages[-1].id
+        for event in self._sample_until_client_frontier(thread_id, first_user_message_id):
+            yield event
+            # Resuming after the real Thinking event guarantees that the
+            # append acknowledgement and pending sampling Message already
+            # exist before title-model I/O starts.
+            if title_task is None and claim.initial_title_eligible and event.kind == "thinking":
+                title_task = self._start_initial_title_task(
+                    claim=claim,
+                    first_user_message_id=first_user_message_id,
+                    appended_snapshot=snapshot,
+                )
+        if title_task is not None:
+            if title_task.result() is not None:
+                # Title I/O may finish while the primary pending placeholder
+                # still exists.  Re-read after the terminal sampling event so
+                # a metadata update never replays that provisional Message.
+                titled_snapshot = self._snapshot_if_thread_exists(thread_id)
+            else:
+                titled_snapshot = None
+            if titled_snapshot is not None:
+                yield AgentHarnessStreamEvent(
+                    kind="title",
+                    thread_id=thread_id,
+                    snapshot=titled_snapshot,
+                    is_final=True,
+                )
 
     def _sample_until_client_frontier(
         self,
@@ -471,33 +555,57 @@ class AgentHarnessService:
                     found.append(block.dataset_id)
         return found
 
-    def _import_source_attachments(self, sources: list[SourceAttachmentInput]) -> list[DatasetAttachmentInput]:
-        if not sources:
-            return []
+    def _import_source_attachment(self, source: SourceAttachmentInput) -> list[DatasetAttachmentInput]:
         if self._dataset_service is None:
             raise ValidationError("Source attachment import requires the dataset service.")
-        imported: list[DatasetAttachmentInput] = []
-        for source in sources:
-            source_path = Path(source.file_path).expanduser()
+        source_path = Path(source.file_path).expanduser()
+        try:
+            source_path = source_path.resolve(strict=True)
+        except (OSError, RuntimeError) as exc:
+            raise ValidationError("The selected source file is no longer available.") from exc
+        if not source_path.is_file():
+            raise ValidationError("The selected source path is not a file.")
+        registered = self._dataset_service.register_dataset_attachment(
+            RegisterDatasetInput(source_path=str(source_path), name=source_path.stem)
+        )
+        return [
+            DatasetAttachmentInput(
+                dataset_id=item.dataset_id,
+                name=item.name,
+                row_count=item.row_count,
+                column_count=item.column_count,
+            )
+            for item in registered.datasets
+        ]
+
+    def _start_initial_title_task(
+        self,
+        *,
+        claim: SubmissionClaim,
+        first_user_message_id: str,
+        appended_snapshot: ConversationSnapshot,
+    ) -> _InitialTitleTask:
+        completed = threading.Event()
+        outcomes: SimpleQueue[ConversationSnapshot | None] = SimpleQueue()
+
+        def run() -> None:
+            snapshot: ConversationSnapshot | None = None
             try:
-                source_path = source_path.resolve(strict=True)
-            except (OSError, RuntimeError) as exc:
-                raise ValidationError("The selected source file is no longer available.") from exc
-            if not source_path.is_file():
-                raise ValidationError("The selected source path is not a file.")
-            registered = self._dataset_service.register_dataset_attachment(
-                RegisterDatasetInput(source_path=str(source_path), name=source_path.stem)
-            )
-            imported.extend(
-                DatasetAttachmentInput(
-                    dataset_id=item.dataset_id,
-                    name=item.name,
-                    row_count=item.row_count,
-                    column_count=item.column_count,
+                snapshot = self._conversation_service.auto_title_initial_thread(
+                    claim=claim,
+                    first_user_message_id=first_user_message_id,
+                    appended_snapshot=appended_snapshot,
                 )
-                for item in registered.datasets
-            )
-        return imported
+            except Exception as exc:
+                # Automatic naming is metadata.  It must never surface as a
+                # failure of an already-acknowledged conversation exchange.
+                LOGGER.warning("Initial Thread title update failed: %s", exc.__class__.__name__)
+            finally:
+                outcomes.put(snapshot)
+                completed.set()
+
+        threading.Thread(target=run, name="xenix-initial-thread-title", daemon=True).start()
+        return _InitialTitleTask(completed=completed, outcomes=outcomes)
 
     def _resolve_dataset_source_presentation(self, dataset_id: str):
         """Read presentation metadata without allowing it to affect replay."""

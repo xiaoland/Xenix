@@ -53,11 +53,16 @@ Establish an evidence-backed boundary between LLM Service, canonical interaction
   Dataset-disposal, legacy guard/step-budget, Artifact-URI, and ToolResult
   local-path decisions out of the documentation mutation. See
   [24-durable-documentation-reconciliation-stage.md](24-durable-documentation-reconciliation-stage.md).
+- Stage 25 implements Composer attachment-import feedback without optimistic
+  conversation state: path-free Harness progress drives Composer tags,
+  canonical append acknowledgement clears captured input, and automatic title
+  work begins only after real sampling starts. See
+  [25-composer-attachment-import-feedback-stage.md](25-composer-attachment-import-feedback-stage.md).
 
 ## Next Step
 
-Sir reviews Stage 24's documentation reconciliation. Combined manual acceptance
-for stages 19–23 remains: Dataset context and reasoning-only bubbles, automatic
-initial title, token usage projection, Thread deletion/pending rejection, and
-source attachment projection/reopen. `data.list` remains out of scope. No
-commit is authorized until Sir explicitly requests one.
+Stage 25 is ready for Sir's manual acceptance alongside the earlier follow-up
+stages: Dataset context and reasoning-only bubbles, automatic initial title,
+token usage projection, Thread deletion/pending rejection, source attachment
+projection/reopen, and Composer import feedback. `data.list` remains out of
+scope. No commit is authorized until Sir explicitly requests one.

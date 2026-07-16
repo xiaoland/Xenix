@@ -1271,6 +1271,9 @@ class AttachmentChip(QFrame):
         self.setProperty("attachmentStatus", state.status.value)
         self._status_label.setToolTip(state.error or "")
 
+    def set_removal_enabled(self, enabled: bool) -> None:
+        self._remove_button.setEnabled(enabled)
+
 
 class ThreadDetailView(QWidget):
     message_submitted = Signal(str, list, str)
@@ -1291,6 +1294,7 @@ class ThreadDetailView(QWidget):
         self._attached_files: list[str] = []
         self._attachment_states: dict[str, ComposerAttachmentState] = {}
         self._running = False
+        self._preparing_submission = False
         self._awaiting_step_confirmation = False
         self._thinking_bubble: ChatMessageBubble | None = None
         self._event_widgets_by_id: dict[str, QWidget] = {}
@@ -1754,8 +1758,46 @@ class ThreadDetailView(QWidget):
     def set_running(self, running: bool) -> None:
         self._running = running
         if running:
+            self._preparing_submission = False
             self._set_composer_drop_hover(False)
             self.clear_step_confirmation()
+        self._sync_send_button_text()
+        self._sync_composer_controls_enabled()
+
+    def begin_composer_submission(self, attachment_paths: list[str]) -> None:
+        """Lock the captured Composer input while Harness owns its import."""
+
+        self._preparing_submission = True
+        self._set_composer_drop_hover(False)
+        for raw_path in attachment_paths:
+            path = str(Path(raw_path).resolve())
+            state = self._attachment_states.get(path)
+            if state is not None:
+                state.status = ComposerAttachmentStatus.PENDING
+                state.error = None
+        self._refresh_attachment_chips()
+        self._sync_send_button_text()
+        self._sync_composer_controls_enabled()
+
+    def acknowledge_composer_submission(self) -> None:
+        """Drop only input that has already become a canonical UserMessage."""
+
+        self._editor.clear()
+        self._attached_files.clear()
+        self._attachment_states.clear()
+        self._refresh_attachment_chips()
+        self._sync_send_button_text()
+        self._sync_composer_controls_enabled()
+
+    def abort_composer_submission(self) -> None:
+        """Return a pre-append Composer to an editable, retryable state."""
+
+        self._preparing_submission = False
+        for state in self._attachment_states.values():
+            if state.status is ComposerAttachmentStatus.PENDING:
+                state.status = ComposerAttachmentStatus.READY
+                state.error = None
+        self._refresh_attachment_chips()
         self._sync_send_button_text()
         self._sync_composer_controls_enabled()
 
@@ -1801,6 +1843,8 @@ class ThreadDetailView(QWidget):
         self._send_button.setIcon(QIcon())
         if self._running:
             send_text = self.tr("Stop")
+        elif self._preparing_submission:
+            send_text = self.tr("Send")
         elif self._has_pending_attachments():
             send_text = ""
             self._send_button.setIcon(spinner_icon())
@@ -1884,6 +1928,7 @@ class ThreadDetailView(QWidget):
             self.files_attached.emit(added_paths)
 
     def restore_composer(self, text: str, file_paths: list[str]) -> None:
+        self._preparing_submission = False
         self._editor.setPlainText(text)
         self._attached_files.clear()
         self._attachment_states.clear()
@@ -1907,6 +1952,8 @@ class ThreadDetailView(QWidget):
         self._sync_composer_controls_enabled()
 
     def _remove_attached_file(self, path: str, *, notify: bool = True) -> None:
+        if self._running or self._preparing_submission:
+            return
         resolved_path = str(Path(path).resolve())
         if resolved_path not in self._attached_files:
             return
@@ -1941,7 +1988,7 @@ class ThreadDetailView(QWidget):
         )
 
     def _can_accept_file_drop(self, event) -> bool:
-        if self._running or self._awaiting_step_confirmation:
+        if self._running or self._preparing_submission or self._awaiting_step_confirmation:
             return False
         return bool(self._local_file_paths(event))
 
@@ -1985,7 +2032,7 @@ class ThreadDetailView(QWidget):
         if self._running:
             self.stop_requested.emit()
             return
-        if self._awaiting_step_confirmation:
+        if self._preparing_submission or self._awaiting_step_confirmation:
             return
         text = self._editor.toPlainText().strip()
         if self._has_unready_attachments():
@@ -1993,18 +2040,18 @@ class ThreadDetailView(QWidget):
         files = self._ready_attachment_paths()
         if not text and not files:
             return
-        self._editor.clear()
-        self._attached_files.clear()
-        self._attachment_states.clear()
-        self._refresh_attachment_chips()
         self.message_submitted.emit(text, files, self.selected_fq_model_key())
 
     def _sync_composer_controls_enabled(self) -> None:
-        can_edit = not self._running and not self._awaiting_step_confirmation
+        can_edit = not self._running and not self._preparing_submission and not self._awaiting_step_confirmation
         self._editor.setEnabled(can_edit)
         self._attach_button.setEnabled(can_edit)
-        self._send_button.setEnabled(not self._awaiting_step_confirmation and not self._has_unready_attachments())
-        self._model_picker.setEnabled(bool(self._model_options))
+        self._send_button.setEnabled(
+            not self._awaiting_step_confirmation
+            and not self._has_unready_attachments()
+            and (self._running or not self._preparing_submission)
+        )
+        self._model_picker.setEnabled(bool(self._model_options) and can_edit)
         self._step_continue_button.setEnabled(self._awaiting_step_confirmation)
         self._step_stop_button.setEnabled(self._awaiting_step_confirmation)
 
@@ -2021,6 +2068,7 @@ class ThreadDetailView(QWidget):
                 status=ComposerAttachmentStatus.READY,
             )
             chip = AttachmentChip(state, self)
+            chip.set_removal_enabled(not self._running and not self._preparing_submission)
             chip.remove_requested.connect(self._remove_attached_file)
             self._attachment_layout.insertWidget(self._attachment_layout.count() - 1, chip)
 
