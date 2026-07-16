@@ -46,6 +46,7 @@ from .storage.models import (
 )
 from .storage.repositories import DatasetColumnBindingRepository, MLTaskRepository, TrainedModelRepository
 from .trained_model_metadata import parse_trained_model_metadata, with_evaluation, with_evaluation_task
+from .tabular import resolve_tabular_column_index, resolve_tabular_schema
 
 _COLUMN_NAME_NORMALIZATION_TRANSLATION = str.maketrans(
     {
@@ -146,6 +147,7 @@ class MLService:
         role_bindings = self._normalize_role_bindings(
             input_data.role_bindings,
             train_role_schema=catalog.train_role_schema if catalog is not None else None,
+            inspection_column_names=[column.name for column in inspection.columns],
         )
         missing_by_role = {
             binding.role: [column for column in binding.columns if column not in available_columns]
@@ -631,6 +633,7 @@ class MLService:
         raw_bindings: list[dict[str, Any]],
         *,
         train_role_schema: ModelRoleSchema | None,
+        inspection_column_names: list[str] | None = None,
     ) -> list[ColumnRoleBinding]:
         if not raw_bindings:
             raise ValidationError("At least one column role binding is required.")
@@ -641,8 +644,12 @@ class MLService:
         normalized: list[ColumnRoleBinding] = []
         seen_roles: set[str] = set()
         for raw_binding in raw_bindings:
+            binding_payload = self._canonicalize_role_binding_columns(
+                raw_binding,
+                inspection_column_names=inspection_column_names,
+            )
             try:
-                binding = ColumnRoleBinding.model_validate(raw_binding)
+                binding = ColumnRoleBinding.model_validate(binding_payload)
             except Exception as exc:
                 raise ValidationError("Column role bindings must be valid role binding objects.") from exc
             role = binding.role.strip()
@@ -683,6 +690,69 @@ class MLService:
             if missing_roles:
                 raise ValidationError(f"Missing required column roles: {', '.join(missing_roles)}.")
         return normalized
+
+    def _canonicalize_role_binding_columns(
+        self,
+        raw_binding: dict[str, Any],
+        *,
+        inspection_column_names: list[str] | None,
+    ) -> dict[str, Any]:
+        if not isinstance(raw_binding, dict):
+            raise ValidationError("Column role bindings must be valid role binding objects.")
+
+        reference_keys = [
+            key
+            for key in ("columns", "column_indexes")
+            if key in raw_binding and raw_binding[key] is not None
+        ]
+        if len(reference_keys) > 1:
+            raise ValidationError("Column role bindings must use either columns or column_indexes, not both.")
+        if not reference_keys:
+            raise ValidationError("Column role bindings require columns or column_indexes.")
+
+        payload = dict(raw_binding)
+        if reference_keys[0] == "column_indexes":
+            payload["columns"] = self._resolve_role_column_indexes(
+                raw_binding["column_indexes"],
+                role=str(raw_binding.get("role") or ""),
+                inspection_column_names=inspection_column_names,
+            )
+        payload.pop("column_indexes", None)
+        return payload
+
+    def _resolve_role_column_indexes(
+        self,
+        raw_indexes: Any,
+        *,
+        role: str,
+        inspection_column_names: list[str] | None,
+    ) -> list[str]:
+        role_label = role.strip() or "<unnamed>"
+        if inspection_column_names is None:
+            raise ValidationError("Column indexes can only be resolved while creating a column binding.")
+        if not isinstance(raw_indexes, list):
+            raise ValidationError(f"Column role '{role_label}' column_indexes must be a list.")
+        if not raw_indexes:
+            raise ValidationError(f"Column role '{role_label}' column_indexes cannot be empty.")
+
+        schema = resolve_tabular_schema(inspection_column_names)
+        columns: list[str] = []
+        for index in raw_indexes:
+            field_name = f"Column role '{role_label}' column_indexes"
+            try:
+                columns.append(resolve_tabular_column_index(schema, index, field_name=field_name))
+            except ValidationError as exc:
+                # Keep the role-binding contract's actionable wording while
+                # delegating strict type/range semantics to the shared helper.
+                if isinstance(index, bool) or not isinstance(index, int):
+                    raise ValidationError(
+                        f"Column role '{role_label}' column_indexes must contain zero-based integer indexes."
+                    ) from exc
+                raise ValidationError(
+                    f"Column role '{role_label}' column_indexes index {index} is outside the available "
+                    "zero-based column range."
+                ) from exc
+        return columns
 
     def _normalize_role_columns(self, columns: list[str], role: str) -> list[str]:
         normalized = [column.strip() for column in columns if column.strip()]

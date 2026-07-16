@@ -18,7 +18,7 @@ from xenix.services.data_transform import (
 )
 from xenix.services.dataset_export_service import DatasetExportService
 from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
-from xenix.services.dataset_inspection import detect_source_format, load_dataframe
+from xenix.services.dataset_inspection import detect_source_format, inspect_dataset_file, load_dataframe
 from xenix.services.ml_service import MLService
 from xenix.services.ml_task_service import MLTaskService
 from xenix.services.preprocessing_worker import InlinePreprocessingWorkerRunner
@@ -160,6 +160,155 @@ def test_data_query_service_runs_read_only_select(monkeypatch, tmp_path: Path) -
     assert result.validation_summary["bindings"] == ["orders"]
 
 
+def test_data_query_service_keeps_names_mode_compatible_after_indexed_execution(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _paths, _dataset_service, service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "unicode-orders.csv"
+    source.write_text(
+        '"客户 名称","金额(元)",c0\n'
+        '"阿兰",10,"source-c0"\n',
+        encoding="utf-8",
+    )
+    binding = DatasetSqlBinding(
+        alias="orders",
+        dataset_id="orders-id",
+        source_path=str(source.resolve()),
+    )
+
+    indexed = service.query(
+        DataQueryInput(
+            bindings=[binding],
+            sql="SELECT c0 AS customer, c1 AS amount, c2 AS source_c0 FROM orders",
+            column_reference="indexes",
+        )
+    )
+    named = service.query(
+        DataQueryInput(
+            bindings=[binding],
+            sql='SELECT "客户 名称" AS customer, c0 AS source_c0 FROM orders',
+        )
+    )
+
+    assert indexed.rows == [{"customer": "阿兰", "amount": 10, "source_c0": "source-c0"}]
+    assert named.rows == [{"customer": "阿兰", "source_c0": "source-c0"}]
+
+
+@pytest.mark.parametrize("source_format", ["csv", "parquet", "xlsx"])
+def test_data_query_service_indexes_registered_columns_for_each_source_format(
+    monkeypatch,
+    tmp_path: Path,
+    source_format: str,
+) -> None:
+    _paths, _dataset_service, service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / f"unicode-orders.{source_format}"
+    if source_format == "csv":
+        source.write_text('"客户 名称","金额(元)"\n"阿兰",10\n', encoding="utf-8")
+    elif source_format == "parquet":
+        with duckdb.connect(database=":memory:") as connection:
+            connection.execute(
+                "COPY (SELECT '阿兰' AS \"客户 名称\", 10 AS \"金额(元)\") TO ? (FORMAT PARQUET)",
+                [str(source)],
+            )
+    else:
+        pd.DataFrame({"客户 名称": ["阿兰"], "金额(元)": [10]}).to_excel(source, index=False)
+
+    result = service.query(
+        DataQueryInput(
+            bindings=[
+                DatasetSqlBinding(
+                    alias="orders",
+                    dataset_id="orders-id",
+                    source_path=str(source.resolve()),
+                )
+            ],
+            sql="SELECT c0 AS customer, c1 AS amount FROM orders",
+            column_reference="indexes",
+        )
+    )
+
+    expected_amount: int | str = "10" if source_format == "xlsx" else 10
+    assert result.rows == [{"customer": "阿兰", "amount": expected_amount}]
+
+
+def test_direct_source_schema_matches_indexed_sql_for_malformed_csv(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _paths, _dataset_service, service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "messy-direct.csv"
+    source.write_text("city,city,amount\n佛山,广州,10\n", encoding="utf-8")
+
+    inspection = inspect_dataset_file(source)
+    assert inspection.preview_columns == ["city", "column_2", "amount"]
+    assert [column.name for column in inspection.columns] == inspection.preview_columns
+
+    result = service.query(
+        DataQueryInput(
+            bindings=[
+                DatasetSqlBinding(
+                    alias="input",
+                    dataset_id="direct-id",
+                    source_path=str(source.resolve()),
+                )
+            ],
+            sql="SELECT c0 AS city_a, c1 AS city_b, c2 AS amount FROM input",
+            column_reference="indexes",
+        )
+    )
+
+    assert result.rows == [{"city_a": "佛山", "city_b": "广州", "amount": 10}]
+
+
+def test_data_query_service_indexed_columns_support_multiple_bindings(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _paths, _dataset_service, service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    orders_source = tmp_path / "orders.csv"
+    orders_source.write_text('"订单号","金额(元)"\n1,10\n2,5\n', encoding="utf-8")
+    customers_source = tmp_path / "customers.csv"
+    customers_source.write_text('"订单号","城市"\n1,"佛山"\n2,"广州"\n', encoding="utf-8")
+
+    result = service.query(
+        DataQueryInput(
+            bindings=[
+                DatasetSqlBinding(
+                    alias="orders",
+                    dataset_id="orders-id",
+                    source_path=str(orders_source.resolve()),
+                ),
+                DatasetSqlBinding(
+                    alias="customers",
+                    dataset_id="customers-id",
+                    source_path=str(customers_source.resolve()),
+                ),
+            ],
+            sql=(
+                "SELECT customers.c1 AS city, orders.c1 AS amount "
+                "FROM orders JOIN customers ON orders.c0 = customers.c0 "
+                "ORDER BY orders.c0"
+            ),
+            column_reference="indexes",
+        )
+    )
+
+    assert result.rows == [{"city": "佛山", "amount": 10}, {"city": "广州", "amount": 5}]
+
+
 def test_data_transform_service_materializes_parquet(monkeypatch, tmp_path: Path) -> None:
     _paths, _dataset_service, service, _artifact_service, _registry, _store = _build_runtime(
         monkeypatch,
@@ -197,6 +346,35 @@ def test_data_transform_service_materializes_parquet(monkeypatch, tmp_path: Path
     assert Path(result.output_path).suffix == ".parquet"
     assert result.transform_report["sql"].startswith("SELECT customer_id")
     assert result.transform_report["bindings"] == [{"alias": "input", "dataset_id": "customers-id"}]
+
+
+def test_data_transform_service_supports_indexed_unicode_columns(monkeypatch, tmp_path: Path) -> None:
+    _paths, _dataset_service, service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "customers.csv"
+    source.write_text('"客户 名称","金额(元)"\n"阿兰",10\n"博文",5\n', encoding="utf-8")
+
+    result = service.transform(
+        DataTransformInput(
+            bindings=[
+                DatasetSqlBinding(
+                    alias="input",
+                    dataset_id="customers-id",
+                    source_path=str(source.resolve()),
+                )
+            ],
+            sql="SELECT c0 AS customer, c1 * 2 AS doubled_amount FROM input ORDER BY c1 DESC",
+            name="Indexed customer totals",
+            column_reference="indexes",
+        )
+    )
+
+    assert _read_dataset_frame(result.output_path).to_dict(orient="records") == [
+        {"customer": "阿兰", "doubled_amount": 20.0},
+        {"customer": "博文", "doubled_amount": 10.0},
+    ]
 
 
 def test_data_transform_service_does_not_fetch_full_output_dataframe(monkeypatch, tmp_path: Path) -> None:

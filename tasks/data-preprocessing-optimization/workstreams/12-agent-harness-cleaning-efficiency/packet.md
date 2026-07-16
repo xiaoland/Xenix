@@ -31,6 +31,17 @@ complete
 - `column` / `columns` name-only cleaning parameters -> explicit,
   non-ambiguous `column_index(es)` preferred references with name fallbacks;
   mixed references reject deterministically.
+- Name-only role binding and SQL access -> request-scoped zero-based index
+  references for role binding, `data.query`, and `data.transform`, resolved
+  against the current dataset schema without ever persisting an index as a
+  durable column identity.
+- Name-only `data.tokenize` selection -> request-scoped zero-based
+  `text_column_index` and `id_column_indexes`, resolved against the loaded
+  source frame before tokenization so reports and artifacts retain canonical
+  names.
+- Per-service loader/index-to-name implementations -> one tabular schema
+  boundary that materializes an ordered canonical `tool_name` projection and
+  resolves all operation indexes from that projection.
 - Skill rule requiring metadata on every cleaning plan -> metadata only when
   the supported operation or its parameters remain uncertain.
 - A post-activation full registry advertisement -> the active Skill's bounded
@@ -47,8 +58,17 @@ complete
 - `LLMConversationService` remains the only canonical conversation writer and
   the LLM-owned registry remains the only Tool dispatcher.
 - A source dataset is never mutated; cleaning produces a derived dataset.
-- Index references use the 0-based indexes returned by `data.query`; a call
-  cannot mix index and name forms for one field.
+- Index references use the 0-based indexes from a source-schema `data.query`
+  result, not a projected result's ordinals; a call cannot mix index and name
+  forms for one field.
+- A role-binding index resolves to the current dataset's canonical column name
+  before persistence; SQL index aliases exist only inside the one query or
+  transform execution that requested them.
+- `data.tokenize` accepts exactly one text selector and at most one identifier
+  selector form; indexes are never persisted or emitted as durable columns.
+- Loader-specific names (for example pandas `.1` and Polars
+  `_duplicated_0`) never escape the tabular boundary as executable column
+  identity; canonical application is position-safe.
 - Tool results retain bounded executable facts and never expose paths,
   credentials, or raw local-runtime evidence.
 - The composition root may project tool advertisements and request hints, but
@@ -86,6 +106,15 @@ complete
    only aggregate request/usage/call metrics.
 5. Run affected PDM tests, skill-catalog verification, compilation and diff
    checks.
+6. Reproduce the U+2019/U+0027 column-name mismatch through the index forms
+   for query, transform, and role binding, while preserving name-mode
+   compatibility.
+7. Prove tokenization index selection with a Unicode-header source and an
+   AgentHarness replay, including mixed-form, invalid-index, duplicate-ID, and
+   text/ID collision rejection.
+8. Prove one malformed source schema yields the same ordered canonical names
+   and index mapping across cleaning, tokenization, role binding, inspection,
+   and SQL query/transform paths for CSV, Parquet, and XLSX where applicable.
 
 ## Verification Run Log
 
@@ -121,8 +150,39 @@ complete
 - 2026-07-16 metadata group contract: provider schema advertises the nine
   valid group names as an enum; an invalid requested group returns one bounded
   `invalid_groups` entry while valid groups still return normally.
+- 2026-07-16 index-reference slice: an isolated Harness replay over an XLSX
+  whose source header contains U+2019 completed activation, indexed query,
+  and indexed role binding without spelling that header. The query returned
+  `c2`/`c5` values, while the persisted binding retained the canonical U+2019
+  source name. Direct read-only replay against the historical source gave the
+  same result. `pdm run test -q tests/test_agent_harness_cleaning_efficiency.py
+  tests/test_data_cleaning.py tests/test_data_transform.py` passed 41 tests;
+  `pdm run test -q tests/test_ml_execution.py -k column_binding` passed 7
+  tests (15 deselected); `pdm run check` and `git diff --check` passed.
+- 2026-07-16 tokenization index slice: `data.tokenize` accepts
+  `text_column_index` and `id_column_indexes`, resolves them against the
+  loaded source-frame order into canonical names, and retains names—not
+  indexes—in the derived data and report. An isolated Harness replay tokenized
+  an XLSX with a U+2019 header without spelling it. The service rejects mixed
+  selector forms, bool/non-integer/out-of-range indexes, duplicate IDs, and a
+  text/ID collision. `pdm run test -q tests/test_data_tokenization.py
+  tests/test_agent_harness_cleaning_efficiency.py tests/test_data_cleaning.py
+  tests/test_data_transform.py` passed 62 tests; `pdm run check` and
+  `git diff --check` passed.
+- 2026-07-16 final regression: full `pdm run test -q` passed 367 tests in
+  206 seconds, with three existing sklearn warnings.
+- 2026-07-16 canonical-column consolidation: `tabular` now owns ordered
+  schema materialization, position-safe Pandas/Polars projection, strict
+  index-to-`tool_name` resolution, and header-only reconciliation for
+  malformed XLSX trailing cells. Import, inspection, cleaning, tokenization,
+  SQL registration, role binding, and ML loading consume that boundary.
+  Service-boundary regression covers CSV/Parquet/XLSX duplicate and empty
+  headers, numeric XLSX headers, multi-sheet selection, malformed report
+  headers, and local `cN` SQL aliases. `pdm run check` and `git diff --check`
+  passed; full `pdm run test -q` passed 388 tests in 220 seconds with the same
+  three sklearn warnings.
 
 ## Next Action
 
-Complete. No commit was created; unrelated `tasks/knowledge-base/` content was
-left untouched.
+Complete. No new commit was created. Unrelated `tasks/knowledge-base/` and
+`tests/.mock-data/` content remains untouched.

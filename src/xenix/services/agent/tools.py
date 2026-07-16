@@ -459,7 +459,9 @@ class AgentToolRegistry:
                 description=(
                     "Create a new derived dataset by tokenizing one Chinese text column with the stable "
                     "Xenix profile zh_business_v1. Use output=token_text to keep source rows and append "
-                    "token_text for downstream text models, or output=token_rows to explode one token per row."
+                    "token_text for downstream text models, or output=token_rows to explode one token per row. "
+                    "Select the text and optional identifier columns by names or zero-based source indexes; "
+                    "do not mix the two forms for one selector."
                 ),
                 parameters_schema={
                     "type": "object",
@@ -468,12 +470,35 @@ class AgentToolRegistry:
                         "name": {"type": "string"},
                         "text_column": {
                             "type": "string",
-                            "description": "Chinese text column to segment.",
+                            "description": (
+                                "Chinese text column name to segment. Use either text_column or "
+                                "text_column_index, never both."
+                            ),
+                        },
+                        "text_column_index": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": (
+                                "Preferred zero-based Chinese text column index from the source schema. "
+                                "Use either text_column_index or text_column, never both."
+                            ),
                         },
                         "id_columns": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "Optional identifier columns preserved in token_rows output.",
+                            "description": (
+                                "Optional identifier column names preserved in token_rows output. Use either "
+                                "id_columns or id_column_indexes, never both."
+                            ),
+                        },
+                        "id_column_indexes": {
+                            "type": "array",
+                            "items": {"type": "integer", "minimum": 0},
+                            "description": (
+                                "Preferred zero-based identifier column indexes from the source schema, "
+                                "preserved in token_rows output. Use either id_column_indexes or id_columns, "
+                                "never both."
+                            ),
                         },
                         "output": {
                             "type": "string",
@@ -486,7 +511,9 @@ class AgentToolRegistry:
                             "description": "Stable Chinese-first tokenization profile owned by Xenix.",
                         },
                     },
-                    "required": ["dataset_id", "text_column"],
+                    # Keep conditional selector requirements in the handler: several providers reject
+                    # JSON Schema oneOf/anyOf even though the fields are portable scalar properties.
+                    "required": ["dataset_id"],
                     "additionalProperties": False,
                 },
             ),
@@ -517,6 +544,8 @@ class AgentToolRegistry:
                     "Run a read-only SELECT/CTE query over registered datasets. "
                     "Pass either dataset_id for one input aliased as input, or bindings for explicit SQL aliases. "
                     "At least one input source is required. If both are present, bindings wins. "
+                    "When column_reference=indexes, each bound relation exposes zero-based c0, c1, ... SQL "
+                    "columns instead of source names; use this for punctuation-heavy or Unicode headers. "
                     "During a cleaning pass, emit at most one data.query call per model response; batch related "
                     "evidence in one compact query and wait for its result before any focused follow-up. "
                     "Returns bounded rows and does not create a derived dataset or artifact."
@@ -543,6 +572,14 @@ class AgentToolRegistry:
                         "sql": {
                             "type": "string",
                             "description": "Read-only SELECT or CTE query to execute.",
+                        },
+                        "column_reference": {
+                            "type": "string",
+                            "enum": ["names", "indexes"],
+                            "description": (
+                                "names is the default source-header mode. indexes exposes each bound relation "
+                                "as c0, c1, ... using the zero-based indexes returned by data.query."
+                            ),
                         },
                         "limit": {
                             "type": "integer",
@@ -581,6 +618,8 @@ class AgentToolRegistry:
                     "Create a new derived dataset from bounded DuckDB SQL over registered datasets. "
                     "Use dataset_id for one input aliased as input, or bindings for explicit aliases. "
                     "At least one input source is required. If both are present, bindings wins. "
+                    "When column_reference=indexes, each bound relation exposes zero-based c0, c1, ... SQL "
+                    "columns instead of source names; use this for punctuation-heavy or Unicode headers. "
                     "For multi-statement scripts, create or leave a final TEMP relation named output; "
                     "Xenix materializes SELECT * FROM output."
                 ),
@@ -610,6 +649,14 @@ class AgentToolRegistry:
                                 "but must leave a final relation named output."
                             ),
                         },
+                        "column_reference": {
+                            "type": "string",
+                            "enum": ["names", "indexes"],
+                            "description": (
+                                "names is the default source-header mode. indexes exposes each bound relation "
+                                "as c0, c1, ... using the zero-based indexes returned by data.query."
+                            ),
+                        },
                         "name": {
                             "type": "string",
                             "description": "Optional name for the generated transformed dataset.",
@@ -633,16 +680,28 @@ class AgentToolRegistry:
                 "columns": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Dataset columns assigned to this semantic role.",
+                    "description": "Legacy exact dataset column names assigned to this semantic role.",
+                },
+                "column_indexes": {
+                    "type": "array",
+                    "items": {"type": "integer", "minimum": 0},
+                    "description": (
+                        "Preferred zero-based dataset column indexes returned by data.query. "
+                        "Use either column_indexes or columns, never both."
+                    ),
                 },
             },
-            "required": ["role", "columns"],
+            "required": ["role"],
         }
         return AgentTool(
             spec=AgentToolSpec(
                 name="data.feature.select",
                 provider_name="data_feature_select",
-                description="Bind registered dataset columns to semantic roles required by a model/analyzer.",
+                description=(
+                    "Bind registered dataset columns to semantic roles required by a model/analyzer. "
+                    "Prefer per-role zero-based column_indexes from data.query; Xenix resolves them against the "
+                    "current dataset schema and persists canonical names."
+                ),
                 parameters_schema={
                     "type": "object",
                     "properties": {
@@ -1074,22 +1133,71 @@ class AgentToolRegistry:
 
     def _data_tokenize(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
         self._raise_if_cancelled(context)
-        unsupported_keys = sorted(set(arguments) - {"dataset_id", "name", "text_column", "id_columns", "output", "tokenizer_profile"})
+        unsupported_keys = sorted(
+            set(arguments)
+            - {
+                "dataset_id",
+                "name",
+                "text_column",
+                "text_column_index",
+                "id_columns",
+                "id_column_indexes",
+                "output",
+                "tokenizer_profile",
+            }
+        )
         if unsupported_keys:
             raise ValidationError("data.tokenize does not accept: " + ", ".join(unsupported_keys))
         dataset_id = self._require_string(arguments, "dataset_id")
         dataset = self._dataset_service.get_dataset(dataset_id)
         default_name = f"{dataset.name} tokenized"
         name = str(arguments.get("name") or default_name).strip() or default_name
-        id_columns = arguments.get("id_columns") or []
-        if not isinstance(id_columns, list) or not all(isinstance(item, str) for item in id_columns):
+
+        text_column = arguments.get("text_column")
+        text_column_index = arguments.get("text_column_index")
+        if text_column is not None and text_column_index is not None:
+            raise ValidationError(
+                "data.tokenize accepts either text_column or text_column_index, not both."
+            )
+        if text_column is None and text_column_index is None:
+            raise ValidationError("data.tokenize requires text_column or text_column_index.")
+        if text_column is not None and (not isinstance(text_column, str) or not text_column.strip()):
+            raise ValidationError("data.tokenize text_column must be a non-empty string.")
+        if text_column_index is not None and (
+            isinstance(text_column_index, bool)
+            or not isinstance(text_column_index, int)
+            or text_column_index < 0
+        ):
+            raise ValidationError("data.tokenize text_column_index must be a zero-based integer.")
+
+        id_columns = arguments.get("id_columns")
+        id_column_indexes = arguments.get("id_column_indexes")
+        if id_columns is not None and id_column_indexes is not None:
+            raise ValidationError(
+                "data.tokenize accepts either id_columns or id_column_indexes, not both."
+            )
+        if id_columns is not None and (
+            not isinstance(id_columns, list) or not all(isinstance(item, str) for item in id_columns)
+        ):
             raise ValidationError("data.tokenize id_columns must be a list of strings.")
+        if id_column_indexes is not None:
+            if not isinstance(id_column_indexes, list):
+                raise ValidationError("data.tokenize id_column_indexes must be a list of integers.")
+            if any(
+                isinstance(item, bool) or not isinstance(item, int) or item < 0
+                for item in id_column_indexes
+            ):
+                raise ValidationError(
+                    "data.tokenize id_column_indexes must contain zero-based integers."
+                )
         tokenize_result = self._data_tokenization_service.tokenize_dataset(
             TokenizeDatasetInput(
                 source_path=dataset.source_path,
                 name=name,
-                text_column=self._require_string(arguments, "text_column"),
-                id_columns=[str(item) for item in id_columns],
+                text_column=text_column,
+                text_column_index=text_column_index,
+                id_columns=id_columns,
+                id_column_indexes=id_column_indexes,
                 output=str(arguments.get("output") or "token_text"),
                 tokenizer_profile=str(arguments.get("tokenizer_profile") or "zh_business_v1"),
             )
@@ -1119,6 +1227,7 @@ class AgentToolRegistry:
                 bindings=bindings,
                 sql=self._require_string(arguments, "sql"),
                 limit=self._optional_integer(arguments, "limit", default=50),
+                column_reference=self._column_reference_mode(arguments, tool_name="data.query"),
             )
         )
         payload = {
@@ -1147,6 +1256,7 @@ class AgentToolRegistry:
                 bindings=bindings,
                 sql=self._require_string(arguments, "sql"),
                 name=name,
+                column_reference=self._column_reference_mode(arguments, tool_name="data.transform"),
             )
         )
         derived_from_dataset_id = input_dataset_ids[0] if len(set(input_dataset_ids)) == 1 else None
@@ -1517,6 +1627,18 @@ class AgentToolRegistry:
                 source_path=dataset.source_path,
             )
         ]
+
+    @staticmethod
+    def _column_reference_mode(arguments: dict[str, Any], *, tool_name: str) -> str:
+        value = arguments.get("column_reference")
+        if value is None:
+            return "names"
+        if not isinstance(value, str):
+            raise ValidationError(f"{tool_name}.column_reference must be 'names' or 'indexes'.")
+        normalized = value.strip()
+        if normalized not in {"names", "indexes"}:
+            raise ValidationError(f"{tool_name}.column_reference must be 'names' or 'indexes'.")
+        return normalized
 
     def _query_columns_payload(self, columns: list[dict[str, str]]) -> dict[str, Any]:
         rows = [

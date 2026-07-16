@@ -11,7 +11,15 @@ from pydantic import BaseModel, Field
 
 from ..exceptions import ValidationError
 from .storage.models import DatasetSourceFormat
-from .tabular import format_column, format_value, load_tabular_frame, preview_rows
+from .tabular import (
+    apply_tabular_schema,
+    load_tabular_frame,
+    load_tabular_schema,
+    preview_rows,
+    reconcile_tabular_schema_to_loaded_columns,
+    resolve_tabular_schema_for_loaded_frame,
+    tabular_schema_tool_names,
+)
 
 
 _XLSX_ATTACHMENT_SCAN_ROW_LIMIT = 50
@@ -110,6 +118,15 @@ def inspect_dataset_file(source_path: Path) -> DatasetInspection:
     if dataframe.height == 0:
         raise ValidationError("Dataset file must contain at least one data row.")
 
+    # Inspection is the source-schema boundary.  Keep its ordered names in
+    # lockstep with the canonical resolver used by imports, SQL, and ML role
+    # bindings; loader placeholders and duplicate suffixes must not leak out.
+    schema = resolve_tabular_schema_for_loaded_frame(source_path, source_format, dataframe)
+    canonical_names = tabular_schema_tool_names(schema)
+    if len(dataframe.columns) != len(canonical_names):
+        raise ValidationError("Dataset source schema could not be resolved consistently.")
+    dataframe = apply_tabular_schema(dataframe, schema)
+
     columns = [
         DatasetColumnMetadata(
             name=str(column_name),
@@ -163,10 +180,9 @@ def _inspect_csv_attachment_metadata(
             except StopIteration as exc:
                 raise ValidationError("Dataset file must contain at least one column.") from exc
 
-            preview_columns = [
-                format_column(column_name, index)
-                for index, column_name in enumerate(header)
-            ]
+            header_schema = load_tabular_schema(source_path, source_format)
+            schema = reconcile_tabular_schema_to_loaded_columns(header_schema, header)
+            preview_columns = tabular_schema_tool_names(schema)
             if not preview_columns:
                 raise ValidationError("Dataset file must contain at least one column.")
 
@@ -214,7 +230,13 @@ def _inspect_xlsx_attachment_metadata(
     finally:
         workbook.close()
 
-    preview_columns = _preview_columns(header_row, column_count)
+    header_schema = load_tabular_schema(source_path, source_format)
+    observed_columns = [
+        header_row[index] if index < len(header_row) else None
+        for index in range(column_count)
+    ]
+    schema = reconcile_tabular_schema_to_loaded_columns(header_schema, observed_columns)
+    preview_columns = tabular_schema_tool_names(schema)
     if not preview_columns:
         raise ValidationError("Dataset file must contain at least one column.")
     if row_count <= 0:
@@ -291,13 +313,6 @@ def _non_empty_row_width(row: tuple[object, ...]) -> int:
         if value is not None and str(value).strip():
             return index + 1
     return 0
-
-
-def _preview_columns(header_row: tuple[object, ...], column_count: int) -> list[str]:
-    return [
-        format_column(header_row[index] if index < len(header_row) else None, index)
-        for index in range(column_count)
-    ]
 
 
 def _has_missing_values(series: pl.Series) -> bool:

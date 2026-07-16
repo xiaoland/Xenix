@@ -52,14 +52,36 @@ These are known operations; call `data.clean` directly instead of metadata:
 ## Cleaning Column References
 
 `data.query` returns zero-based column indexes. For `data.clean`, prefer
-`column_index` or `column_indexes` from that schema. Use `column_name` or
-`column_names` only as a fallback, and never mix an index form with a name form
-in one operation. Within one `data.clean` call, treat
+`column_index` or `column_indexes` from a source-schema query such as
+`SELECT * FROM input LIMIT 50`. A projected or renamed query result has its
+own ordinal positions and must not be reused for a source-dataset operation.
+Use `column_name` or `column_names` only as a fallback, and never mix an index
+form with a name form in one operation. Within one `data.clean` call, treat
 `missing.drop_high_missing_columns` and `encoding.one_hot` as column-set
 boundaries: after either operation, do not use `column_index` or
 `column_indexes` for a later operation. Use names for the remainder when they
 are known, or finish the step and issue a new `data.query` followed by a new
 `data.clean` call. The runtime rejects stale indexes rather than guessing.
+
+## Query, Transform, and Role References
+
+When source headers contain spaces, punctuation, or Unicode typography, set
+`column_reference: "indexes"` on `data.query` or `data.transform`. In that
+one SQL call, each bound relation exposes zero-based `c0`, `c1`, ... columns;
+for example, use `input.c2` for source column index 2. This SQL aliasing is
+temporary—never use `c2` as a durable dataset field name.
+
+For `data.feature.select`, prefer per-role `column_indexes` from the current
+dataset's source-schema query, for example `{"role":"target","column_indexes":[5]}`.
+Never use positions from a projected or renamed query result. Use `columns`
+only as a name fallback; never mix the two forms in one role. Xenix resolves
+indexes against the current dataset and persists canonical names.
+
+For `data.tokenize`, use `text_column_index` and optional `id_column_indexes`
+from that same source-schema order when headers are awkward. `text_column` and
+`text_column_index` are mutually exclusive; `id_columns` and
+`id_column_indexes` are mutually exclusive. Xenix resolves the indexes before
+tokenization, so its derived dataset and report retain canonical column names.
 
 ## Optional References
 

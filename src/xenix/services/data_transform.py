@@ -5,7 +5,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 import duckdb
@@ -19,7 +19,16 @@ from ..observability import record_counter, record_histogram, start_span
 from .dataset_inspection import detect_source_format
 from .preprocessing_worker import LocalPreprocessingWorkerRunner, PreprocessingWorkerRunner
 from .storage.models import DatasetSourceFormat
-from .tabular import load_pandas_frame_with_schema, load_tabular_frame, resolve_tabular_schema
+from .tabular import (
+    LoadedPandasFrame,
+    TabularSchema,
+    apply_tabular_schema,
+    load_pandas_frame_with_schema,
+    load_tabular_schema,
+    load_tabular_frame,
+    resolve_tabular_schema_for_loaded_frame,
+    tabular_schema_tool_names,
+)
 
 
 _MAX_SQL_LENGTH = 20_000
@@ -112,6 +121,8 @@ _DISALLOWED_FUNCTIONS = {
     "sqlite_scan",
 }
 
+ColumnReferenceMode = Literal["names", "indexes"]
+
 
 class DatasetSqlBinding(SQLModel):
     alias: str
@@ -123,12 +134,14 @@ class DataQueryInput(SQLModel):
     bindings: list[DatasetSqlBinding]
     sql: str
     limit: int = _DEFAULT_QUERY_LIMIT
+    column_reference: ColumnReferenceMode = "names"
 
 
 class DataTransformInput(SQLModel):
     bindings: list[DatasetSqlBinding]
     sql: str
     name: str
+    column_reference: ColumnReferenceMode = "names"
 
 
 class DataQueryResult(SQLModel):
@@ -399,7 +412,12 @@ class DataQueryTransformService:
             sql = self._validator.normalize_sql(input_data.sql)
             with tempfile.TemporaryDirectory() as temp_dir:
                 with duckdb.connect(database=":memory:") as connection:
-                    self._register_bindings(connection, bindings, temp_dir=Path(temp_dir))
+                    self._register_bindings(
+                        connection,
+                        bindings,
+                        temp_dir=Path(temp_dir),
+                        column_reference=input_data.column_reference,
+                    )
                     total_row_count = int(
                         connection.execute(
                             f"SELECT COUNT(*) AS total_rows FROM ({sql}) AS xenix_query_result_count"
@@ -444,7 +462,12 @@ class DataQueryTransformService:
             with tempfile.TemporaryDirectory() as temp_dir:
                 temp_output_path = Path(temp_dir) / "transform-output.parquet"
                 with duckdb.connect(database=":memory:") as connection:
-                    self._register_bindings(connection, bindings, temp_dir=Path(temp_dir))
+                    self._register_bindings(
+                        connection,
+                        bindings,
+                        temp_dir=Path(temp_dir),
+                        column_reference=input_data.column_reference,
+                    )
                     if validation_summary["statement"] in {"select", "with"}:
                         connection.execute(f"CREATE TEMP TABLE output AS {sql}")
                     else:
@@ -504,48 +527,122 @@ class DataQueryTransformService:
             unit="ms",
         )
 
-    def _register_bindings(self, connection, bindings: list[DatasetSqlBinding], *, temp_dir: Path) -> None:
-        for binding in bindings:
-            self._register_binding(connection, binding, temp_dir=temp_dir)
+    def _register_bindings(
+        self,
+        connection,
+        bindings: list[DatasetSqlBinding],
+        *,
+        temp_dir: Path,
+        column_reference: ColumnReferenceMode,
+    ) -> None:
+        if column_reference == "names":
+            for binding in bindings:
+                self._register_binding(connection, binding, relation_name=binding.alias, temp_dir=temp_dir)
+            return
 
-    def _register_binding(self, connection, binding: DatasetSqlBinding, *, temp_dir: Path) -> None:
+        relation_aliases = {binding.alias.lower() for binding in bindings}
+        for binding in bindings:
+            source_relation = self._temporary_source_relation_name(relation_aliases)
+            relation_aliases.add(source_relation.lower())
+            schema = self._register_binding(
+                connection,
+                binding,
+                relation_name=source_relation,
+                temp_dir=temp_dir,
+            )
+            self._create_indexed_binding_view(connection, binding.alias, source_relation, schema)
+
+    def _register_binding(
+        self,
+        connection,
+        binding: DatasetSqlBinding,
+        *,
+        relation_name: str,
+        temp_dir: Path,
+    ) -> TabularSchema:
         path = Path(binding.source_path).expanduser()
         source_format = detect_source_format(path)
         if source_format is DatasetSourceFormat.PARQUET:
-            connection.execute(
-                f'CREATE TEMP VIEW "{binding.alias}" AS '
-                f"SELECT * FROM read_parquet({self._sql_string(str(path))})",
-            )
-            return
+            return self._register_parquet_binding(connection, relation_name, path)
         if source_format in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}:
-            self._register_excel_binding(connection, binding, path, source_format, temp_dir=temp_dir)
-            return
-        frame = self._load_frame(path)
-        connection.register(binding.alias, frame)
+            return self._register_excel_binding(
+                connection,
+                relation_name,
+                path,
+                source_format,
+                temp_dir=temp_dir,
+            )
+        loaded = self._load_frame_with_schema(path)
+        connection.register(relation_name, loaded.frame)
+        return loaded.schema
+
+    def _register_parquet_binding(
+        self,
+        connection,
+        relation_name: str,
+        path: Path,
+    ) -> TabularSchema:
+        source_query = f"read_parquet({self._sql_string(str(path))})"
+        schema = load_tabular_schema(path, DatasetSourceFormat.PARQUET)
+        if not schema.columns:
+            raise ValidationError(f"Dataset binding alias '{relation_name}' has no visible columns.")
+        source_identifier = self._sql_identifier(relation_name)
+        projection = ", ".join(
+            f"source.{self._sql_identifier(column.loader_name or column.source_name or column.tool_name)} "
+            f"AS {self._sql_identifier(column.tool_name)}"
+            for column in schema.columns
+        )
+        connection.execute(
+            f"CREATE TEMP VIEW {source_identifier} AS "
+            f"SELECT {projection} FROM {source_query} AS source",
+        )
+        return schema
 
     def _register_excel_binding(
         self,
         connection,
-        binding: DatasetSqlBinding,
+        relation_name: str,
         path: Path,
         source_format: DatasetSourceFormat,
         *,
         temp_dir: Path,
-    ) -> None:
+    ) -> TabularSchema:
         frame = load_tabular_frame(path, source_format)
-        schema = resolve_tabular_schema(frame.columns)
-        frame = frame.rename(
-            {
-                original_name: column.tool_name
-                for original_name, column in zip(frame.columns, schema.columns, strict=True)
-            }
-        )
-        csv_path = temp_dir / f"{binding.alias}.csv"
+        schema = resolve_tabular_schema_for_loaded_frame(path, source_format, frame)
+        frame = apply_tabular_schema(frame, schema)
+        csv_path = temp_dir / f"{relation_name}.csv"
         frame.write_csv(csv_path)
         connection.execute(
-            f'CREATE TEMP TABLE "{binding.alias}" AS '
+            f"CREATE TEMP TABLE {self._sql_identifier(relation_name)} AS "
             f"SELECT * FROM read_csv({self._sql_string(str(csv_path))}, header=true, all_varchar=true)",
         )
+        return schema
+
+    def _create_indexed_binding_view(
+        self,
+        connection,
+        alias: str,
+        source_relation: str,
+        schema: TabularSchema,
+    ) -> None:
+        source_identifier = self._sql_identifier(source_relation)
+        source_columns = tabular_schema_tool_names(schema)
+        if not source_columns:
+            raise ValidationError(f"Dataset binding alias '{alias}' has no visible columns.")
+        projection = ", ".join(
+            f"{source_identifier}.{self._sql_identifier(column)} AS c{index}"
+            for index, column in enumerate(source_columns)
+        )
+        connection.execute(
+            f"CREATE TEMP VIEW {self._sql_identifier(alias)} AS "
+            f"SELECT {projection} FROM {source_identifier}"
+        )
+
+    def _temporary_source_relation_name(self, occupied_aliases: set[str]) -> str:
+        while True:
+            candidate = f"__xenix_sql_source_{uuid4().hex}"
+            if candidate.lower() not in occupied_aliases:
+                return candidate
 
     def _validate_bindings(self, bindings: list[DatasetSqlBinding]) -> list[DatasetSqlBinding]:
         normalized: list[DatasetSqlBinding] = []
@@ -573,10 +670,13 @@ class DataQueryTransformService:
         return normalized
 
     def _load_frame(self, path: Path) -> pd.DataFrame:
+        return self._load_frame_with_schema(path).frame
+
+    def _load_frame_with_schema(self, path: Path) -> LoadedPandasFrame:
         source_format = detect_source_format(path)
         if source_format is DatasetSourceFormat.UNKNOWN:
             raise ValidationError("Only .csv, .parquet, .xlsx, and .xls dataset files are supported.")
-        return load_pandas_frame_with_schema(path, source_format).frame
+        return load_pandas_frame_with_schema(path, source_format)
 
     def _normalize_limit(self, limit: int) -> int:
         try:
@@ -600,3 +700,6 @@ class DataQueryTransformService:
 
     def _sql_string(self, value: str) -> str:
         return "'" + value.replace("'", "''") + "'"
+
+    def _sql_identifier(self, value: str) -> str:
+        return '"' + value.replace('"', '""') + '"'

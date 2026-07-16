@@ -36,7 +36,13 @@ from .storage.models import (
     TrainedModelRow,
 )
 from .storage.repositories import DatasetRepository, ProjectRepository
-from .tabular import TabularRuntimeError, load_tabular_frame, resolve_tabular_schema
+from .tabular import (
+    TabularSchema,
+    TabularRuntimeError,
+    apply_tabular_schema,
+    load_tabular_frame,
+    resolve_tabular_schema_for_loaded_frame,
+)
 
 
 def _utc_now() -> datetime:
@@ -582,10 +588,12 @@ class DatasetService:
     ) -> list[dict[str, object]]:
         if source_format is DatasetSourceFormat.CSV:
             frame = pl.read_csv(source_path, try_parse_dates=False, infer_schema_length=None)
-            return [self._frame_spec(frame, sheet_name=None, sheet_index=None)]
+            schema = resolve_tabular_schema_for_loaded_frame(source_path, source_format, frame)
+            return [self._frame_spec(frame, schema=schema, sheet_name=None, sheet_index=None)]
         if source_format is DatasetSourceFormat.PARQUET:
             frame = pl.read_parquet(source_path)
-            return [self._frame_spec(frame, sheet_name=None, sheet_index=None)]
+            schema = resolve_tabular_schema_for_loaded_frame(source_path, source_format, frame)
+            return [self._frame_spec(frame, schema=schema, sheet_name=None, sheet_index=None)]
         if source_format in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}:
             workbook = pl.read_excel(
                 source_path,
@@ -594,12 +602,31 @@ class DatasetService:
                 raise_if_empty=False,
             )
             if isinstance(workbook, pl.DataFrame):
-                return [self._frame_spec(workbook, sheet_name=None, sheet_index=0)]
+                schema = resolve_tabular_schema_for_loaded_frame(
+                    source_path,
+                    source_format,
+                    workbook,
+                    sheet_name=0,
+                )
+                return [self._frame_spec(workbook, schema=schema, sheet_name=None, sheet_index=0)]
             specs: list[dict[str, object]] = []
             for index, (sheet_name, frame) in enumerate(workbook.items()):
                 if frame.width == 0 or frame.height == 0:
                     continue
-                specs.append(self._frame_spec(frame, sheet_name=str(sheet_name), sheet_index=index))
+                schema = resolve_tabular_schema_for_loaded_frame(
+                    source_path,
+                    source_format,
+                    frame,
+                    sheet_name=str(sheet_name),
+                )
+                specs.append(
+                    self._frame_spec(
+                        frame,
+                        schema=schema,
+                        sheet_name=str(sheet_name),
+                        sheet_index=index,
+                    )
+                )
             return specs
         raise ValidationError("Only .csv, .parquet, .xlsx, and .xls dataset files are supported.")
 
@@ -607,6 +634,7 @@ class DatasetService:
         self,
         frame: pl.DataFrame,
         *,
+        schema: TabularSchema,
         sheet_name: str | None,
         sheet_index: int | None,
     ) -> dict[str, object]:
@@ -614,13 +642,9 @@ class DatasetService:
             raise ValidationError("Dataset file must contain at least one column.")
         if frame.height == 0:
             raise ValidationError("Dataset file must contain at least one data row.")
-        schema = resolve_tabular_schema(frame.columns)
-        renamed = frame.rename(
-            {
-                original_name: column.tool_name
-                for original_name, column in zip(frame.columns, schema.columns, strict=True)
-            }
-        )
+        if len(frame.columns) != len(schema.columns):
+            raise ValidationError("Dataset source schema could not be resolved consistently.")
+        renamed = apply_tabular_schema(frame, schema)
         return {
             "frame": renamed,
             "sheet_name": sheet_name,

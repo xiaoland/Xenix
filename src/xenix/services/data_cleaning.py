@@ -15,9 +15,14 @@ from sqlmodel import SQLModel
 from ..config import AppPaths
 from ..exceptions import ValidationError
 from ..observability import record_counter, record_histogram, start_span
-from .dataset_inspection import detect_source_format, load_dataframe
+from .dataset_inspection import detect_source_format
 from .preprocessing_worker import LocalPreprocessingWorkerRunner, PreprocessingWorkerRunner
 from .storage.models import DatasetSourceFormat
+from .tabular import (
+    load_pandas_frame_with_schema,
+    resolve_tabular_column_index,
+    resolve_tabular_schema,
+)
 
 
 KEEP_SCHEMA = {"type": "string", "enum": ["first", "last", "false"]}
@@ -725,7 +730,8 @@ class DataCleaningService:
             if source_format is DatasetSourceFormat.UNKNOWN:
                 raise ValidationError("Only .csv, .parquet, .xlsx, and .xls dataset files are supported.")
 
-            frame = load_dataframe(source_path, source_format)
+            loaded = load_pandas_frame_with_schema(source_path, source_format, preserve_types=True)
+            frame = loaded.frame
             if len(frame.columns) == 0:
                 raise ValidationError("Dataset file must contain at least one column.")
 
@@ -1534,13 +1540,8 @@ class DataCleaningService:
         return [key for key in keys if key in params and params.get(key) is not None]
 
     def _column_at_index(self, frame: pd.DataFrame, value: Any, field_name: str) -> str:
-        if isinstance(value, bool) or not isinstance(value, int):
-            raise ValidationError(f"{field_name} must contain a zero-based integer column index.")
-        if value < 0 or value >= len(frame.columns):
-            raise ValidationError(
-                f"{field_name} index {value} is outside the available zero-based column range."
-            )
-        return self._require_column(frame, str(frame.columns[value]), field_name)
+        schema = resolve_tabular_schema(frame.columns)
+        return resolve_tabular_column_index(schema, value, field_name=field_name)
 
     def _require_numeric_column(self, frame: pd.DataFrame, column: str, operation_name: str) -> None:
         if not is_numeric_dtype(frame[column]) or is_bool_dtype(frame[column]):

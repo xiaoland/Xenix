@@ -55,23 +55,8 @@ class RecordingScriptedProvider:
         messages: list[ProviderMessage],
         tools: list[AgentToolSpec],
     ) -> ProviderResponse:
-        tool_names = [spec.name for spec in tools]
-        message_payload = [message.model_dump(mode="json") for message in messages]
-        tool_payload = [spec.model_dump(mode="json") for spec in tools]
-        request_payload = {"messages": message_payload, "tools": tool_payload}
-        request_bytes = len(canonical_json_bytes(request_payload))
-        tool_definition_bytes = len(canonical_json_bytes(tool_payload))
-        self.calls.append(
-            {
-                "messages": messages,
-                "tool_names": tool_names,
-                "request_bytes": request_bytes,
-                "tool_definition_bytes": tool_definition_bytes,
-            }
-        )
+        dataset_id, call_number = self._record_request(messages, tools)
 
-        dataset_id = _dataset_id_from_messages(messages)
-        call_number = len(self.calls)
         if call_number == 1:
             return ProviderResponse(
                 tool_calls=[
@@ -158,6 +143,176 @@ class RecordingScriptedProvider:
             )
         raise AssertionError(f"unexpected provider call {call_number}")
 
+    def _record_request(
+        self,
+        messages: list[ProviderMessage],
+        tools: list[AgentToolSpec],
+    ) -> tuple[str, int]:
+        tool_names = [spec.name for spec in tools]
+        message_payload = [message.model_dump(mode="json") for message in messages]
+        tool_payload = [spec.model_dump(mode="json") for spec in tools]
+        request_payload = {"messages": message_payload, "tools": tool_payload}
+        request_bytes = len(canonical_json_bytes(request_payload))
+        tool_definition_bytes = len(canonical_json_bytes(tool_payload))
+        self.calls.append(
+            {
+                "messages": messages,
+                "tool_names": tool_names,
+                "request_bytes": request_bytes,
+                "tool_definition_bytes": tool_definition_bytes,
+            }
+        )
+        return _dataset_id_from_messages(messages), len(self.calls)
+
+
+class IndexedRoleBindingProvider(RecordingScriptedProvider):
+    """Replay the Unicode-header regression without spelling source headers."""
+
+    def complete(
+        self,
+        messages: list[ProviderMessage],
+        tools: list[AgentToolSpec],
+    ) -> ProviderResponse:
+        dataset_id, call_number = self._record_request(messages, tools)
+        if call_number == 1:
+            return ProviderResponse(
+                tool_calls=[
+                    ProviderToolCall(
+                        provider_call_id="activate-1",
+                        tool_name="agent.skill.activate",
+                        provider_name="agent_skill_activate",
+                        arguments={"name": "xenix-data-preprocessing"},
+                    )
+                ],
+                usage_payload={
+                    "input_tokens": 510,
+                    "cached_input_tokens": 0,
+                    "output_tokens": 40,
+                    "total_tokens": 550,
+                },
+            )
+        if call_number == 2:
+            return ProviderResponse(
+                tool_calls=[
+                    ProviderToolCall(
+                        provider_call_id="query-1",
+                        tool_name="data.query",
+                        provider_name="data_query",
+                        arguments={
+                            "dataset_id": dataset_id,
+                            "column_reference": "indexes",
+                            "sql": "SELECT c2 AS last_month_commission, c5 AS churn FROM input",
+                        },
+                    )
+                ],
+                usage_payload={
+                    "input_tokens": 570,
+                    "cached_input_tokens": 128,
+                    "output_tokens": 50,
+                    "total_tokens": 620,
+                },
+            )
+        if call_number == 3:
+            return ProviderResponse(
+                tool_calls=[
+                    ProviderToolCall(
+                        provider_call_id="bind-1",
+                        tool_name="data.feature.select",
+                        provider_name="data_feature_select",
+                        arguments={
+                            "dataset_id": dataset_id,
+                            "role_bindings": [
+                                {"role": "feature", "column_indexes": [0, 1, 2, 3, 4]},
+                                {"role": "target", "column_indexes": [5]},
+                            ],
+                        },
+                    )
+                ],
+                usage_payload={
+                    "input_tokens": 640,
+                    "cached_input_tokens": 256,
+                    "output_tokens": 60,
+                    "total_tokens": 700,
+                },
+            )
+        if call_number == 4:
+            return ProviderResponse(
+                assistant_content_blocks=[
+                    {"type": "text", "text": "字段角色已按索引绑定。"}
+                ],
+                usage_payload={
+                    "input_tokens": 680,
+                    "cached_input_tokens": 384,
+                    "output_tokens": 30,
+                    "total_tokens": 710,
+                },
+            )
+        raise AssertionError(f"unexpected provider call {call_number}")
+
+
+class IndexedTokenizationProvider(RecordingScriptedProvider):
+    """Replay tokenization by source indexes, without spelling Unicode headers."""
+
+    def complete(
+        self,
+        messages: list[ProviderMessage],
+        tools: list[AgentToolSpec],
+    ) -> ProviderResponse:
+        dataset_id, call_number = self._record_request(messages, tools)
+        if call_number == 1:
+            return ProviderResponse(
+                tool_calls=[
+                    ProviderToolCall(
+                        provider_call_id="activate-1",
+                        tool_name="agent.skill.activate",
+                        provider_name="agent_skill_activate",
+                        arguments={"name": "xenix-data-preprocessing"},
+                    )
+                ],
+                usage_payload={
+                    "input_tokens": 510,
+                    "cached_input_tokens": 0,
+                    "output_tokens": 40,
+                    "total_tokens": 550,
+                },
+            )
+        if call_number == 2:
+            return ProviderResponse(
+                tool_calls=[
+                    ProviderToolCall(
+                        provider_call_id="tokenize-1",
+                        tool_name="data.tokenize",
+                        provider_name="data_tokenize",
+                        arguments={
+                            "dataset_id": dataset_id,
+                            "name": "Unicode reviews tokenized",
+                            "text_column_index": 1,
+                            "id_column_indexes": [0],
+                            "output": "token_rows",
+                        },
+                    )
+                ],
+                usage_payload={
+                    "input_tokens": 570,
+                    "cached_input_tokens": 128,
+                    "output_tokens": 50,
+                    "total_tokens": 620,
+                },
+            )
+        if call_number == 3:
+            return ProviderResponse(
+                assistant_content_blocks=[
+                    {"type": "text", "text": "已按索引完成中文文本分词。"}
+                ],
+                usage_payload={
+                    "input_tokens": 640,
+                    "cached_input_tokens": 256,
+                    "output_tokens": 30,
+                    "total_tokens": 670,
+                },
+            )
+        raise AssertionError(f"unexpected provider call {call_number}")
+
 
 def _dataset_id_from_messages(messages: list[ProviderMessage]) -> str:
     for message in messages:
@@ -167,7 +322,7 @@ def _dataset_id_from_messages(messages: list[ProviderMessage]) -> str:
     raise AssertionError("the provider request did not contain the attached dataset")
 
 
-def _build_runtime(monkeypatch, tmp_path: Path):
+def _build_runtime(monkeypatch, tmp_path: Path, *, provider=None):
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "isolated-runtime"))
     paths = ensure_app_dirs(get_app_paths())
     storage = StorageBootstrapService().initialize(paths)
@@ -221,7 +376,7 @@ def _build_runtime(monkeypatch, tmp_path: Path):
         context_messages_provider=context_messages,
         usage_observability=LocalLLMUsageObservability(paths.logs / LLM_USAGE_JOURNAL_FILE_NAME),
     )
-    provider = RecordingScriptedProvider()
+    provider = provider or RecordingScriptedProvider()
     harness = AgentHarnessService(
         conversation_service=conversation,
         provider=provider,
@@ -336,4 +491,117 @@ def test_harness_replays_compact_indexed_cleaning_without_metadata_roundtrip(
         {"customer_id": 1, "amount": 10, "segment": "A"},
         {"customer_id": 2, "amount": 0, "segment": "B"},
         {"customer_id": 3, "amount": 30, "segment": "B"},
+    ]
+
+
+def test_harness_replays_indexed_query_and_role_binding_for_unicode_headers(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    provider = IndexedRoleBindingProvider()
+    harness, provider, _dataset_service, _conversation = _build_runtime(
+        monkeypatch,
+        tmp_path,
+        provider=provider,
+    )
+    source = tmp_path / "unicode-churn.xlsx"
+    pd.DataFrame(
+        [[22686.5, 297, 149.25, 2029.85, 0, 0]],
+        columns=[
+            "Account Balance (Yuan)",
+            "Days Since Last Transaction",
+            "Last Month’s Trading Commission (Yuan)",
+            "Total Trading Commission (Yuan)",
+            "Years with This Brokerage",
+            "Customer Churn (Yes/No)",
+        ],
+    ).to_excel(source, index=False)
+
+    snapshot = harness.submit_user_turn(
+        SubmitUserTurnInput(
+            text="请按字段角色准备这个客户流失数据。",
+            source_attachments=[SourceAttachmentInput(file_path=str(source))],
+            client_submission_id="indexed-role-binding-replay",
+        )
+    )
+
+    calls = [message for message in snapshot.messages if message.kind.value == "tool_call"]
+    results = [message for message in snapshot.messages if message.kind.value == "tool_result"]
+    assert [call.tool_id for call in calls] == [
+        "agent.skill.activate",
+        "data.query",
+        "data.feature.select",
+    ]
+    assert [result.result_status for result in results] == ["succeeded", "succeeded", "succeeded"]
+    assert calls[1].arguments_payload["column_reference"] == "indexes"
+    assert calls[1].arguments_payload["sql"] == "SELECT c2 AS last_month_commission, c5 AS churn FROM input"
+    assert calls[2].arguments_payload["role_bindings"] == [
+        {"role": "feature", "column_indexes": [0, 1, 2, 3, 4]},
+        {"role": "target", "column_indexes": [5]},
+    ]
+    assert results[1].value_payload["rows"]["data"] == [[149.25, 0]]
+    bindings_by_role = {
+        binding["role"]: binding["columns"]
+        for binding in results[2].value_payload["role_bindings"]
+    }
+    assert bindings_by_role["feature"][2] == "Last Month’s Trading Commission (Yuan)"
+    assert bindings_by_role["target"] == ["Customer Churn (Yes/No)"]
+    assert snapshot.messages[-1].text == "字段角色已按索引绑定。"
+
+
+def test_harness_replays_indexed_tokenization_for_unicode_headers(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    provider = IndexedTokenizationProvider()
+    harness, provider, dataset_service, _conversation = _build_runtime(
+        monkeypatch,
+        tmp_path,
+        provider=provider,
+    )
+    source = tmp_path / "unicode-reviews.xlsx"
+    pd.DataFrame(
+        [
+            ["r1", "订单 退款 速度 快"],
+            ["r2", "服务 热情 环境 舒适"],
+        ],
+        columns=["Review ID (编号)", "Review’s Text"],
+    ).to_excel(source, index=False)
+
+    snapshot = harness.submit_user_turn(
+        SubmitUserTurnInput(
+            text="请把这个中文评论字段分词。",
+            source_attachments=[SourceAttachmentInput(file_path=str(source))],
+            client_submission_id="indexed-tokenization-replay",
+        )
+    )
+
+    calls = [message for message in snapshot.messages if message.kind.value == "tool_call"]
+    results = [message for message in snapshot.messages if message.kind.value == "tool_result"]
+    assert [call.tool_id for call in calls] == [
+        "agent.skill.activate",
+        "data.tokenize",
+    ]
+    assert [result.result_status for result in results] == ["succeeded", "succeeded"]
+    tokenize_arguments = calls[1].arguments_payload
+    assert tokenize_arguments["text_column_index"] == 1
+    assert tokenize_arguments["id_column_indexes"] == [0]
+    assert "Review’s Text" not in json.dumps(tokenize_arguments, ensure_ascii=False)
+    assert "Review ID (编号)" not in json.dumps(tokenize_arguments, ensure_ascii=False)
+    assert snapshot.messages[-1].text == "已按索引完成中文文本分词。"
+    assert len(provider.calls) == 3
+
+    source_dataset_id = _dataset_id_from_messages(provider.calls[0]["messages"])
+    tokenize_result = results[1].value_payload
+    derived = dataset_service.get_dataset(tokenize_result["dataset_id"])
+    assert derived.derived_from_dataset_id == source_dataset_id
+    frame = load_dataframe(Path(derived.source_path), detect_source_format(Path(derived.source_path)))
+    assert frame.to_dict(orient="records") == [
+        {"source_row_number": 1, "Review ID (编号)": "r1", "token_index": 1, "token": "订单"},
+        {"source_row_number": 1, "Review ID (编号)": "r1", "token_index": 2, "token": "退款"},
+        {"source_row_number": 1, "Review ID (编号)": "r1", "token_index": 3, "token": "速度"},
+        {"source_row_number": 2, "Review ID (编号)": "r2", "token_index": 1, "token": "服务"},
+        {"source_row_number": 2, "Review ID (编号)": "r2", "token_index": 2, "token": "热情"},
+        {"source_row_number": 2, "Review ID (编号)": "r2", "token_index": 3, "token": "环境"},
+        {"source_row_number": 2, "Review ID (编号)": "r2", "token_index": 4, "token": "舒适"},
     ]

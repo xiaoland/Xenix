@@ -231,15 +231,16 @@ def test_data_cleaning_service_normalizes_column_names(monkeypatch, tmp_path: Pa
     )
 
     frame = _read_dataset_frame(result.output_path)
-    assert frame.columns.tolist() == ["产品_价格_元", "product_price", "金额", "金额_2", "column_5"]
+    # The source schema is canonicalized by position before operations.  The
+    # duplicate/empty headers therefore arrive at the cleaning operation as
+    # deterministic tool names and remain stable in its report.
+    assert frame.columns.tolist() == ["产品_价格_元", "product_price", "column_3", "column_4", "column_5"]
     operation_report = result.report["operations"][0]
     assert operation_report["operation"] == "schema.normalize_column_names"
-    assert operation_report["columns_changed"] == 4
-    assert operation_report["mapping"][0] == {"old": " 产品 价格（元） ", "new": "产品_价格_元"}
+    assert operation_report["columns_changed"] == 3
+    assert operation_report["mapping"][0] == {"old": "产品 价格（元）", "new": "产品_价格_元"}
     assert operation_report["generated_empty_names"] == [{"column_index": 4, "new": "column_5"}]
-    assert operation_report["duplicate_collisions"] == [
-        {"column_index": 3, "base_name": "金额", "resolved_name": "金额_2"}
-    ]
+    assert operation_report["duplicate_collisions"] == []
 
 
 def test_data_cleaning_service_drops_high_missing_columns(monkeypatch, tmp_path: Path) -> None:
@@ -273,6 +274,29 @@ def test_data_cleaning_service_drops_high_missing_columns(monkeypatch, tmp_path:
     assert operation_report["columns_removed"] == 1
     assert operation_report["missing_ratios"]["mostly_missing"] == 1.0
     assert operation_report["missing_ratios"]["sometimes_missing"] == pytest.approx(1 / 3)
+
+
+def test_data_cleaning_canonicalizes_malformed_headers_before_index_operations(monkeypatch, tmp_path: Path) -> None:
+    _paths, _dataset_service, cleaning_service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "malformed-headers.csv"
+    source.write_text("record_id,,备注\n1, ,良好\n", encoding="utf-8")
+
+    result = cleaning_service.clean_dataset(
+        CleanDatasetInput(
+            source_path=str(source.resolve()),
+            name="Canonical headers",
+            operations=[
+                {"operation": "text.trim", "params": {"column_indexes": [1]}},
+            ],
+        )
+    )
+
+    frame = _read_dataset_frame(result.output_path)
+    assert frame.columns.tolist() == ["record_id", "column_2", "备注"]
+    assert result.report["operations"][0]["column"] == "column_2"
 
 
 @pytest.mark.parametrize(
@@ -747,6 +771,62 @@ def test_data_clean_metadata_returns_compact_operation_catalog(monkeypatch, tmp_
     assert metadata_size < 11_200
 
 
+def test_data_tools_resolve_indexes_for_unicode_query_and_role_binding(monkeypatch, tmp_path: Path) -> None:
+    _paths, dataset_service, _cleaning_service, _artifact_service, registry, store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "unicode-churn.csv"
+    source.write_text(
+        '"Account Balance (Yuan)","Days Since Last Transaction",'
+        '"Last Month’s Trading Commission (Yuan)","Total Trading Commission (Yuan)",'
+        '"Years with This Brokerage","Customer Churn (Yes/No)"\n'
+        "22686.5,297,149.25,2029.85,0,0\n",
+        encoding="utf-8",
+    )
+    dataset = dataset_service.register_dataset(
+        RegisterDatasetInput(source_path=str(source.resolve()), name="Unicode churn")
+    )
+
+    query_arguments = {
+        "dataset_id": dataset.id,
+        "column_reference": "indexes",
+        "sql": "SELECT c2 AS last_month_commission, c5 AS churn FROM input",
+    }
+    query_result = registry.execute(
+        "data.query",
+        query_arguments,
+        _tool_context(store, "data.query", query_arguments),
+    )
+    assert query_result.payload["rows"]["data"] == [[149.25, 0]]
+
+    binding_arguments = {
+        "dataset_id": dataset.id,
+        "role_bindings": [
+            {"role": "feature", "column_indexes": [0, 1, 2, 3, 4]},
+            {"role": "target", "column_indexes": [5]},
+        ],
+    }
+    binding_result = registry.execute(
+        "data.feature.select",
+        binding_arguments,
+        _tool_context(store, "data.feature.select", binding_arguments),
+    )
+    bindings_by_role = {
+        item["role"]: item["columns"] for item in binding_result.payload["role_bindings"]
+    }
+    assert bindings_by_role == {
+        "feature": [
+            "Account Balance (Yuan)",
+            "Days Since Last Transaction",
+            "Last Month’s Trading Commission (Yuan)",
+            "Total Trading Commission (Yuan)",
+            "Years with This Brokerage",
+        ],
+        "target": ["Customer Churn (Yes/No)"],
+    }
+
+
 def test_data_clean_tool_schema_stays_compact(monkeypatch, tmp_path: Path) -> None:
     _paths, _dataset_service, _cleaning_service, _artifact_service, registry, _store = _build_runtime(
         monkeypatch,
@@ -782,4 +862,22 @@ def test_data_clean_tool_schema_stays_compact(monkeypatch, tmp_path: Path) -> No
             "encoding",
             "scaling",
         ],
+    }
+    assert specs["data.query"].parameters_schema["properties"]["column_reference"]["enum"] == [
+        "names",
+        "indexes",
+    ]
+    assert specs["data.transform"].parameters_schema["properties"]["column_reference"]["enum"] == [
+        "names",
+        "indexes",
+    ]
+    role_binding_schema = specs["data.feature.select"].parameters_schema["properties"]["role_bindings"]["items"]
+    assert role_binding_schema["required"] == ["role"]
+    assert role_binding_schema["properties"]["column_indexes"] == {
+        "type": "array",
+        "items": {"type": "integer", "minimum": 0},
+        "description": (
+            "Preferred zero-based dataset column indexes returned by data.query. "
+            "Use either column_indexes or columns, never both."
+        ),
     }

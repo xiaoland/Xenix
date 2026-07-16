@@ -18,6 +18,7 @@ from xenix.services.ml_service import (
     TuneWithEvaluateInput,
 )
 from xenix.services.ml_task_service import MLTaskService
+from xenix.services.ml.dataset_loader import load_dataset
 from xenix.services.project_service import CreateProjectInput, ProjectService
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import MLTaskArtifactKind, MLTaskStatus, MLTaskType
@@ -55,6 +56,17 @@ def _register_dataset(
 def _read_dataset_frame(path: str | Path) -> pd.DataFrame:
     source_path = Path(path)
     return load_dataframe(source_path, detect_source_format(source_path))
+
+
+def test_ml_dataset_loader_preserves_xlsx_native_column_types(tmp_path: Path) -> None:
+    source = tmp_path / "typed-input.xlsx"
+    pd.DataFrame({"amount": [10, 20], "label": [0, 1]}).to_excel(source, index=False)
+
+    frame = load_dataset(source)
+
+    assert frame.columns.tolist() == ["amount", "label"]
+    assert pd.api.types.is_numeric_dtype(frame["amount"])
+    assert pd.api.types.is_numeric_dtype(frame["label"])
 
 
 def _create_binding(
@@ -1061,6 +1073,87 @@ def test_column_binding_error_names_missing_columns_and_suggestions(monkeypatch,
     assert "`Last Month's Trading Commission (Yuan)` -> `Last Month’s Trading Commission (Yuan)`" in message
     assert "Available columns:" in message
     assert "Use the exact column names returned by data.query or dataset inspection." in message
+
+
+def test_column_binding_resolves_column_indexes_to_canonical_names(monkeypatch, tmp_path: Path) -> None:
+    project_service, dataset_service, _ml_task_service, ml_service = _build_services(monkeypatch, tmp_path)
+    project = project_service.create_project(CreateProjectInput(name="Retail"))
+    dataset_file = tmp_path / "indexed-columns.csv"
+    dataset_file.write_text(
+        "customer_id,amount,segment,label\n"
+        "1,20,north,0\n",
+        encoding="utf-8",
+    )
+    dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Indexed columns")
+
+    binding = ml_service.create_column_binding(
+        CreateColumnBindingInput(
+            dataset_id=dataset.id,
+            role_bindings=[
+                {"role": "feature", "column_indexes": [2, 1]},
+                {"role": "target", "column_indexes": [3]},
+            ],
+        )
+    )
+
+    assert binding.role_bindings == [
+        {
+            "role": "feature",
+            "columns": ["segment", "amount"],
+            "role_kind": "many_columns",
+            "required": True,
+            "metadata": {},
+        },
+        {
+            "role": "target",
+            "columns": ["label"],
+            "role_kind": "single_column",
+            "required": True,
+            "metadata": {},
+        },
+    ]
+    assert all("column_indexes" not in role_binding for role_binding in binding.role_bindings)
+
+
+@pytest.mark.parametrize(
+    ("feature_binding", "message"),
+    [
+        (
+            {"role": "feature", "columns": ["amount"], "column_indexes": [1]},
+            "either columns or column_indexes, not both",
+        ),
+        ({"role": "feature"}, "require columns or column_indexes"),
+        ({"role": "feature", "column_indexes": [-1]}, "outside the available zero-based column range"),
+        ({"role": "feature", "column_indexes": [4]}, "outside the available zero-based column range"),
+        ({"role": "feature", "column_indexes": [True]}, "must contain zero-based integer indexes"),
+    ],
+)
+def test_column_binding_rejects_invalid_column_indexes(
+    monkeypatch,
+    tmp_path: Path,
+    feature_binding: dict[str, object],
+    message: str,
+) -> None:
+    project_service, dataset_service, _ml_task_service, ml_service = _build_services(monkeypatch, tmp_path)
+    project = project_service.create_project(CreateProjectInput(name="Retail"))
+    dataset_file = tmp_path / "indexed-columns.csv"
+    dataset_file.write_text(
+        "customer_id,amount,segment,label\n"
+        "1,20,north,0\n",
+        encoding="utf-8",
+    )
+    dataset = _register_dataset(dataset_service, project.id, dataset_file, name="Indexed columns")
+
+    with pytest.raises(ValidationError, match=message):
+        ml_service.create_column_binding(
+            CreateColumnBindingInput(
+                dataset_id=dataset.id,
+                role_bindings=[
+                    feature_binding,
+                    {"role": "target", "columns": ["label"]},
+                ],
+            )
+        )
 
 
 def test_apply_rejects_input_files_missing_required_features(monkeypatch, tmp_path: Path) -> None:

@@ -25,6 +25,11 @@ parallel or repeated metadata queries. Batch related aggregate checks in one
 CTE/projection, then make a single focused follow-up only when the result makes
 the cleaning decision materially ambiguous.
 
+When headers contain spaces, punctuation, or Unicode typography, set
+`column_reference: "indexes"`. In that one query, each bound relation exposes
+zero-based SQL aliases `c0`, `c1`, ... instead of source names; use
+`input.c2` for source index 2. This mode is query-local.
+
 ### `data.integrate`
 
 Use only when multiple registered datasets should be vertically appended into one generated dataset. The current tool accepts `dataset_ids` and an optional `name`; it does not accept join keys, join type, or column conflict rules.
@@ -61,7 +66,9 @@ Use for predefined atomic cleaning operations on one registered dataset:
 If `operations` is absent or empty, no cleaning happens. Do not use `data.clean` as a vague instruction such as “clean everything”; provide explicit operations and parameters.
 
 `data.query` returns zero-based column indexes. Prefer `column_index` or
-`column_indexes` in cleaning parameters; `column_name` and `column_names` are
+`column_indexes` in cleaning parameters, but take them only from a
+source-schema query such as `SELECT * FROM input LIMIT 50`; a projection or
+rename has result-local ordinal positions. `column_name` and `column_names` are
 fallback forms. Provide exactly one form for a selected field set—never mix
 index and name references in one operation. In the same call, do not carry
 indexes past `missing.drop_high_missing_columns` or `encoding.one_hot`, since
@@ -78,7 +85,13 @@ Use for service-owned Chinese text segmentation when raw text must become a dura
 - text classification, text clustering, topic modeling, or similarity retrieval;
 - token-preserving analysis that should not be re-segmented ad hoc in later tools.
 
-The current tool accepts one text column plus optional identifier columns and one Xenix-owned profile, `zh_business_v1`.
+The current tool accepts one text column plus optional identifier columns and
+one Xenix-owned profile, `zh_business_v1`. For difficult headers, use the
+source-schema zero-based `text_column_index` and optional `id_column_indexes`
+instead of names. Provide exactly one text-selector form and at most one
+identifier-selector form; never reuse a projected query result's ordinal.
+Xenix resolves indexes before tokenization, and its report retains canonical
+column names.
 
 Choose:
 
@@ -100,6 +113,10 @@ Use for SQL-derived datasets:
 
 `data.transform` materializes a derived dataset. Use `dataset_id` for one input aliased as `input`, or `bindings` for multiple inputs with explicit SQL aliases. Use `data.query` first when only diagnostic evidence is needed.
 
+`data.transform` also accepts `column_reference: "indexes"` with the same
+query-local `c0`, `c1`, ... aliases. Give output columns explicit business
+names before materializing a derived dataset.
+
 ### `data.feature.select`
 
 Use before modeling to create a durable role-binding snapshot. Bind:
@@ -110,6 +127,12 @@ Use before modeling to create a durable role-binding snapshot. Bind:
 - exclusions through explicit reasoning in the surrounding answer.
 
 Do not include identifiers, post-outcome fields, target duplicates, or sensitive/prohibited fields as predictive features.
+
+Prefer each role's zero-based `column_indexes` from a source-schema
+`SELECT * FROM input` query; projected/renamed result positions are not source
+indexes. Xenix resolves them against the current dataset schema and persists
+canonical names. Use `columns` only as a fallback and never mix names with
+indexes in one role.
 
 ## Planning Pattern
 

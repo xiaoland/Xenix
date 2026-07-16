@@ -4,6 +4,7 @@ from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 import pandas as pd
+import polars as pl
 import pytest
 
 from xenix.config import ensure_app_dirs, get_app_paths
@@ -133,8 +134,12 @@ def test_dataset_service_inspects_xlsx_without_pandas_read_excel(monkeypatch, tm
         ]
     ).to_excel(dataset_file, index=False)
 
+    original_read_excel = pd.read_excel
+
     def fail_read_excel(*_args, **_kwargs):
-        pytest.fail("xlsx inspection should use the Polars-native tabular path")
+        if _kwargs.get("nrows") != 0:
+            pytest.fail("xlsx inspection should use the Polars-native tabular path")
+        return original_read_excel(*_args, **_kwargs)
 
     monkeypatch.setattr("xenix.services.dataset_inspection.pd.read_excel", fail_read_excel)
 
@@ -217,8 +222,12 @@ def test_dataset_service_registers_xlsx_attachment_without_full_inspection(
         ]
     ).to_excel(dataset_file, index=False)
 
+    original_read_excel = pd.read_excel
+
     def fail_read_excel(*_args, **_kwargs):
-        pytest.fail("attachment registration should not read the full xlsx dataframe")
+        if _kwargs.get("nrows") != 0:
+            pytest.fail("attachment registration should not read the full xlsx dataframe")
+        return original_read_excel(*_args, **_kwargs)
 
     monkeypatch.setattr("xenix.services.dataset_inspection.pd.read_excel", fail_read_excel)
 
@@ -258,6 +267,26 @@ def test_dataset_service_registers_xlsx_attachment_with_stale_dimension_metadata
     assert attachment.row_count == 2
     assert attachment.column_count == 2
     assert attachment.preview_columns == ["name", "value"]
+
+
+def test_attachment_metadata_reconciles_malformed_xlsx_header_width(monkeypatch, tmp_path: Path) -> None:
+    _project_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
+    dataset_file = tmp_path / "report.xlsx"
+    pd.DataFrame(
+        [
+            ["品项销售明细", None, None],
+            ["营业日期【2026/04/01-2026/04/30】", None, None],
+            ["城市", "销售数量", "销售金额(元)"],
+            ["佛山市", 1, 118],
+        ]
+    ).to_excel(dataset_file, header=False, index=False)
+
+    metadata = dataset_service.inspect_attachment_metadata(
+        InspectDatasetInput(source_path=str(dataset_file.resolve()))
+    )
+
+    assert metadata.column_count == 3
+    assert metadata.preview_columns == ["品项销售明细", "column_2", "column_3"]
 
 
 def test_dataset_service_registers_workbook_sheets_as_app_owned_parquet_datasets(
@@ -301,6 +330,72 @@ def test_dataset_service_registers_workbook_sheets_as_app_owned_parquet_datasets
         {"region": "north", "amount": 10},
         {"region": "south", "amount": 5},
     ]
+
+
+@pytest.mark.parametrize("source_kind", ["csv", "parquet", "xlsx"])
+def test_dataset_service_materialization_uses_canonical_ordered_column_names(
+    monkeypatch,
+    tmp_path: Path,
+    source_kind: str,
+) -> None:
+    """Registered artifacts retain the source schema's positional authority.
+
+    The three loaders expose the same logical headers with different duplicate
+    and placeholder suffixes.  Registration must persist the one canonical
+    projection used by inspection and downstream tool bindings.
+    """
+
+    _project_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
+    dataset_file = tmp_path / f"canonical.{source_kind}"
+    if source_kind == "csv":
+        dataset_file.write_text(
+            "city,city,,amount\n"
+            "north,south,west,1\n",
+            encoding="utf-8",
+        )
+    elif source_kind == "parquet":
+        pl.DataFrame(
+            {
+                "city": ["north"],
+                "city_duplicated_0": ["south"],
+                "__UNNAMED__2": ["west"],
+                "amount": [1],
+            }
+        ).write_parquet(dataset_file)
+    else:
+        pd.DataFrame(
+            [["north", "south", "west", 1]],
+            columns=["city", "city", None, "amount"],
+        ).to_excel(dataset_file, index=False)
+
+    dataset = dataset_service.register_dataset(
+        RegisterDatasetInput(source_path=str(dataset_file.resolve()), name="Canonical")
+    )
+
+    materialized = pl.read_parquet(dataset.source_path)
+    assert materialized.columns == ["city", "column_2", "column_3", "amount"]
+    inspection = dataset_service.inspect_source_file(
+        InspectDatasetInput(source_path=str(dataset_file.resolve()))
+    )
+    assert inspection.preview_columns == materialized.columns
+
+
+def test_dataset_service_materializes_numeric_xlsx_header_with_canonical_name(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _project_service, dataset_service, _ml_task_service = _build_services(monkeypatch, tmp_path)
+    dataset_file = tmp_path / "numeric-header.xlsx"
+    pd.DataFrame([["x", 1]], columns=[1, "amount"]).to_excel(dataset_file, index=False)
+
+    dataset = dataset_service.register_dataset(
+        RegisterDatasetInput(source_path=str(dataset_file.resolve()), name="Numeric")
+    )
+
+    assert pl.read_parquet(dataset.source_path).columns == ["column_1", "amount"]
+    assert dataset_service.inspect_source_file(
+        InspectDatasetInput(source_path=str(dataset_file.resolve()))
+    ).preview_columns == ["column_1", "amount"]
 
 
 def test_dataset_service_discards_unreferenced_dataset(monkeypatch, tmp_path: Path) -> None:

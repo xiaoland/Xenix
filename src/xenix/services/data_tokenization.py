@@ -14,8 +14,13 @@ from sqlmodel import SQLModel
 from ..config import AppPaths
 from ..exceptions import ValidationError
 from ..observability import record_counter, record_histogram, start_span
-from .dataset_inspection import detect_source_format, load_dataframe
+from .dataset_inspection import detect_source_format
 from .storage.models import DatasetSourceFormat
+from .tabular import (
+    TabularSchema,
+    load_pandas_frame_with_schema,
+    resolve_tabular_column_index,
+)
 
 _TOKENIZER_PROFILE = "zh_business_v1"
 _OUTPUT_MODES = {"token_text", "token_rows"}
@@ -52,10 +57,12 @@ _ZH_BUSINESS_STOPWORDS = {
 class TokenizeDatasetInput(SQLModel):
     source_path: str
     name: str
-    text_column: str
+    text_column: str | None = None
+    text_column_index: object | None = None
     output: str = "token_text"
     tokenizer_profile: str = _TOKENIZER_PROFILE
-    id_columns: list[str] = Field(default_factory=list)
+    id_columns: list[str] | None = None
+    id_column_indexes: object | None = None
 
 
 class TokenizeDatasetResult(SQLModel):
@@ -82,12 +89,25 @@ class DataTokenizationService:
 
             output_mode = self._normalize_output(input_data.output)
             tokenizer_profile = self._normalize_profile(input_data.tokenizer_profile)
-            frame = load_dataframe(source_path, source_format)
+            loaded = load_pandas_frame_with_schema(source_path, source_format)
+            frame = loaded.frame
             if len(frame.columns) == 0:
                 raise ValidationError("Dataset file must contain at least one column.")
+            schema = loaded.schema
 
-            text_column = self._required_column(frame, input_data.text_column, field_name="text_column")
-            id_columns = self._id_columns(frame, input_data.id_columns, text_column=text_column)
+            text_column = self._text_column(
+                frame,
+                schema,
+                input_data.text_column,
+                input_data.text_column_index,
+            )
+            id_columns = self._id_columns(
+                frame,
+                schema,
+                input_data.id_columns,
+                input_data.id_column_indexes,
+                text_column=text_column,
+            )
             tokenized_rows = [self._tokenize_value(value) for value in frame[text_column].tolist()]
 
             if output_mode == "token_text":
@@ -138,6 +158,21 @@ class DataTokenizationService:
             raise ValidationError(f"data.tokenize tokenizer_profile must be {_TOKENIZER_PROFILE}.")
         return normalized
 
+    def _text_column(
+        self,
+        frame: pd.DataFrame,
+        schema: TabularSchema,
+        raw_column: str | None,
+        raw_index: object | None,
+    ) -> str:
+        if raw_column is not None and raw_index is not None:
+            raise ValidationError("data.tokenize must use either text_column or text_column_index, not both.")
+        if raw_index is not None:
+            return self._column_at_index(schema, raw_index, "text_column_index")
+        if raw_column is None:
+            raise ValidationError("data.tokenize requires text_column or text_column_index.")
+        return self._required_column(frame, raw_column, field_name="text_column")
+
     def _required_column(self, frame: pd.DataFrame, raw_column: str, *, field_name: str) -> str:
         column = str(raw_column or "").strip()
         if not column:
@@ -146,18 +181,46 @@ class DataTokenizationService:
             raise ValidationError(f"data.tokenize {field_name} '{column}' was not found in the dataset.")
         return column
 
-    def _id_columns(self, frame: pd.DataFrame, raw_columns: list[str], *, text_column: str) -> list[str]:
-        normalized: list[str] = []
+    def _id_columns(
+        self,
+        frame: pd.DataFrame,
+        schema: TabularSchema,
+        raw_columns: list[str] | None,
+        raw_indexes: object | None,
+        *,
+        text_column: str,
+    ) -> list[str]:
+        if raw_columns is not None and raw_indexes is not None:
+            raise ValidationError("data.tokenize must use either id_columns or id_column_indexes, not both.")
+        if raw_indexes is not None:
+            if not isinstance(raw_indexes, list):
+                raise ValidationError(
+                    "data.tokenize id_column_indexes must be a list of zero-based integer column indexes."
+                )
+            normalized = [
+                self._column_at_index(schema, value, "id_column_indexes")
+                for value in raw_indexes
+            ]
+        else:
+            normalized = []
+            for raw_column in raw_columns or []:
+                normalized.append(self._required_column(frame, raw_column, field_name="id_columns"))
+
         seen: set[str] = set()
-        for raw_column in raw_columns:
-            column = self._required_column(frame, raw_column, field_name="id_columns")
+        for column in normalized:
             if column == text_column:
                 raise ValidationError("data.tokenize id_columns cannot include text_column.")
             if column in seen:
                 raise ValidationError("data.tokenize id_columns cannot contain duplicates.")
             seen.add(column)
-            normalized.append(column)
         return normalized
+
+    def _column_at_index(self, schema: TabularSchema, value: object, field_name: str) -> str:
+        return resolve_tabular_column_index(
+            schema,
+            value,
+            field_name=f"data.tokenize {field_name}",
+        )
 
     def _tokenize_value(self, value: object) -> list[str]:
         if value is None or pd.isna(value):

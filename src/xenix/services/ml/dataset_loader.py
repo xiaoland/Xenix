@@ -2,24 +2,19 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import duckdb
 import pandas as pd
 
 from ...exceptions import ValidationError
+from ..dataset_inspection import detect_source_format
+from ..storage.models import DatasetSourceFormat
+from ..tabular import load_pandas_frame_with_schema
 
 
 def load_dataset(path: Path) -> pd.DataFrame:
-    suffix = path.suffix.lower()
-    if suffix == ".csv":
-        return pd.read_csv(path)
-    if suffix == ".parquet":
-        return duckdb.connect(database=":memory:").execute(
-            "SELECT * FROM read_parquet(?)",
-            [str(path)],
-        ).fetchdf()
-    if suffix in {".xlsx", ".xls"}:
-        return pd.read_excel(path)
-    raise ValidationError(f"Unsupported dataset format '{path.suffix}'.")
+    source_format = detect_source_format(path)
+    if source_format is DatasetSourceFormat.UNKNOWN:
+        raise ValidationError(f"Unsupported dataset format '{path.suffix}'.")
+    return load_pandas_frame_with_schema(path, source_format, preserve_types=True).frame
 
 
 def load_holdout_frame(path: Path) -> pd.DataFrame:
