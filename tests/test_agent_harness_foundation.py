@@ -4,7 +4,7 @@ import pytest
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import NotFoundError, ValidationError
-from xenix.services.agent import AgentHarnessService
+from xenix.services.agent import AgentHarnessService, SubmitUserTurnInput
 from xenix.services.llm import (
     AppendUserMessageInput,
     DatasetBlock,
@@ -85,6 +85,34 @@ class _CaptureProvider:
     def complete(self, messages, _tools):
         self.messages = list(messages)
         return ProviderResponse(assistant_content_blocks=[{"type": "text", "text": "Ready."}])
+
+
+def test_duplicate_submission_ack_only_projects_existing_snapshot(monkeypatch, tmp_path: Path) -> None:
+    service = _conversation(monkeypatch, tmp_path)
+    provider = _CaptureProvider()
+    harness = AgentHarnessService(conversation_service=service, provider=provider)
+    first_events = list(
+        harness.submit_user_turn_stream(
+            SubmitUserTurnInput(text="First submission", client_submission_id="duplicate-ack")
+        )
+    )
+    first_snapshot = next(event.snapshot for event in reversed(first_events) if event.snapshot is not None)
+    assert provider.messages
+
+    replay_events = list(
+        harness.submit_user_turn_stream(
+            SubmitUserTurnInput(
+                thread_id=first_snapshot.thread.id,
+                text="A replay must not be sent again",
+                client_submission_id="duplicate-ack",
+            )
+        )
+    )
+
+    assert len(replay_events) == 1
+    assert replay_events[0].is_final is True
+    assert replay_events[0].snapshot is not None
+    assert replay_events[0].snapshot.messages == first_snapshot.messages
 
 
 def test_legacy_dataset_block_is_reduced_in_provider_neutral_context(monkeypatch, tmp_path: Path) -> None:

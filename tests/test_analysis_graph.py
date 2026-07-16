@@ -552,11 +552,11 @@ def test_analysis_graph_tool_registers_image_artifact(monkeypatch, tmp_path: Pat
         arguments,
         _tool_context(conversation_store, "analysis.graph", arguments),
     )
-    resolved = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}?view=image")
+    assert isinstance(result.value, dict)
+    resolved = artifact_service.resolve_uri(f"artifact://{result.value['artifact_id']}?view=image")
 
-    assert result.payload["dataset_id"] == dataset.id
-    assert "artifact_link" not in result.payload
-    assert not hasattr(result, "content_blocks")
+    assert result.value["dataset_id"] == dataset.id
+    assert "artifact_link" not in result.value
     assert resolved.kind is ArtifactKind.IMAGE
     assert resolved.mime_type == "image/svg+xml"
     assert resolved.title == "Revenue by region"
@@ -581,9 +581,10 @@ def test_analysis_graph_tool_registers_wordcloud_artifact(monkeypatch, tmp_path:
         arguments,
         _tool_context(conversation_store, "analysis.graph", arguments),
     )
-    resolved = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}?view=image")
+    assert isinstance(result.value, dict)
+    resolved = artifact_service.resolve_uri(f"artifact://{result.value['artifact_id']}?view=image")
 
-    assert result.payload["dataset_id"] == dataset.id
+    assert result.value["dataset_id"] == dataset.id
     assert resolved.kind is ArtifactKind.IMAGE
     assert resolved.mime_type == "image/svg+xml"
     assert resolved.metadata_payload["analysis_graph"]["spec_format"] == "wordcloud"

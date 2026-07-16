@@ -69,9 +69,11 @@ from .tooling import (
     ToolScope,
     StagedToolCall,
     TerminalToolResult,
-    bounded_result_payload,
+    canonical_tool_result_value,
     canonical_json_bytes,
     scope_fingerprint,
+    terminal_tool_result,
+    tool_failure_from_exception,
 )
 
 
@@ -127,6 +129,7 @@ class SubmissionClaim:
     expected_frontier_id: str | None
     client_submission_id: str
     initial_title_eligible: bool = False
+    existing_message_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -145,6 +148,23 @@ class ConversationLiveEvent:
     staged_call_id: str | None = None
 
 
+class ThreadPausedError(ValidationError):
+    """A runtime-only Thread pause prevented a new LLM provider request."""
+
+    def __init__(self, thread_id: str) -> None:
+        super().__init__(
+            f"LLM sampling is paused for Thread '{thread_id}'.",
+            error_code="llm_thread_paused",
+        )
+
+
+@dataclass
+class _ThreadControl:
+    """Process-local pause state; never persisted as Conversation state."""
+
+    paused: bool = False
+
+
 @dataclass
 class _PendingExchange:
     pending_message_id: str
@@ -157,6 +177,7 @@ class _PendingExchange:
     output_items: tuple[ProviderOutputItem, ...] = ()
     calls: dict[str, StagedToolCall] = field(default_factory=dict)
     results: dict[str, TerminalToolResult] = field(default_factory=dict)
+    tool_execution_started: bool = False
     cancelled: bool = False
 
 
@@ -188,6 +209,7 @@ class LLMConversationService:
         self._claims_lock = threading.Lock()
         self._pending: dict[str, _PendingExchange] = {}
         self._pending_lock = threading.RLock()
+        self._thread_controls: dict[str, _ThreadControl] = {}
 
     @property
     def tool_registry(self) -> AgentToolRegistry:
@@ -224,7 +246,7 @@ class LLMConversationService:
         claim: SubmissionClaim,
         first_user_message_id: str,
         appended_snapshot: ConversationSnapshot | None = None,
-    ) -> ConversationSnapshot:
+    ) -> ConversationSnapshot | None:
         """Persist metadata for a just-appended first UserMessage when eligible.
 
         The claim captures the pre-append eligibility from canonical state; the
@@ -251,20 +273,26 @@ class LLMConversationService:
                 if not self._is_initial_title_target(snapshot, first_user_message_id):
                     return snapshot
 
-        title = self._automatic_initial_thread_title(snapshot)
-        with self._gate(thread_id):
-            with self._session_factory() as session:
-                row = self._repository.set_initial_title_if_blank(
-                    session,
-                    thread_id=thread_id,
-                    title=title,
-                    now=_utc_now(),
-                )
-                if row is None:
-                    raise NotFoundError(f"Conversation Thread '{thread_id}' was not found.")
-                messages = self._repository.list_messages(session, thread_id)
-                session.commit()
-                return ConversationSnapshot(thread=row, messages=messages)
+        try:
+            title = self._automatic_initial_thread_title(snapshot)
+        except ThreadPausedError:
+            return None
+        with self._pending_lock:
+            with self._gate(thread_id):
+                if self._thread_control_locked(thread_id).paused:
+                    return None
+                with self._session_factory() as session:
+                    row = self._repository.set_initial_title_if_blank(
+                        session,
+                        thread_id=thread_id,
+                        title=title,
+                        now=_utc_now(),
+                    )
+                    if row is None:
+                        raise NotFoundError(f"Conversation Thread '{thread_id}' was not found.")
+                    messages = self._repository.list_messages(session, thread_id)
+                    session.commit()
+                    return ConversationSnapshot(thread=row, messages=messages)
 
     def create_thread(self, input_data: CreateConversationThreadInput | None = None) -> ConversationSnapshot:
         input_data = input_data or CreateConversationThreadInput()
@@ -353,14 +381,34 @@ class LLMConversationService:
             return self.get_thread_snapshot(thread_id)
 
     def delete_thread(self, thread_id: str) -> None:
-        with self._gate(thread_id):
-            with self._session_factory() as session:
-                if self._repository.list_pending(session, thread_id):
-                    raise ValidationError("Cannot delete a Thread while LLM sampling is pending.")
-                row = self._repository.delete_thread(session, thread_id)
-                if row is None:
-                    raise NotFoundError(f"Conversation Thread '{thread_id}' was not found.")
-                session.commit()
+        with self._pending_lock:
+            with self._gate(thread_id):
+                with self._session_factory() as session:
+                    if self._repository.list_pending(session, thread_id):
+                        raise ValidationError("Cannot delete a Thread while LLM sampling is pending.")
+                    row = self._repository.delete_thread(session, thread_id)
+                    if row is None:
+                        raise NotFoundError(f"Conversation Thread '{thread_id}' was not found.")
+                    session.commit()
+                self._thread_controls.pop(thread_id, None)
+
+    def pause_thread(self, thread_id: str) -> None:
+        """Pause new LLM provider sends for one Thread in this process only."""
+
+        with self._pending_lock:
+            with self._gate(thread_id):
+                with self._session_factory() as session:
+                    if self._repository.get_thread(session, thread_id) is None:
+                        raise NotFoundError(f"Conversation Thread '{thread_id}' was not found.")
+                control = self._thread_control_locked(thread_id)
+                if not control.paused:
+                    control.paused = True
+
+    def is_thread_paused(self, thread_id: str) -> bool:
+        """Return only runtime pause state; it is intentionally not durable."""
+
+        with self._pending_lock:
+            return self._thread_control_locked(thread_id).paused
 
     def claim_user_submission(
         self,
@@ -374,20 +422,36 @@ class LLMConversationService:
             raise ValidationError("Client submission ID cannot be empty.")
         if thread_id is None:
             return SubmissionClaim(thread_id="", expected_frontier_id=None, client_submission_id=normalized_id)
-        with self._gate(thread_id):
-            snapshot = self.get_thread_snapshot(thread_id)
-            self._validate_user_append_messages(snapshot.messages, expected_frontier_id)
-            key = (thread_id, normalized_id)
-            with self._claims_lock:
-                if key in self._claims:
-                    raise ValidationError("This submission is already being prepared.")
-                self._claims.add(key)
-            return SubmissionClaim(
-                thread_id=thread_id,
-                expected_frontier_id=expected_frontier_id,
-                client_submission_id=normalized_id,
-                initial_title_eligible=self.is_initial_title_eligible(snapshot),
-            )
+        with self._pending_lock:
+            with self._gate(thread_id):
+                snapshot = self.get_thread_snapshot(thread_id)
+                duplicate = next(
+                    (message for message in snapshot.messages if message.client_submission_id == normalized_id),
+                    None,
+                )
+                if duplicate is not None:
+                    return SubmissionClaim(
+                        thread_id=thread_id,
+                        expected_frontier_id=expected_frontier_id,
+                        client_submission_id=normalized_id,
+                        existing_message_id=duplicate.id,
+                    )
+                self._validate_user_append_messages(
+                    snapshot.messages,
+                    expected_frontier_id,
+                    allow_paused_tool_result=self._thread_control_locked(thread_id).paused,
+                )
+                key = (thread_id, normalized_id)
+                with self._claims_lock:
+                    if key in self._claims:
+                        raise ValidationError("This submission is already being prepared.")
+                    self._claims.add(key)
+                return SubmissionClaim(
+                    thread_id=thread_id,
+                    expected_frontier_id=expected_frontier_id,
+                    client_submission_id=normalized_id,
+                    initial_title_eligible=self.is_initial_title_eligible(snapshot),
+                )
 
     def release_user_submission_claim(self, claim: SubmissionClaim) -> None:
         if not claim.thread_id:
@@ -404,36 +468,50 @@ class LLMConversationService:
         client_submission_id = input_data.client_submission_id.strip()
         if not client_submission_id:
             raise ValidationError("Client submission ID cannot be empty.")
-        with self._gate(input_data.thread_id):
-            with self._session_factory() as session:
-                thread = self._repository.get_thread(session, input_data.thread_id)
-                if thread is None:
-                    raise NotFoundError(f"Conversation Thread '{input_data.thread_id}' was not found.")
-                messages = self._repository.list_messages(session, input_data.thread_id)
-                duplicate = next(
-                    (row for row in messages if row.client_submission_id == client_submission_id),
-                    None,
-                )
-                if duplicate is None:
-                    self._validate_user_append_messages(messages, expected_frontier_id)
-                    canonical_blocks = normalize_message_blocks(input_data.content_blocks)
-                    if any(isinstance(block, SourceAttachmentBlock) for block in canonical_blocks):
-                        raise ValidationError(
-                            "SourceAttachmentBlock is a legacy presentation block and cannot be written to a new User Message."
-                        )
-                    row = ConversationMessageRow(
-                        thread_id=input_data.thread_id,
-                        sequence_index=len(messages),
-                        kind=ConversationMessageKind.USER,
-                        client_submission_id=client_submission_id,
-                        content_payload={"blocks": blocks_to_json(canonical_blocks)},
-                        created_at=_utc_now(),
+        with self._pending_lock:
+            with self._gate(input_data.thread_id):
+                control = self._thread_control_locked(input_data.thread_id)
+                with self._session_factory() as session:
+                    thread = self._repository.get_thread(session, input_data.thread_id)
+                    if thread is None:
+                        raise NotFoundError(f"Conversation Thread '{input_data.thread_id}' was not found.")
+                    messages = self._repository.list_messages(session, input_data.thread_id)
+                    duplicate = next(
+                        (row for row in messages if row.client_submission_id == client_submission_id),
+                        None,
                     )
-                    self._repository.append_message(session, row)
-                    thread.updated_at = _utc_now()
-                    session.add(thread)
-                    session.commit()
-                return ConversationSnapshot(thread=thread, messages=self._repository.list_messages(session, input_data.thread_id))
+                    if duplicate is None:
+                        self._validate_user_append_messages(
+                            messages,
+                            expected_frontier_id,
+                            allow_paused_tool_result=control.paused,
+                        )
+                        canonical_blocks = normalize_message_blocks(input_data.content_blocks)
+                        if any(isinstance(block, SourceAttachmentBlock) for block in canonical_blocks):
+                            raise ValidationError(
+                                "SourceAttachmentBlock is a legacy presentation block and cannot be written to a new User Message."
+                            )
+                        row = ConversationMessageRow(
+                            thread_id=input_data.thread_id,
+                            sequence_index=len(messages),
+                            kind=ConversationMessageKind.USER,
+                            client_submission_id=client_submission_id,
+                            content_payload={"blocks": blocks_to_json(canonical_blocks)},
+                            created_at=_utc_now(),
+                        )
+                        self._repository.append_message(session, row)
+                        thread.updated_at = _utc_now()
+                        session.add(thread)
+                        session.commit()
+                        # A new explicit User Message is the only re-entry
+                        # command.  It never automatically replays the paused
+                        # ToolResult frontier.
+                        if control.paused:
+                            control.paused = False
+                    return ConversationSnapshot(
+                        thread=thread,
+                        messages=self._repository.list_messages(session, input_data.thread_id),
+                    )
 
     def sample_existing_frontier(
         self,
@@ -495,6 +573,7 @@ class LLMConversationService:
                 messages=self._provider_messages(snapshot),
                 tool_scope=scope,
                 retry_callback=retry_callback,
+                before_provider_request=lambda: self._admit_provider_request(pending_message_id),
             )
             return self._stage_provider_response(
                 pending_message_id,
@@ -530,6 +609,7 @@ class LLMConversationService:
                 "fq_model_key": selected_model_key,
                 "messages": self._provider_messages(snapshot),
                 "tools": self._tool_registry.list_specs(effective_scope),
+                "before_provider_request": lambda: self._admit_provider_request(pending.pending_message_id),
             }
             for event in service.stream(**stream_arguments):
                 if isinstance(event, LLMRetryEvent):
@@ -567,6 +647,10 @@ class LLMConversationService:
             exchange = self._current_exchange(pending_message_id)
             if exchange.calls:
                 raise ValidationError("A tool-calling exchange can finalize only after all Tool Results exist.")
+            with self._gate(exchange.thread_id):
+                if self._exchange_is_paused_locked(exchange):
+                    self._discard_pending_locked(exchange.thread_id, expected_pending_id=pending_message_id)
+                    raise ThreadPausedError(exchange.thread_id)
         return self._finalize_exchange(pending_message_id)
 
     def invoke_staged_tool(
@@ -589,12 +673,21 @@ class LLMConversationService:
                 raise ValidationError("The staged Tool Call is not part of this pending exchange.")
             if staged_call_message_id in exchange.results:
                 raise ValidationError("The staged Tool Call already has a terminal result.")
+            with self._gate(exchange.thread_id):
+                # Once one Tool in an admitted exchange has crossed this
+                # boundary, its complete result set may still converge after
+                # a pause.  Before that boundary, Stop wins without starting
+                # a fresh domain-side effect.
+                if not exchange.tool_execution_started and self._exchange_is_paused_locked(exchange):
+                    self._discard_pending_locked(exchange.thread_id, expected_pending_id=pending_message_id)
+                    raise ThreadPausedError(exchange.thread_id)
+                exchange.tool_execution_started = True
 
         if cancel_requested():
             self.cancel_sampling(pending_message_id)
             return None
         try:
-            value = self._tool_registry.invoke(
+            outcome = self._tool_registry.invoke(
                 tool_name=call.tool_name,
                 provider_name=call.provider_name,
                 arguments=call.arguments,
@@ -605,26 +698,12 @@ class LLMConversationService:
                 ),
                 scope=exchange.scope,
             )
-            payload, fits = bounded_result_payload(value)
-            terminal = (
-                TerminalToolResult(status=ConversationToolResultStatus.SUCCEEDED.value, payload=payload)
-                if fits
-                else TerminalToolResult(
-                    status=ConversationToolResultStatus.FAILED.value,
-                    payload=payload,
-                    error_code=str(payload.get("error_code") or "tool_result_invalid"),
-                    error_summary="Tool result is invalid.",
-                )
-            )
-        except Exception:
-            # Tool implementations can expose file paths, SQL, provider
-            # payloads, or debug dumps through exception text.  The canonical
-            # conversation stores only a bounded, implementation-neutral
-            # failure summary.
-            terminal = TerminalToolResult(
-                status=ConversationToolResultStatus.FAILED.value,
-                error_summary="Tool execution failed.",
-            )
+            terminal = terminal_tool_result(outcome)
+        except Exception as exc:
+            # Preserve the concrete diagnostic in the same canonical value
+            # consumed by the provider and Chatbot.  Bounds constrain storage
+            # stability; they are not a separate redaction policy.
+            terminal = terminal_tool_result(tool_failure_from_exception(exc))
 
         if cancel_requested():
             self.cancel_sampling(pending_message_id)
@@ -695,6 +774,9 @@ class LLMConversationService:
         # keeping provider and tool I/O outside both locks.
         with self._pending_lock:
             with self._gate(thread_id):
+                control = self._thread_control_locked(thread_id)
+                if control.paused:
+                    raise ThreadPausedError(thread_id)
                 with self._session_factory() as session:
                     thread = self._repository.get_thread(session, thread_id)
                     if thread is None:
@@ -728,7 +810,10 @@ class LLMConversationService:
                     scope_fingerprint=advertised_scope_fingerprint,
                 )
                 self._pending[row.id] = exchange
-                return PendingSampling(pending_message_id=row.id, thread_id=thread_id)
+                return PendingSampling(
+                    pending_message_id=row.id,
+                    thread_id=thread_id,
+                )
 
     def _stage_provider_response(
         self,
@@ -748,6 +833,7 @@ class LLMConversationService:
             # preserves that fact; only a closed canonical interaction makes
             # it eligible for a Chatbot overview.
             self._record_usage_observation(observation)
+        self._accept_provider_response(pending_message_id)
         pending = self._stage_provider_output(pending_message_id, response.output_items)
         return pending
 
@@ -805,6 +891,9 @@ class LLMConversationService:
                 exchange = self._current_exchange(pending_message_id)
                 self._validate_exchange_result_budget(exchange)
                 with self._gate(exchange.thread_id):
+                    if not exchange.tool_execution_started and self._exchange_is_paused_locked(exchange):
+                        self._discard_pending_locked(exchange.thread_id, expected_pending_id=pending_message_id)
+                        raise ThreadPausedError(exchange.thread_id)
                     with self._session_factory() as session:
                         pending = self._repository.get_message(session, pending_message_id)
                         if pending is None or pending.kind is not ConversationMessageKind.PENDING_LLM_SAMPLING:
@@ -889,8 +978,11 @@ class LLMConversationService:
                     content_payload={"tool_name": call.tool_name},
                     tool_call_message_id=call.staged_call_id,
                     result_status=ConversationToolResultStatus(result.status),
-                    value_payload=result.payload,
-                    error_summary=result.error_summary,
+                    value_payload=result.value,
+                    # New failures are their own typed canonical value.  Keep
+                    # this legacy column empty rather than duplicating a
+                    # competing failure summary.
+                    error_summary=None,
                     created_at=_utc_now(),
                 )
             )
@@ -907,15 +999,19 @@ class LLMConversationService:
         messages: list[ProviderMessage],
         tool_scope: ToolScope,
         retry_callback: Callable[[LLMRetryEvent], None] | None,
+        before_provider_request: Callable[[], None] | None = None,
     ) -> ProviderResponse:
         specs = self._tool_registry.list_specs(tool_scope)
         if provider is not None:
+            if before_provider_request is not None:
+                before_provider_request()
             return provider.complete(messages, specs)
         arguments = {
             "fq_model_key": fq_model_key,
             "messages": messages,
             "tools": specs,
             "retry_callback": retry_callback,
+            "before_provider_request": before_provider_request,
         }
         return self._require_llm_service().complete(**arguments)
 
@@ -941,6 +1037,8 @@ class LLMConversationService:
             if title is None:
                 raise ValidationError("Thread title model returned an empty title.")
             return title
+        except ThreadPausedError:
+            raise
         except Exception as exc:
             LOGGER.warning("Initial Thread title model failed; using deterministic fallback: %s", exc)
             return fallback
@@ -964,17 +1062,35 @@ class LLMConversationService:
         fq_model_key = self._thread_title_fq_model_key()
         if fq_model_key is None:
             raise ValidationError("Thread title model is not configured.")
-        response = self._require_llm_service().complete(
-            fq_model_key=fq_model_key,
-            messages=messages,
-            tools=[],
-        )
+        gateway = self._require_llm_service()
+        if isinstance(gateway, LLMService):
+            response = gateway.complete(
+                fq_model_key=fq_model_key,
+                messages=messages,
+                tools=[],
+                before_provider_request=lambda: self._admit_auxiliary_provider_request(thread_id),
+            )
+        else:
+            # Tests and third-party in-process gateways predating the
+            # per-attempt admission hook retain their narrow ``complete``
+            # signature.  They still receive one admission before I/O; the
+            # production LLMService performs it before every retry attempt.
+            self._admit_auxiliary_provider_request(thread_id)
+            response = gateway.complete(
+                fq_model_key=fq_model_key,
+                messages=messages,
+                tools=[],
+            )
         self._record_auxiliary_usage(
             operation="thread_title",
             thread_id=thread_id,
             usage_payload=response.usage_payload,
             fq_model_key=fq_model_key,
         )
+        # Usage records the completed provider request even when a Thread
+        # pause won while it was in flight.  Its response, however, may not
+        # produce a title proposal or canonical metadata mutation afterward.
+        self._accept_auxiliary_provider_response(thread_id)
         return response
 
     def _thread_title_fq_model_key(self) -> str | None:
@@ -1137,7 +1253,7 @@ class LLMConversationService:
                     rows.append(
                         ProviderMessage(
                             role="tool",
-                            content=json.dumps(self._result_provider_value(row), ensure_ascii=False),
+                            tool_result_value=self._canonical_tool_result_value(row),
                             provider_payload={"tool_call_id": call.provider_call_id or ""},
                             source_message_id=row.id,
                         )
@@ -1255,8 +1371,7 @@ class LLMConversationService:
         for result in exchange.results.values():
             envelope = {
                 "status": result.status,
-                "value": result.payload,
-                "error": result.error_summary,
+                "value": result.value,
             }
             total += len(canonical_json_bytes(envelope))
         if total > MAX_EXCHANGE_RESULT_BYTES:
@@ -1266,6 +1381,8 @@ class LLMConversationService:
     def _validate_user_append_messages(
         messages: list[ConversationMessageRow],
         expected_frontier_id: str | None,
+        *,
+        allow_paused_tool_result: bool = False,
     ) -> None:
         if any(row.kind is ConversationMessageKind.PENDING_LLM_SAMPLING for row in messages):
             raise ValidationError("Cannot append a User Message while LLM sampling is pending.")
@@ -1279,9 +1396,54 @@ class LLMConversationService:
         if tail.kind in {
             ConversationMessageKind.USER,
             ConversationMessageKind.CLIENT_CONTROL,
-            ConversationMessageKind.TOOL_RESULT,
         }:
             raise ValidationError("The existing Client frontier must be sampled before another User Message.")
+        if tail.kind is ConversationMessageKind.TOOL_RESULT and not allow_paused_tool_result:
+            raise ValidationError("The existing Client frontier must be sampled before another User Message.")
+
+    def _admit_provider_request(self, pending_message_id: str) -> None:
+        """Linearize one provider attempt against the runtime Thread pause."""
+
+        with self._pending_lock:
+            exchange = self._current_exchange(pending_message_id)
+            with self._gate(exchange.thread_id):
+                if self._exchange_is_paused_locked(exchange):
+                    self._discard_pending_locked(exchange.thread_id, expected_pending_id=pending_message_id)
+                    raise ThreadPausedError(exchange.thread_id)
+
+    def _accept_provider_response(self, pending_message_id: str) -> None:
+        """Discard a response that returned after a Thread pause won."""
+
+        with self._pending_lock:
+            exchange = self._current_exchange(pending_message_id)
+            with self._gate(exchange.thread_id):
+                if self._exchange_is_paused_locked(exchange):
+                    self._discard_pending_locked(exchange.thread_id, expected_pending_id=pending_message_id)
+                    raise ThreadPausedError(exchange.thread_id)
+
+    def _accept_auxiliary_provider_response(self, thread_id: str) -> None:
+        """Reject metadata-provider output returned after a Thread pause."""
+
+        with self._pending_lock:
+            with self._gate(thread_id):
+                if self._thread_control_locked(thread_id).paused:
+                    raise ThreadPausedError(thread_id)
+
+    def _admit_auxiliary_provider_request(self, thread_id: str) -> None:
+        """Give metadata LLM work the same Thread-pause admission rule."""
+
+        with self._pending_lock:
+            with self._gate(thread_id):
+                if self._thread_control_locked(thread_id).paused:
+                    raise ThreadPausedError(thread_id)
+
+    def _exchange_is_paused_locked(self, exchange: _PendingExchange) -> bool:
+        return self._thread_control_locked(exchange.thread_id).paused
+
+    def _thread_control_locked(self, thread_id: str) -> _ThreadControl:
+        """Return a Thread control while ``_pending_lock`` is held."""
+
+        return self._thread_controls.setdefault(thread_id, _ThreadControl())
 
     def _discard_pending_locked(self, thread_id: str, expected_pending_id: str | None) -> None:
         matching_ids = {
@@ -1355,14 +1517,14 @@ class LLMConversationService:
         }
 
     @staticmethod
-    def _result_provider_value(result: ConversationMessageRow) -> dict[str, Any]:
-        if result.result_status is ConversationToolResultStatus.SUCCEEDED:
-            return result.value_payload or {}
-        return {
-            "status": result.result_status.value if result.result_status is not None else "failed",
-            "error": result.error_summary or "Tool execution failed.",
-            "value": result.value_payload,
-        }
+    def _canonical_tool_result_value(result: ConversationMessageRow) -> Any:
+        status = getattr(result, "result_status", None)
+        failed = status is ConversationToolResultStatus.FAILED or getattr(status, "value", status) == "failed"
+        return canonical_tool_result_value(
+            value=result.value_payload,
+            failed=failed,
+            legacy_error_summary=result.error_summary,
+        )
 
     def _require_llm_service(self) -> LLMService:
         if self._llm_service is None:

@@ -8,6 +8,7 @@ database, source workbook, and provider transcript under ``tmp_path``.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +43,12 @@ from xenix.services.ml_service import MLService
 from xenix.services.ml_task_service import MLTaskService
 from xenix.services.preprocessing_worker import InlinePreprocessingWorkerRunner
 from xenix.services.storage import StorageBootstrapService
+
+
+def _xtt_metadata(value: str, key: str) -> str:
+    match = re.search(rf"^{re.escape(key)}: (.+)$", value, re.MULTILINE)
+    assert match is not None, f"missing XTT metadata field {key!r}: {value}"
+    return match.group(1)
 
 
 class RecordingScriptedProvider:
@@ -433,7 +440,9 @@ def test_harness_replays_compact_indexed_cleaning_without_metadata_roundtrip(
     assert all(result.tool_call_message_id == call.id for call, result in zip(calls, results, strict=True))
     assert [result.result_status for result in results] == ["succeeded", "succeeded", "succeeded"]
     assert results[0].value_payload["skill_name"] == "xenix-data-preprocessing"
-    assert results[1].value_payload["columns"]["_schema"] == {"name": 0, "type": 1, "index": 2}
+    assert isinstance(results[1].value_payload, str)
+    assert "schema:" in results[1].value_payload
+    assert "shape:" in results[1].value_payload
     clean_arguments = calls[2].arguments_payload
     assert clean_arguments["operations"][0]["params"] == {"column_indexes": [1], "value": 0}
     assert clean_arguments["operations"][1]["params"] == {"column_indexes": [2]}
@@ -482,9 +491,10 @@ def test_harness_replays_compact_indexed_cleaning_without_metadata_roundtrip(
     assert len({call["tool_definition_bytes"] for call in scoped_calls}) == 1
 
     clean_result = results[2].value_payload
-    assert clean_result["cleaning_report"]["operation_count"] == 3
+    assert isinstance(clean_result, str)
+    assert "operations:" in clean_result
     assert len(canonical_json_bytes(clean_result)) < 16_000
-    derived = dataset_service.get_dataset(clean_result["dataset_id"])
+    derived = dataset_service.get_dataset(_xtt_metadata(clean_result, "dataset_id"))
     assert derived.derived_from_dataset_id == _dataset_id_from_messages(provider.calls[0]["messages"])
     frame = load_dataframe(Path(derived.source_path), detect_source_format(Path(derived.source_path)))
     assert frame.to_dict(orient="records") == [
@@ -539,7 +549,8 @@ def test_harness_replays_indexed_query_and_role_binding_for_unicode_headers(
         {"role": "feature", "column_indexes": [0, 1, 2, 3, 4]},
         {"role": "target", "column_indexes": [5]},
     ]
-    assert results[1].value_payload["rows"]["data"] == [[149.25, 0]]
+    assert isinstance(results[1].value_payload, str)
+    assert "| 1 | 149.25 | 0 |" in results[1].value_payload
     bindings_by_role = {
         binding["role"]: binding["columns"]
         for binding in results[2].value_payload["role_bindings"]
@@ -593,7 +604,8 @@ def test_harness_replays_indexed_tokenization_for_unicode_headers(
 
     source_dataset_id = _dataset_id_from_messages(provider.calls[0]["messages"])
     tokenize_result = results[1].value_payload
-    derived = dataset_service.get_dataset(tokenize_result["dataset_id"])
+    assert isinstance(tokenize_result, str)
+    derived = dataset_service.get_dataset(_xtt_metadata(tokenize_result, "dataset_id"))
     assert derived.derived_from_dataset_id == source_dataset_id
     frame = load_dataframe(Path(derived.source_path), detect_source_format(Path(derived.source_path)))
     assert frame.to_dict(orient="records") == [

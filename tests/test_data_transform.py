@@ -1,3 +1,4 @@
+import re
 import sqlite3
 from pathlib import Path
 
@@ -89,6 +90,12 @@ def _read_dataset_frame(path: str | Path) -> pd.DataFrame:
     return load_dataframe(source_path, detect_source_format(source_path))
 
 
+def _xtt_metadata(value: str, key: str) -> str:
+    match = re.search(rf"^{re.escape(key)}: (.+)$", value, re.MULTILINE)
+    assert match is not None, f"missing XTT metadata field {key!r}: {value}"
+    return match.group(1)
+
+
 def test_data_integrate_tool_uses_dataset_ids_and_returns_artifact_id(monkeypatch, tmp_path: Path) -> None:
     _paths, dataset_service, _service, artifact_service, registry, store = _build_runtime(
         monkeypatch,
@@ -104,17 +111,18 @@ def test_data_integrate_tool_uses_dataset_ids_and_returns_artifact_id(monkeypatc
         _tool_context(store, "data.integrate", arguments),
     )
 
-    derived_dataset = dataset_service.get_dataset(result.payload["dataset_id"])
+    assert isinstance(result.value, str)
+    derived_dataset = dataset_service.get_dataset(_xtt_metadata(result.value, "dataset_id"))
     assert _read_dataset_frame(derived_dataset.source_path)["order_id"].tolist() == [1, 2]
-    assert result.payload["input_dataset_ids"] == [orders.id, more_orders.id]
-    assert "dataset_uri" not in result.payload
-    assert "artifact_uri" not in result.payload
-    artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
+    assert f"input_dataset_ids: [{orders.id}, {more_orders.id}]" in result.value
+    assert "dataset_uri" not in result.value
+    assert "artifact_uri" not in result.value
+    artifact = artifact_service.resolve_uri(f"artifact://{_xtt_metadata(result.value, 'artifact_id')}")
     assert artifact.metadata_payload["dataset_id"] == derived_dataset.id
     assert artifact.metadata_payload["dataset_export"]["dataset_id"] == derived_dataset.id
     assert Path(artifact.absolute_path).suffix == ".xlsx"
     assert pd.read_excel(artifact.absolute_path)["order_id"].tolist() == [1, 2]
-    assert "source_path" not in result.payload["inspection"]
+    assert "source_path" not in result.value
 
 
 def test_data_query_service_runs_read_only_select(monkeypatch, tmp_path: Path) -> None:
@@ -600,23 +608,17 @@ def test_data_query_tool_returns_bounded_rows(monkeypatch, tmp_path: Path) -> No
 
     result = registry.execute("data.query", arguments, _tool_context(store, "data.query", arguments))
 
-    assert result.payload["returned_row_count"] == 2
-    assert result.payload["total_row_count"] == 3
-    assert result.payload["truncated"] is True
-    assert list(result.payload) == ["columns", "rows", "returned_row_count", "total_row_count", "truncated"]
-    assert result.payload["columns"] == {
-        "_schema": {"name": 0, "type": 1, "index": 2},
-        "data": [["order_id", "int64", 0], ["amount", "int64", 1]],
-    }
-    assert result.payload["rows"] == {
-        "_schema": {"order_id": 0, "amount": 1},
-        "data": [[3, 30], [2, 20]],
-    }
-    assert "bindings" not in result.payload
-    assert "input_dataset_ids" not in result.payload
-    assert "limit" not in result.payload
-    assert "validation_summary" not in result.payload
-    assert not hasattr(result, "content_blocks")
+    assert isinstance(result.value, str)
+    assert "shape: 2 rows × 2 columns" in result.value
+    assert "returned_rows: 2" in result.value
+    assert "total_rows: 3" in result.value
+    assert "truncated: true" in result.value
+    assert "| 1 | 3 | 30 |" in result.value
+    assert "| 2 | 2 | 20 |" in result.value
+    assert "bindings:" not in result.value
+    assert "input_dataset_ids:" not in result.value
+    assert "limit:" not in result.value
+    assert "validation_summary:" not in result.value
 
 
 def test_data_query_tool_uses_bindings_when_dataset_id_is_also_present(monkeypatch, tmp_path: Path) -> None:
@@ -644,9 +646,10 @@ def test_data_query_tool_uses_bindings_when_dataset_id_is_also_present(monkeypat
 
     result = registry.execute("data.query", arguments, _tool_context(store, "data.query", arguments))
 
-    assert result.payload["rows"]["_schema"] == {"order_id": 0, "amount": 1}
-    assert result.payload["rows"]["data"] == [[2, 20]]
-    assert result.payload["total_row_count"] == 1
+    assert isinstance(result.value, str)
+    assert "shape: 1 rows × 2 columns" in result.value
+    assert "| 1 | 2 | 20 |" in result.value
+    assert "total_rows: 1" in result.value
 
 
 def test_data_query_tool_accepts_canonical_names_for_messy_xlsx(monkeypatch, tmp_path: Path) -> None:
@@ -663,15 +666,12 @@ def test_data_query_tool_accepts_canonical_names_for_messy_xlsx(monkeypatch, tmp
 
     result = registry.execute("data.query", arguments, _tool_context(store, "data.query", arguments))
 
-    assert result.payload["columns"] == {
-        "_schema": {"name": 0, "type": 1, "index": 2},
-        "data": [["column_2", "str", 0]],
-    }
-    assert result.payload["rows"] == {
-        "_schema": {"column_2": 0},
-        "data": [[None], ["销售数量"], ["1"]],
-    }
-    assert result.payload["total_row_count"] == 3
+    assert isinstance(result.value, str)
+    assert "column_2: str" in result.value
+    assert "| 1 | ∅ |" in result.value
+    assert "| 2 | 销售数量 |" in result.value
+    assert "| 3 | 1 |" in result.value
+    assert "total_rows: 3" in result.value
 
 
 def test_data_transform_tool_registers_derived_dataset_and_returns_artifact_id(monkeypatch, tmp_path: Path) -> None:
@@ -696,28 +696,26 @@ def test_data_transform_tool_registers_derived_dataset_and_returns_artifact_id(m
         arguments,
         _tool_context(store, "data.transform", arguments),
     )
-    derived_dataset = dataset_service.get_dataset(result.payload["dataset_id"])
+    assert isinstance(result.value, str)
+    derived_dataset = dataset_service.get_dataset(_xtt_metadata(result.value, "dataset_id"))
     frame = _read_dataset_frame(derived_dataset.source_path)
 
     assert derived_dataset.derived_from_dataset_id == dataset.id
-    assert "dataset_uri" not in result.payload
-    assert "artifact_uri" not in result.payload
-    artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
+    assert "dataset_uri" not in result.value
+    assert "artifact_uri" not in result.value
+    artifact = artifact_service.resolve_uri(f"artifact://{_xtt_metadata(result.value, 'artifact_id')}")
     assert artifact.metadata_payload["dataset_id"] == derived_dataset.id
     assert artifact.metadata_payload["dataset_export"]["source_path"] == derived_dataset.source_path
     assert pd.read_excel(artifact.absolute_path).to_dict(orient="records") == [
         {"customer_id": 1, "total_amount": 25},
         {"customer_id": 2, "total_amount": 5},
     ]
-    assert result.payload["row_count"] == 2
+    assert "row_count: 2" in result.value
     assert frame.to_dict(orient="records") == [
         {"customer_id": 1, "total_amount": 25.0},
         {"customer_id": 2, "total_amount": 5.0},
     ]
-    assert (
-        result.payload["transform_report"]["validation_summary"]["requires_output_relation"]
-        == "output"
-    )
+    assert "transform_report:" not in result.value
 
 
 def test_data_transform_tool_records_multi_input_lineage_in_result(monkeypatch, tmp_path: Path) -> None:
@@ -755,10 +753,11 @@ def test_data_transform_tool_records_multi_input_lineage_in_result(monkeypatch, 
         arguments,
         _tool_context(store, "data.transform", arguments),
     )
-    derived_dataset = dataset_service.get_dataset(result.payload["dataset_id"])
+    assert isinstance(result.value, str)
+    derived_dataset = dataset_service.get_dataset(_xtt_metadata(result.value, "dataset_id"))
 
     assert derived_dataset.derived_from_dataset_id is None
-    assert result.payload["input_dataset_ids"] == [orders.id, customers.id]
-    assert "dataset_uri" not in result.payload
-    artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
+    assert f"input_dataset_ids: [{orders.id}, {customers.id}]" in result.value
+    assert "dataset_uri" not in result.value
+    artifact = artifact_service.resolve_uri(f"artifact://{_xtt_metadata(result.value, 'artifact_id')}")
     assert artifact.metadata_payload["input_dataset_ids"] == [orders.id, customers.id]

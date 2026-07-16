@@ -119,9 +119,11 @@ class MainWindow(QMainWindow):
         self._update_service = update_service
         self._agent_thread_id: str | None = None
         self._active_pending_message_id: str | None = None
+        self._active_submission_id: str | None = None
         self._composer_attachments: dict[str, _ComposerAttachmentRecord] = {}
         self._pending_composer_submission: _PendingComposerSubmission | None = None
         self._cancelled_pending_message_ids: set[str] = set()
+        self._paused_thread_ids: set[str] = set()
         self._settings_dialog: SettingsDialog | None = None
         self._tool_call_detail_views: list[ToolCallDetailView] = []
         self._thread_title_progress_dialog: QProgressDialog | None = None
@@ -376,6 +378,16 @@ class MainWindow(QMainWindow):
             text=text,
             file_paths=[str(Path(file_path).resolve()) for file_path in file_paths],
         )
+        # The client submission id is a live stream generation.  It lets the
+        # GUI discard late events from an older submission on the same Thread
+        # after a pause/re-entry race without persisting a Run identity.
+        self._active_submission_id = client_submission_id
+        # A new explicit User Message is the UI's re-entry command.  The
+        # Conversation service clears its runtime pause when that append
+        # commits; clear the local event gate at the same boundary so the new
+        # stream can render its acknowledgement/thinking events immediately.
+        if self._agent_thread_id is not None:
+            self._paused_thread_ids.discard(self._agent_thread_id)
         self._thread_detail_view.begin_composer_submission(file_paths)
 
         def run_harness() -> None:
@@ -423,6 +435,8 @@ class MainWindow(QMainWindow):
         self._pending_composer_submission = None
         self._agent_thread_id = snapshot.thread.id
         self._active_pending_message_id = None
+        self._active_submission_id = None
+        self._paused_thread_ids.discard(snapshot.thread.id)
         self._sync_thread_model_picker(snapshot)
         self._thread_detail_view.hide_thinking_indicator()
         self._thread_detail_view.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
@@ -430,6 +444,16 @@ class MainWindow(QMainWindow):
         self._refresh_history_sidebar(selected_thread_id=snapshot.thread.id)
 
     def _render_harness_stream_event(self, event) -> None:
+        if not self._event_belongs_to_current_stream(event):
+            return
+        if (
+            event.thread_id in self._paused_thread_ids
+            and not (event.kind == "snapshot" and event.is_final)
+        ):
+            # A paused Thread may still deliver one stable terminal snapshot,
+            # but no stale Thinking/activity/connection event may reactivate
+            # the Composer after Stop.
+            return
         if event.kind == "attachment_import" and event.attachment_import is not None:
             self._render_attachment_import_progress(event)
             return
@@ -448,6 +472,7 @@ class MainWindow(QMainWindow):
                 return
             self._acknowledge_composer_submission(event.client_submission_id)
             self._agent_thread_id = event.snapshot.thread.id
+            self._paused_thread_ids.discard(event.snapshot.thread.id)
             self._active_pending_message_id = event.pending_message_id
             self._sync_thread_model_picker(event.snapshot)
             self._thread_detail_view.render_events(
@@ -479,8 +504,24 @@ class MainWindow(QMainWindow):
             self._restore_stable_message_view()
             self._thread_detail_view.abort_composer_submission()
         self._active_pending_message_id = None
+        self._active_submission_id = None
         self._thread_detail_view.show_error(message)
         self._thread_detail_view.set_running(False)
+
+    def _event_belongs_to_current_stream(self, event: AgentHarnessStreamEvent) -> bool:
+        """Reject late events from an inactive Thread or old submission.
+
+        Sampling events carry the client submission id as a live-only stream
+        generation.  Metadata events (for example automatic title refreshes)
+        intentionally have no submission id and are accepted only for the
+        currently selected Thread.
+        """
+
+        submission_id = getattr(event, "client_submission_id", None)
+        if submission_id is not None:
+            return self._active_submission_id == submission_id
+        event_thread_id = getattr(event, "thread_id", None)
+        return event_thread_id is None or event_thread_id == self._agent_thread_id
 
     def _acknowledge_composer_submission(self, client_submission_id: str | None) -> None:
         pending = self._pending_composer_submission
@@ -621,18 +662,25 @@ class MainWindow(QMainWindow):
         if self._pending_composer_submission is not None and self._active_pending_message_id is None:
             self._thread_detail_view.show_error(self.tr("The submitted message is being prepared and cannot be stopped."))
             return
-        if self._active_pending_message_id is not None:
-            self._agent_harness_service.cancel_sampling(self._active_pending_message_id)
-            self._cancelled_pending_message_ids.add(self._active_pending_message_id)
+        thread_id = self._agent_thread_id
+        if thread_id is None:
+            return
+        try:
+            self._agent_harness_service.pause_thread(thread_id)
+        except Exception as exc:
+            self._thread_detail_view.show_error(str(exc))
+            return
+        self._paused_thread_ids.add(thread_id)
         self._thread_detail_view.hide_thinking_indicator()
         self._thread_detail_view.set_running(False)
-        self._thread_detail_view.show_error("Stopped.")
+        self._thread_detail_view.show_error(self.tr("Stopped."))
 
     def _reload_agent_provider(self) -> None:
         self._sync_model_picker_options()
 
     def _create_agent_thread(self) -> None:
         self._active_pending_message_id = None
+        self._active_submission_id = None
         snapshot = self._agent_harness_service.create_thread(
             interface_locale=self._translation_manager.current_locale(),
         )
@@ -668,9 +716,11 @@ class MainWindow(QMainWindow):
             return
         snapshot = self._agent_harness_service.get_thread_snapshot(thread_id)
         self._agent_thread_id = thread_id
+        self._active_submission_id = None
         self._sync_thread_model_picker(snapshot)
         if self._active_pending_message_id is not None:
             self._active_pending_message_id = None
+        self._thread_detail_view.set_running(False)
         self._thread_detail_view.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
 
     def _open_history_item_menu(self, position: QPoint) -> None:
@@ -804,7 +854,10 @@ class MainWindow(QMainWindow):
         if thread_id is None:
             return
 
-        if self._thread_detail_view._running and self._agent_thread_id == thread_id:
+        if (
+            self._agent_thread_id == thread_id
+            and (self._thread_detail_view._running or self._active_pending_message_id is not None)
+        ):
             QMessageBox.information(
                 self,
                 self.tr("Delete Thread"),

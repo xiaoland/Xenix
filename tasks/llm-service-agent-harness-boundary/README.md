@@ -58,11 +58,16 @@ Establish an evidence-backed boundary between LLM Service, canonical interaction
   canonical append acknowledgement clears captured input, and automatic title
   work begins only after real sampling starts. See
   [25-composer-attachment-import-feedback-stage.md](25-composer-attachment-import-feedback-stage.md).
+- Stage 26 implements direct canonical ToolResult values (including XTT),
+  Thread-targeted runtime Stop/pause rather than pending-Message cancellation,
+  and a typed ToolFailure contract. Provider adapters carry one direct value,
+  Chatbot projects that value, and historical failed rows retain a bounded
+  compatibility read. See
+  [26-tool-result-thread-pause-tool-failure-stage.md](26-tool-result-thread-pause-tool-failure-stage.md).
 
 ## Next Step
 
-Stage 25 is ready for Sir's manual acceptance alongside the earlier follow-up
-stages: Dataset context and reasoning-only bubbles, automatic initial title,
-token usage projection, Thread deletion/pending rejection, source attachment
-projection/reopen, and Composer import feedback. `data.list` remains out of
-scope. No commit is authorized until Sir explicitly requests one.
+Stage 26 is ready for Sir's manual acceptance: direct tabular XTT result detail,
+typed failure detail, Thread Stop around Tool boundaries, and explicit
+new-message re-entry. `data.list` remains out of scope. No commit is authorized
+until Sir explicitly requests one.

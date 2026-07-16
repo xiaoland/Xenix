@@ -18,15 +18,19 @@ Chatbot events, UI code, and integration tests.
   DatasetService, then asks `LLMConversationService` to append the User
   Message. Dataset blocks are canonical context; source attachments are
   presentation-only data derived later from Dataset provenance.
-- **Sampling:** Harness owns the live loop and converts LLM Conversation live
-  notifications into Thinking/activity/connection Events. Its cancellation maps
-  are callback aids keyed by a pending Message identity and must be cleared on
-  finalization, cancellation, or generator abandonment; they are never another
-  execution-state store.
+- **Sampling and Stop:** Harness owns the live loop and converts LLM
+  Conversation live notifications into Thinking/activity/connection Events.
+  User-facing Stop routes a `thread_id` pause command to
+  `LLMConversationService`; Harness does not own its pause state. Its
+  pending-Message cancellation maps are internal callback aids, cleared on
+  finalization, abandonment, or cleanup; they are never another execution-state
+  store or the meaning of Stop.
 - **Pending completion:** LLMConversationService keeps private pending-exchange
-  staging and performs Tool invocation/finalization. Harness must consume the
-  resulting snapshot and decide only whether the new final frontier needs the
-  next sample.
+  staging and performs Tool invocation/finalization. A Tool's direct returned
+  value is the canonical ToolResult value: tabular Tools return XTT before the
+  boundary receives it, and a typed ToolFailure remains that same value.
+  Harness must consume the resulting snapshot and decide only whether the new
+  final frontier needs the next sample.
 - **Projection:** First run the pure structural snapshot projection. Then, and
   only then, enrich Dataset blocks through DatasetService's read-only source
   presentation resolver. A failed resolver is a soft omission, not a Thread
@@ -41,17 +45,20 @@ Chatbot events, UI code, and integration tests.
 
 ## Current Non-assumptions
 
-The current Conversation/Harness lifecycle does not rely on completion-guard or
-step-budget pause/resume behavior. Their product disposition is outside this
-document; do not use their configuration or UI remnants as a lifecycle contract
-without a separately approved implementation and verification.
+There is no durable completion-guard, step-budget pause/resume, Turn, Run, or
+cross-process pause recovery. The implemented runtime-only Thread pause blocks
+later provider admission, not Tool cancellation. Once an admitted Tool exchange
+has begun, it may converge its complete atomic result set; Harness then stops
+at that ToolResult frontier. After it, only a new explicit UserMessage clears
+pause; no stale-frontier replay occurs. Do not use legacy configuration or UI
+remnants as a lifecycle contract.
 
 ## Change Guidance
 
 Preserve the public command/snapshot seam. A new provider, Tool, stream path,
-cancellation path, or source presentation must still converge on the canonical
-snapshot specified by Product TDD, and must not make Chatbot UI infer protocol
-state from storage or raw Tool payloads.
+pause path, or source presentation must still converge on the canonical snapshot
+specified by Product TDD. It must not make Chatbot UI infer protocol state from
+storage or derive a second ToolResult from a raw Tool payload.
 
 Read the nearest `src/xenix/services/agent/AGENTS.md` before changing this
 loop. Source and tests decide exact method/field behavior; this document only

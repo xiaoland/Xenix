@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -62,6 +63,12 @@ def _tool_context(
 def _read_dataset_frame(path: str | Path) -> pd.DataFrame:
     source_path = Path(path)
     return load_dataframe(source_path, detect_source_format(source_path))
+
+
+def _xtt_metadata(value: str, key: str) -> str:
+    match = re.search(rf"^{re.escape(key)}: (.+)$", value, re.MULTILINE)
+    assert match is not None, f"missing XTT metadata field {key!r}: {value}"
+    return match.group(1)
 
 
 def test_data_tokenization_service_creates_token_text_dataset(monkeypatch, tmp_path: Path) -> None:
@@ -171,14 +178,15 @@ def test_data_tokenize_tool_registers_derived_dataset_and_artifact(monkeypatch, 
     context = _tool_context(store, "data.tokenize", arguments)
 
     result = registry.execute("data.tokenize", arguments, context)
-    derived_dataset = dataset_service.get_dataset(result.payload["dataset_id"])
+    assert isinstance(result.value, str)
+    derived_dataset = dataset_service.get_dataset(_xtt_metadata(result.value, "dataset_id"))
     tokenized_frame = _read_dataset_frame(derived_dataset.source_path).fillna("")
 
     assert derived_dataset.derived_from_dataset_id == source_dataset.id
     assert derived_dataset.project_id == source_dataset.project_id
-    assert "dataset_uri" not in result.payload
-    assert "artifact_uri" not in result.payload
-    artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
+    assert "dataset_uri" not in result.value
+    assert "artifact_uri" not in result.value
+    artifact = artifact_service.resolve_uri(f"artifact://{_xtt_metadata(result.value, 'artifact_id')}")
     assert artifact.metadata_payload["dataset_id"] == derived_dataset.id
     assert artifact.metadata_payload["dataset_export"]["dataset_id"] == derived_dataset.id
     assert pd.read_excel(artifact.absolute_path).columns.tolist() == [
@@ -188,9 +196,9 @@ def test_data_tokenize_tool_registers_derived_dataset_and_artifact(monkeypatch, 
         "token_count",
     ]
     assert tokenized_frame.columns.tolist() == ["review_id", "review_text", "token_text", "token_count"]
-    assert result.payload["row_count"] == 2
-    assert result.payload["tokenization_report"]["output"] == "token_text"
-    assert "artifact_link" not in result.payload
+    assert "row_count: 2" in result.value
+    assert "output: token_text" in result.value
+    assert "artifact_link" not in result.value
 
 
 def test_data_tokenize_tool_schema_is_dataset_scoped(monkeypatch, tmp_path: Path) -> None:

@@ -1,4 +1,4 @@
-from xenix.services.agent.xenix_table_text import render_xenix_table_tool_result
+from xenix.services.llm.xenix_table_text import render_xenix_table_tool_result
 
 
 def test_xenix_table_text_renders_data_query_compact_table_payload() -> None:

@@ -39,6 +39,9 @@ class ProviderMessage(SQLModel):
     # derive their own provider text from them.
     content: str = ""
     content_blocks: list[CanonicalMessageBlock] = Field(default_factory=list)
+    # Direct canonical value for a Tool Result.  Unlike ``content``, this is
+    # not a provider wire encoding; each adapter chooses its own carrier.
+    tool_result_value: Any = None
     provider_payload: dict[str, Any] = Field(default_factory=dict)
     source_message_id: str | None = None
 
@@ -694,7 +697,10 @@ class OpenAICompatibleChatProvider:
             # block (including UI-hidden Dataset blocks) reaches the provider.
             # Structured Tool Call/Result fields remain provider_payload and
             # are not flattened into this text fallback.
-            content = blocks_to_markdown(row.content_blocks) if row.content_blocks else row.content
+            if row.role == "tool":
+                content = _tool_result_wire_content(row.tool_result_value)
+            else:
+                content = blocks_to_markdown(row.content_blocks) if row.content_blocks else row.content
             message = {"role": row.role, "content": content}
             if row.role == "assistant":
                 reasoning_content = row.provider_payload.get("reasoning_content")
@@ -710,6 +716,14 @@ class OpenAICompatibleChatProvider:
                 message["tool_call_id"] = row.provider_payload.get("tool_call_id", "")
             provider_messages.append(message)
         return provider_messages
+
+
+def _tool_result_wire_content(value: Any) -> str:
+    """Encode one direct canonical ToolResult for this OpenAI-compatible wire."""
+
+    if isinstance(value, str):
+        return value
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
 def extract_reasoning_content(raw_payload: dict[str, Any]) -> str | None:

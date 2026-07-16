@@ -185,8 +185,11 @@ def test_data_query_uses_canonical_names_for_messy_xlsx(monkeypatch, tmp_path: P
         _tool_context(conversation_store, "data.query", arguments),
     )
 
-    assert result.payload["columns"]["data"] == [["column_2", "str", 0]]
-    assert result.payload["rows"]["data"] == [[None], ["销售数量"], ["1"]]
+    assert isinstance(result.value, str)
+    assert "column_2: str" in result.value
+    assert "| 1 | ∅ |" in result.value
+    assert "| 2 | 销售数量 |" in result.value
+    assert "| 3 | 1 |" in result.value
 
 
 def test_data_query_schema_does_not_expose_profile_controls(monkeypatch, tmp_path: Path) -> None:

@@ -183,6 +183,35 @@ def test_captured_chat_completion_request_contains_dataset_fallback() -> None:
     assert "rows: 7" in wire_content
 
 
+def test_openai_adapter_carries_direct_tool_result_values_without_reinterpreting_them() -> None:
+    provider = OpenAICompatibleChatProvider(api_key="test", model="mock")
+    xtt = "shape: 1 rows × 1 columns\n\ndata:\n| # | total |\n|---:|---:|\n| 1 | 42 |"
+    direct_json = {"dataset_id": "dataset-1", "ok": True}
+
+    payload = provider._build_payload(
+        [
+            ProviderMessage(
+                role="tool",
+                tool_result_value=xtt,
+                provider_payload={"tool_call_id": "call-xtt"},
+            ),
+            ProviderMessage(
+                role="tool",
+                tool_result_value=direct_json,
+                provider_payload={"tool_call_id": "call-json"},
+            ),
+        ],
+        [],
+        stream=False,
+    )
+
+    wire_messages = payload["messages"]
+    assert wire_messages[0]["content"] == xtt
+    assert wire_messages[0]["tool_call_id"] == "call-xtt"
+    assert json.loads(wire_messages[1]["content"]) == direct_json
+    assert wire_messages[1]["tool_call_id"] == "call-json"
+
+
 def test_conversation_persists_json_and_reloads_typed_blocks(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     context = StorageBootstrapService().initialize(ensure_app_dirs(get_app_paths()))

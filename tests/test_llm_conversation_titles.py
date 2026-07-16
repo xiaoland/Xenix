@@ -410,3 +410,34 @@ def test_delayed_initial_title_does_not_block_append_ack_or_thinking_and_is_a_la
 
     with pytest.raises(StopIteration):
         next(stream)
+
+
+def test_pause_discards_an_in_flight_automatic_title_response(monkeypatch, tmp_path: Path) -> None:
+    title_started = threading.Event()
+    release_title = threading.Event()
+    title_gateway = _TitleModelGateway(
+        output="Title that arrived after stop",
+        started=title_started,
+        release=release_title,
+    )
+    harness, _conversation, _primary = _harness(monkeypatch, tmp_path, title_gateway)
+    thread = harness.create_thread()
+    stream = harness.submit_user_turn_stream(
+        SubmitUserTurnInput(
+            thread_id=thread.thread.id,
+            text="Start a title request, then stop it.",
+            client_submission_id="pause-title-response",
+        )
+    )
+
+    next(stream)  # append acknowledgement
+    next(stream)  # Thinking; starts the independent title task before primary completion
+    next(stream)  # primary terminal snapshot
+    assert title_started.wait(timeout=2)
+
+    harness.pause_thread(thread.thread.id)
+    release_title.set()
+
+    with pytest.raises(StopIteration):
+        next(stream)
+    assert harness.get_thread_snapshot(thread.thread.id).thread.title is None

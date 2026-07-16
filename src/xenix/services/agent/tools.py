@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from pydantic import BaseModel, Field, ValidationError as PydanticValidationError
+from pydantic import ValidationError as PydanticValidationError
 
 from ...config import AppPaths
 from ...exceptions import NotFoundError, ValidationError
@@ -55,7 +55,8 @@ from ..storage.models import (
     ProblemKind,
     TrainedModelRow,
 )
-from ..llm.tooling import AgentToolSpec, ToolExecutionContext
+from ..llm.tooling import AgentToolSpec, ToolExecutionContext, ToolSuccess
+from ..llm.xenix_table_text import render_xenix_table_tool_result
 from .tool_presentations import DEFAULT_TOOL_PRESENTATION, ToolPresentation, tool_presentation_for_name
 
 
@@ -85,10 +86,7 @@ MAX_CLEANING_REPORT_COLUMN_NAME_CHARS = 96
 MODEL_HYPER_TRAIN_GRACE_SECONDS = 60.0
 
 
-class ToolExecutionResult(BaseModel):
-    payload: dict[str, Any] = Field(default_factory=dict)
-
-ToolHandler = Callable[[dict[str, Any], ToolExecutionContext], ToolExecutionResult]
+ToolHandler = Callable[[dict[str, Any], ToolExecutionContext], ToolSuccess]
 
 
 @dataclass(frozen=True)
@@ -162,7 +160,7 @@ class AgentToolRegistry:
 
         for tool in self._tools.values():
             def implementation(arguments, context, handler=tool.handler):
-                return handler(arguments, context).payload
+                return handler(arguments, context)
 
             registry.register(tool.spec, implementation)
 
@@ -177,7 +175,7 @@ class AgentToolRegistry:
         tool_name: str,
         arguments: dict[str, Any],
         context: ToolExecutionContext,
-    ) -> ToolExecutionResult:
+    ) -> ToolSuccess:
         self._raise_if_cancelled(context)
         tool = self._tools.get(tool_name)
         if tool is None:
@@ -912,7 +910,7 @@ class AgentToolRegistry:
             presentation=tool_presentation_for_name("model.task.query"),
         )
 
-    def _data_integrate(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+    def _data_integrate(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
         self._raise_if_cancelled(context)
         raw_dataset_ids = arguments.get("dataset_ids")
         if not isinstance(raw_dataset_ids, list) or len(raw_dataset_ids) < 2:
@@ -925,17 +923,17 @@ class AgentToolRegistry:
         output_path = output_dir / f"{self._slug(name)}-{int(time.time())}.csv"
         pd.concat(frames, ignore_index=True).to_csv(output_path, index=False)
         input_dataset_ids = [dataset.id for dataset in datasets]
-        result = self._register_generated_dataset_result(
+        payload = self._register_generated_dataset_result(
             context,
             output_path=output_path,
             name=name,
             summary="Integrated dataset created.",
             metadata_payload={"input_dataset_ids": input_dataset_ids},
         )
-        result.payload["input_dataset_ids"] = input_dataset_ids
-        return result
+        payload["input_dataset_ids"] = input_dataset_ids
+        return self._tabular_tool_success("data.integrate", payload)
 
-    def _analysis_graph(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+    def _analysis_graph(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
         self._raise_if_cancelled(context)
         unsupported_keys = sorted(set(arguments) - {"dataset_id", "spec", "wordcloud_spec"})
         if unsupported_keys:
@@ -983,9 +981,9 @@ class AgentToolRegistry:
             "artifact_id": artifact.id,
             "graph": graph_metadata,
         }
-        return ToolExecutionResult(payload=payload)
+        return ToolSuccess(value=payload)
 
-    def _analysis_lambda(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+    def _analysis_lambda(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
         self._raise_if_cancelled(context)
         unsupported_keys = sorted(set(arguments) - {"code", "datasets", "params", "manifest"})
         if unsupported_keys:
@@ -1067,9 +1065,9 @@ class AgentToolRegistry:
             "artifacts": artifact_payloads,
             "dataset_ids": [dataset.dataset_id for dataset in datasets],
         }
-        return ToolExecutionResult(payload=payload)
+        return ToolSuccess(value=payload)
 
-    def _data_clean(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+    def _data_clean(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
         self._raise_if_cancelled(context)
         unsupported_keys = sorted(set(arguments) - {"dataset_id", "name", "operations"})
         if unsupported_keys:
@@ -1090,8 +1088,9 @@ class AgentToolRegistry:
                 "warnings": [],
                 "no_op": True,
             }
-            return ToolExecutionResult(
-                payload={
+            return self._tabular_tool_success(
+                "data.clean",
+                {
                     "dataset_id": dataset.id,
                     "source_dataset_id": dataset.id,
                     "cleaning_report": report,
@@ -1109,7 +1108,7 @@ class AgentToolRegistry:
         clean_result = self._data_cleaning_service.clean_dataset(clean_input)
         row_count_before = int(clean_result.report.get("row_count_before", 0))
         row_count_after = int(clean_result.report.get("row_count_after", 0))
-        result = self._register_generated_dataset_result(
+        payload = self._register_generated_dataset_result(
             context,
             output_path=Path(clean_result.output_path),
             name=name,
@@ -1117,21 +1116,21 @@ class AgentToolRegistry:
             derived_from_dataset_id=dataset.id,
             metadata_payload={"cleaning_report": clean_result.report},
         )
-        result.payload["row_count_before"] = row_count_before
-        result.payload["row_count_after"] = row_count_after
-        result.payload["cleaning_report"] = self._compact_cleaning_report(clean_result.report)
-        return result
+        payload["row_count_before"] = row_count_before
+        payload["row_count_after"] = row_count_after
+        payload["cleaning_report"] = self._compact_cleaning_report(clean_result.report)
+        return self._tabular_tool_success("data.clean", payload)
 
-    def _data_clean_metadata(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+    def _data_clean_metadata(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
         self._raise_if_cancelled(context)
         unsupported_keys = sorted(set(arguments) - {"groups"})
         if unsupported_keys:
             raise ValidationError("data.clean.metadata does not accept: " + ", ".join(unsupported_keys))
         groups = self._optional_string_list(arguments, "groups")
         payload = cleaning_operation_metadata(groups)
-        return ToolExecutionResult(payload=payload)
+        return ToolSuccess(value=payload)
 
-    def _data_tokenize(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+    def _data_tokenize(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
         self._raise_if_cancelled(context)
         unsupported_keys = sorted(
             set(arguments)
@@ -1203,7 +1202,7 @@ class AgentToolRegistry:
             )
         )
         row_count = int(tokenize_result.report.get("output_row_count", 0))
-        result = self._register_generated_dataset_result(
+        payload = self._register_generated_dataset_result(
             context,
             output_path=Path(tokenize_result.output_path),
             name=name,
@@ -1211,11 +1210,11 @@ class AgentToolRegistry:
             derived_from_dataset_id=dataset.id,
             metadata_payload={"tokenization_report": tokenize_result.report},
         )
-        result.payload["row_count"] = row_count
-        result.payload["tokenization_report"] = tokenize_result.report
-        return result
+        payload["row_count"] = row_count
+        payload["tokenization_report"] = tokenize_result.report
+        return self._tabular_tool_success("data.tokenize", payload)
 
-    def _data_query(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+    def _data_query(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
         self._raise_if_cancelled(context)
         bindings = self._resolve_sql_bindings(
             arguments,
@@ -1237,9 +1236,9 @@ class AgentToolRegistry:
             "total_row_count": query_result.total_row_count,
             "truncated": query_result.truncated,
         }
-        return ToolExecutionResult(payload=payload)
+        return self._tabular_tool_success("data.query", payload)
 
-    def _data_transform(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+    def _data_transform(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
         self._raise_if_cancelled(context)
         bindings = self._resolve_sql_bindings(
             arguments,
@@ -1260,7 +1259,7 @@ class AgentToolRegistry:
             )
         )
         derived_from_dataset_id = input_dataset_ids[0] if len(set(input_dataset_ids)) == 1 else None
-        result = self._register_generated_dataset_result(
+        payload = self._register_generated_dataset_result(
             context,
             output_path=Path(transform_result.output_path),
             name=name,
@@ -1271,13 +1270,13 @@ class AgentToolRegistry:
                 "input_dataset_ids": input_dataset_ids,
             },
         )
-        result.payload["row_count"] = transform_result.row_count
-        result.payload["columns"] = transform_result.columns
-        result.payload["transform_report"] = transform_result.transform_report
-        result.payload["input_dataset_ids"] = input_dataset_ids
-        return result
+        payload["row_count"] = transform_result.row_count
+        payload["columns"] = transform_result.columns
+        payload["transform_report"] = transform_result.transform_report
+        payload["input_dataset_ids"] = input_dataset_ids
+        return self._tabular_tool_success("data.transform", payload)
 
-    def _data_feature_select(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+    def _data_feature_select(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
         self._raise_if_cancelled(context)
         dataset_id = self._require_string(arguments, "dataset_id")
         role_bindings = arguments.get("role_bindings")
@@ -1292,8 +1291,8 @@ class AgentToolRegistry:
                 role_bindings=[dict(item) for item in role_bindings],
             )
         )
-        return ToolExecutionResult(
-            payload={
+        return ToolSuccess(
+            value={
                 "binding_id": binding.id,
                 "dataset_id": binding.dataset_id,
                 "role_bindings": list(binding.role_bindings),
@@ -1303,7 +1302,7 @@ class AgentToolRegistry:
             },
         )
 
-    def _model_metadata(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+    def _model_metadata(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
         self._raise_if_cancelled(context)
         raw_model_key = str(arguments.get("model_key") or "").strip()
         raw_model_keys = self._optional_string_list(arguments, "model_keys")
@@ -1384,9 +1383,9 @@ class AgentToolRegistry:
             "model_keys": [model["model_key"] for model in models],
             "models": models,
         }
-        return ToolExecutionResult(payload=payload)
+        return ToolSuccess(value=payload)
 
-    def _model_train(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+    def _model_train(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
         self._raise_if_cancelled(context)
         binding_id = self._require_string(arguments, "binding_id")
         models = self._normalize_model_keys(
@@ -1431,9 +1430,9 @@ class AgentToolRegistry:
             "ml_tasks": [self._ml_task_payload(task) for task in tasks],
             "trained_models": [self._trained_model_payload(model) for model in trained_models],
         }
-        return ToolExecutionResult(payload=payload)
+        return ToolSuccess(value=payload)
 
-    def _model_hyper_train(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+    def _model_hyper_train(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
         self._raise_if_cancelled(context)
         binding_id = self._require_string(arguments, "binding_id")
         grids = arguments.get("param_grids_by_model")
@@ -1478,9 +1477,9 @@ class AgentToolRegistry:
             "ml_tasks": [self._ml_task_payload(task) for task in tasks],
             "trained_models": [self._trained_model_payload(model) for model in trained_models],
         }
-        return ToolExecutionResult(payload=payload)
+        return ToolSuccess(value=payload)
 
-    def _model_apply(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+    def _model_apply(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
         self._raise_if_cancelled(context)
         trained_model_id = self._require_string(arguments, "trained_model_id")
         resolved_input_files = self._resolve_apply_input_sources(self._optional_string_list(arguments, "input_sources"))
@@ -1525,8 +1524,8 @@ class AgentToolRegistry:
                 metadata_payload={"ml_task_id": task.id, "dataset_id": task.dataset_id},
             )
         )
-        return ToolExecutionResult(
-            payload={
+        return ToolSuccess(
+            value={
                 "async_state": "completed",
                 "ml_task_id": task.id,
                 "task_ids": [task.id],
@@ -1557,7 +1556,7 @@ class AgentToolRegistry:
             raise ValidationError("Apply input dataset source file is missing.")
         return dataset.source_path
 
-    def _model_task_query(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
+    def _model_task_query(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
         self._raise_if_cancelled(context)
         task_ids = self._require_string_list(arguments, "task_ids")
         include_logs = bool(arguments.get("include_logs"))
@@ -1584,7 +1583,7 @@ class AgentToolRegistry:
             "task_ids": task_ids,
             "tasks": tasks,
         }
-        return ToolExecutionResult(payload=payload)
+        return ToolSuccess(value=payload)
 
     def _resolve_sql_bindings(
         self,
@@ -1840,6 +1839,22 @@ class AgentToolRegistry:
             return text[:limit]
         return text[: limit - 1] + "…"
 
+    def _tabular_tool_success(self, tool_name: str, payload: dict[str, Any]) -> ToolSuccess:
+        """Return the one canonical value for a tabular Tool.
+
+        The formatter runs while the concrete Tool still owns the raw
+        intermediate payload.  Once this method returns, only the XTT text
+        (when the payload has a tabular contract) crosses the LLM boundary;
+        there is no later raw-payload-to-XTT projection.
+        """
+
+        rendered = render_xenix_table_tool_result(
+            tool_name=tool_name,
+            status="succeeded",
+            payload=payload,
+        )
+        return ToolSuccess(value=rendered if rendered is not None else payload)
+
     def _register_generated_dataset_result(
         self,
         context: ToolExecutionContext,
@@ -1849,7 +1864,7 @@ class AgentToolRegistry:
         summary: str,
         derived_from_dataset_id: str | None = None,
         metadata_payload: dict[str, Any] | None = None,
-    ) -> ToolExecutionResult:
+    ) -> dict[str, Any]:
         resolved_output_path = output_path.resolve()
         payload = self._preprocessing_worker_runner.run(
             "data.register_generated_dataset",
@@ -1862,9 +1877,7 @@ class AgentToolRegistry:
             },
             paths=self._paths,
         )
-        return ToolExecutionResult(
-            payload=payload,
-        )
+        return payload
 
     def _compact_table(self, keys: list[str], rows: list[list[Any]]) -> dict[str, Any]:
         return {
@@ -2037,7 +2050,7 @@ class AgentToolRegistry:
         dataset_id: str,
         root_task_ids: list[str],
         operation: str,
-    ) -> ToolExecutionResult:
+    ) -> ToolSuccess:
         root_tasks = [self._ml_service.get_task_details(task_id).task for task_id in root_task_ids]
         trained_models = self._trained_models_for_root_tasks(root_task_ids)
         tasks = self._related_training_tasks(root_tasks, trained_models)
@@ -2051,7 +2064,7 @@ class AgentToolRegistry:
             "ml_tasks": [self._ml_task_payload(task) for task in tasks],
             "trained_models": [self._trained_model_payload(model) for model in trained_models],
         }
-        return ToolExecutionResult(payload=payload)
+        return ToolSuccess(value=payload)
 
     def _single_task_receipt(
         self,
@@ -2059,7 +2072,7 @@ class AgentToolRegistry:
         tool_name: str,
         task_id: str,
         operation: str,
-    ) -> ToolExecutionResult:
+    ) -> ToolSuccess:
         task = self._ml_service.get_task_details(task_id).task
         payload = {
             "async_state": "running_background",
@@ -2070,7 +2083,7 @@ class AgentToolRegistry:
             "dataset_id": task.dataset_id,
             "ml_tasks": [self._ml_task_payload(task)],
         }
-        return ToolExecutionResult(payload=payload)
+        return ToolSuccess(value=payload)
 
     def _task_receipt_markdown(self, payload: dict[str, Any]) -> str:
         task_ids = [str(task_id) for task_id in payload.get("task_ids", [])]

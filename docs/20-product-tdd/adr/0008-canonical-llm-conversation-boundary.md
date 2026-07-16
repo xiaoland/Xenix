@@ -23,11 +23,15 @@ Use one ordered canonical Thread/Message log owned exclusively by
   one pending sampling Message as the only provisional canonical state.
 - Put provider interaction, transcript adaptation, and the LLM-owned AgentTool
   protocol/registry/validation/invocation at the LLM boundary.
-- Keep Agent Harness process-local: it coordinates import, live sampling and
-  cancellation policy, and snapshot-to-Chatbot-event projection. It does not
-  directly write or mutate Messages or dispatch Tools.
+- Keep Agent Harness process-local: it coordinates import, live sampling,
+  Thread-pause requests, and snapshot-to-Chatbot-event projection. It does not
+  directly write or mutate Messages or dispatch Tools. Pending-message
+  cancellation is cleanup, not user-facing Stop.
 - Inject concrete Tool implementations through LLM-owned interfaces. The LLM
   boundary never imports Harness or concrete/domain Tool modules.
+- Make a Tool's bounded direct returned value the only ToolResult value.
+  Provider adapters encode it only for transport; XTT and typed ToolFailure are
+  values chosen at the LLM-owned Tool boundary, not Harness projections.
 - Do not introduce a persistent Turn, Run, execution ledger, or Artifact/Log
   provenance relation as a second conversation authority.
 
@@ -42,6 +46,10 @@ Use one ordered canonical Thread/Message log owned exclusively by
   migration an explicit dependency order.
 - Provider adapters choose their own history/wire form without mutating
   canonical Messages.
+- Stop is a process-local Thread admission pause. It prevents later provider
+  requests but neither persists a recovery state nor promises Tool cancellation
+  or rollback. An already executing admitted Tool exchange may settle its
+  atomic result set; a new explicit UserMessage is the sole re-entry command.
 
 The contract linked above owns the precise topology, sequences, invariants, and
 verification routes; this ADR preserves the decision and its non-goals.

@@ -32,6 +32,7 @@ from ..llm import (
     LLMConversationService,
     PendingSampling,
     SubmissionClaim,
+    ThreadPausedError,
     TextBlock,
     blocks_from_payload,
 )
@@ -211,15 +212,27 @@ class AgentHarnessService:
     def generate_thread_title(self, thread_id: str) -> str:
         return self._conversation_service.generate_thread_title(thread_id)
 
+    def pause_thread(self, thread_id: str) -> None:
+        """Pause future sampling for one Thread without cancelling a Tool.
+
+        Pending-message cancellation remains an internal cleanup capability.  A
+        user-facing Stop targets the Thread because the pending Message id is
+        only a provisional correlation and may already have been replaced by a
+        terminal Tool Result before the next sample is admitted.
+        """
+
+        self._conversation_service.pause_thread(thread_id)
+
+    def is_thread_paused(self, thread_id: str) -> bool:
+        checker = getattr(self._conversation_service, "is_thread_paused", None)
+        return bool(checker(thread_id)) if callable(checker) else False
+
     def cancel_sampling(self, pending_message_id: str) -> None:
         with self._cancel_lock:
             event = self._cancel_events.get(pending_message_id)
             if event is not None:
                 event.set()
         self._conversation_service.cancel_sampling(pending_message_id)
-
-    # Compatibility name for the UI transition; the identity is a pending Message.
-    cancel_run = cancel_sampling
 
     def submit_user_turn(self, input_data: SubmitUserTurnInput) -> ConversationSnapshot:
         final: ConversationSnapshot | None = None
@@ -250,6 +263,24 @@ class AgentHarnessService:
             expected_frontier_id=self._frontier_id(thread_id),
             client_submission_id=submission_id,
         )
+        existing_message_id = getattr(claim, "existing_message_id", None)
+        if existing_message_id:
+            # A retried client acknowledgement is not a new UserMessage.  Do
+            # not import attachments, clear a Thread pause, or re-sample the
+            # old frontier; simply project the already-canonical snapshot.
+            try:
+                snapshot = self.get_thread_snapshot(thread_id)
+                yield AgentHarnessStreamEvent(
+                    kind="snapshot",
+                    thread_id=thread_id,
+                    client_submission_id=submission_id,
+                    snapshot=snapshot,
+                    chatbot_events=self.project_chatbot_events(snapshot),
+                    is_final=True,
+                )
+            finally:
+                self._conversation_service.release_user_submission_claim(claim)
+            return
         try:
             imported: list[DatasetAttachmentInput] = []
             for source_index, source in enumerate(input_data.source_attachments):
@@ -301,7 +332,11 @@ class AgentHarnessService:
         )
         title_task: _InitialTitleTask | None = None
         first_user_message_id = snapshot.messages[-1].id
-        for event in self._sample_until_client_frontier(thread_id, first_user_message_id):
+        for event in self._sample_until_client_frontier(
+            thread_id,
+            first_user_message_id,
+            client_submission_id=submission_id,
+        ):
             yield event
             # Resuming after the real Thinking event guarantees that the
             # append acknowledgement and pending sampling Message already
@@ -332,8 +367,21 @@ class AgentHarnessService:
         self,
         thread_id: str,
         frontier_id: str,
+        *,
+        client_submission_id: str | None = None,
     ) -> Iterator[AgentHarnessStreamEvent]:
         while True:
+            # A Thread pause is a live admission barrier.  The current
+            # exchange, if any, is allowed to settle; a paused loop must never
+            # start another provider request merely because an old Tool Result
+            # snapshot was already yielded.
+            if self.is_thread_paused(thread_id):
+                yield from self._paused_pending_events(
+                    thread_id,
+                    pending_message_id=None,
+                    client_submission_id=client_submission_id,
+                )
+                return
             scope = self._sampling_tool_scope(thread_id)
             pending: PendingSampling | None = None
             active_pending_id: str | None = None
@@ -347,21 +395,40 @@ class AgentHarnessService:
                     )
                     active_pending_id = started.pending_message_id
                     self._register_cancel_event(active_pending_id, thread_id)
-                    yield from self._sampling_started_events(active_pending_id, retry_events)
+                    yield from self._sampling_started_events(
+                        thread_id,
+                        active_pending_id,
+                        retry_events,
+                        client_submission_id=client_submission_id,
+                    )
                     try:
                         pending = self._conversation_service.complete_pending_sampling(
                             pending_message_id=active_pending_id,
                             provider=self._provider,
                             retry_callback=lambda retry: retry_events.append(_retry_payload(retry)),
                         )
+                    except ThreadPausedError:
+                        yield from self._paused_pending_events(
+                            thread_id,
+                            pending_message_id=active_pending_id,
+                            client_submission_id=client_submission_id,
+                        )
+                        return
                     except ValidationError:
                         if self._cancel_requested(active_pending_id)():
-                            yield from self._cancelled_pending_events(thread_id, active_pending_id)
+                            yield from self._cancelled_pending_events(
+                                thread_id,
+                                active_pending_id,
+                                client_submission_id=client_submission_id,
+                            )
                             return
                         raise
                     if retry_events:
                         yield AgentHarnessStreamEvent(
-                            kind="connection", pending_message_id=active_pending_id,
+                            kind="connection",
+                            thread_id=thread_id,
+                            pending_message_id=active_pending_id,
+                            client_submission_id=client_submission_id,
                             chatbot_event=build_llm_connection_chatbot_event(
                                 sampling_id=active_pending_id, retry_events=retry_events,
                             ),
@@ -379,10 +446,25 @@ class AgentHarnessService:
                             if isinstance(live, PendingSampling):
                                 pending = live
                                 continue
-                            yield from self._project_live_event(live)
+                            yield from self._project_live_event(
+                                live,
+                                thread_id=thread_id,
+                                client_submission_id=client_submission_id,
+                            )
+                    except ThreadPausedError:
+                        yield from self._paused_pending_events(
+                            thread_id,
+                            pending_message_id=active_pending_id,
+                            client_submission_id=client_submission_id,
+                        )
+                        return
                     except ValidationError:
                         if active_pending_id is not None and self._cancel_requested(active_pending_id)():
-                            yield from self._cancelled_pending_events(thread_id, active_pending_id)
+                            yield from self._cancelled_pending_events(
+                                thread_id,
+                                active_pending_id,
+                                client_submission_id=client_submission_id,
+                            )
                             return
                         raise
                 if pending is None:
@@ -395,7 +477,10 @@ class AgentHarnessService:
                     self._clear_cancel_event(active_pending_id)
                     active_pending_id = None
                     yield AgentHarnessStreamEvent(
-                        kind="snapshot", thread_id=thread_id, pending_message_id=pending.pending_message_id,
+                        kind="snapshot",
+                        thread_id=thread_id,
+                        pending_message_id=pending.pending_message_id,
+                        client_submission_id=client_submission_id,
                         snapshot=snapshot, chatbot_events=self.project_chatbot_events(snapshot), is_final=True,
                     )
                     return
@@ -414,18 +499,39 @@ class AgentHarnessService:
                     if snapshot is None:
                         return
                     yield AgentHarnessStreamEvent(
-                        kind="snapshot", thread_id=thread_id, pending_message_id=pending.pending_message_id,
+                        kind="snapshot",
+                        thread_id=thread_id,
+                        pending_message_id=pending.pending_message_id,
+                        client_submission_id=client_submission_id,
                         snapshot=snapshot, chatbot_events=self.project_chatbot_events(snapshot), is_final=True,
                     )
                     return
+                paused = self.is_thread_paused(thread_id)
                 yield AgentHarnessStreamEvent(
-                    kind="snapshot", thread_id=thread_id, pending_message_id=pending.pending_message_id,
+                    kind="snapshot",
+                    thread_id=thread_id,
+                    pending_message_id=pending.pending_message_id,
+                    client_submission_id=client_submission_id,
                     snapshot=snapshot, chatbot_events=self.project_chatbot_events(snapshot),
+                    is_final=paused,
                 )
+                if paused:
+                    return
                 frontier_id = snapshot.messages[-1].id
+            except ThreadPausedError:
+                yield from self._paused_pending_events(
+                    thread_id,
+                    pending_message_id=active_pending_id,
+                    client_submission_id=client_submission_id,
+                )
+                return
             except Exception:
                 if active_pending_id is not None and self._cancel_requested(active_pending_id)():
-                    yield from self._cancelled_pending_events(thread_id, active_pending_id)
+                    yield from self._cancelled_pending_events(
+                        thread_id,
+                        active_pending_id,
+                        client_submission_id=client_submission_id,
+                    )
                     return
                 raise
             finally:
@@ -440,35 +546,63 @@ class AgentHarnessService:
                         self._clear_cancel_event(active_pending_id)
 
     def _sampling_started_events(
-        self, pending_message_id: str, retry_events: list[dict[str, Any]],
+        self,
+        thread_id: str,
+        pending_message_id: str,
+        retry_events: list[dict[str, Any]],
+        *,
+        client_submission_id: str | None = None,
     ) -> Iterator[AgentHarnessStreamEvent]:
         yield AgentHarnessStreamEvent(
-            kind="thinking", pending_message_id=pending_message_id,
+            kind="thinking",
+            thread_id=thread_id,
+            pending_message_id=pending_message_id,
+            client_submission_id=client_submission_id,
             chatbot_event=build_thinking_chatbot_event(
                 pending_message_id=pending_message_id, status=ChatbotEventStatus.IN_PROGRESS,
             ),
         )
         if retry_events:
             yield AgentHarnessStreamEvent(
-                kind="connection", pending_message_id=pending_message_id,
+                kind="connection",
+                thread_id=thread_id,
+                pending_message_id=pending_message_id,
+                client_submission_id=client_submission_id,
                 chatbot_event=build_llm_connection_chatbot_event(
                     sampling_id=pending_message_id, retry_events=retry_events,
                 ),
             )
 
-    def _project_live_event(self, event: ConversationLiveEvent) -> Iterator[AgentHarnessStreamEvent]:
+    def _project_live_event(
+        self,
+        event: ConversationLiveEvent,
+        *,
+        thread_id: str,
+        client_submission_id: str | None = None,
+    ) -> Iterator[AgentHarnessStreamEvent]:
         if event.kind == "sampling_started":
-            yield from self._sampling_started_events(event.pending_message_id, [])
+            yield from self._sampling_started_events(
+                thread_id,
+                event.pending_message_id,
+                [],
+                client_submission_id=client_submission_id,
+            )
         elif event.kind == "retry" and event.retry is not None:
             yield AgentHarnessStreamEvent(
-                kind="connection", pending_message_id=event.pending_message_id,
+                kind="connection",
+                thread_id=thread_id,
+                pending_message_id=event.pending_message_id,
+                client_submission_id=client_submission_id,
                 chatbot_event=build_llm_connection_chatbot_event(
                     sampling_id=event.pending_message_id, retry_events=[_retry_payload(event.retry)],
                 ),
             )
         elif event.kind == "tool_progress":
             yield AgentHarnessStreamEvent(
-                kind="activity", pending_message_id=event.pending_message_id,
+                kind="activity",
+                thread_id=thread_id,
+                pending_message_id=event.pending_message_id,
+                client_submission_id=client_submission_id,
                 chatbot_event=build_activity_chatbot_event(
                     pending_message_id=event.pending_message_id, sequence_index=0,
                 ),
@@ -505,6 +639,8 @@ class AgentHarnessService:
         self,
         thread_id: str,
         pending_message_id: str,
+        *,
+        client_submission_id: str | None = None,
     ) -> Iterator[AgentHarnessStreamEvent]:
         snapshot = self._snapshot_if_thread_exists(thread_id)
         self._clear_cancel_event(pending_message_id)
@@ -514,6 +650,38 @@ class AgentHarnessService:
             kind="snapshot",
             thread_id=thread_id,
             pending_message_id=pending_message_id,
+            client_submission_id=client_submission_id,
+            snapshot=snapshot,
+            chatbot_events=self.project_chatbot_events(snapshot),
+            is_final=True,
+        )
+
+    def _paused_pending_events(
+        self,
+        thread_id: str,
+        pending_message_id: str | None,
+        *,
+        client_submission_id: str | None = None,
+    ) -> Iterator[AgentHarnessStreamEvent]:
+        """Close a paused loop with the stable canonical projection.
+
+        A Thread pause does not itself delete a pending exchange.  The
+        Conversation service either already discarded a pre-admission
+        placeholder or will let an admitted provider/Tool exchange settle.
+        This projection is therefore only a UI terminal acknowledgement; it is
+        never a durable Run/Turn or a synthetic Message.
+        """
+
+        snapshot = self._snapshot_if_thread_exists(thread_id)
+        if pending_message_id is not None:
+            self._clear_cancel_event(pending_message_id)
+        if snapshot is None:
+            return
+        yield AgentHarnessStreamEvent(
+            kind="snapshot",
+            thread_id=thread_id,
+            pending_message_id=pending_message_id,
+            client_submission_id=client_submission_id,
             snapshot=snapshot,
             chatbot_events=self.project_chatbot_events(snapshot),
             is_final=True,

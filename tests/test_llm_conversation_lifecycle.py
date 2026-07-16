@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -13,7 +14,11 @@ from xenix.services.llm import (
     ProviderResponse,
     ProviderToolCall,
 )
-from xenix.services.llm.tooling import MAX_TOOL_ERROR_SUMMARY_CHARS
+from xenix.services.llm.tooling import (
+    MAX_TOOL_FAILURE_MESSAGE_CHARS,
+    ToolFailure,
+    canonical_tool_result_value,
+)
 from xenix.services.storage import StorageBootstrapService
 
 
@@ -136,7 +141,7 @@ def test_finalization_failure_discards_the_pending_placeholder(monkeypatch, tmp_
     service.cancel_sampling(resumed.pending_message_id)
 
 
-def test_tool_exception_summary_is_generic_and_bounded(monkeypatch, tmp_path: Path) -> None:
+def test_tool_exception_is_a_typed_and_bounded_canonical_failure(monkeypatch, tmp_path: Path) -> None:
     def _raise_sensitive_error(_arguments, _context):
         raise RuntimeError(r"F:\\private\\dataset.csv: " + "x" * 10_000)
 
@@ -155,9 +160,105 @@ def test_tool_exception_summary_is_generic_and_bounded(monkeypatch, tmp_path: Pa
 
     assert final is not None
     result = next(message for message in final.messages if message.kind.value == "tool_result")
-    assert result.error_summary == "Tool execution failed."
-    assert r"F:\\private" not in result.error_summary
-    assert len(result.error_summary) <= MAX_TOOL_ERROR_SUMMARY_CHARS
+    assert result.error_summary is None
+    assert result.value_payload["type"] == "tool_failure"
+    assert result.value_payload["code"] == "tool_execution_failed"
+    assert r"F:\\private" in result.value_payload["message"]
+    assert result.value_payload["details"] == {"exception_type": "RuntimeError"}
+    assert len(result.value_payload["message"]) <= MAX_TOOL_FAILURE_MESSAGE_CHARS
+
+
+def test_direct_tool_failure_is_persisted_without_a_second_summary(monkeypatch, tmp_path: Path) -> None:
+    failure = ToolFailure(
+        code="invalid_query",
+        message="The selected SQL expression is invalid.",
+        details={"sql": "SELECT * FROM missing"},
+        repair_hints=("Select an existing relation.",),
+        retryable=False,
+    )
+    service = _conversation(monkeypatch, tmp_path, _registry(lambda _arguments, _context: failure))
+    thread_id, frontier_id = _user_frontier(service)
+    pending = service.sample_existing_frontier(
+        thread_id=thread_id,
+        expected_frontier_id=frontier_id,
+        provider=_SingleToolProvider(),
+    )
+
+    final = service.invoke_staged_tool(
+        pending_message_id=pending.pending_message_id,
+        staged_call_message_id=pending.staged_calls[0].staged_call_id,
+    )
+
+    assert final is not None
+    result = next(message for message in final.messages if message.kind.value == "tool_result")
+    assert result.error_summary is None
+    assert result.value_payload == failure.to_value()
+
+
+def test_legacy_failed_result_keeps_a_bounded_diagnostic_value_as_typed_failure_detail() -> None:
+    value = canonical_tool_result_value(
+        value={"error_code": "old_query_error", "sql": "SELECT * FROM missing"},
+        failed=True,
+        legacy_error_summary="Tool execution failed.",
+    )
+
+    assert value == {
+        "type": "tool_failure",
+        "code": "legacy_tool_failure",
+        "message": "Tool execution failed.",
+        "details": {"error_code": "old_query_error", "sql": "SELECT * FROM missing"},
+    }
+
+
+def test_conversation_recognizes_a_string_legacy_failed_status() -> None:
+    value = LLMConversationService._canonical_tool_result_value(  # noqa: SLF001 - compatibility boundary
+        SimpleNamespace(
+            result_status="failed",
+            value_payload=None,
+            error_summary="Historical tool failure.",
+        )
+    )
+
+    assert value == {
+        "type": "tool_failure",
+        "code": "legacy_tool_failure",
+        "message": "Historical tool failure.",
+    }
+
+
+def test_validation_error_diagnostics_are_preserved_in_tool_failure(monkeypatch, tmp_path: Path) -> None:
+    def invalid_tool(_arguments, _context):
+        raise ValidationError(
+            "DuckDB Binder Error: table customer_missing does not exist.",
+            error_code="data_query_invalid",
+            error_details={"sql": "SELECT * FROM customer_missing"},
+            repair_hints=["Use a registered dataset alias."],
+            retryable=False,
+        )
+
+    service = _conversation(monkeypatch, tmp_path, _registry(invalid_tool))
+    thread_id, frontier_id = _user_frontier(service)
+    pending = service.sample_existing_frontier(
+        thread_id=thread_id,
+        expected_frontier_id=frontier_id,
+        provider=_SingleToolProvider(),
+    )
+
+    final = service.invoke_staged_tool(
+        pending_message_id=pending.pending_message_id,
+        staged_call_message_id=pending.staged_calls[0].staged_call_id,
+    )
+
+    assert final is not None
+    result = next(message for message in final.messages if message.kind.value == "tool_result")
+    assert result.value_payload == {
+        "type": "tool_failure",
+        "code": "data_query_invalid",
+        "message": "DuckDB Binder Error: table customer_missing does not exist.",
+        "details": {"sql": "SELECT * FROM customer_missing"},
+        "repair_hints": ["Use a registered dataset alias."],
+        "retryable": False,
+    }
 
 
 def test_abandoning_a_service_stream_after_thinking_discards_pending(monkeypatch, tmp_path: Path) -> None:

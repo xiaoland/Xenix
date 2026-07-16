@@ -20,7 +20,8 @@ UI -> services -> adapters and persistence
 - `LLMConversationService` owns canonical Thread/Message state, provider-facing
   context and adapter interaction, and the LLM-owned AgentTool
   protocol/registry/validation/invocation. Agent Harness owns live intake/import,
-  sampling/cancellation policy, and snapshot-to-Chatbot-event projection. Data,
+  sampling coordination, Thread-pause requests, and snapshot-to-Chatbot-event
+  projection. Data,
   artifact, and ML services retain their domain authority.
 - Adapters own provider, filesystem, database, and ML execution mechanics without
   becoming product-state authorities.

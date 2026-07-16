@@ -169,8 +169,8 @@ def test_skill_resource_reads_require_activation_in_the_same_thread(monkeypatch,
         arguments={"skill_name": "demo-skill", "path": "references/guide.md"},
         context=ToolExecutionContext(thread_id="thread-after-activation"),
     )
-    assert result["path"] == "references/guide.md"
-    assert result["size_bytes"] == len("bounded guide".encode("utf-8"))
+    assert result.value["path"] == "references/guide.md"
+    assert result.value["size_bytes"] == len("bounded guide".encode("utf-8"))
 
 
 def test_skill_harness_replays_failed_then_successful_resource_read(monkeypatch, tmp_path: Path) -> None:
@@ -205,7 +205,10 @@ def test_skill_harness_replays_failed_then_successful_resource_read(monkeypatch,
         "agent.skill.read_reference",
     ]
     assert [result.result_status.value for result in results] == ["failed", "succeeded", "succeeded"]
-    assert results[0].value_payload == {}
+    failure = results[0].value_payload
+    assert failure["type"] == "tool_failure"
+    assert failure["code"] == "agent_skill_not_activated"
+    assert "must be activated" in failure["message"]
     assert results[2].value_payload["path"] == "references/guide.md"
     assert _active_flag(provider.calls[0]) is False
     assert _active_flag(provider.calls[1]) is False

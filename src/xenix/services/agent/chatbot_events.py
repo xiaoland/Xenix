@@ -16,6 +16,7 @@ from pydantic import model_serializer
 from sqlmodel import Field, SQLModel
 
 from ..llm.messages import blocks_from_payload, blocks_to_json
+from ..llm.tooling import canonical_tool_result_value
 from .skill_catalog import is_agent_skill_tool
 from .tool_presentations import ToolPresentation, tool_presentation_for_name
 
@@ -59,6 +60,9 @@ class ChatbotEvent(SQLModel):
     source_message_ids: list[str] = Field(default_factory=list)
     tool_call_id: str | None = None
     tool_name: str | None = None
+    # The canonical ToolResult value copied from the Conversation Message.
+    # Detail blocks are only its UI envelope, never an alternate raw result.
+    tool_result_value: Any = None
     icon_key: str | None = None
     summary: str | None = None
     usage_payload: dict[str, Any] | None = None
@@ -403,7 +407,8 @@ def project_tool_chatbot_event(
     source_ids = [call_id]
     if result_message is not None:
         source_ids.append(str(result_message.id))
-    payload = _result_payload(result_message)
+    result_value = _canonical_result_value(result_message, result_status)
+    payload = result_value if isinstance(result_value, dict) else None
     summary = presentation.summary_for(result_status or "pending")
     if status is ChatbotEventStatus.COMPLETED and isinstance(payload, dict):
         summary = _tool_summary_from_payload(tool_name, payload) or summary
@@ -413,7 +418,8 @@ def project_tool_chatbot_event(
         author=ChatbotEventAuthor.TOOL, status=status,
         source_message_ids=source_ids, tool_call_id=call_id,
         tool_name=tool_name, icon_key=presentation.icon_key, summary=summary,
-        detail_blocks=_tool_detail_blocks(tool_call, result_message, result_status),
+        tool_result_value=result_value,
+        detail_blocks=_tool_detail_blocks(tool_call, result_value, result_status),
         actions=_tool_actions(tool_name, payload),
     )
 
@@ -469,9 +475,14 @@ def _tool_name(message: Any) -> str:
     return str(getattr(message, "tool_id", "") or "")
 
 
-def _result_payload(message: Any | None) -> dict[str, Any] | None:
-    payload = getattr(message, "value_payload", None) if message is not None else None
-    return dict(payload) if isinstance(payload, dict) else None
+def _canonical_result_value(message: Any | None, result_status: str | None) -> Any:
+    if message is None:
+        return None
+    return canonical_tool_result_value(
+        value=getattr(message, "value_payload", None),
+        failed=result_status == "failed",
+        legacy_error_summary=getattr(message, "error_summary", None),
+    )
 
 
 def _tool_summary_from_payload(tool_name: str, payload: dict[str, Any]) -> str | None:
@@ -494,17 +505,19 @@ def _tool_actions(tool_name: str, payload: dict[str, Any] | None) -> list[dict[s
     return [{"type": "open_tool_call_detail", "task_ids": task_ids}] if task_ids else []
 
 
-def _tool_detail_blocks(tool_call: Any, result: Any | None, result_status: str | None) -> list[dict[str, Any]]:
+def _tool_detail_blocks(tool_call: Any, result_value: Any, result_status: str | None) -> list[dict[str, Any]]:
     tool_name = _tool_name(tool_call)
-    payload = _result_payload(result)
     lines = [f"### {tool_name}", "", f"Status: `{result_status or 'pending'}`"]
     arguments = getattr(tool_call, "arguments_payload", None) or {}
     lines.extend(["", "#### Arguments", "```json", _json_dump(arguments), "```"])
-    error = getattr(result, "error_summary", None) if result is not None else None
-    if error:
-        lines.extend(["", "#### Error", str(error)])
-    if payload is not None:
-        lines.extend(["", "#### Result", "```json", _json_dump(payload), "```"])
+    if result_value is not None:
+        lines.extend(["", "#### Result"])
+        if isinstance(result_value, str):
+            # XTT is already the canonical Tool Result text.  Render it
+            # directly rather than re-serializing a hidden JSON payload.
+            lines.append(result_value)
+        else:
+            lines.extend(["```json", _json_dump(result_value), "```"])
     return [{"type": "markdown", "text": "\n".join(lines)}]
 
 

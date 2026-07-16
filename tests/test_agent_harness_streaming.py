@@ -19,11 +19,13 @@ from xenix.services.agent.chatbot_events import enrich_chatbot_events_with_sourc
 from xenix.services.dataset_service import DatasetService
 from xenix.services.llm import (
     AgentToolRegistry,
+    AgentToolSpec,
     DatasetBlock,
     LLMConversationService,
     ProviderResponse,
     SourceAttachmentBlock,
     TextBlock,
+    ToolFailure,
     blocks_from_payload,
 )
 from xenix.services.storage import StorageBootstrapService
@@ -52,6 +54,28 @@ class RecordingTextProvider:
     def complete(self, messages, _tools):
         self.messages = list(messages)
         return ProviderResponse(assistant_content_blocks=[{"type": "text", "text": "Imported."}])
+
+
+class ToolThenTextProvider:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def complete(self, _messages, _tools):
+        self.calls += 1
+        if self.calls == 1:
+            from xenix.services.llm import ProviderToolCall
+
+            return ProviderResponse(
+                tool_calls=[
+                    ProviderToolCall(
+                        provider_call_id="provider-call-1",
+                        tool_name="test.tool",
+                        provider_name="test_tool",
+                        arguments={},
+                    )
+                ]
+            )
+        return ProviderResponse(assistant_content_blocks=[{"type": "text", "text": "Should not run."}])
 
 
 class BlockingImportDatasetService:
@@ -122,6 +146,269 @@ def test_cancelled_provider_completion_finishes_without_resurrecting_pending_mes
     snapshot = outcome[-1].snapshot
     assert snapshot is not None
     assert [message.kind.value for message in snapshot.messages] == ["user"]
+
+
+def test_pause_before_provider_admission_sends_no_request_and_discards_placeholder(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    context = StorageBootstrapService().initialize(ensure_app_dirs(get_app_paths()))
+    provider = BlockingProvider()
+    conversation = LLMConversationService(
+        session_factory=context.session_factory,
+        tool_registry=AgentToolRegistry(),
+    )
+    harness = AgentHarnessService(conversation_service=conversation, provider=provider)
+    stream = harness.submit_user_turn_stream(
+        SubmitUserTurnInput(text="Pause before the request.", client_submission_id="pause-before-request")
+    )
+
+    append_ack = next(stream)
+    thinking = next(stream)
+    assert append_ack.snapshot is not None
+    assert thinking.thread_id == append_ack.thread_id
+    assert thinking.client_submission_id == "pause-before-request"
+    assert thinking.pending_message_id is not None
+    thread_id = append_ack.snapshot.thread.id
+
+    harness.pause_thread(thread_id)
+    events = list(stream)
+
+    assert provider.started.is_set() is False
+    assert events and events[-1].is_final is True
+    snapshot = events[-1].snapshot
+    assert snapshot is not None
+    assert [message.kind.value for message in snapshot.messages] == ["user"]
+    assert all(message.kind.value != "pending_llm_sampling" for message in snapshot.messages)
+
+
+def test_pause_after_tool_result_prevents_next_provider_sample(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    context = StorageBootstrapService().initialize(ensure_app_dirs(get_app_paths()))
+    provider = ToolThenTextProvider()
+    registry = AgentToolRegistry()
+    registry.register(
+        AgentToolSpec(name="test.tool", provider_name="test_tool", description="test"),
+        lambda _arguments, _context: {"ok": True},
+    )
+    conversation = LLMConversationService(session_factory=context.session_factory, tool_registry=registry)
+    harness = AgentHarnessService(conversation_service=conversation, provider=provider)
+    stream = harness.submit_user_turn_stream(
+        SubmitUserTurnInput(text="Pause after the tool.", client_submission_id="pause-after-tool")
+    )
+
+    append_ack = next(stream)
+    thinking = next(stream)
+    assert append_ack.snapshot is not None
+    assert thinking.kind == "thinking"
+    tool_snapshot = next(
+        event
+        for event in stream
+        if event.kind == "snapshot" and event.snapshot is not None
+        and any(message.kind.value == "tool_result" for message in event.snapshot.messages)
+    )
+    assert tool_snapshot.is_final is False
+    assert provider.calls == 1
+
+    harness.pause_thread(append_ack.snapshot.thread.id)
+    remaining = list(stream)
+
+    assert provider.calls == 1
+    assert remaining and remaining[-1].is_final is True
+    final = remaining[-1].snapshot
+    assert final is not None
+    assert [message.kind.value for message in final.messages] == ["user", "tool_call", "tool_result"]
+
+
+def test_new_user_message_reenters_paused_tool_result_frontier_without_replay(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    context = StorageBootstrapService().initialize(ensure_app_dirs(get_app_paths()))
+    provider = ToolThenTextProvider()
+    registry = AgentToolRegistry()
+    registry.register(
+        AgentToolSpec(name="test.tool", provider_name="test_tool", description="test"),
+        lambda _arguments, _context: {"ok": True},
+    )
+    conversation = LLMConversationService(session_factory=context.session_factory, tool_registry=registry)
+    harness = AgentHarnessService(conversation_service=conversation, provider=provider)
+    first_stream = harness.submit_user_turn_stream(
+        SubmitUserTurnInput(text="Create the paused tool result.", client_submission_id="paused-turn")
+    )
+    append_ack = next(first_stream)
+    next(first_stream)  # Thinking
+    tool_snapshot = next(
+        event
+        for event in first_stream
+        if event.kind == "snapshot"
+        and event.snapshot is not None
+        and any(message.kind.value == "tool_result" for message in event.snapshot.messages)
+    )
+    assert append_ack.snapshot is not None
+    thread_id = append_ack.snapshot.thread.id
+    assert tool_snapshot.is_final is False
+    harness.pause_thread(thread_id)
+    paused_events = list(first_stream)
+    assert paused_events and paused_events[-1].is_final is True
+    paused_snapshot = paused_events[-1].snapshot
+    assert paused_snapshot is not None
+    assert [message.kind.value for message in paused_snapshot.messages] == ["user", "tool_call", "tool_result"]
+
+    resumed_events = list(
+        harness.submit_user_turn_stream(
+            SubmitUserTurnInput(
+                thread_id=thread_id,
+                text="Continue with a new explicit message.",
+                client_submission_id="resumed-turn",
+            )
+        )
+    )
+
+    assert provider.calls == 2
+    resumed_snapshot = next(event.snapshot for event in reversed(resumed_events) if event.snapshot is not None)
+    assert [message.kind.value for message in resumed_snapshot.messages] == [
+        "user",
+        "tool_call",
+        "tool_result",
+        "user",
+        "assistant",
+    ]
+
+
+def test_pause_during_tool_allows_tool_to_finish_without_continuation(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    context = StorageBootstrapService().initialize(ensure_app_dirs(get_app_paths()))
+    provider = ToolThenTextProvider()
+    started = threading.Event()
+    release = threading.Event()
+
+    def blocking_tool(_arguments, _context):
+        started.set()
+        assert release.wait(timeout=3), "Tool test barrier timed out."
+        return {"ok": True}
+
+    registry = AgentToolRegistry()
+    registry.register(
+        AgentToolSpec(name="test.tool", provider_name="test_tool", description="test"),
+        blocking_tool,
+    )
+    conversation = LLMConversationService(session_factory=context.session_factory, tool_registry=registry)
+    harness = AgentHarnessService(conversation_service=conversation, provider=provider)
+    stream = harness.submit_user_turn_stream(
+        SubmitUserTurnInput(text="Pause during the tool.", client_submission_id="pause-during-tool")
+    )
+    append_ack = next(stream)
+    next(stream)  # Thinking
+    outcome: list[object] = []
+
+    worker = threading.Thread(target=lambda: outcome.extend(stream), daemon=True)
+    worker.start()
+    assert started.wait(timeout=2)
+    assert append_ack.snapshot is not None
+    harness.pause_thread(append_ack.snapshot.thread.id)
+    release.set()
+    worker.join(timeout=3)
+
+    assert not worker.is_alive()
+    assert provider.calls == 1
+    final_events = [event for event in outcome if getattr(event, "is_final", False)]
+    assert final_events
+    final = final_events[-1].snapshot
+    assert final is not None
+    assert [message.kind.value for message in final.messages] == ["user", "tool_call", "tool_result"]
+
+
+def test_pause_allows_an_already_started_tool_exchange_to_commit_its_atomic_result_set(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    class TwoToolThenTextProvider:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def complete(self, _messages, _tools):
+            self.calls += 1
+            if self.calls == 1:
+                from xenix.services.llm import ProviderToolCall
+
+                return ProviderResponse(
+                    tool_calls=[
+                        ProviderToolCall(
+                            provider_call_id="provider-call-a",
+                            tool_name="test.tool_a",
+                            provider_name="test_tool_a",
+                            arguments={},
+                        ),
+                        ProviderToolCall(
+                            provider_call_id="provider-call-b",
+                            tool_name="test.tool_b",
+                            provider_name="test_tool_b",
+                            arguments={},
+                        ),
+                    ]
+                )
+            return ProviderResponse(assistant_content_blocks=[{"type": "text", "text": "Should not run."}])
+
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    context = StorageBootstrapService().initialize(ensure_app_dirs(get_app_paths()))
+    provider = TwoToolThenTextProvider()
+    first_started = threading.Event()
+    release_first = threading.Event()
+    completed: list[str] = []
+
+    def first_tool(_arguments, _context):
+        first_started.set()
+        assert release_first.wait(timeout=3), "First tool test barrier timed out."
+        completed.append("a")
+        return {"tool": "a"}
+
+    def second_tool(_arguments, _context):
+        completed.append("b")
+        return {"tool": "b"}
+
+    registry = AgentToolRegistry()
+    registry.register(
+        AgentToolSpec(name="test.tool_a", provider_name="test_tool_a", description="test"),
+        first_tool,
+    )
+    registry.register(
+        AgentToolSpec(name="test.tool_b", provider_name="test_tool_b", description="test"),
+        second_tool,
+    )
+    conversation = LLMConversationService(session_factory=context.session_factory, tool_registry=registry)
+    harness = AgentHarnessService(conversation_service=conversation, provider=provider)
+    stream = harness.submit_user_turn_stream(
+        SubmitUserTurnInput(text="Pause an admitted two-tool exchange.", client_submission_id="pause-tool-batch")
+    )
+    append_ack = next(stream)
+    next(stream)  # Thinking
+    outcome: list[object] = []
+    worker = threading.Thread(target=lambda: outcome.extend(stream), daemon=True)
+    worker.start()
+    assert first_started.wait(timeout=2)
+    assert append_ack.snapshot is not None
+
+    harness.pause_thread(append_ack.snapshot.thread.id)
+    release_first.set()
+    worker.join(timeout=3)
+
+    assert not worker.is_alive()
+    assert completed == ["a", "b"]
+    assert provider.calls == 1
+    final_events = [event for event in outcome if getattr(event, "is_final", False)]
+    assert final_events
+    final = final_events[-1].snapshot
+    assert final is not None
+    assert [message.kind.value for message in final.messages] == [
+        "user",
+        "tool_call",
+        "tool_call",
+        "tool_result",
+        "tool_result",
+    ]
 
 
 def test_snapshot_projection_preserves_assistant_fields_and_reasoning_only_event() -> None:
@@ -224,6 +511,43 @@ def test_snapshot_projection_preserves_refusal_and_tool_call_result_order() -> N
     assert events[1].reasoning == "Preparing the tool call."
     assert events[2].source_message_ids == ["tool-call", "tool-result"]
     assert events[3].refusal == "I cannot do that."
+
+
+def test_tool_failure_projection_uses_the_canonical_typed_value() -> None:
+    failure = ToolFailure(
+        code="query_invalid",
+        message="Binder error: relation sales_missing does not exist.",
+        details={"sql": "SELECT * FROM sales_missing"},
+        repair_hints=("Inspect the registered dataset aliases.",),
+    ).to_value()
+    snapshot = SimpleNamespace(
+        messages=[
+            SimpleNamespace(
+                id="tool-call",
+                kind="tool_call",
+                sequence_index=0,
+                content_payload={"tool_name": "data.query"},
+                tool_id="data.query",
+                arguments_payload={"sql": "SELECT * FROM sales_missing"},
+            ),
+            SimpleNamespace(
+                id="tool-result",
+                kind="tool_result",
+                sequence_index=1,
+                tool_call_message_id="tool-call",
+                result_status="failed",
+                value_payload=failure,
+                error_summary="legacy generic summary must not win",
+            ),
+        ]
+    )
+
+    event = project_chatbot_events(snapshot)[0]
+
+    assert event.tool_result_value == failure
+    detail = event.detail_blocks[0]["text"]
+    assert "Binder error: relation sales_missing does not exist." in detail
+    assert "legacy generic summary must not win" not in detail
 
 
 def test_dataset_block_is_structural_until_optional_source_enrichment() -> None:

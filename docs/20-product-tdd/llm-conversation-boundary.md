@@ -46,9 +46,10 @@ Tool modules.
   owns the provider-facing transcript, pending/final Message lifecycle, and
   the `AgentTool` protocol, registry, scope validation, and invocation.
 - Agent Harness owns transient application coordination only: source import,
-  the decision to sample or cancel, and snapshot-to-Chatbot-event projection.
-  It does not directly write or mutate canonical Messages, dispatch a Tool, or
-  serialize provider history.
+  the decision to sample, Thread-pause requests, and snapshot-to-Chatbot-event
+  projection. It does not directly write or mutate canonical Messages, dispatch
+  a Tool, or serialize provider history. Pending-message cancellation remains
+  internal cleanup/abandonment, not the product meaning of Stop.
 - Chatbot UI submits intent and renders Chatbot Events. It neither accesses a
   conversation repository nor infers protocol state from storage rows or raw
   Tool payloads.
@@ -59,6 +60,11 @@ Tool modules.
   an Assistant Message when the provider emitted one. A ToolResult directly
   identifies its ToolCall; neither Artifact nor observability becomes
   conversation provenance.
+- A ToolResult stores one bounded direct JSON value. Tabular Tools choose XTT
+  before returning; known and normalized failures use the typed `ToolFailure`
+  value. Provider adapters only encode that value for their wire protocol, and
+  Chatbot projection only copies/renders it; neither owns a raw-result fallback
+  or a second semantic result representation.
 - DatasetService owns materialized data and original-source provenance. After a
   snapshot is loaded, Harness may derive an ephemeral source attachment for
   Chatbot display. That presentation is not canonical content, provider input,
@@ -109,11 +115,51 @@ sequenceDiagram
     end
 ```
 
-The pending Message gives Harness a stable identity for Thinking and
-cancellation without making either a canonical conversation concept. When a
+The pending Message gives Harness a stable identity for Thinking and internal
+cleanup without making either a canonical conversation concept. When a
 ToolResult leaves the final frontier requiring another LLM sample, Harness
 chooses the next loop iteration; Tool invocation itself remains inside the LLM
 boundary.
+
+## Thread Pause Sequence
+
+```mermaid
+sequenceDiagram
+    actor U as "User"
+    participant UI as "Chatbot UI"
+    participant H as "Agent Harness"
+    participant C as "LLMConversationService"
+    participant P as "Provider adapter / LLM"
+    participant T as "Registered Tool"
+
+    U->>UI: "Stop"
+    UI->>H: "pause_thread(thread_id)"
+    H->>C: "pause_thread(thread_id)"
+    Note over C: "process-local admission gate"
+    alt "provider request has not been admitted"
+        C-->>H: "discard provisional Message; stable snapshot"
+    else "provider I/O is already in flight"
+        P-->>C: "response may arrive"
+        C->>C: "discard post-pause response"
+    else "an admitted Tool exchange is executing"
+        T-->>C: "complete its atomic result set"
+        C-->>H: "final ToolResult snapshot"
+    end
+    Note over H,C: "no later provider request for this Thread"
+    U->>UI: "new explicit UserMessage"
+    UI->>H: "submission"
+    H->>C: "append UserMessage"
+    Note over C: "clear runtime pause; do not replay stale ToolResult"
+```
+
+Pause linearizes with each provider-attempt admission inside
+`LLMConversationService`. Once an already admitted Tool-calling exchange has
+started execution, it may settle its complete atomic result set rather than
+splitting a durable ToolCall/ToolResult group; pause still prohibits its next
+provider admission. Pause is runtime-only: it is not a durable Turn, Run, or
+recovery record, and process restart does not restore it. A new explicit
+UserMessage is the only resume command after a paused terminal ToolResult; it
+never causes automatic replay of that old frontier.
 
 ## History Reopen and Source-Presentation Sequence
 
@@ -153,6 +199,10 @@ opening or cause provider/canonical data to gain a local path.
   Chatbot event must preserve the topology above. Do not add a convenience
   callback from LLM to Harness or a second state holder for presentation or
   execution recovery.
+- Stop may not be reimplemented as cancellation keyed by a provisional pending
+  Message. A Tool already executing is not promised cancellation, rollback,
+  idempotency, or domain-side-effect compensation; the pause only closes later
+  LLM admission for its Thread.
 - The boundary intentionally accepts process loss of an incomplete exchange
   and possible domain side-effect orphans. A later user-driven sample may
   repeat semantic work; it must not infer a ToolResult from logs, Artifacts, or
@@ -169,6 +219,11 @@ opening or cause provider/canonical data to gain a local path.
   `tests/test_agent_harness_first_slice.py`,
   `tests/test_agent_harness_streaming.py`,
   `tests/test_dataset_service_source_presentation.py`, and `tests/test_main.py`.
+- Direct ToolResult/XTT continuity, typed ToolFailure, adapter encoding, and
+  Thread-pause races: `tests/test_agent_harness_first_slice.py`,
+  `tests/test_agent_harness_streaming.py`,
+  `tests/test_llm_conversation_lifecycle.py`, and
+  `tests/test_llm_message_blocks.py`.
 - Canonical storage, deletion ordering, and migration/bootstrap:
   `tests/test_repositories.py`, `tests/test_migrations.py`, and
   `tests/test_storage_bootstrap.py`.

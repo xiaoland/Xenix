@@ -1159,7 +1159,7 @@ def test_main_window_generated_thread_title_cancel_preserves_title(monkeypatch, 
         window.close()
 
 
-def test_main_window_stop_cancels_active_sampling(monkeypatch, tmp_path: Path) -> None:
+def test_main_window_stop_pauses_thread_without_cancelling_active_sampling(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
@@ -1168,8 +1168,11 @@ def test_main_window_stop_cancels_active_sampling(monkeypatch, tmp_path: Path) -
     try:
         assert window._agent_harness_service is not None
         cancelled_pending_ids: list[str] = []
+        paused_thread_ids: list[str] = []
         monkeypatch.setattr(window._agent_harness_service, "cancel_sampling", lambda value: cancelled_pending_ids.append(value))
+        monkeypatch.setattr(window._agent_harness_service, "pause_thread", lambda value: paused_thread_ids.append(value))
 
+        window._agent_thread_id = "thread-to-stop"
         window._active_pending_message_id = "pending-to-stop"
         window._thread_detail_view.set_running(True)
         window._thread_detail_view.apply_chatbot_event(
@@ -1183,10 +1186,45 @@ def test_main_window_stop_cancels_active_sampling(monkeypatch, tmp_path: Path) -
         window._thread_detail_view._send_button.click()
         app.processEvents()
 
-        assert cancelled_pending_ids == ["pending-to-stop"]
+        assert paused_thread_ids == ["thread-to-stop"]
+        assert cancelled_pending_ids == []
         assert window._thread_detail_view._running is False
         assert window._thread_detail_view._thinking_bubble is None
-        assert "pending-to-stop" in window._cancelled_pending_message_ids
+        assert "pending-to-stop" not in window._cancelled_pending_message_ids
+        assert "thread-to-stop" in window._paused_thread_ids
+    finally:
+        window.close()
+
+
+def test_main_window_ignores_late_stream_event_from_old_submission(monkeypatch, tmp_path: Path) -> None:
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+
+    app, window = build_main_window(show=True)
+    try:
+        window._agent_thread_id = "thread-current"
+        window._active_submission_id = "submission-current"
+        window._thread_detail_view.set_running(False)
+
+        window._render_harness_stream_event(
+            AgentHarnessStreamEvent(
+                kind="thinking",
+                thread_id="thread-current",
+                pending_message_id="pending-old",
+                client_submission_id="submission-old",
+                chatbot_event=ChatbotEvent(
+                    id="pending-old:thinking:1",
+                    kind=ChatbotEventKind.THINKING,
+                    author=ChatbotEventAuthor.ASSISTANT,
+                    status=ChatbotEventStatus.IN_PROGRESS,
+                ),
+            )
+        )
+        app.processEvents()
+
+        assert window._thread_detail_view._running is False
+        assert window._active_pending_message_id is None
     finally:
         window.close()
 

@@ -320,7 +320,11 @@ class ConversationMessageRow(SQLModel, table=True):
             index=True,
         ),
     )
-    value_payload: dict[str, Any] | None = Field(
+    # Tool Results are direct JSON values.  A tabular result can therefore be
+    # canonical Xenix Table Text (a string), while other Tools may return a
+    # JSON object/array/scalar.  SQLite's existing JSON column already admits
+    # every one of these values; this is a logical contract widening only.
+    value_payload: Any | None = Field(
         default=None,
         sa_column=Column(JSON, nullable=True),
     )

@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -54,6 +55,12 @@ def _build_runtime(monkeypatch, tmp_path: Path):
 def _read_dataset_frame(path: str | Path) -> pd.DataFrame:
     source_path = Path(path)
     return load_dataframe(source_path, detect_source_format(source_path))
+
+
+def _xtt_metadata(value: str, key: str) -> str:
+    match = re.search(rf"^{re.escape(key)}: (.+)$", value, re.MULTILINE)
+    assert match is not None, f"missing XTT metadata field {key!r}: {value}"
+    return match.group(1)
 
 
 def _tool_context(
@@ -541,25 +548,25 @@ def test_data_clean_tool_registers_derived_dataset_and_artifact(monkeypatch, tmp
     context = _tool_context(store, "data.clean", arguments)
 
     result = registry.execute("data.clean", arguments, context)
-    derived_dataset = dataset_service.get_dataset(result.payload["dataset_id"])
+    assert isinstance(result.value, str)
+    derived_dataset = dataset_service.get_dataset(_xtt_metadata(result.value, "dataset_id"))
 
     assert derived_dataset.derived_from_dataset_id == source_dataset.id
     assert derived_dataset.project_id == source_dataset.project_id
-    assert "dataset_uri" not in result.payload
-    assert "artifact_uri" not in result.payload
-    artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
+    assert "dataset_uri" not in result.value
+    assert "artifact_uri" not in result.value
+    artifact = artifact_service.resolve_uri(f"artifact://{_xtt_metadata(result.value, 'artifact_id')}")
     assert artifact.metadata_payload["dataset_id"] == derived_dataset.id
     assert artifact.metadata_payload["dataset_export"]["dataset_id"] == derived_dataset.id
     assert pd.read_excel(artifact.absolute_path).fillna("").to_dict(orient="records") == [
         {"customer_id": 1, "amount": 10, "segment": "A"},
         {"customer_id": 2, "amount": "", "segment": "B"},
     ]
-    assert result.payload["row_count_before"] == 3
-    assert result.payload["row_count_after"] == 2
-    assert result.payload["cleaning_report"]["operation_count"] == 1
-    assert result.payload["cleaning_report"]["operations"][0]["operation"] == "duplicate.key_columns"
+    assert "row_count_before: 3" in result.value
+    assert "row_count_after: 2" in result.value
+    assert "operations: [duplicate.key_columns]" in result.value
     assert artifact.metadata_payload["cleaning_report"]["operations"][0]["columns"] == ["customer_id"]
-    assert "artifact_link" not in result.payload
+    assert "artifact_link" not in result.value
 
 
 def test_data_clean_tool_compacts_report_but_keeps_next_step_facts_and_full_audit(
@@ -602,23 +609,16 @@ def test_data_clean_tool_compacts_report_but_keeps_next_step_facts_and_full_audi
     context = _tool_context(store, "data.clean", arguments)
 
     result = registry.execute("data.clean", arguments, context)
-    compact_report = result.payload["cleaning_report"]
-    compact_operations = compact_report["operations"]
-
-    assert compact_operations[0]["encoded_columns"] == ["segment"]
-    assert compact_operations[0]["generated_columns"] == ["segment_a", "segment_b"]
-    assert compact_operations[1]["feature_range"] == [2.0, 4.0]
-    compact_column = compact_operations[1]["columns"][0]
-    assert len(compact_column) == MAX_CLEANING_REPORT_COLUMN_NAME_CHARS
-    assert compact_column.endswith("…")
+    assert isinstance(result.value, str)
+    assert "operations: [encoding.one_hot, scaling.minmax]" in result.value
     bounded_warning_report = registry._compact_cleaning_report(
         {"warnings": ["warning-" + ("x" * (MAX_CLEANING_REPORT_WARNING_CHARS + 20))]}
     )
     assert len(bounded_warning_report["warnings"][0]) == MAX_CLEANING_REPORT_WARNING_CHARS
     assert bounded_warning_report["warnings"][0].endswith("…")
-    assert len(json.dumps(result.payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")) < 16_000
+    assert len(result.value.encode("utf-8")) < 16_000
 
-    artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
+    artifact = artifact_service.resolve_uri(f"artifact://{_xtt_metadata(result.value, 'artifact_id')}")
     full_report = artifact.metadata_payload["cleaning_report"]
     assert full_report["operations"][1]["columns"] == [long_column]
     assert full_report["operations"][0]["columns_summary"][0]["generated_columns"] == [
@@ -645,11 +645,11 @@ def test_data_clean_tool_no_ops_reports_nothing_happened(monkeypatch, tmp_path: 
 
     result = registry.execute("data.clean", arguments, context)
 
-    assert result.payload["dataset_id"] == source_dataset.id
-    assert result.payload["cleaning_report"]["no_op"] is True
-    assert "artifact_id" not in result.payload
-    assert "Nothing happened" in result.payload["message"]
-    assert not hasattr(result, "content_blocks")
+    assert isinstance(result.value, dict)
+    assert result.value["dataset_id"] == source_dataset.id
+    assert result.value["cleaning_report"]["no_op"] is True
+    assert "artifact_id" not in result.value
+    assert "Nothing happened" in result.value["message"]
 
 
 def test_data_clean_tool_rejects_legacy_policy_fields(monkeypatch, tmp_path: Path) -> None:
@@ -682,12 +682,12 @@ def test_data_clean_metadata_returns_compact_operation_catalog(monkeypatch, tmp_
 
     result = registry.execute("data.clean.metadata", arguments, context)
 
-    assert result.payload["column_reference"] == {
+    assert result.value["column_reference"] == {
         "index_base": 0,
         "single": "column_index preferred; column_name fallback; choose one",
         "multiple": "column_indexes preferred; column_names fallback; choose one",
     }
-    assert result.payload["group_names"] == [
+    assert result.value["group_names"] == [
         "schema",
         "duplicates",
         "missing",
@@ -698,10 +698,10 @@ def test_data_clean_metadata_returns_compact_operation_catalog(monkeypatch, tmp_
         "encoding",
         "scaling",
     ]
-    assert [group["group"] for group in result.payload["groups"]] == ["missing", "text"]
+    assert [group["group"] for group in result.value["groups"]] == ["missing", "text"]
     operations = [
         operation["operation"]
-        for group in result.payload["groups"]
+        for group in result.value["groups"]
         for operation in group["operations"]
     ]
     assert "missing.fill_constant" in operations
@@ -709,32 +709,32 @@ def test_data_clean_metadata_returns_compact_operation_catalog(monkeypatch, tmp_
     assert "text.map_values" in operations
     missing_fill_mean = next(
         operation
-        for group in result.payload["groups"]
+        for group in result.value["groups"]
         for operation in group["operations"]
         if operation["operation"] == "missing.fill_mean"
     )
     assert missing_fill_mean["params"] == ["multiple_columns"]
     assert all(
         set(operation) == {"operation", "summary", "params"}
-        for group in result.payload["groups"]
+        for group in result.value["groups"]
         for operation in group["operations"]
     )
-    assert all(group["summary"] for group in result.payload["groups"])
-    assert result.payload["groups"][0]["summary"] == "Fill/drop missing"
-    assert result.payload["groups"][1]["summary"] == "Clean text"
+    assert all(group["summary"] for group in result.value["groups"])
+    assert result.value["groups"][0]["summary"] == "Fill/drop missing"
+    assert result.value["groups"][1]["summary"] == "Clean text"
 
     partial_result = registry.execute(
         "data.clean.metadata",
         {"groups": ["schema", "duplicate", "missing"]},
         context,
     )
-    assert [group["group"] for group in partial_result.payload["groups"]] == ["schema", "missing"]
-    assert partial_result.payload["invalid_groups"] == [
+    assert [group["group"] for group in partial_result.value["groups"]] == ["schema", "missing"]
+    assert partial_result.value["invalid_groups"] == [
         {"group": "duplicate", "error_code": "unknown_group"}
     ]
-    assert partial_result.payload["operation_count"] == (
-        len(partial_result.payload["groups"][0]["operations"])
-        + len(partial_result.payload["groups"][1]["operations"])
+    assert partial_result.value["operation_count"] == (
+        len(partial_result.value["groups"][0]["operations"])
+        + len(partial_result.value["groups"][1]["operations"])
     )
 
     all_invalid_result = registry.execute(
@@ -742,16 +742,16 @@ def test_data_clean_metadata_returns_compact_operation_catalog(monkeypatch, tmp_
         {"groups": ["duplicate"]},
         context,
     )
-    assert all_invalid_result.payload["groups"] == []
-    assert all_invalid_result.payload["invalid_groups"] == [
+    assert all_invalid_result.value["groups"] == []
+    assert all_invalid_result.value["invalid_groups"] == [
         {"group": "duplicate", "error_code": "unknown_group"}
     ]
-    assert all_invalid_result.payload["operation_count"] == 0
+    assert all_invalid_result.value["operation_count"] == 0
 
     all_result = registry.execute("data.clean.metadata", {}, context)
     all_operations = [
         operation["operation"]
-        for group in all_result.payload["groups"]
+        for group in all_result.value["groups"]
         for operation in group["operations"]
     ]
     assert "schema.normalize_column_names" in all_operations
@@ -761,12 +761,12 @@ def test_data_clean_metadata_returns_compact_operation_catalog(monkeypatch, tmp_
     assert "scaling.standard" in all_operations
     all_iqr_operation = next(
         operation
-        for group in all_result.payload["groups"]
+        for group in all_result.value["groups"]
         for operation in group["operations"]
         if operation["operation"] == "outlier.clip_iqr"
     )
     assert all_iqr_operation["summary"] == "Clip outliers by IQR"
-    metadata_size = len(json.dumps(all_result.payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+    metadata_size = len(json.dumps(all_result.value, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
     assert metadata_size < 4_096
     assert metadata_size < 11_200
 
@@ -798,7 +798,8 @@ def test_data_tools_resolve_indexes_for_unicode_query_and_role_binding(monkeypat
         query_arguments,
         _tool_context(store, "data.query", query_arguments),
     )
-    assert query_result.payload["rows"]["data"] == [[149.25, 0]]
+    assert isinstance(query_result.value, str)
+    assert "| 1 | 149.25 | 0 |" in query_result.value
 
     binding_arguments = {
         "dataset_id": dataset.id,
@@ -813,7 +814,7 @@ def test_data_tools_resolve_indexes_for_unicode_query_and_role_binding(monkeypat
         _tool_context(store, "data.feature.select", binding_arguments),
     )
     bindings_by_role = {
-        item["role"]: item["columns"] for item in binding_result.payload["role_bindings"]
+        item["role"]: item["columns"] for item in binding_result.value["role_bindings"]
     }
     assert bindings_by_role == {
         "feature": [

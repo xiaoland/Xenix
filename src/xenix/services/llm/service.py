@@ -245,6 +245,7 @@ class LLMService:
         messages: list[ProviderMessage],
         tools: list[AgentToolSpec],
         retry_callback: Callable[[LLMRetryEvent], None] | None = None,
+        before_provider_request: Callable[[], None] | None = None,
     ) -> ProviderResponse:
         settings = self.load_settings()
         provider = self._build_provider_from_settings(settings, fq_model_key)
@@ -254,6 +255,7 @@ class LLMService:
             tools=tools,
             max_attempts=settings.retry_attempts,
             retry_callback=retry_callback,
+            before_provider_request=before_provider_request,
         )
 
     def stream(
@@ -262,6 +264,7 @@ class LLMService:
         fq_model_key: str | None = None,
         messages: list[ProviderMessage],
         tools: list[AgentToolSpec],
+        before_provider_request: Callable[[], None] | None = None,
     ) -> Iterator[ProviderStreamEvent | LLMRetryEvent]:
         settings = self.load_settings()
         provider = self._build_provider_from_settings(settings, fq_model_key)
@@ -274,6 +277,8 @@ class LLMService:
                     max_attempts=max_attempts,
                     exc=previous_error,
                 )
+            if before_provider_request is not None:
+                before_provider_request()
             try:
                 stream = getattr(provider, "stream", None)
                 if callable(stream):
@@ -369,6 +374,7 @@ class LLMService:
         tools: list[AgentToolSpec],
         max_attempts: int,
         retry_callback: Callable[[LLMRetryEvent], None] | None,
+        before_provider_request: Callable[[], None] | None,
     ) -> ProviderResponse:
         attempts = self._max_attempts(max_attempts)
         previous_error: Exception | None = None
@@ -381,6 +387,8 @@ class LLMService:
                         exc=previous_error,
                     )
                 )
+            if before_provider_request is not None:
+                before_provider_request()
             try:
                 return provider.complete(messages, tools)
             except Exception as exc:
