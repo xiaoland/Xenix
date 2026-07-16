@@ -54,7 +54,13 @@ from .messages import (
     blocks_to_markdown,
     normalize_message_blocks,
 )
-from .providers import AgentProvider, LLMRetryEvent, ProviderMessage, ProviderResponse, ProviderStreamEvent
+from .providers import (
+    AgentProvider,
+    LLMRetryEvent,
+    ProviderMessage,
+    ProviderResponse,
+    ProviderStreamEvent,
+)
 from .service import LLMModelOption, LLMService
 from .tooling import (
     MAX_EXCHANGE_RESULT_BYTES,
@@ -497,22 +503,25 @@ class LLMConversationService:
         tool_scope: ToolScope | None = None,
         fq_model_key: str | None = None,
     ) -> Iterator[ConversationLiveEvent | PendingSampling]:
+        effective_scope = tool_scope or ToolScope()
         pending = self.begin_sampling(
             thread_id=thread_id,
             expected_frontier_id=expected_frontier_id,
-            tool_scope=tool_scope or ToolScope(),
+            tool_scope=effective_scope,
         )
         handed_off = False
         try:
             yield ConversationLiveEvent(kind="sampling_started", pending_message_id=pending.pending_message_id)
             snapshot = self.get_thread_snapshot(thread_id)
             service = self._require_llm_service()
+            selected_model_key = fq_model_key or snapshot.thread.selected_fq_model_key
             final_response: ProviderResponse | None = None
-            for event in service.stream(
-                fq_model_key=fq_model_key or snapshot.thread.selected_fq_model_key,
-                messages=self._provider_messages(snapshot),
-                tools=self._tool_registry.list_specs(tool_scope),
-            ):
+            stream_arguments = {
+                "fq_model_key": selected_model_key,
+                "messages": self._provider_messages(snapshot),
+                "tools": self._tool_registry.list_specs(effective_scope),
+            }
+            for event in service.stream(**stream_arguments):
                 if isinstance(event, LLMRetryEvent):
                     yield ConversationLiveEvent(kind="retry", pending_message_id=pending.pending_message_id, retry=event)
                 elif isinstance(event, ProviderStreamEvent):
@@ -525,7 +534,7 @@ class LLMConversationService:
             staged = self._stage_provider_response(
                 pending.pending_message_id,
                 final_response,
-                fq_model_key=fq_model_key or snapshot.thread.selected_fq_model_key,
+                fq_model_key=selected_model_key,
             )
             # Once the staged capability is delivered, the caller owns the
             # next explicit action: finalize it or cancel it.  Before that
@@ -892,12 +901,13 @@ class LLMConversationService:
         specs = self._tool_registry.list_specs(tool_scope)
         if provider is not None:
             return provider.complete(messages, specs)
-        return self._require_llm_service().complete(
-            fq_model_key=fq_model_key,
-            messages=messages,
-            tools=specs,
-            retry_callback=retry_callback,
-        )
+        arguments = {
+            "fq_model_key": fq_model_key,
+            "messages": messages,
+            "tools": specs,
+            "retry_callback": retry_callback,
+        }
+        return self._require_llm_service().complete(**arguments)
 
     def is_initial_title_eligible(self, snapshot: ConversationSnapshot) -> bool:
         """Whether an append may establish this Thread's initial title."""

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import re
 import unicodedata
 from pathlib import Path
@@ -22,7 +21,18 @@ from .storage.models import DatasetSourceFormat
 
 
 KEEP_SCHEMA = {"type": "string", "enum": ["first", "last", "false"]}
-COLUMNS_SCHEMA = {"type": "array", "items": {"type": "string"}}
+COLUMN_NAMES_SCHEMA = {"type": "array", "items": {"type": "string"}}
+COLUMN_INDEXES_SCHEMA = {"type": "array", "items": {"type": "integer", "minimum": 0}}
+COLUMN_NAME_SCHEMA = {"type": "string"}
+COLUMN_INDEX_SCHEMA = {"type": "integer", "minimum": 0}
+COLUMN_LIST_REFERENCE_PROPERTIES = {
+    "column_indexes": COLUMN_INDEXES_SCHEMA,
+    "column_names": COLUMN_NAMES_SCHEMA,
+}
+COLUMN_REFERENCE_PROPERTIES = {
+    "column_index": COLUMN_INDEX_SCHEMA,
+    "column_name": COLUMN_NAME_SCHEMA,
+}
 ACTION_SCHEMA = {"type": "string", "enum": ["report_only", "drop_rows"]}
 BOOLEAN_SCHEMA = {"type": "boolean"}
 
@@ -68,15 +78,15 @@ _CLEANING_OPERATION_GROUPS: dict[str, dict[str, Any]] = {
             {
                 "operation": "duplicate.key_columns",
                 "description": "Remove duplicate rows based on selected key columns.",
+                "column_ref": "many",
                 "params_schema": {
                     "type": "object",
-                    "properties": {"columns": COLUMNS_SCHEMA, "keep": KEEP_SCHEMA},
-                    "required": ["columns"],
+                    "properties": {**COLUMN_LIST_REFERENCE_PROPERTIES, "keep": KEEP_SCHEMA},
                     "additionalProperties": False,
                 },
                 "example": {
                     "operation": "duplicate.key_columns",
-                    "params": {"columns": ["customer_id"], "keep": "first"},
+                    "params": {"column_indexes": [0], "keep": "first"},
                 },
             },
         ],
@@ -87,76 +97,78 @@ _CLEANING_OPERATION_GROUPS: dict[str, dict[str, Any]] = {
             {
                 "operation": "missing.fill_mean",
                 "description": "Fill missing numeric values with each column mean.",
+                "column_ref": "many",
                 "params_schema": {
                     "type": "object",
-                    "properties": {"columns": COLUMNS_SCHEMA},
-                    "required": ["columns"],
+                    "properties": {**COLUMN_LIST_REFERENCE_PROPERTIES},
                     "additionalProperties": False,
                 },
-                "example": {"operation": "missing.fill_mean", "params": {"columns": ["amount"]}},
+                "example": {"operation": "missing.fill_mean", "params": {"column_indexes": [1]}},
             },
             {
                 "operation": "missing.fill_median",
                 "description": "Fill missing numeric values with each column median.",
+                "column_ref": "many",
                 "params_schema": {
                     "type": "object",
-                    "properties": {"columns": COLUMNS_SCHEMA},
-                    "required": ["columns"],
+                    "properties": {**COLUMN_LIST_REFERENCE_PROPERTIES},
                     "additionalProperties": False,
                 },
-                "example": {"operation": "missing.fill_median", "params": {"columns": ["amount"]}},
+                "example": {"operation": "missing.fill_median", "params": {"column_indexes": [1]}},
             },
             {
                 "operation": "missing.fill_mode",
                 "description": "Fill missing values with each column mode.",
+                "column_ref": "many",
                 "params_schema": {
                     "type": "object",
-                    "properties": {"columns": COLUMNS_SCHEMA},
-                    "required": ["columns"],
+                    "properties": {**COLUMN_LIST_REFERENCE_PROPERTIES},
                     "additionalProperties": False,
                 },
-                "example": {"operation": "missing.fill_mode", "params": {"columns": ["segment"]}},
+                "example": {"operation": "missing.fill_mode", "params": {"column_indexes": [2]}},
             },
             {
                 "operation": "missing.fill_constant",
                 "description": "Fill missing values with a constant value.",
+                "column_ref": "many",
                 "params_schema": {
                     "type": "object",
-                    "properties": {"columns": COLUMNS_SCHEMA, "value": {}},
-                    "required": ["columns", "value"],
+                    "properties": {**COLUMN_LIST_REFERENCE_PROPERTIES, "value": {}},
+                    "required": ["value"],
                     "additionalProperties": False,
                 },
-                "example": {"operation": "missing.fill_constant", "params": {"columns": ["amount"], "value": 0}},
+                "example": {"operation": "missing.fill_constant", "params": {"column_indexes": [1], "value": 0}},
             },
             {
                 "operation": "missing.forward_fill",
                 "description": "Fill missing values from the previous non-empty row value.",
+                "column_ref": "many",
                 "params_schema": {
                     "type": "object",
-                    "properties": {"columns": COLUMNS_SCHEMA},
-                    "required": ["columns"],
+                    "properties": {**COLUMN_LIST_REFERENCE_PROPERTIES},
                     "additionalProperties": False,
                 },
-                "example": {"operation": "missing.forward_fill", "params": {"columns": ["segment"]}},
+                "example": {"operation": "missing.forward_fill", "params": {"column_indexes": [2]}},
             },
             {
                 "operation": "missing.drop_rows",
                 "description": "Drop rows where any selected column is missing.",
+                "column_ref": "many",
                 "params_schema": {
                     "type": "object",
-                    "properties": {"columns": COLUMNS_SCHEMA},
-                    "required": ["columns"],
+                    "properties": {**COLUMN_LIST_REFERENCE_PROPERTIES},
                     "additionalProperties": False,
                 },
-                "example": {"operation": "missing.drop_rows", "params": {"columns": ["amount"]}},
+                "example": {"operation": "missing.drop_rows", "params": {"column_indexes": [1]}},
             },
             {
                 "operation": "missing.drop_high_missing_columns",
                 "description": "Drop columns whose missing ratio is greater than an explicit threshold.",
+                "column_ref": "many_optional",
                 "params_schema": {
                     "type": "object",
                     "properties": {
-                        "columns": COLUMNS_SCHEMA,
+                        **COLUMN_LIST_REFERENCE_PROPERTIES,
                         "threshold": {"type": "number", "minimum": 0, "maximum": 1},
                     },
                     "required": ["threshold"],
@@ -175,22 +187,23 @@ _CLEANING_OPERATION_GROUPS: dict[str, dict[str, Any]] = {
             {
                 "operation": "type.convert",
                 "description": "Convert one column to a target type.",
+                "column_ref": "one",
                 "params_schema": {
                     "type": "object",
                     "properties": {
-                        "column": {"type": "string"},
+                        **COLUMN_REFERENCE_PROPERTIES,
                         "target_type": {
                             "type": "string",
                             "enum": ["numeric", "integer", "datetime", "text", "boolean"],
                         },
                         "date_format": {"type": "string"},
                     },
-                    "required": ["column", "target_type"],
+                    "required": ["target_type"],
                     "additionalProperties": False,
                 },
                 "example": {
                     "operation": "type.convert",
-                    "params": {"column": "amount", "target_type": "numeric"},
+                    "params": {"column_index": 1, "target_type": "numeric"},
                 },
             },
         ],
@@ -201,70 +214,71 @@ _CLEANING_OPERATION_GROUPS: dict[str, dict[str, Any]] = {
             {
                 "operation": "text.trim",
                 "description": "Strip leading and trailing whitespace.",
+                "column_ref": "many",
                 "params_schema": {
                     "type": "object",
-                    "properties": {"columns": COLUMNS_SCHEMA},
-                    "required": ["columns"],
+                    "properties": {**COLUMN_LIST_REFERENCE_PROPERTIES},
                     "additionalProperties": False,
                 },
-                "example": {"operation": "text.trim", "params": {"columns": ["region"]}},
+                "example": {"operation": "text.trim", "params": {"column_indexes": [2]}},
             },
             {
                 "operation": "text.lowercase",
                 "description": "Convert text to lowercase.",
+                "column_ref": "many",
                 "params_schema": {
                     "type": "object",
-                    "properties": {"columns": COLUMNS_SCHEMA},
-                    "required": ["columns"],
+                    "properties": {**COLUMN_LIST_REFERENCE_PROPERTIES},
                     "additionalProperties": False,
                 },
-                "example": {"operation": "text.lowercase", "params": {"columns": ["region"]}},
+                "example": {"operation": "text.lowercase", "params": {"column_indexes": [2]}},
             },
             {
                 "operation": "text.uppercase",
                 "description": "Convert text to uppercase.",
+                "column_ref": "many",
                 "params_schema": {
                     "type": "object",
-                    "properties": {"columns": COLUMNS_SCHEMA},
-                    "required": ["columns"],
+                    "properties": {**COLUMN_LIST_REFERENCE_PROPERTIES},
                     "additionalProperties": False,
                 },
-                "example": {"operation": "text.uppercase", "params": {"columns": ["region"]}},
+                "example": {"operation": "text.uppercase", "params": {"column_indexes": [2]}},
             },
             {
                 "operation": "text.collapse_whitespace",
                 "description": "Collapse repeated whitespace into one space.",
+                "column_ref": "many",
                 "params_schema": {
                     "type": "object",
-                    "properties": {"columns": COLUMNS_SCHEMA},
-                    "required": ["columns"],
+                    "properties": {**COLUMN_LIST_REFERENCE_PROPERTIES},
                     "additionalProperties": False,
                 },
-                "example": {"operation": "text.collapse_whitespace", "params": {"columns": ["region"]}},
+                "example": {"operation": "text.collapse_whitespace", "params": {"column_indexes": [2]}},
             },
             {
                 "operation": "text.empty_to_null",
                 "description": "Convert empty text values to null.",
+                "column_ref": "many",
                 "params_schema": {
                     "type": "object",
-                    "properties": {"columns": COLUMNS_SCHEMA},
-                    "required": ["columns"],
+                    "properties": {**COLUMN_LIST_REFERENCE_PROPERTIES},
                     "additionalProperties": False,
                 },
-                "example": {"operation": "text.empty_to_null", "params": {"columns": ["region"]}},
+                "example": {"operation": "text.empty_to_null", "params": {"column_indexes": [2]}},
             },
             {
                 "operation": "text.map_values",
                 "description": "Replace text values through an exact value map.",
+                "column_ref": "many",
                 "params_schema": {
                     "type": "object",
-                    "properties": {"columns": COLUMNS_SCHEMA, "value_map": {"type": "object"}},
-                    "required": ["columns", "value_map"],
+                    "properties": {**COLUMN_LIST_REFERENCE_PROPERTIES, "value_map": {"type": "object"}},
+                    "required": ["value_map"],
                     "additionalProperties": False,
                 },
                 "example": {
                     "operation": "text.map_values",
-                    "params": {"columns": ["region"], "value_map": {"n": "north"}},
+                    "params": {"column_indexes": [2], "value_map": {"n": "north"}},
                 },
             },
         ],
@@ -275,96 +289,100 @@ _CLEANING_OPERATION_GROUPS: dict[str, dict[str, Any]] = {
             {
                 "operation": "validation.not_null",
                 "description": "Find rows where a column is null.",
+                "column_ref": "one",
                 "params_schema": {
                     "type": "object",
-                    "properties": {"column": {"type": "string"}, "action": ACTION_SCHEMA, "name": {"type": "string"}},
-                    "required": ["column"],
+                    "properties": {**COLUMN_REFERENCE_PROPERTIES, "action": ACTION_SCHEMA, "name": {"type": "string"}},
                     "additionalProperties": False,
                 },
-                "example": {"operation": "validation.not_null", "params": {"column": "amount"}},
+                "example": {"operation": "validation.not_null", "params": {"column_index": 1}},
             },
             {
                 "operation": "validation.non_negative",
                 "description": "Find rows where a numeric column is below zero.",
+                "column_ref": "one",
                 "params_schema": {
                     "type": "object",
-                    "properties": {"column": {"type": "string"}, "action": ACTION_SCHEMA, "name": {"type": "string"}},
-                    "required": ["column"],
+                    "properties": {**COLUMN_REFERENCE_PROPERTIES, "action": ACTION_SCHEMA, "name": {"type": "string"}},
                     "additionalProperties": False,
                 },
                 "example": {
                     "operation": "validation.non_negative",
-                    "params": {"column": "amount", "action": "drop_rows"},
+                    "params": {"column_index": 1, "action": "drop_rows"},
                 },
             },
             {
                 "operation": "validation.min",
                 "description": "Find rows where a numeric column is below a minimum value.",
+                "column_ref": "one",
                 "params_schema": {
                     "type": "object",
                     "properties": {
-                        "column": {"type": "string"},
+                        **COLUMN_REFERENCE_PROPERTIES,
                         "value": {},
                         "action": ACTION_SCHEMA,
                         "name": {"type": "string"},
                     },
-                    "required": ["column", "value"],
+                    "required": ["value"],
                     "additionalProperties": False,
                 },
-                "example": {"operation": "validation.min", "params": {"column": "amount", "value": 0}},
+                "example": {"operation": "validation.min", "params": {"column_index": 1, "value": 0}},
             },
             {
                 "operation": "validation.max",
                 "description": "Find rows where a numeric column is above a maximum value.",
+                "column_ref": "one",
                 "params_schema": {
                     "type": "object",
                     "properties": {
-                        "column": {"type": "string"},
+                        **COLUMN_REFERENCE_PROPERTIES,
                         "value": {},
                         "action": ACTION_SCHEMA,
                         "name": {"type": "string"},
                     },
-                    "required": ["column", "value"],
+                    "required": ["value"],
                     "additionalProperties": False,
                 },
-                "example": {"operation": "validation.max", "params": {"column": "amount", "value": 1000}},
+                "example": {"operation": "validation.max", "params": {"column_index": 1, "value": 1000}},
             },
             {
                 "operation": "validation.allowed_values",
                 "description": "Find rows where a value is outside an allowed set.",
+                "column_ref": "one",
                 "params_schema": {
                     "type": "object",
                     "properties": {
-                        "column": {"type": "string"},
+                        **COLUMN_REFERENCE_PROPERTIES,
                         "values": {"type": "array"},
                         "action": ACTION_SCHEMA,
                         "name": {"type": "string"},
                     },
-                    "required": ["column", "values"],
+                    "required": ["values"],
                     "additionalProperties": False,
                 },
                 "example": {
                     "operation": "validation.allowed_values",
-                    "params": {"column": "status", "values": ["open", "closed"]},
+                    "params": {"column_index": 2, "values": ["open", "closed"]},
                 },
             },
             {
                 "operation": "validation.regex",
                 "description": "Find rows where text does not match a regular expression.",
+                "column_ref": "one",
                 "params_schema": {
                     "type": "object",
                     "properties": {
-                        "column": {"type": "string"},
+                        **COLUMN_REFERENCE_PROPERTIES,
                         "value": {},
                         "action": ACTION_SCHEMA,
                         "name": {"type": "string"},
                     },
-                    "required": ["column", "value"],
+                    "required": ["value"],
                     "additionalProperties": False,
                 },
                 "example": {
                     "operation": "validation.regex",
-                    "params": {"column": "email", "value": r"^[^@]+@[^@]+$"},
+                    "params": {"column_index": 0, "value": r"^[^@]+@[^@]+$"},
                 },
             },
         ],
@@ -375,18 +393,18 @@ _CLEANING_OPERATION_GROUPS: dict[str, dict[str, Any]] = {
             {
                 "operation": "outlier.clip_iqr",
                 "description": "Clip numeric values outside IQR-derived bounds to the nearest bound.",
+                "column_ref": "many",
                 "params_schema": {
                     "type": "object",
                     "properties": {
-                        "columns": COLUMNS_SCHEMA,
+                        **COLUMN_LIST_REFERENCE_PROPERTIES,
                         "multiplier": {"type": "number", "exclusiveMinimum": 0},
                     },
-                    "required": ["columns"],
                     "additionalProperties": False,
                 },
                 "example": {
                     "operation": "outlier.clip_iqr",
-                    "params": {"columns": ["amount"], "multiplier": 1.5},
+                    "params": {"column_indexes": [1], "multiplier": 1.5},
                 },
             },
         ],
@@ -397,19 +415,19 @@ _CLEANING_OPERATION_GROUPS: dict[str, dict[str, Any]] = {
             {
                 "operation": "encoding.one_hot",
                 "description": "Expand categorical columns into deterministic one-hot indicator columns.",
+                "column_ref": "many",
                 "params_schema": {
                     "type": "object",
                     "properties": {
-                        "columns": COLUMNS_SCHEMA,
+                        **COLUMN_LIST_REFERENCE_PROPERTIES,
                         "drop_first": BOOLEAN_SCHEMA,
                         "max_categories": {"type": "integer", "minimum": 1},
                     },
-                    "required": ["columns"],
                     "additionalProperties": False,
                 },
                 "example": {
                     "operation": "encoding.one_hot",
-                    "params": {"columns": ["segment"], "drop_first": False, "max_categories": 50},
+                    "params": {"column_indexes": [2], "drop_first": False, "max_categories": 50},
                 },
             },
         ],
@@ -420,10 +438,11 @@ _CLEANING_OPERATION_GROUPS: dict[str, dict[str, Any]] = {
             {
                 "operation": "scaling.minmax",
                 "description": "Scale numeric columns into a configured feature range.",
+                "column_ref": "many",
                 "params_schema": {
                     "type": "object",
                     "properties": {
-                        "columns": COLUMNS_SCHEMA,
+                        **COLUMN_LIST_REFERENCE_PROPERTIES,
                         "feature_range": {
                             "type": "array",
                             "items": {"type": "number"},
@@ -431,55 +450,228 @@ _CLEANING_OPERATION_GROUPS: dict[str, dict[str, Any]] = {
                             "maxItems": 2,
                         },
                     },
-                    "required": ["columns"],
                     "additionalProperties": False,
                 },
                 "example": {
                     "operation": "scaling.minmax",
-                    "params": {"columns": ["amount"], "feature_range": [0, 1]},
+                    "params": {"column_indexes": [1], "feature_range": [0, 1]},
                 },
             },
             {
                 "operation": "scaling.standard",
                 "description": "Standardize numeric columns using mean and standard deviation.",
+                "column_ref": "many",
                 "params_schema": {
                     "type": "object",
-                    "properties": {"columns": COLUMNS_SCHEMA},
-                    "required": ["columns"],
+                    "properties": {**COLUMN_LIST_REFERENCE_PROPERTIES},
                     "additionalProperties": False,
                 },
-                "example": {"operation": "scaling.standard", "params": {"columns": ["amount"]}},
+                "example": {"operation": "scaling.standard", "params": {"column_indexes": [1]}},
             },
         ],
     },
 }
 
 
+# Keep the provider-facing catalog semantic without copying the verbose
+# implementation descriptions into every result.  These labels are
+# deliberately short: the full descriptions remain source-owned above, while
+# metadata only needs enough language to route an unfamiliar operation.
+_CLEANING_GROUP_SUMMARIES = {
+    "schema": "Normalize names",
+    "duplicates": "Drop duplicates",
+    "missing": "Fill/drop missing",
+    "types": "Convert types",
+    "text": "Clean text",
+    "validation": "Check values",
+    "outliers": "Clip outliers",
+    "encoding": "One-hot encode",
+    "scaling": "Scale values",
+}
+_CLEANING_OPERATION_SUMMARIES = {
+    "schema.normalize_column_names": "Normalize names",
+    "duplicate.exact_rows": "Drop duplicates",
+    "duplicate.key_columns": "Drop key duplicates",
+    "missing.fill_mean": "Fill mean",
+    "missing.fill_median": "Fill median",
+    "missing.fill_mode": "Fill mode",
+    "missing.fill_constant": "Fill constant",
+    "missing.forward_fill": "Forward-fill gaps",
+    "missing.drop_rows": "Drop missing rows",
+    "missing.drop_high_missing_columns": "Drop sparse columns",
+    "type.convert": "Convert type",
+    "text.trim": "Trim text",
+    "text.lowercase": "Lowercase",
+    "text.uppercase": "Uppercase",
+    "text.collapse_whitespace": "Collapse spaces",
+    "text.empty_to_null": "Empty to null",
+    "text.map_values": "Map text",
+    "validation.not_null": "Find nulls",
+    "validation.non_negative": "Find negatives",
+    "validation.min": "Find below min",
+    "validation.max": "Find above max",
+    "validation.allowed_values": "Find disallowed",
+    "validation.regex": "Find regex misses",
+    "outlier.clip_iqr": "Clip outliers by IQR",
+    "encoding.one_hot": "One-hot encode",
+    "scaling.minmax": "Scale to range",
+    "scaling.standard": "Standardize",
+}
+_COLUMN_INDEX_INVALIDATING_OPERATIONS = frozenset(
+    {
+        "missing.drop_high_missing_columns",
+        "encoding.one_hot",
+    }
+)
+
+
+def cleaning_operation_group_names() -> tuple[str, ...]:
+    """Return the stable, provider-advertised cleaning metadata group names."""
+
+    return tuple(_CLEANING_OPERATION_GROUPS)
+
+
 def cleaning_operation_metadata(groups: list[str] | None = None) -> dict[str, Any]:
-    selected_groups = _normalize_groups(groups)
-    group_payloads = [copy.deepcopy({"group": group, **_CLEANING_OPERATION_GROUPS[group]}) for group in selected_groups]
+    selected_groups, invalid_groups = _normalize_groups(groups)
+    payload = {
+        "column_reference": {
+            "index_base": 0,
+            "single": "column_index preferred; column_name fallback; choose one",
+            "multiple": "column_indexes preferred; column_names fallback; choose one",
+        },
+        "groups": [
+            {
+                "group": group,
+                "summary": _cleaning_group_summary(group),
+                "operations": [
+                    _compact_cleaning_operation_metadata(operation)
+                    for operation in _CLEANING_OPERATION_GROUPS[group]["operations"]
+                ],
+            }
+            for group in selected_groups
+        ],
+        "group_names": list(cleaning_operation_group_names()),
+        "operation_count": sum(len(_CLEANING_OPERATION_GROUPS[group]["operations"]) for group in selected_groups),
+    }
+    if invalid_groups:
+        payload["invalid_groups"] = [
+            {"group": group, "error_code": "unknown_group"}
+            for group in invalid_groups
+        ]
+    return payload
+
+
+def _compact_cleaning_operation_metadata(operation: dict[str, Any]) -> dict[str, Any]:
+    operation_name = str(operation.get("operation") or "")
+    params_schema = operation.get("params_schema")
+    if not isinstance(params_schema, dict):
+        return {
+            "operation": operation_name,
+            "summary": _cleaning_operation_summary(operation_name, operation),
+            "params": [],
+        }
+    properties = params_schema.get("properties")
+    if not isinstance(properties, dict):
+        properties = {}
+    required = {
+        str(name)
+        for name in params_schema.get("required", [])
+        if isinstance(name, str)
+    }
+    params: list[str] = []
+    column_ref = str(operation.get("column_ref") or "")
+    if column_ref == "one":
+        params.append("single_column")
+    elif column_ref == "many":
+        params.append("multiple_columns")
+    elif column_ref == "many_optional":
+        params.append("multiple_columns?")
+    for name, schema in properties.items():
+        if name in {
+            "column_index",
+            "column_name",
+            "column_indexes",
+            "column_names",
+        }:
+            continue
+        params.append(_compact_cleaning_parameter_signature(str(name), schema, required=name in required))
     return {
-        "groups": group_payloads,
-        "group_names": list(_CLEANING_OPERATION_GROUPS),
-        "operation_count": sum(len(group["operations"]) for group in group_payloads),
+        "operation": operation_name,
+        "summary": _cleaning_operation_summary(operation_name, operation),
+        "params": params,
     }
 
 
-def _normalize_groups(groups: list[str] | None) -> list[str]:
+def _cleaning_group_summary(group: str) -> str:
+    summary = _CLEANING_GROUP_SUMMARIES.get(group)
+    if summary:
+        return summary
+    description = _CLEANING_OPERATION_GROUPS.get(group, {}).get("description")
+    return _cleaning_summary_fallback(description, fallback="Cleaning operations")
+
+
+def _cleaning_operation_summary(operation_name: str, operation: dict[str, Any]) -> str:
+    summary = _CLEANING_OPERATION_SUMMARIES.get(operation_name)
+    if summary:
+        return summary
+    return _cleaning_summary_fallback(
+        operation.get("description"),
+        fallback="Apply a cleaning operation",
+    )
+
+
+def _cleaning_summary_fallback(value: Any, *, fallback: str) -> str:
+    normalized = re.sub(r"\s+", " ", str(value or "")).strip()
+    if not normalized:
+        return fallback
+    # Descriptions are implementation-owned and may grow; metadata remains a
+    # bounded routing hint even for a newly added operation without a map entry.
+    return normalized[:72].rstrip(" .,;:")
+
+
+def _compact_cleaning_parameter_signature(name: str, schema: Any, *, required: bool) -> str:
+    label = name if required else f"{name}?"
+    if not isinstance(schema, dict):
+        return label
+    enum = schema.get("enum")
+    if isinstance(enum, list) and enum:
+        values = "|".join(str(value) for value in enum)
+        return f"{label}: {values}"
+    value_type = schema.get("type")
+    if value_type == "array":
+        items = schema.get("items")
+        item_type = str(items.get("type") or "value") if isinstance(items, dict) else "value"
+        min_items = schema.get("minItems")
+        max_items = schema.get("maxItems")
+        if isinstance(min_items, int) and min_items == max_items:
+            return f"{label}: {item_type}[{min_items}]"
+        return f"{label}: {item_type}[]"
+    if value_type == "number":
+        minimum = schema.get("minimum")
+        maximum = schema.get("maximum")
+        if isinstance(minimum, (int, float)) and isinstance(maximum, (int, float)):
+            return f"{label}: number {minimum}..{maximum}"
+    if isinstance(value_type, str) and value_type:
+        return f"{label}: {value_type}"
+    return label
+
+
+def _normalize_groups(groups: list[str] | None) -> tuple[list[str], list[str]]:
     if not groups:
-        return list(_CLEANING_OPERATION_GROUPS)
+        return list(_CLEANING_OPERATION_GROUPS), []
     normalized: list[str] = []
+    invalid: list[str] = []
     for group in groups:
         value = str(group or "").strip()
-        if not value or value in normalized:
+        if not value or value in normalized or value in invalid:
             continue
         if value not in _CLEANING_OPERATION_GROUPS:
-            raise ValidationError(
-                "Unknown data.clean.metadata group "
-                f"'{value}'. Available groups: {', '.join(_CLEANING_OPERATION_GROUPS)}."
-            )
+            invalid.append(value)
+            continue
         normalized.append(value)
-    return normalized or list(_CLEANING_OPERATION_GROUPS)
+    if not normalized and not invalid:
+        return list(_CLEANING_OPERATION_GROUPS), []
+    return normalized, invalid
 
 
 class CleanOperation(SQLModel):
@@ -551,8 +743,22 @@ class DataCleaningService:
                 self._record_operation(started_at)
                 return CleanDatasetResult(output_path=str(source_path.resolve()), report=report)
 
+            index_reference_invalidated_by: str | None = None
             for operation in input_data.operations:
+                operation_name = str(operation.operation or "").strip()
+                if index_reference_invalidated_by and self._uses_index_reference(operation.params):
+                    raise ValidationError(
+                        f"{operation_name or 'cleaning operation'}.params cannot use column_index(es) "
+                        f"after '{index_reference_invalidated_by}' may add or remove columns in the same "
+                        "data.clean call; use column_name(s), or start a new data.query/data.clean call."
+                    )
                 frame = self._apply_operation(frame, operation, report)
+                if operation_name in _COLUMN_INDEX_INVALIDATING_OPERATIONS:
+                    # Be conservative even when the operation happens to be a
+                    # no-op (for example, one-hot skips a high-cardinality
+                    # column): the caller cannot safely know the post-op index
+                    # mapping while planning one atomic call.
+                    index_reference_invalidated_by = operation_name
 
             output_dir = self._paths.artifacts / "datasets" / "cleaned"
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -617,6 +823,13 @@ class DataCleaningService:
         if operation_name.startswith("scaling."):
             return self._apply_scaling_operation(frame, operation_name, params, report)
         raise ValidationError(f"Unsupported cleaning operation '{operation_name}'.")
+
+    @staticmethod
+    def _uses_index_reference(params: dict[str, Any]) -> bool:
+        return any(
+            key in params and params.get(key) is not None
+            for key in ("column_index", "column_indexes")
+        )
 
     def _apply_schema_operation(
         self,
@@ -1248,18 +1461,86 @@ class DataCleaningService:
         return False if keep == "false" else keep
 
     def _params_columns(self, frame: pd.DataFrame, params: dict[str, Any], operation_name: str) -> list[str]:
-        columns = params.get("columns")
-        if not isinstance(columns, list):
-            raise ValidationError(f"{operation_name}.params.columns must be a list.")
-        return self._require_columns(frame, columns, f"{operation_name}.params.columns")
+        return self._resolve_column_list_reference(
+            frame,
+            params,
+            operation_name,
+            required=True,
+        )
 
     def _params_optional_columns(self, frame: pd.DataFrame, params: dict[str, Any], operation_name: str) -> list[str]:
-        if "columns" not in params or params.get("columns") is None:
-            return [str(column) for column in frame.columns]
-        return self._params_columns(frame, params, operation_name)
+        return self._resolve_column_list_reference(
+            frame,
+            params,
+            operation_name,
+            required=False,
+        )
 
     def _params_column(self, frame: pd.DataFrame, params: dict[str, Any], operation_name: str) -> str:
-        return self._require_column(frame, str(params.get("column") or ""), f"{operation_name}.params.column")
+        active_keys = self._active_reference_keys(
+            params,
+            ("column_index", "column_name", "column"),
+        )
+        if len(active_keys) > 1:
+            raise ValidationError(
+                f"{operation_name}.params must use either column_index or column_name, not both."
+            )
+        if not active_keys:
+            raise ValidationError(f"{operation_name}.params requires column_index or column_name.")
+        key = active_keys[0]
+        if key == "column_index":
+            return self._column_at_index(
+                frame,
+                params.get(key),
+                f"{operation_name}.params.column_index",
+            )
+        return self._require_column(frame, str(params.get(key) or ""), f"{operation_name}.params.{key}")
+
+    def _resolve_column_list_reference(
+        self,
+        frame: pd.DataFrame,
+        params: dict[str, Any],
+        operation_name: str,
+        *,
+        required: bool,
+    ) -> list[str]:
+        active_keys = self._active_reference_keys(
+            params,
+            ("column_indexes", "column_names", "columns"),
+        )
+        if len(active_keys) > 1:
+            raise ValidationError(
+                f"{operation_name}.params must use either column_indexes or column_names, not both."
+            )
+        if not active_keys:
+            if required:
+                raise ValidationError(f"{operation_name}.params requires column_indexes or column_names.")
+            return [str(column) for column in frame.columns]
+        key = active_keys[0]
+        values = params.get(key)
+        if not isinstance(values, list):
+            raise ValidationError(f"{operation_name}.params.{key} must be a list.")
+        if key == "column_indexes":
+            if not values:
+                raise ValidationError(f"{operation_name}.params.column_indexes cannot be empty.")
+            return [
+                self._column_at_index(frame, value, f"{operation_name}.params.column_indexes")
+                for value in values
+            ]
+        return self._require_columns(frame, values, f"{operation_name}.params.{key}")
+
+    @staticmethod
+    def _active_reference_keys(params: dict[str, Any], keys: tuple[str, ...]) -> list[str]:
+        return [key for key in keys if key in params and params.get(key) is not None]
+
+    def _column_at_index(self, frame: pd.DataFrame, value: Any, field_name: str) -> str:
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValidationError(f"{field_name} must contain a zero-based integer column index.")
+        if value < 0 or value >= len(frame.columns):
+            raise ValidationError(
+                f"{field_name} index {value} is outside the available zero-based column range."
+            )
+        return self._require_column(frame, str(frame.columns[value]), field_name)
 
     def _require_numeric_column(self, frame: pd.DataFrame, column: str, operation_name: str) -> None:
         if not is_numeric_dtype(frame[column]) or is_bool_dtype(frame[column]):

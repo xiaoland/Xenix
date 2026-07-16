@@ -278,13 +278,15 @@ class LLMService:
                 stream = getattr(provider, "stream", None)
                 if callable(stream):
                     buffered_events = []
-                    for event in stream(messages, tools):
+                    events = stream(messages, tools)
+                    for event in events:
                         if self._is_live_tool_call_progress(event):
                             yield event
                             continue
                         buffered_events.append(event)
                 else:
-                    buffered_events = [ProviderStreamEvent(response=provider.complete(messages, tools))]
+                    response = provider.complete(messages, tools)
+                    buffered_events = [ProviderStreamEvent(response=response)]
                 yield from buffered_events
                 return
             except Exception as exc:

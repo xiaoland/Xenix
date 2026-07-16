@@ -8,6 +8,7 @@ Result.  It neither persists conversation state nor dispatches tools.
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator
@@ -92,12 +93,18 @@ class AgentHarnessService:
         provider: AgentProvider | None = None,
         llm_service: LLMService | None = None,
         dataset_service: DatasetService | None = None,
+        tool_name_scope_provider: Callable[[ConversationSnapshot], tuple[str, ...] | None] | None = None,
     ) -> None:
         self._conversation_service = conversation_service
         self._tool_presentation_registry = tool_presentation_registry
         self._provider = provider
         self._llm_service = llm_service
         self._dataset_service = dataset_service
+        # The composition root may project a bounded advertised tool set from
+        # finalized Conversation state (for example, active Agent Skills).
+        # It never receives a writer capability and the Conversation service
+        # still freezes/validates the resulting scope for each provider call.
+        self._tool_name_scope_provider = tool_name_scope_provider
         self._cancel_events: dict[str, threading.Event] = {}
         self._pending_threads: dict[str, str] = {}
         # The local maps are only a live callback aid.  No helper recurses
@@ -243,7 +250,7 @@ class AgentHarnessService:
         frontier_id: str,
     ) -> Iterator[AgentHarnessStreamEvent]:
         while True:
-            scope = ToolScope(dataset_ids=tuple(self._dataset_ids(thread_id)))
+            scope = self._sampling_tool_scope(thread_id)
             pending: PendingSampling | None = None
             active_pending_id: str | None = None
             try:
@@ -429,7 +436,33 @@ class AgentHarnessService:
         )
 
     def _dataset_ids(self, thread_id: str) -> list[str]:
+        return self._dataset_ids_from_snapshot(self.get_thread_snapshot(thread_id))
+
+    def _sampling_tool_scope(self, thread_id: str) -> ToolScope:
         snapshot = self.get_thread_snapshot(thread_id)
+        tool_names: tuple[str, ...] = ()
+        if self._tool_name_scope_provider is not None:
+            selected = self._tool_name_scope_provider(snapshot)
+            if selected is not None:
+                tool_names = self._normalize_tool_scope_names(selected)
+        return ToolScope(
+            tool_names=tool_names,
+            dataset_ids=tuple(self._dataset_ids_from_snapshot(snapshot)),
+        )
+
+    @staticmethod
+    def _normalize_tool_scope_names(names: tuple[str, ...]) -> tuple[str, ...]:
+        normalized: list[str] = []
+        for name in names:
+            if not isinstance(name, str) or not name.strip():
+                raise ValidationError("Tool scope names must be non-empty strings.")
+            value = name.strip()
+            if value not in normalized:
+                normalized.append(value)
+        return tuple(normalized)
+
+    @staticmethod
+    def _dataset_ids_from_snapshot(snapshot: ConversationSnapshot) -> list[str]:
         found: list[str] = []
         for message in snapshot.messages:
             payload = message.content_payload if isinstance(message.content_payload, dict) else None

@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -5,7 +6,12 @@ import pytest
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import ValidationError
-from xenix.services.agent.tools import AgentToolRegistry, ToolExecutionContext
+from xenix.services.agent.tools import (
+    MAX_CLEANING_REPORT_COLUMN_NAME_CHARS,
+    MAX_CLEANING_REPORT_WARNING_CHARS,
+    AgentToolRegistry,
+    ToolExecutionContext,
+)
 from xenix.services.artifact_service import ArtifactService
 from xenix.services.data_cleaning import CleanDatasetInput, DataCleaningService
 from xenix.services.data_transform import DataQueryTransformService
@@ -153,6 +159,55 @@ def test_data_cleaning_service_applies_atomic_operations(monkeypatch, tmp_path: 
     ]
 
 
+def test_data_cleaning_service_resolves_zero_based_column_indexes_and_rejects_mixed_references(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _paths, _dataset_service, cleaning_service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "indexed-columns.csv"
+    source.write_text(
+        "customer_id,amount,segment\n"
+        "1,, north \n"
+        "2,20,south\n",
+        encoding="utf-8",
+    )
+
+    result = cleaning_service.clean_dataset(
+        CleanDatasetInput(
+            source_path=str(source.resolve()),
+            name="Indexed columns",
+            operations=[
+                {"operation": "missing.fill_constant", "params": {"column_indexes": [1], "value": 0}},
+                {"operation": "text.trim", "params": {"column_indexes": [2]}},
+                {"operation": "validation.non_negative", "params": {"column_index": 1}},
+            ],
+        )
+    )
+
+    frame = _read_dataset_frame(result.output_path)
+    assert frame.to_dict(orient="records") == [
+        {"customer_id": 1, "amount": 0.0, "segment": "north"},
+        {"customer_id": 2, "amount": 20.0, "segment": "south"},
+    ]
+
+    with pytest.raises(ValidationError, match="column_indexes or column_names, not both"):
+        cleaning_service.clean_dataset(
+            CleanDatasetInput(
+                source_path=str(source.resolve()),
+                name="Mixed columns",
+                operations=[
+                    {
+                        "operation": "text.trim",
+                        "params": {"column_indexes": [2], "column_names": ["segment"]},
+                    }
+                ],
+            )
+        )
+
+
 def test_data_cleaning_service_normalizes_column_names(monkeypatch, tmp_path: Path) -> None:
     _paths, _dataset_service, cleaning_service, _artifact_service, _registry, _store = _build_runtime(
         monkeypatch,
@@ -218,6 +273,82 @@ def test_data_cleaning_service_drops_high_missing_columns(monkeypatch, tmp_path:
     assert operation_report["columns_removed"] == 1
     assert operation_report["missing_ratios"]["mostly_missing"] == 1.0
     assert operation_report["missing_ratios"]["sometimes_missing"] == pytest.approx(1 / 3)
+
+
+@pytest.mark.parametrize(
+    ("boundary_operation", "boundary_params"),
+    [
+        (
+            "missing.drop_high_missing_columns",
+            {"threshold": 0.5},
+        ),
+        (
+            "encoding.one_hot",
+            {"columns": ["segment"], "max_categories": 10},
+        ),
+    ],
+)
+def test_data_cleaning_service_rejects_stale_indexes_after_column_set_boundary(
+    monkeypatch,
+    tmp_path: Path,
+    boundary_operation: str,
+    boundary_params: dict,
+) -> None:
+    _paths, _dataset_service, cleaning_service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / f"stale-index-{boundary_operation.split('.')[0]}.csv"
+    source.write_text(
+        "id,mostly_missing,segment,amount\n"
+        "1,,A,10\n"
+        "2,,B,20\n"
+        "3,,A,30\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match=r"column_index\(es\).*new data.query/data.clean call"):
+        cleaning_service.clean_dataset(
+            CleanDatasetInput(
+                source_path=str(source.resolve()),
+                name="Stale index rejection",
+                operations=[
+                    {"operation": boundary_operation, "params": boundary_params},
+                    {"operation": "text.trim", "params": {"column_indexes": [1]}},
+                ],
+            )
+        )
+
+
+def test_data_cleaning_service_allows_name_references_after_column_set_boundary(monkeypatch, tmp_path: Path) -> None:
+    _paths, _dataset_service, cleaning_service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "name-after-boundary.csv"
+    source.write_text(
+        "id,mostly_missing,segment,amount\n"
+        "1,,A,10\n"
+        "2,,B,20\n"
+        "3,,A,30\n",
+        encoding="utf-8",
+    )
+
+    result = cleaning_service.clean_dataset(
+        CleanDatasetInput(
+            source_path=str(source.resolve()),
+            name="Name references after boundary",
+            operations=[
+                {
+                    "operation": "missing.drop_high_missing_columns",
+                    "params": {"threshold": 0.5},
+                },
+                {"operation": "text.trim", "params": {"columns": ["segment"]}},
+            ],
+        )
+    )
+
+    assert _read_dataset_frame(result.output_path).columns.tolist() == ["id", "segment", "amount"]
 
 
 def test_data_cleaning_service_clips_iqr_outliers(monkeypatch, tmp_path: Path) -> None:
@@ -401,8 +532,75 @@ def test_data_clean_tool_registers_derived_dataset_and_artifact(monkeypatch, tmp
     ]
     assert result.payload["row_count_before"] == 3
     assert result.payload["row_count_after"] == 2
+    assert result.payload["cleaning_report"]["operation_count"] == 1
     assert result.payload["cleaning_report"]["operations"][0]["operation"] == "duplicate.key_columns"
+    assert artifact.metadata_payload["cleaning_report"]["operations"][0]["columns"] == ["customer_id"]
     assert "artifact_link" not in result.payload
+
+
+def test_data_clean_tool_compacts_report_but_keeps_next_step_facts_and_full_audit(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _paths, dataset_service, _cleaning_service, artifact_service, registry, store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    long_column = "constant_" + ("x" * 100)
+    source = tmp_path / "compact-report.csv"
+    source.write_text(
+        f"segment,{long_column}\n"
+        "A,5\n"
+        "B,5\n"
+        "A,5\n",
+        encoding="utf-8",
+    )
+    source_dataset = dataset_service.register_dataset(
+        RegisterDatasetInput(
+            source_path=str(source.resolve()),
+            name="Compact report source",
+        )
+    )
+    arguments = {
+        "dataset_id": source_dataset.id,
+        "name": "Compact report result",
+        "operations": [
+            {
+                "operation": "encoding.one_hot",
+                "params": {"columns": ["segment"]},
+            },
+            {
+                "operation": "scaling.minmax",
+                "params": {"columns": [long_column], "feature_range": [2, 4]},
+            },
+        ],
+    }
+    context = _tool_context(store, "data.clean", arguments)
+
+    result = registry.execute("data.clean", arguments, context)
+    compact_report = result.payload["cleaning_report"]
+    compact_operations = compact_report["operations"]
+
+    assert compact_operations[0]["encoded_columns"] == ["segment"]
+    assert compact_operations[0]["generated_columns"] == ["segment_a", "segment_b"]
+    assert compact_operations[1]["feature_range"] == [2.0, 4.0]
+    compact_column = compact_operations[1]["columns"][0]
+    assert len(compact_column) == MAX_CLEANING_REPORT_COLUMN_NAME_CHARS
+    assert compact_column.endswith("…")
+    bounded_warning_report = registry._compact_cleaning_report(
+        {"warnings": ["warning-" + ("x" * (MAX_CLEANING_REPORT_WARNING_CHARS + 20))]}
+    )
+    assert len(bounded_warning_report["warnings"][0]) == MAX_CLEANING_REPORT_WARNING_CHARS
+    assert bounded_warning_report["warnings"][0].endswith("…")
+    assert len(json.dumps(result.payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")) < 16_000
+
+    artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
+    full_report = artifact.metadata_payload["cleaning_report"]
+    assert full_report["operations"][1]["columns"] == [long_column]
+    assert full_report["operations"][0]["columns_summary"][0]["generated_columns"] == [
+        "segment_a",
+        "segment_b",
+    ]
 
 
 def test_data_clean_tool_no_ops_reports_nothing_happened(monkeypatch, tmp_path: Path) -> None:
@@ -450,7 +648,7 @@ def test_data_clean_tool_rejects_legacy_policy_fields(monkeypatch, tmp_path: Pat
         registry.execute("data.clean", arguments, context)
 
 
-def test_data_clean_metadata_returns_operation_group_schemas(monkeypatch, tmp_path: Path) -> None:
+def test_data_clean_metadata_returns_compact_operation_catalog(monkeypatch, tmp_path: Path) -> None:
     _paths, _dataset_service, _cleaning_service, _artifact_service, registry, store = _build_runtime(
         monkeypatch,
         tmp_path,
@@ -460,6 +658,11 @@ def test_data_clean_metadata_returns_operation_group_schemas(monkeypatch, tmp_pa
 
     result = registry.execute("data.clean.metadata", arguments, context)
 
+    assert result.payload["column_reference"] == {
+        "index_base": 0,
+        "single": "column_index preferred; column_name fallback; choose one",
+        "multiple": "column_indexes preferred; column_names fallback; choose one",
+    }
     assert result.payload["group_names"] == [
         "schema",
         "duplicates",
@@ -480,6 +683,46 @@ def test_data_clean_metadata_returns_operation_group_schemas(monkeypatch, tmp_pa
     assert "missing.fill_constant" in operations
     assert "missing.drop_high_missing_columns" in operations
     assert "text.map_values" in operations
+    missing_fill_mean = next(
+        operation
+        for group in result.payload["groups"]
+        for operation in group["operations"]
+        if operation["operation"] == "missing.fill_mean"
+    )
+    assert missing_fill_mean["params"] == ["multiple_columns"]
+    assert all(
+        set(operation) == {"operation", "summary", "params"}
+        for group in result.payload["groups"]
+        for operation in group["operations"]
+    )
+    assert all(group["summary"] for group in result.payload["groups"])
+    assert result.payload["groups"][0]["summary"] == "Fill/drop missing"
+    assert result.payload["groups"][1]["summary"] == "Clean text"
+
+    partial_result = registry.execute(
+        "data.clean.metadata",
+        {"groups": ["schema", "duplicate", "missing"]},
+        context,
+    )
+    assert [group["group"] for group in partial_result.payload["groups"]] == ["schema", "missing"]
+    assert partial_result.payload["invalid_groups"] == [
+        {"group": "duplicate", "error_code": "unknown_group"}
+    ]
+    assert partial_result.payload["operation_count"] == (
+        len(partial_result.payload["groups"][0]["operations"])
+        + len(partial_result.payload["groups"][1]["operations"])
+    )
+
+    all_invalid_result = registry.execute(
+        "data.clean.metadata",
+        {"groups": ["duplicate"]},
+        context,
+    )
+    assert all_invalid_result.payload["groups"] == []
+    assert all_invalid_result.payload["invalid_groups"] == [
+        {"group": "duplicate", "error_code": "unknown_group"}
+    ]
+    assert all_invalid_result.payload["operation_count"] == 0
 
     all_result = registry.execute("data.clean.metadata", {}, context)
     all_operations = [
@@ -492,6 +735,16 @@ def test_data_clean_metadata_returns_operation_group_schemas(monkeypatch, tmp_pa
     assert "encoding.one_hot" in all_operations
     assert "scaling.minmax" in all_operations
     assert "scaling.standard" in all_operations
+    all_iqr_operation = next(
+        operation
+        for group in all_result.payload["groups"]
+        for operation in group["operations"]
+        if operation["operation"] == "outlier.clip_iqr"
+    )
+    assert all_iqr_operation["summary"] == "Clip outliers by IQR"
+    metadata_size = len(json.dumps(all_result.payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+    assert metadata_size < 4_096
+    assert metadata_size < 11_200
 
 
 def test_data_clean_tool_schema_stays_compact(monkeypatch, tmp_path: Path) -> None:
@@ -516,4 +769,17 @@ def test_data_clean_tool_schema_stays_compact(monkeypatch, tmp_path: Path) -> No
     assert set(operation_schema["properties"]) == {"operation", "params"}
     assert "enum" not in operation_schema["properties"]["operation"]
     assert "data.clean.metadata" in specs
-    assert specs["data.clean.metadata"].parameters_schema["properties"]["groups"]["items"] == {"type": "string"}
+    assert specs["data.clean.metadata"].parameters_schema["properties"]["groups"]["items"] == {
+        "type": "string",
+        "enum": [
+            "schema",
+            "duplicates",
+            "missing",
+            "types",
+            "text",
+            "validation",
+            "outliers",
+            "encoding",
+            "scaling",
+        ],
+    }

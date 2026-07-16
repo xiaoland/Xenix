@@ -6,6 +6,7 @@ import re
 import sys
 import threading
 import time
+from collections.abc import Callable
 from datetime import datetime
 from importlib import import_module
 from pathlib import Path
@@ -40,6 +41,40 @@ STARTUP_SPLASH_HOLD_MS = 2200
 STARTUP_TIMING_ENV = "XENIX_STARTUP_TIMING"
 _STARTUP_TIMING_T0 = time.perf_counter()
 StorageRecoveryAction = Literal["quarantine", "open", "exit"]
+
+# This is an advertisement policy, not a second tool registry.  The LLM
+# boundary remains the authority for registered definitions and validates the
+# frozen scope before accepting or invoking any provider Tool Call.
+_AGENT_SKILL_COMMON_TOOL_NAMES = (
+    "agent.skill.activate",
+    "agent.skill.read_reference",
+    "agent.skill.read_asset",
+    "data.query",
+)
+_AGENT_SKILL_TOOL_NAMES: dict[str, tuple[str, ...]] = {
+    "xenix-data-preprocessing": (
+        "data.integrate",
+        "data.clean",
+        "data.clean.metadata",
+        "data.tokenize",
+        "data.transform",
+        "data.feature.select",
+    ),
+    "xenix-data-analysis": (
+        "data.transform",
+        "analysis.graph",
+    ),
+    "xenix-data-modeling": (
+        "data.transform",
+        "data.feature.select",
+        "model.metadata",
+        "model.train",
+        "model.hyper_train",
+        "model.apply",
+        "model.task.query",
+        "analysis.graph",
+    ),
+}
 
 
 class TrialLockStartupExit(Exception):
@@ -311,7 +346,12 @@ def _load_runtime_imports() -> SimpleNamespace:
     )
 
 
-def _register_agent_skill_tools(registry, catalog) -> None:
+def _register_agent_skill_tools(
+    registry,
+    catalog,
+    *,
+    activated_skill_names_provider: Callable[[str], set[str]] | None = None,
+) -> None:
     """Inject concrete Skill operations into the LLM-owned tool registry.
 
     The catalog remains an application adapter.  The registry, validation and
@@ -324,29 +364,72 @@ def _register_agent_skill_tools(registry, catalog) -> None:
             activation,
             lambda arguments, _context: catalog.activate(str(arguments["name"])),
         )
+
+    def active_skill_names(context) -> set[str]:
+        if activated_skill_names_provider is None:
+            return set()
+        return set(activated_skill_names_provider(context.thread_id))
+
     all_skill_names = {skill.name for skill in catalog.list_skills()}
     for spec in catalog.resource_tool_specs(activated_skill_names=all_skill_names):
         if spec.name.endswith("read_reference"):
             implementation = lambda arguments, _context: catalog.read_reference(
-                skill_name=str(arguments["skill_name"]), path=str(arguments["path"])
+                skill_name=str(arguments["skill_name"]),
+                path=str(arguments["path"]),
+                activated_skill_names=active_skill_names(_context),
             )
         else:
             implementation = lambda arguments, _context: catalog.read_asset(
-                skill_name=str(arguments["skill_name"]), path=str(arguments["path"])
+                skill_name=str(arguments["skill_name"]),
+                path=str(arguments["path"]),
+                activated_skill_names=active_skill_names(_context),
             )
         registry.register(spec, implementation)
 
 
-def _agent_skill_context_messages(catalog, snapshot) -> list:
+def _agent_skill_activated_skill_names(snapshot) -> set[str]:
+    activation_call_ids = {
+        message.id
+        for message in snapshot.messages
+        if getattr(message, "tool_id", None) == "agent.skill.activate"
+    }
     activated: set[str] = set()
     for message in snapshot.messages:
-        if getattr(message, "tool_id", None) != "agent.skill.activate":
+        if getattr(message, "tool_call_message_id", None) not in activation_call_ids:
+            continue
+        status = getattr(message, "result_status", None)
+        if getattr(status, "value", status) != "succeeded":
             continue
         payload = getattr(message, "value_payload", None)
         if isinstance(payload, dict) and isinstance(payload.get("skill_name"), str):
             activated.add(payload["skill_name"])
+    return activated
+
+
+def _agent_skill_context_messages(catalog, snapshot) -> list:
+    activated = _agent_skill_activated_skill_names(snapshot)
     message = catalog.catalog_provider_message(activated_skill_names=activated)
     return [message] if message is not None else []
+
+
+def _agent_skill_tool_scope_names(snapshot) -> tuple[str, ...] | None:
+    """Project relevant tools after a known Skill becomes active.
+
+    The first request keeps the full registry for backward compatibility and
+    skill discovery.  Once all active skills are known to this composition
+    root, a later sampling request receives their union plus the skill
+    handoff/read tools.  An unknown active Skill deliberately falls back to
+    the full registry rather than accidentally hiding a capability.
+    """
+
+    active = _agent_skill_activated_skill_names(snapshot)
+    if not active or any(name not in _AGENT_SKILL_TOOL_NAMES for name in active):
+        return None
+    names = list(_AGENT_SKILL_COMMON_TOOL_NAMES)
+    for skill_name, skill_tools in _AGENT_SKILL_TOOL_NAMES.items():
+        if skill_name in active:
+            names.extend(skill_tools)
+    return tuple(dict.fromkeys(names))
 
 
 def _load_runtime_imports_with_events(
@@ -567,7 +650,6 @@ def build_main_window(
         llm_tool_registry = runtime.LLMToolRegistry()
         concrete_tool_registry.register_with_llm(llm_tool_registry)
         skill_catalog = runtime.AgentSkillCatalog.from_default_catalog()
-        _register_agent_skill_tools(llm_tool_registry, skill_catalog)
         conversation_service = runtime.LLMConversationService(
             session_factory=context.session_factory,
             llm_service=llm_service,
@@ -579,12 +661,20 @@ def build_main_window(
                 paths.logs / LLM_USAGE_JOURNAL_FILE_NAME
             ),
         )
+        _register_agent_skill_tools(
+            llm_tool_registry,
+            skill_catalog,
+            activated_skill_names_provider=lambda thread_id: _agent_skill_activated_skill_names(
+                conversation_service.get_thread_snapshot(thread_id)
+            ),
+        )
         conversation_service.discard_stale_pending_messages()
         agent_harness_service = runtime.AgentHarnessService(
             conversation_service=conversation_service,
             tool_presentation_registry=concrete_tool_registry,
             llm_service=llm_service,
             dataset_service=dataset_service,
+            tool_name_scope_provider=_agent_skill_tool_scope_names,
         )
         from .services.update_service import UpdateService
 

@@ -20,7 +20,12 @@ from ..artifact_service import (
     RegisterArtifactInput,
     build_artifact_uri,
 )
-from ..data_cleaning import CleanDatasetInput, DataCleaningService, cleaning_operation_metadata
+from ..data_cleaning import (
+    CleanDatasetInput,
+    DataCleaningService,
+    cleaning_operation_group_names,
+    cleaning_operation_metadata,
+)
 from ..data_tokenization import DataTokenizationService, TokenizeDatasetInput
 from ..data_transform import (
     DataQueryInput,
@@ -71,6 +76,12 @@ _MODEL_KEY_ALIAS_OVERRIDES = {
 }
 MODEL_APPLY_GRACE_SECONDS = 30.0
 MODEL_TRAIN_GRACE_SECONDS = 60.0
+MAX_CLEANING_REPORT_OPERATION_ENTRIES = 12
+MAX_CLEANING_REPORT_VALIDATION_ENTRIES = 12
+MAX_CLEANING_REPORT_WARNING_ENTRIES = 5
+MAX_CLEANING_REPORT_COLUMN_NAMES = 6
+MAX_CLEANING_REPORT_WARNING_CHARS = 240
+MAX_CLEANING_REPORT_COLUMN_NAME_CHARS = 96
 MODEL_HYPER_TRAIN_GRACE_SECONDS = 60.0
 
 
@@ -393,7 +404,10 @@ class AgentToolRegistry:
                 provider_name="data_clean",
                 description=(
                     "Create a new derived dataset by applying atomic predefined cleaning operations "
-                    "to one registered dataset. Call data.clean.metadata for operation parameter schemas."
+                    "to one registered dataset. Prefer zero-based column_index or column_indexes from "
+                    "data.query; use data.clean.metadata only for unfamiliar operations or parameters. "
+                    "After missing.drop_high_missing_columns or encoding.one_hot, use names or a new "
+                    "data.query/data.clean call before using indexes."
                 ),
                 parameters_schema={
                     "type": "object",
@@ -415,11 +429,20 @@ class AgentToolRegistry:
             spec=AgentToolSpec(
                 name="data.clean.metadata",
                 provider_name="data_clean_metadata",
-                description="Return data.clean operation groups, operation names, and parameter schemas.",
+                description=(
+                    "Return a compact data.clean operation catalog. Request only relevant groups when an "
+                    "operation or parameter is uncertain."
+                ),
                 parameters_schema={
                     "type": "object",
                     "properties": {
-                        "groups": {"type": "array", "items": {"type": "string"}},
+                        "groups": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "enum": list(cleaning_operation_group_names()),
+                            },
+                        },
                     },
                     "additionalProperties": False,
                 },
@@ -494,6 +517,8 @@ class AgentToolRegistry:
                     "Run a read-only SELECT/CTE query over registered datasets. "
                     "Pass either dataset_id for one input aliased as input, or bindings for explicit SQL aliases. "
                     "At least one input source is required. If both are present, bindings wins. "
+                    "During a cleaning pass, emit at most one data.query call per model response; batch related "
+                    "evidence in one compact query and wait for its result before any focused follow-up. "
                     "Returns bounded rows and does not create a derived dataset or artifact."
                 ),
                 parameters_schema={
@@ -1035,7 +1060,7 @@ class AgentToolRegistry:
         )
         result.payload["row_count_before"] = row_count_before
         result.payload["row_count_after"] = row_count_after
-        result.payload["cleaning_report"] = clean_result.report
+        result.payload["cleaning_report"] = self._compact_cleaning_report(clean_result.report)
         return result
 
     def _data_clean_metadata(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolExecutionResult:
@@ -1515,6 +1540,183 @@ class AgentToolRegistry:
             "_schema": {column_name: index for index, column_name in enumerate(column_names)},
             "data": data,
         }
+
+    def _compact_cleaning_report(self, report: dict[str, Any]) -> dict[str, Any]:
+        """Project full execution audit into the bounded next-call facts.
+
+        The complete report is retained in the generated artifact metadata.  A
+        provider only needs the operation sequence, aggregate effects, small
+        field samples and warnings needed to decide its next Tool call.
+        """
+
+        compact: dict[str, Any] = {}
+        for key in ("row_count_before", "row_count_after", "rows_removed", "no_op"):
+            value = report.get(key)
+            if isinstance(value, (str, int, float, bool)) or value is None:
+                compact[key] = value
+
+        operations = report.get("operations")
+        if isinstance(operations, list):
+            compact["operation_count"] = len(operations)
+            compact["operations"] = [
+                self._compact_cleaning_report_operation(item)
+                for item in operations[:MAX_CLEANING_REPORT_OPERATION_ENTRIES]
+                if isinstance(item, dict)
+            ]
+            omitted = len(operations) - len(compact["operations"])
+            if omitted:
+                compact["omitted_operation_entries"] = omitted
+
+        validation_rules = report.get("validation_rules")
+        if isinstance(validation_rules, list):
+            compact["validation_rule_count"] = len(validation_rules)
+            compact["validation_rules"] = [
+                self._compact_cleaning_validation_rule(item)
+                for item in validation_rules[:MAX_CLEANING_REPORT_VALIDATION_ENTRIES]
+                if isinstance(item, dict)
+            ]
+            omitted = len(validation_rules) - len(compact["validation_rules"])
+            if omitted:
+                compact["omitted_validation_rules"] = omitted
+
+        warnings = report.get("warnings")
+        if isinstance(warnings, list):
+            normalized_warnings = [
+                self._bounded_cleaning_text(item, MAX_CLEANING_REPORT_WARNING_CHARS)
+                for item in warnings
+                if str(item).strip()
+            ]
+            compact["warning_count"] = len(normalized_warnings)
+            if normalized_warnings:
+                compact["warnings"] = normalized_warnings[:MAX_CLEANING_REPORT_WARNING_ENTRIES]
+                omitted = len(normalized_warnings) - len(compact["warnings"])
+                if omitted:
+                    compact["omitted_warnings"] = omitted
+        return compact
+
+    def _compact_cleaning_report_operation(self, operation: dict[str, Any]) -> dict[str, Any]:
+        compact: dict[str, Any] = {}
+        name = operation.get("operation")
+        if isinstance(name, str) and name:
+            compact["operation"] = name
+        for key in (
+            "column",
+            "rows_removed",
+            "cells_filled",
+            "cells_changed",
+            "coerced_to_null",
+            "columns_changed",
+            "columns_removed",
+            "threshold",
+            "multiplier",
+            "target_type",
+            "style",
+            "ascii_lower",
+            "drop_first",
+            "max_categories",
+        ):
+            value = operation.get(key)
+            if isinstance(value, (str, int, float, bool)):
+                if key == "column":
+                    compact[key] = self._bounded_cleaning_text(
+                        value,
+                        MAX_CLEANING_REPORT_COLUMN_NAME_CHARS,
+                    )
+                else:
+                    compact[key] = value
+        feature_range = operation.get("feature_range")
+        if (
+            isinstance(feature_range, list)
+            and len(feature_range) == 2
+            and all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in feature_range)
+        ):
+            compact["feature_range"] = list(feature_range)
+        self._compact_cleaning_report_columns(compact, "columns", operation.get("columns"))
+        self._compact_cleaning_report_columns(compact, "dropped_columns", operation.get("dropped_columns"))
+        self._compact_cleaning_report_columns(compact, "evaluated_columns", operation.get("evaluated_columns"))
+        self._compact_cleaning_report_columns(
+            compact,
+            "encoded_columns",
+            operation.get("encoded_columns"),
+            include_empty=True,
+        )
+        skipped_columns = operation.get("skipped_columns")
+        if isinstance(skipped_columns, list):
+            self._compact_cleaning_report_columns(
+                compact,
+                "skipped_columns",
+                [
+                    item.get("column")
+                    for item in skipped_columns
+                    if isinstance(item, dict) and item.get("column") is not None
+                ],
+            )
+        columns_summary = operation.get("columns_summary")
+        if isinstance(columns_summary, list):
+            generated_columns: list[Any] = []
+            for summary in columns_summary:
+                if isinstance(summary, dict) and isinstance(summary.get("generated_columns"), list):
+                    generated_columns.extend(summary["generated_columns"])
+            self._compact_cleaning_report_columns(compact, "generated_columns", generated_columns)
+        for source_key, count_key in (
+            ("mapping", "renamed_column_count"),
+            ("generated_empty_names", "generated_column_name_count"),
+            ("duplicate_collisions", "duplicate_column_name_count"),
+            ("columns_summary", "column_summary_count"),
+            ("category_columns", "generated_category_column_count"),
+        ):
+            value = operation.get(source_key)
+            if isinstance(value, (list, dict)):
+                compact[count_key] = len(value)
+        return compact
+
+    def _compact_cleaning_validation_rule(self, rule: dict[str, Any]) -> dict[str, Any]:
+        compact: dict[str, Any] = {}
+        for key in ("name", "column", "operation", "action", "violations", "rows_removed"):
+            value = rule.get(key)
+            if isinstance(value, (str, int, float, bool)):
+                if key in {"name", "column"}:
+                    compact[key] = self._bounded_cleaning_text(
+                        value,
+                        MAX_CLEANING_REPORT_COLUMN_NAME_CHARS,
+                    )
+                else:
+                    compact[key] = value
+        return compact
+
+    @staticmethod
+    def _compact_cleaning_report_columns(
+        compact: dict[str, Any],
+        key: str,
+        value: Any,
+        *,
+        include_empty: bool = False,
+    ) -> None:
+        if not isinstance(value, list):
+            return
+        values = [str(item) for item in value if str(item).strip()]
+        if not values:
+            if include_empty:
+                compact[key] = []
+                compact[f"{key}_count"] = 0
+            return
+        compact[key] = [
+            AgentToolRegistry._bounded_cleaning_text(item, MAX_CLEANING_REPORT_COLUMN_NAME_CHARS)
+            for item in values[:MAX_CLEANING_REPORT_COLUMN_NAMES]
+        ]
+        compact[f"{key}_count"] = len(values)
+        omitted = len(values) - len(compact[key])
+        if omitted:
+            compact[f"omitted_{key}"] = omitted
+
+    @staticmethod
+    def _bounded_cleaning_text(value: Any, limit: int) -> str:
+        text = str(value)
+        if len(text) <= limit:
+            return text
+        if limit <= 1:
+            return text[:limit]
+        return text[: limit - 1] + "…"
 
     def _register_generated_dataset_result(
         self,

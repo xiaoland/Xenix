@@ -204,7 +204,11 @@ class OpenAICompatibleChatProvider:
         if not self._api_key:
             raise ValidationError("LLM API key is required for the OpenAI-compatible provider.")
 
-        payload = self._build_payload(messages, tools, stream=False)
+        payload = self._build_payload(
+            messages,
+            tools,
+            stream=False,
+        )
         raw = self._post_json(payload)
         return self._parse_chat_completion(raw, tools)
 
@@ -214,12 +218,18 @@ class OpenAICompatibleChatProvider:
         tools: list[_ToolDefinition],
     ):
         if not self._streaming_enabled:
-            yield ProviderStreamEvent(response=self.complete(messages, tools))
+            yield ProviderStreamEvent(
+                response=self.complete(messages, tools)
+            )
             return
         if not self._api_key:
             raise ValidationError("LLM API key is required for the OpenAI-compatible provider.")
 
-        payload = self._build_payload(messages, tools, stream=True)
+        payload = self._build_payload(
+            messages,
+            tools,
+            stream=True,
+        )
         text_parts: list[str] = []
         reasoning_parts: list[str] = []
         refusal_parts: list[str] = []

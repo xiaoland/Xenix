@@ -75,15 +75,13 @@ class AgentSkillCatalog:
             for skill in self.list_skills()
         ]
         content = (
-            "Xenix has built-in Agent Skills. Skills are dynamic prompt modules, not plugins, "
-            "script execution, filesystem access, or external extensions.\n"
-            "When the user task matches an inactive skill description, call "
-            f"`{AGENT_SKILL_ACTIVATE_TOOL_NAME}` with the skill name before proceeding. "
-            "Do not activate unrelated skills. Use the returned instructions in later reasoning. "
-            f"After activation, use `{AGENT_SKILL_READ_REFERENCE_TOOL_NAME}` or "
-            f"`{AGENT_SKILL_READ_ASSET_TOOL_NAME}` only when the activated skill lists a needed resource.\n\n"
-            "<available_agent_skills>\n"
-            f"{json.dumps(entries, ensure_ascii=False, indent=2)}\n"
+            "Xenix Agent Skills are prompt instructions only, never plugins, scripts, filesystem access, or external "
+            "extensions. For a matching inactive skill, call "
+            f"`{AGENT_SKILL_ACTIVATE_TOOL_NAME}` before proceeding; do not activate unrelated skills and follow its "
+            "returned instructions. After activation, read only a listed needed resource with "
+            f"`{AGENT_SKILL_READ_REFERENCE_TOOL_NAME}` or `{AGENT_SKILL_READ_ASSET_TOOL_NAME}`.\n"
+            "<available_agent_skills>"
+            f"{json.dumps(entries, ensure_ascii=False, separators=(',', ':'))}"
             "</available_agent_skills>"
         )
         return ProviderMessage(role="system", content=content)
@@ -190,17 +188,57 @@ class AgentSkillCatalog:
             "resources": {key: sorted(value) for key, value in skill.resources.items()},
         }
 
-    def read_reference(self, *, skill_name: str, path: str) -> dict[str, Any]:
-        return self._read_resource(kind="references", skill_name=skill_name, path=path)
+    def read_reference(
+        self,
+        *,
+        skill_name: str,
+        path: str,
+        activated_skill_names: set[str] | None = None,
+    ) -> dict[str, Any]:
+        return self._read_resource(
+            kind="references",
+            skill_name=skill_name,
+            path=path,
+            activated_skill_names=activated_skill_names,
+        )
 
-    def read_asset(self, *, skill_name: str, path: str) -> dict[str, Any]:
-        return self._read_resource(kind="assets", skill_name=skill_name, path=path)
+    def read_asset(
+        self,
+        *,
+        skill_name: str,
+        path: str,
+        activated_skill_names: set[str] | None = None,
+    ) -> dict[str, Any]:
+        return self._read_resource(
+            kind="assets",
+            skill_name=skill_name,
+            path=path,
+            activated_skill_names=activated_skill_names,
+        )
 
-    def _read_resource(self, *, kind: str, skill_name: str, path: str) -> dict[str, Any]:
+    def _read_resource(
+        self,
+        *,
+        kind: str,
+        skill_name: str,
+        path: str,
+        activated_skill_names: set[str] | None,
+    ) -> dict[str, Any]:
         normalized_skill_name = skill_name.strip()
         skill = self._skills.get(normalized_skill_name)
         if skill is None:
             raise NotFoundError(f"Agent Skill '{skill_name}' was not found.")
+
+        activated = {
+            name.strip()
+            for name in (activated_skill_names or set())
+            if isinstance(name, str) and name.strip()
+        }
+        if skill.name not in activated:
+            raise ValidationError(
+                f"Agent Skill '{skill.name}' must be activated in this Thread before reading resources.",
+                error_code="agent_skill_not_activated",
+            )
 
         normalized_path = _normalize_resource_path(path)
         resources = skill.resources.get(kind, {})
