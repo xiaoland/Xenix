@@ -66,7 +66,11 @@ def main() -> int:
     if manifest["version"] != args.version or not manifest["unsigned"]:
         raise RuntimeError("Manifest identity or unsigned boundary is invalid.")
     artifact_names = {item["name"] for item in manifest["artifacts"]}
-    immutable = [item for item in manifest["artifacts"] if item["name"] not in FEED_NAMES]
+    immutable = [
+        item
+        for item in manifest["artifacts"]
+        if item["name"] not in FEED_NAMES and "Setup" not in item["name"]
+    ]
     feeds = [item for item in manifest["artifacts"] if item["name"] in FEED_NAMES]
     setups = [item for item in manifest["artifacts"] if "Setup" in item["name"]]
     for item in immutable:
