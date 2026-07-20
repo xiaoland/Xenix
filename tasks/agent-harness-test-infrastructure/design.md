@@ -1,6 +1,7 @@
 # Minimal Agent Harness Benchmark Design
 
-The current scope lives in [packet.md](packet.md).
+The current scope lives in [packet.md](packet.md). The second non-tabular
+product case is specified in [chart-case.md](chart-case.md).
 
 ## Topology
 
@@ -13,7 +14,7 @@ flowchart LR
     H --> L[Real Conversation / Skills / Tools / LLM]
     L --> S[(Isolated product state)]
     H --> R[Raw run: events + final snapshot]
-    S --> O[Case outcome oracle]
+    S --> O[Case-owned outcome oracle]
     R --> M[Metrics collector]
     O --> J[Bounded JSON result]
     M --> J
@@ -93,9 +94,48 @@ class AgentHarnessBenchmarkResult:
     def outcome_passed(self) -> bool: ...
 ```
 
-This is not a generic scorer framework. The cleaning case owns a plain Python
-oracle returning named checks. The runner owns common timing/counting and JSON
+This is not a generic scorer framework. Each case owns a plain Python oracle
+returning named checks. The runner owns common timing/counting and JSON
 serialization. Missing provider usage stays `null`, not a misleading zero.
+
+## Second-Case Extension Boundary
+
+The April case showed that terminal output location is case-owned. A graph case
+makes that rule concrete: its product output is a registered SVG Artifact, not
+a Dataset. The runner therefore uses one small structural contract rather than
+an `Any` convention or a case-specific branch:
+
+```python
+@dataclass(frozen=True)
+class BenchmarkCaseServices:
+    datasets: BenchmarkDatasetAccess
+    artifacts: BenchmarkArtifactAccess
+
+@dataclass(frozen=True)
+class BenchmarkCaseContext:
+    snapshot: ConversationSnapshot | None
+    services: BenchmarkCaseServices
+    source_state: object | None
+    run_dataset_ids: frozenset[str]
+    runtime_home: Path
+    settings_unchanged: bool
+
+class BenchmarkCase(Protocol):
+    case_id: str
+    def validate_input(self) -> str: ...
+    def build_submission(self, *, thread_id: str, fq_model_key: str) -> SubmitUserTurnInput: ...
+    def capture_source_state(self, *, snapshot: ConversationSnapshot,
+                             services: BenchmarkCaseServices) -> object: ...
+    def assess(self, *, context: BenchmarkCaseContext) -> BenchmarkCaseAssessment: ...
+```
+
+`BenchmarkCaseServices` is deliberately narrower than the headless service
+graph: cases may read public Dataset/Artifact state, but cannot invoke Harness,
+LLM, or Tools. `BenchmarkCaseContext` prevents each new case from extending a
+long positional/keyword parameter list. The table-oriented `terminal_shape`
+metric remains nullable; an Artifact case supplies `None` rather than adding a
+chart-specific global metric. Its named product checks carry the relevant
+truth.
 
 ## Run Sequence
 
@@ -122,7 +162,7 @@ serialization. Missing provider usage stays `null`, not a misleading zero.
    successful canonical Tool Results from newest to oldest and selects the
    first referenced, readable Dataset id that was created in this isolated run
    and is not one of the attached source datasets.
-8. Run the cleaning oracle after the turn timer, recording its own elapsed time.
+8. Run the case oracle after the turn timer, recording its own elapsed time.
 9. Verify source/config identity and state confinement, then atomically write
    one sanitized JSON result for the cell.
 10. Dispose the cell's caller-owned engine/runtime in `finally`, continue to the
@@ -157,8 +197,10 @@ values, endpoints, API keys, and raw exception text are never serialized.
   the benchmark pre-creates a titled Thread through the public Harness API.
 - Output identity is a case concern, not a universal Dataset-graph inference.
   The April locator uses the latest run-created Dataset referenced by a
-  successful canonical Tool Result. It does not inspect Tool arguments, assume
-  a Tool name, traverse lineage, or sort Dataset timestamps.
+  successful canonical Tool Result. The graph locator resolves a canonical
+  result's `artifact_id` through public `ArtifactService`. Neither inspects
+  Tool arguments, follows Assistant prose, traverses lineage, or sorts
+  timestamps.
 - The large oracle can dominate CPU/memory. Its timing is excluded from Agent
   latency, uses Polars/shared tabular loading, and compares compact row
   fingerprints rather than retaining Python row objects.

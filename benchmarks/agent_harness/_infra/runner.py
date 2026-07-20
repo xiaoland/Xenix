@@ -21,17 +21,26 @@ from xenix.services.llm import FrozenLLMSettingsSource, LLMService, LLMSettings
 from xenix.services.ml.worker_settings import MLWorkerSettingsService
 from xenix.services.storage import StorageBootstrapService
 
-from .cleaning_april import AprilDineInSalesCleaningCase, BenchmarkInputError
 from .contracts import (
     AgentHarnessBenchmarkResult,
+    BenchmarkCase,
+    BenchmarkCaseAssessment,
+    BenchmarkCaseContext,
+    BenchmarkCaseServices,
     BenchmarkIdentity,
+    BenchmarkInputError,
     BenchmarkMetrics,
     BenchmarkRunStatus,
+    JudgeResult,
+    JudgeStatus,
+    SemanticVerdict,
     TokenUsage,
 )
+from .judge import judge_independence, run_judge
 
 
 LLM_SETTINGS_PATH_ENV = "XENIX_AGENT_BENCHMARK_LLM_SETTINGS_PATH"
+JUDGE_LLM_SETTINGS_PATH_ENV = "XENIX_AGENT_BENCHMARK_JUDGE_LLM_SETTINGS_PATH"
 DEFAULT_OUTPUT_DIRECTORY = Path("build") / "agent-harness-benchmarks"
 
 
@@ -47,10 +56,23 @@ class BenchmarkRun:
     persisted: bool
 
 
+@dataclass(frozen=True)
+class _JudgeConfiguration:
+    settings: LLMSettings | None = None
+    settings_sha256: str | None = None
+    model_key: str | None = None
+    setup_error: str | None = None
+
+    @property
+    def enabled(self) -> bool:
+        return self.settings is not None and self.model_key is not None and self.setup_error is None
+
+
 @dataclass
 class _StreamMeasurements:
     snapshot: Any | None = None
     source_state: Any | None = None
+    source_state_captured: bool = False
     pending_message_ids: set[str] | None = None
     provider_retry_count: int = 0
     title_event_count: int = 0
@@ -59,7 +81,7 @@ class _StreamMeasurements:
         if self.pending_message_ids is None:
             self.pending_message_ids = set()
 
-    def observe(self, event: Any, *, case: Any, dataset_service: Any) -> None:
+    def observe(self, event: Any, *, case: BenchmarkCase, services: BenchmarkCaseServices) -> None:
         pending_message_id = getattr(event, "pending_message_id", None)
         if isinstance(pending_message_id, str) and pending_message_id:
             self.pending_message_ids.add(pending_message_id)
@@ -71,11 +93,12 @@ class _StreamMeasurements:
         snapshot = getattr(event, "snapshot", None)
         if snapshot is not None:
             self.snapshot = snapshot
-            if self.source_state is None:
+            if not self.source_state_captured:
                 self.source_state = case.capture_source_state(
                     snapshot=snapshot,
-                    dataset_service=dataset_service,
+                    services=services,
                 )
+                self.source_state_captured = True
 
 
 def resolve_llm_settings_path(explicit_path: Path | None = None) -> Path:
@@ -84,6 +107,15 @@ def resolve_llm_settings_path(explicit_path: Path | None = None) -> Path:
     raw = os.environ.get(LLM_SETTINGS_PATH_ENV, "").strip()
     if not raw:
         raise BenchmarkSettingsError("missing_llm_settings")
+    return Path(raw)
+
+
+def resolve_judge_llm_settings_path(explicit_path: Path | None = None) -> Path:
+    if explicit_path is not None:
+        return explicit_path
+    raw = os.environ.get(JUDGE_LLM_SETTINGS_PATH_ENV, "").strip()
+    if not raw:
+        raise BenchmarkSettingsError("missing_judge_llm_settings")
     return Path(raw)
 
 
@@ -96,6 +128,35 @@ def load_settings_snapshot(path: Path) -> tuple[LLMSettings, str]:
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
         raise BenchmarkSettingsError("invalid_llm_settings") from None
     return settings, _sha256_file(path)
+
+
+def _load_judge_configuration(
+    *,
+    judge_settings_path: Path | None,
+    judge_model_key: str | None,
+) -> _JudgeConfiguration:
+    environment_path = os.environ.get(JUDGE_LLM_SETTINGS_PATH_ENV, "").strip()
+    requested = judge_settings_path is not None or bool(environment_path) or bool(judge_model_key and judge_model_key.strip())
+    if not requested:
+        return _JudgeConfiguration()
+    try:
+        resolved_path = resolve_judge_llm_settings_path(judge_settings_path)
+        settings, settings_sha256 = load_settings_snapshot(resolved_path)
+    except BenchmarkSettingsError as exc:
+        return _JudgeConfiguration(setup_error=f"judge_{exc.code}")
+    selected_model = (judge_model_key or settings.default_fq_model_key).strip()
+    setup_error = _model_setup_error(settings, selected_model)
+    if setup_error is not None:
+        return _JudgeConfiguration(
+            settings_sha256=settings_sha256,
+            model_key=selected_model or None,
+            setup_error=f"judge_{setup_error}",
+        )
+    return _JudgeConfiguration(
+        settings=settings,
+        settings_sha256=settings_sha256,
+        model_key=selected_model,
+    )
 
 
 def configured_model_keys(settings: LLMSettings) -> tuple[str, ...]:
@@ -136,12 +197,12 @@ def dry_run_models(
 def run_benchmark(
     *,
     settings_path: Path | None,
-    source_path: Path,
+    case: BenchmarkCase,
     output_directory: Path = DEFAULT_OUTPUT_DIRECTORY,
     requested_models: Iterable[str] | None = None,
-    case: Any | None = None,
+    judge_settings_path: Path | None = None,
+    judge_model_key: str | None = None,
 ) -> tuple[BenchmarkRun, ...]:
-    benchmark_case = case or AprilDineInSalesCleaningCase(source_path)
     identity = _repository_identity()
     try:
         resolved_settings_path = resolve_llm_settings_path(settings_path)
@@ -157,7 +218,7 @@ def run_benchmark(
             output_directory,
             (
                 _invalid_result(
-                    case_id=benchmark_case.case_id,
+                    case_id=case.case_id,
                     provider_model="unresolved",
                     identity=identity,
                     failure_kind=exc.code,
@@ -166,12 +227,17 @@ def run_benchmark(
         )
 
     model_keys = filtered_model_keys(settings, requested_models)
+    judge_configuration = _load_judge_configuration(
+        judge_settings_path=judge_settings_path,
+        judge_model_key=judge_model_key,
+    )
     try:
-        fixture_sha256 = benchmark_case.validate_input()
+        fixture_sha256 = case.validate_input()
     except BenchmarkInputError as exc:
         invalid_identity = BenchmarkIdentity(
             fixture_sha256=None,
             settings_sha256=settings_sha256,
+            judge_settings_sha256=judge_configuration.settings_sha256,
             repository_commit=identity.repository_commit,
             repository_dirty=identity.repository_dirty,
         )
@@ -179,7 +245,7 @@ def run_benchmark(
             output_directory,
             tuple(
                 _invalid_result(
-                    case_id=benchmark_case.case_id,
+                    case_id=case.case_id,
                     provider_model=model_key,
                     identity=invalid_identity,
                     failure_kind=exc.code,
@@ -191,6 +257,7 @@ def run_benchmark(
     cell_identity = BenchmarkIdentity(
         fixture_sha256=fixture_sha256,
         settings_sha256=settings_sha256,
+        judge_settings_sha256=judge_configuration.settings_sha256,
         repository_commit=identity.repository_commit,
         repository_dirty=identity.repository_dirty,
     )
@@ -198,12 +265,13 @@ def run_benchmark(
         output_directory,
         tuple(
             _run_model_cell(
-                case=benchmark_case,
+                case=case,
                 settings=settings,
                 settings_path=resolved_settings_path,
                 settings_sha256=settings_sha256,
                 model_key=model_key,
                 identity=cell_identity,
+                judge_configuration=judge_configuration,
             )
             for model_key in model_keys
         ),
@@ -212,12 +280,13 @@ def run_benchmark(
 
 def _run_model_cell(
     *,
-    case: Any,
+    case: BenchmarkCase,
     settings: LLMSettings,
     settings_path: Path,
     settings_sha256: str,
     model_key: str,
     identity: BenchmarkIdentity,
+    judge_configuration: _JudgeConfiguration,
 ) -> AgentHarnessBenchmarkResult:
     run_id = uuid4().hex
     setup_error = _model_setup_error(settings, model_key)
@@ -231,10 +300,11 @@ def _run_model_cell(
         )
 
     measurements = _StreamMeasurements()
-    metrics = BenchmarkMetrics()
+    subject_metrics = BenchmarkMetrics()
     run_status = BenchmarkRunStatus.COMPLETED
     failure_kind: str | None = None
     assessment = None
+    judge_result = JudgeResult()
     with tempfile.TemporaryDirectory(prefix="xenix-agent-benchmark-") as temporary_root:
         root = Path(temporary_root)
         paths = _benchmark_paths(root / "runtime")
@@ -254,6 +324,10 @@ def _run_model_cell(
                     paths.logs / LLM_USAGE_JOURNAL_FILE_NAME
                 ),
             )
+            case_services = BenchmarkCaseServices(
+                datasets=services.datasets,
+                artifacts=services.artifacts,
+            )
             before_dataset_ids = {dataset.id for dataset in services.datasets.list_datasets()}
             title = _synthetic_title(case.case_id, model_key, run_id)
             thread = services.harness.create_thread(title=title, fq_model_key=model_key)
@@ -266,7 +340,7 @@ def _run_model_cell(
                     measurements.observe(
                         event,
                         case=case,
-                        dataset_service=services.datasets,
+                        services=case_services,
                     )
             except Exception as exc:
                 run_status = BenchmarkRunStatus.RUNTIME_ERROR
@@ -283,26 +357,28 @@ def _run_model_cell(
                     measurements.snapshot = services.harness.get_thread_snapshot(thread_id)
                 except Exception:
                     pass
-            run_dataset_ids = {
+            run_dataset_ids = frozenset(
                 dataset.id for dataset in services.datasets.list_datasets()
-            } - before_dataset_ids
+            ) - before_dataset_ids
             try:
                 assessment_started_at = time.perf_counter()
                 assessment = case.assess(
-                    snapshot=measurements.snapshot,
-                    dataset_service=services.datasets,
-                    source_state=measurements.source_state,
-                    run_dataset_ids=run_dataset_ids,
-                    runtime_home=paths.home,
-                    settings_unchanged=_sha256_file(settings_path) == settings_sha256,
+                    context=BenchmarkCaseContext(
+                        snapshot=measurements.snapshot,
+                        source_state=measurements.source_state,
+                        run_dataset_ids=run_dataset_ids,
+                        runtime_home=paths.home,
+                        settings_unchanged=_sha256_file(settings_path) == settings_sha256,
+                        services=case_services,
+                    )
                 )
-                oracle_seconds = time.perf_counter() - assessment_started_at
-                metrics = _collect_metrics(
+                assessment_seconds = time.perf_counter() - assessment_started_at
+                subject_metrics = _collect_metrics(
                     harness=services.harness,
                     dataset_service=services.datasets,
                     snapshot=measurements.snapshot,
                     turn_seconds=turn_seconds,
-                    oracle_seconds=oracle_seconds,
+                    assessment_seconds=assessment_seconds,
                     pending_message_ids=measurements.pending_message_ids,
                     provider_retry_count=measurements.provider_retry_count,
                     terminal_shape=assessment.terminal_shape,
@@ -312,22 +388,39 @@ def _run_model_cell(
                     run_status = BenchmarkRunStatus.MEASUREMENT_ERROR
                     failure_kind = _exception_kind(exc)
                 try:
-                    metrics = _collect_metrics(
+                    subject_metrics = _collect_metrics(
                         harness=services.harness,
                         dataset_service=services.datasets,
                         snapshot=measurements.snapshot,
                         turn_seconds=turn_seconds,
-                        oracle_seconds=None,
+                        assessment_seconds=None,
                         pending_message_ids=measurements.pending_message_ids,
                         provider_retry_count=measurements.provider_retry_count,
                         terminal_shape=None,
                     )
                 except Exception:
-                    metrics = BenchmarkMetrics(
+                    subject_metrics = BenchmarkMetrics(
                         turn_seconds=turn_seconds,
                         sampling_round_count=len(measurements.pending_message_ids),
                         provider_retry_count=measurements.provider_retry_count,
                     )
+            try:
+                judge_result = _evaluate_judge(
+                    assessment=assessment,
+                    run_status=run_status,
+                    configuration=judge_configuration,
+                    subject_model_key=model_key,
+                )
+            except Exception:
+                judge_result = JudgeResult(
+                    status=JudgeStatus.PROVIDER_ERROR,
+                    provider_model=judge_configuration.model_key,
+                    independence=judge_independence(
+                        judge_model_key=judge_configuration.model_key,
+                        subject_model_key=model_key,
+                    ),
+                    summary="judge_dispatch_error",
+                )
         except Exception as exc:
             run_status = BenchmarkRunStatus.RUNTIME_ERROR
             failure_kind = _exception_kind(exc)
@@ -340,8 +433,11 @@ def _run_model_cell(
         run_id=run_id,
         provider_model=model_key,
         run_status=run_status,
-        metrics=metrics,
-        outcome_checks=assessment.checks if assessment is not None else (),
+        subject_metrics=subject_metrics,
+        semantic_verdict=_semantic_verdict(assessment=assessment, run_status=run_status, judge_result=judge_result),
+        semantic_checks=assessment.semantic_checks if assessment is not None else (),
+        integrity_checks=assessment.integrity_checks if assessment is not None else (),
+        judge=judge_result,
         identity=identity,
         failure_kind=failure_kind,
     )
@@ -353,7 +449,7 @@ def _collect_metrics(
     dataset_service: Any,
     snapshot: Any | None,
     turn_seconds: float,
-    oracle_seconds: float | None,
+    assessment_seconds: float | None,
     pending_message_ids: set[str],
     provider_retry_count: int,
     terminal_shape: tuple[int, int] | None,
@@ -374,7 +470,7 @@ def _collect_metrics(
     usage_count, token_usage = _usage_metrics(harness, snapshot)
     return BenchmarkMetrics(
         turn_seconds=turn_seconds,
-        oracle_seconds=oracle_seconds,
+        assessment_seconds=assessment_seconds,
         sampling_round_count=len(pending_message_ids),
         usage_reported_primary_response_count=usage_count,
         token_usage=token_usage,
@@ -420,6 +516,109 @@ def _usage_metrics(harness: Any, snapshot: Any | None) -> tuple[int | None, Toke
     return total_request_count, aggregate
 
 
+def _evaluate_judge(
+    *,
+    assessment: BenchmarkCaseAssessment | None,
+    run_status: BenchmarkRunStatus,
+    configuration: _JudgeConfiguration,
+    subject_model_key: str,
+) -> JudgeResult:
+    if assessment is None:
+        return JudgeResult(status=JudgeStatus.BLOCKED, summary="subject_assessment_unavailable")
+    if not assessment.judge_required:
+        return JudgeResult()
+    if run_status is not BenchmarkRunStatus.COMPLETED:
+        return _blocked_judge_result(
+            configuration=configuration,
+            subject_model_key=subject_model_key,
+            summary="subject_run_not_completed",
+        )
+    if not assessment.integrity_passed:
+        return _blocked_judge_result(
+            configuration=configuration,
+            subject_model_key=subject_model_key,
+            summary="benchmark_integrity_invalid",
+        )
+    if not assessment.semantic_checks_passed:
+        return _blocked_judge_result(
+            configuration=configuration,
+            subject_model_key=subject_model_key,
+            summary="semantic_prerequisite_failed",
+        )
+    if assessment.judge_input is None:
+        return _blocked_judge_result(
+            configuration=configuration,
+            subject_model_key=subject_model_key,
+            summary="insufficient_semantic_evidence",
+            verdict=SemanticVerdict.INCONCLUSIVE,
+        )
+    if configuration.setup_error is not None:
+        return JudgeResult(
+            status=JudgeStatus.INVALID_SETUP,
+            provider_model=configuration.model_key,
+            independence=judge_independence(
+                judge_model_key=configuration.model_key,
+                subject_model_key=subject_model_key,
+            ),
+            summary=configuration.setup_error,
+        )
+    if not configuration.enabled:
+        return JudgeResult(
+            status=JudgeStatus.NOT_CONFIGURED,
+            provider_model=configuration.model_key,
+            independence=judge_independence(
+                judge_model_key=configuration.model_key,
+                subject_model_key=subject_model_key,
+            ),
+            summary="judge_not_configured",
+        )
+    judge_llm = LLMService(FrozenLLMSettingsSource(configuration.settings))
+    return run_judge(
+        llm=judge_llm,
+        judge_input=assessment.judge_input,
+        judge_model_key=configuration.model_key,
+        subject_model_key=subject_model_key,
+    )
+
+
+def _blocked_judge_result(
+    *,
+    configuration: _JudgeConfiguration,
+    subject_model_key: str,
+    summary: str,
+    verdict: SemanticVerdict = SemanticVerdict.NOT_EVALUATED,
+) -> JudgeResult:
+    return JudgeResult(
+        status=JudgeStatus.BLOCKED,
+        verdict=verdict,
+        provider_model=configuration.model_key,
+        independence=judge_independence(
+            judge_model_key=configuration.model_key,
+            subject_model_key=subject_model_key,
+        ),
+        summary=summary,
+    )
+
+
+def _semantic_verdict(
+    *,
+    assessment: BenchmarkCaseAssessment | None,
+    run_status: BenchmarkRunStatus,
+    judge_result: JudgeResult,
+) -> SemanticVerdict:
+    if run_status is not BenchmarkRunStatus.COMPLETED or assessment is None:
+        return SemanticVerdict.NOT_EVALUATED
+    if not assessment.integrity_passed:
+        return SemanticVerdict.NOT_EVALUATED
+    if not assessment.semantic_checks:
+        return SemanticVerdict.NOT_EVALUATED
+    if not assessment.semantic_checks_passed:
+        return SemanticVerdict.FAIL
+    if assessment.judge_required:
+        return judge_result.verdict
+    return SemanticVerdict.PASS
+
+
 def _persist_all(output_directory: Path, results: Iterable[AgentHarnessBenchmarkResult]) -> tuple[BenchmarkRun, ...]:
     runs: list[BenchmarkRun] = []
     for result in results:
@@ -463,7 +662,7 @@ def _invalid_result(
         run_id=run_id or uuid4().hex,
         provider_model=provider_model,
         run_status=BenchmarkRunStatus.INVALID_SETUP,
-        metrics=BenchmarkMetrics(),
+        subject_metrics=BenchmarkMetrics(),
         identity=identity,
         failure_kind=failure_kind,
     )
@@ -506,7 +705,7 @@ def _synthetic_title(case_id: str, model_key: str, run_id: str) -> str:
 
 
 def _repository_identity() -> BenchmarkIdentity:
-    project_root = Path(__file__).resolve().parents[2]
+    project_root = Path(__file__).resolve().parents[3]
     try:
         commit = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],

@@ -12,12 +12,13 @@ This file owns objective proof and the run ledger. Scope remains
 | provider/model matrix | typed config parse, full model expansion, filter, sequential continuation, no provider injection | one result or explicit safe failure per configured model |
 | title suppression | pre-titled Thread is not initial-title eligible and emits no title event/usage | cell transcript counters contain primary work only |
 | metrics | canonical fixture snapshots cover message/Tool/status/usage/retry/missing-usage folds | result counters reconcile with public final projection |
-| output location | case locator covers valid/latest reference, source/stale/malformed/unreadable/no reference | located Dataset matches the cell's final successful reference |
+| output location | Dataset and SVG Artifact locators cover valid/latest reference, source/stale/malformed/unreadable/no reference | each case resolves its own final public product reference |
 | cleaning oracle | small frames cover correct, retained report/header, duplicates, missing/corrupt rows | April terminal data checks and direct shape/content evidence agree |
 | failure persistence | pass, outcome fail, invalid setup, runtime error, measurement error, and write failure | failing cells do not abort later matrix cells |
 | privacy/isolation | serializer denylist probes plus temp-path assertions | source/config hashes unchanged; report inspection is bounded |
 | AIMock removal | old config extra-field compatibility, settings/UI/provider/i18n regression, scoped search | real provider cells run with no development override |
 | default stability | targeted tests, `pdm run check`, default `pdm run test` | live command remains explicit and outside default tests |
+| second-case growth | shared case contract/context, registry, graph oracle, and privacy probes | chart cell uses the same real Harness/LLM matrix path as cleaning |
 
 ## Command Evidence Slots
 
@@ -32,6 +33,9 @@ Record exact commands, exit codes, and bounded findings here during execution:
 | Kimi reference cell | explicit `benchmark-agent-harness --model kimi/kimi-k2.6` | PASS, completed outcome fail | persisted bounded report; see live matrix below |
 | remaining model cells | explicit one-model sequential `benchmark-agent-harness` commands | PASS, completed outcome fail | one persisted bounded report for every other configured model |
 | default regression | `pdm run test` | PASS | 363 tests + 58 main-window tests passed; no real provider call |
+| V1.1 graph offline | `pdm run test tests/test_agent_harness_benchmark.py tests/test_analysis_graph.py` | PASS | 34 passed; Dataset and Artifact outcome locators, source/isolation, registry, CLI, privacy, and missing/foreign Artifact branches proved without a provider call |
+| V1.1 Kimi graph cell | `pdm run benchmark-agent-harness -- --case analysis.revenue_by_region_chart --model kimi/kimi-k2.6` | completed; structural baseline only | persisted bounded report; 21.5 s, 15,884 tokens, 3 rounds, 2 succeeded Tool results. Its old six checks did not prove chart/data semantics. |
+| V1.1 default regression | `pdm run test` | PASS | 369 non-UI tests and 58 UI tests passed; no real provider call |
 
 ## V1 Live Matrix (one run per configured model)
 
@@ -54,6 +58,21 @@ observations, not thresholds or statistical rankings. A bounded report scan
 across all four JSON files found zero API-key, endpoint, source/configuration
 path, prompt/data, canonical-id, Tool-payload, or workbook-name markers.
 
+## V1.1 Graph Extension Observation — Superseded as a Semantic Pass
+
+The chart cell used the committed four-row sales fixture and the same isolated
+pre-titled `provider=None` Harness path. Kimi K2.6 made two successful Tool
+calls (`data.query`, `analysis.graph`) across three sampling rounds. The final
+Artifact was structurally readable and the report remained private, but those
+facts are not a proof that it was the requested bar chart with correct values.
+
+The old checks duplicated Tool/renderer health coverage (`analysis.graph`
+already tests SVG validity) and checked graph metadata instead of artifact
+semantics. Treat this as a performance/structural observation only. The
+replacement oracle must parse final SVG accessibility semantics and compare an
+independent fixture-derived category/value map. It must not inspect Tool
+arguments or use graph metadata as truth.
+
 ## Completion Checklist
 
 | Claim | Proof |
@@ -62,7 +81,7 @@ path, prompt/data, canonical-id, Tool-payload, or workbook-name markers.
 | Real provider path | Harness `provider=None`, configured `LLMService` observed |
 | Model matrix | every configured fq model gets one fresh sequential cell |
 | Benchmark, not only test | persisted outcome + token/time/message/Tool/failure metrics |
-| Meaningful oracle | header/report rows fixed, duplicates removed, business rows preserved |
+| Meaningful oracle | cleaning data and graph Artifact outputs are each checked from final public product state |
 | Failure visibility | outcome-failing run still writes metrics/result |
 | State/privacy isolation | temp-home writes only; bounded secret-free JSON |
 | Default stability | ordinary test command remains offline and deterministic |
@@ -70,13 +89,14 @@ path, prompt/data, canonical-id, Tool-payload, or workbook-name markers.
 | Metric honesty | missing usage is null; sampling/retry/usage counts stay distinct |
 | Timing honesty | attachment-inclusive turn and oracle time separated; title task absent |
 
-No second case, repeated trials, aggregate statistics, hosted storage, generic
-scorer framework, or automated performance threshold is required for V1.
+Repeated trials, aggregate statistics, hosted storage, a generic scorer
+framework, and automated performance thresholds remain deferred.
 
 ## Run Ledger (Newest First)
 
 | Date | Scope | Result | Evidence / follow-up |
 | --- | --- | --- | --- |
+| 2026-07-20 | V1.1 second graph Artifact case | STRUCTURAL BASELINE ONLY | Formal case context and allow-listed CLI registry work, but the initial graph oracle was not semantic. Rework outcome/integrity taxonomy and re-run before treating this as a chart-quality result. |
 | 2026-07-20 | V1 implementation, real-provider matrix, and full regression | PASS | Four configured models completed and persisted reports; all outcome failures are recorded above rather than hidden. Follow up in a separate performance slice; do not overfit V1 to any one model. |
 | 2026-07-20 | AIMock removal | PASS | Removed service/settings/UI/config/fixture surface; legacy extra key compatibility and UI/i18n regressions passed. |
 | 2026-07-20 | Offline benchmark infrastructure | PASS | Shared headless composition, frozen external settings source, matrix kernel, terminal locator, oracle, privacy serializer, and focused tests completed. |
@@ -86,5 +106,6 @@ scorer framework, or automated performance threshold is required for V1.
 | 2026-07-20 | Small-first rescope | PASS | V1 remains one shared composition, one runner, one case, and AIMock removal |
 | 2026-07-19 | Benchmark research and poly-file split | PASS | Outcome-first and isolated-run lessons retained; platform abstractions deferred |
 
-The first V1 baseline is complete. A second case, repetitions, thresholds, and
-model-specific remediation remain deliberately out of scope.
+The first V1 baseline is complete. The second-case structural extension is
+complete, while its semantic outcome correction is pending. Repetitions,
+thresholds, and model-specific remediation remain deliberately out of scope.

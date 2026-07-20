@@ -77,3 +77,9 @@ guards local ownership and sequence traps.
   `tests/test_dataset_service_source_presentation.py`, and `tests/test_main.py`.
 - Deletion, migration, and bootstrap: `tests/test_repositories.py`,
   `tests/test_migrations.py`, and `tests/test_storage_bootstrap.py`.
+
+## Agent Harness Benchmark
+
+[Agent Harness Benchmark](agent-harness-benchmark.md) records the local
+evaluation boundary for real-provider benchmark cases, semantic judging,
+integrity, measurements, and the offline/live policy.

@@ -5,8 +5,9 @@ The control surface is [packet.md](packet.md). Design decisions live in
 [case-contract.md](case-contract.md), and proof/commands in
 [verification.md](verification.md).
 
-Status: **all four V1 slices complete**. Exact deterministic and live evidence
-is recorded in [verification.md](verification.md).
+Status: **five structural slices complete; graph semantic-outcome correction
+pending**. Exact deterministic and live evidence is recorded in
+[verification.md](verification.md).
 
 ## Execution Order
 
@@ -241,3 +242,47 @@ changes:
 
 Provider/model outcome failures, high token use, slow latency, or unsupported
 Tool behavior are benchmark findings, not automatic reasons to expand V1.
+
+## Slice 5 — Graph Artifact Case as an Extension Test
+
+### Objective
+
+Prove that a second benchmark case with a registered SVG Artifact terminal
+output can join the same real-provider matrix without runner knowledge of
+charts, Tool sequences, Tool arguments, or a special result schema.
+
+### Planned Addresses
+
+- `tests/agent_harness_benchmark/contracts.py` — shared case protocol,
+  assessment/context values, and input error.
+- `tests/agent_harness_benchmark/runner.py` — consume the formal contract and
+  construct a narrow public Dataset/Artifact context; remove default-April
+  source coupling.
+- `tests/agent_harness_benchmark/chart_revenue.py` plus a small committed CSV
+  fixture — fixed chart task and Artifact/SVG oracle.
+- `tests/agent_harness_benchmark/cases.py` and
+  `scripts/run_agent_harness_benchmark.py` — allow-listed CLI registry and
+  case-specific input construction.
+- `tests/test_agent_harness_benchmark.py` — extension, locator, privacy, and
+  invalid-input proofs.
+
+### Case Contract
+
+The input is a four-row `region,amount,score,date` sales table. The user asks
+for a static `Revenue by region` bar chart. The oracle requires canonical
+completion, a readable in-cell registered IMAGE/SVG Artifact referenced by a
+successful canonical result, Vega-Lite metadata matching the fixed source
+fields/row count/title, a parseable non-empty SVG bar mark, unchanged source,
+and confined state. It does not require a particular Tool sequence or request
+payload.
+
+### Slice Exit
+
+- April and graph cases execute the same runner kernel with no case-id branch.
+- A custom case needs no dummy `source_path`; only the April factory requires
+  its external hash-pinned workbook.
+- Offline tests reject missing, unreadable, source/outside-runtime, malformed,
+  and non-SVG Artifact results without leaking their identifiers or paths.
+- One Kimi K2.6 graph cell records a normal sanitized JSON observation; an
+  outcome failure remains a benchmark result unless it exposes an
+  infrastructure defect.

@@ -60,9 +60,9 @@ dist = "python scripts/build_distribution_zip.py"
 pytest = "python scripts/run_pytest.py"
 test = { composite = ["i18n-compile", "python scripts/run_pytest.py"] }
 benchmark-agent-harness = "python scripts/run_agent_harness_benchmark.py"
-check = { composite = ["agent-skills-generate", "agent-skills-check", "python -m compileall src tests scripts"] }
+check = { composite = ["agent-skills-generate", "agent-skills-check", "python -m compileall src tests benchmarks scripts"] }
 diagnostic-bundle = "python scripts/create_diagnostic_bundle.py"
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 testpaths = ["tests"]
