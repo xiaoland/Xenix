@@ -6,7 +6,7 @@ import xenix.services.llm.service as llm_service_module
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import ValidationError
 from xenix.services.llm import (
-    AimockSettings,
+    FrozenLLMSettingsSource,
     LLMDialect,
     LLMProviderConfig,
     LLMService,
@@ -15,6 +15,64 @@ from xenix.services.llm import (
     PACKAGED_TRIAL_SECRET_SOURCE,
     PackagedTrialLLMConfig,
 )
+
+
+def test_frozen_llm_settings_source_isolates_snapshot_and_loaded_settings() -> None:
+    caller_settings = LLMSettings(
+        providers=[
+            LLMProviderConfig(
+                key="benchmark",
+                base_url="https://llm.example.test",
+                api_key="benchmark-secret",
+                models=["chat"],
+                dialect_config={"nested": {"setting": "original"}},
+            )
+        ],
+        default_fq_model_key="benchmark/chat",
+    )
+    source = FrozenLLMSettingsSource(caller_settings)
+
+    caller_settings.providers[0].models.append("caller-mutated")
+    caller_settings.providers[0].dialect_config["nested"]["setting"] = "caller-mutated"
+    first_load = source.load()
+    first_load.providers[0].models.append("load-mutated")
+    first_load.providers[0].dialect_config["nested"]["setting"] = "load-mutated"
+    second_load = source.load()
+
+    assert second_load.providers[0].models == ["chat"]
+    assert second_load.providers[0].dialect_config == {"nested": {"setting": "original"}}
+    assert "benchmark-secret" not in repr(source)
+
+
+def test_frozen_llm_settings_source_builds_real_provider_and_rejects_writes() -> None:
+    source = FrozenLLMSettingsSource(
+        LLMSettings(
+            providers=[
+                LLMProviderConfig(
+                    key="benchmark",
+                    base_url="https://llm.example.test",
+                    api_key="benchmark-secret",
+                    models=["chat"],
+                    timeout_seconds=45,
+                )
+            ],
+            default_fq_model_key="benchmark/chat",
+        )
+    )
+    llm_service = LLMService(source)
+
+    provider = llm_service.build_provider()
+
+    assert provider.provider_key == "benchmark"
+    assert provider._base_url == "https://llm.example.test"
+    assert provider._api_key == "benchmark-secret"
+    assert provider._model == "chat"
+    assert provider._timeout_seconds == 45
+    with pytest.raises(ValidationError, match="read-only") as exc_info:
+        llm_service.save_settings(LLMSettings())
+    assert exc_info.value.error_code == "llm_settings_read_only"
+    assert "benchmark-secret" not in str(exc_info.value)
+    assert source.load().default_fq_model_key == "benchmark/chat"
 
 
 def test_llm_settings_persist_multi_provider_config(monkeypatch, tmp_path: Path) -> None:
@@ -180,49 +238,37 @@ def test_llm_settings_save_does_not_persist_packaged_trial_secret(monkeypatch, t
     assert '"api_key": ""' in saved
 
 
-def test_llm_settings_use_aimock_only_in_development(monkeypatch, tmp_path: Path) -> None:
+def test_llm_settings_drop_legacy_aimock_from_modern_payload(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    monkeypatch.setenv("XENIX_ENV", "development")
     paths = ensure_app_dirs(get_app_paths())
     settings_service = LLMSettingsService(paths)
-    settings_service.save(
-        LLMSettings(
-            providers=[
-                LLMProviderConfig(
-                    key="openai",
-                    base_url="https://llm.example.test",
-                    api_key="secret",
-                    models=["gpt-test", "guard-test", "title-test"],
-                )
-            ],
-            default_fq_model_key="openai/gpt-test",
-            turn_completion_guard_fq_model_key="openai/guard-test",
-            thread_title_fq_model_key="openai/title-test",
-            aimock=AimockSettings(
-                enabled=True,
-                base_url="http://127.0.0.1:4010",
-                api_key="test",
-            ),
-        )
+    settings_service.settings_path.parent.mkdir(parents=True, exist_ok=True)
+    settings_service.settings_path.write_text(
+        """{
+  "providers": [{
+    "key": "openai",
+    "base_url": "https://llm.example.test",
+    "api_key": "provider-secret",
+    "models": ["gpt-test"]
+  }],
+  "default_fq_model_key": "openai/gpt-test",
+  "aimock": {
+    "enabled": true,
+    "base_url": "http://deprecated.example.test",
+    "api_key": "deprecated-secret"
+  }
+}""",
+        encoding="utf-8",
     )
-    llm_service = LLMService(settings_service)
 
-    provider = llm_service.build_provider()
-    guard_provider = llm_service.build_turn_completion_guard_provider()
-    title_provider = llm_service.build_thread_title_provider()
+    loaded = settings_service.load()
+    settings_service.save(loaded)
+    saved = settings_service.settings_path.read_text(encoding="utf-8")
 
-    assert settings_service.is_development() is True
-    assert provider._base_url == "http://127.0.0.1:4010"
-    assert provider._api_key == "test"
-    assert provider._model == "gpt-test"
-    assert guard_provider is not None
-    assert guard_provider._base_url == "http://127.0.0.1:4010"
-    assert guard_provider._api_key == "test"
-    assert guard_provider._model == "guard-test"
-    assert title_provider is not None
-    assert title_provider._base_url == "http://127.0.0.1:4010"
-    assert title_provider._api_key == "test"
-    assert title_provider._model == "title-test"
+    assert loaded.default_fq_model_key == "openai/gpt-test"
+    assert loaded.providers[0].api_key == "provider-secret"
+    assert '"aimock"' not in saved
+    assert "deprecated-secret" not in saved
 
 
 def test_llm_service_rejects_slashes_inside_provider_or_model_keys() -> None:

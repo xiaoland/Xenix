@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..llm import AimockSettings, LLMSettings, LLMSettingsService, XenixEnvironment
+from ..llm import LLMSettings, LLMSettingsService
 
 AgentSettings = LLMSettings
 AgentSettingsService = LLMSettingsService
@@ -8,6 +8,4 @@ AgentSettingsService = LLMSettingsService
 __all__ = [
     "AgentSettings",
     "AgentSettingsService",
-    "AimockSettings",
-    "XenixEnvironment",
 ]

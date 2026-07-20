@@ -28,7 +28,6 @@ from ..build_info import BUILD_COMMIT, BUILD_COMMIT_DISPLAY
 from ..config import AppPaths
 from ..i18n import TranslationManager
 from ..services.llm import (
-    AimockSettings,
     LLMDialect,
     LLMProviderConfig,
     LLMService,
@@ -241,11 +240,6 @@ class SettingsDialog(QDialog):
         self._global_models_card_layout = QFormLayout(self._global_models_card)
         self._global_models_card_layout.setContentsMargins(12, 12, 12, 12)
 
-        self._aimock_card = QFrame()
-        self._aimock_card.setFrameShape(QFrame.StyledPanel)
-        self._aimock_card_layout = QFormLayout(self._aimock_card)
-        self._aimock_card_layout.setContentsMargins(12, 12, 12, 12)
-
         self._ml_workers_card = QFrame()
         self._ml_workers_card.setFrameShape(QFrame.StyledPanel)
         self._ml_workers_card_layout = QFormLayout(self._ml_workers_card)
@@ -266,11 +260,6 @@ class SettingsDialog(QDialog):
         self._llm_guard_model_label = QLabel()
         self._llm_thread_title_model_label = QLabel()
         self._llm_retry_attempts_label = QLabel()
-
-        self._aimock_title_label = QLabel()
-        self._aimock_enabled_label = QLabel()
-        self._aimock_base_url_label = QLabel()
-        self._aimock_api_key_label = QLabel()
 
         self._ml_workers_title_label = QLabel()
         self._ml_workers_summary_label = QLabel()
@@ -296,11 +285,6 @@ class SettingsDialog(QDialog):
         self._llm_thread_title_model_selector = QComboBox()
         self._llm_retry_attempts_input = QSpinBox()
         self._llm_retry_attempts_input.setRange(1, 20)
-
-        self._aimock_enabled_checkbox = QCheckBox()
-        self._aimock_base_url_input = QLineEdit()
-        self._aimock_api_key_input = QLineEdit()
-        self._aimock_api_key_input.setEchoMode(QLineEdit.Password)
 
         self.resize(760, 760)
         self._build_ui()
@@ -356,12 +340,6 @@ class SettingsDialog(QDialog):
         self._llm_card_layout.addRow(self._provider_timeout_label, self._provider_timeout_input)
         self._llm_card_layout.addRow(self._provider_streaming_label, self._provider_streaming_checkbox)
 
-        self._aimock_card_layout.addRow(self._aimock_title_label)
-        self._aimock_card_layout.addRow(self._aimock_enabled_label, self._aimock_enabled_checkbox)
-        self._aimock_card_layout.addRow(self._aimock_base_url_label, self._aimock_base_url_input)
-        self._aimock_card_layout.addRow(self._aimock_api_key_label, self._aimock_api_key_input)
-        self._aimock_card.setVisible(self._llm_settings_service.is_development())
-
         self._ml_workers_summary_label.setWordWrap(True)
         self._ml_workers_card_layout.addRow(self._ml_workers_title_label)
         self._ml_workers_card_layout.addRow(self._ml_workers_summary_label)
@@ -373,7 +351,6 @@ class SettingsDialog(QDialog):
         ai_layout.setSpacing(16)
         ai_layout.addWidget(self._global_models_card)
         ai_layout.addWidget(self._llm_card)
-        ai_layout.addWidget(self._aimock_card)
         ai_layout.addStretch(1)
 
         ml_workers_tab = QWidget()
@@ -428,10 +405,6 @@ class SettingsDialog(QDialog):
         self._remove_provider_button.setText(self.tr("Remove"))
         self._provider_dialect_selector.setItemText(0, self.tr("OpenAI-compatible"))
         self._refresh_provider_field_state()
-        self._aimock_title_label.setText(self.tr("AIMock"))
-        self._aimock_enabled_label.setText(self.tr("Use AIMock"))
-        self._aimock_base_url_label.setText(self.tr("AIMock base URL"))
-        self._aimock_api_key_label.setText(self.tr("AIMock API key"))
         self._ml_workers_title_label.setText(self.tr("ML workers"))
         self._ml_workers_setup_button.setText(self.tr("Add SSH worker..."))
         self._about_button.setText(self.tr("About"))
@@ -505,9 +478,6 @@ class SettingsDialog(QDialog):
             title_key=settings.thread_title_fq_model_key,
         )
         self._llm_retry_attempts_input.setValue(settings.retry_attempts)
-        self._aimock_enabled_checkbox.setChecked(settings.aimock.enabled)
-        self._aimock_base_url_input.setText(settings.aimock.base_url)
-        self._aimock_api_key_input.setText(settings.aimock.api_key)
 
     def _save_agent_settings(self) -> None:
         try:
@@ -518,11 +488,6 @@ class SettingsDialog(QDialog):
                 turn_completion_guard_fq_model_key=str(self._llm_guard_model_selector.currentData() or ""),
                 thread_title_fq_model_key=str(self._llm_thread_title_model_selector.currentData() or ""),
                 retry_attempts=self._llm_retry_attempts_input.value(),
-                aimock=AimockSettings(
-                    enabled=self._aimock_enabled_checkbox.isChecked(),
-                    base_url=self._aimock_base_url_input.text().strip(),
-                    api_key=self._aimock_api_key_input.text(),
-                ),
             )
         except Exception as exc:
             QMessageBox.warning(self, self.tr("Settings"), str(exc))

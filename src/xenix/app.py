@@ -45,38 +45,6 @@ StorageRecoveryAction = Literal["quarantine", "open", "exit"]
 # This is an advertisement policy, not a second tool registry.  The LLM
 # boundary remains the authority for registered definitions and validates the
 # frozen scope before accepting or invoking any provider Tool Call.
-_AGENT_SKILL_COMMON_TOOL_NAMES = (
-    "agent.skill.activate",
-    "agent.skill.read_reference",
-    "agent.skill.read_asset",
-    "data.query",
-)
-_AGENT_SKILL_TOOL_NAMES: dict[str, tuple[str, ...]] = {
-    "xenix-data-preprocessing": (
-        "data.integrate",
-        "data.clean",
-        "data.clean.metadata",
-        "data.tokenize",
-        "data.transform",
-        "data.feature.select",
-    ),
-    "xenix-data-analysis": (
-        "data.transform",
-        "analysis.graph",
-    ),
-    "xenix-data-modeling": (
-        "data.transform",
-        "data.feature.select",
-        "model.metadata",
-        "model.train",
-        "model.hyper_train",
-        "model.apply",
-        "model.task.query",
-        "analysis.graph",
-    ),
-}
-
-
 class TrialLockStartupExit(Exception):
     pass
 
@@ -314,6 +282,7 @@ def _load_runtime_imports() -> SimpleNamespace:
         return module
 
     agent_harness = load_module("xenix.services.agent.harness_service")
+    agent_composition = load_module("xenix.services.agent.composition")
     agent_skill_catalog = load_module("xenix.services.agent.skill_catalog")
     lazy_tools = load_module("xenix.services.agent.lazy_tools")
     artifact_service = load_module("xenix.services.artifact_service")
@@ -329,6 +298,7 @@ def _load_runtime_imports() -> SimpleNamespace:
 
     return SimpleNamespace(
         AgentHarnessService=agent_harness.AgentHarnessService,
+        build_headless_agent_services=agent_composition.build_headless_agent_services,
         AgentSkillCatalog=agent_skill_catalog.AgentSkillCatalog,
         AgentToolRegistry=lazy_tools.LazyAgentToolRegistry,
         ArtifactService=artifact_service.ArtifactService,
@@ -352,84 +322,39 @@ def _register_agent_skill_tools(
     *,
     activated_skill_names_provider: Callable[[str], set[str]] | None = None,
 ) -> None:
-    """Inject concrete Skill operations into the LLM-owned tool registry.
+    """Compatibility forwarding for historical desktop/test imports."""
 
-    The catalog remains an application adapter.  The registry, validation and
-    invocation capability remain inside the LLM boundary.
-    """
+    from .services.agent.composition import register_agent_skill_tools
 
-    activation = catalog.activation_tool_spec()
-    if activation is not None:
-        registry.register(
-            activation,
-            lambda arguments, _context: catalog.activate(str(arguments["name"])),
-        )
-
-    def active_skill_names(context) -> set[str]:
-        if activated_skill_names_provider is None:
-            return set()
-        return set(activated_skill_names_provider(context.thread_id))
-
-    all_skill_names = {skill.name for skill in catalog.list_skills()}
-    for spec in catalog.resource_tool_specs(activated_skill_names=all_skill_names):
-        if spec.name.endswith("read_reference"):
-            implementation = lambda arguments, _context: catalog.read_reference(
-                skill_name=str(arguments["skill_name"]),
-                path=str(arguments["path"]),
-                activated_skill_names=active_skill_names(_context),
-            )
-        else:
-            implementation = lambda arguments, _context: catalog.read_asset(
-                skill_name=str(arguments["skill_name"]),
-                path=str(arguments["path"]),
-                activated_skill_names=active_skill_names(_context),
-            )
-        registry.register(spec, implementation)
+    register_agent_skill_tools(
+        registry,
+        catalog,
+        activated_skill_names_provider=activated_skill_names_provider,
+    )
 
 
 def _agent_skill_activated_skill_names(snapshot) -> set[str]:
-    activation_call_ids = {
-        message.id
-        for message in snapshot.messages
-        if getattr(message, "tool_id", None) == "agent.skill.activate"
-    }
-    activated: set[str] = set()
-    for message in snapshot.messages:
-        if getattr(message, "tool_call_message_id", None) not in activation_call_ids:
-            continue
-        status = getattr(message, "result_status", None)
-        if getattr(status, "value", status) != "succeeded":
-            continue
-        payload = getattr(message, "value_payload", None)
-        if isinstance(payload, dict) and isinstance(payload.get("skill_name"), str):
-            activated.add(payload["skill_name"])
-    return activated
+    """Compatibility forwarding for historical desktop/test imports."""
+
+    from .services.agent.composition import agent_skill_activated_skill_names
+
+    return agent_skill_activated_skill_names(snapshot)
 
 
 def _agent_skill_context_messages(catalog, snapshot) -> list:
-    activated = _agent_skill_activated_skill_names(snapshot)
-    message = catalog.catalog_provider_message(activated_skill_names=activated)
-    return [message] if message is not None else []
+    """Compatibility forwarding for historical desktop/test imports."""
+
+    from .services.agent.composition import agent_skill_context_messages
+
+    return agent_skill_context_messages(catalog, snapshot)
 
 
 def _agent_skill_tool_scope_names(snapshot) -> tuple[str, ...] | None:
-    """Project relevant tools after a known Skill becomes active.
+    """Compatibility forwarding for historical desktop/test imports."""
 
-    The first request keeps the full registry for backward compatibility and
-    skill discovery.  Once all active skills are known to this composition
-    root, a later sampling request receives their union plus the skill
-    handoff/read tools.  An unknown active Skill deliberately falls back to
-    the full registry rather than accidentally hiding a capability.
-    """
+    from .services.agent.composition import agent_skill_tool_scope_names
 
-    active = _agent_skill_activated_skill_names(snapshot)
-    if not active or any(name not in _AGENT_SKILL_TOOL_NAMES for name in active):
-        return None
-    names = list(_AGENT_SKILL_COMMON_TOOL_NAMES)
-    for skill_name, skill_tools in _AGENT_SKILL_TOOL_NAMES.items():
-        if skill_name in active:
-            names.extend(skill_tools)
-    return tuple(dict.fromkeys(names))
+    return agent_skill_tool_scope_names(snapshot)
 
 
 def _load_runtime_imports_with_events(
@@ -597,84 +522,20 @@ def build_main_window(
 
         _update_startup_stage(app, splash, StartupStage.LOADING_WORKBENCH)
         step_start = time.perf_counter()
-        dataset_service = runtime.LazyServiceProxy(
-            "xenix.services.dataset_service",
-            "DatasetService",
-            context.session_factory,
-            paths,
-        )
-        data_cleaning_service = runtime.LazyServiceProxy(
-            "xenix.services.data_cleaning",
-            "DataCleaningService",
-            paths,
-        )
-        data_transform_service = runtime.LazyServiceProxy(
-            "xenix.services.data_transform",
-            "DataQueryTransformService",
-            paths,
-        )
         ml_worker_settings_service = runtime.MLWorkerSettingsService(paths)
-        ml_task_service = runtime.LazyServiceProxy(
-            "xenix.services.ml_task_service",
-            "MLTaskService",
-            context.session_factory,
-            paths,
-            worker_settings_service=ml_worker_settings_service,
-        )
-        ml_service = runtime.MLService(
-            paths=paths,
-            session_factory=context.session_factory,
-            dataset_service=dataset_service,
-            ml_task_service=ml_task_service,
-        )
-        artifact_service = runtime.ArtifactService(context.session_factory)
-        dataset_export_service = runtime.DatasetExportService(
-            paths=paths,
-            dataset_service=dataset_service,
-            artifact_service=artifact_service,
-        )
-        link_router = runtime.LinkRouter(
-            artifact_service=artifact_service,
-        )
         llm_settings_service = runtime.LLMSettingsService(paths)
         llm_service = runtime.LLMService(llm_settings_service)
-        concrete_tool_registry = runtime.AgentToolRegistry(
+        agent_services = runtime.build_headless_agent_services(
             paths=paths,
-            dataset_service=dataset_service,
-            data_cleaning_service=data_cleaning_service,
-            data_transform_service=data_transform_service,
-            ml_service=ml_service,
-            artifact_service=artifact_service,
-            dataset_export_service=dataset_export_service,
-        )
-        llm_tool_registry = runtime.LLMToolRegistry()
-        concrete_tool_registry.register_with_llm(llm_tool_registry)
-        skill_catalog = runtime.AgentSkillCatalog.from_default_catalog()
-        conversation_service = runtime.LLMConversationService(
             session_factory=context.session_factory,
-            llm_service=llm_service,
-            tool_registry=llm_tool_registry,
-            context_messages_provider=lambda snapshot: _agent_skill_context_messages(
-                skill_catalog, snapshot
-            ),
+            llm=llm_service,
+            ml_worker_settings=ml_worker_settings_service,
             usage_observability=LocalLLMUsageObservability(
                 paths.logs / LLM_USAGE_JOURNAL_FILE_NAME
             ),
         )
-        _register_agent_skill_tools(
-            llm_tool_registry,
-            skill_catalog,
-            activated_skill_names_provider=lambda thread_id: _agent_skill_activated_skill_names(
-                conversation_service.get_thread_snapshot(thread_id)
-            ),
-        )
-        conversation_service.discard_stale_pending_messages()
-        agent_harness_service = runtime.AgentHarnessService(
-            conversation_service=conversation_service,
-            tool_presentation_registry=concrete_tool_registry,
-            llm_service=llm_service,
-            dataset_service=dataset_service,
-            tool_name_scope_provider=_agent_skill_tool_scope_names,
+        link_router = runtime.LinkRouter(
+            artifact_service=agent_services.artifacts,
         )
         from .services.update_service import UpdateService
 
@@ -687,14 +548,14 @@ def build_main_window(
             log_path=log_path,
             db_path=runtime.database_path(paths),
             translation_manager=translation_manager,
-            agent_harness_service=agent_harness_service,
+            agent_harness_service=agent_services.harness,
             llm_service=llm_service,
             llm_settings_service=llm_settings_service,
             ml_worker_settings_service=ml_worker_settings_service,
-            artifact_service=artifact_service,
+            artifact_service=agent_services.artifacts,
             link_router=link_router,
-            dataset_service=dataset_service,
-            ml_service=ml_service,
+            dataset_service=agent_services.datasets,
+            ml_service=agent_services.ml,
             update_service=update_service,
         )
         _emit_startup_timing("main_window.construct", step_start)

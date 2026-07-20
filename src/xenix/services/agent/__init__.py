@@ -30,7 +30,6 @@ _EXPORTS = {
     "AgentSkillCatalog": ".skill_catalog",
     "AgentSettings": ".settings",
     "AgentSettingsService": ".settings",
-    "AimockSettings": ".settings",
     "LLMDialect": "..llm",
     "LLMModelOption": "..llm",
     "LLMProviderConfig": "..llm",
@@ -38,6 +37,8 @@ _EXPORTS = {
     "LLMSettings": "..llm",
     "LLMSettingsService": "..llm",
     "AgentToolRegistry": ".tools",
+    "HeadlessAgentServices": ".composition",
+    "build_headless_agent_services": ".composition",
     "ToolPresentation": ".tool_presentations",
     "tool_presentation_for_name": ".tool_presentations",
 }

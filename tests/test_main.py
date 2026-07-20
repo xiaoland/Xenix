@@ -1,4 +1,3 @@
-import json
 import sqlite3
 import threading
 import time
@@ -450,7 +449,6 @@ def test_main_window_keeps_settings_entry_on_thread_detail_view_shell(monkeypatc
 
         assert window._settings_dialog is not None
         assert window._settings_dialog.isVisible()
-        assert window._settings_dialog._aimock_card.isHidden() is True
         window._settings_dialog._open_about_dialog()
         app.processEvents()
 
@@ -2492,79 +2490,3 @@ def test_svg_artifact_preview_rasterizes_on_white_background(monkeypatch, tmp_pa
     corner = image.pixelColor(0, 0)
     assert corner.alpha() == 255
     assert (corner.red(), corner.green(), corner.blue()) == (255, 255, 255)
-
-
-def test_main_window_uses_aimock_settings_in_development(monkeypatch, tmp_path: Path) -> None:
-    runtime_home = tmp_path / "xenix-home"
-    streamed_text = "AIMock streamed this response."
-    captured_urls: list[str] = []
-    captured_payload: dict[str, object] = {}
-
-    class FakeAIMockSSE:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb) -> None:
-            return None
-
-        def __iter__(self):
-            chunks = [
-                {"choices": [{"delta": {"content": "AIMock streamed "}}]},
-                {"choices": [{"delta": {"content": "this response."}}]},
-            ]
-            for chunk in chunks:
-                yield f"data: {json.dumps(chunk)}\n\n".encode("utf-8")
-            yield b"data: [DONE]\n\n"
-
-    def fake_urlopen(http_request, timeout):
-        captured_urls.append(http_request.full_url)
-        captured_payload.update(json.loads(http_request.data.decode("utf-8")))
-        return FakeAIMockSSE()
-
-    monkeypatch.setattr("xenix.services.agent.providers.request.urlopen", fake_urlopen)
-    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
-    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
-    monkeypatch.setenv("XENIX_ENV", "development")
-
-    app, window = build_main_window(show=True)
-    try:
-        window._open_settings()
-        settings = window._settings_dialog
-        assert settings is not None
-        assert settings._aimock_card.isVisibleTo(settings)
-
-        settings._provider_models_input.setPlainText("mock-model")
-        settings._store_current_provider_fields()
-        settings._refresh_model_selectors(default_key="openai/mock-model")
-        settings._aimock_enabled_checkbox.setChecked(True)
-        settings._aimock_base_url_input.setText("http://aimock.local")
-        settings._aimock_api_key_input.setText("test-aimock")
-        settings._save_button.click()
-        app.processEvents()
-
-        window._submit_chat_message("Use AIMock.", [], window._thread_detail_view.selected_fq_model_key())
-        for _ in range(100):
-            app.processEvents()
-            if captured_urls and not window._thread_detail_view._running:
-                break
-            time.sleep(0.01)
-
-        assert window._thread_detail_view._running is False
-        assert captured_urls == ["http://aimock.local/v1/chat/completions"]
-        assert captured_payload["stream"] is True
-        assert captured_payload["model"] == "mock-model"
-        assistant_texts = [
-            str(block.get("text", ""))
-            for index in range(window._thread_detail_view._message_layout.count())
-            if (item := window._thread_detail_view._message_layout.itemAt(index)) is not None
-            and (bubble := item.widget()) is not None
-            and getattr(getattr(bubble, "_card", None), "objectName", lambda: "")() == "chatMessageAssistant"
-            for block in getattr(bubble, "_blocks", [])
-                if block.get("type") in {"text", "markdown"}
-        ]
-
-        assert streamed_text in assistant_texts
-    finally:
-        if window._settings_dialog is not None:
-            window._settings_dialog.close()
-        window.close()
