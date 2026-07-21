@@ -167,7 +167,7 @@ class AgentToolRegistry:
     def tool_presentation(self, tool_name: str) -> ToolPresentation:
         tool = self._tools.get(tool_name)
         if tool is None:
-            return DEFAULT_TOOL_PRESENTATION
+            return tool_presentation_for_name(tool_name)
         return tool.presentation
 
     def execute(

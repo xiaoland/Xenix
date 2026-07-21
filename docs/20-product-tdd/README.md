@@ -42,6 +42,7 @@ migration, observability, and recovery belong in
 | [Artifact links](artifact-links.md) | Producing services, Agent Harness, Chatbot UI, LinkRouter, and ArtifactService | Dataset ids, artifact ids, or local paths become interchangeable and unsafe. |
 | [LLM conversation boundary](llm-conversation-boundary.md) | Chatbot UI, Agent Harness, LLMConversationService, providers, Tool implementations, and DatasetService | A reverse dependency, second writer, or persistent execution authority reappears. |
 | [ML task lifecycle](ml-task-lifecycle.md) | Agent tools, ML services, persistence, workers, and UI | Task state, placement, finalization, and result ownership diverge. |
+| [Knowledge Base boundary](knowledge-base-boundary.md) | Knowledge Workspace, import/OCR services, storage, ArtifactService, Agent tools, and packaging | Parsed content, search projections, citations, or paths acquire competing authority. |
 | [Architecture decisions](adr/README.md) | Units affected by each accepted decision | Rationale and compatibility consequences are lost or silently rewritten. |
 
 ## Verification

@@ -27,6 +27,18 @@ def artifact_apply_root(paths: AppPaths) -> Path:
     return paths.artifacts / "apply"
 
 
+def knowledge_root(paths: AppPaths) -> Path:
+    return paths.artifacts / "knowledge"
+
+
+def knowledge_objects_root(paths: AppPaths) -> Path:
+    return knowledge_root(paths) / "objects"
+
+
+def knowledge_staging_root(paths: AppPaths) -> Path:
+    return knowledge_root(paths) / "staging"
+
+
 def ml_task_parent_root(paths: AppPaths) -> Path:
     return paths.artifacts / "ml-tasks"
 
@@ -74,5 +86,7 @@ def ensure_storage_layout(paths: AppPaths) -> None:
         artifact_training_root(paths),
         artifact_apply_root(paths),
         ml_task_parent_root(paths),
+        knowledge_objects_root(paths),
+        knowledge_staging_root(paths),
     ):
         directory.mkdir(parents=True, exist_ok=True)

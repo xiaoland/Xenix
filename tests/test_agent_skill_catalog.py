@@ -139,6 +139,47 @@ def test_modeling_skill_scope_keeps_its_result_explanation_tool() -> None:
     assert scope is not None
     assert "model.train" in scope
     assert "analysis.graph" in scope
+    assert "knowledge.lookup" in scope
+
+
+def test_default_data_skills_integrate_knowledge_without_a_standalone_skill() -> None:
+    skills = {
+        skill.name: skill
+        for skill in AgentSkillCatalog.from_default_catalog().list_skills()
+    }
+
+    assert "xenix-knowledge-retrieval" not in skills
+    assert {
+        "xenix-data-analysis",
+        "xenix-data-preprocessing",
+        "xenix-data-modeling",
+    } <= set(skills)
+    assert all(
+        "`knowledge.lookup`" in skills[name].body
+        for name in (
+            "xenix-data-analysis",
+            "xenix-data-preprocessing",
+            "xenix-data-modeling",
+        )
+    )
+    analysis = skills["xenix-data-analysis"].body
+    assert "what the Knowledge Library claims" in analysis
+    assert "what the current data computes" in analysis
+    assert "what conclusion or action follows" in analysis
+    assert "Knowledge-context layer" in analysis
+    plan = json.loads(
+        skills["xenix-data-analysis"].resources["assets"][
+            "assets/analysis-plan-template.json"
+        ]
+    )
+    assert plan["version"] == "0.4.0"
+    assert plan["knowledge_context"]["requested_mode"] == "auto"
+    assert "knowledge_lookup" in plan["tool_plan"]
+    report = skills["xenix-data-analysis"].resources["assets"][
+        "assets/management-report-template.md"
+    ]
+    assert "知识库内容是带来源的主张，不是当前数据计算结果" in report
+    assert "当前数据的主要发现" in report
 
 
 def test_skill_resource_reads_require_activation_in_the_same_thread(monkeypatch, tmp_path: Path) -> None:

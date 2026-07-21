@@ -21,24 +21,45 @@ registry and no second case-specific test implementation.
 
 A case owns its business intent, fixture validation, submission, terminal
 output location, privacy-reviewed evidence projection, and rubric identity.
-It must not require a prescribed Tool trace, Assistant prose, chart grammar,
-or golden output. The regional-sales graph case, for example, accepts an
+It must not require a prescribed Tool trace, exact Assistant wording, chart
+grammar, or golden output. It may grade the semantic content of the terminal
+answer when that is the user's requested deliverable. The regional-sales graph
+case, for example, accepts an
 appropriate presentation form rather than bars, a title, or a particular axis
 layout.
+
+A case may prepare isolated product state through a narrow public-service seam.
+Preparation runs once per cell after the production headless graph and Thread
+exist, but before subject timing begins. The rainy-season case uses this seam
+to index its rule in the cell's global Knowledge Library; it does not add a
+per-Thread enablement state or alter the production conversation boundary.
+
+Knowledge-plus-data cases judge the Agent's final answer surfaces: terminal Assistant
+content and the public Datasets, Artifacts, or charts it actually delivered. Tool
+Calls and ToolResults are execution telemetry, not semantic pass criteria; they may
+diagnose a failure but cannot make a case pass. The rainy-season case therefore
+requires the exact derived Dataset linked to the attached source without inspecting
+whether or how the Agent called `knowledge.lookup`; it also checks the terminal answer
+for the governing rule and the exact SKU/quantity actions without prescribing wording
+or formatting. Cases whose answer is primarily insight or advice evaluate the
+terminal answer against bounded fixture facts and an explicit rubric, using the Judge
+only when deterministic checks cannot express the semantic requirement.
 
 ## Evidence and Judge Boundary
 
 Each judge-enabled case supplies only a bounded packet of user intent,
-independent fixture facts, and final public Dataset/Artifact semantics. For a
-text-only judge, graph evidence is a semantic projection such as visible text
-and accessibility labels, not pixels or raw SVG. It may assess task fulfilment,
-factual grounding, and semantic comprehensibility, but not visual aesthetics.
+independent fixture facts, final public Dataset/Artifact semantics, and—only
+when the rubric grades it—the terminal Assistant answer. For a text-only judge,
+graph evidence is a semantic projection such as visible text and accessibility
+labels, not pixels or raw SVG. It may assess task fulfilment, factual grounding,
+and semantic comprehensibility, but not visual aesthetics.
 
 Evidence is untrusted content. It must be delimited and treated as data, and
-must exclude transcripts, Tool arguments/results, Assistant prose, raw fixture
-rows, raw artifacts, internal identifiers, paths, provider metadata, and
-credentials. Persist only bounded verdict scores and reason codes; discard raw
-judge prompts, responses, and errors.
+must exclude transcripts, intermediate Assistant content, Tool arguments/results,
+raw fixture rows, raw artifacts, internal identifiers, paths, provider metadata,
+and credentials. A terminal answer included for a matching rubric is a bounded
+final-output projection, never the conversation transcript. Persist only bounded
+verdict scores and reason codes; discard raw judge prompts, responses, and errors.
 
 The judge is a rubric-based, pointwise evaluator after the subject cell has
 settled. Its configuration is explicit and separate from the subject matrix;

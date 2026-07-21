@@ -13,7 +13,7 @@ description: >-
   xenix-data-modeling after the data is ready.
 license: MIT
 metadata:
-  version: "0.3.0"
+  version: "0.4.0"
   product: "Xenix"
   language: "zh-CN"
   runtime: "tool-only; no script execution"
@@ -30,6 +30,15 @@ Use only the advertised Xenix tools; there is no script or filesystem runtime.
 3. Do not drop meaningful rows or columns, merge business categories, change grain, or choose an ambiguous target without explaining it or asking first.
 4. Preserve business meaning. Keep role binding explicit: target, partial_target, feature, exclusions, and reasons.
 5. Hand off reporting/charts to `xenix-data-analysis`, and training/scoring to `xenix-data-modeling`, after preparation is clear.
+
+## Knowledge-Sensitive Cleaning
+
+Use `knowledge.lookup` when saved business taxonomy, field meaning, missing-value
+semantics, or category rules could materially change a cleaning decision. Use one
+compact business-language query and prefer `mode: "auto"`. A retrieved excerpt is a
+source claim: it cannot by itself authorize dropping records, merging categories,
+changing grain, or treating missing data as a particular business state. Explain a
+conflict or ask the user when it would change the derived dataset.
 
 ## Efficient Cleaning Path
 

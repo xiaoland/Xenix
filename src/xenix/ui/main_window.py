@@ -48,7 +48,9 @@ from .settings_dialog import SettingsDialog
 from .tool_call_detail_view import ToolCallDetailView
 
 if TYPE_CHECKING:
+    from ..services.knowledge_import_service import KnowledgeImportService
     from ..services.ml_service import MLService
+    from ..services.paddle_ocr_service import PaddleOcrDeploymentService
     from ..services.update_service import UpdateService
 
 
@@ -102,6 +104,8 @@ class MainWindow(QMainWindow):
         dataset_service: DatasetService,
         ml_service: MLService,
         update_service: UpdateService | None = None,
+        knowledge_import_service: KnowledgeImportService | None = None,
+        paddle_ocr_deployment: PaddleOcrDeploymentService | None = None,
     ) -> None:
         super().__init__()
         self._paths = paths
@@ -117,6 +121,8 @@ class MainWindow(QMainWindow):
         self._dataset_service = dataset_service
         self._ml_service = ml_service
         self._update_service = update_service
+        self._knowledge_import_service = knowledge_import_service
+        self._paddle_ocr_deployment = paddle_ocr_deployment
         self._agent_thread_id: str | None = None
         self._active_pending_message_id: str | None = None
         self._active_submission_id: str | None = None
@@ -125,6 +131,7 @@ class MainWindow(QMainWindow):
         self._cancelled_pending_message_ids: set[str] = set()
         self._paused_thread_ids: set[str] = set()
         self._settings_dialog: SettingsDialog | None = None
+        self._knowledge_workspace = None
         self._tool_call_detail_views: list[ToolCallDetailView] = []
         self._thread_title_progress_dialog: QProgressDialog | None = None
         self._service_link_progress_dialog: QProgressDialog | None = None
@@ -133,6 +140,8 @@ class MainWindow(QMainWindow):
         self._title_label = QLabel(parent=self)
         self._settings_button = QPushButton(parent=self)
         self._settings_button.clicked.connect(self._open_settings)
+        self._knowledge_button = QPushButton(parent=self)
+        self._knowledge_button.clicked.connect(self._open_knowledge_workspace)
 
         self._history_sidebar = QFrame(parent=self)
         self._history_sidebar.setObjectName("historySidebar")
@@ -197,8 +206,10 @@ class MainWindow(QMainWindow):
         header_layout.setSpacing(12)
         emphasize_label(self._title_label, point_delta=2)
         self._settings_button.setMinimumWidth(96)
+        self._knowledge_button.setMinimumWidth(112)
         header_layout.addWidget(self._title_label)
         header_layout.addStretch(1)
+        header_layout.addWidget(self._knowledge_button)
         header_layout.addWidget(self._settings_button)
         layout.addLayout(header_layout)
 
@@ -238,12 +249,15 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(self.tr("Xenix Native"))
         self._title_label.setText(self.tr("Xenix"))
         self._settings_button.setText(self.tr("Settings"))
+        self._knowledge_button.setText(self.tr("Knowledge"))
         self._history_label.setText(self.tr("History"))
         self._new_thread_button.setText("")
         self._new_thread_button.setToolTip(self.tr("New thread"))
         self._thread_detail_view.retranslate_ui()
         if self._settings_dialog is not None:
             self._settings_dialog.retranslate_ui()
+        if self._knowledge_workspace is not None:
+            self._knowledge_workspace.retranslate_ui()
         self._retranslate_service_link_progress()
         self._sync_model_picker_options()
 
@@ -301,6 +315,26 @@ class MainWindow(QMainWindow):
         self._settings_dialog.show()
         self._settings_dialog.raise_()
         self._settings_dialog.activateWindow()
+
+    def _open_knowledge_workspace(self) -> None:
+        if self._knowledge_import_service is None or self._paddle_ocr_deployment is None:
+            QMessageBox.warning(
+                self,
+                self.tr("Knowledge Workspace"),
+                self.tr("Knowledge services are not available."),
+            )
+            return
+        if self._knowledge_workspace is None:
+            from .knowledge_workspace import KnowledgeWorkspaceDialog
+
+            self._knowledge_workspace = KnowledgeWorkspaceDialog(
+                import_service=self._knowledge_import_service,
+                ocr_deployment=self._paddle_ocr_deployment,
+                parent=self,
+            )
+        self._knowledge_workspace.show()
+        self._knowledge_workspace.raise_()
+        self._knowledge_workspace.activateWindow()
 
     def _submit_chat_message(self, text: str, file_paths: list[str], fq_model_key: str) -> None:
         if self._pending_composer_submission is not None or self._active_pending_message_id is not None:

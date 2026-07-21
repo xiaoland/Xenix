@@ -9,7 +9,7 @@ from sqlmodel import SQLModel
 from ...exceptions import ValidationError
 from . import models  # noqa: F401
 
-CURRENT_SCHEMA_VERSION = 15
+CURRENT_SCHEMA_VERSION = 17
 
 
 def get_user_version(engine: Engine) -> int:
@@ -25,6 +25,7 @@ def set_user_version(engine: Engine, version: int) -> None:
 def bootstrap_current_schema(engine: Engine) -> int:
     SQLModel.metadata.create_all(engine)
     _ensure_v15_triggers(engine)
+    _ensure_v16_knowledge_fts(engine)
     set_user_version(engine, CURRENT_SCHEMA_VERSION)
     return CURRENT_SCHEMA_VERSION
 
@@ -1101,6 +1102,51 @@ def migrate_v14_to_v15(engine: Engine) -> int:
     return 15
 
 
+def _ensure_v16_knowledge_fts(engine: Engine) -> None:
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_unit_fts USING fts5("
+            "unit_id UNINDEXED, title, search_text, tokenize='unicode61')"
+        )
+
+
+def migrate_v15_to_v16(engine: Engine) -> int:
+    with engine.begin() as connection:
+        SQLModel.metadata.create_all(connection)
+        connection.exec_driver_sql(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_unit_fts USING fts5("
+            "unit_id UNINDEXED, title, search_text, tokenize='unicode61')"
+        )
+        connection.exec_driver_sql("PRAGMA user_version=16")
+    return 16
+
+
+def migrate_v16_to_v17(engine: Engine) -> int:
+    with engine.begin() as connection:
+        columns = {str(row[1]) for row in connection.exec_driver_sql("PRAGMA table_info(knowledge_document)")}
+        if "source_sha256" not in columns:
+            connection.exec_driver_sql("ALTER TABLE knowledge_document ADD COLUMN source_sha256 VARCHAR")
+        if "source_format" not in columns:
+            connection.exec_driver_sql("ALTER TABLE knowledge_document ADD COLUMN source_format VARCHAR")
+        if "canonical_path" not in columns:
+            connection.exec_driver_sql("ALTER TABLE knowledge_document ADD COLUMN canonical_path VARCHAR")
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_knowledge_document_source_sha256 "
+            "ON knowledge_document (source_sha256)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_knowledge_document_source_format "
+            "ON knowledge_document (source_format)"
+        )
+        connection.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_knowledge_document_library_source_sha256 "
+            "ON knowledge_document (library_id, source_sha256)"
+        )
+        SQLModel.metadata.create_all(connection)
+        connection.exec_driver_sql("PRAGMA user_version=17")
+    return 17
+
+
 def run_migrations(engine: Engine) -> int:
     current_version = get_user_version(engine)
     if current_version == 0:
@@ -1133,6 +1179,10 @@ def run_migrations(engine: Engine) -> int:
         current_version = migrate_v13_to_v14(engine)
     if current_version == 14:
         current_version = migrate_v14_to_v15(engine)
+    if current_version == 15:
+        current_version = migrate_v15_to_v16(engine)
+    if current_version == 16:
+        current_version = migrate_v16_to_v17(engine)
     if current_version == CURRENT_SCHEMA_VERSION:
         return current_version
     raise ValidationError(

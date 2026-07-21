@@ -288,6 +288,8 @@ def _load_runtime_imports() -> SimpleNamespace:
     artifact_service = load_module("xenix.services.artifact_service")
     dataset_export_service = load_module("xenix.services.dataset_export_service")
     link_router = load_module("xenix.services.link_router")
+    knowledge_import = load_module("xenix.services.knowledge_import_service")
+    paddle_ocr = load_module("xenix.services.paddle_ocr_service")
     lazy_ml_service = load_module("xenix.services.lazy_ml_service")
     lazy_services = load_module("xenix.services.lazy_services")
     llm = load_module("xenix.services.llm")
@@ -307,6 +309,9 @@ def _load_runtime_imports() -> SimpleNamespace:
         DatasetExportService=dataset_export_service.DatasetExportService,
         LazyServiceProxy=lazy_services.LazyServiceProxy,
         LinkRouter=link_router.LinkRouter,
+        KnowledgeImportService=knowledge_import.KnowledgeImportService,
+        PaddleOcrDeploymentService=paddle_ocr.PaddleOcrDeploymentService,
+        PaddleOcrService=paddle_ocr.PaddleOcrService,
         LLMService=llm.LLMService,
         LLMSettingsService=llm.LLMSettingsService,
         MLService=lazy_ml_service.LazyMLService,
@@ -540,6 +545,14 @@ def build_main_window(
         from .services.update_service import UpdateService
 
         update_service = UpdateService(paths, runtime.database_path(paths))
+        paddle_ocr_deployment = runtime.PaddleOcrDeploymentService(paths)
+        knowledge_import_service = runtime.KnowledgeImportService(
+            paths=paths,
+            session_factory=context.session_factory,
+            knowledge_service=agent_services.knowledge,
+            artifact_service=agent_services.artifacts,
+            ocr_service=runtime.PaddleOcrService(paddle_ocr_deployment),
+        )
         _emit_startup_timing("services.construct", step_start)
 
         step_start = time.perf_counter()
@@ -557,6 +570,8 @@ def build_main_window(
             dataset_service=agent_services.datasets,
             ml_service=agent_services.ml,
             update_service=update_service,
+            knowledge_import_service=knowledge_import_service,
+            paddle_ocr_deployment=paddle_ocr_deployment,
         )
         _emit_startup_timing("main_window.construct", step_start)
 

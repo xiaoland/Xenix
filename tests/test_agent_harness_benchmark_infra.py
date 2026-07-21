@@ -362,6 +362,27 @@ def test_stream_measurements_fold_retry_title_and_sampling_signals_independently
     assert captured_snapshots == [snapshot]
 
 
+def test_optional_case_prepare_receives_only_the_production_knowledge_service() -> None:
+    knowledge = object()
+    received: list[object] = []
+    case = SimpleNamespace(
+        prepare=lambda *, services: received.append(services),
+    )
+
+    runner._prepare_case(  # noqa: SLF001 - optional case lifecycle boundary
+        case=case,
+        services=SimpleNamespace(knowledge=knowledge, harness=object(), datasets=object()),
+    )
+    runner._prepare_case(  # noqa: SLF001 - backwards-compatible no-op boundary
+        case=SimpleNamespace(),
+        services=SimpleNamespace(knowledge=knowledge),
+    )
+
+    assert len(received) == 1
+    assert received[0].knowledge is knowledge
+    assert not hasattr(received[0], "harness")
+
+
 def test_usage_metrics_keep_missing_usage_unknown_and_aggregate_reported_usage() -> None:
     no_usage_harness = SimpleNamespace(project_chatbot_events=lambda _snapshot: [])
     usage_harness = SimpleNamespace(
@@ -424,6 +445,7 @@ def test_benchmark_cli_collects_case_modules_without_provider_access() -> None:
     assert completed.returncode == 0, completed.stderr
     assert "test_cleaning_april" in completed.stdout
     assert "test_revenue_by_region_chart" in completed.stdout
+    assert "test_rainy_season_restock" in completed.stdout
 
 
 def test_benchmark_cases_are_inert_without_the_explicit_live_switch() -> None:
@@ -436,4 +458,4 @@ def test_benchmark_cases_are_inert_without_the_explicit_live_switch() -> None:
     )
 
     assert completed.returncode == 0, completed.stderr
-    assert "2 skipped" in completed.stdout
+    assert "3 skipped" in completed.stdout

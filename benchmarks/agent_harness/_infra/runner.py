@@ -26,6 +26,7 @@ from .contracts import (
     BenchmarkCase,
     BenchmarkCaseAssessment,
     BenchmarkCaseContext,
+    BenchmarkCasePreparationServices,
     BenchmarkCaseServices,
     BenchmarkIdentity,
     BenchmarkInputError,
@@ -332,6 +333,7 @@ def _run_model_cell(
             title = _synthetic_title(case.case_id, model_key, run_id)
             thread = services.harness.create_thread(title=title, fq_model_key=model_key)
             thread_id = thread.thread.id
+            _prepare_case(case=case, services=services)
             started_at = time.perf_counter()
             try:
                 for event in services.harness.submit_user_turn_stream(
@@ -440,6 +442,17 @@ def _run_model_cell(
         judge=judge_result,
         identity=identity,
         failure_kind=failure_kind,
+    )
+
+
+def _prepare_case(*, case: BenchmarkCase, services: Any) -> None:
+    prepare = getattr(case, "prepare", None)
+    if prepare is None:
+        return
+    prepare(
+        services=BenchmarkCasePreparationServices(
+            knowledge=services.knowledge,
+        )
     )
 
 

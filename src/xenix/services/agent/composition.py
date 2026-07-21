@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from ..artifact_service import ArtifactService
     from ..dataset_service import DatasetService
     from ..llm import LLMService
+    from ..knowledge_service import KnowledgeService
     from ..ml.worker_settings import MLWorkerSettingsService
     from ..ml_service import MLService
     from .harness_service import AgentHarnessService
@@ -34,6 +35,7 @@ _AGENT_SKILL_COMMON_TOOL_NAMES = (
     "agent.skill.read_reference",
     "agent.skill.read_asset",
     "data.query",
+    "knowledge.lookup",
 )
 _AGENT_SKILL_TOOL_NAMES: dict[str, tuple[str, ...]] = {
     "xenix-data-preprocessing": (
@@ -75,6 +77,7 @@ class HeadlessAgentServices:
     artifacts: ArtifactService
     ml: MLService
     llm: LLMService
+    knowledge: KnowledgeService
 
 
 def build_headless_agent_services(
@@ -97,12 +100,14 @@ def build_headless_agent_services(
     # Preserve delayed domain imports for desktop startup and headless
     # preflight; they are needed only when a caller actually builds the graph.
     from ..artifact_service import ArtifactService
+    from ..knowledge_service import KnowledgeService
     from ..lazy_ml_service import LazyMLService
     from ..lazy_services import LazyServiceProxy
     from ..llm import AgentToolRegistry as LLMToolRegistry
     from ..llm import LLMConversationService
     from .harness_service import AgentHarnessService
     from .lazy_tools import LazyAgentToolRegistry
+    from .knowledge_tool import register_knowledge_lookup_tool
     from .skill_catalog import AgentSkillCatalog
 
     datasets = LazyServiceProxy(
@@ -135,6 +140,7 @@ def build_headless_agent_services(
         ml_task_service=ml_task_service,
     )
     artifacts = ArtifactService(session_factory)
+    knowledge = KnowledgeService(session_factory)
 
     concrete_tools = LazyAgentToolRegistry(
         paths=paths,
@@ -146,6 +152,7 @@ def build_headless_agent_services(
     )
     llm_tools = LLMToolRegistry()
     concrete_tools.register_with_llm(llm_tools)
+    register_knowledge_lookup_tool(llm_tools, knowledge)
 
     skill_catalog = AgentSkillCatalog.from_default_catalog()
     conversation = LLMConversationService(
@@ -178,6 +185,7 @@ def build_headless_agent_services(
         artifacts=artifacts,
         ml=ml,
         llm=llm,
+        knowledge=knowledge,
     )
 
 

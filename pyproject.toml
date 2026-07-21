@@ -32,6 +32,9 @@ dependencies = [
     "polars[calamine,rtcompat]==1.42.1",
     "xlsxwriter>=3.2.0",
     "velopack==1.2.0",
+    "docling<3,>=2.114.0",
+    "zstandard<1,>=0.23",
+    "charset-normalizer<4,>=3.4",
 ]
 
 [dependency-groups]

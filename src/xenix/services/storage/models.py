@@ -353,6 +353,78 @@ class ArtifactRow(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utc_now)
 
 
+class KnowledgeDocumentRow(SQLModel, table=True):
+    """Current searchable identity for one document in a Knowledge Library."""
+
+    __tablename__ = "knowledge_document"
+    __table_args__ = (
+        UniqueConstraint(
+            "library_id",
+            "source_sha256",
+            name="uq_knowledge_document_library_source_sha256",
+        ),
+    )
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    library_id: str = Field(default="global", index=True)
+    title: str = Field(index=True)
+    source_artifact_id: str | None = Field(default=None, foreign_key="artifact.id", index=True)
+    source_sha256: str | None = Field(default=None, index=True)
+    source_format: str | None = Field(default=None, index=True)
+    canonical_path: str | None = None
+    canonical_generation_id: str = Field(default_factory=generate_id, index=True)
+    active: bool = Field(default=True, index=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class KnowledgeUnitRow(SQLModel, table=True):
+    """Bounded source-linked text that can be returned by Knowledge lookup."""
+
+    __tablename__ = "knowledge_unit"
+    __table_args__ = (
+        UniqueConstraint(
+            "document_id",
+            "canonical_generation_id",
+            "ordinal",
+            name="uq_knowledge_unit_generation_ordinal",
+        ),
+    )
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    document_id: str = Field(foreign_key="knowledge_document.id", index=True)
+    canonical_generation_id: str = Field(index=True)
+    ordinal: int = Field(index=True)
+    text: str
+    search_text: str
+    locator_payload: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class KnowledgeImportRow(SQLModel, table=True):
+    """User-visible lifecycle of one Knowledge source import attempt."""
+
+    __tablename__ = "knowledge_import"
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    library_id: str = Field(default="global", index=True)
+    original_file_name: str
+    source_format: str = Field(index=True)
+    source_sha256: str | None = Field(default=None, index=True)
+    status: str = Field(default="pending", index=True)
+    document_id: str | None = Field(default=None, foreign_key="knowledge_document.id", index=True)
+    source_artifact_id: str | None = Field(default=None, foreign_key="artifact.id", index=True)
+    canonical_path: str | None = None
+    reused_existing: bool = False
+    error_code: str | None = Field(default=None, index=True)
+    error_summary: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class TrainedModelRow(SQLModel, table=True):
     __tablename__ = "trained_model"
 

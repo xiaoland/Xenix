@@ -127,6 +127,24 @@ class BenchmarkArtifactAccess(Protocol):
     def resolve_uri(self, uri: str) -> Any: ...
 
 
+class BenchmarkKnowledgePreparationAccess(Protocol):
+    def index_plain_text(
+        self,
+        *,
+        title: str,
+        text: str,
+        document_id: str | None = None,
+        source_artifact_id: str | None = None,
+    ) -> Any: ...
+
+
+@dataclass(frozen=True)
+class BenchmarkCasePreparationServices:
+    """The narrow production-service seam available before subject timing."""
+
+    knowledge: BenchmarkKnowledgePreparationAccess
+
+
 @dataclass(frozen=True)
 class BenchmarkCaseServices:
     """The read-only public product services available to a case oracle."""
@@ -148,7 +166,11 @@ class BenchmarkCaseContext:
 
 
 class BenchmarkCase(Protocol):
-    """Small outcome-first contract; the runner never branches on case id."""
+    """Small outcome-first contract; the runner never branches on case id.
+
+    A case may additionally define ``prepare(*, services)`` when its isolated
+    cell needs public product state before the measured subject turn.
+    """
 
     case_id: str
 

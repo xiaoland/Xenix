@@ -625,6 +625,87 @@
     </message>
 </context>
 <context>
+    <name>KnowledgeImportQueueDialog</name>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="57"/>
+        <source>Knowledge Import Queue</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="58"/>
+        <source>Close</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>KnowledgeWorkspaceDialog</name>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="120"/>
+        <source>Import Knowledge</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="122"/>
+        <source>Knowledge documents (*.txt *.docx *.doc *.ppt *.pptx *.pdf)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="148"/>
+        <source>Knowledge Import Failed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="166"/>
+        <source>Local OCR setup: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="172"/>
+        <source>Local OCR Setup Failed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="177"/>
+        <source>Local PaddleOCR is ready</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="179"/>
+        <source>Local PaddleOCR runtime is installed; models are not ready</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="181"/>
+        <source>Local PaddleOCR is not installed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="185"/>
+        <source>Knowledge Workspace</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="188"/>
+        <source>Import TXT, DOCX, DOC, PPTX, PPT, or PDF documents. Xenix indexes bounded evidence for Agent analysis.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="192"/>
+        <source>Import documents</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="193"/>
+        <source>Import queue</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="194"/>
+        <source>Set up local OCR</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>MLWorkspace</name>
     <message>
         <source>Project</source>
@@ -846,123 +927,138 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../ui/main_window.py" line="238"/>
+        <location filename="../ui/main_window.py" line="249"/>
         <source>Xenix Native</source>
         <translation>Xenix Native</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="239"/>
+        <location filename="../ui/main_window.py" line="250"/>
         <source>Xenix</source>
         <translation type="unfinished">Xenix</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="240"/>
+        <location filename="../ui/main_window.py" line="251"/>
         <source>Settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="241"/>
+        <location filename="../ui/main_window.py" line="252"/>
+        <source>Knowledge</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="253"/>
         <source>History</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="243"/>
+        <location filename="../ui/main_window.py" line="255"/>
         <source>New thread</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="408"/>
+        <location filename="../ui/main_window.py" line="323"/>
+        <source>Knowledge Workspace</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="324"/>
+        <source>Knowledge services are not available.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="442"/>
         <source>The selected source path is not a file.</source>
         <translation>The selected source path is not a file.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="591"/>
-        <location filename="../ui/main_window.py" line="608"/>
+        <location filename="../ui/main_window.py" line="625"/>
+        <location filename="../ui/main_window.py" line="642"/>
         <source>Opening link...</source>
         <translation>Opening link...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="609"/>
+        <location filename="../ui/main_window.py" line="643"/>
         <source>Open Link</source>
         <translation>Open Link</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="663"/>
+        <location filename="../ui/main_window.py" line="697"/>
         <source>The submitted message is being prepared and cannot be stopped.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="676"/>
+        <location filename="../ui/main_window.py" line="710"/>
         <source>Stopped.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="732"/>
+        <location filename="../ui/main_window.py" line="766"/>
         <source>Rename</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="733"/>
+        <location filename="../ui/main_window.py" line="767"/>
         <source>Generate title...</source>
         <translation>Generate title...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="734"/>
+        <location filename="../ui/main_window.py" line="768"/>
         <source>Copy thread ID</source>
         <translation>Copy thread ID</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="735"/>
+        <location filename="../ui/main_window.py" line="769"/>
         <source>Delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="760"/>
+        <location filename="../ui/main_window.py" line="794"/>
         <source>Rename Thread</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="761"/>
-        <location filename="../ui/main_window.py" line="828"/>
+        <location filename="../ui/main_window.py" line="795"/>
+        <location filename="../ui/main_window.py" line="862"/>
         <source>Thread name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="777"/>
-        <location filename="../ui/main_window.py" line="808"/>
-        <location filename="../ui/main_window.py" line="838"/>
-        <location filename="../ui/main_window.py" line="848"/>
+        <location filename="../ui/main_window.py" line="811"/>
+        <location filename="../ui/main_window.py" line="842"/>
+        <location filename="../ui/main_window.py" line="872"/>
+        <location filename="../ui/main_window.py" line="882"/>
         <source>Generate Thread Title</source>
         <translation>Generate Thread Title</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="778"/>
+        <location filename="../ui/main_window.py" line="812"/>
         <source>Thread title model is not configured.</source>
         <translation>Thread title model is not configured.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="801"/>
+        <location filename="../ui/main_window.py" line="835"/>
         <source>Generating thread title...</source>
         <translation>Generating thread title...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="827"/>
+        <location filename="../ui/main_window.py" line="861"/>
         <source>Apply Generated Title</source>
         <translation>Apply Generated Title</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="863"/>
-        <location filename="../ui/main_window.py" line="871"/>
+        <location filename="../ui/main_window.py" line="897"/>
+        <location filename="../ui/main_window.py" line="905"/>
         <source>Delete Thread</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="864"/>
+        <location filename="../ui/main_window.py" line="898"/>
         <source>Stop the current run before deleting this thread.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="872"/>
+        <location filename="../ui/main_window.py" line="906"/>
         <source>Delete &quot;{title}&quot;? This action cannot be undone.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1952,12 +2048,12 @@ State file: {state_path}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app.py" line="716"/>
+        <location filename="../app.py" line="731"/>
         <source>Unable to start Xenix</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app.py" line="717"/>
+        <location filename="../app.py" line="732"/>
         <source>Xenix could not finish startup.
 
 {error}</source>
