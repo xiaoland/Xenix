@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
+from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_dynamic_libs
 
 
 project_root = Path.cwd()
@@ -18,6 +18,23 @@ polars_datas = (
     + collect_data_files("fastexcel")
 )
 skill_catalog = src_root / "xenix" / "services" / "agent" / "skills" / "catalog.json"
+knowledge_binaries = []
+knowledge_datas = []
+knowledge_hiddenimports = []
+for package_name in (
+    "docling",
+    "docling_core",
+    "docling_ibm_models",
+    "lancedb",
+    "pypdfium2",
+    "pikepdf",
+    "zstandard",
+    "msoffcrypto",
+):
+    package_datas, package_binaries, package_hiddenimports = collect_all(package_name)
+    knowledge_datas += package_datas
+    knowledge_binaries += package_binaries
+    knowledge_hiddenimports += package_hiddenimports
 
 
 def collect_xenix_worker_source():
@@ -37,7 +54,7 @@ def collect_xenix_worker_source():
 a = Analysis(
     [str(scripts_root / "run_packaged.py")],
     pathex=[str(src_root)],
-    binaries=xgboost_binaries + polars_binaries,
+    binaries=xgboost_binaries + polars_binaries + knowledge_binaries,
     datas=[
         (str(src_root / "xenix" / "resources"), "xenix/resources"),
         (str(src_root / "xenix" / "translations"), "xenix/translations"),
@@ -45,7 +62,8 @@ a = Analysis(
     ]
     + collect_xenix_worker_source()
     + xgboost_datas
-    + polars_datas,
+    + polars_datas
+    + knowledge_datas,
     hiddenimports=[
         "xenix._generated_release_config",
         "xenix.services.agent.chatbot_events",
@@ -68,6 +86,21 @@ a = Analysis(
         "xenix.services.ml.worker_settings",
         "xenix.services.ml_service",
         "xenix.services.ml_task_service",
+        "xenix.services.embedding_service",
+        "xenix.services.knowledge_canonical",
+        "xenix.services.knowledge_content_store",
+        "xenix.services.knowledge_derivation_service",
+        "xenix.services.knowledge_docling_worker",
+        "xenix.services.knowledge_import_service",
+        "xenix.services.knowledge_import_worker",
+        "xenix.services.knowledge_index_service",
+        "xenix.services.knowledge_packaged_smoke",
+        "xenix.services.knowledge_pipeline",
+        "xenix.services.knowledge_semantic_service",
+        "xenix.services.knowledge_service",
+        "xenix.services.knowledge_task_logs",
+        "xenix.services.knowledge_vector_store",
+        "xenix.services.paddle_ocr_service",
         "xenix.services.storage",
         "xenix.services.storage.layout",
         "fastexcel",
@@ -82,7 +115,7 @@ a = Analysis(
         "_polars_runtime_compat._polars_runtime",
         "_polars_runtime_32",
         "_polars_runtime_32._polars_runtime",
-    ],
+    ] + knowledge_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

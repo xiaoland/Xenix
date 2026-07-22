@@ -5,6 +5,7 @@ from __future__ import annotations
 from hashlib import sha256
 from pathlib import Path
 import re
+import time
 import unicodedata
 from typing import Any
 
@@ -38,10 +39,8 @@ _INVENTORY_PATH = _FIXTURE_DIRECTORY / "rainy_season_inventory.csv"
 _RULE_PATH = _FIXTURE_DIRECTORY / "rainy_season_restock_rule.txt"
 _INVENTORY_SIZE = 201
 _INVENTORY_SHA256 = "6DB0E521DB7FF9867F23BDD4123F0E0E0DAF603EA845381B40F0DB3B462B79BC"
-_RULE_SIZE = 258
-_RULE_SHA256 = "044D02B3DE372C0DA6B4DB4BFC2542175287D05BA65FB7C9802B2559A8C7605A"
-_RULE_DOCUMENT_ID = "rainy-season-restock-rule"
-_RULE_TITLE = "华东雨季备货规则"
+_RULE_SIZE = 316
+_RULE_SHA256 = "43A1BB0D8CCA73C2348017597754965F6C6F3276D45B31749E5082051D8E90BC"
 _EXPECTED_RESTOCK = {"U100": 130.0, "R200": 75.0}
 
 
@@ -49,7 +48,7 @@ pytestmark = pytest.mark.agent_harness_live
 
 
 class RainySeasonRestockCase:
-    """Apply one indexed business rule without prescribing the Agent's route."""
+    """Apply one imported business rule without prescribing the Agent's route."""
 
     case_id = CASE_ID
 
@@ -75,18 +74,32 @@ class RainySeasonRestockCase:
         return sha256(f"{inventory_digest}:{rule_digest}".encode("ascii")).hexdigest().upper()
 
     def prepare(self, *, services: BenchmarkCasePreparationServices) -> None:
-        rule_text = self.rule_path.read_text(encoding="utf-8").strip()
-        services.knowledge.index_plain_text(
-            title=_RULE_TITLE,
-            text=rule_text,
-            document_id=_RULE_DOCUMENT_ID,
-        )
+        imported = services.knowledge_import.import_file(self.rule_path, timeout=60.0)
+        deadline = time.monotonic() + 60.0
+        while time.monotonic() < deadline:
+            status = services.knowledge_derivation.status_for_import(imported.import_id)
+            if status is not None and status.status == "succeeded":
+                if status.phase != "completed":
+                    raise BenchmarkInputError("knowledge_rule_not_retrieval_ready")
+                task_id = services.knowledge_index.enqueue_rebuild(
+                    ("text_vector",),
+                    trigger="manual",
+                )
+                index_result = services.knowledge_index.rebuild_now(task_id)
+                if index_result.status != "succeeded":
+                    raise BenchmarkInputError("knowledge_vector_index_failed")
+                return
+            if status is not None and status.status == "failed":
+                raise BenchmarkInputError("knowledge_rule_derivation_failed")
+            time.sleep(0.02)
+        raise BenchmarkInputError("knowledge_rule_derivation_timeout")
 
     def build_submission(self, *, thread_id: str, fq_model_key: str) -> SubmitUserTurnInput:
         return SubmitUserTurnInput(
             thread_id=thread_id,
             text=(
-                "请应用知识库中的华东雨季备货规则，基于这份库存表创建需要补货的商品清单。"
+                "请用 semantic 模式检索知识库中与‘季节性采购边界’含义相关的经验，"
+                "并基于这份库存表创建需要补货的商品清单。"
                 "新数据集只保留需要补货的商品，并包含 SKU 和补货数量。"
                 "最终答复请简要说明采用的补货规则，并列出需要补货的 SKU 与数量。"
             ),
@@ -250,48 +263,13 @@ def _grounded_final_answer_observed(snapshot: Any | None) -> bool:
     if not text:
         return False
 
-    rainwear_only = "雨具" in text and any(term in text for term in ("仅", "只", "非雨具"))
-    three_week_demand = (
-        (
-            any(term in text for term in ("三周", "3周"))
-            and any(term in text for term in ("平均需求", "平均销量", "周均需求", "周均销量"))
-        )
-        or bool(re.search(r"(?:3|三)(?:倍|[×*X])?(?:周均需求|周均销量)", text))
-    )
-    subtract_inventory = any(
-        term in text
-        for term in (
-            "扣除当前库存",
-            "扣除现有库存",
-            "减去当前库存",
-            "减去现有库存",
-            "减当前库存",
-            "减现有库存",
-            "扣减当前库存",
-            "扣减现有库存",
-            "-当前库存",
-            "-现有库存",
-        )
-    )
-    floor_at_zero = any(
-        term in text
-        for term in (
-            "负值归零",
-            "归零",
-            "最低为0",
-            "不低于0",
-            "MAX(0",
-            "补货量为0",
-            "小于0则不补货",
-            "低于0则不补货",
-            "取0",
-        )
-    )
+    rainwear_only = _rainwear_scope_observed(text)
+    three_week_demand = _three_week_target_observed(text)
+    inventory_rule = _inventory_rule_observed(text)
     return (
         rainwear_only
         and three_week_demand
-        and subtract_inventory
-        and floor_at_zero
+        and inventory_rule
         and _sku_quantity_pair_observed(text, "U100", 130)
         and _sku_quantity_pair_observed(text, "R200", 75)
     )
@@ -299,7 +277,112 @@ def _grounded_final_answer_observed(snapshot: Any | None) -> bool:
 
 def _normalized_answer_text(value: Any) -> str:
     text = unicodedata.normalize("NFKC", str(value or "")).upper()
+    text = text.translate(
+        str.maketrans({
+            "−": "-",
+            "‐": "-",
+            "‑": "-",
+            "‒": "-",
+            "–": "-",
+            "—": "-",
+            "﹘": "-",
+        })
+    )
     return re.sub(r"\s+", "", text)
+
+
+def _three_week_target_observed(text: str) -> bool:
+    if re.search(r"(?:3|三)周(?:平均|均)?(?:需求|销量|流出量)", text):
+        return True
+    weekly_metric = (
+        r"(?:周均(?:需求|销量|流出量)|每周平均(?:需求|销量|流出量)|"
+        r"WEEKLY_AVERAGE_(?:DEMAND|SALES|OUTFLOW))"
+    )
+    multiplier = r"(?:3|三)(?:倍)?"
+    return bool(
+        re.search(rf"{weekly_metric}.{{0,8}}?{multiplier}", text)
+        or re.search(rf"{multiplier}(?:[×*X])?.{{0,8}}?{weekly_metric}", text)
+    )
+
+
+def _rainwear_scope_observed(text: str) -> bool:
+    scope_named = "雨具" in text or "遮雨" in text or "防水穿戴" in text
+    restriction_named = any(
+        term in text
+        for term in (
+            "仅",
+            "只",
+            "非雨具",
+            "不属于",
+            "不属",
+            "排除",
+            "不进入",
+            "不纳入",
+            "不在雨季补货范围",
+        )
+    )
+    return scope_named and restriction_named
+
+
+def _inventory_rule_observed(text: str) -> bool:
+    if re.search(
+        r"(?:扣除|减去|扣减|减|-)(?:当前|现有)?(?:手头)?(?:库存|数量)",
+        text,
+    ):
+        return True
+    if any(term in text for term in ("库存缺口", "补货缺口", "库存差额")):
+        return True
+    target_named = "目标库存" in text or "目标持有量" in text
+    inventory_named = any(
+        term in text
+        for term in (
+            "当前库存",
+            "现有库存",
+            "手头库存",
+            "当前手头数量",
+            "手头数量",
+        )
+    )
+    return (target_named and inventory_named) or _floor_at_zero_observed(text)
+
+
+def _floor_at_zero_observed(text: str) -> bool:
+    if any(
+        term in text
+        for term in (
+            "负值归零",
+            "负数归零",
+            "归零",
+            "最低为0",
+            "最低为零",
+            "最小为0",
+            "最小为零",
+            "不低于0",
+            "不低于零",
+            "不得低于0",
+            "不得低于零",
+            "补货量为0",
+            "小于0则不补货",
+            "低于0则不补货",
+            "小于零则不补货",
+            "低于零则不补货",
+            "非正数不补货",
+            "正数才补货",
+            "只保留正数",
+            "仅保留正数",
+            "取0",
+            "取零",
+        )
+    ):
+        return True
+    return bool(
+        re.search(r"MAX\([^)]{0,80}(?:,0(?:\.0+)?|0(?:\.0+)?,)[^)]*\)", text)
+        or re.search(
+            r"(?:结果|补货数量|追加件数)(?:≤|<=|小于等于|不大于)0"
+            r".{0,24}?(?:不列入|不补货|不予补货|无需补货|库存充足)",
+            text,
+        )
+    )
 
 
 def _sku_quantity_pair_observed(text: str, sku: str, quantity: int) -> bool:

@@ -3,8 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
+import time
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,13 +29,48 @@ PIP_WHEEL_SHA256 = "382ff9f685ee3bc25864f820aa50505825f10f5458ffff07e30a6d96e571
 PADDLE_VERSION = "3.3.1"
 PADDLE_OCR_VERSION = "3.7.0"
 SIDECAR_PROTOCOL_VERSION = 1
+MODEL_INVENTORY_VERSION = 2
+MAX_SIDECAR_STATUS_BYTES = 4 * 1024
+MAX_OCR_RESULT_BYTES = 16 * 1024 * 1024
+SIDECAR_POLL_INTERVAL_SECONDS = 0.1
+SIDECAR_TERMINATE_GRACE_SECONDS = 0.5
+MODEL_MARKER = (
+    f"xenix-paddleocr-models:v{SIDECAR_PROTOCOL_VERSION}:"
+    f"python-{PYTHON_VERSION}:paddle-{PADDLE_VERSION}:paddleocr-{PADDLE_OCR_VERSION}:"
+    f"inventory-{MODEL_INVENTORY_VERSION}"
+)
+
+_HEALTH_KEYS = frozenset({"protocol", "python", "paddle", "paddleocr"})
+_MANIFEST_KEYS = frozenset(
+    {
+        "protocol",
+        "python",
+        "paddle",
+        "paddleocr",
+        "model_marker",
+        "model_file_count",
+        "model_inventory_sha256",
+        "models_ready",
+    }
+)
+_WARMUP_KEYS = frozenset(
+    {
+        "protocol",
+        "model_marker",
+        "model_file_count",
+        "model_inventory_sha256",
+        "models_ready",
+    }
+)
+_MODEL_KEYS = frozenset({"protocol", "model_file_count", "model_inventory_sha256"})
+_OCR_KEYS = frozenset({"protocol", "pages"})
+_SHA256_PATTERN = re.compile(r"[0-9a-f]{64}\Z")
 
 
 @dataclass(frozen=True)
 class PaddleOcrStatus:
     installed: bool
     models_ready: bool
-    runtime_path: str | None
     detail: str | None = None
 
 
@@ -56,22 +93,47 @@ class PaddleOcrDeploymentService:
 
     def status(self) -> PaddleOcrStatus:
         if not self.python_path.is_file() or not self.worker_path.is_file():
-            return PaddleOcrStatus(False, False, None)
-        probe = self._run_worker("health", timeout=60)
+            return PaddleOcrStatus(False, False, "runtime_missing")
+        try:
+            probe = self._run_worker("health", timeout=60)
+        except (OSError, subprocess.SubprocessError):
+            return PaddleOcrStatus(False, False, "health_check_failed")
         if probe.returncode != 0:
-            return PaddleOcrStatus(False, False, str(self._runtime), "health_check_failed")
-        models_ready = False
-        if self._manifest_path.is_file():
-            try:
-                models_ready = bool(json.loads(self._manifest_path.read_text(encoding="utf-8")).get("models_ready"))
-            except (OSError, json.JSONDecodeError):
-                models_ready = False
-        return PaddleOcrStatus(True, models_ready, str(self._runtime))
+            return PaddleOcrStatus(False, False, "health_check_failed")
+        try:
+            health = _bounded_json_object(probe.stdout)
+        except (RecursionError, TypeError, ValueError, UnicodeError):
+            return PaddleOcrStatus(False, False, "health_payload_invalid")
+        if not _health_payload_is_compatible(health):
+            return PaddleOcrStatus(False, False, "health_incompatible")
+
+        if not self._manifest_path.is_file():
+            return PaddleOcrStatus(True, False, "models_manifest_missing")
+        try:
+            manifest = _bounded_json_file(self._manifest_path)
+        except (OSError, RecursionError, TypeError, ValueError, UnicodeError):
+            return PaddleOcrStatus(True, False, "models_manifest_invalid")
+        if not _manifest_is_current(manifest):
+            return PaddleOcrStatus(True, False, "models_manifest_stale")
+        try:
+            model_probe = self._run_worker("models", timeout=60)
+        except (OSError, subprocess.SubprocessError):
+            return PaddleOcrStatus(True, False, "models_probe_failed")
+        if model_probe.returncode != 0:
+            return PaddleOcrStatus(True, False, "models_probe_failed")
+        try:
+            model_inventory = _bounded_json_object(model_probe.stdout)
+        except (RecursionError, TypeError, ValueError, UnicodeError):
+            return PaddleOcrStatus(True, False, "models_probe_invalid")
+        if not _model_inventory_matches_manifest(model_inventory, manifest):
+            return PaddleOcrStatus(True, False, "models_missing_or_changed")
+        return PaddleOcrStatus(True, True)
 
     def install(self, progress: Callable[[str], None] | None = None) -> PaddleOcrStatus:
         report = progress or (lambda _phase: None)
         self._root.mkdir(parents=True, exist_ok=True)
         self._downloads.mkdir(parents=True, exist_ok=True)
+        self._manifest_path.unlink(missing_ok=True)
         report("downloading_python")
         python_zip = self._download_verified(
             PYTHON_EMBED_URL,
@@ -112,44 +174,103 @@ class PaddleOcrDeploymentService:
         if not worker_source.is_file():
             raise ValidationError("PaddleOCR worker resource is missing.")
         shutil.copyfile(worker_source, self.worker_path)
-        health = self._run_worker("health", timeout=120)
-        if health.returncode != 0:
+        try:
+            health = self._run_worker("health", timeout=120)
+        except (OSError, subprocess.SubprocessError):
+            raise ValidationError("PaddleOCR local runtime health check failed.") from None
+        if health.returncode != 0 or not _completed_health_is_compatible(health):
             raise ValidationError("PaddleOCR local runtime health check failed.")
 
         report("downloading_models")
-        warmup = self._run_worker("warmup", timeout=1800)
-        if warmup.returncode != 0:
+        try:
+            warmup = self._run_worker("warmup", timeout=1800)
+        except (OSError, subprocess.SubprocessError):
+            raise ValidationError("PaddleOCR local models could not be prepared.") from None
+        warmup_payload = _completed_warmup_payload(warmup) if warmup.returncode == 0 else None
+        if warmup_payload is None:
             raise ValidationError("PaddleOCR local models could not be prepared.")
-        self._manifest_path.write_text(
-            json.dumps(
-                {
-                    "protocol": SIDECAR_PROTOCOL_VERSION,
-                    "python": PYTHON_VERSION,
-                    "paddle": PADDLE_VERSION,
-                    "paddleocr": PADDLE_OCR_VERSION,
-                    "models_ready": True,
-                },
-                sort_keys=True,
-            ),
-            encoding="utf-8",
-        )
-        report("ready")
-        return self.status()
+        manifest = {
+            "protocol": SIDECAR_PROTOCOL_VERSION,
+            "python": PYTHON_VERSION,
+            "paddle": PADDLE_VERSION,
+            "paddleocr": PADDLE_OCR_VERSION,
+            "model_marker": MODEL_MARKER,
+            "model_file_count": warmup_payload["model_file_count"],
+            "model_inventory_sha256": warmup_payload["model_inventory_sha256"],
+            "models_ready": True,
+        }
+        manifest_temp = self._manifest_path.with_suffix(".json.tmp")
+        manifest_temp.write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
+        os.replace(manifest_temp, self._manifest_path)
 
-    def _run_worker(self, command: str, *, timeout: int, arguments: list[str] | None = None):
+        verified = self.status()
+        if not verified.installed or not verified.models_ready:
+            self._manifest_path.unlink(missing_ok=True)
+            raise ValidationError("PaddleOCR local runtime readiness could not be verified.")
+        report("ready")
+        return verified
+
+    def _run_worker(
+        self,
+        command: str,
+        *,
+        timeout: int,
+        arguments: list[str] | None = None,
+        check_cancelled: Callable[[], object] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         environment = os.environ.copy()
         environment["HOME"] = str(self._root)
         environment["USERPROFILE"] = str(self._root)
-        environment["PADDLEX_HOME"] = str(self._root / "models")
-        environment["PADDLEOCR_HOME"] = str(self._root / "models")
-        return subprocess.run(
-            [str(self.python_path), str(self.worker_path), command, *(arguments or ())],
-            capture_output=True,
+        model_cache = str(self._root / "models")
+        environment["PADDLE_PDX_CACHE_HOME"] = model_cache
+        environment["PADDLEX_HOME"] = model_cache
+        environment["PADDLEOCR_HOME"] = model_cache
+        worker_command = [str(self.python_path), str(self.worker_path), command, *(arguments or ())]
+        if check_cancelled is None:
+            return subprocess.run(
+                worker_command,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                check=False,
+                env=environment,
+            )
+
+        check_cancelled()
+        process = subprocess.Popen(
+            worker_command,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=timeout,
-            check=False,
             env=environment,
         )
+        deadline = time.monotonic() + timeout
+        try:
+            while True:
+                check_cancelled()
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(worker_command, timeout)
+                try:
+                    stdout, stderr = process.communicate(
+                        timeout=min(SIDECAR_POLL_INTERVAL_SECONDS, remaining)
+                    )
+                except subprocess.TimeoutExpired:
+                    continue
+                check_cancelled()
+                return subprocess.CompletedProcess(
+                    worker_command,
+                    process.returncode,
+                    stdout,
+                    stderr,
+                )
+        except BaseException:
+            try:
+                _stop_worker_process(process)
+            except BaseException:
+                pass
+            raise
 
     def _enable_site_packages(self) -> None:
         pth = next(self._runtime.glob("python*._pth"), None)
@@ -179,20 +300,66 @@ class PaddleOcrService:
     def __init__(self, deployment: PaddleOcrDeploymentService) -> None:
         self._deployment = deployment
 
-    def recognize(self, image_path: Path, *, output_path: Path, timeout: int = 300) -> dict:
+    def is_ready(self) -> bool:
         status = self._deployment.status()
-        if not status.installed or not status.models_ready:
+        return status.installed and status.models_ready
+
+    def recognize(
+        self,
+        image_path: Path,
+        *,
+        output_path: Path,
+        timeout: int = 300,
+        check_cancelled: Callable[[], object] | None = None,
+    ) -> dict[str, object]:
+        if check_cancelled is not None:
+            check_cancelled()
+        if not self.is_ready():
             raise ValidationError("Local PaddleOCR is not installed. Run one-click setup first.")
-        completed = self._deployment._run_worker(
-            "ocr",
-            timeout=timeout,
-            arguments=["--input", str(image_path.resolve()), "--output", str(output_path.resolve())],
-        )
+        if check_cancelled is not None:
+            check_cancelled()
+
+        callback_error: BaseException | None = None
+
+        def guarded_cancel_check() -> object:
+            nonlocal callback_error
+            assert check_cancelled is not None
+            try:
+                return check_cancelled()
+            except BaseException as exc:
+                callback_error = exc
+                raise
+
+        try:
+            arguments = ["--input", str(image_path.resolve()), "--output", str(output_path.resolve())]
+            output_path.unlink(missing_ok=True)
+            if check_cancelled is None:
+                completed = self._deployment._run_worker(
+                    "ocr",
+                    timeout=timeout,
+                    arguments=arguments,
+                )
+            else:
+                completed = self._deployment._run_worker(
+                    "ocr",
+                    timeout=timeout,
+                    arguments=arguments,
+                    check_cancelled=guarded_cancel_check,
+                )
+        except BaseException as exc:
+            if exc is callback_error:
+                raise
+            if isinstance(exc, (OSError, subprocess.SubprocessError)):
+                raise ValidationError("Local PaddleOCR recognition failed.") from None
+            raise
         if completed.returncode != 0 or not output_path.is_file():
             raise ValidationError("Local PaddleOCR recognition failed.")
-        payload = json.loads(output_path.read_text(encoding="utf-8"))
-        if payload.get("protocol") != SIDECAR_PROTOCOL_VERSION:
-            raise ValidationError("Local PaddleOCR protocol version is incompatible.")
+        try:
+            payload = _bounded_json_file(output_path, max_bytes=MAX_OCR_RESULT_BYTES)
+        except (OSError, RecursionError, TypeError, ValueError, UnicodeError):
+            raise ValidationError("Local PaddleOCR recognition returned invalid data.") from None
+        if not _ocr_payload_is_valid(payload):
+            raise ValidationError("Local PaddleOCR recognition returned invalid data.")
         return payload
 
 
@@ -214,3 +381,176 @@ def _sha256(path: Path) -> str:
         for block in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def _stop_worker_process(process: subprocess.Popen[str]) -> None:
+    try:
+        process_running = process.poll() is None
+    except OSError:
+        process_running = True
+    if process_running:
+        try:
+            process.terminate()
+        except OSError:
+            pass
+    try:
+        process.communicate(timeout=SIDECAR_TERMINATE_GRACE_SECONDS)
+    except (OSError, ValueError):
+        pass
+    except subprocess.TimeoutExpired:
+        try:
+            process_running = process.poll() is None
+        except OSError:
+            process_running = True
+        if process_running:
+            try:
+                process.kill()
+            except OSError:
+                pass
+        try:
+            process.communicate(timeout=SIDECAR_TERMINATE_GRACE_SECONDS)
+        except (OSError, subprocess.TimeoutExpired, ValueError):
+            pass
+    for stream in (process.stdout, process.stderr):
+        if stream is not None:
+            try:
+                stream.close()
+            except (OSError, ValueError):
+                pass
+
+
+def _bounded_json_file(
+    path: Path,
+    *,
+    max_bytes: int = MAX_SIDECAR_STATUS_BYTES,
+) -> dict[str, object]:
+    with path.open("rb") as source:
+        payload = source.read(max_bytes + 1)
+    if not payload or len(payload) > max_bytes:
+        raise ValueError("Sidecar JSON payload is outside the supported bound.")
+    return _bounded_json_object(payload.decode("utf-8"), max_bytes=max_bytes)
+
+
+def _bounded_json_object(
+    raw: object,
+    *,
+    max_bytes: int = MAX_SIDECAR_STATUS_BYTES,
+) -> dict[str, object]:
+    if not isinstance(raw, str):
+        raise TypeError("Sidecar JSON payload must be text.")
+    encoded = raw.encode("utf-8")
+    if not encoded or len(encoded) > max_bytes:
+        raise ValueError("Sidecar JSON payload is outside the supported bound.")
+
+    def reject_constant(value: str) -> None:
+        raise ValueError(f"Non-finite JSON constant is not supported: {value}")
+
+    def reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        payload: dict[str, object] = {}
+        for key, value in pairs:
+            if key in payload:
+                raise ValueError("Duplicate sidecar JSON keys are not supported.")
+            payload[key] = value
+        return payload
+
+    payload = json.loads(
+        raw,
+        parse_constant=reject_constant,
+        object_pairs_hook=reject_duplicate_keys,
+    )
+    if not isinstance(payload, dict) or not all(isinstance(key, str) for key in payload):
+        raise TypeError("Sidecar JSON payload must be an object.")
+    return payload
+
+
+def _health_payload_is_compatible(payload: dict[str, object]) -> bool:
+    return (
+        payload.keys() == _HEALTH_KEYS
+        and type(payload.get("protocol")) is int
+        and payload["protocol"] == SIDECAR_PROTOCOL_VERSION
+        and type(payload.get("python")) is str
+        and payload["python"] == PYTHON_VERSION
+        and type(payload.get("paddle")) is str
+        and payload["paddle"] == PADDLE_VERSION
+        and type(payload.get("paddleocr")) is str
+        and payload["paddleocr"] == PADDLE_OCR_VERSION
+    )
+
+
+def _manifest_is_current(payload: dict[str, object]) -> bool:
+    return (
+        payload.keys() == _MANIFEST_KEYS
+        and type(payload.get("protocol")) is int
+        and payload["protocol"] == SIDECAR_PROTOCOL_VERSION
+        and type(payload.get("python")) is str
+        and payload["python"] == PYTHON_VERSION
+        and type(payload.get("paddle")) is str
+        and payload["paddle"] == PADDLE_VERSION
+        and type(payload.get("paddleocr")) is str
+        and payload["paddleocr"] == PADDLE_OCR_VERSION
+        and type(payload.get("model_marker")) is str
+        and payload["model_marker"] == MODEL_MARKER
+        and type(payload.get("model_file_count")) is int
+        and payload["model_file_count"] > 0
+        and type(payload.get("model_inventory_sha256")) is str
+        and _SHA256_PATTERN.fullmatch(payload["model_inventory_sha256"]) is not None
+        and payload.get("models_ready") is True
+    )
+
+
+def _warmup_payload_is_current(payload: dict[str, object]) -> bool:
+    return (
+        payload.keys() == _WARMUP_KEYS
+        and type(payload.get("protocol")) is int
+        and payload["protocol"] == SIDECAR_PROTOCOL_VERSION
+        and type(payload.get("model_marker")) is str
+        and payload["model_marker"] == MODEL_MARKER
+        and type(payload.get("model_file_count")) is int
+        and payload["model_file_count"] > 0
+        and type(payload.get("model_inventory_sha256")) is str
+        and _SHA256_PATTERN.fullmatch(payload["model_inventory_sha256"]) is not None
+        and payload.get("models_ready") is True
+    )
+
+
+def _model_inventory_matches_manifest(
+    payload: dict[str, object],
+    manifest: dict[str, object],
+) -> bool:
+    return (
+        payload.keys() == _MODEL_KEYS
+        and type(payload.get("protocol")) is int
+        and payload["protocol"] == SIDECAR_PROTOCOL_VERSION
+        and type(payload.get("model_file_count")) is int
+        and payload["model_file_count"] > 0
+        and type(payload.get("model_inventory_sha256")) is str
+        and _SHA256_PATTERN.fullmatch(payload["model_inventory_sha256"]) is not None
+        and payload["model_file_count"] == manifest.get("model_file_count")
+        and payload["model_inventory_sha256"] == manifest.get("model_inventory_sha256")
+    )
+
+
+def _ocr_payload_is_valid(payload: dict[str, object]) -> bool:
+    pages = payload.get("pages")
+    return (
+        payload.keys() == _OCR_KEYS
+        and type(payload.get("protocol")) is int
+        and payload["protocol"] == SIDECAR_PROTOCOL_VERSION
+        and isinstance(pages, list)
+        and all(isinstance(page, dict) for page in pages)
+    )
+
+
+def _completed_health_is_compatible(completed: object) -> bool:
+    try:
+        return _health_payload_is_compatible(_bounded_json_object(getattr(completed, "stdout", None)))
+    except (RecursionError, TypeError, ValueError, UnicodeError):
+        return False
+
+
+def _completed_warmup_payload(completed: object) -> dict[str, object] | None:
+    try:
+        payload = _bounded_json_object(getattr(completed, "stdout", None))
+        return payload if _warmup_payload_is_current(payload) else None
+    except (RecursionError, TypeError, ValueError, UnicodeError):
+        return None

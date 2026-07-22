@@ -127,22 +127,27 @@ class BenchmarkArtifactAccess(Protocol):
     def resolve_uri(self, uri: str) -> Any: ...
 
 
-class BenchmarkKnowledgePreparationAccess(Protocol):
-    def index_plain_text(
-        self,
-        *,
-        title: str,
-        text: str,
-        document_id: str | None = None,
-        source_artifact_id: str | None = None,
-    ) -> Any: ...
+class BenchmarkKnowledgeImportAccess(Protocol):
+    def import_file(self, source_path: Path, *, timeout: float = 60.0) -> Any: ...
+
+
+class BenchmarkKnowledgeDerivationAccess(Protocol):
+    def status_for_import(self, import_id: str) -> Any: ...
+
+
+class BenchmarkKnowledgeIndexAccess(Protocol):
+    def enqueue_rebuild(self, index_kinds: Any, *, trigger: str) -> str: ...
+
+    def rebuild_now(self, task_id: str) -> Any: ...
 
 
 @dataclass(frozen=True)
 class BenchmarkCasePreparationServices:
     """The narrow production-service seam available before subject timing."""
 
-    knowledge: BenchmarkKnowledgePreparationAccess
+    knowledge_import: BenchmarkKnowledgeImportAccess
+    knowledge_derivation: BenchmarkKnowledgeDerivationAccess
+    knowledge_index: BenchmarkKnowledgeIndexAccess
 
 
 @dataclass(frozen=True)
@@ -273,6 +278,7 @@ class JudgeResult:
 class BenchmarkIdentity:
     fixture_sha256: str | None = None
     settings_sha256: str | None = None
+    embedding_settings_sha256: str | None = None
     judge_settings_sha256: str | None = None
     repository_commit: str | None = None
     repository_dirty: bool | None = None
@@ -281,6 +287,7 @@ class BenchmarkIdentity:
         return {
             "fixture_sha256": self.fixture_sha256,
             "settings_sha256": self.settings_sha256,
+            "embedding_settings_sha256": self.embedding_settings_sha256,
             "judge_settings_sha256": self.judge_settings_sha256,
             "repository_commit": self.repository_commit,
             "repository_dirty": self.repository_dirty,
@@ -300,7 +307,7 @@ class AgentHarnessBenchmarkResult:
     judge: JudgeResult = field(default_factory=JudgeResult)
     identity: BenchmarkIdentity = field(default_factory=BenchmarkIdentity)
     failure_kind: str | None = None
-    schema_version: int = 2
+    schema_version: int = 3
 
     @property
     def integrity_passed(self) -> bool:

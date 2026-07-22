@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QUrl, Signal
+from PySide6.QtCore import QEvent, QThreadPool, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
@@ -27,6 +28,7 @@ from PySide6.QtWidgets import (
 from ..build_info import BUILD_COMMIT, BUILD_COMMIT_DISPLAY
 from ..config import AppPaths
 from ..i18n import TranslationManager
+from ..services.embedding_service import EmbeddingSettings, EmbeddingSettingsService
 from ..services.llm import (
     LLMDialect,
     LLMProviderConfig,
@@ -36,8 +38,24 @@ from ..services.llm import (
     PACKAGED_TRIAL_SECRET_SOURCE,
 )
 from ..services.ml.worker_settings import MLWorkerKind, MLWorkerSettingsService
+from ..services.knowledge_index_service import (
+    KnowledgeIndexKind,
+    KnowledgeIndexService,
+)
+from ..services.paddle_ocr_service import (
+    PaddleOcrDeploymentService,
+    PaddleOcrStatus,
+)
 from ..services.update_service import UpdateService, UpdateState, UpdateStatus
+from .ocr_deployment_tasks import OcrInstallTask, OcrStatusTask
+from .knowledge_index_ui import KnowledgeIndexRebuildDialog
 from .ssh_worker_setup_wizard import SshWorkerSetupWizard
+
+
+class SettingsTab(StrEnum):
+    AI = "ai"
+    KNOWLEDGE_BASE = "knowledge_base"
+    ML_WORKERS = "ml_workers"
 
 
 class AboutDialog(QDialog):
@@ -195,6 +213,7 @@ class AboutDialog(QDialog):
 
 class SettingsDialog(QDialog):
     agent_settings_saved = Signal()
+    embedding_settings_saved = Signal()
     ml_worker_settings_saved = Signal()
 
     def __init__(
@@ -206,7 +225,10 @@ class SettingsDialog(QDialog):
         llm_service: LLMService,
         llm_settings_service: LLMSettingsService,
         ml_worker_settings_service: MLWorkerSettingsService,
+        embedding_settings_service: EmbeddingSettingsService,
         update_service: UpdateService | None = None,
+        paddle_ocr_deployment: PaddleOcrDeploymentService | None = None,
+        knowledge_index_service: KnowledgeIndexService | None = None,
         parent: QDialog | None = None,
     ) -> None:
         super().__init__(parent)
@@ -216,13 +238,27 @@ class SettingsDialog(QDialog):
         self._translation_manager = translation_manager
         self._llm_service = llm_service
         self._llm_settings_service = llm_settings_service
+        self._embedding_settings_service = embedding_settings_service
         self._ml_worker_settings_service = ml_worker_settings_service
         self._update_service = update_service
+        self._paddle_ocr_deployment = paddle_ocr_deployment
+        self._knowledge_index_service = knowledge_index_service
         self._provider_configs: list[LLMProviderConfig] = []
         self._loading_provider = False
         self._active_provider_index = 0
+        self._embedding_settings_snapshot = EmbeddingSettings()
         self._ssh_worker_wizard: SshWorkerSetupWizard | None = None
         self._about_dialog: AboutDialog | None = None
+        self._thread_pool = QThreadPool.globalInstance()
+        self._lifecycle_generation = 0
+        self._active = False
+        self._cached_ocr_status: PaddleOcrStatus | None = None
+        self._ocr_status_task: OcrStatusTask | None = None
+        self._ocr_install_task: OcrInstallTask | None = None
+        self._index_dialog: KnowledgeIndexRebuildDialog | None = None
+        self._knowledge_refresh_timer = QTimer(self)
+        self._knowledge_refresh_timer.setInterval(1_000)
+        self._knowledge_refresh_timer.timeout.connect(self._render_index_status)
 
         self._language_label = QLabel()
         self._language_selector = QComboBox()
@@ -234,6 +270,21 @@ class SettingsDialog(QDialog):
         self._llm_card.setFrameShape(QFrame.StyledPanel)
         self._llm_card_layout = QFormLayout(self._llm_card)
         self._llm_card_layout.setContentsMargins(12, 12, 12, 12)
+
+        self._embedding_card = QFrame()
+        self._embedding_card.setFrameShape(QFrame.StyledPanel)
+        self._embedding_card_layout = QFormLayout(self._embedding_card)
+        self._embedding_card_layout.setContentsMargins(12, 12, 12, 12)
+
+        self._ocr_card = QFrame()
+        self._ocr_card.setFrameShape(QFrame.StyledPanel)
+        self._ocr_card_layout = QFormLayout(self._ocr_card)
+        self._ocr_card_layout.setContentsMargins(12, 12, 12, 12)
+
+        self._index_card = QFrame()
+        self._index_card.setFrameShape(QFrame.StyledPanel)
+        self._index_card_layout = QFormLayout(self._index_card)
+        self._index_card_layout.setContentsMargins(12, 12, 12, 12)
 
         self._global_models_card = QFrame()
         self._global_models_card.setFrameShape(QFrame.StyledPanel)
@@ -261,6 +312,24 @@ class SettingsDialog(QDialog):
         self._llm_thread_title_model_label = QLabel()
         self._llm_retry_attempts_label = QLabel()
 
+        self._embedding_title_label = QLabel()
+        self._embedding_enabled_label = QLabel()
+        self._embedding_base_url_label = QLabel()
+        self._embedding_api_key_label = QLabel()
+        self._embedding_model_label = QLabel()
+        self._embedding_dimensions_label = QLabel()
+        self._embedding_batch_size_label = QLabel()
+        self._embedding_timeout_label = QLabel()
+
+        self._ocr_title_label = QLabel()
+        self._ocr_status_label = QLabel()
+        self._ocr_setup_button = QPushButton()
+
+        self._index_title_label = QLabel()
+        self._index_status_label = QLabel()
+        self._index_status_label.setWordWrap(True)
+        self._index_rebuild_button = QPushButton()
+
         self._ml_workers_title_label = QLabel()
         self._ml_workers_summary_label = QLabel()
         self._ml_workers_setup_button = QPushButton()
@@ -286,10 +355,25 @@ class SettingsDialog(QDialog):
         self._llm_retry_attempts_input = QSpinBox()
         self._llm_retry_attempts_input.setRange(1, 20)
 
+        self._embedding_enabled_checkbox = QCheckBox()
+        self._embedding_base_url_input = QLineEdit()
+        self._embedding_api_key_input = QLineEdit()
+        self._embedding_api_key_input.setEchoMode(QLineEdit.Password)
+        self._embedding_model_input = QLineEdit()
+        self._embedding_dimensions_input = QSpinBox()
+        self._embedding_dimensions_input.setRange(0, 65_536)
+        self._embedding_batch_size_input = QSpinBox()
+        self._embedding_batch_size_input.setRange(1, 2_048)
+        self._embedding_timeout_input = QSpinBox()
+        self._embedding_timeout_input.setRange(1, 3_600)
+        self._embedding_timeout_input.setSuffix(" s")
+        self._tab_indexes: dict[SettingsTab, int] = {}
+
         self.resize(760, 760)
         self._build_ui()
         self._wire_events()
         self._load_agent_settings()
+        self._load_embedding_settings()
         self.retranslate_ui()
 
     def _build_ui(self) -> None:
@@ -340,6 +424,24 @@ class SettingsDialog(QDialog):
         self._llm_card_layout.addRow(self._provider_timeout_label, self._provider_timeout_input)
         self._llm_card_layout.addRow(self._provider_streaming_label, self._provider_streaming_checkbox)
 
+        self._embedding_card_layout.addRow(self._embedding_title_label)
+        self._embedding_card_layout.addRow(self._embedding_enabled_label, self._embedding_enabled_checkbox)
+        self._embedding_card_layout.addRow(self._embedding_base_url_label, self._embedding_base_url_input)
+        self._embedding_card_layout.addRow(self._embedding_api_key_label, self._embedding_api_key_input)
+        self._embedding_card_layout.addRow(self._embedding_model_label, self._embedding_model_input)
+        self._embedding_card_layout.addRow(self._embedding_dimensions_label, self._embedding_dimensions_input)
+        self._embedding_card_layout.addRow(self._embedding_batch_size_label, self._embedding_batch_size_input)
+        self._embedding_card_layout.addRow(self._embedding_timeout_label, self._embedding_timeout_input)
+
+        self._ocr_status_label.setWordWrap(True)
+        self._ocr_card_layout.addRow(self._ocr_title_label)
+        self._ocr_card_layout.addRow(self._ocr_status_label)
+        self._ocr_card_layout.addRow(self._ocr_setup_button)
+
+        self._index_card_layout.addRow(self._index_title_label)
+        self._index_card_layout.addRow(self._index_status_label)
+        self._index_card_layout.addRow(self._index_rebuild_button)
+
         self._ml_workers_summary_label.setWordWrap(True)
         self._ml_workers_card_layout.addRow(self._ml_workers_title_label)
         self._ml_workers_card_layout.addRow(self._ml_workers_summary_label)
@@ -353,6 +455,15 @@ class SettingsDialog(QDialog):
         ai_layout.addWidget(self._llm_card)
         ai_layout.addStretch(1)
 
+        knowledge_tab = QWidget()
+        knowledge_layout = QVBoxLayout(knowledge_tab)
+        knowledge_layout.setContentsMargins(12, 12, 12, 12)
+        knowledge_layout.setSpacing(16)
+        knowledge_layout.addWidget(self._embedding_card)
+        knowledge_layout.addWidget(self._ocr_card)
+        knowledge_layout.addWidget(self._index_card)
+        knowledge_layout.addStretch(1)
+
         ml_workers_tab = QWidget()
         ml_workers_layout = QVBoxLayout(ml_workers_tab)
         ml_workers_layout.setContentsMargins(12, 12, 12, 12)
@@ -360,8 +471,11 @@ class SettingsDialog(QDialog):
         ml_workers_layout.addWidget(self._ml_workers_card)
         ml_workers_layout.addStretch(1)
 
-        self._tabs.addTab(ai_tab, "")
-        self._tabs.addTab(ml_workers_tab, "")
+        self._tab_indexes = {
+            SettingsTab.AI: self._tabs.addTab(ai_tab, ""),
+            SettingsTab.KNOWLEDGE_BASE: self._tabs.addTab(knowledge_tab, ""),
+            SettingsTab.ML_WORKERS: self._tabs.addTab(ml_workers_tab, ""),
+        }
         scroll_layout.addWidget(self._tabs)
         scroll_layout.addStretch(1)
         layout.addWidget(scroll, 1)
@@ -380,12 +494,21 @@ class SettingsDialog(QDialog):
         self._add_provider_button.clicked.connect(self._add_provider)
         self._remove_provider_button.clicked.connect(self._remove_provider)
         self._ml_workers_setup_button.clicked.connect(self._open_ssh_worker_wizard)
+        self._ocr_setup_button.clicked.connect(self._install_ocr)
+        self._index_rebuild_button.clicked.connect(self._open_index_rebuild)
 
     def retranslate_ui(self) -> None:
         self.setWindowTitle(self.tr("Settings"))
         self._language_label.setText(self.tr("Language"))
-        self._tabs.setTabText(0, self.tr("AI"))
-        self._tabs.setTabText(1, self.tr("ML Workers"))
+        self._tabs.setTabText(self._tab_indexes[SettingsTab.AI], self.tr("AI"))
+        self._tabs.setTabText(
+            self._tab_indexes[SettingsTab.KNOWLEDGE_BASE],
+            self.tr("Knowledge Base"),
+        )
+        self._tabs.setTabText(
+            self._tab_indexes[SettingsTab.ML_WORKERS],
+            self.tr("ML Workers"),
+        )
         self._global_models_title_label.setText(self.tr("Global models"))
         self._llm_title_label.setText(self.tr("LLM providers"))
         self._provider_selector_label.setText(self.tr("Provider"))
@@ -401,6 +524,19 @@ class SettingsDialog(QDialog):
         self._llm_guard_model_label.setText(self.tr("Turn guard model"))
         self._llm_thread_title_model_label.setText(self.tr("Thread title model"))
         self._llm_retry_attempts_label.setText(self.tr("LLM retry attempts"))
+        self._embedding_title_label.setText(self.tr("Embedding provider"))
+        self._embedding_enabled_label.setText(self.tr("Enabled"))
+        self._embedding_base_url_label.setText(self.tr("Base URL"))
+        self._embedding_api_key_label.setText(self.tr("API key"))
+        self._embedding_model_label.setText(self.tr("Model"))
+        self._embedding_dimensions_label.setText(self.tr("Dimensions"))
+        self._embedding_dimensions_input.setSpecialValueText(self.tr("Provider default (0)"))
+        self._embedding_batch_size_label.setText(self.tr("Batch size"))
+        self._embedding_timeout_label.setText(self.tr("Timeout"))
+        self._ocr_title_label.setText(self.tr("OCR"))
+        self._ocr_setup_button.setText(self.tr("Set up local PaddleOCR"))
+        self._index_title_label.setText(self.tr("Indexes"))
+        self._index_rebuild_button.setText(self.tr("Rebuild indexes..."))
         self._add_provider_button.setText(self.tr("Add"))
         self._remove_provider_button.setText(self.tr("Remove"))
         self._provider_dialect_selector.setItemText(0, self.tr("OpenAI-compatible"))
@@ -416,11 +552,133 @@ class SettingsDialog(QDialog):
             title_key=self._llm_thread_title_model_selector.currentData(),
         )
         self._refresh_ml_worker_summary()
+        self._render_ocr_status()
+        self._render_index_status()
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == QEvent.LanguageChange:
             self.retranslate_ui()
         super().changeEvent(event)
+
+    def show_tab(self, tab: SettingsTab) -> None:
+        self._tabs.setCurrentIndex(self._tab_indexes[SettingsTab(tab)])
+
+    def _install_ocr(self) -> None:
+        if self._paddle_ocr_deployment is None or self._ocr_install_task is not None:
+            return
+        self._ocr_setup_button.setEnabled(False)
+        generation = self._lifecycle_generation
+        task = OcrInstallTask(self._paddle_ocr_deployment, generation)
+        task.signals.phase.connect(self._on_ocr_phase)
+        task.signals.finished.connect(self._on_ocr_setup_finished)
+        self._ocr_install_task = task
+        self._thread_pool.start(task)
+
+    def _on_ocr_phase(self, generation: int, phase: str) -> None:
+        if generation != self._lifecycle_generation or not self._active:
+            return
+        translations = {
+            "downloading_python": self.tr("Downloading embedded Python"),
+            "installing_pip": self.tr("Installing package manager"),
+            "installing_worker": self.tr("Installing OCR runtime"),
+            "downloading_models": self.tr("Preparing OCR models"),
+            "ready": self.tr("Ready"),
+        }
+        translated = translations.get(phase, self.tr("Preparing local OCR"))
+        self._ocr_status_label.setText(
+            self.tr("Local OCR setup: %1").replace("%1", translated)
+        )
+
+    def _on_ocr_setup_finished(
+        self,
+        generation: int,
+        status: PaddleOcrStatus | None,
+    ) -> None:
+        self._ocr_install_task = None
+        if status is not None:
+            self._cached_ocr_status = status
+        if generation != self._lifecycle_generation or not self._active:
+            if self._active:
+                self._schedule_ocr_status_probe()
+            return
+        self._ocr_setup_button.setEnabled(self._paddle_ocr_deployment is not None)
+        self._render_ocr_status()
+        if status is None:
+            QMessageBox.warning(
+                self,
+                self.tr("Local OCR Setup Failed"),
+                self.tr("Local OCR setup could not be completed."),
+            )
+
+    def _schedule_ocr_status_probe(self) -> None:
+        if (
+            not self._active
+            or self._paddle_ocr_deployment is None
+            or self._ocr_status_task is not None
+            or self._ocr_install_task is not None
+        ):
+            return
+        generation = self._lifecycle_generation
+        task = OcrStatusTask(self._paddle_ocr_deployment, generation)
+        task.signals.finished.connect(self._on_ocr_status_finished)
+        self._ocr_status_task = task
+        self._thread_pool.start(task)
+
+    def _on_ocr_status_finished(self, generation: int, status: PaddleOcrStatus) -> None:
+        self._ocr_status_task = None
+        if generation != self._lifecycle_generation or not self._active:
+            if self._active:
+                self._schedule_ocr_status_probe()
+            return
+        self._cached_ocr_status = status
+        self._render_ocr_status()
+
+    def _render_ocr_status(self) -> None:
+        status = self._cached_ocr_status
+        if self._paddle_ocr_deployment is None:
+            text = self.tr("Local PaddleOCR service is unavailable")
+            enabled = False
+        elif status is None:
+            text = self.tr("Checking local PaddleOCR status")
+            enabled = self._ocr_install_task is None
+        elif status.installed and status.models_ready:
+            text = self.tr("Local PaddleOCR is ready")
+            enabled = self._ocr_install_task is None
+        elif status.installed:
+            text = self.tr(
+                "Local PaddleOCR runtime is installed; models are not ready"
+            )
+            enabled = self._ocr_install_task is None
+        else:
+            text = self.tr("Local PaddleOCR is not installed")
+            enabled = self._ocr_install_task is None
+        self._ocr_status_label.setText(text)
+        self._ocr_setup_button.setEnabled(enabled)
+
+    def showEvent(self, event) -> None:
+        self._active = True
+        self._lifecycle_generation += 1
+        self._render_ocr_status()
+        self._render_index_status()
+        super().showEvent(event)
+        self._knowledge_refresh_timer.start()
+        self._schedule_ocr_status_probe()
+
+    def hideEvent(self, event) -> None:
+        self._deactivate_ocr()
+        super().hideEvent(event)
+
+    def closeEvent(self, event) -> None:
+        self._deactivate_ocr()
+        super().closeEvent(event)
+
+    def _deactivate_ocr(self) -> None:
+        if self._active:
+            self._lifecycle_generation += 1
+        self._active = False
+        self._knowledge_refresh_timer.stop()
+        if self._index_dialog is not None:
+            self._index_dialog.hide()
 
     def _reload_language_options(self) -> None:
         current_locale = self._translation_manager.current_locale()
@@ -479,21 +737,169 @@ class SettingsDialog(QDialog):
         )
         self._llm_retry_attempts_input.setValue(settings.retry_attempts)
 
+    def _load_embedding_settings(self) -> None:
+        settings = self._embedding_settings_service.load()
+        self._embedding_settings_snapshot = settings.model_copy(deep=True)
+        self._embedding_enabled_checkbox.setChecked(settings.enabled)
+        self._embedding_base_url_input.setText(settings.base_url)
+        self._embedding_api_key_input.setText(settings.api_key)
+        self._embedding_model_input.setText(settings.model)
+        self._embedding_dimensions_input.setValue(settings.dimensions or 0)
+        self._embedding_batch_size_input.setValue(settings.batch_size)
+        self._embedding_timeout_input.setValue(settings.timeout_seconds)
+
     def _save_agent_settings(self) -> None:
+        rebuild_choice = "none"
         try:
             self._store_current_provider_fields()
-            settings = LLMSettings(
+            llm_settings = LLMSettings(
                 providers=self._provider_configs,
                 default_fq_model_key=str(self._llm_default_model_selector.currentData() or ""),
                 turn_completion_guard_fq_model_key=str(self._llm_guard_model_selector.currentData() or ""),
                 thread_title_fq_model_key=str(self._llm_thread_title_model_selector.currentData() or ""),
                 retry_attempts=self._llm_retry_attempts_input.value(),
             )
+            embedding_settings = self._embedding_settings_from_fields()
         except Exception as exc:
             QMessageBox.warning(self, self.tr("Settings"), str(exc))
             return
-        self._llm_settings_service.save(settings)
+        try:
+            confirmation_required = (
+                self._knowledge_index_service is not None
+                and self._knowledge_index_service.embedding_change_requires_confirmation(
+                    self._embedding_settings_snapshot,
+                    embedding_settings,
+                )
+            )
+        except Exception:
+            QMessageBox.warning(
+                self,
+                self.tr("Knowledge Indexes"),
+                self.tr("Knowledge index status is unavailable"),
+            )
+            return
+        if confirmation_required:
+            rebuild_choice = self._confirm_embedding_compatibility_change()
+            if rebuild_choice == "cancel":
+                return
+        try:
+            self._llm_settings_service.save(llm_settings)
+            self._embedding_settings_service.save(embedding_settings)
+        except Exception as exc:
+            QMessageBox.warning(self, self.tr("Settings"), str(exc))
+            return
+        self._embedding_settings_snapshot = embedding_settings.model_copy(deep=True)
         self.agent_settings_saved.emit()
+        self.embedding_settings_saved.emit()
+        if rebuild_choice == "rebuild" and self._knowledge_index_service is not None:
+            try:
+                self._knowledge_index_service.enqueue_rebuild(
+                    (KnowledgeIndexKind.TEXT_VECTOR,),
+                    trigger="settings_change",
+                )
+            except Exception:
+                QMessageBox.warning(
+                    self,
+                    self.tr("Knowledge Indexes"),
+                    self.tr(
+                        "Embedding settings were saved, but the vector rebuild "
+                        "could not be queued."
+                    ),
+                )
+        self._render_index_status()
+
+    def _confirm_embedding_compatibility_change(self) -> str:
+        message = QMessageBox(self)
+        message.setIcon(QMessageBox.Warning)
+        message.setWindowTitle(self.tr("Rebuild text vectors?"))
+        message.setText(
+            self.tr(
+                "This change uses a different embedding space. Existing text "
+                "vectors cannot be reused for current Knowledge content."
+            )
+        )
+        rebuild = message.addButton(
+            self.tr("Save and rebuild now"),
+            QMessageBox.AcceptRole,
+        )
+        save_only = message.addButton(
+            self.tr("Save; rebuild later"),
+            QMessageBox.ActionRole,
+        )
+        cancel = message.addButton(QMessageBox.Cancel)
+        message.setDefaultButton(rebuild)
+        message.exec()
+        selected = message.clickedButton()
+        if selected is rebuild:
+            return "rebuild"
+        if selected is save_only:
+            return "later"
+        if selected is cancel:
+            return "cancel"
+        return "cancel"
+
+    def _embedding_settings_from_fields(self) -> EmbeddingSettings:
+        dimensions = self._embedding_dimensions_input.value()
+        current = self._embedding_settings_snapshot
+        return EmbeddingSettings(
+            schema_version=current.schema_version,
+            enabled=self._embedding_enabled_checkbox.isChecked(),
+            provider_key=current.provider_key,
+            dialect=current.dialect,
+            base_url=self._embedding_base_url_input.text(),
+            api_key=self._embedding_api_key_input.text(),
+            model=self._embedding_model_input.text(),
+            dimensions=dimensions or None,
+            batch_size=self._embedding_batch_size_input.value(),
+            timeout_seconds=self._embedding_timeout_input.value(),
+        )
+
+    def _open_index_rebuild(self) -> None:
+        if self._knowledge_index_service is None:
+            return
+        if self._index_dialog is None:
+            self._index_dialog = KnowledgeIndexRebuildDialog(
+                self._knowledge_index_service,
+                self,
+            )
+            self._index_dialog.submitted.connect(
+                lambda _task_id: self._render_index_status()
+            )
+        self._index_dialog.open()
+
+    def _render_index_status(self) -> None:
+        if self._knowledge_index_service is None:
+            self._index_status_label.setText(
+                self.tr("Knowledge index service is unavailable")
+            )
+            self._index_rebuild_button.setEnabled(False)
+            return
+        try:
+            status = self._knowledge_index_service.status()
+        except Exception:
+            self._index_status_label.setText(
+                self.tr("Knowledge index status is unavailable")
+            )
+            self._index_rebuild_button.setEnabled(False)
+            return
+        self._index_status_label.setText(
+            self.tr("Keyword: %1\nText vectors: %2")
+            .replace("%1", self._translated_index_state(status.keyword_state))
+            .replace(
+                "%2", self._translated_index_state(status.text_vector_state)
+            )
+        )
+        self._index_rebuild_button.setEnabled(status.unit_count > 0)
+
+    def _translated_index_state(self, state: str) -> str:
+        translations = {
+            "ready": self.tr("Ready"),
+            "building": self.tr("Building"),
+            "needs_rebuild": self.tr("Needs rebuild"),
+            "unavailable": self.tr("Unavailable"),
+            "needs_attention": self.tr("Needs attention"),
+        }
+        return translations.get(state, self.tr("Unknown status"))
 
     def _refresh_ml_worker_summary(self) -> None:
         settings = self._ml_worker_settings_service.load()

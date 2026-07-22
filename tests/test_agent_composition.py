@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
+import time
+import urllib.request
 from pathlib import Path
 
 from xenix.config import ensure_app_dirs, get_app_paths
@@ -11,6 +14,9 @@ from xenix.observability import NullLLMUsageObservability
 from xenix.services.agent import AgentHarnessService, SubmitUserTurnInput
 from xenix.services.agent.composition import HeadlessAgentServices, build_headless_agent_services
 from xenix.services.agent.skill_catalog import AgentSkill, AgentSkillCatalog
+from xenix.services.embedding_service import EmbeddingSettings, EmbeddingSettingsService
+from xenix.services.knowledge_derivation_service import KnowledgeDerivationService
+from xenix.services.knowledge_import_service import KnowledgeImportService
 from xenix.services.llm import (
     AgentToolRegistry,
     AgentToolSpec,
@@ -23,6 +29,7 @@ from xenix.services.llm import (
 )
 from xenix.services.ml.worker_settings import MLWorkerSettingsService
 from xenix.services.storage import StorageBootstrapService
+from tests.knowledge_test_support import seed_knowledge_text
 
 
 def test_headless_composition_module_imports_without_pyside() -> None:
@@ -77,6 +84,7 @@ def test_builder_wires_real_llm_graph_without_an_injected_provider(monkeypatch, 
     paths = ensure_app_dirs(get_app_paths())
     storage = StorageBootstrapService().initialize(paths)
     llm = LLMService(LLMSettingsService(paths))
+    embedding_settings = EmbeddingSettingsService(paths)
     worker_settings = MLWorkerSettingsService(paths)
     usage_observability = NullLLMUsageObservability()
     catalog = AgentSkillCatalog(
@@ -99,12 +107,14 @@ def test_builder_wires_real_llm_graph_without_an_injected_provider(monkeypatch, 
         paths=paths,
         session_factory=storage.session_factory,
         llm=llm,
+        embedding_settings_service=embedding_settings,
         ml_worker_settings=worker_settings,
         usage_observability=usage_observability,
     )
 
     assert isinstance(services, HeadlessAgentServices)
     assert services.llm is llm
+    assert services.embedding_settings is embedding_settings
     assert services.harness._provider is None  # noqa: SLF001 - real gateway boundary
     assert services.harness._llm_service is llm  # noqa: SLF001 - graph identity
     assert services.harness._dataset_service is services.datasets  # noqa: SLF001 - graph identity
@@ -126,6 +136,89 @@ def test_builder_wires_real_llm_graph_without_an_injected_provider(monkeypatch, 
     )
     assert knowledge_spec.provider_name == "knowledge_lookup"
     assert set(knowledge_spec.parameters_schema["properties"]) == {"query", "mode"}
+
+
+def test_production_composition_resolves_auto_from_embedding_readiness(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "runtime"))
+    paths = ensure_app_dirs(get_app_paths())
+    storage = StorageBootstrapService().initialize(paths)
+    services = build_headless_agent_services(
+        paths=paths,
+        session_factory=storage.session_factory,
+        llm=LLMService(LLMSettingsService(paths)),
+        embedding_settings_service=EmbeddingSettingsService(paths),
+        ml_worker_settings=MLWorkerSettingsService(paths),
+        usage_observability=NullLLMUsageObservability(),
+    )
+    seed_knowledge_text(services.knowledge, title="规则", text="雨具采用三周平均销量补货。")
+
+    result = services.knowledge.retrieve("雨具补货", mode="auto")
+
+    assert result.mode == "keyword"
+    assert len(result.matches) == 1
+    assert EmbeddingSettingsService(paths).load() == EmbeddingSettings()
+
+
+def test_production_composition_executes_real_semantic_path(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "runtime"))
+    paths = ensure_app_dirs(get_app_paths())
+    storage = StorageBootstrapService().initialize(paths)
+    EmbeddingSettingsService(paths).save(
+        EmbeddingSettings(
+            enabled=True,
+            provider_key="test",
+            base_url="https://embedding.example.test",
+            model="meaning-v1",
+            dimensions=2,
+        )
+    )
+
+    class _Response:
+        def __init__(self, payload: dict) -> None:
+            self._body = json.dumps(payload).encode("utf-8")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback) -> None:
+            return None
+
+        def read(self, size: int = -1) -> bytes:
+            return self._body[:size]
+
+    def fake_urlopen(request: urllib.request.Request, timeout: int) -> _Response:
+        payload = json.loads(request.data.decode("utf-8"))
+        data = []
+        for index, text in enumerate(payload["input"]):
+            meaning = (1.0, 0.0) if "雨季" in text or "防水出行" in text else (0.0, 1.0)
+            data.append({"index": index, "embedding": list(meaning)})
+        return _Response({"data": data})
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    services = build_headless_agent_services(
+        paths=paths,
+        session_factory=storage.session_factory,
+        llm=LLMService(LLMSettingsService(paths)),
+        embedding_settings_service=EmbeddingSettingsService(paths),
+        ml_worker_settings=MLWorkerSettingsService(paths),
+        usage_observability=NullLLMUsageObservability(),
+    )
+    seed_knowledge_text(services.knowledge,
+        title="经营经验",
+        text="防水出行品按三期周均销量建立目标库存。",
+    )
+    services.knowledge_semantic.rebuild_generation()
+
+    result = services.knowledge.retrieve("雨季商品补货", mode="semantic")
+
+    assert result.mode == "semantic"
+    assert [match.title for match in result.matches] == ["经营经验"]
 
 
 class _KnowledgeThenTextProvider:
@@ -159,6 +252,34 @@ class _TextCaptureProvider:
         return ProviderResponse(assistant_content_blocks=[{"type": "text", "text": "继续完成。"}])
 
 
+def _import_retrieval_ready_text(paths, storage, artifacts, source: Path) -> None:
+    derivation = KnowledgeDerivationService(
+        paths=paths,
+        session_factory=storage.session_factory,
+    )
+    importer = KnowledgeImportService(
+        paths=paths,
+        session_factory=storage.session_factory,
+        artifact_service=artifacts,
+        canonical_ready_notifier=derivation.enqueue_generation,
+    )
+    try:
+        imported = importer.import_file(source, timeout=60)
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline:
+            status = derivation.status_for_import(imported.import_id)
+            if status is not None and status.status == "succeeded":
+                assert status.phase == "completed"
+                return
+            if status is not None and status.status == "failed":
+                raise AssertionError(status.error_code)
+            time.sleep(0.02)
+        raise AssertionError("Knowledge derivation did not complete.")
+    finally:
+        importer.shutdown()
+        derivation.shutdown()
+
+
 def test_production_knowledge_lookup_keeps_one_value_across_reload_provider_and_chatbot(
     monkeypatch,
     tmp_path: Path,
@@ -173,13 +294,16 @@ def test_production_knowledge_lookup_keeps_one_value_across_reload_provider_and_
         paths=paths,
         session_factory=storage.session_factory,
         llm=llm,
+        embedding_settings_service=EmbeddingSettingsService(paths),
         ml_worker_settings=worker_settings,
         usage_observability=usage_observability,
     )
-    services.knowledge.index_plain_text(
-        title="华东备货规则",
-        text="雨具目标库存为三周平均销量，补货量扣除现有库存。",
+    source = tmp_path / "华东备货规则.txt"
+    source.write_text(
+        "雨具目标库存为三周平均销量，补货量扣除现有库存。",
+        encoding="utf-8",
     )
+    _import_retrieval_ready_text(paths, storage, services.artifacts, source)
     provider = _KnowledgeThenTextProvider()
     services.harness.set_provider(provider)
     thread = services.harness.create_thread(title="Knowledge continuity")
@@ -213,6 +337,7 @@ def test_production_knowledge_lookup_keeps_one_value_across_reload_provider_and_
         paths=paths,
         session_factory=storage.session_factory,
         llm=llm,
+        embedding_settings_service=EmbeddingSettingsService(paths),
         ml_worker_settings=worker_settings,
         usage_observability=usage_observability,
     )
@@ -302,6 +427,7 @@ def test_historical_knowledge_result_is_not_rewritten_by_production_composition(
         paths=paths,
         session_factory=storage.session_factory,
         llm=llm,
+        embedding_settings_service=EmbeddingSettingsService(paths),
         ml_worker_settings=MLWorkerSettingsService(paths),
         usage_observability=NullLLMUsageObservability(),
     )

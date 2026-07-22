@@ -3,13 +3,16 @@ from __future__ import annotations
 from typing import Any
 
 from ...exceptions import ValidationError
-from ..knowledge_service import MAX_KNOWLEDGE_QUERY_CHARS, KnowledgeService
+from ..knowledge_service import (
+    MAX_KNOWLEDGE_QUERY_CHARS,
+    KnowledgeRetrievalUnavailable,
+    KnowledgeService,
+)
 from ..llm import AgentToolSpec, ToolFailure, ToolSuccess
 
 KNOWLEDGE_LOOKUP_TOOL_NAME = "knowledge.lookup"
 _LOOKUP_ARGUMENTS = frozenset({"query", "mode"})
 _LOOKUP_MODES = ("auto", "keyword", "semantic", "hybrid")
-_READY_LOOKUP_MODES = ("keyword",)
 _RESULT_LIMIT = 5
 _MAX_SOURCE_CHARS = 240
 _MAX_EXCERPT_CHARS = 1600
@@ -64,20 +67,16 @@ def register_knowledge_lookup_tool(registry: Any, service: KnowledgeService) -> 
         except ValidationError as exc:
             return ToolFailure(code="invalid_knowledge_lookup", message=str(exc))
 
-        if mode not in _READY_LOOKUP_MODES and mode != "auto":
-            return ToolFailure(
-                code="knowledge_retrieval_mode_unavailable",
-                message=f"The requested '{mode}' Knowledge retrieval mode is not available.",
-                details={
-                    "requested_mode": mode,
-                    "available_modes": list(_READY_LOOKUP_MODES),
-                },
-                repair_hints=("Use 'auto' or 'keyword' for this lookup.",),
-                retryable=False,
-            )
-
         try:
-            matches = service.lookup(query, top_k=_RESULT_LIMIT)
+            result = service.retrieve(query, mode=mode, top_k=_RESULT_LIMIT)
+        except KnowledgeRetrievalUnavailable as exc:
+            return ToolFailure(
+                code=exc.error_code or "knowledge_retrieval_mode_unavailable",
+                message=str(exc),
+                details=dict(exc.error_details),
+                repair_hints=tuple(exc.repair_hints),
+                retryable=bool(exc.retryable),
+            )
         except Exception:
             return ToolFailure(
                 code="knowledge_lookup_failed",
@@ -86,8 +85,8 @@ def register_knowledge_lookup_tool(registry: Any, service: KnowledgeService) -> 
 
         return ToolSuccess(
             value={
-                "mode": "keyword",
-                "results": _public_results(matches),
+                "mode": result.mode,
+                "results": _public_results(result.matches),
             }
         )
 

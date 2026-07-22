@@ -97,7 +97,14 @@ def test_main_window_language_switch_updates_chat_shell(
         assert window._history_label.text() == "History"
         assert settings._about_button.text() == "About"
         assert settings._tabs.tabText(0) == "AI"
-        assert settings._tabs.tabText(1) == "ML Workers"
+        assert settings._tabs.tabText(1) == "Knowledge Base"
+        assert settings._tabs.tabText(2) == "ML Workers"
+        window._open_knowledge_workspace()
+        workspace = window._knowledge_workspace
+        assert workspace is not None
+        workspace._settings_button.click()
+        assert window._settings_dialog is settings
+        assert settings._tabs.currentIndex() == 1
         assert settings._global_models_title_label.text() == "Global models"
         assert settings._llm_title_label.text() == "LLM providers"
         assert settings._llm_default_model_label.text() == "Default model"
@@ -211,7 +218,8 @@ def test_main_window_language_switch_updates_chat_shell(
         assert window._history_label.text() == "历史"
         assert settings._about_button.text() == "关于"
         assert settings._tabs.tabText(0) == "AI"
-        assert settings._tabs.tabText(1) == "ML 工作器"
+        assert settings._tabs.tabText(1) == "知识库"
+        assert settings._tabs.tabText(2) == "ML 工作器"
         assert settings._global_models_title_label.text() == "全局模型"
         assert settings._llm_title_label.text() == "LLM 提供商"
         assert settings._llm_default_model_label.text() == "默认模型"
@@ -254,7 +262,8 @@ def test_main_window_language_switch_updates_chat_shell(
         assert window.windowTitle() == "Xenix Native"
         assert settings._about_button.text() == "About"
         assert settings._tabs.tabText(0) == "AI"
-        assert settings._tabs.tabText(1) == "ML Workers"
+        assert settings._tabs.tabText(1) == "Knowledge Base"
+        assert settings._tabs.tabText(2) == "ML Workers"
         assert settings._global_models_title_label.text() == "Global models"
         assert settings._llm_title_label.text() == "LLM providers"
         assert settings._llm_default_model_label.text() == "Default model"

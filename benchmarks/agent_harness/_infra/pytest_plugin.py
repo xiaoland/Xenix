@@ -52,6 +52,15 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         ),
     )
     group.addoption(
+        "--embedding-settings",
+        type=Path,
+        dest="agent_harness_embedding_settings",
+        help=(
+            "External subject Embedding settings JSON; otherwise "
+            "XENIX_AGENT_BENCHMARK_EMBEDDING_SETTINGS_PATH."
+        ),
+    )
+    group.addoption(
         "--judge-model",
         dest="agent_harness_judge_model",
         help="Optional judge provider/model key from the explicit judge settings.",
@@ -99,6 +108,10 @@ class AgentHarnessBenchmarkController:
 
         runs = run_benchmark(
             settings_path=_path_option(self.config, "agent_harness_llm_settings"),
+            embedding_settings_path=_path_option(
+                self.config,
+                "agent_harness_embedding_settings",
+            ),
             case=case,
             output_directory=Path(
                 self.config.getoption("agent_harness_output_directory")

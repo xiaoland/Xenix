@@ -247,6 +247,28 @@ def test_analysis_graph_service_writes_svg_from_vegalite_spec(monkeypatch, tmp_p
     assert not any("Invalid path data" in message for message in qt_messages)
 
 
+def test_analysis_graph_repairs_process_wide_svg_namespace_pollution(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    source = _write_sales_csv(tmp_path)
+    ET.register_namespace("svg", analysis_graph_module._SVG_NS)
+
+    try:
+        result = AnalysisGraphService(paths).graph_dataset(
+            GraphDatasetInput(
+                source_path=str(source.resolve()),
+                dataset_name="Sales",
+                spec=_bar_spec(),
+            )
+        )
+    finally:
+        ET.register_namespace("", analysis_graph_module._SVG_NS)
+
+    svg = Path(result.output_path).read_text(encoding="utf-8")
+    assert svg.lstrip().startswith("<svg")
+    assert "<svg:svg" not in svg
+
+
 def test_analysis_graph_service_renders_wordcloud_from_wordcloud_spec(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())

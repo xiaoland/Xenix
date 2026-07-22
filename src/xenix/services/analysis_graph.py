@@ -661,7 +661,7 @@ class AnalysisGraphService:
         except ET.ParseError as exc:
             raise ValidationError("analysis.graph renderer did not return a valid SVG image.") from exc
         self._remove_empty_path_elements(root)
-        return ET.tostring(root, encoding="unicode")
+        return self._serialize_svg(root)
 
     def _remove_empty_path_elements(self, parent: ET.Element) -> None:
         for child in list(parent):
@@ -772,7 +772,7 @@ class AnalysisGraphService:
             title.text = tooltip_by_word[word]
             title.tail = word
             element.insert(0, title)
-        return ET.tostring(root, encoding="unicode")
+        return self._serialize_svg(root)
 
     def _add_wordcloud_title(self, *, svg: str, title: str, width: int, height: int) -> str:
         root = ET.fromstring(svg)
@@ -817,6 +817,13 @@ class AnalysisGraphService:
         root.insert(insertion_index, background)
         root.insert(insertion_index + 1, title_element)
         root.append(content_group)
+        return self._serialize_svg(root)
+
+    def _serialize_svg(self, root: ET.Element) -> str:
+        # XML libraries loaded by optional document runtimes may replace the
+        # process-wide ElementTree prefix for SVG. Reassert the public artifact
+        # contract at the serialization boundary instead of relying on import order.
+        ET.register_namespace("", _SVG_NS)
         return ET.tostring(root, encoding="unicode")
 
     def _is_wordcloud_background_rect(self, element: ET.Element) -> bool:

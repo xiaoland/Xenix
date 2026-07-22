@@ -287,8 +287,11 @@ def _load_runtime_imports() -> SimpleNamespace:
     lazy_tools = load_module("xenix.services.agent.lazy_tools")
     artifact_service = load_module("xenix.services.artifact_service")
     dataset_export_service = load_module("xenix.services.dataset_export_service")
+    embedding_service = load_module("xenix.services.embedding_service")
     link_router = load_module("xenix.services.link_router")
     knowledge_import = load_module("xenix.services.knowledge_import_service")
+    knowledge_derivation = load_module("xenix.services.knowledge_derivation_service")
+    knowledge_index = load_module("xenix.services.knowledge_index_service")
     paddle_ocr = load_module("xenix.services.paddle_ocr_service")
     lazy_ml_service = load_module("xenix.services.lazy_ml_service")
     lazy_services = load_module("xenix.services.lazy_services")
@@ -307,9 +310,12 @@ def _load_runtime_imports() -> SimpleNamespace:
         LLMConversationService=llm.LLMConversationService,
         LLMToolRegistry=llm.AgentToolRegistry,
         DatasetExportService=dataset_export_service.DatasetExportService,
+        EmbeddingSettingsService=embedding_service.EmbeddingSettingsService,
         LazyServiceProxy=lazy_services.LazyServiceProxy,
         LinkRouter=link_router.LinkRouter,
         KnowledgeImportService=knowledge_import.KnowledgeImportService,
+        KnowledgeDerivationService=knowledge_derivation.KnowledgeDerivationService,
+        KnowledgeIndexService=knowledge_index.KnowledgeIndexService,
         PaddleOcrDeploymentService=paddle_ocr.PaddleOcrDeploymentService,
         PaddleOcrService=paddle_ocr.PaddleOcrService,
         LLMService=llm.LLMService,
@@ -519,7 +525,17 @@ def build_main_window(
                 initial_error=exc,
             )
 
+        knowledge_import_service = None
+        knowledge_derivation_service = None
+        knowledge_index_service = None
+
         def shutdown_runtime() -> None:
+            if knowledge_import_service is not None:
+                knowledge_import_service.shutdown()
+            if knowledge_derivation_service is not None:
+                knowledge_derivation_service.shutdown()
+            if knowledge_index_service is not None:
+                knowledge_index_service.shutdown()
             context.engine.dispose()
             flush_observability()
 
@@ -529,11 +545,13 @@ def build_main_window(
         step_start = time.perf_counter()
         ml_worker_settings_service = runtime.MLWorkerSettingsService(paths)
         llm_settings_service = runtime.LLMSettingsService(paths)
+        embedding_settings_service = runtime.EmbeddingSettingsService(paths)
         llm_service = runtime.LLMService(llm_settings_service)
         agent_services = runtime.build_headless_agent_services(
             paths=paths,
             session_factory=context.session_factory,
             llm=llm_service,
+            embedding_settings_service=embedding_settings_service,
             ml_worker_settings=ml_worker_settings_service,
             usage_observability=LocalLLMUsageObservability(
                 paths.logs / LLM_USAGE_JOURNAL_FILE_NAME
@@ -546,12 +564,22 @@ def build_main_window(
 
         update_service = UpdateService(paths, runtime.database_path(paths))
         paddle_ocr_deployment = runtime.PaddleOcrDeploymentService(paths)
+        knowledge_index_service = runtime.KnowledgeIndexService(
+            session_factory=context.session_factory,
+            semantic_service=agent_services.knowledge_semantic,
+            embedding_service=agent_services.embedding,
+            embedding_settings_source=embedding_settings_service,
+        )
+        knowledge_derivation_service = runtime.KnowledgeDerivationService(
+            paths=paths,
+            session_factory=context.session_factory,
+            retrieval_ready_notifier=knowledge_index_service.notify_corpus_changed,
+        )
         knowledge_import_service = runtime.KnowledgeImportService(
             paths=paths,
             session_factory=context.session_factory,
-            knowledge_service=agent_services.knowledge,
             artifact_service=agent_services.artifacts,
-            ocr_service=runtime.PaddleOcrService(paddle_ocr_deployment),
+            canonical_ready_notifier=knowledge_derivation_service.enqueue_generation,
         )
         _emit_startup_timing("services.construct", step_start)
 
@@ -564,6 +592,7 @@ def build_main_window(
             agent_harness_service=agent_services.harness,
             llm_service=llm_service,
             llm_settings_service=llm_settings_service,
+            embedding_settings_service=embedding_settings_service,
             ml_worker_settings_service=ml_worker_settings_service,
             artifact_service=agent_services.artifacts,
             link_router=link_router,
@@ -571,6 +600,9 @@ def build_main_window(
             ml_service=agent_services.ml,
             update_service=update_service,
             knowledge_import_service=knowledge_import_service,
+            knowledge_derivation_service=knowledge_derivation_service,
+            knowledge_service=agent_services.knowledge,
+            knowledge_index_service=knowledge_index_service,
             paddle_ocr_deployment=paddle_ocr_deployment,
         )
         _emit_startup_timing("main_window.construct", step_start)
@@ -710,6 +742,10 @@ def _run_smoke_checks(paths) -> None:
     xgboost_prediction = xgboost_estimator.predict([[1.5]])
     if len(xgboost_prediction) != 1:
         raise RuntimeError("XGBoost packaged runtime smoke fit failed.")
+
+    from .services.knowledge_packaged_smoke import run_knowledge_packaged_smoke
+
+    run_knowledge_packaged_smoke(paths)
 
 
 def run(*, smoke_test: bool = False) -> int:

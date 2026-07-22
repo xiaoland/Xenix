@@ -19,6 +19,8 @@ if TYPE_CHECKING:
     from ...observability import LLMUsageObservability
     from ..artifact_service import ArtifactService
     from ..dataset_service import DatasetService
+    from ..embedding_service import EmbeddingService, EmbeddingSettingsService
+    from ..knowledge_semantic_service import KnowledgeSemanticService
     from ..llm import LLMService
     from ..knowledge_service import KnowledgeService
     from ..ml.worker_settings import MLWorkerSettingsService
@@ -78,6 +80,9 @@ class HeadlessAgentServices:
     ml: MLService
     llm: LLMService
     knowledge: KnowledgeService
+    embedding_settings: EmbeddingSettingsService
+    embedding: EmbeddingService
+    knowledge_semantic: KnowledgeSemanticService
 
 
 def build_headless_agent_services(
@@ -85,6 +90,7 @@ def build_headless_agent_services(
     paths: AppPaths,
     session_factory: sessionmaker,
     llm: LLMService,
+    embedding_settings_service: EmbeddingSettingsService,
     ml_worker_settings: MLWorkerSettingsService,
     usage_observability: LLMUsageObservability,
 ) -> HeadlessAgentServices:
@@ -100,7 +106,10 @@ def build_headless_agent_services(
     # Preserve delayed domain imports for desktop startup and headless
     # preflight; they are needed only when a caller actually builds the graph.
     from ..artifact_service import ArtifactService
+    from ..embedding_service import OpenAICompatibleEmbeddingService
+    from ..knowledge_semantic_service import KnowledgeSemanticService
     from ..knowledge_service import KnowledgeService
+    from ..knowledge_vector_store import LanceKnowledgeVectorStore
     from ..lazy_ml_service import LazyMLService
     from ..lazy_services import LazyServiceProxy
     from ..llm import AgentToolRegistry as LLMToolRegistry
@@ -140,7 +149,16 @@ def build_headless_agent_services(
         ml_task_service=ml_task_service,
     )
     artifacts = ArtifactService(session_factory)
-    knowledge = KnowledgeService(session_factory)
+    embedding = OpenAICompatibleEmbeddingService(embedding_settings_service)
+    semantic_knowledge = KnowledgeSemanticService(
+        session_factory,
+        embedding_service=embedding,
+        vector_store=LanceKnowledgeVectorStore(paths),
+    )
+    knowledge = KnowledgeService(
+        session_factory,
+        semantic_search=semantic_knowledge,
+    )
 
     concrete_tools = LazyAgentToolRegistry(
         paths=paths,
@@ -186,6 +204,9 @@ def build_headless_agent_services(
         ml=ml,
         llm=llm,
         knowledge=knowledge,
+        embedding_settings=embedding_settings_service,
+        embedding=embedding,
+        knowledge_semantic=semantic_knowledge,
     )
 
 

@@ -367,6 +367,14 @@ def _translate_tool_summary(summary: str) -> str:
         return QCoreApplication.translate("ToolCallItem", "Ran tool")
     if summary == "Cancelled tool run":
         return QCoreApplication.translate("ToolCallItem", "Cancelled tool run")
+    if summary == "Searching knowledge...":
+        return QCoreApplication.translate("ToolCallItem", "Searching knowledge...")
+    if summary == "Searched knowledge":
+        return QCoreApplication.translate("ToolCallItem", "Searched knowledge")
+    if summary == "Failed to search knowledge":
+        return QCoreApplication.translate("ToolCallItem", "Failed to search knowledge")
+    if summary == "Cancelled knowledge search":
+        return QCoreApplication.translate("ToolCallItem", "Cancelled knowledge search")
     if summary == "Inspecting dataset...":
         return QCoreApplication.translate("ToolCallItem", "Inspecting dataset...")
     if summary == "Inspected dataset":

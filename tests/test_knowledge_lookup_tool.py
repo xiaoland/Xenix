@@ -4,13 +4,19 @@ from types import SimpleNamespace
 import pytest
 
 from xenix.config import ensure_app_dirs, get_app_paths
+from xenix.exceptions import ValidationError
 from xenix.services.agent.knowledge_tool import (
     knowledge_lookup_tool_spec,
     register_knowledge_lookup_tool,
 )
-from xenix.services.knowledge_service import KnowledgeService
+from xenix.services.knowledge_service import (
+    KnowledgeRetrievalResult,
+    KnowledgeRetrievalUnavailable,
+    KnowledgeService,
+)
 from xenix.services.llm import AgentToolRegistry, ToolExecutionContext, ToolFailure, ToolSuccess
 from xenix.services.storage import StorageBootstrapService
+from tests.knowledge_test_support import seed_knowledge_text
 
 
 def _registry(monkeypatch, tmp_path: Path) -> tuple[AgentToolRegistry, KnowledgeService]:
@@ -61,7 +67,7 @@ def test_lookup_tool_has_small_business_facing_contract_with_selectable_mode() -
 
 def test_lookup_tool_returns_one_minimal_value_for_auto_and_keyword(monkeypatch, tmp_path: Path) -> None:
     registry, service = _registry(monkeypatch, tmp_path)
-    service.index_plain_text(
+    seed_knowledge_text(service,
         title="华东备货规则",
         text="雨具目标库存为三周平均销量，补货量扣除现有库存。",
     )
@@ -96,7 +102,7 @@ def test_lookup_tool_returns_one_minimal_value_for_auto_and_keyword(monkeypatch,
     ]
 
 
-def test_lookup_tool_empty_result_is_success_and_invalid_input_is_typed_failure(
+def test_lookup_tool_empty_result_is_success_and_extra_input_is_rejected_by_registry(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -109,17 +115,18 @@ def test_lookup_tool_empty_result_is_success_and_invalid_input_is_typed_failure(
         arguments={"query": "不存在的规则"},
         context=context,
     )
-    invalid = registry.invoke(
-        tool_name="knowledge.lookup",
-        provider_name="knowledge_lookup",
-        arguments={"query": "规则", "top_k": 3},
-        context=context,
-    )
+    with pytest.raises(ValidationError) as exc_info:
+        registry.invoke(
+            tool_name="knowledge.lookup",
+            provider_name="knowledge_lookup",
+            arguments={"query": "规则", "top_k": 3},
+            context=context,
+        )
 
     assert isinstance(empty, ToolSuccess)
     assert empty.value == {"mode": "keyword", "results": []}
-    assert isinstance(invalid, ToolFailure)
-    assert invalid.code == "invalid_knowledge_lookup"
+    assert exc_info.value.error_code == "llm_tool_arguments_invalid"
+    assert exc_info.value.error_details == {"schema_keyword": "additionalProperties"}
 
 
 @pytest.mark.parametrize(
@@ -140,22 +147,25 @@ def test_lookup_tool_rejects_values_outside_its_advertised_contract(
 ) -> None:
     registry, _service = _registry(monkeypatch, tmp_path)
 
-    outcome = registry.invoke(
-        tool_name="knowledge.lookup",
-        provider_name="knowledge_lookup",
-        arguments=arguments,
-        context=ToolExecutionContext(thread_id="thread-1"),
-    )
+    with pytest.raises(ValidationError) as exc_info:
+        registry.invoke(
+            tool_name="knowledge.lookup",
+            provider_name="knowledge_lookup",
+            arguments=arguments,
+            context=ToolExecutionContext(thread_id="thread-1"),
+        )
 
-    assert isinstance(outcome, ToolFailure)
-    assert outcome.code == "invalid_knowledge_lookup"
+    assert exc_info.value.error_code == "llm_tool_arguments_invalid"
 
 
 @pytest.mark.parametrize("mode", ["semantic", "hybrid"])
 def test_lookup_tool_reports_unavailable_modes_without_keyword_fallback(mode: str) -> None:
     class _NeverLookup:
-        def lookup(self, _query: str, **_kwargs):
-            raise AssertionError("an unavailable mode must not execute keyword lookup")
+        def retrieve(self, _query: str, **_kwargs):
+            raise KnowledgeRetrievalUnavailable(
+                requested_mode=mode,
+                available_modes=["keyword"],
+            )
 
     outcome = _invoke_service(_NeverLookup(), {"query": "雨季规则", "mode": mode})
 
@@ -180,16 +190,18 @@ def test_lookup_tool_reports_unavailable_modes_without_keyword_fallback(mode: st
     ],
 )
 def test_lookup_tool_allowlists_location_and_sanitizes_failures(private_path: str) -> None:
-
     class _UnsafeMatchService:
-        def lookup(self, _query: str, **_kwargs):
-            return [
-                SimpleNamespace(
-                    title=private_path,
-                    locator={"path": private_path, "page": 2},
-                    quote="雨具补货使用三周平均需求。",
-                )
-            ]
+        def retrieve(self, _query: str, **_kwargs):
+            return KnowledgeRetrievalResult(
+                mode="keyword",
+                matches=[
+                    SimpleNamespace(
+                        title=private_path,
+                        locator={"path": private_path, "page": 2},
+                        quote="雨具补货使用三周平均需求。",
+                    )
+                ],
+            )
 
     success = _invoke_service(_UnsafeMatchService(), {"query": "雨具补货"})
 
@@ -207,7 +219,7 @@ def test_lookup_tool_allowlists_location_and_sanitizes_failures(private_path: st
     assert private_path not in str(success.value)
 
     class _BrokenService:
-        def lookup(self, _query: str, **_kwargs):
+        def retrieve(self, _query: str, **_kwargs):
             raise RuntimeError(f"database failed at {private_path}")
 
     failure = _invoke_service(_BrokenService(), {"query": "雨具补货"})

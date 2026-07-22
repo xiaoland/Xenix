@@ -9,7 +9,7 @@ from sqlmodel import select
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.storage import StorageBootstrapService
-from xenix.services.storage.layout import database_path
+from xenix.services.storage.layout import database_path, knowledge_indexes_root
 from xenix.services.storage.migrations import CURRENT_SCHEMA_VERSION, get_user_version
 from xenix.services.storage.models import (
     ArtifactKind,
@@ -177,17 +177,26 @@ def _create_v14_fixture(db_path: Path) -> None:
         connection.execute("PRAGMA user_version=14")
 
 
-def test_fresh_bootstrap_creates_v17_target_schema(monkeypatch, tmp_path: Path) -> None:
+def test_fresh_bootstrap_creates_v21_target_schema(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
 
-    assert context.schema_version == CURRENT_SCHEMA_VERSION == 17
-    assert get_user_version(context.engine) == 17
+    assert context.schema_version == CURRENT_SCHEMA_VERSION == 21
+    assert get_user_version(context.engine) == 21
     inspector = inspect(context.engine)
     tables = set(inspector.get_table_names())
     assert {"conversation_thread", "conversation_message", "artifact"}.issubset(tables)
-    assert {"knowledge_document", "knowledge_unit", "knowledge_unit_fts", "knowledge_import"}.issubset(tables)
+    assert {
+        "knowledge_document",
+        "knowledge_unit",
+        "knowledge_unit_fts",
+        "knowledge_import",
+        "knowledge_vector_generation",
+        "knowledge_canonical_generation",
+        "knowledge_derivation",
+        "knowledge_index_task",
+    }.issubset(tables)
     assert not tables.intersection({"agent_thread", "agent_turn", "agent_message", "agent_run", "agent_tool_call"})
     assert _table_columns(context, "artifact") == {
         "id", "kind", "title", "absolute_path", "mime_type", "summary",
@@ -208,6 +217,25 @@ def test_fresh_bootstrap_creates_v17_target_schema(monkeypatch, tmp_path: Path) 
     assert "tool_call_message_id" in fresh_shape[0]
     assert "ux_conversation_message_pending_thread" in fresh_shape[1]
     assert fresh_shape[2]
+    assert knowledge_indexes_root(paths).is_dir()
+    assert {"retrieval_generation_id", "retrieval_status"}.issubset(
+        _table_columns(context, "knowledge_document")
+    )
+    assert {
+        "phase",
+        "attempt_number",
+        "retry_of",
+        "planned_document_id",
+        "canonical_generation_id",
+        "envelope_sha256",
+        "content_ir_sha256",
+        "retryable",
+        "cancel_requested",
+    }.issubset(_table_columns(context, "knowledge_import"))
+    assert {
+        constraint["name"]
+        for constraint in inspector.get_unique_constraints("knowledge_import")
+    } == {"uq_knowledge_import_planned_document_attempt"}
 
 
 def test_v14_upgrade_preserves_artifact_and_converts_complete_history(monkeypatch, tmp_path: Path) -> None:
@@ -216,7 +244,7 @@ def test_v14_upgrade_preserves_artifact_and_converts_complete_history(monkeypatc
     _create_v14_fixture(database_path(paths))
     context = StorageBootstrapService().initialize(paths)
 
-    assert context.schema_version == 17
+    assert context.schema_version == 21
     with context.session_factory() as session:
         artifact = session.get(ArtifactRow, "artifact-1")
         assert artifact is not None

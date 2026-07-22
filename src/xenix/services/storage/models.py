@@ -373,6 +373,8 @@ class KnowledgeDocumentRow(SQLModel, table=True):
     source_format: str | None = Field(default=None, index=True)
     canonical_path: str | None = None
     canonical_generation_id: str = Field(default_factory=generate_id, index=True)
+    retrieval_generation_id: str | None = Field(default=None, index=True)
+    retrieval_status: str = Field(default="pending", index=True)
     active: bool = Field(default=True, index=True)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
@@ -404,10 +406,67 @@ class KnowledgeUnitRow(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utc_now)
 
 
+class KnowledgeVectorGenerationRow(SQLModel, table=True):
+    """Published immutable vector projection for one exact library corpus/profile."""
+
+    __tablename__ = "knowledge_vector_generation"
+    __table_args__ = (
+        Index(
+            "ix_knowledge_vector_generation_lookup",
+            "library_id",
+            "profile_fingerprint",
+            "corpus_fingerprint",
+            "created_at",
+        ),
+    )
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    library_id: str = Field(default="global", index=True)
+    corpus_fingerprint: str = Field(index=True)
+    profile_fingerprint: str = Field(index=True)
+    provider_key: str
+    model: str
+    dimensions: int
+    distance_metric: str = "cosine"
+    relative_path: str
+    unit_count: int
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class KnowledgeIndexTaskRow(SQLModel, table=True):
+    """Observable rebuild attempt for derived Knowledge search projections."""
+
+    __tablename__ = "knowledge_index_task"
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    library_id: str = Field(default="global", index=True)
+    index_kinds_payload: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    trigger: str = Field(index=True)
+    status: str = Field(default="queued", index=True)
+    phase: str = Field(default="queued", index=True)
+    profile_fingerprint: str | None = Field(default=None, index=True)
+    corpus_fingerprint: str | None = Field(default=None, index=True)
+    vector_generation_id: str | None = Field(default=None, index=True)
+    error_code: str | None = Field(default=None, index=True)
+    error_summary: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class KnowledgeImportRow(SQLModel, table=True):
     """User-visible lifecycle of one Knowledge source import attempt."""
 
     __tablename__ = "knowledge_import"
+    __table_args__ = (
+        UniqueConstraint(
+            "planned_document_id",
+            "attempt_number",
+            name="uq_knowledge_import_planned_document_attempt",
+        ),
+    )
 
     id: str = Field(default_factory=generate_id, primary_key=True)
     library_id: str = Field(default="global", index=True)
@@ -415,12 +474,86 @@ class KnowledgeImportRow(SQLModel, table=True):
     source_format: str = Field(index=True)
     source_sha256: str | None = Field(default=None, index=True)
     status: str = Field(default="pending", index=True)
+    phase: str = Field(default="queued", index=True)
+    attempt_number: int = 1
+    retry_of: str | None = Field(default=None, index=True)
+    planned_document_id: str | None = Field(default=None, index=True)
     document_id: str | None = Field(default=None, foreign_key="knowledge_document.id", index=True)
     source_artifact_id: str | None = Field(default=None, foreign_key="artifact.id", index=True)
+    canonical_generation_id: str | None = Field(default=None, index=True)
     canonical_path: str | None = None
+    envelope_sha256: str | None = None
+    content_ir_sha256: str | None = None
     reused_existing: bool = False
     error_code: str | None = Field(default=None, index=True)
     error_summary: str | None = None
+    retryable: bool = False
+    cancel_requested: bool = False
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class KnowledgeCanonicalGenerationRow(SQLModel, table=True):
+    """Immutable metadata binding one verified canonical content bundle."""
+
+    __tablename__ = "knowledge_canonical_generation"
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    document_id: str = Field(foreign_key="knowledge_document.id", index=True)
+    import_id: str | None = Field(default=None, foreign_key="knowledge_import.id", index=True)
+    source_artifact_id: str | None = Field(default=None, foreign_key="artifact.id", index=True)
+    library_id: str = Field(default="global", index=True)
+    source_sha256: str = Field(index=True)
+    source_format: str = Field(index=True)
+    media_type: str | None = None
+    display_name: str
+    envelope_sha256: str = Field(index=True)
+    content_ir_sha256: str = Field(index=True)
+    relative_path: str
+    schema_version: int = 2
+    pipeline_payload: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    warnings_payload: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    compatibility_state: str = Field(default="verified", index=True)
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class KnowledgeDerivationRow(SQLModel, table=True):
+    """One service-owned attempt to derive retrieval state from a canonical generation."""
+
+    __tablename__ = "knowledge_derivation"
+    __table_args__ = (
+        Index(
+            "ix_knowledge_derivation_lookup",
+            "document_id",
+            "canonical_generation_id",
+            "created_at",
+        ),
+    )
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    document_id: str = Field(foreign_key="knowledge_document.id", index=True)
+    canonical_generation_id: str = Field(
+        foreign_key="knowledge_canonical_generation.id",
+        index=True,
+    )
+    import_id: str | None = Field(default=None, foreign_key="knowledge_import.id", index=True)
+    status: str = Field(default="queued", index=True)
+    phase: str = Field(default="queued", index=True)
+    attempt_number: int = 1
+    retry_of: str | None = Field(
+        default=None,
+        foreign_key="knowledge_derivation.id",
+        index=True,
+    )
+    error_code: str | None = Field(default=None, index=True)
+    error_summary: str | None = None
+    retryable: bool = False
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 

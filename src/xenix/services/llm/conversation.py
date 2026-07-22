@@ -700,9 +700,9 @@ class LLMConversationService:
             )
             terminal = terminal_tool_result(outcome)
         except Exception as exc:
-            # Preserve the concrete diagnostic in the same canonical value
-            # consumed by the provider and Chatbot.  Bounds constrain storage
-            # stability; they are not a separate redaction policy.
+            # Project the failure once into the same canonical value consumed
+            # by the provider and Chatbot.  Only explicitly public validation
+            # diagnostics survive; unexpected exceptions stay generic.
             terminal = terminal_tool_result(tool_failure_from_exception(exc))
 
         if cancel_requested():

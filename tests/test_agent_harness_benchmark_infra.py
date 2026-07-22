@@ -37,6 +37,9 @@ from benchmarks.agent_harness._infra.judge import (
     parse_judge_response,
     run_judge,
 )
+from benchmarks.agent_harness.test_rainy_season_restock import (
+    _grounded_final_answer_observed,
+)
 from xenix.services.llm import AssistantOutputItem, ProviderResponse
 
 
@@ -99,6 +102,24 @@ def _settings_file(tmp_path: Path, *, models: list[str] | None = None) -> Path:
                     }
                 ],
                 "default_fq_model_key": "benchmark/one",
+            }
+        ),
+        encoding="utf-8",
+    )
+    return settings_path
+
+
+def _embedding_settings_file(tmp_path: Path) -> Path:
+    settings_path = tmp_path / "embedding-settings.json"
+    settings_path.write_text(
+        json.dumps(
+            {
+                "enabled": True,
+                "provider_key": "benchmark-embedding",
+                "base_url": "https://embedding-endpoint.example.test",
+                "api_key": "embedding-secret-must-not-leak",
+                "model": "meaning-one",
+                "dimensions": 8,
             }
         ),
         encoding="utf-8",
@@ -289,6 +310,7 @@ def test_invalid_fixture_persists_one_safe_result_per_configured_model(tmp_path:
 
 def test_matrix_continues_after_one_cell_runtime_result(tmp_path: Path, monkeypatch) -> None:
     settings_path = _settings_file(tmp_path)
+    embedding_settings_path = _embedding_settings_file(tmp_path)
     observed_models: list[str] = []
 
     def fake_run_model_cell(**arguments):
@@ -311,6 +333,7 @@ def test_matrix_continues_after_one_cell_runtime_result(tmp_path: Path, monkeypa
     monkeypatch.setattr(runner, "_run_model_cell", fake_run_model_cell)
     runs = runner.run_benchmark(
         settings_path=settings_path,
+        embedding_settings_path=embedding_settings_path,
         output_directory=tmp_path / "results",
         case=_PassingCase(),
     )
@@ -321,6 +344,14 @@ def test_matrix_continues_after_one_cell_runtime_result(tmp_path: Path, monkeypa
         BenchmarkRunStatus.COMPLETED,
     ]
     assert all(run.persisted for run in runs)
+    assert all(
+        run.result.identity.embedding_settings_sha256
+        == runner._sha256_file(embedding_settings_path)  # noqa: SLF001
+        for run in runs
+    )
+    payload = json.dumps([run.result.to_payload() for run in runs])
+    assert "embedding-secret-must-not-leak" not in payload
+    assert "embedding-endpoint.example.test" not in payload
 
 
 def test_stream_measurements_fold_retry_title_and_sampling_signals_independently() -> None:
@@ -362,8 +393,10 @@ def test_stream_measurements_fold_retry_title_and_sampling_signals_independently
     assert captured_snapshots == [snapshot]
 
 
-def test_optional_case_prepare_receives_only_the_production_knowledge_service() -> None:
-    knowledge = object()
+def test_optional_case_prepare_receives_only_production_import_services() -> None:
+    knowledge_import = object()
+    knowledge_derivation = object()
+    knowledge_index = object()
     received: list[object] = []
     case = SimpleNamespace(
         prepare=lambda *, services: received.append(services),
@@ -371,16 +404,69 @@ def test_optional_case_prepare_receives_only_the_production_knowledge_service() 
 
     runner._prepare_case(  # noqa: SLF001 - optional case lifecycle boundary
         case=case,
-        services=SimpleNamespace(knowledge=knowledge, harness=object(), datasets=object()),
+        knowledge_import=knowledge_import,
+        knowledge_derivation=knowledge_derivation,
+        knowledge_index=knowledge_index,
     )
     runner._prepare_case(  # noqa: SLF001 - backwards-compatible no-op boundary
         case=SimpleNamespace(),
-        services=SimpleNamespace(knowledge=knowledge),
+        knowledge_import=knowledge_import,
+        knowledge_derivation=knowledge_derivation,
+        knowledge_index=knowledge_index,
     )
 
     assert len(received) == 1
-    assert received[0].knowledge is knowledge
+    assert received[0].knowledge_import is knowledge_import
+    assert received[0].knowledge_derivation is knowledge_derivation
+    assert received[0].knowledge_index is knowledge_index
     assert not hasattr(received[0], "harness")
+
+
+def test_restock_oracle_grades_the_terminal_answer_not_tool_vocabulary() -> None:
+    snapshot = SimpleNamespace(
+        messages=[
+            SimpleNamespace(
+                kind=SimpleNamespace(value="assistant"),
+                text=(
+                    "仅处理雨具；目标持有量按最近每周平均流出量的三倍设定。"
+                    "追加件数为目标持有量减去手头数量且最低为零。"
+                    "最终清单：U100 补货 130，R200 补货 75。"
+                ),
+            )
+        ]
+    )
+
+    assert _grounded_final_answer_observed(snapshot) is True
+
+
+def test_restock_oracle_accepts_a_unicode_minus_formula_in_the_final_answer() -> None:
+    snapshot = SimpleNamespace(
+        messages=[
+            SimpleNamespace(
+                kind=SimpleNamespace(value="assistant"),
+                text=(
+                    "只保留雨具，目标库存 = weekly_average_demand × 3，"
+                    "补货数量 = 目标库存 − 当前手头数量；若结果 ≤ 0 则不予补货。"
+                    "U100：130；R200：75。"
+                ),
+            )
+        ]
+    )
+
+    assert _grounded_final_answer_observed(snapshot) is True
+
+
+def test_restock_oracle_rejects_values_without_a_reported_business_rule() -> None:
+    snapshot = SimpleNamespace(
+        messages=[
+            SimpleNamespace(
+                kind=SimpleNamespace(value="assistant"),
+                text="补货结果：U100 为 130，R200 为 75。",
+            )
+        ]
+    )
+
+    assert _grounded_final_answer_observed(snapshot) is False
 
 
 def test_usage_metrics_keep_missing_usage_unknown_and_aggregate_reported_usage() -> None:

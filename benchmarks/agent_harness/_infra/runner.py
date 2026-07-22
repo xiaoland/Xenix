@@ -17,6 +17,10 @@ from uuid import uuid4
 from xenix.config import AppPaths, ensure_app_dirs, package_root
 from xenix.observability import LLMTokenUsage, LLM_USAGE_JOURNAL_FILE_NAME, LocalLLMUsageObservability
 from xenix.services.agent.composition import build_headless_agent_services
+from xenix.services.embedding_service import EmbeddingSettings, EmbeddingSettingsService
+from xenix.services.knowledge_derivation_service import KnowledgeDerivationService
+from xenix.services.knowledge_import_service import KnowledgeImportService
+from xenix.services.knowledge_index_service import KnowledgeIndexService
 from xenix.services.llm import FrozenLLMSettingsSource, LLMService, LLMSettings
 from xenix.services.ml.worker_settings import MLWorkerSettingsService
 from xenix.services.storage import StorageBootstrapService
@@ -41,6 +45,7 @@ from .judge import judge_independence, run_judge
 
 
 LLM_SETTINGS_PATH_ENV = "XENIX_AGENT_BENCHMARK_LLM_SETTINGS_PATH"
+EMBEDDING_SETTINGS_PATH_ENV = "XENIX_AGENT_BENCHMARK_EMBEDDING_SETTINGS_PATH"
 JUDGE_LLM_SETTINGS_PATH_ENV = "XENIX_AGENT_BENCHMARK_JUDGE_LLM_SETTINGS_PATH"
 DEFAULT_OUTPUT_DIRECTORY = Path("build") / "agent-harness-benchmarks"
 
@@ -120,6 +125,13 @@ def resolve_judge_llm_settings_path(explicit_path: Path | None = None) -> Path:
     return Path(raw)
 
 
+def resolve_embedding_settings_path(explicit_path: Path | None = None) -> Path | None:
+    if explicit_path is not None:
+        return explicit_path
+    raw = os.environ.get(EMBEDDING_SETTINGS_PATH_ENV, "").strip()
+    return Path(raw) if raw else None
+
+
 def load_settings_snapshot(path: Path) -> tuple[LLMSettings, str]:
     if not path.is_file():
         raise BenchmarkSettingsError("missing_llm_settings")
@@ -128,6 +140,17 @@ def load_settings_snapshot(path: Path) -> tuple[LLMSettings, str]:
         settings = LLMSettings.model_validate_json(raw)
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
         raise BenchmarkSettingsError("invalid_llm_settings") from None
+    return settings, _sha256_file(path)
+
+
+def load_embedding_settings_snapshot(path: Path) -> tuple[EmbeddingSettings, str]:
+    if not path.is_file():
+        raise BenchmarkSettingsError("missing_embedding_settings")
+    try:
+        raw = path.read_text(encoding="utf-8")
+        settings = EmbeddingSettings.model_validate_json(raw)
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
+        raise BenchmarkSettingsError("invalid_embedding_settings") from None
     return settings, _sha256_file(path)
 
 
@@ -198,6 +221,7 @@ def dry_run_models(
 def run_benchmark(
     *,
     settings_path: Path | None,
+    embedding_settings_path: Path | None = None,
     case: BenchmarkCase,
     output_directory: Path = DEFAULT_OUTPUT_DIRECTORY,
     requested_models: Iterable[str] | None = None,
@@ -228,6 +252,34 @@ def run_benchmark(
         )
 
     model_keys = filtered_model_keys(settings, requested_models)
+    resolved_embedding_settings_path = resolve_embedding_settings_path(
+        embedding_settings_path
+    )
+    embedding_settings: EmbeddingSettings | None = None
+    embedding_settings_sha256: str | None = None
+    if resolved_embedding_settings_path is not None:
+        try:
+            embedding_settings, embedding_settings_sha256 = (
+                load_embedding_settings_snapshot(resolved_embedding_settings_path)
+            )
+        except BenchmarkSettingsError as exc:
+            invalid_identity = BenchmarkIdentity(
+                settings_sha256=settings_sha256,
+                repository_commit=identity.repository_commit,
+                repository_dirty=identity.repository_dirty,
+            )
+            return _persist_all(
+                output_directory,
+                tuple(
+                    _invalid_result(
+                        case_id=case.case_id,
+                        provider_model=model_key,
+                        identity=invalid_identity,
+                        failure_kind=exc.code,
+                    )
+                    for model_key in model_keys
+                ),
+            )
     judge_configuration = _load_judge_configuration(
         judge_settings_path=judge_settings_path,
         judge_model_key=judge_model_key,
@@ -238,6 +290,7 @@ def run_benchmark(
         invalid_identity = BenchmarkIdentity(
             fixture_sha256=None,
             settings_sha256=settings_sha256,
+            embedding_settings_sha256=embedding_settings_sha256,
             judge_settings_sha256=judge_configuration.settings_sha256,
             repository_commit=identity.repository_commit,
             repository_dirty=identity.repository_dirty,
@@ -258,6 +311,7 @@ def run_benchmark(
     cell_identity = BenchmarkIdentity(
         fixture_sha256=fixture_sha256,
         settings_sha256=settings_sha256,
+        embedding_settings_sha256=embedding_settings_sha256,
         judge_settings_sha256=judge_configuration.settings_sha256,
         repository_commit=identity.repository_commit,
         repository_dirty=identity.repository_dirty,
@@ -270,6 +324,9 @@ def run_benchmark(
                 settings=settings,
                 settings_path=resolved_settings_path,
                 settings_sha256=settings_sha256,
+                embedding_settings=embedding_settings,
+                embedding_settings_path=resolved_embedding_settings_path,
+                embedding_settings_sha256=embedding_settings_sha256,
                 model_key=model_key,
                 identity=cell_identity,
                 judge_configuration=judge_configuration,
@@ -285,6 +342,9 @@ def _run_model_cell(
     settings: LLMSettings,
     settings_path: Path,
     settings_sha256: str,
+    embedding_settings: EmbeddingSettings | None,
+    embedding_settings_path: Path | None,
+    embedding_settings_sha256: str | None,
     model_key: str,
     identity: BenchmarkIdentity,
     judge_configuration: _JudgeConfiguration,
@@ -311,19 +371,43 @@ def _run_model_cell(
         paths = _benchmark_paths(root / "runtime")
         storage = None
         services = None
+        knowledge_derivation = None
+        knowledge_import = None
+        knowledge_index = None
         thread_id: str | None = None
         try:
             storage = StorageBootstrapService().initialize(paths)
             llm = LLMService(FrozenLLMSettingsSource(settings))
             worker_settings = MLWorkerSettingsService(paths)
+            embedding_settings_service = EmbeddingSettingsService(paths)
+            if embedding_settings is not None:
+                embedding_settings_service.save(embedding_settings)
             services = build_headless_agent_services(
                 paths=paths,
                 session_factory=storage.session_factory,
                 llm=llm,
+                embedding_settings_service=embedding_settings_service,
                 ml_worker_settings=worker_settings,
                 usage_observability=LocalLLMUsageObservability(
                     paths.logs / LLM_USAGE_JOURNAL_FILE_NAME
                 ),
+            )
+            knowledge_index = KnowledgeIndexService(
+                session_factory=storage.session_factory,
+                semantic_service=services.knowledge_semantic,
+                embedding_service=services.embedding,
+                embedding_settings_source=embedding_settings_service,
+                start_worker=False,
+            )
+            knowledge_derivation = KnowledgeDerivationService(
+                paths=paths,
+                session_factory=storage.session_factory,
+            )
+            knowledge_import = KnowledgeImportService(
+                paths=paths,
+                session_factory=storage.session_factory,
+                artifact_service=services.artifacts,
+                canonical_ready_notifier=knowledge_derivation.enqueue_generation,
             )
             case_services = BenchmarkCaseServices(
                 datasets=services.datasets,
@@ -333,7 +417,12 @@ def _run_model_cell(
             title = _synthetic_title(case.case_id, model_key, run_id)
             thread = services.harness.create_thread(title=title, fq_model_key=model_key)
             thread_id = thread.thread.id
-            _prepare_case(case=case, services=services)
+            _prepare_case(
+                case=case,
+                knowledge_import=knowledge_import,
+                knowledge_derivation=knowledge_derivation,
+                knowledge_index=knowledge_index,
+            )
             started_at = time.perf_counter()
             try:
                 for event in services.harness.submit_user_turn_stream(
@@ -370,7 +459,17 @@ def _run_model_cell(
                         source_state=measurements.source_state,
                         run_dataset_ids=run_dataset_ids,
                         runtime_home=paths.home,
-                        settings_unchanged=_sha256_file(settings_path) == settings_sha256,
+                        settings_unchanged=(
+                            _sha256_file(settings_path) == settings_sha256
+                            and (
+                                embedding_settings_path is None
+                                or (
+                                    embedding_settings_sha256 is not None
+                                    and _sha256_file(embedding_settings_path)
+                                    == embedding_settings_sha256
+                                )
+                            )
+                        ),
                         services=case_services,
                     )
                 )
@@ -427,6 +526,12 @@ def _run_model_cell(
             run_status = BenchmarkRunStatus.RUNTIME_ERROR
             failure_kind = _exception_kind(exc)
         finally:
+            if knowledge_import is not None:
+                knowledge_import.shutdown()
+            if knowledge_derivation is not None:
+                knowledge_derivation.shutdown()
+            if knowledge_index is not None:
+                knowledge_index.shutdown()
             if storage is not None:
                 storage.engine.dispose()
 
@@ -445,13 +550,21 @@ def _run_model_cell(
     )
 
 
-def _prepare_case(*, case: BenchmarkCase, services: Any) -> None:
+def _prepare_case(
+    *,
+    case: BenchmarkCase,
+    knowledge_import: Any,
+    knowledge_derivation: Any,
+    knowledge_index: Any,
+) -> None:
     prepare = getattr(case, "prepare", None)
     if prepare is None:
         return
     prepare(
         services=BenchmarkCasePreparationServices(
-            knowledge=services.knowledge,
+            knowledge_import=knowledge_import,
+            knowledge_derivation=knowledge_derivation,
+            knowledge_index=knowledge_index,
         )
     )
 

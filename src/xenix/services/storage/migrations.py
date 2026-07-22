@@ -9,7 +9,7 @@ from sqlmodel import SQLModel
 from ...exceptions import ValidationError
 from . import models  # noqa: F401
 
-CURRENT_SCHEMA_VERSION = 17
+CURRENT_SCHEMA_VERSION = 21
 
 
 def get_user_version(engine: Engine) -> int:
@@ -793,6 +793,164 @@ def _require_legacy_shape(connection) -> None:
             )
 
 
+def _require_knowledge_source_shape(connection, version: int) -> None:
+    """Reject incomplete databases before advancing a deployed Knowledge edge."""
+
+    required: dict[str, set[str]] = {
+        "conversation_thread": {
+            "id",
+            "title",
+            "system_prompt",
+            "selected_fq_model_key",
+            "created_at",
+            "updated_at",
+        },
+        "conversation_message": {
+            "id",
+            "thread_id",
+            "sequence_index",
+            "kind",
+            "content_payload",
+            "created_at",
+        },
+        "artifact": {
+            "id",
+            "kind",
+            "title",
+            "absolute_path",
+            "metadata_payload",
+            "ready_to_open",
+            "created_at",
+        },
+    }
+    if version >= 16:
+        required.update(
+            {
+                "knowledge_document": {
+                    "id",
+                    "library_id",
+                    "title",
+                    "source_artifact_id",
+                    "canonical_generation_id",
+                    "active",
+                    "created_at",
+                    "updated_at",
+                },
+                "knowledge_unit": {
+                    "id",
+                    "document_id",
+                    "canonical_generation_id",
+                    "ordinal",
+                    "text",
+                    "search_text",
+                    "locator_payload",
+                    "created_at",
+                },
+                "knowledge_unit_fts": {"unit_id", "title", "search_text"},
+                "knowledge_import": {
+                    "id",
+                    "library_id",
+                    "original_file_name",
+                    "source_format",
+                    "source_sha256",
+                    "status",
+                    "document_id",
+                    "source_artifact_id",
+                    "canonical_path",
+                    "reused_existing",
+                    "error_code",
+                    "error_summary",
+                    "created_at",
+                    "updated_at",
+                },
+            }
+        )
+    if version >= 17:
+        required["knowledge_document"].update(
+            {"source_sha256", "source_format", "canonical_path"}
+        )
+    if version >= 18:
+        required["knowledge_vector_generation"] = {
+            "id",
+            "library_id",
+            "corpus_fingerprint",
+            "profile_fingerprint",
+            "provider_key",
+            "model",
+            "dimensions",
+            "distance_metric",
+            "relative_path",
+            "unit_count",
+            "created_at",
+        }
+    if version >= 19:
+        required["knowledge_document"].update(
+            {"retrieval_generation_id", "retrieval_status"}
+        )
+        required["knowledge_import"].update(
+            {
+                "phase",
+                "attempt_number",
+                "retry_of",
+                "planned_document_id",
+                "canonical_generation_id",
+                "envelope_sha256",
+                "content_ir_sha256",
+                "retryable",
+                "cancel_requested",
+            }
+        )
+        required["knowledge_canonical_generation"] = {
+            "id",
+            "document_id",
+            "import_id",
+            "source_artifact_id",
+            "library_id",
+            "source_sha256",
+            "source_format",
+            "media_type",
+            "display_name",
+            "envelope_sha256",
+            "content_ir_sha256",
+            "relative_path",
+            "schema_version",
+            "pipeline_payload",
+            "warnings_payload",
+            "compatibility_state",
+            "created_at",
+        }
+        required["knowledge_derivation"] = {
+            "id",
+            "document_id",
+            "canonical_generation_id",
+            "import_id",
+            "status",
+            "phase",
+            "attempt_number",
+            "retry_of",
+            "error_code",
+            "error_summary",
+            "retryable",
+            "created_at",
+            "updated_at",
+        }
+
+    tables = _table_names(connection)
+    missing_tables = sorted(set(required) - tables)
+    if missing_tables:
+        raise ValidationError(
+            f"Unsupported v{version} database: missing required tables "
+            + ", ".join(missing_tables)
+        )
+    for table_name, columns in required.items():
+        missing_columns = sorted(columns - _table_columns(connection, table_name))
+        if missing_columns:
+            raise ValidationError(
+                f"Unsupported v{version} database: {table_name} is missing columns "
+                + ", ".join(missing_columns)
+            )
+
+
 def _content_text(value: object) -> str | None:
     parsed = value
     if isinstance(value, str):
@@ -1112,17 +1270,15 @@ def _ensure_v16_knowledge_fts(engine: Engine) -> None:
 
 def migrate_v15_to_v16(engine: Engine) -> int:
     with engine.begin() as connection:
-        SQLModel.metadata.create_all(connection)
-        connection.exec_driver_sql(
-            "CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_unit_fts USING fts5("
-            "unit_id UNINDEXED, title, search_text, tokenize='unicode61')"
-        )
+        _require_knowledge_source_shape(connection, 15)
+        _create_v16_knowledge_schema(connection)
         connection.exec_driver_sql("PRAGMA user_version=16")
     return 16
 
 
 def migrate_v16_to_v17(engine: Engine) -> int:
     with engine.begin() as connection:
+        _require_knowledge_source_shape(connection, 16)
         columns = {str(row[1]) for row in connection.exec_driver_sql("PRAGMA table_info(knowledge_document)")}
         if "source_sha256" not in columns:
             connection.exec_driver_sql("ALTER TABLE knowledge_document ADD COLUMN source_sha256 VARCHAR")
@@ -1142,9 +1298,371 @@ def migrate_v16_to_v17(engine: Engine) -> int:
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_knowledge_document_library_source_sha256 "
             "ON knowledge_document (library_id, source_sha256)"
         )
-        SQLModel.metadata.create_all(connection)
         connection.exec_driver_sql("PRAGMA user_version=17")
     return 17
+
+
+def migrate_v17_to_v18(engine: Engine) -> int:
+    with engine.begin() as connection:
+        _require_knowledge_source_shape(connection, 17)
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE knowledge_vector_generation (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                library_id VARCHAR NOT NULL,
+                corpus_fingerprint VARCHAR NOT NULL,
+                profile_fingerprint VARCHAR NOT NULL,
+                provider_key VARCHAR NOT NULL,
+                model VARCHAR NOT NULL,
+                dimensions INTEGER NOT NULL,
+                distance_metric VARCHAR NOT NULL,
+                relative_path VARCHAR NOT NULL,
+                unit_count INTEGER NOT NULL,
+                created_at DATETIME NOT NULL
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX ix_knowledge_vector_generation_library_id "
+            "ON knowledge_vector_generation (library_id)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX ix_knowledge_vector_generation_corpus_fingerprint "
+            "ON knowledge_vector_generation (corpus_fingerprint)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX ix_knowledge_vector_generation_profile_fingerprint "
+            "ON knowledge_vector_generation (profile_fingerprint)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX ix_knowledge_vector_generation_lookup "
+            "ON knowledge_vector_generation "
+            "(library_id, profile_fingerprint, corpus_fingerprint, created_at)"
+        )
+        connection.exec_driver_sql("PRAGMA user_version=18")
+    return 18
+
+
+def migrate_v18_to_v19(engine: Engine) -> int:
+    with engine.begin() as connection:
+        _require_knowledge_source_shape(connection, 18)
+
+        connection.exec_driver_sql(
+            "ALTER TABLE knowledge_document ADD COLUMN retrieval_generation_id VARCHAR"
+        )
+        connection.exec_driver_sql(
+            "ALTER TABLE knowledge_document ADD COLUMN retrieval_status "
+            "VARCHAR NOT NULL DEFAULT 'pending'"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX ix_knowledge_document_retrieval_generation_id "
+            "ON knowledge_document (retrieval_generation_id)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX ix_knowledge_document_retrieval_status "
+            "ON knowledge_document (retrieval_status)"
+        )
+        connection.exec_driver_sql(
+            """
+            UPDATE knowledge_document
+            SET retrieval_generation_id=canonical_generation_id,
+                retrieval_status='ready'
+            WHERE EXISTS (
+                SELECT 1
+                FROM knowledge_unit
+                WHERE knowledge_unit.document_id=knowledge_document.id
+                  AND knowledge_unit.canonical_generation_id=
+                      knowledge_document.canonical_generation_id
+            )
+            """
+        )
+
+        import_columns = (
+            ("phase", "VARCHAR NOT NULL DEFAULT 'queued'"),
+            ("attempt_number", "INTEGER NOT NULL DEFAULT 1"),
+            ("retry_of", "VARCHAR"),
+            ("planned_document_id", "VARCHAR"),
+            ("canonical_generation_id", "VARCHAR"),
+            ("envelope_sha256", "VARCHAR"),
+            ("content_ir_sha256", "VARCHAR"),
+            ("retryable", "BOOLEAN NOT NULL DEFAULT 0"),
+            ("cancel_requested", "BOOLEAN NOT NULL DEFAULT 0"),
+        )
+        for column_name, declaration in import_columns:
+            connection.exec_driver_sql(
+                f"ALTER TABLE knowledge_import ADD COLUMN {column_name} {declaration}"
+            )
+        for column_name in (
+            "phase",
+            "retry_of",
+            "planned_document_id",
+            "canonical_generation_id",
+        ):
+            connection.exec_driver_sql(
+                f"CREATE INDEX ix_knowledge_import_{column_name} "
+                f"ON knowledge_import ({column_name})"
+            )
+        connection.exec_driver_sql(
+            "UPDATE knowledge_import "
+            "SET planned_document_id=document_id "
+            "WHERE planned_document_id IS NULL AND document_id IS NOT NULL"
+        )
+        connection.exec_driver_sql(
+            """
+            UPDATE knowledge_import
+            SET canonical_generation_id=(
+                SELECT knowledge_document.canonical_generation_id
+                FROM knowledge_document
+                WHERE knowledge_document.id=knowledge_import.document_id
+            )
+            WHERE canonical_generation_id IS NULL AND document_id IS NOT NULL
+            """
+        )
+
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE knowledge_canonical_generation (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                document_id VARCHAR NOT NULL,
+                import_id VARCHAR,
+                source_artifact_id VARCHAR,
+                library_id VARCHAR NOT NULL,
+                source_sha256 VARCHAR NOT NULL,
+                source_format VARCHAR NOT NULL,
+                media_type VARCHAR,
+                display_name VARCHAR NOT NULL,
+                envelope_sha256 VARCHAR NOT NULL,
+                content_ir_sha256 VARCHAR NOT NULL,
+                relative_path VARCHAR NOT NULL,
+                schema_version INTEGER NOT NULL,
+                pipeline_payload JSON NOT NULL,
+                warnings_payload JSON NOT NULL,
+                compatibility_state VARCHAR NOT NULL DEFAULT 'verified',
+                created_at DATETIME NOT NULL,
+                FOREIGN KEY(document_id) REFERENCES knowledge_document (id),
+                FOREIGN KEY(import_id) REFERENCES knowledge_import (id),
+                FOREIGN KEY(source_artifact_id) REFERENCES artifact (id)
+            )
+            """
+        )
+        for column_name in (
+            "document_id",
+            "import_id",
+            "source_artifact_id",
+            "library_id",
+            "source_sha256",
+            "source_format",
+            "envelope_sha256",
+            "content_ir_sha256",
+            "compatibility_state",
+        ):
+            connection.exec_driver_sql(
+                f"CREATE INDEX ix_knowledge_canonical_generation_{column_name} "
+                f"ON knowledge_canonical_generation ({column_name})"
+            )
+
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE knowledge_derivation (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                document_id VARCHAR NOT NULL,
+                canonical_generation_id VARCHAR NOT NULL,
+                import_id VARCHAR,
+                status VARCHAR NOT NULL,
+                phase VARCHAR NOT NULL,
+                attempt_number INTEGER NOT NULL,
+                retry_of VARCHAR,
+                error_code VARCHAR,
+                error_summary VARCHAR,
+                retryable BOOLEAN NOT NULL,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                FOREIGN KEY(document_id) REFERENCES knowledge_document (id),
+                FOREIGN KEY(canonical_generation_id)
+                    REFERENCES knowledge_canonical_generation (id),
+                FOREIGN KEY(import_id) REFERENCES knowledge_import (id),
+                FOREIGN KEY(retry_of) REFERENCES knowledge_derivation (id)
+            )
+            """
+        )
+        for column_name in (
+            "document_id",
+            "canonical_generation_id",
+            "import_id",
+            "status",
+            "phase",
+            "retry_of",
+            "error_code",
+        ):
+            connection.exec_driver_sql(
+                f"CREATE INDEX ix_knowledge_derivation_{column_name} "
+                f"ON knowledge_derivation ({column_name})"
+            )
+        connection.exec_driver_sql(
+            "CREATE INDEX ix_knowledge_derivation_lookup "
+            "ON knowledge_derivation "
+            "(document_id, canonical_generation_id, created_at)"
+        )
+        connection.exec_driver_sql("PRAGMA user_version=19")
+    return 19
+
+
+def migrate_v19_to_v20(engine: Engine) -> int:
+    with engine.begin() as connection:
+        _require_knowledge_source_shape(connection, 19)
+        connection.exec_driver_sql(
+            "UPDATE knowledge_import "
+            "SET status='canonical_ready', phase='completed' "
+            "WHERE status='succeeded'"
+        )
+        attempts = connection.exec_driver_sql(
+            "SELECT id, planned_document_id "
+            "FROM knowledge_import "
+            "WHERE planned_document_id IS NOT NULL "
+            "ORDER BY planned_document_id, attempt_number, created_at, id"
+        ).fetchall()
+        current_document_id: str | None = None
+        ordinal = 0
+        for import_id, planned_document_id in attempts:
+            if planned_document_id != current_document_id:
+                current_document_id = planned_document_id
+                ordinal = 1
+            else:
+                ordinal += 1
+            connection.exec_driver_sql(
+                "UPDATE knowledge_import SET attempt_number=? WHERE id=?",
+                (ordinal, import_id),
+            )
+        connection.exec_driver_sql(
+            "CREATE UNIQUE INDEX uq_knowledge_import_planned_document_attempt "
+            "ON knowledge_import (planned_document_id, attempt_number)"
+        )
+        connection.exec_driver_sql("PRAGMA user_version=20")
+    return 20
+
+
+def migrate_v20_to_v21(engine: Engine) -> int:
+    with engine.begin() as connection:
+        _require_knowledge_source_shape(connection, 20)
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE knowledge_index_task (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                library_id VARCHAR NOT NULL,
+                index_kinds_payload JSON NOT NULL,
+                trigger VARCHAR NOT NULL,
+                status VARCHAR NOT NULL,
+                phase VARCHAR NOT NULL,
+                profile_fingerprint VARCHAR,
+                corpus_fingerprint VARCHAR,
+                vector_generation_id VARCHAR,
+                error_code VARCHAR,
+                error_summary VARCHAR,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL
+            )
+            """
+        )
+        for column_name in (
+            "library_id",
+            "trigger",
+            "status",
+            "phase",
+            "profile_fingerprint",
+            "corpus_fingerprint",
+            "vector_generation_id",
+            "error_code",
+        ):
+            connection.exec_driver_sql(
+                f"CREATE INDEX ix_knowledge_index_task_{column_name} "
+                f"ON knowledge_index_task ({column_name})"
+            )
+        connection.exec_driver_sql("PRAGMA user_version=21")
+    return 21
+
+
+def _create_v16_knowledge_schema(connection) -> None:
+    """Create the fixed historical v16 Knowledge shape without current metadata."""
+
+    connection.exec_driver_sql(
+        """
+        CREATE TABLE IF NOT EXISTS knowledge_document (
+            id VARCHAR NOT NULL PRIMARY KEY,
+            library_id VARCHAR NOT NULL,
+            title VARCHAR NOT NULL,
+            source_artifact_id VARCHAR,
+            canonical_generation_id VARCHAR NOT NULL,
+            active BOOLEAN NOT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            FOREIGN KEY(source_artifact_id) REFERENCES artifact (id)
+        )
+        """
+    )
+    connection.exec_driver_sql(
+        """
+        CREATE TABLE IF NOT EXISTS knowledge_unit (
+            id VARCHAR NOT NULL PRIMARY KEY,
+            document_id VARCHAR NOT NULL,
+            canonical_generation_id VARCHAR NOT NULL,
+            ordinal INTEGER NOT NULL,
+            text VARCHAR NOT NULL,
+            search_text VARCHAR NOT NULL,
+            locator_payload JSON NOT NULL,
+            created_at DATETIME NOT NULL,
+            CONSTRAINT uq_knowledge_unit_generation_ordinal
+                UNIQUE (document_id, canonical_generation_id, ordinal),
+            FOREIGN KEY(document_id) REFERENCES knowledge_document (id)
+        )
+        """
+    )
+    connection.exec_driver_sql(
+        """
+        CREATE TABLE IF NOT EXISTS knowledge_import (
+            id VARCHAR NOT NULL PRIMARY KEY,
+            library_id VARCHAR NOT NULL,
+            original_file_name VARCHAR NOT NULL,
+            source_format VARCHAR NOT NULL,
+            source_sha256 VARCHAR,
+            status VARCHAR NOT NULL,
+            document_id VARCHAR,
+            source_artifact_id VARCHAR,
+            canonical_path VARCHAR,
+            reused_existing BOOLEAN NOT NULL,
+            error_code VARCHAR,
+            error_summary VARCHAR,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            FOREIGN KEY(document_id) REFERENCES knowledge_document (id),
+            FOREIGN KEY(source_artifact_id) REFERENCES artifact (id)
+        )
+        """
+    )
+    indexes = (
+        ("ix_knowledge_document_library_id", "knowledge_document", "library_id"),
+        ("ix_knowledge_document_title", "knowledge_document", "title"),
+        ("ix_knowledge_document_source_artifact_id", "knowledge_document", "source_artifact_id"),
+        ("ix_knowledge_document_canonical_generation_id", "knowledge_document", "canonical_generation_id"),
+        ("ix_knowledge_document_active", "knowledge_document", "active"),
+        ("ix_knowledge_unit_document_id", "knowledge_unit", "document_id"),
+        ("ix_knowledge_unit_canonical_generation_id", "knowledge_unit", "canonical_generation_id"),
+        ("ix_knowledge_unit_ordinal", "knowledge_unit", "ordinal"),
+        ("ix_knowledge_import_library_id", "knowledge_import", "library_id"),
+        ("ix_knowledge_import_source_format", "knowledge_import", "source_format"),
+        ("ix_knowledge_import_source_sha256", "knowledge_import", "source_sha256"),
+        ("ix_knowledge_import_status", "knowledge_import", "status"),
+        ("ix_knowledge_import_document_id", "knowledge_import", "document_id"),
+        ("ix_knowledge_import_source_artifact_id", "knowledge_import", "source_artifact_id"),
+        ("ix_knowledge_import_error_code", "knowledge_import", "error_code"),
+    )
+    for name, table, column in indexes:
+        connection.exec_driver_sql(
+            f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({column})"
+        )
+    connection.exec_driver_sql(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_unit_fts USING fts5("
+        "unit_id UNINDEXED, title, search_text, tokenize='unicode61')"
+    )
 
 
 def run_migrations(engine: Engine) -> int:
@@ -1183,11 +1701,20 @@ def run_migrations(engine: Engine) -> int:
         current_version = migrate_v15_to_v16(engine)
     if current_version == 16:
         current_version = migrate_v16_to_v17(engine)
+    if current_version == 17:
+        current_version = migrate_v17_to_v18(engine)
+    if current_version == 18:
+        current_version = migrate_v18_to_v19(engine)
+    if current_version == 19:
+        current_version = migrate_v19_to_v20(engine)
+    if current_version == 20:
+        current_version = migrate_v20_to_v21(engine)
     if current_version == CURRENT_SCHEMA_VERSION:
         return current_version
     raise ValidationError(
-        f"Local schema version {current_version} belongs to an obsolete development baseline. "
-        f"Delete the local database and restart the app to bootstrap schema v{CURRENT_SCHEMA_VERSION}."
+        f"Local schema version {current_version} cannot be upgraded automatically to "
+        f"schema v{CURRENT_SCHEMA_VERSION}. Preserve the runtime state and use the "
+        "documented storage recovery flow."
     )
 
 

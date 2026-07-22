@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from pydantic import ConfigDict
 from sqlalchemy.orm import sessionmaker
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, Session, SQLModel
 
 from ..exceptions import NotFoundError, ValidationError
 from ..observability import record_counter, start_span
@@ -87,34 +87,43 @@ class ArtifactService:
     def register_artifact(self, input_data: RegisterArtifactInput) -> ArtifactRow:
         attributes = {"artifact.kind": input_data.kind.value}
         with start_span("artifact.register", attributes):
-            title = input_data.title.strip()
-            if not title:
-                raise ValidationError("Artifact title cannot be empty.")
-
-            path = Path(input_data.absolute_path).expanduser()
-            if not path.is_absolute():
-                raise ValidationError("Artifact path must be absolute.")
-            if not path.exists():
-                raise ValidationError("Artifact path must exist.")
-
-            now = _utc_now()
-            row = ArtifactRow(
-                kind=input_data.kind,
-                title=title,
-                absolute_path=str(path),
-                mime_type=input_data.mime_type,
-                summary=input_data.summary,
-                preview_payload=input_data.preview_payload,
-                metadata_payload=dict(input_data.metadata_payload),
-                ready_to_open=input_data.ready_to_open,
-                created_at=now,
-            )
-
             with self._session_factory() as session:
-                self._artifacts.create(session, row)
+                row = self.register_artifact_in_session(session, input_data)
                 session.commit()
                 record_counter("xenix.artifact.register.count", attributes={**attributes, "status": "succeeded"})
                 return row
+
+    def register_artifact_in_session(
+        self,
+        session: Session,
+        input_data: RegisterArtifactInput,
+    ) -> ArtifactRow:
+        """Register through a caller-owned transaction.
+
+        Import admission uses this seam so the app-owned source Artifact and its
+        durable queued attempt become visible together.
+        """
+
+        title = input_data.title.strip()
+        if not title:
+            raise ValidationError("Artifact title cannot be empty.")
+        path = Path(input_data.absolute_path).expanduser()
+        if not path.is_absolute():
+            raise ValidationError("Artifact path must be absolute.")
+        if not path.exists():
+            raise ValidationError("Artifact path must exist.")
+        row = ArtifactRow(
+            kind=input_data.kind,
+            title=title,
+            absolute_path=str(path),
+            mime_type=input_data.mime_type,
+            summary=input_data.summary,
+            preview_payload=input_data.preview_payload,
+            metadata_payload=dict(input_data.metadata_payload),
+            ready_to_open=input_data.ready_to_open,
+            created_at=_utc_now(),
+        )
+        return self._artifacts.create(session, row)
 
     def resolve_uri(self, uri: str) -> ResolvedArtifact:
         parsed = urlparse(uri)

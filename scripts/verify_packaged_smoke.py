@@ -60,6 +60,7 @@ def main() -> int:
             runtime_root / "temp",
             runtime_root / "artifacts",
             runtime_root / "state" / "xenix.db",
+            runtime_root / "state" / "knowledge-smoke.json",
             runtime_root / "logs" / "xenix.log",
         ]
         missing = [path for path in expected_paths if not path.exists()]

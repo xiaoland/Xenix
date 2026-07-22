@@ -37,6 +37,7 @@ from ..services.agent import (
 )
 from ..services.artifact_service import ArtifactService
 from ..services.dataset_service import DatasetService
+from ..services.embedding_service import EmbeddingSettingsService
 from ..services.link_router import LinkRouter
 from ..services.llm import ConversationSnapshot, LLMService, LLMSettingsService
 from ..services.ml.worker_settings import MLWorkerSettingsService
@@ -44,11 +45,14 @@ from .chatbot import ComposerAttachmentStatus, ThreadDetailView
 from .icons import plus_icon
 from .layout_debug import dump_layout_if_enabled
 from .native_widgets import emphasize_label
-from .settings_dialog import SettingsDialog
+from .settings_dialog import SettingsDialog, SettingsTab
 from .tool_call_detail_view import ToolCallDetailView
 
 if TYPE_CHECKING:
+    from ..services.knowledge_derivation_service import KnowledgeDerivationService
     from ..services.knowledge_import_service import KnowledgeImportService
+    from ..services.knowledge_index_service import KnowledgeIndexService
+    from ..services.knowledge_service import KnowledgeService
     from ..services.ml_service import MLService
     from ..services.paddle_ocr_service import PaddleOcrDeploymentService
     from ..services.update_service import UpdateService
@@ -98,6 +102,7 @@ class MainWindow(QMainWindow):
         agent_harness_service: AgentHarnessService,
         llm_service: LLMService,
         llm_settings_service: LLMSettingsService,
+        embedding_settings_service: EmbeddingSettingsService,
         ml_worker_settings_service: MLWorkerSettingsService,
         artifact_service: ArtifactService,
         link_router: LinkRouter,
@@ -105,6 +110,9 @@ class MainWindow(QMainWindow):
         ml_service: MLService,
         update_service: UpdateService | None = None,
         knowledge_import_service: KnowledgeImportService | None = None,
+        knowledge_derivation_service: KnowledgeDerivationService | None = None,
+        knowledge_service: KnowledgeService | None = None,
+        knowledge_index_service: KnowledgeIndexService | None = None,
         paddle_ocr_deployment: PaddleOcrDeploymentService | None = None,
     ) -> None:
         super().__init__()
@@ -115,6 +123,7 @@ class MainWindow(QMainWindow):
         self._agent_harness_service = agent_harness_service
         self._llm_service = llm_service
         self._llm_settings_service = llm_settings_service
+        self._embedding_settings_service = embedding_settings_service
         self._ml_worker_settings_service = ml_worker_settings_service
         self._artifact_service = artifact_service
         self._link_router = link_router
@@ -122,6 +131,9 @@ class MainWindow(QMainWindow):
         self._ml_service = ml_service
         self._update_service = update_service
         self._knowledge_import_service = knowledge_import_service
+        self._knowledge_derivation_service = knowledge_derivation_service
+        self._knowledge_service = knowledge_service
+        self._knowledge_index_service = knowledge_index_service
         self._paddle_ocr_deployment = paddle_ocr_deployment
         self._agent_thread_id: str | None = None
         self._active_pending_message_id: str | None = None
@@ -298,7 +310,12 @@ class MainWindow(QMainWindow):
             return
         self._sync_thread_model_picker(snapshot)
 
-    def _open_settings(self) -> None:
+    def _open_settings(
+        self,
+        _checked: bool = False,
+        *,
+        tab: SettingsTab = SettingsTab.AI,
+    ) -> None:
         if self._settings_dialog is None:
             self._settings_dialog = SettingsDialog(
                 paths=self._paths,
@@ -307,17 +324,21 @@ class MainWindow(QMainWindow):
                 translation_manager=self._translation_manager,
                 llm_service=self._llm_service,
                 llm_settings_service=self._llm_settings_service,
+                embedding_settings_service=self._embedding_settings_service,
                 ml_worker_settings_service=self._ml_worker_settings_service,
                 update_service=self._update_service,
+                paddle_ocr_deployment=self._paddle_ocr_deployment,
+                knowledge_index_service=self._knowledge_index_service,
                 parent=self,
             )
             self._settings_dialog.agent_settings_saved.connect(self._reload_agent_provider)
+        self._settings_dialog.show_tab(tab)
         self._settings_dialog.show()
         self._settings_dialog.raise_()
         self._settings_dialog.activateWindow()
 
     def _open_knowledge_workspace(self) -> None:
-        if self._knowledge_import_service is None or self._paddle_ocr_deployment is None:
+        if self._knowledge_import_service is None:
             QMessageBox.warning(
                 self,
                 self.tr("Knowledge Workspace"),
@@ -329,7 +350,13 @@ class MainWindow(QMainWindow):
 
             self._knowledge_workspace = KnowledgeWorkspaceDialog(
                 import_service=self._knowledge_import_service,
+                derivation_service=self._knowledge_derivation_service,
+                knowledge_service=self._knowledge_service,
+                knowledge_index_service=self._knowledge_index_service,
                 ocr_deployment=self._paddle_ocr_deployment,
+                open_knowledge_settings=lambda: self._open_settings(
+                    tab=SettingsTab.KNOWLEDGE_BASE
+                ),
                 parent=self,
             )
         self._knowledge_workspace.show()

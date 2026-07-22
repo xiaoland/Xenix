@@ -5,10 +5,13 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import re
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol, TypeAlias
 
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import SchemaError
 from pydantic import Field, field_validator
 from sqlmodel import SQLModel
 
@@ -20,6 +23,63 @@ MAX_TOOL_CALLS = 16
 MAX_TOOL_PAYLOAD_BYTES = 64 * 1024
 MAX_EXCHANGE_RESULT_BYTES = 1024 * 1024
 MAX_TOOL_FAILURE_MESSAGE_CHARS = 16 * 1024
+
+_PUBLIC_ERROR_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,127}$")
+_SENSITIVE_DIAGNOSTIC_MARKERS = (
+    "api key",
+    "api-key",
+    "api_key",
+    "apikey",
+    "authorization",
+    "bearer",
+    "credential",
+    "password",
+    "secret",
+    "token",
+)
+_SENSITIVE_DIAGNOSTIC_KEYS = (
+    "credential",
+    "endpoint",
+    "password",
+    "path",
+    "secret",
+    "token",
+    "url",
+    "uri",
+)
+_PUBLIC_VALIDATION_DETAIL_KEYS = frozenset(
+    {
+        "actual_count",
+        "actual_dimensions",
+        "available_modes",
+        "category_count",
+        "color_field",
+        "color_mode",
+        "count_field",
+        "dimensions",
+        "distance_metric",
+        "engine",
+        "expected_count",
+        "expected_dimensions",
+        "field",
+        "field_role",
+        "maximum_dimensions",
+        "maximum_length",
+        "minimum",
+        "mode",
+        "operation",
+        "palette_size",
+        "requested_field",
+        "requested_mode",
+        "schema_keyword",
+        "sql",
+        "status_code",
+        "text_index",
+        "total_terms",
+        "visible_terms",
+        "word_field",
+    }
+)
 
 # A Tool Result is a JSON value, rather than a JSON-object-only payload.  In
 # particular, tabular tools return Xenix Table Text directly as a string.  The
@@ -150,6 +210,24 @@ class RegisteredTool:
     implementation: AgentToolImplementation
 
 
+def _freeze_tool_spec(spec: AgentToolSpec) -> tuple[AgentToolSpec, Draft202012Validator]:
+    """Snapshot and compile one advertised schema before it becomes executable."""
+
+    frozen_spec = spec.model_copy(deep=True)
+    try:
+        ensure_bounded_json(
+            frozen_spec.parameters_schema,
+            label=f"Tool '{frozen_spec.name}' parameter schema",
+        )
+        Draft202012Validator.check_schema(frozen_spec.parameters_schema)
+    except (SchemaError, ValidationError):
+        raise ValidationError(
+            "Tool parameter schema is invalid.",
+            error_code="llm_tool_schema_invalid",
+        ) from None
+    return frozen_spec, Draft202012Validator(frozen_spec.parameters_schema)
+
+
 @dataclass(frozen=True)
 class StagedToolCall:
     """Immutable in-memory call awaiting an LLM-owned invocation."""
@@ -198,6 +276,7 @@ class AgentToolRegistry:
     ) -> None:
         self._tools: dict[str, RegisteredTool] = {}
         self._provider_names: dict[str, str] = {}
+        self._validators: dict[str, Draft202012Validator] = {}
         values = (tools or {}).values() if isinstance(tools, Mapping) else (tools or ())
         for tool in values:
             self.register(tool.spec, tool.implementation)
@@ -210,24 +289,33 @@ class AgentToolRegistry:
             raise ValidationError(
                 f"Provider tool name '{spec.provider_name}' is already registered by '{owner}'."
             )
-        self._tools[spec.name] = RegisteredTool(spec=spec, implementation=implementation)
-        self._provider_names[spec.provider_name] = spec.name
+        registered_spec, validator = _freeze_tool_spec(spec)
+        self._tools[registered_spec.name] = RegisteredTool(
+            spec=registered_spec,
+            implementation=implementation,
+        )
+        self._provider_names[registered_spec.provider_name] = registered_spec.name
+        self._validators[registered_spec.name] = validator
 
     register_tool = register
 
     def list_specs(self, scope: ToolScope | None = None) -> list[AgentToolSpec]:
         names = set(scope.tool_names) if scope is not None and scope.tool_names else None
         return [
-            tool.spec
+            tool.spec.model_copy(deep=True)
             for tool in self._tools.values()
             if names is None or tool.spec.name in names
         ]
 
     def get(self, name: str) -> RegisteredTool:
         try:
-            return self._tools[name]
+            tool = self._tools[name]
         except KeyError as exc:
             raise ValidationError(f"Tool '{name}' is not registered.") from exc
+        return RegisteredTool(
+            spec=tool.spec.model_copy(deep=True),
+            implementation=tool.implementation,
+        )
 
     def validate_call(
         self,
@@ -245,6 +333,18 @@ class AgentToolRegistry:
         if scope is not None and scope.tool_names and tool_name not in scope.tool_names:
             raise ValidationError(f"Tool '{tool_name}' is outside the advertised scope.")
         ensure_bounded_json(arguments, label=f"Tool call '{tool_name}' arguments")
+        validator = self._validators[tool_name]
+        validation_error = next(validator.iter_errors(arguments), None)
+        if validation_error is not None:
+            keyword = validation_error.validator
+            if not isinstance(keyword, str) or keyword not in validator.VALIDATORS:
+                keyword = "schema"
+            raise ValidationError(
+                "Tool arguments do not match the registered schema.",
+                error_code="llm_tool_arguments_invalid",
+                error_details={"schema_keyword": keyword},
+                retryable=False,
+            )
 
     def invoke(
         self,
@@ -334,52 +434,119 @@ def canonical_tool_result_value(
         return copy.deepcopy(value)
     if isinstance(value, dict) and value.get("type") == "tool_failure":
         return copy.deepcopy(value)
+    fallback_message = "Tool execution failed."
+    legacy_message = legacy_error_summary.strip() if isinstance(legacy_error_summary, str) else ""
+    if not legacy_message or not _diagnostic_value_is_public(legacy_message):
+        legacy_message = fallback_message
+    legacy_details = (
+        copy.deepcopy(value)
+        if value is not None and _diagnostic_value_is_public(value)
+        else None
+    )
     # Some old failed rows retained a bounded diagnostic payload alongside the
-    # generic summary. Preserve it as structured legacy detail when it still
-    # fits the current canonical value bound; this is a read compatibility
-    # conversion, not a second durable result field.
+    # generic summary. Preserve only public structured detail that still fits
+    # the current canonical value bound; this is a read compatibility
+    # conversion, not a mutation or second durable result field.
     try:
         return ToolFailure(
             code="legacy_tool_failure",
-            message=(legacy_error_summary or "Tool execution failed."),
-            details=copy.deepcopy(value) if value is not None else None,
+            message=legacy_message,
+            details=legacy_details,
         ).to_value()
     except ValidationError:
         return ToolFailure(
             code="legacy_tool_failure",
-            message=(legacy_error_summary or "Tool execution failed."),
+            message=legacy_message,
         ).to_value()
 
 
 def tool_failure_from_exception(exc: Exception) -> ToolFailure:
-    """Preserve useful diagnostics from a Tool exception in one typed value."""
+    """Project an exception into a provider-safe failure without exposing diagnostics."""
 
-    code = getattr(exc, "error_code", None)
-    details = getattr(exc, "error_details", None)
-    hints = getattr(exc, "repair_hints", None)
-    retryable = getattr(exc, "retryable", None)
-    message = str(exc).strip() or exc.__class__.__name__
-    if not isinstance(code, str) or not code.strip():
-        code = "tool_execution_failed"
-    if isinstance(details, (dict, list)) and not details:
-        details = None
-    if not isinstance(details, (dict, list, str, int, float, bool)) and details is not None:
-        details = None
-    if details is None:
-        details = {"exception_type": exc.__class__.__name__}
+    if not isinstance(exc, ValidationError):
+        return _unexpected_tool_failure()
+
+    code = exc.error_code or "tool_validation_failed"
+    message = str(exc).strip() or "Tool input is invalid."
+    details = dict(exc.error_details) if exc.error_details else None
+    hints = tuple(exc.repair_hints)
+    if not _validation_diagnostic_is_public(
+        code=code,
+        message=message,
+        details=details,
+        hints=hints,
+    ):
+        return _invalid_tool_input_failure()
     try:
         return ToolFailure(
             code=code,
             message=message,
             details=details,
-            repair_hints=tuple(hints) if isinstance(hints, list | tuple) else (),
-            retryable=retryable,
+            repair_hints=hints,
+            retryable=exc.retryable,
         )
     except ValidationError:
-        # A malformed domain-provided detail must not replace the original
-        # diagnostic with an opaque generic error.
-        return ToolFailure(
-            code="tool_execution_failed",
-            message=message,
-            details={"exception_type": exc.__class__.__name__},
+        return _invalid_tool_input_failure()
+
+
+def _unexpected_tool_failure() -> ToolFailure:
+    return ToolFailure(
+        code="tool_execution_failed",
+        message="Tool execution failed.",
+    )
+
+
+def _invalid_tool_input_failure() -> ToolFailure:
+    return ToolFailure(
+        code="tool_validation_failed",
+        message="Tool input is invalid.",
+        retryable=False,
+    )
+
+
+def _validation_diagnostic_is_public(
+    *,
+    code: str,
+    message: str,
+    details: ToolResultValue | None,
+    hints: tuple[str, ...],
+) -> bool:
+    if not _PUBLIC_ERROR_CODE_PATTERN.fullmatch(code):
+        return False
+    return all(
+        _diagnostic_value_is_public(value)
+        for value in (message, details, list(hints))
+        if value is not None
+    )
+
+
+def _diagnostic_value_is_public(value: ToolResultValue, *, key: str | None = None) -> bool:
+    if key is not None:
+        normalized_key = key.casefold().replace("-", "_")
+        if (
+            normalized_key not in _PUBLIC_VALIDATION_DETAIL_KEYS
+            or any(marker in normalized_key for marker in _SENSITIVE_DIAGNOSTIC_KEYS)
+        ):
+            return False
+    if value is None or isinstance(value, bool | int | float):
+        return True
+    if isinstance(value, str):
+        normalized = value.strip().casefold()
+        if any(marker in normalized for marker in _SENSITIVE_DIAGNOSTIC_MARKERS):
+            return False
+        return not (
+            "://" in normalized
+            or "/" in value
+            or "\\" in value
+            or value.startswith(("~", "."))
+            or (len(value) >= 2 and value[0].isalpha() and value[1] == ":")
         )
+    if isinstance(value, list | tuple):
+        return all(_diagnostic_value_is_public(item) for item in value)
+    if isinstance(value, dict):
+        return all(
+            isinstance(item_key, str)
+            and _diagnostic_value_is_public(item_value, key=item_key)
+            for item_key, item_value in value.items()
+        )
+    return False

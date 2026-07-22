@@ -35,6 +35,10 @@ dependencies = [
     "docling<3,>=2.114.0",
     "zstandard<1,>=0.23",
     "charset-normalizer<4,>=3.4",
+    "lancedb<1,>=0.34",
+    "pikepdf<11,>=10.10",
+    "msoffcrypto-tool<7,>=6.0",
+    "jsonschema<5,>=4.26",
 ]
 
 [dependency-groups]
@@ -69,3 +73,6 @@ diagnostic-bundle = "python scripts/create_diagnostic_bundle.py"
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
 testpaths = ["tests"]
+markers = [
+    "agent_harness_live: explicit real-provider Agent Harness benchmark case",
+]
