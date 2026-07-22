@@ -1,8 +1,8 @@
 # Knowledge Base — Product Delivery Packet
 
-**Status:** initial delivery packet; engineering completion withdrawn after compliance audit
+**Status:** original design packet reconciled by Slice 01; only live Phase B outcome acceptance remains
 **Opened:** 2026-07-14
-**Posture:** implementation authorized after design/preplay; no commit authority
+**Posture:** implementation locally verified; commit organization authorized on 2026-07-22
 
 > **Follow-up opened 2026-07-21:** the implemented vertical path and benchmark are
 > useful evidence, but the cross-contract completion gate failed. Current diagnosis,
@@ -14,7 +14,7 @@
 
 Define a locally authoritative Knowledge Base through which a user can import work
 journals and industry material into one global Library, let Xenix derive searchable
-evidence from TXT, DOC/DOCX, PPT/PPTX, and PDF files, and let the Agent retrieve
+evidence from TXT, DOC/DOCX, PDF, JPEG, and PNG files, and let the Agent retrieve
 bounded, cited evidence to improve data-analysis interpretation. The internal library
 identity remains extensible to multiple instances without exposing that UX in MVP.
 
@@ -63,41 +63,36 @@ as well as metadata; large source/canonical bytes stay in an app-owned CAS.
 
 ## Current Truth
 
-- SQLModel and SQLAlchemy are already project dependencies; no ORM introduction is
-  needed.
-- SQLite is the established owner of bounded local application state and the local
-  filesystem is the owner of large/user-openable bytes. `ArtifactService` already
-  owns artifact registration, resolution, and activation.
-- No document parser, OCR, embedding capability, vector index, general
-  retrieval service, document/chunk storage model, or document-import lifecycle
-  currently exists.
-- The existing TF-IDF text-similarity model is a trained ML analyzer over tokenized
-  tabular data, not a reusable RAG index.
-- The current Agent attachment flow materializes CSV/Excel-style datasets; a PDF or
-  DOCX can be registered as a source artifact but cannot enter Agent work today.
-- Product decisions confirmed and refreshed through 2026-07-21: MVP exposes one global Library while
-  retaining an internal future extension path; DoclingDocument is its content IR with
-  a separate Xenix lifecycle envelope; MVP accepts TXT, DOC/DOCX, PPT/PPTX, and PDF
-  but not Markdown, standalone images, or VLM; local PaddleOCR plus one-click private
-  deployment is required; same-SHA sources reuse by
-  default; encrypted documents use transient passwords; and DOC PDF-vs-DOCX selection
-  follows an agreed fidelity spike.
-- The first split workstream now defines import as source snapshot through
-  **canonical-ready** publication. Chunking, embeddings, indexes, and Agent exposure
-  are intentionally deferred so their storage/tool decisions do not leak into the
-  import contract.
-- Workstream 02 is being reset around a retrieval-first model: start with the query
-  contract and the knowledge units it needs to return, then choose persistence and
-  indexing mechanisms. Its earlier media-first draft is superseded; no physical
-  storage topology, retention policy, or dependency is approved by this packet.
-- Related evidence and exact source anchors are in
-  [evidence/current-architecture.md](evidence/current-architecture.md).
+- SQLite owns import/document/readiness/current-generation state and bounded Units;
+  the app-owned content-addressed store owns source and canonical bytes;
+  `ArtifactService` owns user-openable source identity.
+- Import is a durable service queue that ends at an immutable DoclingDocument bundle
+  and canonical-ready publication. Independent derivation is the only production
+  publisher of bounded Units and FTS readiness.
+- TXT, DOC/DOCX, PDF, JPEG, and PNG are the exact MVP format registry. Markdown,
+  PPT/PPTX, and VLM remain out of scope. Images without OCR can be canonical-ready
+  while honestly remaining unavailable for retrieval.
+- Local PaddleOCR is an isolated one-click-installed sidecar with versioned health,
+  content-hashed model inventory, bounded output, and cooperative cancellation.
+- Embedding settings are independent from LLM settings. Keyword uses SQLite FTS5;
+  semantic uses immutable LanceDB exact-cosine generations; hybrid uses deterministic
+  RRF; explicit unavailable modes fail rather than masquerade as keyword.
+- `knowledge.lookup` has one canonical `mode/results[{source, location?, excerpt}]`
+  value. Production retrieval is read-only, and the Agent benchmark imports its rule
+  through the real canonical/derivation path and grades final answer surfaces.
+- The repeatable DOC fidelity spike selected DOC→DOCX: both routes preserved all body
+  markers and the table, while DOCX retained the picture and PDF only added page
+  locators. Evidence is under `evidence/` and the executable report is written under
+  `build/knowledge-doc-fidelity-spike/`.
+- Detailed remediation and the remaining live-provider gate are in the
+  [follow-up packet](../knowledge-base-follow-up/README.md).
 
 ## Next Step
 
-Continue discussion and contract reconciliation in the
-[follow-up packet](../knowledge-base-follow-up/README.md). Repair implementation may
-begin only after that packet produces a reviewed repair preplay and Impact Handshake.
+Two isolated rainy-season cells have now produced the exact Dataset and passed
+integrity, but both failed grounded final-answer wording. Diagnose that stable
+omission, repair the correct Agent/oracle owner, then rerun; no ToolResult inspection
+may substitute for the final answer/Dataset verdict.
 
 ## Packet Map
 

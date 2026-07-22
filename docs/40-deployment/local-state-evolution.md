@@ -18,6 +18,39 @@ Automatic migration does not create a pre-migration backup and has no rollback p
 
 The nearest `src/xenix/services/storage/AGENTS.md` owns migration-author tripwires. Migration functions, models, and tests own SQL, table/field shape, version values, and edge composition.
 
+## Derived-State Reconciliation
+
+Knowledge vector bytes are rebuildable projections; their SQLite generation rows
+are the readiness authority. Vector maintenance is not a schema migration and does
+not infer ownership from an arbitrary file name or recursively sweep Knowledge
+storage. It serializes with vector build and search, accepts only strictly contained
+generation paths, and removes only metadata-backed missing/corrupt projections,
+manifest-proven metadata orphans, and stale vector-owned staging.
+
+For a corrupt live projection, maintenance first atomically renames the contained
+path into same-volume private trash, then removes its SQLite row, then attempts
+physical deletion. Physical trash deletion is best effort. If Windows still holds
+the live path and the rename cannot complete after bounded retries, the row remains;
+maintenance must not report or manufacture a different readiness state. Source
+snapshots, canonical content, non-vector staging, symlinks, and unknown sentinels are
+outside this cleanup authority.
+
+Import-owned source/canonical orphan reclamation is also not a schema migration. It
+runs before the Import worker starts, takes its live references from SQLite, and
+recognizes only the exact sharded CAS/staging layouts owned by the current content
+store. It atomically detaches definite crash orphans to private same-volume trash;
+unknown, corrupt, link-like, referenced, and out-of-root shapes remain untouched.
+This authority is separate from vector reconciliation and never deletes vector
+generations or arbitrary staging entries.
+
+Observable Knowledge index tasks are SQLite business metadata, not Lance authority.
+When their table is introduced, use a fixed forward migration and prove both the
+prior supported fixture and fresh bootstrap. Queued/running rows recovered after an
+application restart may be replayed by the single index coordinator; successful or
+failed terminal rows remain bounded operational evidence. Readiness is still derived
+from current Units, profile/corpus fingerprints, the accepted generation, and any
+active task—never from a competing persisted `is_ready` flag.
+
 ## Failure and Recovery
 
 Distinguish these cases before acting:

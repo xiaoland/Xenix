@@ -2,11 +2,11 @@
 
 ## Current Boundary
 
-This document reserves data/lifecycle semantics for the later storage workstream. The
-import workstream defines only the minimum durable identities needed to publish a
-canonical-ready generation safely. It does not prescribe ORM fields, table names,
-filesystem layout, chunk rows, index formats, or where normalized retrieval-unit text
-will live. That last question is explicitly under retrieval-first review.
+Import publishes immutable canonical-ready identity; independent derivation publishes
+bounded retrieval Units/FTS readiness; semantic lookup may publish a rebuildable
+Lance generation. SQLite owns mutable lifecycle/current pointers and Unit text. The
+filesystem owns source/canonical CAS and vector bytes. This follows the retrieval-
+first decision recorded in Workstream 02.
 
 ## Minimum Metadata Semantics
 
@@ -57,20 +57,18 @@ Retry/reparse creates a new immutable generation. Cancellation keeps the stable 
 snapshot, removes unpublished derived staging at a safe boundary, and never overwrites
 a prior canonical-ready generation.
 
-## Later Derivation and Storage Questions
+## Derivation and Storage Resolution
 
-The exploratory design for these questions now lives in
-[workstreams/02-storage](workstreams/02-storage/README.md). It is not yet an
-approved implementation contract; the following remain intentionally unresolved
-until Sir reviews that workstream:
+[Workstream 02](workstreams/02-storage/README.md) now owns the implemented contract:
 
-- the `knowledge_chunk` / index-generation schema and filesystem layout;
-- index readiness versus canonical readiness;
-- Docling-to-chunk serialization/locator choices;
-- embedding/index descriptor compatibility and retention;
-- duplicate/revision UX beyond same-SHA default reuse;
-- deletion/deactivation/reference-aware purge; and
-- migration/backup/restore mechanics for knowledge files plus metadata.
+- `knowledge_unit` rows are bounded passages tied to one current canonical
+  generation; page provenance becomes `page N`, otherwise `passage N`;
+- FTS5 is a derived SQLite projection over Chinese-pretokenized Unit text;
+- LanceDB stores immutable `unit_id -> vector` generations bound by SQLite/manifest
+  corpus and Embedding-profile fingerprints;
+- canonical-ready and retrieval-ready remain separate transitions; and
+- cleanup reclaims only proven staging/orphans. Bounded retention of superseded
+  healthy Lance generations remains an explicit performance/space follow-up.
 
-Those decisions consume the immutable envelope/Docling contract, rather than forcing
-the importer to write chunks or index files prematurely.
+These decisions consume the immutable envelope/Docling contract and do not force the
+importer to write Units, embeddings, or indexes.

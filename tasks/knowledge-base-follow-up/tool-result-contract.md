@@ -39,16 +39,20 @@ Canonical result:
 
 `mode` is optional on input and defaults to `auto`; accepted values are `auto`,
 `keyword`, `semantic`, and `hybrid`. The result reports the strategy actually used so
-an `auto` call is intelligible. Until semantic/vector indexing is implemented,
-explicit `semantic` or `hybrid` requests return one typed Tool failure with the
-currently available modes; they must never fall back silently or claim success.
+an `auto` call is intelligible. `semantic` and `hybrid` execute when an enabled
+Embedding profile and a complete current vector generation are usable. Otherwise an
+explicit request returns one typed Tool failure with the currently available modes;
+it must never fall back silently or claim success. `auto` reports `hybrid` when that
+path succeeds and `keyword` when an expected semantic unavailability causes a fresh
+keyword lookup. Integrity and unexpected failures do not masquerade as fallback.
 
 - `auto` selects the best currently ready mode;
 - `keyword` matches explicit words and phrases;
 - `semantic` matches meaning when wording differs; and
 - `hybrid` combines term and meaning evidence.
 
-`location` is optional when no honest human-readable locator exists. Empty lookup is
+`location` is optional when no honest human-readable locator exists. An empty lookup
+is still a success and preserves its resolved mode, for example
 `{"mode": "keyword", "results": []}`. Result count remains service-owned.
 
 The result does not expose query echo, score, library ID, document
@@ -61,7 +65,7 @@ canonical result contract, not to a hidden presentation/provenance channel.
 
 The Tool must be independently understandable. A Skill may teach a broader workflow,
 but it must not be required for the model to discover the Tool's purpose or use it
-correctly. Proposed description:
+correctly. Production description:
 
 > Search the user's Knowledge Library for business rules, definitions, assumptions,
 > and experience relevant to the current data task. Ask in business language; choose
@@ -107,13 +111,18 @@ state isolation without requiring a `knowledge.lookup` call or any particular re
 payload. Insight/advice cases grade the terminal answer against bounded fixture facts
 and a rubric. Tool telemetry may diagnose failure but cannot satisfy semantic success.
 
-## Open Decisions
+## Location Decision and Future Extension
 
-- How to produce concise, honest locations for DOCX/PPTX/TXT without inventing page
-  numbers.
-- Whether a future source-opening action justifies one actionable identity in the
-  canonical value, and what typed UI behavior would consume it.
+Current results use an honest bounded `page N` label when canonical provenance has a
+page anchor; otherwise derivation supplies a stable human-oriented `passage N` label.
+No page number is invented for DOCX or TXT.
+
+Whether a future source-opening action justifies one actionable identity in the
+canonical value remains deliberately open. That identity is added only together with
+the typed Agent/UI operation that consumes it, never as speculative provenance.
 
 `top_k` and document filtering remain service-owned until an Agent operation shows a
-concrete need. Semantic and hybrid retrieval are required in Phase B of the active
-Slice 01; Phase A's typed unavailability is a checkpoint state, not the final engine.
+concrete need. Slice 01 Phase B implemented semantic and hybrid retrieval; Phase A's
+typed unavailability remains only the historical checkpoint contract. Slice 02's
+visual-evidence proposal retains the same rule: an `evidence_ref` is admissible only
+together with a typed operation that consumes it.

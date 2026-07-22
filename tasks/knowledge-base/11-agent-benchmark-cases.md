@@ -7,10 +7,11 @@ Knowledge Base's East China rainy-season rule. The knowledge states that only ra
 gear uses three weeks of average demand and `max(0, 3 × weekly demand - on hand)`.
 
 The deterministic result is a new derived Dataset containing exactly `U100 → 130`
-and `R200 → 75`; sunscreen and thermos rows are excluded. A successful run must also
-contain a bounded citation to the rule unit, preserve the source Dataset, and finish
-with a canonical Assistant completion. The benchmark does not prescribe tool order,
-SQL, Skill calls, or response wording.
+and `R200 → 75`; sunscreen and thermos rows are excluded. A successful run must
+preserve the source Dataset and finish with a grounded canonical Assistant completion
+that states the applied rule and SKU/quantity actions. The benchmark does not inspect
+Tool Calls/ToolResults or prescribe tool order, SQL, Skill calls, retrieval payload,
+or exact response wording.
 
 This is the first delivery gate because it validates the whole useful loop:
 
@@ -24,10 +25,10 @@ One knowledge document records campaign metrics; another records the guardrails
 `margin >= 18%` and `returns <= 5%`, with highest conversion preferred among passing
 candidates. The user asks which promotion to reuse.
 
-If promoted later, the gate should require evidence from both the metrics unit and guardrail unit, bounded
-quotes with stable citations, and no source mutation or path leakage. Under the current
-benchmark policy this proves the Agent acquired sufficient evidence, not that its
-free-form final sentence selected the right campaign. A future typed recommendation
-artifact can close that remaining answer-quality gap without weakening the Judge.
+If promoted later, the gate should require a final recommendation grounded in both
+the metrics and guardrail facts plus no source mutation or path leakage. It must not
+infer success from stable IDs, quotes, or a prescribed Tool trace. A future typed
+recommendation artifact can provide a deterministic oracle without weakening the
+final-answer Judge.
 This candidate is not an executable benchmark or a completion claim for the current
 goal.

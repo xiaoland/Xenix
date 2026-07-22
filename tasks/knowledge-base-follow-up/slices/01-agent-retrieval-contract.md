@@ -12,9 +12,9 @@ composition persists/reloads/replays/projects that same value.
 
 ## Phase Scope
 
-- Close KB-F01, KB-F15, and KB-F16.
-- Close KB-F13 with deterministic production-composition continuity evidence.
-- Close the Knowledge Tool portions of KB-F10 and KB-F12: no raw locator/path in its
+- Verify the Phase A sub-scope of KB-F01, KB-F15, and KB-F16.
+- Verify the Phase A sub-scope of KB-F13 with deterministic production-composition continuity evidence.
+- Verify the Knowledge Tool portions of KB-F10 and KB-F12: no raw locator/path in its
   result or error, and undeclared arguments are rejected.
 - Stabilize the interface-only part of KB-F14. Semantic execution, vector projection,
   and rank fusion continue in Phase B of the same Slice 01.
@@ -35,9 +35,10 @@ composition persists/reloads/replays/projects that same value.
 - **Benchmark:** Tool-result shape is proven by component/continuity tests. Product
   benchmarks grade final answer surfaces and do not use ToolResults as semantic
   evidence.
-- **Deferred to later Slice 01 phases:** storage schemas, import lifecycle, real
+- **Deferred at this historical checkpoint:** storage schemas, import lifecycle, real
   vector/hybrid retrieval, Knowledge Workspace UI, OCR deployment, packaging
-  exercises, and generic exception normalization for unrelated Tools.
+  exercises, and generic exception normalization for unrelated Tools. Phase B has
+  since implemented the vector/hybrid item; the others retain their later owners.
 
 ## Target Contract
 
@@ -101,10 +102,10 @@ They are not a hidden ToolResult and cannot enrich a historical result later.
 6. **Skill routing:** a normal data-analysis activation now teaches when and how to
    retrieve Knowledge. Preprocessing/modeling receive only local semantic rules; no
    fourth task Skill is advertised.
-7. **Benchmark:** fixture setup may seed Knowledge through a public service seam, but
-   the oracle grades only the final Assistant/Dataset/Artifact/chart deliverable. It
-   does not inspect Tool Calls or ToolResults and cannot freeze retrieval payloads as
-   a golden result.
+7. **Benchmark:** fixture setup imports Knowledge through the production Import and
+   Derivation services; only isolated component tests may use an explicitly named
+   test seeder. The oracle grades the final Assistant/Dataset/Artifact/chart
+   deliverable and never freezes Tool Calls or ToolResults as a golden result.
 8. **Production continuity:** build the real headless graph, assert registration,
    invoke a staged Knowledge call, reopen the conversation service on the same
    SQLite state, and verify provider replay plus Chatbot projection carry exactly the
@@ -155,7 +156,7 @@ Evidence:
 - `pdm run check` — Skill catalog generation/check and compile verification passed.
 - `pdm run benchmark-agent-harness -- --collect-only` — all 3 live cases collected without provider access.
 - Full repository verification completed the non-UI phase with 400 passed. The UI
-  phase completed 57 passed and one environment-only failure: an existing
+  run passed 57 tests; its fresh-home smoke remained unverified because an existing
   `scripts/run_dev.py` process owned Xenix's Windows single-instance mutex,
   so the fresh-home smoke test could not acquire it. No user process was terminated.
 - Follow-up packet relative links and `git diff --check` passed.
@@ -171,6 +172,7 @@ Review corrections made before closeout:
 - locked historical rich Knowledge ToolResults to shape-preserving replay.
 
 Remaining work is intentionally routed, not hidden, into later phases of this same
-Slice 01. Real semantic/hybrid execution is Phase B; import, storage, migration, OCR,
-UI, schema/path closure, and packaged delivery retain their phase owners. The final
-Import/Storage/Tool cross-review remains mandatory before Slice 01 can close.
+Slice 01. Phase B has since implemented real semantic/hybrid execution; import,
+storage, migration, OCR, UI, schema/path closure, and packaged delivery retain their
+phase owners. The final Import/Storage/Tool cross-review remains mandatory before
+Slice 01 can close.

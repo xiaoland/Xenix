@@ -17,16 +17,16 @@ dependency.
 
 | Need | Candidate / role | Position |
 | --- | --- | --- |
-| Content IR/parser | Docling + pinned `docling-core` | Core proposal; version/model/package spike required |
+| Content IR/parser | Docling + pinned `docling-core` | Implemented core; frozen smoke exercised |
 | TXT detection/decoding | stdlib BOM/strict decoder + direct `charset-normalizer` use | Recommended; preserve byte/line sidecar |
 | File signatures | Xenix signature/container probe | MVP core; `python-magic` only optional corroboration after DLL spike |
 | DOCX | Docling primary; Mammoth diagnostic fallback | Recommended primary/supplement separation |
 | Pandoc | Explicit fidelity/repair experiment only | Not automatic MVP runtime fallback |
-| Legacy DOC | Pinned LibreOffice headless conversion capability | Required comparative PDF-vs-DOCX spike |
-| PDF probe/repair | `pikepdf` / QPDF candidate | Optional, bounded/preprocessor only; package spike |
+| Legacy DOC | Pinned LibreOffice headless conversion capability | DOC→DOCX selected by repeatable comparative spike |
+| PDF probe/repair | `pikepdf` / QPDF | Implemented bounded probe/decrypt/preprocessor; frozen smoke exercised |
 | PDF native/layout/render | Docling PDF adapter under Xenix page route; selected renderer/probe helpers after spike | Core route, not one whole-file pipeline |
-| Remote OCR | PaddleOCR Official API (AI Studio) adapter under `OcrService` | MVP direction; real API/schema/package spike |
-| Local structured OCR | PP-StructureV3 sidecar/worker/self-hosted service | Future only; not GUI-process dependency |
+| Local OCR | Private PaddleOCR sidecar/worker under `OcrService` | MVP implementation; one-click install/readiness/package exercise |
+| Structured OCR | PP-StructureV3 sidecar/worker/self-hosted service | Future enrichment; not GUI-process dependency |
 | VLM | None | Explicitly excluded from MVP |
 
 No dependency is added by this packet.
@@ -77,10 +77,10 @@ artifact; every intermediate is checksummed and attempt-local. [LibreOffice comm
 
 ## PDF: Per-Page Policy
 
-`pikepdf` is a candidate for encryption/page/syntax/limit evidence and explicit
-derived repair, powered by QPDF. It is neither the text/layout parser nor renderer,
-and it must never silently rewrite the source. Its native packaging/licensing still
-needs a Windows/PyInstaller spike. [pikepdf tutorial](https://pikepdf.readthedocs.io/en/latest/tutorial.html)
+`pikepdf` handles bounded encryption/page/syntax/limit evidence and explicit
+attempt-local preprocessing, powered by QPDF. It is neither the text/layout parser
+nor renderer, and it never silently rewrites the source. Its native path is included
+in the packaged Knowledge smoke. [pikepdf tutorial](https://pikepdf.readthedocs.io/en/latest/tutorial.html)
 [pikepdf installation](https://pikepdf.readthedocs.io/en/stable/installation.html)
 
 The route is document probe → per-page quality probe → native, OCR, hybrid, or
@@ -89,15 +89,13 @@ for OCR must retain a coordinate transform and page identity. Native and OCR tex
 kept as labelled projections when they conflict; a later retrieval policy chooses
 search visibility.
 
-## OCR: Paddle API First, Local Structure Later
+## OCR: Private Local Text Service, Structured Enrichment Later
 
-`OcrService` is an independent service, not a Docling/LLM convenience function. Its
-first candidate adapter submits selected image/page bytes to the configured PaddleOCR
-Official API (AI Studio), handles asynchronous submit/poll/download within a bounded
-budget, normalizes text/polygon/confidence/language/version results, and records a
-non-secret profile descriptor. A direct HTTP adapter versus official SDK decision
-must be made by a clean-package/schema spike; an API SDK can still pull substantial
-native dependencies. [PaddleOCR Official API](https://www.paddleocr.ai/main/en/version3.x/inference_deployment/serving/paddleocr_official_api/overview.html)
+`OcrService` is an independent service, not a Docling/LLM convenience function. MVP
+uses a one-click-installed private PaddleOCR worker in an isolated runtime. Health
+checks bind worker protocol/package versions, the active manifest, and installed
+model markers; requests/results are bounded and cancellation is cooperative. The GUI
+process never imports Paddle runtime or treats a stale manifest as readiness.
 
 PP-StructureV3 belongs to a future `StructuredDocumentCapability`, not the MVP OCR
 adapter: it performs layout/table/document analysis, has model/runtime complexity, and
@@ -105,22 +103,20 @@ should run in a sidecar, worker, or self-hosted service rather than inside the G
 process unless a dedicated package/Python/runtime spike proves otherwise.
 [PP-StructureV3](https://paddlepaddle.github.io/PaddleOCR/main/en/version3.x/pipeline_usage/PP-StructureV3.html)
 
-## Later Retrieval Stack
+## Retrieval Stack
 
-Storage/tool workstreams will decide chunks, embeddings, keyword/vector persistence,
-hybrid ranking, and Agent contract. They must consume frozen Docling/envelope
-generations and retain the existing SQLite-metadata-only rule. No index/vector
-dependency is selected by this import workstream.
+SQLite owns bounded current Units and Chinese-pretokenized FTS5. Independent
+OpenAI-compatible Embedding settings feed immutable LanceDB exact-cosine generations;
+Xenix combines FTS/vector ranks with deterministic RRF. Lance bytes remain derived,
+and Import receives no Embedding/Lance dependency.
 
-## Mandatory Spikes Before Product Implementation
+## Verification Outcome and Follow-up
 
-1. Pinned Docling/core/model/assets: all MVP fixtures, JSON referenced assets,
-   page-range/merge behavior, offline artifact path, model licenses, clean package.
-2. TXT/DOCX/DOC: CJK decode/line map; Mammoth/Pandoc comparison only where useful;
-   LibreOffice PDF-vs-DOCX fidelity/cancellation/distribution.
-3. PDF: native/scanned/mixed/OCR-layer/broken-font/complex-layout per-page route,
-   pikepdf encrypted/damaged behavior, coordinate/manifest correctness.
-4. Paddle AI Studio: upload/submit/poll/download/schema/error/quota/page mapping,
-   token redaction, CJK quality, cancellation semantics, SDK-vs-HTTP packaging.
-5. PP-StructureV3: separate CPU/GPU/sidecar/worker/Python/package/model-disk proof;
-   no commitment follows merely from a Python demo.
+1. Docling/core/assets, PDFium, pikepdf, Zstandard, LanceDB, and the Paddle worker
+   resource are exercised by focused tests and the packaged Knowledge smoke.
+2. TXT/CJK bounds, DOCX/PDF/image routes, encrypted retry, page-level decisions, and
+   immutable envelope/CAS identity have executable fixtures.
+3. The repeatable legacy-DOC comparison selected DOC→DOCX; see
+   [the fidelity evidence](evidence/doc-fidelity-spike.md).
+4. Rich PP-StructureV3 layout/table enrichment remains a separate future capability
+   with its own quality/runtime/package contract; no VLM support is implied.

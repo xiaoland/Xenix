@@ -5,7 +5,9 @@
 > boundary absorbed retrieval publication, UI daemon threads became the runner, and
 > migration/package proof was insufficient. See the
 > [follow-up compliance audit](../knowledge-base-follow-up/compliance-audit.md).
-> This document remains design history, not evidence of current conformance.
+> This document remains design history, not evidence of current conformance. The
+> [Phase C–G closeout](../knowledge-base-follow-up/slices/01-phases-c-g-closeout.md)
+> records the reconciled implementation and global review.
 
 ## Vertical Slice 1 — Retrieval Before Parsers
 
@@ -15,20 +17,18 @@
 2. Add a Knowledge service that indexes already-normalized text and performs safe CJK
    keyword lookup. Chinese query/document pre-tokenization uses `jieba`; FTS is a
    derived candidate path and rows are revalidated against current units.
-3. Register one bounded `knowledge.lookup` tool. It accepts `query`, optional
-   `document_ids`, and bounded `top_k`; results expose stable IDs, title, locator, and
-   quote, never raw paths or whole documents.
-4. Add a short knowledge-retrieval Skill that teaches evidence use and separation of
-   knowledge claims from data calculations. It must not be treated as an authorization
-   switch.
+3. Register one bounded `knowledge.lookup` Tool. The reconciled contract accepts only
+   `query/mode?` and returns `mode/results[{source, location?, excerpt}]`.
+4. Integrate knowledge-evidence use into the three data Skills; no standalone
+   Knowledge Skill or authorization switch remains.
 5. Extend benchmark setup through public product services and make the rainy-season
    case pass. Keep existing cases and offline defaults unchanged.
 
 ## Vertical Slice 2 — Import and Canonical CAS
 
 Add FileProbe, FormatNormalizer, ParserRouter, Parse, and Canonicalizer around Docling.
-TXT is decoded/normalized directly; DOCX/PPTX/PDF use verified Docling routes;
-DOC/PPT use a converter capability selected by fidelity and packaging spikes. Publish
+TXT is decoded/normalized directly; DOCX/PDF/JPEG/PNG use registered Docling/image
+routes; DOC uses the spike-selected DOCX converter capability. Publish
 source bytes and compressed Docling JSON through staging into an app-owned
 content-addressed store.
 

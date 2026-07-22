@@ -85,9 +85,9 @@ proven idempotent checkpoint; it never mutates a published canonical generation.
 
 ## OCR and VLM Policy
 
-- OCR is conditional and independent from `LLMService`. The first selected service
-  route is PaddleOCR Official API (AI Studio), normalized into a typed projection with
-  engine/model/profile/version, geometry, language, confidence, and outcome.
+- OCR is conditional and independent from `LLMService`. MVP uses a privately managed
+  local PaddleOCR worker, normalized into a typed bounded projection with engine/
+  package/protocol/model descriptors, text, confidence, and outcome.
 - OCR may receive content through the user-configured profile without a per-import
   confirmation. It may never receive a raw local path, credentials, or unrelated
   document bundle.

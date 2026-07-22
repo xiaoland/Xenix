@@ -14,33 +14,51 @@ Findings are assigned through [the slice ledger](slices/README.md). A split find
 keeps one ID with explicit phase sub-scope: for example, Phase A removes unsafe
 Knowledge Tool projection while the generic exception-normalization seam in KB-F10
 remains for a later cross-cutting Phase. A phase is marked verified only for the
-sub-scope named in its own acceptance checks; Slice 01 stays open until all rows and
-the global review converge.
+sub-scope named in its own acceptance checks. Slice closure and any accepted residual
+are recorded in the slice ledger rather than rewriting historical evidence.
 
 ## Current Disposition Inside Slice 01
 
-The Findings table below preserves the audit-at-open evidence. This table is the
+The Findings table below is explicitly the **historical audit-at-open baseline**. It
+is retained without rewriting its original evidence. This disposition table is the
 current remediation state and prevents repaired source from being described as if it
 were still unchanged.
 
-| Finding | Current disposition | Remaining phase |
+| Finding | Current disposition | Remaining acceptance |
 | --- | --- | --- |
-| KB-F01 | Phase A verified: the one canonical value is now `mode/results[{source, location?, excerpt}]`; no private Knowledge identity crosses the Tool. | Final Slice 01 cross-review. |
-| KB-F02 | Open: Import still crosses canonical-ready into retrieval derivation. | Phase E. |
-| KB-F03 | Open: Import execution/queue ownership remains in UI daemon threads. | Phase E. |
-| KB-F04 | Open: Artifact, document/index publication, and import status do not converge atomically. | Phase E. |
-| KB-F05 | Open: canonical envelope is incomplete. | Phase C. |
-| KB-F06 | Open: canonical content addressing is based on source hash rather than payload identity. | Phase C. |
-| KB-F07 | Open: historical Knowledge migration edges and real prior fixtures remain inadequate. | Phase D. |
-| KB-F08 | Open verification gap: packaged Knowledge native/data paths lack a meaningful exercise. | Phase F, then Phase G. |
-| KB-F09 | Open: OCR readiness trusts insufficient manifest/process evidence. | Phase F. |
-| KB-F10 | Partially verified: Knowledge source/locator/error projection is allowlisted and path-safe. | Generic Tool exception normalization and other cross-cutting path seams remain Phase F. |
-| KB-F11 | Open: dynamic Knowledge UI/tool presentation state is not fully translated or presentation-safe. | Phase F. |
-| KB-F12 | Partially verified: `knowledge.lookup` rejects every undeclared argument at execution. | Generic registry-wide JSON Schema enforcement remains Phase F. |
-| KB-F13 | Verified: production composition registration plus new and historical values are proven across persistence, reopen, provider replay, and Chatbot copy. | None. |
-| KB-F14 | Interface verified: mode selection is explicit and unavailable modes cannot fake keyword success. | Semantic/vector and hybrid execution remain Phase B. |
-| KB-F15 | Phase A verified: Tool and property descriptions explain business purpose, evidence use, and exact mode semantics without index plumbing. | Revisit during Phase B readiness changes. |
-| KB-F16 | Verified: methodology is integrated into the three data Skills and their analysis assets; the standalone Knowledge Skill is removed. | None. |
+| KB-F01 | Locally verified: one canonical `mode/results[{source, location?, excerpt}]` value; no private Knowledge identity crosses the Tool. | None. |
+| KB-F02 | Locally verified: Import stops at canonical-ready; only `KnowledgeDerivationService` publishes Units/FTS/retrieval readiness. | None. |
+| KB-F03 | Locally verified: enqueue persists before the service-owned worker runs; UI submits and polls DTOs only. Startup reclaims interrupted attempts. | None. |
+| KB-F04 | Locally verified: source Artifact/CAS and canonical bundle may precede publication, while generation + document pointer + terminal import state converge in one SQLite transaction; proven orphans are reclaimed. | None. |
+| KB-F05 | Locally verified: canonical envelope records application identity, source/probe/pipeline/OCR provenance, IR/assets hashes, warnings, and validation. | None. |
+| KB-F06 | Locally verified: deterministic envelope/content IR bytes have independent SHA-256 identities and verified immutable CAS publication. | None. |
+| KB-F07 | Locally verified: fixed v15→v20 edges, static historical fixtures, deterministic duplicate repair, FK/FTS/ORM readability, and fresh bootstrap evidence. | None. |
+| KB-F08 | Locally verified: frozen smoke exercises Docling/PDFium, pikepdf, Zstandard canonical round-trip, LanceDB write/search, and Paddle worker resource resolution. | None. |
+| KB-F09 | Locally verified: readiness rechecks worker protocol/package, active manifest, model markers, and installed content rather than trusting a stale flag. | None. |
+| KB-F10 | Locally verified: Tool schema/path/error handling is registry-wide; unsafe exception or locator content cannot enter canonical ToolResult state. | None. |
+| KB-F11 | Locally verified: service DTO state and safe error codes are translated for bilingual Workspace/Queue/Embedding UI; visual evidence is retained. | None. |
+| KB-F12 | Locally verified: registry execution validates the advertised JSON Schema, including unknown arguments, types, enum, bounds, and required fields. | None. |
+| KB-F13 | Locally verified: production Import→Derivation→Tool composition plus persistence, reopen, provider replay, and Chatbot copy preserves one value. | None. |
+| KB-F14 | Implementation locally verified: independent Embedding protocol/settings, exact-cosine Lance generations, deterministic RRF hybrid, truthful `auto`, bounds, and multi-library isolation. Two live cells completed with exact Datasets and integrity, but both failed grounded final-answer wording. | Carried to Slice 02 as `KB2-F01`; not retroactively accepted as passing. |
+| KB-F15 | Locally verified: Tool/property descriptions are direct, task-oriented, mode-honest, and contain no index plumbing. | None. |
+| KB-F16 | Locally verified: Knowledge methodology is integrated into the three data Skills and analysis assets; no standalone Knowledge Skill remains. | None. |
+| KB-F17 | Locally verified: one extensible format registry admits TXT, DOC/DOCX, PDF, JPEG, and PNG and rejects PPT/PPTX; UI copy shares that authority. | None. |
+
+## Slice 02 Current Disposition
+
+Sir authorized Slice 02 on 2026-07-22. The table records current implementation and
+acceptance state; multimodal retrieval remains a parked capability rather than a
+hidden acceptance requirement.
+
+| Finding | State | Evidence and consequence | Owning phase |
+| --- | --- | --- | --- |
+| KB2-F01 | Locally verified | The oracle now grades bounded equivalent final wording while still requiring the business rule, inventory-gap/non-positive logic, and exact Dataset. The isolated live cell passed semantic, integrity, persistence, and pytest verdicts. | D |
+| KB2-F02 | Locally verified | Each heavy import attempt runs in a spawned process without SQLite authority. The parent validates and publishes; bounded content-free JSONL events are readable from the modeless Queue log viewer. Crash/cancel/package seams are exercised. | A |
+| KB2-F03 | Locally verified | The Workspace lists service-owned logical document summaries and owns empty/unavailable states; attempts, Units, hashes, and internal IDs remain absent. | B |
+| KB2-F04 | Locally verified | Lookup never creates a vector generation. Compatibility-changing saves confirm only with searchable content; persisted/coalesced tasks expose rebuild state, and corpus changes enqueue only when Embedding and searchable Units exist. | C |
+| KB2-F05 | Locally verified | Knowledge Base Settings owns Embedding, OCR, and indexes. Workspace opens the shared dialog through a stable tab key; OCR status/install work stays off the UI thread. | B |
+| KB2-F06 | Parked by Sir | Canonical image/OCR preservation remains text-searchable only; visual meaning has no multimodal embedding or Agent evidence path. No multimodal UI or contract was added in this slice. | Separate follow-up |
+| KB2-F07 | Locally verified | A window-modal sheet selects real keyword and text-vector projections, shows bounded estimates, disables unavailable vector work, and queues observable rebuild tasks. | C |
 
 ## Findings
 
@@ -62,6 +80,7 @@ were still unchanged.
 | KB-F14 | High | Confirmed | The original delivery packet names keyword, semantic, and hybrid retrieval as the target. Current `KnowledgeService` has only jieba-prepared SQLite FTS5 lookup; `knowledge.lookup` always returns `mode_used: "keyword"`. There is no EmbeddingService, vector projection/table, LanceDB dependency, vector query, or rank fusion. | Vector and hybrid retrieval are not supported. Later task/durable wording demoted them to a gated enhancement without a clearly recorded product decision that reconciles the original target. |
 | KB-F15 | Medium | Confirmed | The Tool description says only “Find bounded evidence…” and “retrieval strategy is selected by Xenix”; the `query` property has no description. It does not tell the model when user knowledge is relevant, what business knowledge to request, or how to combine it with computed data evidence. | Without activating a Skill, Tool discoverability and correct use depend too heavily on the model inferring product semantics from a generic description. The strategy sentence also describes plumbing rather than helping task completion. |
 | KB-F16 | High | Confirmed | Knowledge methodology lives in a separate `xenix-knowledge-retrieval` Skill, while `xenix-data-analysis` does not mention the Knowledge Library or `knowledge.lookup`. Composition gives the Tool common scope, so the separate Skill is not an authorization boundary. | A supporting evidence capability is modeled as an independent user task, fragmenting the data-analysis method and creating unnecessary Skill activation/routing burden. |
+| KB-F17 | High | Confirmed | Sir explicitly committed the MVP to TXT, DOC/DOCX, PDF, JPEG, and PNG. The accepted import UI design repeats that set. Current `SUPPORTED_KNOWLEDGE_SUFFIXES` rejects JPEG/PNG and admits PPT/PPTX; the durable Product TDD was changed to describe the shortcut rather than recording a product decision. | Users cannot import the promised image knowledge sources, while implementation scope and documentation advertise an unapproved substitute. Format-routing extensibility is not proven by the central suffix set. |
 
 ## Rejected Findings
 
@@ -71,7 +90,9 @@ were still unchanged.
 
 ## Evidence Interpretation
 
-The successful rainy-season benchmark remains valid evidence that the model can use
-the current Tool to retrieve a rule and create the exact derived Dataset. It does not
-prove that the Tool payload is minimal, imports are correctly owned, publication is
-atomic, migrations are stable, or the packaged application exercises the same path.
+The rainy-season case imports its rule through production Import and Derivation,
+uses a lexical paraphrase, explicitly requests semantic mode, and grades only the
+exact final Dataset and grounded terminal answer. With explicit user-controlled
+settings, two 2026-07-22 live cells completed: both passed exact-Dataset and all
+integrity checks, while `grounded_final_answer` failed. Tool telemetry cannot
+substitute for that remaining outcome verdict.

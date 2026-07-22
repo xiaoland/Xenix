@@ -80,16 +80,12 @@ OcrResult
   provider/model/version descriptor; warnings; source-to-image transform
 ```
 
-The MVP concrete adapter is `PaddleAiStudioOcrAdapter`: it calls the user-configured
-PaddleOCR Official API (AI Studio), submits only the selected page/region input,
-polls its asynchronous job within a bounded budget, downloads any transient result
-into app-owned staging, and normalizes it to `OcrResult`. It does not call a
-PaddleOCR MCP server or `LLMService`; MCP is an external-tool integration surface,
-while Xenix needs a typed internal service boundary. The API SDK/client choice is a
-spike: an SDK may bring a substantial native dependency graph even when it does not
-run local models, while a minimal pinned HTTP adapter assumes the schema-normalization
-burden. [PaddleOCR Official API overview](https://www.paddleocr.ai/main/en/version3.x/inference_deployment/serving/paddleocr_official_api/overview.html)
-[Python API](https://www.paddleocr.ai/main/en/version3.x/inference_deployment/serving/paddleocr_official_api/python.html)
+The MVP concrete adapter is a privately managed local PaddleOCR worker. One-click
+installation owns an isolated runtime/model inventory; readiness validates exact
+protocol/package versions, the active manifest, and installed model markers. Import
+submits only selected bounded image/page bytes, receives bounded normalized text and
+confidence, and cooperates with cancellation. It does not call an MCP server or
+`LLMService`, and the GUI process never imports the Paddle runtime.
 
 `OcrResultToDoclingAdapter` inserts the text/geometry as labelled content/projection
 in the assembled DoclingDocument. This makes Paddle provider changes replaceable and
@@ -110,15 +106,14 @@ Paddle runtime/models into the GUI process. The MVP contracts intentionally dist
 `text_regions` OCR from `layout`/`tables` structured parsing so it can be added without
 changing the importer. No VLM route is enabled in MVP.
 
-## Required PDF/OCR Spikes
+## PDF/OCR Verification and Follow-up
 
 1. Per-page route/merge stability on born-digital, scan, mixed, OCR-layer,
    broken-font, rotated, and complex-layout CJK PDFs.
 2. Password entry/retry with no password persistence or logs.
 3. `pikepdf` malformed/encrypted/limit behavior and packaged native runtime.
-4. Paddle AI Studio upload/submit/poll/download/result-normalization, timeout/rate
-   limit/cancel semantics, geometry transform, privacy/logging, and Chinese accuracy
-   fixtures; compare official SDK against a minimal HTTP adapter in a clean package.
-5. A separate local PP-StructureV3 sidecar/worker CPU/GPU/package/disk/Docling-mapping
+4. Local worker install/health/model/result bounds, cancellation, logging/privacy,
+   Chinese recognition fixtures, resource resolution, and frozen package execution.
+5. A separate PP-StructureV3 sidecar/worker CPU/GPU/package/disk/Docling-mapping
    feasibility report before any local support commitment, including the Python 3.14
    compatibility gap.

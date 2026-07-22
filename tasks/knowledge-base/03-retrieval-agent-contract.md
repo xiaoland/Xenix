@@ -1,123 +1,92 @@
 # Retrieval and Agent Contract
 
-## Lookup Is an Agent Tool
+## Lookup Is One Agent Tool
 
-Retrieval belongs behind a `knowledge.lookup` Agent tool. It is not hidden prompt
-assembly, and it is not a provider-specific RAG extension. This preserves the
-existing Harness ordering: the Agent proposes a tool call, the Knowledge Base
-returns one canonical bounded result, the result is persisted, and the next
-provider request is replayed from that fact.
+Retrieval belongs behind `knowledge.lookup`, not hidden prompt injection or a
+provider-specific RAG extension. The Tool is common scope because Knowledge is a
+supporting capability inside data work; Skill activation neither grants nor removes
+authority.
 
-The tool becomes available only when a user has explicitly enabled knowledge. MVP has
-one global Library, so its lookup input intentionally has no user-selectable
-`library_ids`; a future multi-library workstream may add an opaque scope without
-changing citation authority:
+Input is deliberately small:
 
 ```json
-{
-  "query": "Which seasonal assumptions should guide this sales analysis?",
-  "mode": "hybrid",
-  "document_ids": ["optional-stable-document-id"],
-  "top_k": 5
-}
+{"query":"Which seasonal assumptions should guide this sales analysis?","mode":"auto"}
 ```
 
-`mode` is an enum: `keyword`, `semantic`, or `hybrid`. `top_k` has a strict small
-maximum. Cross-field rules (such as scope authorization or a requested semantic
-mode when no compatible embedding index is ready) are execution validation, not
-provider-schema combinators.
+`mode` is optional and accepts `auto`, `keyword`, `semantic`, or `hybrid`. Library,
+document filters, result count, index generation, rank-fusion constants, and current
+readiness are service-owned until a real Agent operation justifies exposing them.
 
-## Bounded Result and Citation Shape
-
-The result returns the evidence necessary to reason, not an entire document or a
-filesystem path:
+## One Bounded Canonical Result
 
 ```json
 {
-  "query": "...",
-  "mode_used": "hybrid",
-  "index_generation_id": "stable-id",
-  "results": [
+  "mode":"hybrid",
+  "results":[
     {
-      "citation_id": "stable-id",
-      "library_id": "stable-id",
-      "document_id": "stable-id",
-      "document_generation_id": "stable-id",
-      "source_artifact_id": "stable-artifact-id",
-      "chunk_id": "stable-id",
-      "title": "Q3 field journal",
-      "locator": {"page": 4, "section": "Seasonality"},
-      "quote": "bounded evidence excerpt",
-      "score": 0.82,
-      "match_kinds": ["keyword", "semantic"]
+      "source":"Q3 field journal",
+      "location":"page 4",
+      "excerpt":"bounded evidence excerpt"
     }
   ]
 }
 ```
 
-The `score` is retrieval guidance, not a claim of truth. The Agent should cite a
-result only when it used it, distinguish the user's documented experience from a
-fact established by the attached dataset, and say when no suitable evidence was
-found. Tool presentation—not the provider or the tool result—constructs any
-`artifact://<source_artifact_id>` Markdown link.
+The result omits query echo, score, library/document/generation/artifact/unit/citation
+IDs, raw locator, path, URI, and index detail. `location` is optional: current
+derivation uses an honest page anchor where present and otherwise a passage label.
+An empty result is still successful and reports the mode actually used.
+
+There is exactly one semantic result plane. `LLMConversationService` persists this
+direct value; provider replay and Chatbot presentation copy it unchanged. Internal
+Knowledge identities remain execution state and cannot later enrich canonical
+history. Historical richer results remain immutable and replay in their original
+shape.
+
+## Retrieval Behavior
+
+| Requested mode | Contract |
+| --- | --- |
+| `keyword` | Chinese-pretokenized SQLite FTS5 only; never calls Embedding/Lance |
+| `semantic` | independent Embedding operation + current immutable Lance exact-cosine generation |
+| `hybrid` | deterministic RRF over FTS and vector candidates |
+| `auto` | attempts hybrid when configured; falls back only for expected semantic unavailability and reports the executed mode |
+
+Explicit semantic/hybrid requests never silently degrade. Stale, partial, wrong-
+profile, wrong-library, dimension-mismatched, or corrupt vector generations are not
+eligible. The Tool description states when user knowledge is useful and how to
+combine source claims with facts computed from current data without mentioning index
+plumbing.
 
 ## Conversation Sequence
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant H as Agent Harness
-    participant P as Chat provider
-    participant R as AgentToolRegistry
-    participant K as KnowledgeBaseService
-    participant C as Conversation Store
-
-    U->>H: Ask for data interpretation
-    H->>P: Messages plus available tool schemas
-    P->>R: knowledge.lookup call
-    R->>K: Validated scope and query
-    K-->>R: Bounded evidence and citations
-    R->>C: Persist one canonical tool result
-    H->>P: Replay persisted evidence result
-    P-->>H: Analysis with attributable citations
-    H-->>U: Typed chatbot projection
+```text
+Agent Tool Call
+  -> registry validates advertised JSON Schema
+  -> KnowledgeService retrieves current Units read-only
+  -> Tool projects one bounded path-safe value
+  -> Conversation persists that exact value
+  -> provider replay and Chatbot copy it unchanged
 ```
 
-No raw document, image bytes, absolute path, index dump, API key, or unbounded
-retrieval evidence crosses the provider-tool boundary. The initial slice keeps
-multimodal provider-message transport out of scope: OCR creates local derived
-evidence, VLM is outside MVP, and the chat provider sees only the bounded lookup
-result.
+No raw document, image bytes, absolute path, provider secret/payload, index dump, or
+unbounded evidence crosses the Tool boundary. Unexpected exceptions become a generic
+bounded Tool failure; useful domain failures are explicit typed values.
 
-## Retrieval Strategy
+## Analysis Method and Evaluation
 
-> **Storage position under review (2026-07-15).** The concrete filesystem-backed
-> recommendation below was a preliminary media-first storage proposal. Workstream 02
-> now starts from the lookup contract and retrieval units; do not treat any storage
-> medium or index engine in this section as accepted until that workstream is
-> resolved.
+The three data Skills teach the Agent to retrieve user-specific rules, definitions,
+assumptions, or experience when they may change computation/interpretation; separate
+source claims from current-data facts; and explain conflicts or missing evidence.
+There is no standalone Knowledge Skill.
 
-The recommended first index implementation is filesystem-backed:
+Agent benchmarks grade terminal Assistant content and public Dataset/Artifact/chart
+deliverables. Tool Calls, ToolResults, mode, IDs, scores, and excerpts are diagnostics
+only. The rainy-season case imports its rule through production
+Import→Canonical→Derivation, then requires the exact restock Dataset and a grounded
+final answer. Two real-provider Phase B cells produced the exact Dataset and passed
+integrity but failed grounded final-answer wording; repair and rerun are the only
+remaining Slice 01 acceptance work.
 
-- A language-aware BM25-style inverted index supplies keyword retrieval. Chinese
-  tokenization can reuse the existing `jieba` dependency, with a defined fallback
-  for mixed-language terms.
-- A compact dense-vector matrix plus an ID/offset manifest supplies semantic
-  retrieval. Start with a deterministic flat cosine scan behind `RetrievalIndex`;
-  introduce HNSW or a vector database only after corpus-size measurements show that
-  it is needed.
-- Hybrid search unions small candidate sets and applies reciprocal-rank fusion.
-  This is stable, explainable, and avoids prematurely tuning incomparable score
-  scales.
-
-SQLite FTS would be technically convenient, but it stores searchable chunk text in
-SQLite and conflicts with the stated “SQLite metadata only” boundary. Use it only
-if Sir deliberately relaxes that rule.
-
-## Citation Projection
-
-The first UI may render citations in the existing tool-result/detail presentation,
-but it must use typed citation data rather than parse a free-form payload. A later
-dedicated citation event/component may show source title, page/section, confidence,
-and an artifact activation link. In either case, conversation replay retains the
-same `citation_id` and immutable document-generation reference.
+See the [follow-up single-result contract](../knowledge-base-follow-up/tool-result-contract.md)
+and [Agent Tool workstream](workstreams/03-agent-tool/README.md).

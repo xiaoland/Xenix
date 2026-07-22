@@ -33,7 +33,7 @@ supports, and what uncertainty remains.
    models, reports, and apply results as local artifacts.
 5. Configure supported LLM providers and choose the LLM model used by the next
    assistant response without changing sampling already in progress.
-6. Open the Knowledge Workspace, import TXT, DOC/DOCX, PPT/PPTX, or PDF material,
+6. Open the Knowledge Workspace, import TXT, DOC/DOCX, PDF, JPEG, or PNG material,
    and let the Agent apply relevant saved knowledge through source-linked lookup.
 
 ## Rules and Scope
@@ -50,8 +50,9 @@ supports, and what uncertainty remains.
 - MVP exposes one global Knowledge Library. Its internal identity permits future
   multiple-library instances, but no library-management UI is promised.
 - Knowledge import preserves the selected source and canonical content locally.
-  Local OCR is installed explicitly through the Knowledge Workspace; VLM, Markdown,
-  and standalone image import are outside MVP.
+  Local OCR is installed explicitly through the Knowledge Workspace and supports
+  standalone JPEG/PNG sources and scanned PDF pages. VLM, Markdown, and PPT/PPTX are
+  outside MVP.
 - Browser-first operation, an always-on Xenix server, and hosted product authority
   are out of scope.
 - Trial builds may enforce a build-time expiry and direct the user to a purchase or

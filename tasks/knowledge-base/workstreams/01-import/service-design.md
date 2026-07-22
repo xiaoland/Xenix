@@ -32,14 +32,14 @@ flowchart LR
     FN --> PR["ParserRouter"]
     PR --> PX["ParseExecutor"]
     PX --> DL["Docling adapters / assembly"]
-    PX --> OCR["OcrService\nPaddle AI Studio adapter"]
+    PX --> OCR["OcrService\nprivate local Paddle worker"]
     DL --> C["Canonicalizer"]
     OCR --> C
     C --> CG["CanonicalGenerationSink port"]
     CG --> FS[("app-owned canonical files")]
     SS --> DB[("SQLite bounded metadata")]
 
-    DERIVE["Later derivation service\nchunks / embeddings / indexes"] -. consumes immutable generation .-> FS
+    DERIVE["KnowledgeDerivationService\nbounded Units + FTS"] -. consumes immutable generation .-> FS
 ```
 
 All arrows point from user intent to service orchestration to adapters/ports. UI
@@ -56,8 +56,9 @@ migration. Same-content deduplication is scoped to that singleton library now.
 
 ## Facade Contract
 
-The actual Python types belong to an approved slice, but the public service surface
-should remain small and UI-safe:
+The public service surface remains small and UI-safe. The implemented first UI slice
+uses enqueue/list/cancel/retry and immutable status views; richer preflight and
+document-detail commands below remain the intended later Workspace extension:
 
 ```text
 preflight_imports(local_file_refs) -> PreflightBatch

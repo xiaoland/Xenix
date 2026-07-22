@@ -14,10 +14,10 @@ published canonical generation through a narrow port.
 
 ## Status
 
-**Implemented MVP slice; packaging verification remains open.** The executable
-contract is TXT, DOC/DOCX, PPT/PPTX, and PDF into a DoclingDocument envelope, with
-page-level PDF text probing and a private local PaddleOCR deployment. Storage and
-Agent lookup are reviewed in their own workstreams.
+**Locally verified after follow-up remediation.** The executable path accepts TXT,
+DOC/DOCX, PDF, JPEG, and PNG through one format registry, publishes an immutable
+DoclingDocument bundle at canonical-ready, and hands retrieval work to an independent
+derivation service. The follow-up packet owns final Slice acceptance and evidence.
 
 ## Durable Owners / Blast Radius
 
@@ -35,7 +35,7 @@ Agent lookup are reviewed in their own workstreams.
 import lifecycle, canonical projection, persistent import queue, or document-AI
 configuration surface.
 
-**To:** one global default library accepts TXT, DOC, DOCX, PPT, PPTX, and PDF
+**To:** one global default library accepts TXT, DOC, DOCX, PDF, JPEG, and PNG
 sources; it snapshots each source, produces a versioned Docling
 IR/envelope generation when possible, and exposes bounded, persistent status in a
 secondary workspace. The internal library identity remains extensible to multiple
@@ -57,14 +57,14 @@ Canonical-ready deliberately does not imply searchable or Agent-available.
 - VLM is out of MVP scope: no provider profile, route, UI, or projection is created.
 - Markdown is out of MVP scope even though a parser may support it; external-resource
   semantics must not be imported accidentally.
-- Import publishes retrieval units only after the canonical envelope is durable; the
-  lookup implementation remains owned by the storage/tool workstreams.
+- Import never publishes retrieval Units. It emits canonical-ready identity to the
+  independently recoverable derivation service after the canonical transaction.
 
 ## Decisions Consumed
 
 - The product exposes one global default Library in MVP. Its internal identity and
   service boundary retain a future multiple-library extension path.
-- MVP source formats are TXT, DOC, DOCX, PPT, PPTX, and PDF.
+- MVP source formats are TXT, DOC, DOCX, PDF, JPEG, and PNG.
 - SQLite owns bounded metadata; large source/canonical bytes remain filesystem-owned.
 - Existing `ArtifactService` owns registered user-openable artifacts.
 - `DoclingDocument` is the unified content IR; Xenix lifecycle/import state is a
@@ -74,23 +74,25 @@ Canonical-ready deliberately does not imply searchable or Agent-available.
 - Same SHA-256 content in the global library defaults to reuse/deduplication.
 - Encrypted documents are in MVP; a password exists only in process memory for the
   active attempt and is never persisted.
-- DOC conversion is selected only after the agreed PDF-versus-DOCX fidelity spike.
+- DOC normalizes to DOCX by default. The repeatable fidelity spike found equivalent
+  body/table recall, DOCX picture retention, and PDF-only page locators.
 
-## Open Questions
+## Explicit Follow-ups
 
-1. Can the complete Docling dependency graph be packaged within an acceptable build
-   time and application size on Windows?
-2. What concrete file/page and subprocess limits fit target desktop hardware?
-3. Which encrypted-document adapters can honor the temporary-password contract
-   without persisting the password?
+1. Tune format/resource limits against broader production corpora without weakening
+   the current fail-closed bounds.
+2. Add document list/detail/open-source and enqueue-time preflight UX in a later UI
+   slice; the current approved surface is Workspace + modeless durable queue.
+3. Evaluate structured PP-StructureV3 enrichment separately from the current OCR
+   text service and preserve the no-VLM MVP boundary.
 
 ## Verification Plan
 
 - Review the service, extensible pipeline, Docling IR, PDF/OCR, UI, and durable-doc
   plan against the invariants above and the existing Artifact/Qt boundaries.
-- Run a pinned Docling/Windows package spike and a DOC conversion spike on Chinese
-  paragraphs, tables, images, and pagination; compare `DOC -> PDF` against a
-  `DOC -> DOCX` control before selecting the adapter implementation.
+- Keep the pinned Docling/Windows packaged exercise and repeatable DOC fidelity spike
+  on Chinese paragraphs, tables, images, and pagination as regression evidence for
+  the selected `DOC -> DOCX` adapter.
 - Maintain real fixtures for all six format families and page-level PDF OCR routing.
 - Add encrypted-document and resource-limit fixtures before those promises become
   release gates.
@@ -103,11 +105,16 @@ Canonical-ready deliberately does not imply searchable or Agent-available.
 - 2026-07-14: packet validation passed for 19 Markdown files: all relative packet
   links resolve, all required control headings are present, and no trailing
   whitespace was found.
+- 2026-07-22: the repeatable DOC comparison selected DOC→DOCX; bilingual Workspace/
+  Queue and Embedding settings captures passed visual review. See
+  [DOC fidelity evidence](../../evidence/doc-fidelity-spike.md) and
+  [UI visual evidence](../../evidence/ui-visual-qa.md).
 
 ## Next Action
 
-Complete packaged-runtime verification, then promote the stable contracts into the
-durable PRD/TDD owners named by this packet.
+Import-local acceptance is complete. Two live Phase B cells prove the real
+Import→Derivation path and exact Dataset but fail grounded final-answer wording; that
+remaining repair belongs to Agent outcome acceptance, not Import.
 
 ## Packet Map
 

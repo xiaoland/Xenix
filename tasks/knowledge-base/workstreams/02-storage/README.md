@@ -1,129 +1,110 @@
 # Knowledge Base — Retrieval Storage Workstream Packet
 
-## Objective & Hypothesis
+## Objective
 
-Define the smallest persistent information model that lets the later Agent lookup
-reliably return relevant, bounded, source-linked knowledge from imported documents.
-The hypothesis is that storage begins with the lookup result—not with a database,
-filesystem, or recovery protocol:
+Store exactly what `knowledge.lookup` needs to find and return useful evidence. The
+MVP driver is **retrievability**: persistence and indexes serve current bounded
+Knowledge Units; recovery and audit mechanics are supporting constraints, not the
+product objective.
 
 ```text
-query + mode + optional document filter
-  -> small set of Knowledge Units
-  -> quote + source anchor + relevance explanation
+query + mode
+  -> current bounded Knowledge Units
+  -> small {source, location?, excerpt} results
 ```
-
-For this MVP, a Knowledge Unit is a searchable passage/table-derived text unit from
-an imported document. The workstream does not expand scope to Xenix conversations,
-datasets, models, logs, a general knowledge graph, or automatically inferred facts.
 
 ## Status
 
-**Keyword MVP implemented and integrated.** The 2026-07-14 media-first
-storage draft was removed because it made recoverability/auditability and physical
-media the primary design axis. The current packet starts from content and retrieval
-purpose. Sir has supplied a promising candidate stack; its evaluated, conditional
-position is recorded below. SQLite stores current searchable units and FTS5 is the
-guaranteed access path. Semantic/LanceDB remains gated by a separate quality and
-packaging spike.
+**Locally implemented and reconciled by follow-up Slice 01.** SQLite owns current
+document/readiness state and Unit text; SQLite FTS5 owns keyword projection; LanceDB
+owns only immutable rebuildable vectors. Source/canonical bytes remain in the
+Import-owned content-addressed store. The sole Slice acceptance item still open is
+the Phase B live real-provider Agent outcome cell.
 
-## Durable Owners / Blast Radius
+## What Is Stored, and Why
 
-| Claim | Intended durable owner when approved | Main affected surfaces |
+| Content/state | Owner | Retrieval purpose |
 | --- | --- | --- |
-| Retrieval-unit catalog and query semantics | Knowledge Base service / cross-unit contract | SQLModel rows, repositories, derivation, lookup service |
-| Source anchor and citation identity | Import + Agent-tool contracts | Docling locators, ArtifactService activation, replay/UI |
-| Keyword/semantic projection implementation | Retrieval runtime | package/runtime, background work, performance tests |
-| Physical placement of searchable text/indexes | Storage ownership decision | SQLite policy, filesystem layout, backup/delete behavior |
-| Tool schema and enabled scope | Later Agent-tool workstream | Harness, ToolScope, provider exposure, typed citation UI |
-
-## State Diff (From -> To)
-
-**From:** documents can become canonical-ready, but there is no defined retrieval
-corpus, searchable unit, source anchor, invalidation policy, or lookup-ready state.
-
-**To:** every searchable imported document contributes current Knowledge
-Units. Each unit contains the normalized text needed for a bounded quote and a source
-anchor needed to reopen/cite the relevant document location. Keyword and semantic
-representations are derived access paths over those units, not the definition of the
-knowledge itself.
+| Source snapshot | local SHA-256 CAS + Artifact identity | preserve/open the exact imported source without leaking paths |
+| Canonical content | immutable DoclingDocument bundle + envelope, Zstandard-compressed | reproduce the content/provenance from which Units are derived |
+| Document/current-generation/readiness metadata | SQLite | exclude stale generations and decide whether a document is searchable |
+| Bounded Unit display text, FTS text, source title, locator | SQLite | keyword ranking and final bounded evidence projection |
+| FTS5 index | SQLite derived table | guaranteed Chinese-pretokenized keyword lookup |
+| Unit vectors | immutable LanceDB generation | semantic candidate ranking without becoming content authority |
+| Corpus/profile/generation binding | SQLite metadata + bounded Lance manifest | reject stale, partial, wrong-model, wrong-library, or corrupt vector projections |
 
 ## Invariants
 
-- The user-visible contract is retrieval: return relevant units, bounded quotes, and
-  honest source anchors. Recovery/audit features may support this but are not MVP
-  drivers.
-- Original source bytes, DoclingDocument IR, images, and OCR payloads are not copied
-  into a generic search record. They remain Import-owned source material.
-- A Knowledge Unit binds to one current document/canonical revision and a precise
-  page/section/item locator. It is never a free-floating generated assertion.
-- Keyword indexes, embeddings, ranks, snippets, and index-health state are derived
-  and rebuildable. They may not become a second authority for document content.
-- A source change/removal must invalidate or remove affected units predictably;
-  lookup must not silently return stale text as current.
-- The one global MVP Library stays an internal scope key. No multi-library UI or
-  source expansion is implied.
-- No raw local paths, credentials, raw provider payloads, full documents, or index
-  dumps cross the later Agent-tool boundary.
+- A Unit belongs to one document and canonical generation. Retrieval resolves only
+  Units from the document's current retrieval generation.
+- Unit content is independently bounded before both SQLite publication and Embedding
+  transmission. Unicode normalization expansion cannot cross the provider bound.
+- Page provenance produces `page N`; non-page material produces an honest
+  `passage N`. Raw paths and opaque storage locators never cross the Tool.
+- Keyword, semantic, hybrid, and auto are real modes. Explicit unavailable semantic/
+  hybrid calls fail; `auto` falls back only for expected semantic unavailability and
+  reports the mode actually used.
+- SQLite Units are content authority. FTS, vectors, scores, snippets, ranks, and
+  generation directories are derived and rebuildable.
+- Reimport/removal changes the current SQLite fingerprint immediately. A stale Lance
+  generation cannot remain eligible merely because its files still exist.
+- One hidden stable `library_id` scopes every row/generation, preserving a future
+  multiple-library extension while MVP exposes only the global Library.
 
-## Decisions Consumed
+## Retrieval and Publication Topology
 
-- MVP imports TXT, DOC, DOCX, PPT, PPTX, and PDF, and Import ends at
-  canonical-ready DoclingDocument/envelope output.
-- MVP exposes one global Library with future multi-library extension space.
-- Lookup will support keyword, semantic, and hybrid modes through an Agent tool.
-- Source opening remains through `ArtifactService`/`artifact://`; a locator is not an
-  external local path.
-- OCR/embedding are independent document-AI capabilities; VLM and Markdown remain
-  out of MVP.
-- Sir's 2026-07-15 correction: model this workstream by **what is stored and why**,
-  with **retrievability** as MVP's primary goal.
+```text
+immutable canonical-ready generation
+  -> KnowledgeDerivationService
+  -> bounded Units + FTS in one SQLite publication
+  -> document retrieval_generation_id becomes current
 
-## Retrieval-driven decisions
+semantic-capable lookup
+  -> freeze independent Embedding operation/settings
+  -> fingerprint current SQLite corpus
+  -> reuse or build/validate/atomically publish immutable Lance generation
+  -> exact cosine candidate Unit IDs
+  -> re-resolve and revalidate current SQLite Units
 
-1. SQLite owns the current searchable Knowledge Unit catalog, including bounded
-   normalized display text, source locator, and pre-tokenized FTS text. This is
-   business/search state, not a large-object leak.
-2. MVP units are hierarchy-aware passages plus table-derived row/group text. OCR text
-   uses the same unit contract and retains page/geometry locators.
-3. Keyword retrieval is the guaranteed baseline. Semantic/hybrid activates only when
-   a compatible embedding profile and vector projection are ready.
-4. Reimport/removal immediately excludes old units from new lookup. Already persisted
-   bounded ToolResults remain historical conversation evidence.
-5. The atomic tool accepts query plus optional document IDs and a bounded top-k; type,
-   date, tags, labels, retrieval mode, and library selection are not MVP inputs.
+hybrid
+  -> SQLite FTS rank + Lance cosine rank
+  -> deterministic reciprocal-rank fusion
+  -> bounded current Unit matches
+```
 
-## Verification Plan
+Import has no Embedding or LanceDB dependency. Production `KnowledgeService` is
+read-only; only derivation writes Units. Tests that need a small isolated corpus use
+an explicitly named test seeder, while integration/benchmark preparation uses the
+real Import→Canonical→Derivation path.
 
-- Define test queries and expected unit/quote/anchor results before choosing an index
-  engine; include Chinese, mixed-language, short exact terms, section concepts,
-  tables, and OCR-derived text.
-- Prove an imported canonical document creates retrievable units with valid source
-  locators, and a document update/removal invalidates them correctly.
-- Prove keyword lookup works without embedding availability; verify semantic/hybrid
-  only against an explicit compatible embedding profile.
-- Measure recall, P95 latency, memory, indexing time, and package behavior on a real
-  target corpus before accepting native ANN/vector infrastructure.
-- Before code, resolve searchable-text placement and the later ToolScope enabled/off
-  contract; current Harness behavior would otherwise advertise a new registered tool
-  by default.
+## Technology Decisions
 
-## Verification Run Log
+- SQLite WAL plus the existing storage/session authority handles business state.
+- SQLite FTS5 with Chinese pre-tokenization is the always-available lexical path.
+- LanceDB OSS exact-flat cosine is sufficient for the MVP corpus; ANN requires
+  measured scale/latency evidence.
+- Staging + atomic rename publishes immutable filesystem generations.
+- Integrity cleanup removes proven orphan/staging objects and never treats derived
+  files as authority.
 
-- 2026-07-15: read-only repository and contract review found that project-level
-  storage guidance permits bounded, queryable SQLite state; it does not itself ban
-  all text. Current conversation/tool payloads already contain bounded text in
-  SQLite. The prior no-chunk-text rule was task-packet direction, not implemented
-  project truth.
-- 2026-07-15: local development SQLite reports FTS5 availability, but that alone
-  does not establish Chinese-tokenization quality or PyInstaller support. No FTS or
-  vector capability is selected by this packet.
+## Verification
 
-## Next Action
+- Fresh and fixed historical migration edges through schema v20, including FK/FTS/
+  ORM readability and deterministic duplicate-attempt repair.
+- Chinese/mixed keyword, lexical-miss semantic-hit, deterministic RRF, explicit
+  unavailability, malformed provider output, stale/corrupt generation, concurrent
+  corpus change, multi-library isolation, and Unicode-expansion bounds.
+- Import→canonical→derivation continuity, removal/current-generation exclusion,
+  query-centered excerpts, and page/passage locations.
+- Real Lance write/close/rename/reopen/search in development and frozen packaged
+  smoke.
 
-Add refresh/removal semantics and enable semantic projection only after it improves
-the benchmark corpus and passes Windows packaging. LanceDB remains a gated derived
-projection, never a prerequisite for useful keyword lookup.
+## Explicit Follow-ups
+
+- Add hierarchy-aware neighboring context and richer table/OCR grouping only after
+  labelled retrieval evaluation.
+- Add bounded retention for superseded healthy Lance generations; current cleanup
+  safely reclaims proven orphans and stale staging only.
 
 ## Packet Map
 
@@ -131,3 +112,4 @@ projection, never a prerequisite for useful keyword lookup.
 - [Storage-policy decision and technology consequences](storage-options.md)
 - [Candidate stack evaluation and flow](candidate-stack-evaluation.md)
 - [Reframing decision register](reframe-register.md)
+- [Follow-up compliance/closeout](../../../knowledge-base-follow-up/README.md)

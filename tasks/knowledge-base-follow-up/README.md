@@ -1,17 +1,17 @@
 # Knowledge Base Follow-up — Contract Realignment
 
-**Status:** active iterative remediation — Slice 01 reopened and in progress
+**Status:** Slice 01 closed; Slice 02 locally verified, global cross-review pending
 **Opened:** 2026-07-21
-**Posture:** accept new findings continuously; design, implement, and verify one bounded phase at a time inside Slice 01
+**Posture:** implement the approved Slice 02 phases; multimodal work is parked
 
 ## Objective
 
-Reconcile the current uncommitted Knowledge Base implementation with the repository's
-Product TDD, Unit TDD, local `AGENTS.md`, implementation taste, and the accepted
-workstream designs. Keep one place for Sir's additional findings, distinguish
-functional evidence from engineering completion, and produce a repair design that
-can be implemented without creating new authorities or rewriting contracts around
-the shortcut.
+Keep the Knowledge Base implementation aligned with Product TDD, Unit TDD, local
+`AGENTS.md`, implementation taste, and the accepted workstream designs while new
+product findings are discussed and admitted as coherent slices. Preserve the Slice
+01 evidence, carry its known benchmark residual honestly, and design Slice 02 around
+observable Knowledge operations, a useful document workspace, explicit index
+lifecycle control. Multimodal retrieval remains a separately admitted follow-up.
 
 ## Guardrails
 
@@ -29,15 +29,15 @@ the shortcut.
 - Tests must prove the governing contract and real delivery boundary. A test that
   merely asserts the current implementation shape is not completion evidence.
 - A new finding does not block the current phase unless it invalidates that phase's
-  contract or authority boundary. Related Knowledge findings join the active Slice
+  contract or authority boundary. Related Knowledge findings join the active slice
   through an explicit Impact Handshake revision; they are never silently hidden or
   promoted into artificial subsystem-sized slices.
 - Only the active phase authorizes product-code changes. Each phase records its own
   Impact Handshake, preplay, verification, and remaining debt while the Slice-level
   scope stays intact. Commits still require Sir's explicit command.
-- Completion of one phase is not completion of Slice 01. After the Import, Storage,
-  and Tool workstreams are all reconciled, perform one global cross-workstream review
-  because their lifecycle, index, and Tool contracts are coupled.
+- Completion of one phase is not completion of its slice. At the end of Slice 02,
+  perform another global Import/Storage/Tool/UI/runtime review because task execution,
+  document lifecycle, index generations, settings, and Agent evidence are coupled.
 
 ## Verification
 
@@ -53,36 +53,43 @@ the shortcut.
 
 ## Current Truth
 
-- The current worktree demonstrates a useful end-to-end path: six accepted file
-  extensions, source-mode Docling import, a real local PaddleOCR deployment, one
-  production Agent benchmark pass, and a canonical `knowledge.lookup` ToolResult.
-- That evidence does **not** establish repository-compliant completion. The earlier
-  completion claim is withdrawn.
-- At audit opening, the Tool's single value followed the correct Conversation path but
-  was over-specified. Phase A has since reduced new results to the agreed
-  `mode/results` value without introducing a second result plane.
-- Confirmed deviations include import/retrieval boundary collapse, UI-owned daemon
-  execution, non-atomic publication, canonical-envelope/CAS identity gaps, mutable
-  migration-edge behavior, insufficient packaged exercises, weak OCR readiness
-  validation, untranslated dynamic UI state, and path-safety seams.
-- The green test suite largely proves the implemented shortcut is internally
-  consistent. Several tests encode that shortcut and therefore cannot serve as
-  independent evidence that the intended design was respected.
-- No product file was modified during the 2026-07-21 compliance audit.
-- Sir corrected the slice granularity on 2026-07-21: the full KB-F01..F16 cohort is
-  Slice 01. The Agent-facing contract is only a verified internal phase; real
-  semantic/hybrid retrieval and every other known remediation remain in the same
-  open Slice.
+- The 2026-07-21 findings remain the historical audit baseline; every KB-F01..F17
+  row has locally executable closure evidence. Sir closed Slice 01 on 2026-07-22.
+- TXT, DOC/DOCX, PDF, JPEG, and PNG enter one extensible probe/normalize/route/parse/
+  canonical path. Import owns a durable queue and stops at immutable canonical-ready;
+  independent derivation alone publishes bounded Units and FTS readiness.
+- SQLite schema v21 owns lifecycle, current pointers, Units, retrieval readiness,
+  and observable Knowledge index rebuild tasks. Source/canonical bytes are
+  content-addressed; LanceDB is an immutable rebuildable semantic projection bound
+  to current SQLite generations.
+- The Tool has one canonical `mode/results[{source, location?, excerpt}]` value,
+  validates its advertised schema, exposes truthful selectable modes, and is taught
+  as part of the three data-analysis Skills rather than a standalone task.
+- Local PaddleOCR readiness, translated service-driven queue UI, independent
+  Embedding settings, real Import-backed benchmark preparation, frozen Knowledge
+  exercises, and DOC fidelity/UI visual evidence are in place.
+- Slice 02 now implements the next product cohort: process-isolated import execution
+  and readable logs, a logical-document list, Knowledge-owned settings, explicit
+  index compatibility/rebuild controls, and the carried final-answer repair.
 - Benchmark outcome authority is the Agent's final Assistant/Dataset/Artifact/chart
   deliverable. Tool Calls and ToolResults are diagnostic telemetry, not semantic
   success evidence.
+- On 2026-07-22 the carried benchmark was diagnosed as an overly narrow
+  final-answer oracle, not missing retrieval or Agent reasoning. After admitting
+  bounded equivalent Chinese wording and Unicode-minus normalization—while still
+  requiring the rule, inventory-gap/non-positive logic, and exact Dataset—the
+  configured `kimi/kimi-k2.6` and independent Embedding provider passed the isolated
+  live cell with semantic and integrity verdicts true.
+- Current JPEG/PNG and document-picture import preserves multimodal source content,
+  but retrieval is text-only: OCR, extracted table text, and surrounding text may be
+  searched; image-only meaning is not embedded or delivered to the Agent.
 
 ## Next Step
 
-Create a checkpoint commit for the completed Agent-boundary phase, then execute
-Phase B in [the active Slice 01 plan](slices/01-known-findings-realignment.md): research
-and weigh semantic/hybrid retrieval, record its design/preplay, and only then
-implement it. Continue admitting related findings without fragmenting this cohort.
+Review the global Import/Storage/Tool/UI/runtime topology with Sir before closing
+Slice 02 or declaring the Knowledge Base workstreams coherent. Multimodal retrieval
+stays outside this slice. Sir authorized organizing the completed work into separate
+implementation and documentation commits on 2026-07-22.
 
 ## Packet Map
 
@@ -92,4 +99,8 @@ implement it. Continue admitting related findings without fragmenting this cohor
 - [Slice ledger and phase map](slices/README.md)
 - [Slice 01 — complete known-findings realignment](slices/01-known-findings-realignment.md)
 - [Slice 01 / Phase A — Agent retrieval contract checkpoint](slices/01-agent-retrieval-contract.md)
+- [Slice 01 / Phase B — Semantic/hybrid retrieval](slices/01-semantic-hybrid-retrieval.md)
+- [Slice 01 / Phases C–G — local closeout](slices/01-phases-c-g-closeout.md)
+- [Slice 02 — Knowledge operations, workspace, and index control](slices/02-knowledge-operations-workspace-indexes.md)
+- [Parked follow-up — multimodal retrieval design](slices/02-multimodal-retrieval.md)
 - [Original Knowledge Base delivery packet](../knowledge-base/README.md)
