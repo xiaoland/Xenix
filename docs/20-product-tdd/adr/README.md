@@ -13,3 +13,4 @@ tests own implementation mechanics.
 | [0006 — SQLite application state](0006-bounded-sqlite-application-state.md) | 2026-07-11 | Accepted | Supersedes 0002; complements 0003 | Current |
 | [0007 — Remote adapters](0007-remote-integrations-remain-adapters.md) | 2026-07-11 | Accepted | Clarifies 0004 and 0005 | Current |
 | [0008 — Canonical LLM conversation boundary](0008-canonical-llm-conversation-boundary.md) | 2026-07-15 | Accepted | Relates to 0006 and 0007 | Current |
+| [0009 — Native Paddle local OCR](0009-official-paddle-native-local-ocr.md) | 2026-07-22 | Accepted | Relates to 0003, 0006, and 0007 | Current |

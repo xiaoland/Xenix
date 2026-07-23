@@ -93,7 +93,7 @@ Canonical-ready deliberately does not imply searchable or Agent-available.
 - Keep the pinned Docling/Windows packaged exercise and repeatable DOC fidelity spike
   on Chinese paragraphs, tables, images, and pagination as regression evidence for
   the selected `DOC -> DOCX` adapter.
-- Maintain real fixtures for all six format families and page-level PDF OCR routing.
+- Maintain real fixtures for all eight format families and page-level PDF OCR routing.
 - Add encrypted-document and resource-limit fixtures before those promises become
   release gates.
 
@@ -112,9 +112,11 @@ Canonical-ready deliberately does not imply searchable or Agent-available.
 
 ## Next Action
 
-Import-local acceptance is complete. Two live Phase B cells prove the real
-Import→Derivation path and exact Dataset but fail grounded final-answer wording; that
-remaining repair belongs to Agent outcome acceptance, not Import.
+Import-local acceptance is complete, and the live Agent outcome now passes. The
+global review has reopened PDF page-quality classification, full adapter
+extensibility, native-process cancellation proof, and the end-to-end OCR corpus as
+cross-workstream findings; see the active review gate rather than treating them as
+Import-local completion evidence.
 
 ## Packet Map
 

@@ -18,8 +18,8 @@ query + mode
 **Locally implemented and reconciled by follow-up Slice 01.** SQLite owns current
 document/readiness state and Unit text; SQLite FTS5 owns keyword projection; LanceDB
 owns only immutable rebuildable vectors. Source/canonical bytes remain in the
-Import-owned content-addressed store. The sole Slice acceptance item still open is
-the Phase B live real-provider Agent outcome cell.
+Import-owned content-addressed store. The live real-provider Agent outcome passes;
+the active global review now owns the vector build/status snapshot finding.
 
 ## What Is Stored, and Why
 

@@ -24,6 +24,10 @@ from xenix.services.storage.models import (
     KnowledgeVectorGenerationRow,
 )
 from xenix.services.storage.repositories.knowledge import KnowledgeRepository
+from xenix.services.knowledge_projection import (
+    RETRIEVAL_PROJECTION_VERSION,
+    retrieval_content_fingerprint,
+)
 
 _NOW = "2026-07-01T00:00:00+00:00"
 
@@ -37,7 +41,7 @@ def _create_unsupported_database(db_path: Path, version: int) -> None:
 def _create_static_knowledge_database(db_path: Path, version: int) -> None:
     """Materialize historical SQL without importing current models or migrations."""
 
-    if version not in {15, 16, 17, 18, 19, 20}:
+    if version not in {15, 16, 17, 18, 19, 20, 21}:
         raise ValueError(version)
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(db_path) as connection:
@@ -196,6 +200,42 @@ def _create_static_knowledge_database(db_path: Path, version: int) -> None:
             connection.execute(
                 "CREATE UNIQUE INDEX uq_knowledge_import_planned_document_attempt "
                 "ON knowledge_import (planned_document_id, attempt_number)"
+            )
+        if version >= 21:
+            connection.executescript(
+                """
+                CREATE TABLE knowledge_index_task (
+                    id VARCHAR NOT NULL PRIMARY KEY,
+                    library_id VARCHAR NOT NULL,
+                    index_kinds_payload JSON NOT NULL,
+                    trigger VARCHAR NOT NULL,
+                    status VARCHAR NOT NULL,
+                    phase VARCHAR NOT NULL,
+                    profile_fingerprint VARCHAR,
+                    corpus_fingerprint VARCHAR,
+                    vector_generation_id VARCHAR,
+                    error_code VARCHAR,
+                    error_summary VARCHAR,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL
+                );
+                CREATE INDEX ix_knowledge_index_task_library_id
+                    ON knowledge_index_task (library_id);
+                CREATE INDEX ix_knowledge_index_task_trigger
+                    ON knowledge_index_task (trigger);
+                CREATE INDEX ix_knowledge_index_task_status
+                    ON knowledge_index_task (status);
+                CREATE INDEX ix_knowledge_index_task_phase
+                    ON knowledge_index_task (phase);
+                CREATE INDEX ix_knowledge_index_task_profile_fingerprint
+                    ON knowledge_index_task (profile_fingerprint);
+                CREATE INDEX ix_knowledge_index_task_corpus_fingerprint
+                    ON knowledge_index_task (corpus_fingerprint);
+                CREATE INDEX ix_knowledge_index_task_vector_generation_id
+                    ON knowledge_index_task (vector_generation_id);
+                CREATE INDEX ix_knowledge_index_task_error_code
+                    ON knowledge_index_task (error_code);
+                """
             )
         connection.execute(f"PRAGMA user_version={version}")
 
@@ -555,6 +595,12 @@ def _assert_current_round_trip(context, *, suffix: str) -> None:
                 )
             ],
         )
+        document.retrieval_projection_version = RETRIEVAL_PROJECTION_VERSION
+        document.retrieval_content_fingerprint = retrieval_content_fingerprint(
+            [(0, "当前雨具规则", {"passage": 1})]
+        )
+        document.retrieval_unit_count = 1
+        session.add(document)
         session.commit()
         session.expire_all()
 
@@ -596,7 +642,7 @@ def test_storage_bootstrap_rejects_unknown_schema_version(monkeypatch, tmp_path:
         StorageBootstrapService().initialize(paths)
 
 
-def test_fresh_v21_schema_is_orm_fts_fk_and_unique_readable(
+def test_fresh_v23_schema_is_orm_fts_fk_and_unique_readable(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -605,7 +651,7 @@ def test_fresh_v21_schema_is_orm_fts_fk_and_unique_readable(
 
     context = StorageBootstrapService().initialize(paths)
 
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 21
+    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 23
     assert {
         "knowledge_canonical_generation",
         "knowledge_derivation",
@@ -624,7 +670,7 @@ def test_fresh_v21_schema_is_orm_fts_fk_and_unique_readable(
     _assert_current_round_trip(context, suffix="f")
 
 
-@pytest.mark.parametrize("version", [15, 16, 17, 18, 19, 20])
+@pytest.mark.parametrize("version", [15, 16, 17, 18, 19, 20, 21])
 def test_static_supported_fixture_upgrades_with_orm_fts_and_fk_proof(
     monkeypatch,
     tmp_path: Path,
@@ -636,7 +682,7 @@ def test_static_supported_fixture_upgrades_with_orm_fts_and_fk_proof(
 
     context = StorageBootstrapService().initialize(paths)
 
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 21
+    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 23
     with context.session_factory() as session:
         artifact = session.get(ArtifactRow, "artifact-1")
         assert artifact is not None and artifact.kind is ArtifactKind.FILE
@@ -646,8 +692,11 @@ def test_static_supported_fixture_upgrades_with_orm_fts_and_fk_proof(
             unit = session.get(KnowledgeUnitRow, "unit-1")
             import_row = session.get(KnowledgeImportRow, "import-1")
             assert document is not None
-            assert document.retrieval_generation_id == "canonical-generation-1"
-            assert document.retrieval_status == "ready"
+            assert document.retrieval_generation_id is None
+            assert document.retrieval_status == "pending"
+            assert document.retrieval_projection_version is None
+            assert document.retrieval_content_fingerprint is None
+            assert document.retrieval_unit_count == 0
             assert unit is not None and unit.locator_payload == {"passage": 1}
             assert import_row is not None
             assert import_row.status == "canonical_ready"
@@ -657,9 +706,10 @@ def test_static_supported_fixture_upgrades_with_orm_fts_and_fk_proof(
             assert import_row.canonical_generation_id == "canonical-generation-1"
             assert import_row.canonical_path == "objects/legacy/canonical.json.zst"
             assert session.get(KnowledgeCanonicalGenerationRow, "canonical-generation-1") is None
-        if version == 18:
+        if version in {18, 19, 20, 21}:
             vector = session.get(KnowledgeVectorGenerationRow, "vector-generation-1")
             assert vector is not None and vector.dimensions == 3
+            assert vector.corpus_fingerprint_schema == 1
     _assert_current_round_trip(context, suffix=str(version)[-1])
 
 

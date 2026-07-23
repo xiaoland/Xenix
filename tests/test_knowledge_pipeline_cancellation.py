@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import subprocess
-import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from xenix.exceptions import ValidationError
 from xenix.services.knowledge_pipeline import (
     FileProbeResult,
     FormatNormalizer,
@@ -14,7 +14,6 @@ from xenix.services.knowledge_pipeline import (
     ParseExecutor,
     ParsePlan,
     ParsePlanUnit,
-    _docling_worker_command,
     _recognize_with_cancellation,
 )
 
@@ -111,27 +110,21 @@ def test_libreoffice_cancellation_terminates_process_and_preserves_exception(
     assert process.killed is False
 
 
-def test_docling_cancellation_escalates_to_kill_and_preserves_exception(
+def test_docling_failure_preserves_a_content_free_diagnostic(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     source = tmp_path / "source.docx"
     source.touch()
-    process = _FakeProcess(ignore_terminate=True)
-    started = False
+    private_content = "private customer presentation content"
 
-    def popen(*_args: Any, **_kwargs: Any) -> _FakeProcess:
-        nonlocal started
-        started = True
-        return process
+    def fail_conversion(*_args: Any, **_kwargs: Any) -> None:
+        raise MemoryError(private_content)
 
-    cancelled = _Cancelled("cancel import")
-
-    def check_cancelled() -> None:
-        if started:
-            raise cancelled
-
-    monkeypatch.setattr(subprocess, "Popen", popen)
+    monkeypatch.setattr(
+        "xenix.services.knowledge_docling.convert_document",
+        fail_conversion,
+    )
     normalized = NormalizedSource(source, "docx", "docx", {"operation": "identity"})
     plan = ParsePlan(
         "docx",
@@ -141,18 +134,21 @@ def test_docling_cancellation_escalates_to_kill_and_preserves_exception(
     )
     probe = FileProbeResult(source, "docx", None, 1, False, {})
 
-    with pytest.raises(_Cancelled) as raised:
+    with pytest.raises(ValidationError) as raised:
         ParseExecutor().parse(
             normalized,
             plan,
             probe=probe,
             work_dir=tmp_path,
-            check_cancelled=check_cancelled,
         )
 
-    assert raised.value is cancelled
-    assert process.terminated is True
-    assert process.killed is True
+    error = raised.value
+    assert getattr(error, "error_code", None) == "knowledge_docling_conversion_failed"
+    assert getattr(error, "retryable", None) is True
+    assert getattr(error, "error_details", None) == {
+        "diagnostic_code": "docling_memory_error"
+    }
+    assert private_content not in str(error)
 
 
 def test_ocr_keyword_detection_does_not_retry_an_internal_type_error(tmp_path: Path) -> None:
@@ -202,29 +198,3 @@ def test_ocr_without_new_keyword_remains_compatible(tmp_path: Path) -> None:
 
     assert payload == {"protocol": 1}
     assert checks == 2
-
-
-def test_docling_worker_command_supports_source_and_frozen_entries(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    source = tmp_path / "source.docx"
-    output = tmp_path / "result.json"
-    monkeypatch.delattr(sys, "frozen", raising=False)
-
-    source_command, _environment = _docling_worker_command(
-        source,
-        source_format="docx",
-        output_path=output,
-    )
-
-    assert source_command[1:3] == ["-m", "xenix.services.knowledge_docling_worker"]
-
-    monkeypatch.setattr(sys, "frozen", True, raising=False)
-    frozen_command, _environment = _docling_worker_command(
-        source,
-        source_format="docx",
-        output_path=output,
-    )
-
-    assert frozen_command[1] == "--knowledge-docling-worker"

@@ -1,582 +1,435 @@
+from __future__ import annotations
+
 import threading
-import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+import time
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
-from PySide6.QtCore import QEvent, QTranslator, Qt
-from PySide6.QtWidgets import (
-    QApplication,
-    QFileDialog,
-    QInputDialog,
-    QMessageBox,
-)
+from PySide6.QtCore import QCoreApplication, QMimeData, QPoint, QPointF, Qt, QUrl
+from PySide6.QtGui import QDragEnterEvent, QDropEvent
+from PySide6.QtWidgets import QApplication, QFileDialog
 
-from xenix.services.paddle_ocr_service import PaddleOcrStatus
-from xenix.services.knowledge_task_logs import KnowledgeTaskLogEntry
-from xenix.services.knowledge_index_service import KnowledgeIndexKind
-from xenix.ui import knowledge_workspace
-from xenix.ui.knowledge_workspace import (
-    KnowledgeWorkspaceDialog,
-    _accepted_import_paths,
-)
-
-
-class _ImportService:
-    def __init__(self, items: list | None = None) -> None:
-        self.items = items or [
-            SimpleNamespace(
-                import_id="import-1",
-                file_name="rules.pdf",
-                status="canonical_ready",
-                phase="derivation_queued",
-                reused_existing=False,
-                error_code=None,
-                error_summary=None,
-                retryable=False,
-            )
-        ]
-        self.enqueued: list[Path] = []
-        self.enqueue_thread_ids: list[int] = []
-        self.list_calls = 0
-        self.retries: list[tuple[str, str | None]] = []
-        self.cancellations: list[str] = []
-        self.logs = (
-            KnowledgeTaskLogEntry(
-                timestamp="2026-07-22T10:00:00+00:00",
-                level="info",
-                phase="parsing",
-                event_code="parsing_started",
-            ),
-        )
-
-    def enqueue_file(self, path: Path):
-        self.enqueued.append(path)
-        self.enqueue_thread_ids.append(threading.get_ident())
-        return SimpleNamespace(status="queued", reused_existing=False)
-
-    def list_imports(self):
-        self.list_calls += 1
-        return list(self.items)
-
-    def retry_import(
-        self,
-        import_id: str,
-        *,
-        password: str | None = None,
-        source_path: Path | None = None,
-    ):
-        del source_path
-        self.retries.append((import_id, password))
-
-    def cancel_import(self, import_id: str):
-        self.cancellations.append(import_id)
-        return True
-
-    def read_import_logs(self, import_id: str):
-        del import_id
-        return self.logs
-
-
-class _OcrDeployment:
-    def __init__(self, status: PaddleOcrStatus | None = None) -> None:
-        self.current_status = status or PaddleOcrStatus(False, False)
-        self.status_thread_ids: list[int] = []
-        self.install_thread_ids: list[int] = []
-
-    def status(self):
-        self.status_thread_ids.append(threading.get_ident())
-        return self.current_status
-
-    def install(self, progress):
-        self.install_thread_ids.append(threading.get_ident())
-        progress("downloading_python")
-        progress("ready")
-        self.current_status = PaddleOcrStatus(True, True)
-        return self.current_status
-
-
-class _KnowledgeService:
-    def __init__(self) -> None:
-        self.documents = [
-            SimpleNamespace(
-                title="Rainy season rules",
-                source_format="pdf",
-                content_state="ready",
-                updated_at=datetime(2026, 7, 22, 10, 30, tzinfo=timezone.utc),
-            )
-        ]
-
-    def list_documents(self):
-        return list(self.documents)
-
-
-class _UnavailableKnowledgeService:
-    def list_documents(self):
-        raise RuntimeError("database unavailable")
-
-
-class _IndexService:
-    def __init__(self) -> None:
-        self.enqueued: list[tuple[tuple[str, ...], str]] = []
-
-    def status(self):
-        return SimpleNamespace(
-            keyword_state="ready",
-            text_vector_state="needs_rebuild",
-            vector_configured=True,
-            unit_count=4,
-            estimated_vector_requests=1,
-        )
-
-    def enqueue_rebuild(self, kinds, *, trigger):
-        self.enqueued.append((tuple(str(kind) for kind in kinds), trigger))
-        return "index-task-1"
+from xenix.services.knowledge_index_service import KnowledgeIndexOverview
+from xenix.services.knowledge_service import KnowledgeDocumentSummary
+from xenix.services.knowledge_task_query import KnowledgeTaskItem, KnowledgeTaskSummary
+from xenix.services.knowledge_workspace_service import KnowledgeWorkspaceSnapshot
+from xenix.services.paddle_ocr_service import PaddleOcrState, PaddleOcrStatus
+from xenix.ui.knowledge_workspace import KnowledgeWorkspaceDialog, _accepted_import_paths
 
 
 def _app(monkeypatch) -> QApplication:
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
-    return QApplication.instance() or QApplication([])
+    app = QApplication.instance() or QApplication([])
+    QCoreApplication.processEvents()
+    return app
 
 
-def _drain_workspace_tasks(workspace: KnowledgeWorkspaceDialog, app: QApplication) -> None:
-    assert workspace._thread_pool.waitForDone(2_000)
-    app.processEvents()
+class _ImportService:
+    def __init__(self) -> None:
+        self.enqueued: list[Path] = []
+        self.cancelled: list[str] = []
+        self.retried: list[tuple[str, str | None, Path | None]] = []
+
+    def enqueue_file(self, path: Path):
+        self.enqueued.append(path)
+
+    def cancel_import(self, import_id: str):
+        self.cancelled.append(import_id)
+
+    def retry_import(self, import_id: str, *, password=None, source_path=None):
+        self.retried.append((import_id, password, source_path))
+
+    def read_import_logs(self, _import_id: str):
+        return ()
 
 
-def test_import_path_filter_is_exact_case_insensitive_and_stably_deduplicated(tmp_path: Path) -> None:
-    values = [
-        str(tmp_path / "a.TXT"),
-        str(tmp_path / "b.docx"),
-        str(tmp_path / "c.doc"),
-        str(tmp_path / "ignored.PPT"),
-        str(tmp_path / "also-ignored.pptx"),
-        str(tmp_path / "d.pdf"),
-        str(tmp_path / "e.JPG"),
-        str(tmp_path / "f.JPEG"),
-        str(tmp_path / "g.png"),
-        str(tmp_path / "a.TXT"),
-    ]
+class _TaskQuery:
+    def __init__(self, tasks: list[KnowledgeTaskItem] | None = None) -> None:
+        self.tasks = list(tasks or ())
 
-    accepted = _accepted_import_paths(values)
-
-    assert [path.suffix.casefold() for path in accepted] == [
-        ".txt",
-        ".docx",
-        ".doc",
-        ".pdf",
-        ".jpg",
-        ".jpeg",
-        ".png",
-    ]
+    def list_tasks(self):
+        return list(self.tasks)
 
 
-def test_workspace_and_import_queue_are_modeless_singletons_with_owned_polling_timer(
-    monkeypatch,
-) -> None:
-    app = _app(monkeypatch)
-    monkeypatch.setattr(knowledge_workspace, "IMPORT_POLL_INTERVAL_MS", 10)
-    imports = _ImportService()
-    workspace = KnowledgeWorkspaceDialog(
-        import_service=imports,
-        ocr_deployment=_OcrDeployment(),
-    )
+class _SnapshotService:
+    def __init__(self, snapshot: KnowledgeWorkspaceSnapshot, *, block=None) -> None:
+        self.value = snapshot
+        self.block = block
+        self.calls: list[int] = []
 
-    workspace.open_import_queue()
-    first = workspace._queue_dialog
-    workspace.open_import_queue()
-    second = workspace._queue_dialog
-    app.processEvents()
-
-    assert workspace.windowModality() == Qt.NonModal
-    assert first is second
-    assert first is not None and first.windowModality() == Qt.NonModal
-    assert first._list.count() == 1
-    assert first._refresh_timer.isActive()
-
-    first.hide()
-    app.processEvents()
-    assert not first._refresh_timer.isActive()
-    first.show()
-    app.processEvents()
-    assert first._refresh_timer.isActive()
-    first.close()
-    app.processEvents()
-    assert not first._refresh_timer.isActive()
-    workspace.close()
+    def snapshot(self):
+        self.calls.append(threading.get_ident())
+        if self.block is not None:
+            self.block()
+        return self.value
 
 
-def test_workspace_degrades_to_a_bounded_unavailable_state_when_listing_fails(
-    monkeypatch,
-) -> None:
-    app = _app(monkeypatch)
-    workspace = KnowledgeWorkspaceDialog(
-        import_service=_ImportService(),
-        knowledge_service=_UnavailableKnowledgeService(),
-    )
-
-    workspace.refresh_documents()
-    app.processEvents()
-
-    assert workspace._documents.rowCount() == 0
-    assert workspace._documents.isHidden()
-    assert workspace._empty_state.text() == (
-        "Knowledge content is temporarily unavailable."
-    )
-    workspace.close()
-
-
-def test_queue_translates_status_phase_error_and_reused_without_raw_summary(monkeypatch) -> None:
-    app = _app(monkeypatch)
-    raw_summary = r"Failed at F:\private\rules.pdf with api-token-secret"
-    imports = _ImportService(
-        [
-            SimpleNamespace(
-                import_id="import-secret",
-                file_name="rules.pdf",
-                status="needs_attention",
-                phase="needs_attention",
-                reused_existing=True,
-                error_code="knowledge_password_required",
-                error_summary=raw_summary,
-                retryable=True,
-            )
-        ]
-    )
-    workspace = KnowledgeWorkspaceDialog(
-        import_service=imports,
-        ocr_deployment=_OcrDeployment(),
-    )
-
-    workspace.open_import_queue()
-    app.processEvents()
-    text = workspace._queue_dialog._list.item(0).text()
-
-    assert "Status: Needs attention" in text
-    assert "Phase: Needs attention" in text
-    assert "Reused existing document" in text
-    assert "A password is required to continue this import." in text
-    assert raw_summary not in text
-    assert "knowledge_password_required" not in text
-    workspace.close()
-
-
-def test_queue_password_retry_is_transient_and_cancel_uses_import_identity(monkeypatch) -> None:
-    app = _app(monkeypatch)
-    imports = _ImportService(
-        [
-            SimpleNamespace(
-                import_id="import-secret",
-                file_name="encrypted.pdf",
-                status="needs_attention",
-                phase="needs_attention",
-                reused_existing=False,
-                error_code="knowledge_password_required",
-                error_summary=None,
-                retryable=True,
-            )
-        ]
-    )
-    workspace = KnowledgeWorkspaceDialog(
-        import_service=imports,
-        ocr_deployment=_OcrDeployment(),
-    )
-    monkeypatch.setattr(
-        QInputDialog,
-        "getText",
-        lambda *_args, **_kwargs: ("transient-pass", True),
-    )
-    workspace.open_import_queue()
-    queue_dialog = workspace._queue_dialog
-    assert queue_dialog is not None
-    queue_dialog._list.setCurrentRow(0)
-
-    queue_dialog._retry_selected()
-
-    assert imports.retries == [("import-secret", "transient-pass")]
-
-    imports.items = [
-        SimpleNamespace(
-            import_id="import-running",
-            file_name="rules.pdf",
-            status="running",
-            phase="parsing",
-            reused_existing=False,
+def _snapshot(*, active: int = 0) -> KnowledgeWorkspaceSnapshot:
+    now = datetime(2026, 7, 22, 8, 0, tzinfo=UTC)
+    return KnowledgeWorkspaceSnapshot(
+        documents=(
+            KnowledgeDocumentSummary(
+                title="运营规则",
+                source_format="pdf",
+                content_state="ready",
+                imported_at=now,
+                updated_at=now,
+            ),
+        ),
+        tasks=KnowledgeTaskSummary(active, 0, active),
+        ocr=PaddleOcrStatus(PaddleOcrState.READY),
+        indexes=KnowledgeIndexOverview(
+            keyword_state="ready",
+            text_vector_state="needs_rebuild",
+            vector_configured=True,
+            unit_count=3,
+            estimated_vector_requests=1,
+            active_task_id="task" if active else None,
+            active_task_status="running" if active else None,
             error_code=None,
-            error_summary=None,
-            retryable=False,
-        )
-    ]
-    queue_dialog.refresh()
-    queue_dialog._list.setCurrentRow(0)
-    queue_dialog._cancel_selected()
-
-    assert imports.cancellations == ["import-running"]
-    workspace.close()
-
-
-def test_queue_opens_a_modeless_bounded_import_log_view(monkeypatch) -> None:
-    app = _app(monkeypatch)
-    workspace = KnowledgeWorkspaceDialog(
-        import_service=_ImportService(),
-        ocr_deployment=_OcrDeployment(),
+        ),
     )
-    workspace.open_import_queue()
-    queue_dialog = workspace._queue_dialog
-    assert queue_dialog is not None
-    queue_dialog._list.setCurrentRow(0)
 
-    queue_dialog._view_selected_log()
+
+def _drain(workspace: KnowledgeWorkspaceDialog, app: QApplication) -> None:
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        app.processEvents()
+        if workspace._snapshot_task is None and workspace._last_snapshot is not None:
+            break
+        time.sleep(0.005)
     app.processEvents()
 
-    log_dialog = queue_dialog._log_dialog
-    assert log_dialog is not None
-    assert log_dialog.windowModality() == Qt.NonModal
-    assert "Document parsing" in log_dialog._content.toPlainText()
-    assert "Document parsing started" in log_dialog._content.toPlainText()
-    assert log_dialog._refresh_timer.isActive()
 
-    queue_dialog.hide()
+def _drain_queue(queue, app: QApplication) -> None:
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        app.processEvents()
+        if queue._load_task is None and queue._table.rowCount() > 0:
+            break
+        time.sleep(0.005)
     app.processEvents()
-    assert not log_dialog._refresh_timer.isActive()
-    workspace.close()
 
 
-def test_file_selection_enqueues_on_gui_thread_and_uses_exact_format_filter(
+def test_supported_file_admission_is_exact_and_deduplicated(tmp_path: Path) -> None:
+    txt = tmp_path / "rules.txt"
+    jpeg = tmp_path / "scan.JPEG"
+    accepted = _accepted_import_paths(
+        [str(txt), str(txt), str(jpeg), str(tmp_path / "slides.pptx")]
+    )
+    assert accepted == [
+        txt.resolve(),
+        jpeg.resolve(),
+        (tmp_path / "slides.pptx").resolve(),
+    ]
+
+
+def test_workspace_shows_shell_before_background_snapshot_and_has_no_description(
     monkeypatch,
-    tmp_path: Path,
 ) -> None:
-    app = _app(monkeypatch)
-    imports = _ImportService([])
-    workspace = KnowledgeWorkspaceDialog(
-        import_service=imports,
-        ocr_deployment=_OcrDeployment(),
-    )
-    selected = [
-        str(tmp_path / "rules.txt"),
-        str(tmp_path / "scan.jpeg"),
-        str(tmp_path / "slides.pptx"),
-    ]
-    captured: dict[str, str] = {}
-
-    def choose_files(*args, **_kwargs):
-        captured["filter"] = str(args[3])
-        return selected, ""
-
-    monkeypatch.setattr(QFileDialog, "getOpenFileNames", choose_files)
-
-    workspace._choose_files()
-    app.processEvents()
-
-    assert [path.suffix for path in imports.enqueued] == [".txt", ".jpeg"]
-    assert captured["filter"] == (
-        "Knowledge documents (*.txt *.doc *.docx *.pdf *.jpg *.jpeg *.png)"
-    )
-    assert imports.enqueue_thread_ids == [threading.get_ident(), threading.get_ident()]
-    assert workspace._queue_dialog is not None
-    assert workspace._queue_dialog._refresh_timer.isActive()
-    workspace.close()
-
-
-def test_queue_translates_snapshot_and_bounded_format_failures(monkeypatch) -> None:
-    app = _app(monkeypatch)
-    imports = _ImportService(
-        [
-            SimpleNamespace(
-                import_id="import-bounded",
-                file_name="unsafe.docx",
-                status="failed",
-                phase="snapshot",
-                reused_existing=False,
-                error_code="knowledge_docx_compression_ratio",
-                error_summary=r"F:\private\unsafe.docx",
-                retryable=False,
-            )
-        ]
-    )
-    workspace = KnowledgeWorkspaceDialog(
-        import_service=imports,
-        ocr_deployment=_OcrDeployment(),
-    )
-
-    workspace.open_import_queue()
-    app.processEvents()
-    text = workspace._queue_dialog._list.item(0).text()
-
-    assert "Phase: Copying source" in text
-    assert "The DOCX package compression ratio is unsafe." in text
-    assert "private" not in text
-    workspace.close()
-
-
-def test_ocr_status_probe_runs_off_gui_thread_and_language_change_uses_cache(monkeypatch) -> None:
-    app = _app(monkeypatch)
-    deployment = _OcrDeployment(PaddleOcrStatus(True, True))
-    workspace = KnowledgeWorkspaceDialog(
-        import_service=_ImportService(),
-        ocr_deployment=deployment,
-    )
-
-    workspace.show()
-    _drain_workspace_tasks(workspace, app)
-
-    assert deployment.status_thread_ids
-    assert all(thread_id != threading.get_ident() for thread_id in deployment.status_thread_ids)
-    assert workspace._ocr_status.text() == "Local PaddleOCR is ready"
-    probe_count = len(deployment.status_thread_ids)
-
-    workspace.changeEvent(QEvent(QEvent.LanguageChange))
-
-    assert len(deployment.status_thread_ids) == probe_count
-    assert workspace._ocr_status.text() == "Local PaddleOCR is ready"
-    workspace.close()
-
-
-def test_hidden_workspace_ignores_late_probe_and_reopen_starts_a_fresh_probe(monkeypatch) -> None:
     app = _app(monkeypatch)
     started = threading.Event()
     release = threading.Event()
 
-    class BlockingDeployment(_OcrDeployment):
-        def status(self):
-            self.status_thread_ids.append(threading.get_ident())
-            if len(self.status_thread_ids) == 1:
-                started.set()
-                assert release.wait(2)
-            return PaddleOcrStatus(True, True)
+    def block() -> None:
+        started.set()
+        assert release.wait(2)
 
-    deployment = BlockingDeployment()
+    service = _SnapshotService(_snapshot(), block=block)
     workspace = KnowledgeWorkspaceDialog(
         import_service=_ImportService(),
-        ocr_deployment=deployment,
+        task_query_service=_TaskQuery(),
+        workspace_service=service,
     )
+    before = time.perf_counter()
     workspace.show()
+    app.processEvents()
+
+    assert time.perf_counter() - before < 0.5
+    assert workspace.isVisible()
+    assert not hasattr(workspace, "_description")
     assert started.wait(2)
-    initial_text = workspace._ocr_status.text()
-
-    workspace.hide()
+    assert service.calls[0] != threading.get_ident()
     release.set()
-    _drain_workspace_tasks(workspace, app)
-
-    assert workspace._ocr_status.text() == initial_text
-
-    workspace.show()
-    _drain_workspace_tasks(workspace, app)
-
-    assert len(deployment.status_thread_ids) == 2
-    assert workspace._ocr_status.text() == "Local PaddleOCR is ready"
+    _drain(workspace, app)
     workspace.close()
 
 
-def test_workspace_lists_logical_documents_and_opens_knowledge_settings(monkeypatch) -> None:
+def test_workspace_lists_documents_and_places_quiet_status_in_footer(monkeypatch) -> None:
     app = _app(monkeypatch)
+    service = _SnapshotService(_snapshot())
     opened: list[bool] = []
     workspace = KnowledgeWorkspaceDialog(
         import_service=_ImportService(),
-        knowledge_service=_KnowledgeService(),
-        ocr_deployment=_OcrDeployment(),
+        task_query_service=_TaskQuery(),
+        workspace_service=service,
         open_knowledge_settings=lambda: opened.append(True),
     )
     workspace.show()
-    _drain_workspace_tasks(workspace, app)
+    _drain(workspace, app)
 
     assert workspace._documents.rowCount() == 1
-    assert workspace._documents.item(0, 0).text() == "Rainy season rules"
+    assert workspace._documents.item(0, 0).text() == "运营规则"
     assert workspace._documents.item(0, 1).text() == "PDF"
-    assert workspace._documents.item(0, 2).text() == "Searchable"
-    assert workspace._documents.item(0, 0).data(Qt.UserRole) is None
-
+    assert "OCR: Ready" in workspace._footer_status.text()
+    assert "Keyword: Ready" in workspace._footer_status.text()
+    assert "Text vectors: Needs rebuild" in workspace._footer_status.text()
+    assert workspace._footer_status.font().pointSize() < workspace.font().pointSize()
+    assert not workspace._refresh_timer.isActive()
     workspace._settings_button.click()
     assert opened == [True]
     workspace.close()
 
 
-def test_workspace_manual_rebuild_sheet_lists_only_real_indexes(monkeypatch) -> None:
+def test_workspace_polls_only_while_snapshot_reports_active_work(monkeypatch) -> None:
     app = _app(monkeypatch)
-    indexes = _IndexService()
+    service = _SnapshotService(_snapshot(active=1))
     workspace = KnowledgeWorkspaceDialog(
         import_service=_ImportService(),
-        knowledge_service=_KnowledgeService(),
-        knowledge_index_service=indexes,
-        ocr_deployment=_OcrDeployment(),
+        task_query_service=_TaskQuery(),
+        workspace_service=service,
     )
+    workspace.show()
+    _drain(workspace, app)
+    assert workspace._refresh_timer.isActive()
 
-    workspace._open_index_rebuild()
-    app.processEvents()
-    sheet = workspace._index_dialog
-    assert sheet is not None
-    assert sheet.windowModality() == Qt.WindowModal
-    assert sheet._keyword_checkbox.text() == "Keyword index"
-    assert sheet._text_vector_checkbox.text() == "Text semantic vector index"
-    assert "Visual" not in " ".join(
-        child.text() for child in sheet.findChildren(type(sheet._keyword_checkbox))
-    )
-
-    sheet._text_vector_checkbox.setChecked(False)
-    sheet._submit()
-
-    assert indexes.enqueued == [
-        ((KnowledgeIndexKind.KEYWORD.value,), "manual")
-    ]
+    service.value = _snapshot(active=0)
+    workspace.refresh_documents()
+    _drain(workspace, app)
+    assert not workspace._refresh_timer.isActive()
     workspace.close()
 
 
-def test_manual_rebuild_sheet_keeps_translated_standard_button_after_language_change(
+def test_hidden_workspace_ignores_late_snapshot_and_reopen_uses_new_generation(
     monkeypatch,
 ) -> None:
     app = _app(monkeypatch)
+    started = threading.Event()
+    release = threading.Event()
+
+    def block() -> None:
+        started.set()
+        assert release.wait(2)
+
+    service = _SnapshotService(_snapshot(), block=block)
     workspace = KnowledgeWorkspaceDialog(
         import_service=_ImportService(),
-        knowledge_service=_KnowledgeService(),
-        knowledge_index_service=_IndexService(),
-        ocr_deployment=_OcrDeployment(),
+        task_query_service=_TaskQuery(),
+        workspace_service=service,
     )
-    workspace._open_index_rebuild()
-    sheet = workspace._index_dialog
-    assert sheet is not None
-    translator = QTranslator(app)
-    catalog = (
-        Path(__file__).resolve().parents[1]
-        / "src"
-        / "xenix"
-        / "translations"
-        / "xenix_zh_CN.qm"
-    )
-    assert translator.load(str(catalog))
+    workspace.show()
+    app.processEvents()
+    assert started.wait(2)
+    workspace.hide()
+    release.set()
+    _drain(workspace, app)
+    assert workspace._documents.rowCount() == 0
 
-    try:
-        app.installTranslator(translator)
+    service.block = None
+    workspace.show()
+    _drain(workspace, app)
+    assert workspace._documents.rowCount() == 1
+    workspace.close()
+
+
+def test_knowledge_task_queue_unifies_task_kinds_and_capability_actions(monkeypatch) -> None:
+    app = _app(monkeypatch)
+    now = datetime(2026, 7, 22, 8, 0, tzinfo=UTC)
+    tasks = [
+        KnowledgeTaskItem(
+            reference="import:1",
+            kind="import",
+            target="rules.pdf",
+            status="running",
+            phase="parsing",
+            trigger="user",
+            updated_at=now,
+            error_code=None,
+            owner="import",
+            owner_id="1",
+            import_id="1",
+            can_cancel=True,
+            can_view_log=True,
+        ),
+        KnowledgeTaskItem(
+            reference="derivation:2",
+            kind="content_preparation",
+            target="运营规则",
+            status="failed",
+            phase="failed",
+            trigger="compatibility",
+            updated_at=now,
+            error_code="knowledge_derivation_failed",
+            owner="derivation",
+            owner_id="2",
+            import_id="1",
+            can_retry=True,
+        ),
+        KnowledgeTaskItem(
+            reference="index:3",
+            kind="index_build",
+            target="Text vector index",
+            status="queued",
+            phase="queued",
+            trigger="manual",
+            updated_at=now,
+            error_code=None,
+            owner="index",
+            owner_id="3",
+            import_id=None,
+            index_kinds=("text_vector",),
+        ),
+    ]
+    imports = _ImportService()
+    workspace = KnowledgeWorkspaceDialog(
+        import_service=imports,
+        task_query_service=_TaskQuery(tasks),
+        workspace_service=_SnapshotService(_snapshot()),
+    )
+    workspace.open_task_queue()
+    queue = workspace._queue_dialog
+    assert queue is not None
+    _drain_queue(queue, app)
+
+    assert queue.windowModality() == Qt.NonModal
+    assert queue._table.rowCount() == 3
+    assert [queue._table.item(row, 0).text() for row in range(3)] == [
+        "Import",
+        "Content preparation",
+        "Index build",
+    ]
+    assert "import:1" not in " ".join(
+        queue._table.item(row, column).text()
+        for row in range(3)
+        for column in range(4)
+    )
+    queue._table.selectRow(0)
+    queue._sync_actions()
+    assert queue._cancel_button.isEnabled()
+    assert queue._view_log_button.isEnabled()
+    assert not queue._retry_button.isEnabled()
+    queue._cancel_button.click()
+    assert imports.cancelled == ["1"]
+    queue.close()
+
+
+def test_visible_idle_task_queue_refreshes_when_reopened(monkeypatch) -> None:
+    app = _app(monkeypatch)
+    query = _TaskQuery()
+    workspace = KnowledgeWorkspaceDialog(
+        import_service=_ImportService(),
+        task_query_service=query,
+        workspace_service=_SnapshotService(_snapshot()),
+    )
+    workspace.open_task_queue()
+    queue = workspace._queue_dialog
+    assert queue is not None
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline and queue._load_task is not None:
         app.processEvents()
+        time.sleep(0.005)
+    assert queue._table.rowCount() == 0
+    assert queue._refresh_timer.isActive()
 
-        assert sheet._rebuild_button.text() == "重建"
-        assert sheet._cancel_button.text() == "取消"
-    finally:
-        app.removeTranslator(translator)
-        workspace.close()
+    query.tasks = [
+        KnowledgeTaskItem(
+            reference="index:1",
+            kind="index_build",
+            target="Keyword index",
+            status="queued",
+            phase="queued",
+            trigger="manual",
+            updated_at=datetime(2026, 7, 22, 8, 0, tzinfo=UTC),
+            error_code=None,
+            owner="index",
+            owner_id="1",
+            import_id=None,
+            index_kinds=("keyword",),
+        )
+    ]
+    workspace.open_task_queue()
+    _drain_queue(queue, app)
+
+    assert queue._table.rowCount() == 1
+    queue.close()
 
 
-def test_knowledge_workspace_translation_catalog_entries_are_complete() -> None:
-    translations = Path(__file__).resolve().parents[1] / "src" / "xenix" / "translations"
+def test_file_selection_uses_lightweight_format_registry_and_opens_task_queue(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    app = _app(monkeypatch)
+    imports = _ImportService()
+    captured: dict[str, str] = {}
 
-    for catalog_name in ("xenix_en_US.ts", "xenix_zh_CN.ts"):
-        root = ET.parse(translations / catalog_name).getroot()
-        contexts = {
-            context.findtext("name"): context
-            for context in root.findall("context")
-        }
-        for context_name in (
-            "KnowledgeImportLogDialog",
-            "KnowledgeImportQueueDialog",
-            "KnowledgeIndexRebuildDialog",
-            "KnowledgeWorkspaceDialog",
-        ):
-            messages = contexts[context_name].findall("message")
-            active = [message for message in messages if message.find("location") is not None]
-            unfinished = [
-                message.findtext("source")
-                for message in active
-                if message.find("translation") is None
-                or message.find("translation").get("type") == "unfinished"
-                or not (message.findtext("translation") or "").strip()
-            ]
-            assert unfinished == []
+    def choose_files(*args, **_kwargs):
+        captured["filter"] = str(args[3])
+        return [str(tmp_path / "rules.txt"), str(tmp_path / "slides.pptx")], ""
+
+    monkeypatch.setattr(QFileDialog, "getOpenFileNames", choose_files)
+    workspace = KnowledgeWorkspaceDialog(
+        import_service=imports,
+        task_query_service=_TaskQuery(),
+        workspace_service=_SnapshotService(_snapshot()),
+    )
+
+    workspace._choose_files()
+    app.processEvents()
+
+    assert [path.suffix for path in imports.enqueued] == [".txt", ".pptx"]
+    assert captured["filter"] == (
+        "Knowledge documents (*.txt *.doc *.docx *.ppt *.pptx *.pdf *.jpg *.jpeg *.png)"
+    )
+    assert workspace._queue_dialog is not None
+    workspace.close()
+
+
+def test_workspace_drop_uses_the_same_ordered_deduplicated_submission(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    app = _app(monkeypatch)
+    imports = _ImportService()
+    workspace = KnowledgeWorkspaceDialog(
+        import_service=imports,
+        task_query_service=_TaskQuery(),
+        workspace_service=_SnapshotService(_snapshot()),
+    )
+    txt = tmp_path / "rules.txt"
+    pptx = tmp_path / "slides.pptx"
+    unsupported = tmp_path / "notes.md"
+    mime_data = QMimeData()
+    mime_data.setUrls(
+        [
+            QUrl.fromLocalFile(str(txt)),
+            QUrl.fromLocalFile(str(pptx)),
+            QUrl.fromLocalFile(str(txt)),
+            QUrl.fromLocalFile(str(unsupported)),
+        ]
+    )
+    target = workspace._documents.viewport()
+    drag = QDragEnterEvent(
+        QPoint(4, 4),
+        Qt.CopyAction,
+        mime_data,
+        Qt.NoButton,
+        Qt.NoModifier,
+    )
+    QApplication.sendEvent(target, drag)
+
+    assert drag.isAccepted()
+
+    drop = QDropEvent(
+        QPointF(4, 4),
+        Qt.CopyAction,
+        mime_data,
+        Qt.NoButton,
+        Qt.NoModifier,
+    )
+    QApplication.sendEvent(target, drop)
+    app.processEvents()
+
+    assert imports.enqueued == [txt.resolve(), pptx.resolve()]
+    assert workspace._queue_dialog is not None
+    workspace.close()

@@ -14,6 +14,7 @@ from xenix.services.embedding_service import (
     EmbeddingValidationError,
 )
 from xenix.services.knowledge_semantic_service import KnowledgeSemanticService
+from xenix.services.knowledge_projection import knowledge_unit_id
 from xenix.services.knowledge_service import (
     MAX_KNOWLEDGE_UNIT_CHARS,
     KnowledgeRetrievalUnavailable,
@@ -22,7 +23,8 @@ from xenix.services.knowledge_service import (
 )
 from xenix.services.knowledge_vector_store import LanceKnowledgeVectorStore
 from xenix.services.storage import StorageBootstrapService
-from xenix.services.storage.models import KnowledgeVectorGenerationRow
+from xenix.services.storage.models import KnowledgeUnitRow, KnowledgeVectorGenerationRow
+from xenix.services.storage.repositories.knowledge import KnowledgeRepository
 from tests.knowledge_test_support import seed_knowledge_text
 
 
@@ -184,6 +186,51 @@ def test_unchanged_corpus_reuses_published_generation(monkeypatch, tmp_path: Pat
     document_calls = [call for call in embedding.calls if "规则正文" in call[0]]
     assert len(document_calls) == 1
     assert len(_generation_rows(storage)) == 1
+
+
+def test_republishing_same_projection_keeps_vector_status_and_search_aligned(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    storage, _embedding, semantic, knowledge = _services(monkeypatch, tmp_path)
+    document = seed_knowledge_text(
+        knowledge,
+        title="规则",
+        text="规则正文：采用三期平均销量。",
+    )
+    generation = semantic.rebuild_generation()
+
+    repository = KnowledgeRepository()
+    with storage.session_factory() as session:
+        current = repository.list_current_units(session, library_id="global")
+        assert len(current) == 1
+        unit = current[0]
+        replacement = KnowledgeUnitRow(
+            id=knowledge_unit_id(
+                document_id=document.id,
+                canonical_generation_id=document.retrieval_generation_id or "",
+                ordinal=unit.ordinal,
+            ),
+            document_id=document.id,
+            canonical_generation_id=document.retrieval_generation_id or "",
+            ordinal=unit.ordinal,
+            text=unit.text,
+            search_text=unit.search_text,
+            locator_payload=unit.locator_payload,
+        )
+        repository.replace_units(
+            session,
+            document=document,
+            units=[replacement],
+        )
+        session.commit()
+
+    state = semantic.inspect_index()
+    candidates = semantic.search("雨季策略", library_id="global", limit=5)
+
+    assert state.ready is True
+    assert state.generation_id == generation.id
+    assert candidates.unit_ids == (replacement.id,)
 
 
 def test_corpus_or_profile_change_creates_a_new_projection(monkeypatch, tmp_path: Path) -> None:

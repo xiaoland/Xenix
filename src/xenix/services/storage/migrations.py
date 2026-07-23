@@ -9,7 +9,7 @@ from sqlmodel import SQLModel
 from ...exceptions import ValidationError
 from . import models  # noqa: F401
 
-CURRENT_SCHEMA_VERSION = 21
+CURRENT_SCHEMA_VERSION = 23
 
 
 def get_user_version(engine: Engine) -> int:
@@ -934,6 +934,33 @@ def _require_knowledge_source_shape(connection, version: int) -> None:
             "created_at",
             "updated_at",
         }
+    if version >= 21:
+        required["knowledge_index_task"] = {
+            "id",
+            "library_id",
+            "index_kinds_payload",
+            "trigger",
+            "status",
+            "phase",
+            "profile_fingerprint",
+            "corpus_fingerprint",
+            "vector_generation_id",
+            "error_code",
+            "error_summary",
+            "created_at",
+            "updated_at",
+        }
+    if version >= 22:
+        required["knowledge_document"].update(
+            {
+                "retrieval_projection_version",
+                "retrieval_content_fingerprint",
+                "retrieval_unit_count",
+            }
+        )
+        required["knowledge_vector_generation"].add(
+            "corpus_fingerprint_schema"
+        )
 
     tables = _table_names(connection)
     missing_tables = sorted(set(required) - tables)
@@ -1581,6 +1608,67 @@ def migrate_v20_to_v21(engine: Engine) -> int:
     return 21
 
 
+def migrate_v21_to_v22(engine: Engine) -> int:
+    with engine.begin() as connection:
+        _require_knowledge_source_shape(connection, 21)
+        connection.exec_driver_sql(
+            "ALTER TABLE knowledge_document "
+            "ADD COLUMN retrieval_projection_version INTEGER"
+        )
+        connection.exec_driver_sql(
+            "ALTER TABLE knowledge_document "
+            "ADD COLUMN retrieval_content_fingerprint VARCHAR"
+        )
+        connection.exec_driver_sql(
+            "ALTER TABLE knowledge_document "
+            "ADD COLUMN retrieval_unit_count INTEGER NOT NULL DEFAULT 0"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX ix_knowledge_document_retrieval_projection_version "
+            "ON knowledge_document (retrieval_projection_version)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX ix_knowledge_document_retrieval_content_fingerprint "
+            "ON knowledge_document (retrieval_content_fingerprint)"
+        )
+        connection.exec_driver_sql(
+            "ALTER TABLE knowledge_vector_generation "
+            "ADD COLUMN corpus_fingerprint_schema INTEGER NOT NULL DEFAULT 1"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX ix_knowledge_vector_generation_corpus_fingerprint_schema "
+            "ON knowledge_vector_generation (corpus_fingerprint_schema)"
+        )
+        # Historical rows have no proof that they satisfy the current bounded
+        # projection contract. Keep the derived bytes for cleanup, but make them
+        # unreachable until service-owned re-derivation publishes v2 atomically.
+        connection.exec_driver_sql(
+            "UPDATE knowledge_document "
+            "SET retrieval_generation_id=NULL, retrieval_status='pending', "
+            "retrieval_projection_version=NULL, "
+            "retrieval_content_fingerprint=NULL, retrieval_unit_count=0 "
+            "WHERE active=1"
+        )
+        connection.exec_driver_sql("PRAGMA user_version=22")
+    return 22
+
+
+def migrate_v22_to_v23(engine: Engine) -> int:
+    """Invalidate row-id-dependent v2 projections before deterministic v3 derivation."""
+
+    with engine.begin() as connection:
+        _require_knowledge_source_shape(connection, 22)
+        connection.exec_driver_sql(
+            "UPDATE knowledge_document "
+            "SET retrieval_generation_id=NULL, retrieval_status='pending', "
+            "retrieval_projection_version=NULL, "
+            "retrieval_content_fingerprint=NULL, retrieval_unit_count=0 "
+            "WHERE active=1"
+        )
+        connection.exec_driver_sql("PRAGMA user_version=23")
+    return 23
+
+
 def _create_v16_knowledge_schema(connection) -> None:
     """Create the fixed historical v16 Knowledge shape without current metadata."""
 
@@ -1709,6 +1797,10 @@ def run_migrations(engine: Engine) -> int:
         current_version = migrate_v19_to_v20(engine)
     if current_version == 20:
         current_version = migrate_v20_to_v21(engine)
+    if current_version == 21:
+        current_version = migrate_v21_to_v22(engine)
+    if current_version == 22:
+        current_version = migrate_v22_to_v23(engine)
     if current_version == CURRENT_SCHEMA_VERSION:
         return current_version
     raise ValidationError(

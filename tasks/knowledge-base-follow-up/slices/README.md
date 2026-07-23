@@ -17,20 +17,26 @@ Impact Handshake revision.
 
 | Slice | State | Cohort | Completion boundary |
 | --- | --- | --- | --- |
-| [02 — Knowledge operations, workspace, and index control](02-knowledge-operations-workspace-indexes.md) | Locally verified; global cross-review with Sir pending | KB2-F01–F05 and F07; F06 parked | All admitted findings resolved; delivery evidence passes; global Import/Storage/Tool/UI/runtime review completed with Sir |
+| [03 — Local OCR, Workspace responsiveness, and Knowledge operations](03-local-ocr-workspace-operations.md) | Phase H locally accepted; final coupled review pending | KB3-F01–F08 plus KB-D26–D35 | Resume the global Import/Storage/Tool/UI/OCR/runtime/release/index review with Sir before closure |
+
+## Prior Locally Delivered Slice
+
+| Slice | State | Carry-forward |
+| --- | --- | --- |
+| [02 — Knowledge operations, workspace, and index control](02-knowledge-operations-workspace-indexes.md) | Locally verified and committed; global cross-review pending | Slice 03 supersedes the import-specific Queue UI decision and carries the global review into Phase E. |
 
 ## Closed Slices
 
 | Slice | State | Closure note |
 | --- | --- | --- |
-| [01 — Known-findings realignment](01-known-findings-realignment.md) | Closed by Sir on 2026-07-22 | All local A–G evidence passed. The two live cells still failed final-answer grounding; this is carried as `KB2-F01` and is not retroactively described as passing. |
+| [01 — Known-findings realignment](01-known-findings-realignment.md) | Closed by Sir on 2026-07-22 | All local A–G evidence passed. The original two live cells remain historical failures; the carried `KB2-F01` oracle repair and later configured-provider rerun now pass without rewriting that history. |
 
 ## Internal Phase Map for Slice 01
 
 | Phase | State | Purpose | Findings / decisions |
 | --- | --- | --- | --- |
 | A — Agent boundary checkpoint | Locally verified | Minimal Tool contract, selectable modes, integrated data-work methodology, canonical replay | KB-F01; Knowledge-specific parts of F10/F12; F13; F15; F16; interface part of F14 |
-| B — Semantic/hybrid retrieval and outcome benchmark | Implementation locally verified; live outcome failed twice | Real embedding/vector retrieval, measured hybrid behavior, and outcome verification over final answer surfaces | execution part of F14; KB-D05/D08; re-verification of the Phase A benchmark correction |
+| B — Semantic/hybrid retrieval and outcome benchmark | Implementation locally verified; historical cells failed, later rerun passed | Real embedding/vector retrieval, measured hybrid behavior, and outcome verification over final answer surfaces | execution part of F14; KB-D05/D08; re-verification of the Phase A benchmark correction |
 | C — Canonical envelope and content identity | Locally verified | Complete the application envelope and make canonical payload identity immutable and self-validating | KB-F05, F06 |
 | D — Storage and migration stabilization | Locally verified | Fixed historical migrations, current-generation invariants, and safe derived-storage reclamation | KB-F07 and Phase B storage consequences |
 | E — Import lifecycle, format routing, and atomic publication | Locally verified | Canonical-ready boundary, promised image routing, service-owned queue, and consistent publication transitions | KB-F02, F03, F04, routing part of F17 |
@@ -47,12 +53,25 @@ inside Slice 01. No phase receives an independent “slice complete” claim.
 | A — Import process and logs | Locally verified | Move one import attempt's heavy execution behind a spawned process while the parent retains publication authority; expose bounded task logs | KB2-F02 |
 | B — Workspace and settings information architecture | Locally verified, including bilingual visual QA | List logical documents; make Knowledge own Embedding/OCR/index settings and direct navigation | KB2-F03, KB2-F05 |
 | C — Index compatibility and rebuild control | Locally verified | Remove surprise lookup-time builds; confirm compatibility-changing settings; add observable automatic/manual rebuild jobs | KB2-F04, KB2-F07 |
-| D — Outcome and cross-workstream acceptance | Live outcome and local delivery passed; review with Sir pending | Repair the carried Agent-answer residual, run delivery evidence, and review Import/Storage/Tool/UI/runtime topology as one system | KB2-F01 and all active Slice 02 findings |
+| D — Outcome and cross-workstream acceptance | Live outcome and local delivery passed; global findings pending disposition | Repair the carried Agent-answer residual, run delivery evidence, and review Import/Storage/Tool/UI/runtime topology as one system | KB2-F01 and all active Slice 02 findings |
 
 ## Current Gate
 
-Slice 01 is closed with its failed benchmark evidence intact. Sir approved the
-recommended Slice 02 decisions and authorized implementation on 2026-07-22.
-Multimodal retrieval (`KB2-F06`) is parked outside this slice. Sir authorized the
-locally verified work to be organized into implementation and documentation commits
-on 2026-07-22; the global cross-review remains the Slice 02 closure gate.
+Slice 01 is closed with its failed benchmark evidence intact. Slice 02 is locally
+verified and committed, while its global review remains explicit. Sir opened Slice
+03 on 2026-07-22 and authorized task-packet work plus one local Knowledge-data reset
+and PPTX diagnostic, deletion of the unreleased Python sidecar, and a disposable
+official Paddle C++ compatibility spike. The spike passed on the selected PP-OCRv6
+medium models and its upstream guard/dependency/size/performance evidence is recorded.
+Sir approved the [detailed Impact Handshake](03-implementation-plan.md). The clean
+native build, frozen offline activation, complete repository suite, release manifest,
+and live final-answer outcome now pass. The global review ran on 2026-07-23 and
+opened KB-D26–D31; Sir admitted the single Phase F convergence repair, whose
+source/full/package/native/live evidence now passes. The final review then opened
+KB-D32–D33 for omitted PPT/PPTX admission and Workspace drag-and-drop. Sir started
+their Phase G implementation; focused/full/package/public-fixture evidence passes.
+The real Workspace re-import then exposed KB-D34–D35. Sir started Phase H; the
+production process-topology, structured failure result, named-fixture regression,
+package smoke, and local queue naming repairs are implemented and locally accepted.
+The coupled review must now resume before Slice 03 closes.
+Multimodal retrieval (`KB2-F06`) remains parked outside the active slice.

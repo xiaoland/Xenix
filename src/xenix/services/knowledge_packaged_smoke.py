@@ -2,20 +2,23 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
-import sys
+import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pikepdf
 import pypdfium2
 
-from ..config import AppPaths, ensure_app_dirs, package_root
+from ..config import AppPaths, ensure_app_dirs
+from ..release_config import ReleaseConfig
 from .artifact_service import ArtifactService
 from .knowledge_content_store import KnowledgeContentStore
+from .knowledge_derivation_service import KnowledgeDerivationService
 from .knowledge_import_service import KnowledgeImportService
 from .knowledge_import_worker import read_worker_result
+from .knowledge_service import KnowledgeService
 from .knowledge_vector_store import KnowledgeVectorRecord, LanceKnowledgeVectorStore
+from .paddle_ocr_service import PaddleOcrDeploymentService, PaddleOcrState
 from .storage import StorageBootstrapService
 from .storage.layout import knowledge_import_result_path
 
@@ -26,22 +29,24 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
     # Keep heavy document runtimes operation-scoped. Importing Docling mutates the
     # process-wide ElementTree namespace registry, which must not affect unrelated
     # SVG generation merely because this smoke module was discovered.
-    from docling.datamodel.base_models import InputFormat
-    from docling.document_converter import DocumentConverter
     from docling_core.types.doc import DocItemLabel, DoclingDocument
     from docx import Document
+    from pptx import Presentation
 
-    with TemporaryDirectory(prefix="xenix-knowledge-smoke-", dir=paths.temp) as temporary:
+    # OCR model paths are passed to a native Windows process. Keep this isolated
+    # smoke topology deliberately short so it tests product behavior rather than
+    # inheriting an arbitrarily deep CI/pytest temporary root.
+    with TemporaryDirectory(prefix="xk-", dir=paths.temp) as temporary:
         root = Path(temporary)
         smoke_paths = ensure_app_dirs(
             AppPaths(
                 home=root,
-                config=root / "config",
-                logs=root / "logs",
-                cache=root / "cache",
-                state=root / "state",
-                temp=root / "temp",
-                artifacts=root / "artifacts",
+                config=root / "c",
+                logs=root / "l",
+                cache=root / "k",
+                state=root / "s",
+                temp=root / "t",
+                artifacts=root / "a",
                 resources=paths.resources,
             )
         )
@@ -64,68 +69,27 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
         finally:
             pdfium_document.close()
 
-        docling_path = root / "knowledge-smoke.docling.json"
         seed_document = DoclingDocument(name="knowledge-packaged-smoke")
         seed_document.add_text(
             label=DocItemLabel.PARAGRAPH,
             text="Knowledge packaged smoke",
         )
-        seed_document.save_as_json(docling_path)
-        docling_document = DocumentConverter(
-            allowed_formats=[InputFormat.JSON_DOCLING]
-        ).convert(docling_path).document
+        docling_document = seed_document
         if "Knowledge packaged smoke" not in docling_document.export_to_text():
             raise RuntimeError("Docling packaged Knowledge IR parse failed.")
 
-        worker_input = root / "knowledge-worker-smoke.docx"
+        worker_docx = root / "knowledge-worker-smoke.docx"
         worker_document = Document()
         worker_document.add_paragraph("Knowledge frozen worker smoke")
-        worker_document.save(worker_input)
-        worker_output = root / "knowledge-worker-smoke.json"
-        worker_environment = dict(os.environ)
-        if getattr(sys, "frozen", False):
-            worker_command = [
-                sys.executable,
-                "--knowledge-docling-worker",
-                "docx",
-                str(worker_input),
-                str(worker_output),
-            ]
-        else:
-            source_root = str(Path(__file__).resolve().parents[2])
-            existing_pythonpath = worker_environment.get("PYTHONPATH")
-            worker_environment["PYTHONPATH"] = (
-                source_root
-                if not existing_pythonpath
-                else os.pathsep.join([source_root, existing_pythonpath])
-            )
-            worker_command = [
-                sys.executable,
-                "-m",
-                "xenix.services.knowledge_docling_worker",
-                "docx",
-                str(worker_input),
-                str(worker_output),
-            ]
-        completed = subprocess.run(
-            worker_command,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=90,
-            check=False,
-            env=worker_environment,
+        worker_document.save(worker_docx)
+        worker_pptx = root / "knowledge-worker-smoke.pptx"
+        worker_presentation = Presentation()
+        slide = worker_presentation.slides.add_slide(
+            worker_presentation.slide_layouts[1]
         )
-        if completed.returncode != 0 or not worker_output.is_file():
-            raise RuntimeError("Docling packaged worker smoke failed.")
-        if worker_output.stat().st_size > 8 * 1024 * 1024:
-            raise RuntimeError("Docling packaged worker output is unbounded.")
-        worker_result = DoclingDocument.model_validate_json(
-            worker_output.read_text(encoding="utf-8")
-        )
-        if "Knowledge frozen worker smoke" not in worker_result.export_to_text():
-            raise RuntimeError("Docling packaged worker round-trip failed.")
-
+        slide.shapes.title.text = "Knowledge presentation smoke"
+        slide.placeholders[1].text = "Knowledge frozen presentation worker smoke"
+        worker_presentation.save(worker_pptx)
         content_store = KnowledgeContentStore(smoke_paths)
         stored = content_store.write_canonical_bundle(
             envelope={"canonical_generation_id": "packaged-smoke"},
@@ -139,23 +103,55 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
         if reopened.envelope.get("canonical_generation_id") != "packaged-smoke":
             raise RuntimeError("Zstandard canonical packaged Knowledge smoke failed.")
 
-        import_source = root / "knowledge-import-worker-smoke.txt"
-        import_source.write_text("Knowledge import spawned worker smoke", encoding="utf-8")
         storage = StorageBootstrapService().initialize(smoke_paths)
+        derivation = KnowledgeDerivationService(
+            paths=smoke_paths,
+            session_factory=storage.session_factory,
+            start_worker=False,
+        )
+        knowledge = KnowledgeService(storage.session_factory)
         importer = KnowledgeImportService(
             paths=smoke_paths,
             session_factory=storage.session_factory,
             artifact_service=ArtifactService(storage.session_factory),
+            canonical_ready_notifier=derivation.enqueue_generation,
         )
         try:
-            imported = importer.import_file(import_source, timeout=90)
-            import_worker_result = read_worker_result(
-                knowledge_import_result_path(smoke_paths, imported.import_id)
-            )
-            if import_worker_result.worker_pid == os.getpid():
-                raise RuntimeError("Knowledge import did not use a spawned worker.")
+            imported_by_format = {}
+            for source_format, source in (
+                ("docx", worker_docx),
+                ("pptx", worker_pptx),
+            ):
+                imported = importer.import_file(source, timeout=180)
+                import_worker_result = read_worker_result(
+                    knowledge_import_result_path(smoke_paths, imported.import_id)
+                )
+                if import_worker_result.worker_pid == os.getpid():
+                    raise RuntimeError("Knowledge import did not use a spawned worker.")
+                if (
+                    import_worker_result.status != "succeeded"
+                    or import_worker_result.failure_stage is not None
+                    or import_worker_result.diagnostic_code is not None
+                ):
+                    raise RuntimeError(
+                        f"Spawned {source_format.upper()} import worker result is invalid."
+                    )
+                imported_by_format[source_format] = imported
+            presentation_import = imported_by_format["pptx"]
+            derivation_view = derivation.status_for_import(presentation_import.import_id)
+            if derivation_view is None:
+                raise RuntimeError("Spawned PPTX derivation was not queued.")
+            derived = derivation.derive_now(derivation_view.job_id)
+            matches = knowledge.lookup("presentation worker smoke", top_k=5)
+            if (
+                not derived.retrieval_ready
+                or not matches
+                or "presentation worker smoke" not in matches[0].quote.casefold()
+            ):
+                raise RuntimeError("Spawned PPTX import did not reach Knowledge lookup.")
         finally:
             importer.shutdown()
+            derivation.shutdown()
             storage.engine.dispose()
 
         vector_store = LanceKnowledgeVectorStore(smoke_paths)
@@ -172,10 +168,93 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
         if vector_store.search(relative_path, query_vector=(0.9, 0.1, 0.0), limit=1) != ["unit-a"]:
             raise RuntimeError("LanceDB packaged Knowledge search failed.")
 
-        worker = package_root() / "resources" / "knowledge_ocr" / "paddle_worker.py"
-        if not worker.is_file():
-            raise RuntimeError("Packaged PaddleOCR worker resource is missing.")
-        compile(worker.read_text(encoding="utf-8"), str(worker), "exec")
+        ocr_archive_value = os.environ.get("XENIX_KNOWLEDGE_OCR_SMOKE_ARCHIVE", "").strip()
+        ocr_deployment = PaddleOcrDeploymentService(smoke_paths)
+        if ocr_deployment.status_snapshot().state is not PaddleOcrState.NOT_INSTALLED:
+            raise RuntimeError("Fresh native OCR deployment state is invalid.")
+        catalog = ocr_deployment.catalog
+        if catalog is not None and (
+            catalog.protocol_version != 2
+            or not catalog.runtime_id.startswith("paddle-inference-")
+            or not catalog.artifact_name.endswith(".zip")
+        ):
+            raise RuntimeError("Packaged native OCR catalog is invalid.")
+        native_ocr_activated = False
+        native_ocr_retrieval = False
+        if ocr_archive_value:
+            if catalog is None:
+                raise RuntimeError("Packaged native OCR catalog is missing.")
+            ocr_archive = Path(ocr_archive_value).resolve()
+            if not ocr_archive.is_file() or ocr_archive.name != catalog.artifact_name:
+                raise RuntimeError("Packaged native OCR smoke archive is invalid.")
+            cached_archive = (
+                smoke_paths.cache / "knowledge-ocr" / "downloads" / catalog.artifact_name
+            )
+            cached_archive.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ocr_archive, cached_archive)
+            ocr_deployment = PaddleOcrDeploymentService(
+                smoke_paths,
+                release_config=ReleaseConfig(
+                    releases_oss_public_url="https://knowledge-ocr-smoke.invalid"
+                ),
+            )
+            phases: list[str] = []
+            installed = ocr_deployment.install(phases.append)
+            if installed.state is not PaddleOcrState.READY or phases[-1:] != ["ready"]:
+                raise RuntimeError("Packaged native OCR activation failed.")
+            runtime = ocr_deployment.open_runtime()
+            if not runtime.executable_path.is_file():
+                raise RuntimeError("Packaged native OCR executable is unavailable after activation.")
+            native_ocr_activated = True
+
+            ocr_image_value = os.environ.get(
+                "XENIX_KNOWLEDGE_OCR_SMOKE_IMAGE",
+                "",
+            ).strip()
+            ocr_image = Path(ocr_image_value).resolve() if ocr_image_value else None
+            if ocr_image is None or not ocr_image.is_file():
+                raise RuntimeError("Packaged native OCR smoke image is unavailable.")
+            image_header = ocr_image.read_bytes()[:8]
+            image_suffix = ".jpg" if image_header.startswith(b"\xff\xd8\xff") else ".png"
+            import_image = root / f"native-ocr-retrieval{image_suffix}"
+            shutil.copy2(ocr_image, import_image)
+            ocr_storage = StorageBootstrapService().initialize(smoke_paths)
+            knowledge = KnowledgeService(ocr_storage.session_factory)
+            derivation = KnowledgeDerivationService(
+                paths=smoke_paths,
+                session_factory=ocr_storage.session_factory,
+                start_worker=False,
+            )
+            importer = KnowledgeImportService(
+                paths=smoke_paths,
+                session_factory=ocr_storage.session_factory,
+                artifact_service=ArtifactService(ocr_storage.session_factory),
+                canonical_ready_notifier=derivation.enqueue_generation,
+            )
+            try:
+                imported = importer.import_file(import_image, timeout=180)
+                derivation_view = derivation.status_for_import(imported.import_id)
+                if derivation_view is None:
+                    raise RuntimeError("Native OCR derivation was not queued.")
+                derived = derivation.derive_now(derivation_view.job_id)
+                if not derived.retrieval_ready:
+                    raise RuntimeError("Native OCR retrieval projection is unavailable.")
+                matches = knowledge.lookup("BOARDING", top_k=5)
+                if not matches or "BOARDING" not in matches[0].quote:
+                    raise RuntimeError("Native OCR text did not reach Knowledge lookup.")
+                worker_result = read_worker_result(
+                    knowledge_import_result_path(smoke_paths, imported.import_id)
+                )
+                recorded_runtime = worker_result.pipeline.get("ocr", {}).get("runtime")
+                if not isinstance(recorded_runtime, dict) or (
+                    recorded_runtime.get("generation_id") != runtime.generation_id
+                ):
+                    raise RuntimeError("Native OCR runtime provenance was not recorded.")
+                native_ocr_retrieval = True
+            finally:
+                importer.shutdown()
+                derivation.shutdown()
+                ocr_storage.engine.dispose()
 
     marker = paths.state / "knowledge-smoke.json"
     marker.write_text(
@@ -183,13 +262,16 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
             {
                 "schema_version": 1,
                 "docling_ir": True,
-                "docling_worker": True,
                 "pdfium_render": True,
                 "pikepdf": True,
                 "canonical_zstd": True,
                 "import_worker_spawn": True,
+                "spawned_docx_import": True,
+                "spawned_pptx_import": True,
                 "lancedb": True,
-                "paddle_worker_resource": True,
+                "paddle_native_deployment": True,
+                "paddle_native_activation": native_ocr_activated,
+                "paddle_native_retrieval": native_ocr_retrieval,
             },
             sort_keys=True,
         ),

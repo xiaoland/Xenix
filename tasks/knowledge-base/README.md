@@ -1,6 +1,6 @@
 # Knowledge Base — Product Delivery Packet
 
-**Status:** original design packet reconciled by Slice 01; only live Phase B outcome acceptance remains
+**Status:** Slice 03 Phase H locally accepted; final cross-review pending
 **Opened:** 2026-07-14
 **Posture:** implementation locally verified; commit organization authorized on 2026-07-22
 
@@ -14,7 +14,7 @@
 
 Define a locally authoritative Knowledge Base through which a user can import work
 journals and industry material into one global Library, let Xenix derive searchable
-evidence from TXT, DOC/DOCX, PDF, JPEG, and PNG files, and let the Agent retrieve
+evidence from TXT, DOC/DOCX, PPT/PPTX, PDF, JPEG, and PNG files, and let the Agent retrieve
 bounded, cited evidence to improve data-analysis interpretation. The internal library
 identity remains extensible to multiple instances without exposing that UX in MVP.
 
@@ -69,11 +69,13 @@ as well as metadata; large source/canonical bytes stay in an app-owned CAS.
 - Import is a durable service queue that ends at an immutable DoclingDocument bundle
   and canonical-ready publication. Independent derivation is the only production
   publisher of bounded Units and FTS readiness.
-- TXT, DOC/DOCX, PDF, JPEG, and PNG are the exact MVP format registry. Markdown,
-  PPT/PPTX, and VLM remain out of scope. Images without OCR can be canonical-ready
-  while honestly remaining unavailable for retrieval.
-- Local PaddleOCR is an isolated one-click-installed sidecar with versioned health,
-  content-hashed model inventory, bounded output, and cooperative cancellation.
+- TXT, DOC/DOCX, PPT/PPTX, PDF, JPEG, and PNG are the intended MVP format registry.
+  Format registry v2 implements PPTX through Docling and PPT through explicit
+  PPT→PPTX normalization. Markdown and VLM remain out of scope. Images without OCR
+  can be canonical-ready while honestly remaining unavailable for retrieval.
+- Local PaddleOCR is an optional one-click-installed native worker built on official
+  Paddle Inference C++, with a verified runtime/model archive, bounded protocol, and
+  no Python/pip/global-model-cache dependency.
 - Embedding settings are independent from LLM settings. Keyword uses SQLite FTS5;
   semantic uses immutable LanceDB exact-cosine generations; hybrid uses deterministic
   RRF; explicit unavailable modes fail rather than masquerade as keyword.
@@ -84,15 +86,16 @@ as well as metadata; large source/canonical bytes stay in an app-owned CAS.
   markers and the table, while DOCX retained the picture and PDF only added page
   locators. Evidence is under `evidence/` and the executable report is written under
   `build/knowledge-doc-fidelity-spike/`.
-- Detailed remediation and the remaining live-provider gate are in the
+- Detailed remediation, the passing live-provider outcome, and the final global
+  review gate are in the
   [follow-up packet](../knowledge-base-follow-up/README.md).
 
 ## Next Step
 
-Two isolated rainy-season cells have now produced the exact Dataset and passed
-integrity, but both failed grounded final-answer wording. Diagnose that stable
-omission, repair the correct Agent/oracle owner, then rerun; no ToolResult inspection
-may substitute for the final answer/Dataset verdict.
+Resume the coupled [cross-workstream review](09-cross-workstream-review.md) with Sir.
+Phase H source/full/fresh-package evidence proves the named PPTX and generated
+DOCX/PPTX through the real spawned Import topology. Tool telemetry remains
+diagnostic and cannot substitute for the Agent's final answer and Dataset outcomes.
 
 ## Packet Map
 

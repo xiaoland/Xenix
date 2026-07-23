@@ -4,14 +4,17 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from docling_core.types.doc import DoclingDocument
 from docx import Document
 from PIL import Image, ImageDraw
+from pptx import Presentation
 
+import xenix.services.knowledge_pipeline as pipeline_module
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.artifact_service import ArtifactService
 from xenix.services.knowledge_derivation_service import KnowledgeDerivationService
 from xenix.services.knowledge_import_service import KnowledgeImportService, _find_libreoffice
-from xenix.services.knowledge_pipeline import FormatNormalizer
+from xenix.services.knowledge_import_worker import InlineKnowledgeImportWorkerRunner
 from xenix.services.knowledge_service import KnowledgeService
 from xenix.services.storage import StorageBootstrapService
 
@@ -33,8 +36,11 @@ def knowledge_runtime(monkeypatch, tmp_path: Path):
             paths=paths,
             session_factory=storage.session_factory,
             artifact_service=ArtifactService(storage.session_factory),
-            normalizer=FormatNormalizer(),
-            ocr_service=ocr_service,
+            worker_runner=(
+                InlineKnowledgeImportWorkerRunner(paths, ocr_service=ocr_service)
+                if ocr_service is not None
+                else None
+            ),
             canonical_ready_notifier=derivation.enqueue_generation,
         )
         started.append((importer, derivation))
@@ -100,6 +106,23 @@ def test_docx_uses_docling_and_becomes_searchable(
     assert _wait_for_lookup(knowledge, "会员日毛利率", docx_result.document_id)
 
 
+def test_pptx_uses_docling_and_becomes_searchable(
+    knowledge_runtime: Callable,
+    tmp_path: Path,
+) -> None:
+    importer, knowledge = knowledge_runtime()
+    pptx_path = tmp_path / "经营汇报.pptx"
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[1])
+    slide.shapes.title.text = "区域补货规则"
+    slide.placeholders[1].text = "华南雨季雨具库存必须覆盖未来三周平均需求。"
+    presentation.save(pptx_path)
+
+    result = importer.import_file(pptx_path)
+
+    assert _wait_for_lookup(knowledge, "雨季雨具三周需求", result.document_id)
+
+
 def test_born_digital_pdf_uses_docling_without_builtin_ocr(
     knowledge_runtime: Callable,
     tmp_path: Path,
@@ -115,6 +138,7 @@ def test_born_digital_pdf_uses_docling_without_builtin_ocr(
 
 def test_scanned_pdf_routes_missing_text_page_to_local_paddle_ocr(
     knowledge_runtime: Callable,
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     class FakeLocalPaddleOcr:
@@ -132,6 +156,11 @@ def test_scanned_pdf_routes_missing_text_page_to_local_paddle_ocr(
                 ],
             }
 
+    monkeypatch.setattr(
+        pipeline_module,
+        "_docling_convert",
+        lambda *_args, **_kwargs: DoclingDocument(name="scanned-policy"),
+    )
     importer, knowledge = knowledge_runtime(ocr_service=FakeLocalPaddleOcr())
     pdf_path = tmp_path / "scanned.pdf"
     image = Image.new("RGB", (600, 300), "white")
@@ -170,6 +199,42 @@ def test_legacy_doc_normalizes_through_libreoffice_then_docling(
     doc_result = importer.import_file(tmp_path / "legacy-rule.doc")
 
     assert _wait_for_lookup(knowledge, "渠道库存规则", doc_result.document_id)
+
+
+@pytest.mark.skipif(_find_libreoffice() is None, reason="LibreOffice is not installed")
+def test_legacy_ppt_normalizes_through_libreoffice_then_docling(
+    knowledge_runtime: Callable,
+    tmp_path: Path,
+) -> None:
+    importer, knowledge = knowledge_runtime()
+    modern_presentation = tmp_path / "legacy-presentation.pptx"
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[1])
+    slide.shapes.title.text = "旧版演示规则"
+    slide.placeholders[1].text = "旧版演示文稿要求门店保留四周安全库存。"
+    presentation.save(modern_presentation)
+    executable = _find_libreoffice()
+    assert executable is not None
+    completed = subprocess.run(
+        [
+            str(executable),
+            "--headless",
+            "--convert-to",
+            "ppt:MS PowerPoint 97",
+            "--outdir",
+            str(tmp_path),
+            str(modern_presentation),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    assert completed.returncode == 0
+
+    result = importer.import_file(tmp_path / "legacy-presentation.ppt")
+
+    assert _wait_for_lookup(knowledge, "门店四周安全库存", result.document_id)
 
 
 def _wait_for_lookup(

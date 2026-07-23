@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from datetime import UTC, datetime
+from pathlib import PurePosixPath
 
 import oss2
 import requests
@@ -12,6 +13,8 @@ import requests
 
 FEED_NAMES = {"assets.win-x64-stable.json", "releases.win-x64-stable.json", "RELEASES-win-x64-stable"}
 ASSETS_FEED_NAME = "assets.win-x64-stable.json"
+MANIFEST_SCHEMA_VERSION = 2
+ARTIFACT_TYPES = {"desktop_release", "update_feed", "knowledge_ocr_runtime"}
 
 
 def digest(data: bytes) -> str:
@@ -49,6 +52,62 @@ def public_feed_data(name: str, candidate_data: bytes, artifact_names: set[str])
     return json.dumps(retained, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 
 
+def validated_artifacts(manifest: object, *, expected_version: str) -> list[dict]:
+    if not isinstance(manifest, dict) or manifest.get("schema_version") != MANIFEST_SCHEMA_VERSION:
+        raise RuntimeError("Candidate manifest schema is unsupported.")
+    if (
+        manifest.get("version") != expected_version
+        or manifest.get("unsigned") is not True
+        or manifest.get("packaged_smoke") != "passed"
+    ):
+        raise RuntimeError("Manifest identity or unsigned boundary is invalid.")
+    artifacts = manifest.get("artifacts")
+    if not isinstance(artifacts, list) or not artifacts:
+        raise RuntimeError("Candidate manifest has no artifacts.")
+    validated: list[dict] = []
+    names: set[str] = set()
+    ocr_count = 0
+    for item in artifacts:
+        if not isinstance(item, dict) or item.keys() != {
+            "type",
+            "path",
+            "name",
+            "bytes",
+            "sha256",
+        }:
+            raise RuntimeError("Candidate artifact shape is invalid.")
+        artifact_type = item["type"]
+        name = item["name"]
+        raw_path = item["path"]
+        if not isinstance(raw_path, str) or not raw_path:
+            raise RuntimeError("Candidate artifact identity is invalid.")
+        relative = PurePosixPath(raw_path)
+        if (
+            artifact_type not in ARTIFACT_TYPES
+            or not isinstance(name, str)
+            or not name
+            or name in {".", ".."}
+            or "/" in name
+            or "\\" in name
+            or relative.is_absolute()
+            or ".." in relative.parts
+            or relative.name != name
+            or name in names
+            or type(item["bytes"]) is not int
+            or item["bytes"] < 1
+            or not isinstance(item["sha256"], str)
+            or len(item["sha256"]) != 64
+            or set(item["sha256"]) - set("0123456789abcdef")
+        ):
+            raise RuntimeError("Candidate artifact identity is invalid.")
+        names.add(name)
+        ocr_count += artifact_type == "knowledge_ocr_runtime"
+        validated.append(item)
+    if ocr_count != 1:
+        raise RuntimeError("Candidate must contain exactly one Knowledge OCR runtime.")
+    return validated
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", required=True)
@@ -63,12 +122,19 @@ def main() -> int:
     if digest(manifest_bytes) != args.manifest_sha256:
         raise RuntimeError("Candidate manifest digest does not match the approved digest.")
     manifest = json.loads(manifest_bytes)
-    if manifest["version"] != args.version or not manifest["unsigned"]:
-        raise RuntimeError("Manifest identity or unsigned boundary is invalid.")
-    artifact_names = {item["name"] for item in manifest["artifacts"]}
-    immutable = [item for item in manifest["artifacts"] if item["name"] not in FEED_NAMES]
-    feeds = [item for item in manifest["artifacts"] if item["name"] in FEED_NAMES]
-    setups = [item for item in manifest["artifacts"] if "Setup" in item["name"]]
+    artifacts = validated_artifacts(manifest, expected_version=args.version)
+    artifact_names = {item["name"] for item in artifacts}
+    immutable = [item for item in artifacts if item["name"] not in FEED_NAMES]
+    feeds = [item for item in artifacts if item["name"] in FEED_NAMES]
+    setups = [item for item in artifacts if "Setup" in item["name"]]
+    for item in artifacts:
+        candidate_key = f"{candidate_prefix}/{item['name']}"
+        if (
+            not bucket.object_exists(candidate_key)
+            or bucket.get_object_meta(candidate_key).content_length != item["bytes"]
+            or object_digest(bucket, candidate_key) != item["sha256"]
+        ):
+            raise RuntimeError(f"Candidate artifact verification failed: {item['name']}")
     for item in immutable:
         published_key = f"{published_prefix}/{item['name']}"
         if bucket.object_exists(published_key):

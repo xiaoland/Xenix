@@ -46,9 +46,11 @@ knowledge on/off control belong to storage/tool workstreams. This window says
 
 ## Modeless Import Queue
 
-The queue dialog combines transient file selection/preflight with persistent queue
-status. It accepts only `.txt`, `.doc`, `.docx`, `.pdf`, `.jpg`, `.jpeg`, and `.png`.
-Markdown is explicitly rejected.
+The task dialog combines transient file selection/preflight with persistent queue
+status. It accepts only `.txt`, `.doc`, `.docx`, `.ppt`, `.pptx`, `.pdf`, `.jpg`,
+`.jpeg`, and `.png`. Markdown is explicitly rejected. The Workspace document-list
+body and shell accept local file drops; drop and picker converge on one submission
+operation before service-owned admission.
 
 | Stage | UI behavior |
 | --- | --- |

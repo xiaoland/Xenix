@@ -2,8 +2,8 @@
 
 ## Canonical Content Is DoclingDocument
 
-Use `DoclingDocument` as the uniform content IR for parsed TXT, DOCX, PDF, JPEG, and
-PNG sources (and DOC after a named conversion route). It represents structured text,
+Use `DoclingDocument` as the uniform content IR for parsed TXT, DOCX, PPTX, PDF,
+JPEG, and PNG sources (and DOC/PPT after named conversion routes). It represents structured text,
 tables, pictures, hierarchy, pages, layout bounding boxes, reading order, and
 provenance. Xenix must not maintain a second competing tree of blocks/tables/images.
 

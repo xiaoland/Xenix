@@ -59,7 +59,7 @@ source file.
 
 ## Adapter Rules
 
-`DoclingAdapter` is the primary parser path for DOCX, PDF, JPEG, and PNG. It returns
+`DoclingAdapter` is the primary parser path for DOCX, PPTX, PDF, JPEG, and PNG. It returns
 a `DoclingDocument` plus conversion warnings/provenance. It must pin Docling and
 `docling-core` versions, record the selected backend/pipeline options, and serialize
 the result immediately while those versions are available.
@@ -69,10 +69,12 @@ Not every allowed source can be delegated blindly:
 | Source | Primary content path | Required caveat |
 | --- | --- | --- |
 | DOCX | Docling adapter | Preserve Docling loss notes; do not claim page locator where DOCX has none. |
+| PPTX | Docling PowerPoint adapter | Preserve slide/item provenance; do not relabel slides as PDF pages. |
 | TXT | `PlainTextToDoclingAdapter` over Docling's text/Markdown input path | Keep an Xenix byte/line/character sidecar. Current Docling text input is handled through the Markdown/Marko route, so it cannot itself promise pure-text line/character locators. |
 | PDF | Docling PDF adapter, under a page-route plan | Docling's standard PDF pipeline can enable OCR by default; explicitly disable/avoid it whenever the selected route delegates OCR to Xenix `OcrService`, so two engines never run silently. |
 | JPEG/PNG | Docling image adapter or an OCR-to-Docling adapter | The source image stays authoritative; OCR text is a labelled projection. |
 | DOC | Office conversion adapter, then the resulting DOCX/PDF is passed to Docling | Legacy binary DOC is not in Docling's supported-input list. |
+| PPT | Office conversion adapter, then the resulting PPTX is passed to Docling | LibreOffice conversion is an explicit normalized input with source/intermediate provenance. |
 
 Mammoth is a **supplemental diagnostic/fallback adapter** for DOCX semantic HTML/text,
 not a second canonical IR: it intentionally favors simple semantic HTML over visual

@@ -19,9 +19,11 @@ from .knowledge_content_store import KnowledgeContentStore
 from .knowledge_pipeline import FileProbe, FormatNormalizer, ParseExecutor, ParserRouter
 from .paddle_ocr_service import PaddleOcrDeploymentService, PaddleOcrService
 from .storage.layout import knowledge_import_result_path, knowledge_import_task_root
+from .windows_process_tree import arm_current_process_tree
 
-_RESULT_SCHEMA_VERSION = 1
+_RESULT_SCHEMA_VERSION = 2
 _MAX_RESULT_BYTES = 256 * 1024
+_DEFAULT_OPERATION_TIMEOUT_SECONDS = 15 * 60
 _TASK_ID = re.compile(r"[0-9a-f]{32}\Z")
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 _EVENT_TOKEN = re.compile(r"[a-z0-9_.-]{1,80}\Z")
@@ -38,6 +40,8 @@ _SUCCESS_KEYS = frozenset(
         "pipeline",
         "warnings",
         "error_code",
+        "failure_stage",
+        "diagnostic_code",
         "retryable",
     }
 )
@@ -74,6 +78,8 @@ class KnowledgeImportWorkerResult:
     pipeline: dict[str, Any] = field(default_factory=dict)
     warnings: tuple[str, ...] = ()
     error_code: str | None = None
+    failure_stage: str | None = None
+    diagnostic_code: str | None = None
     retryable: bool = False
 
 
@@ -95,10 +101,12 @@ class LocalKnowledgeImportWorkerRunner:
         *,
         poll_interval: float = 0.05,
         cancel_grace: float = 1.0,
+        operation_timeout: float = _DEFAULT_OPERATION_TIMEOUT_SECONDS,
         entrypoint: Callable[..., None] | None = None,
     ) -> None:
         self._poll_interval = max(0.01, poll_interval)
         self._cancel_grace = max(0.1, cancel_grace)
+        self._operation_timeout = max(0.1, operation_timeout)
         self._entrypoint = entrypoint or knowledge_import_worker_entry
 
     def run(
@@ -117,13 +125,27 @@ class LocalKnowledgeImportWorkerRunner:
         cancel_event = context.Event()
         event_queue = context.Queue()
         process = context.Process(
-            target=self._entrypoint,
-            args=(request, cancel_event, event_queue),
+            target=_managed_knowledge_import_worker_entry,
+            args=(self._entrypoint, request, cancel_event, event_queue),
             name=f"xenix-knowledge-import-{request.import_id[:8]}",
         )
         cancellation_started: float | None = None
-        process.start()
+        timed_out = False
+        process_started = False
         try:
+            try:
+                process.start()
+                process_started = True
+            except (OSError, RuntimeError) as exc:
+                on_event(
+                    KnowledgeImportWorkerEvent(
+                        "failed",
+                        "worker_launch_failed",
+                        "error",
+                    )
+                )
+                raise KnowledgeImportWorkerLaunchFailed from exc
+            operation_started = time.monotonic()
             while process.is_alive():
                 _drain_events(event_queue, on_event)
                 if is_cancelled():
@@ -132,18 +154,57 @@ class LocalKnowledgeImportWorkerRunner:
                         cancellation_started = time.monotonic()
                     elif time.monotonic() - cancellation_started >= self._cancel_grace:
                         process.terminate()
+                elif (
+                    cancellation_started is None
+                    and time.monotonic() - operation_started >= self._operation_timeout
+                ):
+                    timed_out = True
+                    cancellation_started = time.monotonic()
+                    cancel_event.set()
+                    on_event(
+                        KnowledgeImportWorkerEvent(
+                            "failed",
+                            "worker_operation_timed_out",
+                            "error",
+                        )
+                    )
+                elif (
+                    timed_out
+                    and cancellation_started is not None
+                    and time.monotonic() - cancellation_started >= self._cancel_grace
+                ):
+                    process.terminate()
                 process.join(self._poll_interval)
             _drain_events(event_queue, on_event)
+            if timed_out:
+                raise KnowledgeImportWorkerTimedOut
             if cancellation_started is not None or is_cancelled():
                 raise KnowledgeImportWorkerCancelled
             if process.exitcode != 0:
+                on_event(
+                    KnowledgeImportWorkerEvent(
+                        "failed",
+                        "worker_process_crashed",
+                        "error",
+                    )
+                )
                 raise KnowledgeImportWorkerCrashed
-            return read_worker_result(result_path)
+            try:
+                return read_worker_result(result_path)
+            except KnowledgeImportWorkerCrashed:
+                on_event(
+                    KnowledgeImportWorkerEvent(
+                        "failed",
+                        "worker_result_invalid",
+                        "error",
+                    )
+                )
+                raise
         finally:
-            if process.is_alive():
+            if process_started and process.is_alive():
                 process.terminate()
                 process.join(self._cancel_grace)
-            if process.is_alive():
+            if process_started and process.is_alive():
                 process.kill()
                 process.join()
             event_queue.close()
@@ -202,6 +263,27 @@ class KnowledgeImportWorkerCrashed(Exception):
     pass
 
 
+class KnowledgeImportWorkerTimedOut(Exception):
+    pass
+
+
+class KnowledgeImportWorkerLaunchFailed(Exception):
+    pass
+
+
+def _managed_knowledge_import_worker_entry(
+    entrypoint,
+    request,
+    cancel_event,
+    event_queue,
+) -> None:
+    # Keep this handle live until process exit. Closing the last handle while the
+    # worker is still alive would intentionally terminate the worker itself.
+    process_tree_handle = arm_current_process_tree()
+    entrypoint(request, cancel_event, event_queue)
+    _ = process_tree_handle
+
+
 def knowledge_import_worker_entry(request, cancel_event, event_queue) -> None:
     """Top-level entrypoint required by Windows spawn and frozen executables."""
 
@@ -227,6 +309,7 @@ def _run_worker_operation(
     store: KnowledgeContentStore | None = None,
 ) -> None:
     result_path = knowledge_import_result_path(request.paths, request.import_id)
+    failure_stage = "probing"
     try:
         _validate_request(request)
         actual_store = store or KnowledgeContentStore(request.paths)
@@ -254,6 +337,7 @@ def _run_worker_operation(
         with TemporaryDirectory(prefix="xenix-knowledge-import-") as temp:
             work_dir = Path(temp)
             check_cancelled = lambda: _raise_if_cancelled(is_cancelled)
+            failure_stage = "normalizing"
             _emit(on_event, "normalizing", "normalization_started")
             normalized = actual_normalizer.normalize(
                 probe,
@@ -261,8 +345,10 @@ def _run_worker_operation(
                 password=request.password,
                 check_cancelled=check_cancelled,
             )
+            failure_stage = "routing"
             _emit(on_event, "routing", "routing_started")
             plan = router.route(normalized, ocr_ready=actual_parser.ocr_ready)
+            failure_stage = "parsing"
             _emit(on_event, "parsing", "parsing_started")
             parsed = actual_parser.parse(
                 normalized,
@@ -272,6 +358,8 @@ def _run_worker_operation(
                 check_cancelled=check_cancelled,
             )
             _raise_if_cancelled(is_cancelled)
+            failure_stage = "canonicalizing"
+            _emit(on_event, "canonicalizing", "canonicalization_started")
             material = canonicalizer.freeze(
                 parsed.document,
                 identity=request.identity,
@@ -279,6 +367,7 @@ def _run_worker_operation(
                 warnings=parsed.warnings,
                 projections=parsed.projections,
             )
+            failure_stage = "publishing_canonical"
             _emit(on_event, "publishing_canonical", "canonical_write_started")
             stored = actual_store.write_canonical_bundle(
                 envelope=material.envelope,
@@ -306,6 +395,8 @@ def _run_worker_operation(
                 status="cancelled",
                 worker_pid=os.getpid(),
                 error_code="knowledge_import_cancelled",
+                failure_stage="cancelled",
+                diagnostic_code="cancelled",
                 retryable=True,
             ),
         )
@@ -315,16 +406,20 @@ def _run_worker_operation(
         if not isinstance(error_code, str) or not error_code.startswith("knowledge_"):
             error_code = "knowledge_import_failed"
         retryable = bool(getattr(exc, "retryable", False))
+        diagnostic_code = _failure_diagnostic_code(exc)
         write_worker_result(
             result_path,
             KnowledgeImportWorkerResult(
                 status="failed",
                 worker_pid=os.getpid(),
                 error_code=error_code,
+                failure_stage=failure_stage,
+                diagnostic_code=diagnostic_code,
                 retryable=retryable,
             ),
         )
-        _emit(on_event, "failed", "worker_failed", level="error")
+        _emit(on_event, "failed", f"{failure_stage}_failed", level="error")
+        _emit(on_event, "failed", diagnostic_code, level="error")
 
 
 def write_worker_result(path: Path, result: KnowledgeImportWorkerResult) -> None:
@@ -388,6 +483,8 @@ def read_worker_result(path: Path) -> KnowledgeImportWorkerResult:
             pipeline=pipeline,
             warnings=tuple(warnings),
             error_code=_optional_string(payload, "error_code"),
+            failure_stage=_optional_string(payload, "failure_stage"),
+            diagnostic_code=_optional_string(payload, "diagnostic_code"),
             retryable=payload.get("retryable") is True,
         )
         _validate_result(result)
@@ -418,11 +515,17 @@ def _validate_result(result: KnowledgeImportWorkerResult) -> None:
             or not result.content_ir_sha256
             or _SHA256.fullmatch(result.content_ir_sha256) is None
             or result.error_code is not None
+            or result.failure_stage is not None
+            or result.diagnostic_code is not None
         ):
             raise ValueError("Knowledge import worker success result is invalid.")
     elif (
         not result.error_code
         or _EVENT_TOKEN.fullmatch(result.error_code) is None
+        or not result.failure_stage
+        or _EVENT_TOKEN.fullmatch(result.failure_stage) is None
+        or not result.diagnostic_code
+        or _EVENT_TOKEN.fullmatch(result.diagnostic_code) is None
         or any(
             value is not None
             for value in (
@@ -441,6 +544,23 @@ def _optional_string(payload: dict[str, Any], key: str) -> str | None:
     if value is not None and not isinstance(value, str):
         raise ValueError(f"result {key}")
     return value
+
+
+def _failure_diagnostic_code(exc: Exception) -> str:
+    error_details = getattr(exc, "error_details", None)
+    if isinstance(error_details, dict):
+        candidate = error_details.get("diagnostic_code")
+        if isinstance(candidate, str) and _EVENT_TOKEN.fullmatch(candidate):
+            return candidate
+    if isinstance(exc, MemoryError):
+        return "memory_error"
+    if isinstance(exc, (ImportError, ModuleNotFoundError)):
+        return "dependency_error"
+    if isinstance(exc, OSError):
+        return "os_error"
+    if isinstance(exc, ValidationError):
+        return "validation_error"
+    return "unexpected_error"
 
 
 def _drain_events(event_queue, callback: Callable[[KnowledgeImportWorkerEvent], None]) -> None:
@@ -477,9 +597,11 @@ __all__ = [
     "KnowledgeImportWorkerCancelled",
     "KnowledgeImportWorkerCrashed",
     "KnowledgeImportWorkerEvent",
+    "KnowledgeImportWorkerLaunchFailed",
     "KnowledgeImportWorkerRequest",
     "KnowledgeImportWorkerResult",
     "KnowledgeImportWorkerRunner",
+    "KnowledgeImportWorkerTimedOut",
     "LocalKnowledgeImportWorkerRunner",
     "knowledge_import_worker_entry",
     "read_worker_result",

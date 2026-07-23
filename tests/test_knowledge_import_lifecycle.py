@@ -9,6 +9,7 @@ import pikepdf
 import pytest
 from docx import Document
 from PIL import Image
+from pptx import Presentation
 from sqlmodel import select
 
 from xenix.config import ensure_app_dirs, get_app_paths
@@ -17,7 +18,10 @@ from xenix.services.artifact_service import ArtifactService
 from xenix.services.knowledge_content_store import KnowledgeContentStore
 from xenix.services.knowledge_derivation_service import KnowledgeDerivationService
 from xenix.services.knowledge_import_service import KnowledgeImportService
-from xenix.services.knowledge_pipeline import FormatNormalizer
+from xenix.services.knowledge_import_worker import (
+    InlineKnowledgeImportWorkerRunner,
+    read_worker_result,
+)
 from xenix.services.knowledge_service import MAX_KNOWLEDGE_UNIT_CHARS, KnowledgeService
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import (
@@ -28,6 +32,7 @@ from xenix.services.storage.models import (
     KnowledgeImportRow,
     KnowledgeUnitRow,
 )
+from xenix.services.storage.layout import knowledge_import_result_path
 
 
 def _runtime(
@@ -37,6 +42,7 @@ def _runtime(
     ocr_service=None,
     retrieval_ready_notifier=None,
     start_worker=True,
+    inline_runner=False,
 ):
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
@@ -51,8 +57,11 @@ def _runtime(
         paths=paths,
         session_factory=storage.session_factory,
         artifact_service=ArtifactService(storage.session_factory),
-        normalizer=FormatNormalizer(),
-        ocr_service=ocr_service,
+        worker_runner=(
+            InlineKnowledgeImportWorkerRunner(paths, ocr_service=ocr_service)
+            if inline_runner or ocr_service is not None
+            else None
+        ),
         canonical_ready_notifier=derivation.enqueue_generation,
         start_worker=start_worker,
     )
@@ -169,21 +178,29 @@ def test_startup_reclaims_bundle_published_before_database_commit(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
-    paths, storage, importer, derivation, _knowledge = _runtime(monkeypatch, tmp_path)
+    paths, storage, importer, derivation, _knowledge = _runtime(
+        monkeypatch,
+        tmp_path,
+        inline_runner=True,
+    )
     source = tmp_path / "rule.txt"
     source.write_text("崩溃前已冻结但尚未提交的知识。", encoding="utf-8")
     published: list[Path] = []
-    write_bundle = importer._store.write_canonical_bundle
+    write_bundle = KnowledgeContentStore.write_canonical_bundle
 
     class InjectedCrash(Exception):
         pass
 
-    def publish_then_crash(**kwargs):
-        stored = write_bundle(**kwargs)
+    def publish_then_crash(store, **kwargs):
+        stored = write_bundle(store, **kwargs)
         published.append(stored.path)
         raise InjectedCrash
 
-    monkeypatch.setattr(importer._store, "write_canonical_bundle", publish_then_crash)
+    monkeypatch.setattr(
+        KnowledgeContentStore,
+        "write_canonical_bundle",
+        publish_then_crash,
+    )
     receipt = importer.enqueue_file(source)
     with pytest.raises(ValidationError):
         importer.wait_for_import(receipt.import_id, timeout=60)
@@ -209,7 +226,7 @@ def test_startup_reclaims_bundle_published_before_database_commit(
 
 
 def test_encrypted_pdf_password_is_transient_and_retryable(monkeypatch, tmp_path: Path) -> None:
-    _paths, storage, importer, derivation, knowledge = _runtime(monkeypatch, tmp_path)
+    paths, storage, importer, derivation, knowledge = _runtime(monkeypatch, tmp_path)
     clear = tmp_path / "clear.pdf"
     encrypted = tmp_path / "encrypted.pdf"
     _write_simple_pdf(clear, "Rain inventory uses three week demand")
@@ -220,6 +237,14 @@ def test_encrypted_pdf_password_is_transient_and_retryable(monkeypatch, tmp_path
         importer.import_file(encrypted, timeout=60)
     assert error.value.error_code == "knowledge_password_required"
     failed = importer.list_imports()[0]
+    worker_result = read_worker_result(
+        knowledge_import_result_path(paths, failed.import_id)
+    )
+    assert worker_result.failure_stage == "normalizing"
+    assert worker_result.diagnostic_code == "validation_error"
+    assert {
+        event.event_code for event in importer.read_import_logs(failed.import_id)
+    } >= {"normalizing_failed", "validation_error"}
     result = importer.wait_for_import(
         importer.retry_import(failed.import_id, password="transient-pass-4821").import_id,
         timeout=60,
@@ -258,6 +283,32 @@ def test_encrypted_docx_decrypts_in_attempt_only(monkeypatch, tmp_path: Path) ->
     )
 
     _wait_for_retrieval(knowledge, "会员渠道毛利率", result.document_id)
+    importer.shutdown()
+    derivation.shutdown()
+
+
+def test_encrypted_pptx_decrypts_in_attempt_only(monkeypatch, tmp_path: Path) -> None:
+    _paths, _storage, importer, derivation, knowledge = _runtime(monkeypatch, tmp_path)
+    clear = tmp_path / "clear.pptx"
+    encrypted = tmp_path / "secret.pptx"
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[1])
+    slide.shapes.title.text = "加密演示规则"
+    slide.placeholders[1].text = "重点客户活动必须提前准备五周安全库存。"
+    presentation.save(clear)
+    with clear.open("rb") as source, encrypted.open("wb") as output:
+        msoffcrypto.OfficeFile(source).encrypt("secret", output)
+
+    with pytest.raises(ValidationError) as error:
+        importer.import_file(encrypted, timeout=60)
+    assert error.value.error_code == "knowledge_password_required"
+    failed_id = importer.list_imports()[0].import_id
+    result = importer.wait_for_import(
+        importer.retry_import(failed_id, password="secret").import_id,
+        timeout=120,
+    )
+
+    _wait_for_retrieval(knowledge, "重点客户五周安全库存", result.document_id)
     importer.shutdown()
     derivation.shutdown()
 
@@ -367,23 +418,32 @@ def test_long_docling_item_is_published_as_bounded_searchable_units(
     derivation.shutdown()
 
 
-def test_unsupported_suffix_is_rejected_and_spoofed_image_fails_after_admission(
+def test_unsupported_suffix_is_rejected_and_spoofed_supported_files_fail_after_admission(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     _paths, _storage, importer, derivation, _knowledge = _runtime(monkeypatch, tmp_path)
+    unsupported = tmp_path / "notes.md"
+    unsupported.write_text("not supported", encoding="utf-8")
     pptx = tmp_path / "slides.pptx"
     pptx.write_bytes(b"PK\x03\x04not-a-supported-presentation")
     spoofed = tmp_path / "fake.png"
     spoofed.write_text("not an image", encoding="utf-8")
 
-    with pytest.raises(ValidationError):
-        importer.enqueue_file(pptx)
-    receipt = importer.enqueue_file(spoofed)
+    with pytest.raises(ValidationError) as unsupported_error:
+        importer.enqueue_file(unsupported)
+    assert "PPT" in str(unsupported_error.value)
+    assert "PPTX" in str(unsupported_error.value)
+    pptx_receipt = importer.enqueue_file(pptx)
+    with pytest.raises(ValidationError) as pptx_error:
+        importer.wait_for_import(pptx_receipt.import_id, timeout=30)
+    assert pptx_error.value.error_code == "knowledge_pptx_package_invalid"
+    assert str(pptx_error.value) == "The PPTX file is not a valid Office document."
+    image_receipt = importer.enqueue_file(spoofed)
     with pytest.raises(ValidationError) as error:
-        importer.wait_for_import(receipt.import_id, timeout=30)
+        importer.wait_for_import(image_receipt.import_id, timeout=30)
     assert error.value.error_code == "knowledge_format_mismatch"
-    assert len(importer.list_imports()) == 1
+    assert len(importer.list_imports()) == 2
     importer.shutdown()
     derivation.shutdown()
 
@@ -404,7 +464,6 @@ def test_derivation_failure_keeps_canonical_ready_and_can_retry_independently(
         paths=paths,
         session_factory=storage.session_factory,
         artifact_service=ArtifactService(storage.session_factory),
-        normalizer=FormatNormalizer(),
         canonical_ready_notifier=derivation.enqueue_generation,
     )
     source = tmp_path / "rule.txt"

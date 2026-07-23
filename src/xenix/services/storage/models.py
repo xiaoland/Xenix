@@ -375,6 +375,9 @@ class KnowledgeDocumentRow(SQLModel, table=True):
     canonical_generation_id: str = Field(default_factory=generate_id, index=True)
     retrieval_generation_id: str | None = Field(default=None, index=True)
     retrieval_status: str = Field(default="pending", index=True)
+    retrieval_projection_version: int | None = Field(default=None, index=True)
+    retrieval_content_fingerprint: str | None = Field(default=None, index=True)
+    retrieval_unit_count: int = Field(default=0)
     active: bool = Field(default=True, index=True)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
@@ -430,6 +433,7 @@ class KnowledgeVectorGenerationRow(SQLModel, table=True):
     distance_metric: str = "cosine"
     relative_path: str
     unit_count: int
+    corpus_fingerprint_schema: int = Field(default=3, index=True)
     created_at: datetime = Field(default_factory=utc_now)
 
 

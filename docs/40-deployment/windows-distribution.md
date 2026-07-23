@@ -1,12 +1,27 @@
 # Windows Distribution
 
-Xenix ships as an unsigned per-user Velopack Setup for Windows 10 1809 x64 or later. `pyproject.toml` owns SemVer; `release.toml` owns immutable package identity, channel, runtime, and pinned release tools. `%LOCALAPPDATA%\Xenix` remains user-state authority and is not the Velopack installation root.
+Xenix ships as an unsigned per-user Velopack Setup for Windows 10 1809 x64 or later. `pyproject.toml` owns SemVer; `release.toml` owns immutable package identity, channel, runtime, and pinned release tools. `%LOCALAPPDATA%\Xenix` remains user-state authority and is not the Velopack installation root. The optional native Knowledge OCR component is a separate immutable release artifact downloaded only after the user chooses local OCR setup; it is not embedded in Setup.
 
 ## Candidate Gate
 
-Create tag `v<version>` on the exact release commit, then manually run `Native Release Candidate` for that tag. The workflow requires the protected `native-candidate` environment and fails unless the complete frozen release configuration is valid. It runs check, the full test suite, PyInstaller package, packaged smoke, Velopack pack, and uploads immutable bytes under `candidates/<version>/<manifest-sha256>/` in the private release bucket.
+Create tag `v<version>` on the exact release commit, then manually run `Native Release Candidate` for that tag. The workflow requires the protected `native-candidate` environment and fails unless the complete frozen release configuration is valid. It builds and verifies the pinned native OCR bundle before the app, then runs check, the full test suite, PyInstaller package, packaged smoke, Velopack pack, and uploads every manifest-approved immutable artifact under `candidates/<version>/<manifest-sha256>/` in the private release bucket.
 
 Record the printed `version` and `manifest_sha256`. Setup, Update, `xenix.exe`, and bundled PE files are intentionally unsigned. SHA-256 proves equality to the reviewed manifest, not publisher identity if the OSS/feed writer is compromised.
+
+The app package embeds only the native OCR catalog. The candidate manifest admits
+the OCR archive from its approved output root as a typed artifact, and public builds
+fail if the catalog or archive identity is absent or inconsistent. The client later
+derives that immutable artifact URL from the same configured published origin used
+by the release; it never resolves Paddle dependencies from upstream.
+
+Packaged smoke must receive the already built locked OCR archive and golden image.
+It installs/verifies that generation offline, imports the image through the spawned
+Knowledge worker, derives bounded Units, reaches keyword lookup, and checks that the
+canonical pipeline recorded the same runtime generation. Activation or self-test
+alone is not sufficient release evidence. Independently, packaged smoke creates a
+valid DOCX and PPTX, imports both through the frozen app's spawned Knowledge worker,
+derives the presentation, and retrieves its bounded text. A direct parser-helper
+exercise or collecting the Word backend alone is not sufficient.
 
 ## Production Publication
 

@@ -12,7 +12,7 @@
 | MVP formats | confirmed | TXT, DOC, DOCX, PDF, JPEG, PNG; no Markdown. |
 | Docling content IR | confirmed | `DoclingDocument` is frozen content IR; Xenix lifecycle/provenance is an envelope. |
 | External OCR routing | confirmed | User-configured OCR may receive content without per-import consent. |
-| OCR MVP provider direction | confirmed and implemented | One-click private local PaddleOCR sidecar; externally configured OCR remains an extension of the same independent service boundary. |
+| OCR MVP provider direction | confirmed and implemented | One-click Xenix-owned official Paddle Inference C++ worker archive; externally configured OCR remains an extension of the same independent service boundary. |
 | VLM | confirmed exclusion | No VLM provider, UI, or projection in MVP. |
 | Duplicate/encryption policy | confirmed | Same SHA defaults to reuse; passwords are transient and never persisted. |
 
@@ -26,7 +26,7 @@
 | PDF helper | pikepdf is bounded probe/decrypt/preprocess support; source is never rewritten | boundary, encrypted-flow, and packaged smoke evidence |
 | TXT route | explicit decoder + `charset-normalizer` candidate evidence; retain sidecar locator | encoding/CJK fixture spike |
 | Format detection | Xenix signature/container probe primary; `python-magic` only optional corroboration | libmagic Windows/package spike |
-| Local PP-StructureV3 | future structured-document enrichment; current local sidecar is PaddleOCR text extraction | separate layout/table quality and package spike |
+| Local PP-StructureV3 | future structured-document enrichment; current native worker provides PaddleOCR text extraction only | separate layout/table quality and package spike |
 | Docling runtime | pin Docling/core/models and use referenced assets/explicit offline cache | clean Windows/package/license spike |
 
 ## Deferred to Storage and Tool Workstreams

@@ -18,7 +18,7 @@ import pikepdf
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from xenix.services.knowledge_docling_worker import _convert
+from xenix.services.knowledge_docling import convert_document
 
 
 MARKERS = (
@@ -166,7 +166,7 @@ def _libreoffice_version() -> str:
 
 
 def _inspect_route(path: Path, *, source_format: str) -> dict[str, object]:
-    document = _convert(path, source_format=source_format)
+    document = convert_document(path, source_format=source_format)
     exported = document.export_to_text()
     labels = Counter(
         str(getattr(getattr(item, "label", None), "value", getattr(item, "label", "")))

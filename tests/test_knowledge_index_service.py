@@ -272,6 +272,35 @@ def test_old_vector_failure_does_not_override_a_later_successful_generation(
     assert status.error_code is None
 
 
+def test_vector_task_cannot_succeed_after_its_published_corpus_is_superseded(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _storage, _settings, _embedding, semantic, knowledge, indexes = _services(
+        monkeypatch,
+        tmp_path,
+    )
+    seed_knowledge_text(knowledge, title="规则甲", text="规则甲使用三周需求。")
+    original_rebuild = semantic.rebuild_generation
+
+    def rebuild_then_change_corpus(**kwargs):
+        generation = original_rebuild(**kwargs)
+        seed_knowledge_text(knowledge, title="规则乙", text="规则乙使用两周需求。")
+        return generation
+
+    monkeypatch.setattr(semantic, "rebuild_generation", rebuild_then_change_corpus)
+    task_id = indexes.enqueue_rebuild(
+        (KnowledgeIndexKind.TEXT_VECTOR,),
+        trigger="manual",
+    )
+
+    completed = indexes.rebuild_now(task_id)
+
+    assert completed.status == "failed"
+    assert completed.error_code == "knowledge_index_rebuild_failed"
+    assert indexes.status().text_vector_state == "needs_attention"
+
+
 def _services(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())

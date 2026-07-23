@@ -292,6 +292,8 @@ def _load_runtime_imports() -> SimpleNamespace:
     knowledge_import = load_module("xenix.services.knowledge_import_service")
     knowledge_derivation = load_module("xenix.services.knowledge_derivation_service")
     knowledge_index = load_module("xenix.services.knowledge_index_service")
+    knowledge_task_query = load_module("xenix.services.knowledge_task_query")
+    knowledge_workspace = load_module("xenix.services.knowledge_workspace_service")
     paddle_ocr = load_module("xenix.services.paddle_ocr_service")
     lazy_ml_service = load_module("xenix.services.lazy_ml_service")
     lazy_services = load_module("xenix.services.lazy_services")
@@ -316,6 +318,8 @@ def _load_runtime_imports() -> SimpleNamespace:
         KnowledgeImportService=knowledge_import.KnowledgeImportService,
         KnowledgeDerivationService=knowledge_derivation.KnowledgeDerivationService,
         KnowledgeIndexService=knowledge_index.KnowledgeIndexService,
+        KnowledgeTaskQueryService=knowledge_task_query.KnowledgeTaskQueryService,
+        KnowledgeWorkspaceService=knowledge_workspace.KnowledgeWorkspaceService,
         PaddleOcrDeploymentService=paddle_ocr.PaddleOcrDeploymentService,
         PaddleOcrService=paddle_ocr.PaddleOcrService,
         LLMService=llm.LLMService,
@@ -581,6 +585,15 @@ def build_main_window(
             artifact_service=agent_services.artifacts,
             canonical_ready_notifier=knowledge_derivation_service.enqueue_generation,
         )
+        knowledge_task_query_service = runtime.KnowledgeTaskQueryService(
+            context.session_factory
+        )
+        knowledge_workspace_service = runtime.KnowledgeWorkspaceService(
+            knowledge_service=agent_services.knowledge,
+            task_query=knowledge_task_query_service,
+            index_service=knowledge_index_service,
+            ocr_deployment=paddle_ocr_deployment,
+        )
         _emit_startup_timing("services.construct", step_start)
 
         step_start = time.perf_counter()
@@ -604,6 +617,8 @@ def build_main_window(
             knowledge_service=agent_services.knowledge,
             knowledge_index_service=knowledge_index_service,
             paddle_ocr_deployment=paddle_ocr_deployment,
+            knowledge_task_query_service=knowledge_task_query_service,
+            knowledge_workspace_service=knowledge_workspace_service,
         )
         _emit_startup_timing("main_window.construct", step_start)
 

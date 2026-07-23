@@ -17,6 +17,11 @@ from .knowledge_service import (
     bound_knowledge_units,
     prepare_knowledge_search_text,
 )
+from .knowledge_projection import (
+    RETRIEVAL_PROJECTION_VERSION,
+    knowledge_unit_id,
+    retrieval_content_fingerprint,
+)
 from .storage.models import (
     KnowledgeCanonicalGenerationRow,
     KnowledgeDerivationRow,
@@ -196,17 +201,10 @@ class KnowledgeDerivationService:
                     document is not None
                     and document.retrieval_status == "ready"
                     and document.retrieval_generation_id == job.canonical_generation_id
+                    and document.retrieval_projection_version
+                    == RETRIEVAL_PROJECTION_VERSION
                 )
-                count = len(
-                    list(
-                        session.exec(
-                            select(KnowledgeUnitRow).where(
-                                KnowledgeUnitRow.document_id == job.document_id,
-                                KnowledgeUnitRow.canonical_generation_id == job.canonical_generation_id,
-                            )
-                        )
-                    )
-                )
+                count = document.retrieval_unit_count if ready and document is not None else 0
                 return DerivationResult(job.id, job.document_id, job.canonical_generation_id, ready, count)
             if job.status not in {"queued", "running"}:
                 raise ValueError("Knowledge derivation job is not runnable.")
@@ -264,6 +262,11 @@ class KnowledgeDerivationService:
 
             rows = [
                 KnowledgeUnitRow(
+                    id=knowledge_unit_id(
+                        document_id=document.id,
+                        canonical_generation_id=generation.id,
+                        ordinal=ordinal,
+                    ),
                     document_id=document.id,
                     canonical_generation_id=generation.id,
                     ordinal=ordinal,
@@ -279,9 +282,17 @@ class KnowledgeDerivationService:
             if rows:
                 document.retrieval_generation_id = generation.id
                 document.retrieval_status = "ready"
+                document.retrieval_projection_version = RETRIEVAL_PROJECTION_VERSION
+                document.retrieval_content_fingerprint = retrieval_content_fingerprint(
+                    (row.ordinal, row.text, row.locator_payload) for row in rows
+                )
+                document.retrieval_unit_count = len(rows)
             else:
                 document.retrieval_generation_id = None
                 document.retrieval_status = "unavailable"
+                document.retrieval_projection_version = RETRIEVAL_PROJECTION_VERSION
+                document.retrieval_content_fingerprint = None
+                document.retrieval_unit_count = 0
             document.updated_at = now
             session.add(document)
             job.status = "succeeded"
@@ -348,10 +359,9 @@ class KnowledgeDerivationService:
                 row.updated_at = utc_now()
                 session.add(row)
                 pending.append(row.id)
-            existing_generations = {
-                row.canonical_generation_id
-                for row in session.exec(select(KnowledgeDerivationRow))
-            }
+            existing_attempts: dict[str, list[KnowledgeDerivationRow]] = {}
+            for row in session.exec(select(KnowledgeDerivationRow)):
+                existing_attempts.setdefault(row.canonical_generation_id, []).append(row)
             documents = list(
                 session.exec(
                     select(KnowledgeDocumentRow).where(
@@ -362,8 +372,13 @@ class KnowledgeDerivationService:
             for document in documents:
                 if (
                     document.retrieval_generation_id == document.canonical_generation_id
-                    or document.canonical_generation_id in existing_generations
+                    and document.retrieval_status == "ready"
+                    and document.retrieval_projection_version
+                    == RETRIEVAL_PROJECTION_VERSION
                 ):
+                    continue
+                attempts = existing_attempts.get(document.canonical_generation_id, [])
+                if any(row.status in {"queued", "running"} for row in attempts):
                     continue
                 generation = session.get(
                     KnowledgeCanonicalGenerationRow,
@@ -377,7 +392,18 @@ class KnowledgeDerivationService:
                     import_id=generation.import_id,
                     status="queued",
                     phase="queued",
-                    attempt_number=1,
+                    attempt_number=max(
+                        (row.attempt_number for row in attempts),
+                        default=0,
+                    )
+                    + 1,
+                    retry_of=max(
+                        attempts,
+                        key=lambda row: row.attempt_number,
+                        default=None,
+                    ).id
+                    if attempts
+                    else None,
                     retryable=False,
                 )
                 session.add(job)

@@ -4,6 +4,7 @@ from PySide6.QtCore import QObject, QRunnable, Signal
 
 from ..services.paddle_ocr_service import (
     PaddleOcrDeploymentService,
+    PaddleOcrState,
     PaddleOcrStatus,
 )
 
@@ -22,9 +23,17 @@ class OcrStatusTask(QRunnable):
 
     def run(self) -> None:
         try:
-            status = self._deployment.status()
+            status_reader = getattr(self._deployment, "status_snapshot", None)
+            if status_reader is None:
+                status_reader = self._deployment.status
+            status = status_reader()
+            if status.state is PaddleOcrState.CHECKING:
+                status = self._deployment.verify_active()
         except Exception:
-            status = PaddleOcrStatus(False, False, "health_check_failed")
+            status = PaddleOcrStatus(
+                PaddleOcrState.REPAIR_REQUIRED,
+                "status_unavailable",
+            )
         self.signals.finished.emit(self._generation, status)
 
 

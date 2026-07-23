@@ -106,6 +106,20 @@ class ReleaseConfig(BaseModel):
             return ""
         return f"{self.releases_oss_public_url}/Xenix-Setup.exe"
 
+    def artifact_url(self, artifact_name: str) -> str:
+        """Resolve one catalog-owned immutable release artifact."""
+
+        name = str(artifact_name).strip()
+        if (
+            not self.releases_oss_public_url
+            or not name
+            or "/" in name
+            or "\\" in name
+            or name in {".", ".."}
+        ):
+            return ""
+        return f"{self.releases_oss_public_url}/{name}"
+
     @classmethod
     def from_environment(
         cls,

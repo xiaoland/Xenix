@@ -23,12 +23,14 @@ Treat its contents by ownership:
 - `artifacts/knowledge/staging/` and `.import-trash/`: app-owned publication and
   startup-reclamation areas; do not sweep them manually while Xenix owns the home;
 - `artifacts/knowledge/tasks/imports/<attempt-id>/logs.jsonl`: bounded content-free
-  import lifecycle events. Inspect through Import Queue; absence of document text,
-  source paths, passwords, credentials, and raw exceptions is intentional;
+  import lifecycle events. Inspect through the Knowledge Workspace `Task queue`;
+  absence of document text, source paths, passwords, credentials, and raw exceptions
+  is intentional. Worker results retain only outcome, failure stage, and a safe
+  diagnostic code;
 - Knowledge vector generations: rebuildable derived indexes whose readiness is owned by SQLite metadata;
-- `cache/knowledge-ocr/`: explicitly installed private PaddleOCR Python runtime,
-  model cache, downloads, and hashed readiness manifest; rebuildable, potentially
-  large, and not an authority for imported content;
+- `cache/knowledge-ocr/`: optional native Paddle Inference OCR generations, explicit
+  model packs, downloads/staging, and the small atomic active-generation pointer;
+  rebuildable, potentially large, and not an authority for imported content;
 - cache and temp: rebuildable acceleration or transient support output;
 - source import files outside the runtime home: user-owned inputs, not reset targets.
 
@@ -39,7 +41,8 @@ Inspect evidence by symptom:
 | startup or persistence failure | application log, active database, schema/migration error |
 | provider behavior | Agent settings and application log; never copy credentials into a report |
 | ML worker failure | worker settings, task log, local/remote validation result |
-| Knowledge import failure | Import Queue state and its View Log event timeline; application log for coordinator/runtime diagnostics |
+| Knowledge import failure | Workspace `Task queue` state and its View Log event timeline; application log for coordinator/runtime diagnostics |
+| local OCR setup or repair failure | Knowledge Settings state, then the application log and the app-owned OCR staging/generation manifests; do not copy raw document content into support evidence |
 | missing dataset, model, or report | database registration plus referenced app-owned file |
 | semantic Knowledge lookup failure | Knowledge Settings index state/task error, then vector-generation metadata and its contained derived index; do not alter canonical objects |
 | telemetry failure | [Observability](observability.md) and local exporter errors |
@@ -89,6 +92,29 @@ submitted from Workspace or Knowledge Settings, and a compatibility-changing
 Embedding save may enqueue a job after explicit confirmation. `Needs rebuild` keeps
 keyword use available; `Needs attention` directs the user to retry rather than
 making Lance or a task row a content authority.
+
+The Workspace `Task queue` is a bounded read model over import, content-preparation,
+and index-task owners. It does not make those task rows interchangeable. Import logs
+remain import-owned; index build detail and retry remain index-service-owned.
+
+Local OCR setup downloads only the immutable artifact named by the catalog embedded
+in the installed Xenix build. It verifies the outer size/digest, safe archive shape,
+runtime member manifest, runtime/model/protocol identities, and native self-test in
+staging before replacing `active.json`. A separate verification record binds the
+active generation, model, engine/protocol, and manifest hash to a recent full member
+scan and self-test. Fast status reads only bounded manifests/that record; absent or
+stale verification reports `checking` and is refreshed in a background task before
+the runtime can execute. A missing generation is `not installed`; an identified but
+invalid generation requires repair. Deleting the OCR cache removes a rebuildable
+optional capability, not Knowledge source/canonical content. Xenix does not use or
+clean `%USERPROFILE%/.paddlex`.
+
+Knowledge retrieval projection v3 uses deterministic Unit identities. The v22→v23
+migration preserves source/canonical content, clears active v2 retrieval pointers,
+and lets the derivation owner republish Units and indexes. Vector status derives the
+expected identities from bounded document metadata; builds consume one frozen
+SQLite projection snapshot and may publish/succeed only while that identity remains
+current.
 
 Knowledge Import performs a separate startup-only reconciliation before its worker
 starts. SQLite source/canonical references are materialized first; only strictly

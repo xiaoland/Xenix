@@ -53,6 +53,8 @@ if TYPE_CHECKING:
     from ..services.knowledge_import_service import KnowledgeImportService
     from ..services.knowledge_index_service import KnowledgeIndexService
     from ..services.knowledge_service import KnowledgeService
+    from ..services.knowledge_task_query import KnowledgeTaskQueryService
+    from ..services.knowledge_workspace_service import KnowledgeWorkspaceService
     from ..services.ml_service import MLService
     from ..services.paddle_ocr_service import PaddleOcrDeploymentService
     from ..services.update_service import UpdateService
@@ -114,6 +116,8 @@ class MainWindow(QMainWindow):
         knowledge_service: KnowledgeService | None = None,
         knowledge_index_service: KnowledgeIndexService | None = None,
         paddle_ocr_deployment: PaddleOcrDeploymentService | None = None,
+        knowledge_task_query_service: KnowledgeTaskQueryService | None = None,
+        knowledge_workspace_service: KnowledgeWorkspaceService | None = None,
     ) -> None:
         super().__init__()
         self._paths = paths
@@ -135,6 +139,8 @@ class MainWindow(QMainWindow):
         self._knowledge_service = knowledge_service
         self._knowledge_index_service = knowledge_index_service
         self._paddle_ocr_deployment = paddle_ocr_deployment
+        self._knowledge_task_query_service = knowledge_task_query_service
+        self._knowledge_workspace_service = knowledge_workspace_service
         self._agent_thread_id: str | None = None
         self._active_pending_message_id: str | None = None
         self._active_submission_id: str | None = None
@@ -354,6 +360,8 @@ class MainWindow(QMainWindow):
                 knowledge_service=self._knowledge_service,
                 knowledge_index_service=self._knowledge_index_service,
                 ocr_deployment=self._paddle_ocr_deployment,
+                task_query_service=self._knowledge_task_query_service,
+                workspace_service=self._knowledge_workspace_service,
                 open_knowledge_settings=lambda: self._open_settings(
                     tab=SettingsTab.KNOWLEDGE_BASE
                 ),

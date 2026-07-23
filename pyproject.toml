@@ -57,12 +57,13 @@ dev = { composite = ["agent-skills-generate", "python scripts/run_dev.py"] }
 i18n-extract = "python scripts/update_translations.py"
 i18n-compile = "python scripts/compile_translations.py"
 package = { composite = ["agent-skills-generate", "agent-skills-check", "python scripts/package_app.py"] }
+build-knowledge-ocr = "python scripts/build_knowledge_ocr_runtime.py"
 smoke = { composite = ["agent-skills-generate", "python scripts/run_dev.py --smoke-test"] }
 smoke-package = "python scripts/verify_packaged_smoke.py"
 velopack = "python scripts/package_velopack.py"
 release-manifest = "python scripts/write_release_manifest.py"
 release-identity = "python scripts/verify_release_identity.py"
-release-candidate = { composite = ["package", "smoke-package", "velopack", "release-manifest"] }
+release-candidate = { composite = ["build-knowledge-ocr", "package", "smoke-package", "velopack", "release-manifest"] }
 dist = "python scripts/build_distribution_zip.py"
 pytest = "python scripts/run_pytest.py"
 test = { composite = ["i18n-compile", "python scripts/run_pytest.py"] }

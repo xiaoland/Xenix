@@ -9,6 +9,11 @@ from xenix.services.knowledge_service import (
     bound_knowledge_units,
     prepare_knowledge_search_text,
 )
+from xenix.services.knowledge_projection import (
+    RETRIEVAL_PROJECTION_VERSION,
+    knowledge_unit_id,
+    retrieval_content_fingerprint,
+)
 from xenix.services.storage.models import (
     KnowledgeDocumentRow,
     KnowledgeUnitRow,
@@ -70,6 +75,11 @@ def seed_knowledge_text(
 
         rows = [
             KnowledgeUnitRow(
+                id=knowledge_unit_id(
+                    document_id=document.id,
+                    canonical_generation_id=generation_id,
+                    ordinal=ordinal,
+                ),
                 document_id=document.id,
                 canonical_generation_id=generation_id,
                 ordinal=ordinal,
@@ -80,6 +90,12 @@ def seed_knowledge_text(
             for ordinal, unit in enumerate(units)
         ]
         repository.replace_units(session, document=document, units=rows)
+        document.retrieval_projection_version = RETRIEVAL_PROJECTION_VERSION
+        document.retrieval_content_fingerprint = retrieval_content_fingerprint(
+            (row.ordinal, row.text, row.locator_payload) for row in rows
+        )
+        document.retrieval_unit_count = len(rows)
+        session.add(document)
         session.commit()
         session.refresh(document)
         return document

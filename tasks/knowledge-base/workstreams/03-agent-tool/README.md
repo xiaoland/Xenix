@@ -83,9 +83,8 @@ diagnostic telemetry only and cannot satisfy semantic success.
 The rainy-season case imports a paraphrased rule through production
 Import→Canonical→Derivation, requests semantic retrieval, and requires an exact
 restock Dataset plus a grounded action-oriented answer. Its local fixture/oracle is
-verified. Two real-provider runs produced the exact Dataset and passed integrity but
-failed grounded final-answer wording; that repair/rerun is the sole remaining Slice
-01 acceptance item.
+verified, and the configured real LLM/Embedding run now passes both final-answer and
+Dataset/integrity verdicts. Tool Calls and ToolResults remain diagnostics only.
 
 ## Verification
 

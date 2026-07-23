@@ -1,17 +1,19 @@
 # Knowledge Base Follow-up — Contract Realignment
 
-**Status:** Slice 01 closed; Slice 02 locally verified, global cross-review pending
+**Status:** Slice 01 closed; Slice 02 locally delivered; Slice 03 Phase H locally accepted
 **Opened:** 2026-07-21
-**Posture:** implement the approved Slice 02 phases; multimodal work is parked
+**Posture:** Phase H delivery evidence passes; final coupled review remains;
+multimodal work is parked
 
 ## Objective
 
 Keep the Knowledge Base implementation aligned with Product TDD, Unit TDD, local
 `AGENTS.md`, implementation taste, and the accepted workstream designs while new
 product findings are discussed and admitted as coherent slices. Preserve the Slice
-01 evidence, carry its known benchmark residual honestly, and design Slice 02 around
-observable Knowledge operations, a useful document workspace, explicit index
-lifecycle control. Multimodal retrieval remains a separately admitted follow-up.
+01 and Slice 02 evidence, and design Slice 03 around a stable native local-OCR
+bundle, a responsive Workspace, truthful status, and one cross-owner task query
+plane rendered locally as `Task queue`. Multimodal retrieval remains a separately
+admitted follow-up.
 
 ## Guardrails
 
@@ -35,9 +37,10 @@ lifecycle control. Multimodal retrieval remains a separately admitted follow-up.
 - Only the active phase authorizes product-code changes. Each phase records its own
   Impact Handshake, preplay, verification, and remaining debt while the Slice-level
   scope stays intact. Commits still require Sir's explicit command.
-- Completion of one phase is not completion of its slice. At the end of Slice 02,
-  perform another global Import/Storage/Tool/UI/runtime review because task execution,
-  document lifecycle, index generations, settings, and Agent evidence are coupled.
+- Completion of one phase is not completion of its slice. After Phase H acceptance,
+  perform another global Import/Storage/Tool/UI/OCR/runtime/release/index review
+  because task execution, document lifecycle, index generations, settings, and
+  Agent evidence are coupled.
 
 ## Verification
 
@@ -55,10 +58,12 @@ lifecycle control. Multimodal retrieval remains a separately admitted follow-up.
 
 - The 2026-07-21 findings remain the historical audit baseline; every KB-F01..F17
   row has locally executable closure evidence. Sir closed Slice 01 on 2026-07-22.
-- TXT, DOC/DOCX, PDF, JPEG, and PNG enter one extensible probe/normalize/route/parse/
-  canonical path. Import owns a durable queue and stops at immutable canonical-ready;
+- TXT, DOC/DOCX, PPT/PPTX, PDF, JPEG, and PNG enter one extensible probe/normalize/
+  route/parse/canonical path. PPTX uses bounded OOXML validation and Docling; legacy
+  PPT uses a named LibreOffice-to-PPTX conversion profile before the same parser.
+  Import still owns a durable queue and stops at immutable canonical-ready;
   independent derivation alone publishes bounded Units and FTS readiness.
-- SQLite schema v21 owns lifecycle, current pointers, Units, retrieval readiness,
+- SQLite schema v23 owns lifecycle, current pointers, deterministic Units, retrieval readiness,
   and observable Knowledge index rebuild tasks. Source/canonical bytes are
   content-addressed; LanceDB is an immutable rebuildable semantic projection bound
   to current SQLite generations.
@@ -83,13 +88,39 @@ lifecycle control. Multimodal retrieval remains a separately admitted follow-up.
 - Current JPEG/PNG and document-picture import preserves multimodal source content,
   but retrieval is text-only: OCR, extracted table text, and surrounding text may be
   searched; image-only meaning is not embedded or delivered to the Agent.
+- Slice 03 is now the active cohort. It records the existing-but-
+  incompatible PaddleOCR runtime, Python/pip deployment fragility, synchronous
+  Workspace status scans, unified task-queue direction, footer hierarchy, and legacy
+  unbounded Unit projection evidence. Sir selected official Paddle Inference C++ and
+  the disposable compatibility spike now passes on PaddleOCR `v3.7.0` + Paddle
+  Inference `3.3.0` with the selected PP-OCRv6 medium models. It also records the
+  required upstream-config guard, complete dynamic DLL closure, sizing/performance
+  baseline, and remaining worker-protocol proof. The packet defines the exact native
+  build, release, migration, service, UI, and acceptance sequence.
+- The 2026-07-23 global rerun opened KB-D26..KB-D31. Sir admitted them as one Phase F
+  repair cohort. The capability/provider graph, PDF page evidence states, frozen
+  projection snapshot, deterministic Unit identities, OCR verification/provenance,
+  Windows Job Object ownership, and route-complete real native OCR acceptance now
+  pass locally.
+- The final review then opened KB-D32 and KB-D33: the intended presentation formats
+  were omitted from the active registry, and the Workspace has no drag-and-drop
+  entry. Sir started their single Phase G cohort; source/full/frozen/public-fixture
+  acceptance now passes locally.
+- A real post-Phase-G Workspace import of the named 53 MB PPTX failed in the
+  production spawned-import topology. Database, task-log, CAS, and direct-parser
+  evidence prove that the source snapshot is intact and that failure occurs only
+  after `parsing_started`. Phase G acceptance bypassed the production nested-process
+  topology. Phase H now makes the spawned Import worker the sole Docling isolation
+  boundary, distinguishes safe worker outcome/stage/diagnostic fields and parent
+  launch/timeout/crash/result failures, exercises the real spawned named-PPTX path,
+  and presents the Workspace-local label `Task queue` / `任务队列`.
 
 ## Next Step
 
-Review the global Import/Storage/Tool/UI/runtime topology with Sir before closing
-Slice 02 or declaring the Knowledge Base workstreams coherent. Multimodal retrieval
-stays outside this slice. Sir authorized organizing the completed work into separate
-implementation and documentation commits on 2026-07-22.
+Resume the final global Import/Storage/Tool/UI/OCR/runtime/release/index review with
+Sir. Phase H source/full/package evidence passes, but a phase cannot close Slice 03
+or substitute for this coupled review. No commit or publication is authorized.
+Multimodal retrieval stays outside this slice.
 
 ## Packet Map
 
@@ -102,5 +133,10 @@ implementation and documentation commits on 2026-07-22.
 - [Slice 01 / Phase B — Semantic/hybrid retrieval](slices/01-semantic-hybrid-retrieval.md)
 - [Slice 01 / Phases C–G — local closeout](slices/01-phases-c-g-closeout.md)
 - [Slice 02 — Knowledge operations, workspace, and index control](slices/02-knowledge-operations-workspace-indexes.md)
+- [Slice 03 — Local OCR, Workspace responsiveness, and Knowledge operations](slices/03-local-ocr-workspace-operations.md)
+- [Slice 03 — Detailed implementation plan and Impact Handshake](slices/03-implementation-plan.md)
+- [Slice 03 evidence — local OCR runtime research](evidence/03-ocr-runtime-research.md)
+- [Slice 03 evidence — native OCR and operations implementation](evidence/03-native-runtime-implementation.md)
+- [Slice 03 evidence — legacy Unit/PPTX diagnostic](evidence/03-pptx-unit-diagnostic.md)
 - [Parked follow-up — multimodal retrieval design](slices/02-multimodal-retrieval.md)
 - [Original Knowledge Base delivery packet](../knowledge-base/README.md)

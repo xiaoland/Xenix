@@ -5,18 +5,18 @@ import hashlib
 import io
 import inspect
 import json
-import os
 import shutil
 import stat
 import subprocess
 import sys
 import time
 import unicodedata
+from contextlib import ExitStack
 from dataclasses import dataclass, field
 from importlib.metadata import PackageNotFoundError, version as package_version
 from pathlib import Path
 from pathlib import PurePosixPath
-from typing import Any, Callable, Iterable, Protocol
+from typing import Any, Callable, Protocol
 from zipfile import BadZipFile, ZipFile
 
 import msoffcrypto
@@ -25,30 +25,38 @@ from charset_normalizer import from_bytes
 from PIL import Image, ImageOps, UnidentifiedImageError, __version__ as pillow_version
 
 from ..exceptions import ValidationError
+from .knowledge_formats import (
+    KNOWLEDGE_FORMAT_REGISTRY,
+    SUPPORTED_KNOWLEDGE_SUFFIXES,
+    KnowledgeFormatCapability,
+    KnowledgeFormatRegistry,
+    knowledge_file_dialog_filter,
+)
+from .knowledge_pdf import PdfPageTextState, probe_pdf_pages
 from .paddle_ocr_service import (
-    MAX_OCR_RESULT_BYTES,
-    PADDLE_OCR_VERSION,
-    SIDECAR_PROTOCOL_VERSION,
+    MAX_PROTOCOL_MESSAGE_BYTES,
+    NATIVE_OCR_PROTOCOL_VERSION,
     PaddleOcrService,
 )
+
+MAX_OCR_RESULT_BYTES = MAX_PROTOCOL_MESSAGE_BYTES
 
 MAX_SOURCE_BYTES = 512 * 1024 * 1024
 MAX_TEXT_LINE_CHARS = 1_000_000
 MAX_IMAGE_PIXELS = 100_000_000
-MAX_DOCX_PACKAGE_ENTRIES = 20_000
-MAX_DOCX_ENTRY_BYTES = 128 * 1024 * 1024
-MAX_DOCX_EXPANDED_BYTES = 512 * 1024 * 1024
-MAX_DOCX_COMPRESSION_RATIO = 200
-MAX_DOCX_MEMBER_NAME_BYTES = 512
-MAX_DOCX_MEMBER_DEPTH = 32
+MAX_OOXML_PACKAGE_ENTRIES = 20_000
+MAX_OOXML_ENTRY_BYTES = 128 * 1024 * 1024
+MAX_OOXML_EXPANDED_BYTES = 512 * 1024 * 1024
+MAX_OOXML_COMPRESSION_RATIO = 200
+MAX_OOXML_MEMBER_NAME_BYTES = 512
+MAX_OOXML_MEMBER_DEPTH = 32
 MAX_HASHABLE_IR_BYTES = 256 * 1024 * 1024
 _CFB_SIGNATURE = bytes.fromhex("D0CF11E0A1B11AE1")
 _IO_CHUNK_BYTES = 1024 * 1024
 _PROCESS_POLL_INTERVAL_SECONDS = 0.05
 _PROCESS_TERMINATE_GRACE_SECONDS = 2.0
-_DOCLING_TIMEOUT_SECONDS = 15 * 60
 _LIBREOFFICE_TIMEOUT_SECONDS = 120
-_DOCX_RATIO_CHECK_MIN_BYTES = 1024 * 1024
+_OOXML_RATIO_CHECK_MIN_BYTES = 1024 * 1024
 _TEXT_ENCODING_ALLOWLIST = frozenset(
     {"utf-8", "utf-16-le", "utf-16-be", "gb18030"}
 )
@@ -70,149 +78,40 @@ CancellationCheck = Callable[[], object]
 
 
 @dataclass(frozen=True)
-class KnowledgeFormatCapability:
-    """One source-format registration shared by admission, normalization, and routing."""
-
+class _OoxmlPackageProfile:
     source_format: str
     display_name: str
-    suffixes: tuple[str, ...]
-    media_type: str
-    normalizer_backend: str
-    parser_format: str
-    parser_route_id: str
+    main_part: str
 
 
-class KnowledgeFormatRegistry:
-    """Validated immutable product-format registry with derived UI/admission views."""
-
-    def __init__(self, capabilities: Iterable[KnowledgeFormatCapability]) -> None:
-        ordered = tuple(capabilities)
-        if not ordered:
-            raise ValueError("Knowledge format registry cannot be empty.")
-        by_format: dict[str, KnowledgeFormatCapability] = {}
-        by_suffix: dict[str, KnowledgeFormatCapability] = {}
-        for capability in ordered:
-            source_format = capability.source_format.strip().casefold()
-            if not source_format or source_format in by_format:
-                raise ValueError("Knowledge source formats must be unique and non-empty.")
-            if capability.source_format != source_format:
-                raise ValueError("Knowledge source formats must be normalized.")
-            if not capability.suffixes:
-                raise ValueError("Knowledge format capabilities require suffixes.")
-            for suffix in capability.suffixes:
-                normalized_suffix = suffix.casefold()
-                if suffix != normalized_suffix or not suffix.startswith("."):
-                    raise ValueError("Knowledge format suffixes must be normalized extensions.")
-                if normalized_suffix in by_suffix:
-                    raise ValueError("Knowledge format suffixes must be unique.")
-                by_suffix[normalized_suffix] = capability
-            by_format[source_format] = capability
-        self._capabilities = ordered
-        self._by_format = by_format
-        self._by_suffix = by_suffix
-
-    @property
-    def capabilities(self) -> tuple[KnowledgeFormatCapability, ...]:
-        return self._capabilities
-
-    @property
-    def supported_suffixes(self) -> frozenset[str]:
-        return frozenset(self._by_suffix)
-
-    @property
-    def parser_route_ids(self) -> tuple[str, ...]:
-        return tuple(dict.fromkeys(item.parser_route_id for item in self._capabilities))
-
-    @property
-    def display_names(self) -> tuple[str, ...]:
-        return tuple(item.display_name for item in self._capabilities)
-
-    def capability_for_suffix(self, suffix: str) -> KnowledgeFormatCapability | None:
-        return self._by_suffix.get(suffix.casefold())
-
-    def capability_for_format(self, source_format: str) -> KnowledgeFormatCapability | None:
-        return self._by_format.get(source_format.casefold())
-
-    def file_dialog_filter(self, label: str = "Knowledge documents") -> str:
-        patterns = " ".join(
-            f"*{suffix}"
-            for capability in self._capabilities
-            for suffix in capability.suffixes
-        )
-        display_label = label.strip() or "Knowledge documents"
-        return f"{display_label} ({patterns})"
-
-    def supported_formats_message(self) -> str:
-        names = self.display_names
-        joined = names[0] if len(names) == 1 else f"{', '.join(names[:-1])}, and {names[-1]}"
-        return f"Supported Knowledge formats are {joined}."
+@dataclass(frozen=True)
+class _OfficeConversionProfile:
+    provider_id: str
+    source_format: str
+    source_display_name: str
+    target_format: str
+    libreoffice_filter: str
+    target_package: _OoxmlPackageProfile
 
 
-KNOWLEDGE_FORMAT_REGISTRY = KnowledgeFormatRegistry(
-    (
-        KnowledgeFormatCapability(
-            "txt",
-            "TXT",
-            (".txt",),
-            "text/plain",
-            "python-codecs",
-            "txt",
-            "xenix-text",
-        ),
-        KnowledgeFormatCapability(
-            "doc",
-            "DOC",
-            (".doc",),
-            "application/msword",
-            "libreoffice-doc-to-docx",
-            "docx",
-            "docling-docx",
-        ),
-        KnowledgeFormatCapability(
-            "docx",
-            "DOCX",
-            (".docx",),
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "ooxml-identity",
-            "docx",
-            "docling-docx",
-        ),
-        KnowledgeFormatCapability(
-            "pdf",
-            "PDF",
-            (".pdf",),
-            "application/pdf",
-            "pdf-identity",
-            "pdf",
-            "docling-pdf-native",
-        ),
-        KnowledgeFormatCapability(
-            "jpeg",
-            "JPEG",
-            (".jpg", ".jpeg"),
-            "image/jpeg",
-            "pillow-image",
-            "image",
-            "docling-image-shell",
-        ),
-        KnowledgeFormatCapability(
-            "png",
-            "PNG",
-            (".png",),
-            "image/png",
-            "pillow-image",
-            "image",
-            "docling-image-shell",
-        ),
-    )
+_DOCX_PACKAGE = _OoxmlPackageProfile("docx", "DOCX", "word/document.xml")
+_PPTX_PACKAGE = _OoxmlPackageProfile("pptx", "PPTX", "ppt/presentation.xml")
+_DOC_TO_DOCX = _OfficeConversionProfile(
+    "doc-to-docx",
+    "doc",
+    "DOC",
+    "docx",
+    "docx:Office Open XML Text",
+    _DOCX_PACKAGE,
 )
-SUPPORTED_KNOWLEDGE_SUFFIXES = KNOWLEDGE_FORMAT_REGISTRY.supported_suffixes
-
-
-def knowledge_file_dialog_filter(label: str = "Knowledge documents") -> str:
-    """Return the product file-dialog filter derived from the format authority."""
-
-    return KNOWLEDGE_FORMAT_REGISTRY.file_dialog_filter(label)
+_PPT_TO_PPTX = _OfficeConversionProfile(
+    "ppt-to-pptx",
+    "ppt",
+    "PPT",
+    "pptx",
+    "pptx:Impress MS PowerPoint 2007 XML",
+    _PPTX_PACKAGE,
+)
 
 
 @dataclass(frozen=True)
@@ -239,6 +138,7 @@ class ParsePlanUnit:
     route_id: str
     reason: str
     page: int | None = None
+    evidence: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -267,14 +167,155 @@ class _OcrBatchResult:
     payload_hashes: tuple[tuple[int, str], ...]
 
 
+@dataclass(frozen=True)
+class FormatProbeFacts:
+    detected_format: str
+    encrypted: bool = False
+    facts: dict[str, Any] = field(default_factory=dict)
+
+
+class FormatProbeProvider(Protocol):
+    provider_id: str
+
+    def probe(
+        self,
+        source: Path,
+        *,
+        header: bytes,
+        size: int,
+        capability: KnowledgeFormatCapability,
+    ) -> FormatProbeFacts: ...
+
+
+class _TextProbeProvider:
+    provider_id = "text"
+
+    def probe(self, source, *, header, size, capability) -> FormatProbeFacts:
+        facts: dict[str, Any] = {}
+        _probe_text(header, facts, sample_is_complete=size <= len(header))
+        return FormatProbeFacts("txt", facts=facts)
+
+
+class _CfbOfficeProbeProvider:
+    def __init__(
+        self,
+        *,
+        provider_id: str,
+        source_format: str,
+        normalized_format: str,
+        office_kind: str,
+    ) -> None:
+        self.provider_id = provider_id
+        self._source_format = source_format
+        self._normalized_format = normalized_format
+        self._office_kind = office_kind
+
+    def probe(self, source, *, header, size, capability) -> FormatProbeFacts:
+        if not header.startswith(_CFB_SIGNATURE):
+            raise _format_mismatch()
+        office_kind, encrypted = _inspect_office_file(source)
+        if office_kind != self._office_kind:
+            raise _format_mismatch()
+        return FormatProbeFacts(
+            self._source_format,
+            encrypted=encrypted,
+            facts={
+                "container": "cfb",
+                "office_kind": office_kind,
+                "normalization_candidate": self._normalized_format,
+            },
+        )
+
+
+class _OoxmlOfficeProbeProvider:
+    def __init__(self, *, provider_id: str, profile: _OoxmlPackageProfile) -> None:
+        self.provider_id = provider_id
+        self._profile = profile
+
+    def probe(self, source, *, header, size, capability) -> FormatProbeFacts:
+        if header.startswith(_CFB_SIGNATURE):
+            office_kind, encrypted = _inspect_office_file(source)
+            if office_kind != "ooxml" or not encrypted:
+                raise _ooxml_error(self._profile, "package_invalid", "container is invalid")
+            return FormatProbeFacts(
+                self._profile.source_format,
+                encrypted=True,
+                facts={"container": "cfb-encrypted-ooxml"},
+            )
+        if not header.startswith(b"PK\x03\x04"):
+            raise _format_mismatch()
+        facts = _verify_ooxml_package(source, self._profile)
+        facts["container"] = "ooxml"
+        return FormatProbeFacts(self._profile.source_format, facts=facts)
+
+
+class _PdfProbeProvider:
+    provider_id = "pdf"
+
+    def probe(self, source, *, header, size, capability) -> FormatProbeFacts:
+        if not header.startswith(b"%PDF-"):
+            raise _format_mismatch()
+        encrypted, facts = _probe_pdf(source)
+        return FormatProbeFacts("pdf", encrypted=encrypted, facts=facts)
+
+
+class _ImageProbeProvider:
+    provider_id = "image"
+
+    def probe(self, source, *, header, size, capability) -> FormatProbeFacts:
+        expected = capability.source_format
+        signature_matches = (
+            expected == "png" and header.startswith(b"\x89PNG\r\n\x1a\n")
+        ) or (
+            expected == "jpeg" and header.startswith(b"\xff\xd8\xff")
+        )
+        if not signature_matches:
+            raise _format_mismatch()
+        return FormatProbeFacts(
+            expected,
+            facts=_probe_image(source, expected_format=expected),
+        )
+
+
 class FileProbe:
     """Return authoritative byte/container facts without mutating the source."""
 
     def __init__(
         self,
         registry: KnowledgeFormatRegistry = KNOWLEDGE_FORMAT_REGISTRY,
+        providers: tuple[FormatProbeProvider, ...] | None = None,
     ) -> None:
         self._registry = registry
+        providers = providers or (
+            _TextProbeProvider(),
+            _CfbOfficeProbeProvider(
+                provider_id="cfb-word",
+                source_format="doc",
+                normalized_format="docx",
+                office_kind="doc",
+            ),
+            _OoxmlOfficeProbeProvider(
+                provider_id="ooxml-word",
+                profile=_DOCX_PACKAGE,
+            ),
+            _CfbOfficeProbeProvider(
+                provider_id="cfb-presentation",
+                source_format="ppt",
+                normalized_format="pptx",
+                office_kind="ppt",
+            ),
+            _OoxmlOfficeProbeProvider(
+                provider_id="ooxml-presentation",
+                profile=_PPTX_PACKAGE,
+            ),
+            _PdfProbeProvider(),
+            _ImageProbeProvider(),
+        )
+        self._providers = _provider_map(
+            providers,
+            required_ids=registry.probe_provider_ids,
+            kind="probe",
+        )
 
     def probe(self, path: Path) -> FileProbeResult:
         source = path.expanduser().resolve()
@@ -291,64 +332,261 @@ class FileProbe:
                 error_code="knowledge_format_unsupported",
             )
         header = _read_prefix(source, 64 * 1024)
-        detected = _detected_format(header, expected_format=capability.source_format)
-        if detected != capability.source_format:
-            raise ValidationError(
-                "The selected file signature does not match its extension.",
-                error_code="knowledge_format_mismatch",
-            )
+        provider = self._providers[capability.probe_provider_id]
+        result = provider.probe(
+            source,
+            header=header,
+            size=size,
+            capability=capability,
+        )
+        if result.detected_format != capability.source_format:
+            raise _format_mismatch()
 
         facts: dict[str, Any] = {
-            "signature": detected,
+            "signature": result.detected_format,
             "byte_size": size,
-            "format_registry_version": 1,
+            "format_registry_version": self._registry.version,
+            "probe_provider_id": provider.provider_id,
         }
-        encrypted = False
-        if detected == "txt":
-            _probe_text(header, facts, sample_is_complete=size <= len(header))
-        elif detected == "docx":
-            if header.startswith(_CFB_SIGNATURE):
-                encrypted = _office_is_encrypted(source)
-                if not encrypted:
-                    raise ValidationError(
-                        "The selected DOCX container is invalid.",
-                        error_code="knowledge_docx_package_invalid",
-                    )
-                facts["container"] = "cfb-encrypted-ooxml"
-            else:
-                facts.update(_verify_docx(source))
-                facts["container"] = "ooxml"
-        elif detected == "doc":
-            encrypted = _office_is_encrypted(source)
-            facts["container"] = "cfb"
-            facts["normalization_candidate"] = "docx"
-        elif detected == "pdf":
-            encrypted, pdf_facts = _probe_pdf(source)
-            facts.update(pdf_facts)
-        elif detected in {"jpeg", "png"}:
-            facts.update(_probe_image(source, expected_format=detected))
-        facts["encrypted"] = encrypted
+        facts.update(result.facts)
+        facts["encrypted"] = result.encrypted
         return FileProbeResult(
             source_path=source,
-            source_format=detected,
+            source_format=result.detected_format,
             media_type=capability.media_type,
             size=size,
-            encrypted=encrypted,
+            encrypted=result.encrypted,
             facts=facts,
+        )
+
+    @property
+    def supported_formats_message(self) -> str:
+        return self._registry.supported_formats_message()
+
+
+@dataclass(frozen=True)
+class NormalizationRequest:
+    probe: FileProbeResult
+    capability: KnowledgeFormatCapability
+    work_dir: Path
+    password: str | None
+    check_cancelled: CancellationCheck | None
+    input_sha256: str
+
+
+class FormatNormalizerProvider(Protocol):
+    provider_id: str
+
+    def normalize(self, request: NormalizationRequest) -> NormalizedSource: ...
+
+
+class _TextNormalizerProvider:
+    provider_id = "text"
+
+    def normalize(self, request: NormalizationRequest) -> NormalizedSource:
+        payload = _read_bytes_cooperatively(
+            request.probe.source_path,
+            check_cancelled=request.check_cancelled,
+        )
+        decoded = _decode_text_payload(payload)
+        text = _normalize_text(decoded.text, check_cancelled=request.check_cancelled)
+        target = request.work_dir / "normalized.txt"
+        _write_text_cooperatively(target, text, check_cancelled=request.check_cancelled)
+        return NormalizedSource(
+            target,
+            request.capability.source_format,
+            request.capability.parser_format,
+            _normalization_descriptor(
+                operation="decode_text",
+                backend="python-codecs",
+                package=_runtime_package("python", sys.version.split()[0]),
+                options={
+                    "decode_errors": "strict",
+                    "allowed_encodings": sorted(_TEXT_ENCODING_ALLOWLIST),
+                    "control_policy": "reject",
+                },
+                input_sha256=request.input_sha256,
+                output_path=target,
+                check_cancelled=request.check_cancelled,
+                details={
+                    "encoding": decoded.encoding,
+                    "bom": decoded.bom,
+                    "newline": {"input": decoded.newline, "output": "lf"},
+                    "normalization": {
+                        "bom_removed": decoded.bom != "none",
+                        "newlines_normalized": decoded.newline not in {"lf", "none"},
+                        "unicode_normalization": "preserved",
+                    },
+                },
+            ),
+        )
+
+
+class _LegacyOfficeNormalizerProvider:
+    def __init__(
+        self,
+        profile: _OfficeConversionProfile,
+        executable: Path | None,
+    ) -> None:
+        self.provider_id = profile.provider_id
+        self._profile = profile
+        self._executable = executable
+
+    def normalize(self, request: NormalizationRequest) -> NormalizedSource:
+        source = _office_source(request)
+        normalized = _convert_legacy_office_source(
+            source,
+            profile=self._profile,
+            executable=self._executable,
+            work_dir=request.work_dir,
+            check_cancelled=request.check_cancelled,
+        )
+        return NormalizedSource(
+            normalized,
+            request.capability.source_format,
+            request.capability.parser_format,
+            _normalization_descriptor(
+                operation="decrypt_and_convert" if request.probe.encrypted else "convert",
+                backend=self.provider_id,
+                package=_runtime_package("libreoffice", "runtime-resolved"),
+                options={
+                    "encrypted_input": request.probe.encrypted,
+                    "headless": True,
+                    "isolated_profile": True,
+                    "source_format": self._profile.source_format,
+                    "target_format": self._profile.target_format,
+                },
+                input_sha256=request.input_sha256,
+                output_path=normalized,
+                check_cancelled=request.check_cancelled,
+            ),
+        )
+
+
+class _OoxmlNormalizerProvider:
+    def __init__(self, *, provider_id: str, profile: _OoxmlPackageProfile) -> None:
+        self.provider_id = provider_id
+        self._profile = profile
+
+    def normalize(self, request: NormalizationRequest) -> NormalizedSource:
+        source = _office_source(request)
+        package_facts = _verify_ooxml_package(
+            source,
+            self._profile,
+            check_cancelled=request.check_cancelled,
+        )
+        return NormalizedSource(
+            source,
+            request.capability.source_format,
+            request.capability.parser_format,
+            _normalization_descriptor(
+                operation="decrypt" if request.probe.encrypted else "identity",
+                backend="msoffcrypto" if request.probe.encrypted else "ooxml-identity",
+                package=(
+                    _installed_package("msoffcrypto-tool")
+                    if request.probe.encrypted
+                    else _runtime_package("python-zipfile", sys.version.split()[0])
+                ),
+                options={
+                    "encrypted_input": request.probe.encrypted,
+                    "package_safety_verified": True,
+                    "entry_count": package_facts["container_entry_count"],
+                },
+                input_sha256=request.input_sha256,
+                output_path=source,
+                check_cancelled=request.check_cancelled,
+            ),
+        )
+
+
+class _PdfNormalizerProvider:
+    provider_id = "pdf"
+
+    def normalize(self, request: NormalizationRequest) -> NormalizedSource:
+        source = request.probe.source_path
+        if request.probe.encrypted:
+            assert request.password is not None
+            source = _decrypt_pdf(
+                source,
+                password=request.password,
+                work_dir=request.work_dir,
+                check_cancelled=request.check_cancelled,
+            )
+        return NormalizedSource(
+            source,
+            request.capability.source_format,
+            request.capability.parser_format,
+            _normalization_descriptor(
+                operation="decrypt" if request.probe.encrypted else "identity",
+                backend="pikepdf" if request.probe.encrypted else "pdf-identity",
+                package=_installed_package("pikepdf"),
+                options={"encrypted_input": request.probe.encrypted, "repair": False},
+                input_sha256=request.input_sha256,
+                output_path=source,
+                check_cancelled=request.check_cancelled,
+            ),
+        )
+
+
+class _ImageNormalizerProvider:
+    provider_id = "image"
+
+    def normalize(self, request: NormalizationRequest) -> NormalizedSource:
+        target = request.work_dir / "normalized-image.png"
+        try:
+            with Image.open(request.probe.source_path) as image:
+                normalized = ImageOps.exif_transpose(image)
+                if normalized.mode not in {"RGB", "RGBA", "L"}:
+                    normalized = normalized.convert("RGB")
+                normalized.save(target, format="PNG")
+        except (OSError, UnidentifiedImageError) as exc:
+            raise ValidationError("The image could not be normalized.") from exc
+        _check_cancelled(request.check_cancelled)
+        return NormalizedSource(
+            target,
+            request.capability.source_format,
+            request.capability.parser_format,
+            _normalization_descriptor(
+                operation="normalize_image",
+                backend="pillow-image",
+                package=_runtime_package("Pillow", pillow_version),
+                options={
+                    "orientation": "exif_transposed",
+                    "pixel_encoding": "png",
+                    "source_format": request.capability.source_format,
+                },
+                input_sha256=request.input_sha256,
+                output_path=target,
+                check_cancelled=request.check_cancelled,
+            ),
         )
 
 
 class FormatNormalizer:
-    """Materialize attempt-local parser inputs and a bounded lineage descriptor."""
+    """Dispatch normalization through one registered capability provider."""
 
     def __init__(
         self,
         executable: Path | None = None,
         *,
         registry: KnowledgeFormatRegistry = KNOWLEDGE_FORMAT_REGISTRY,
+        providers: tuple[FormatNormalizerProvider, ...] | None = None,
     ) -> None:
-        self._executable = executable
         self._registry = registry
+        providers = providers or (
+            _TextNormalizerProvider(),
+            _LegacyOfficeNormalizerProvider(_DOC_TO_DOCX, executable),
+            _OoxmlNormalizerProvider(provider_id="docx", profile=_DOCX_PACKAGE),
+            _LegacyOfficeNormalizerProvider(_PPT_TO_PPTX, executable),
+            _OoxmlNormalizerProvider(provider_id="pptx", profile=_PPTX_PACKAGE),
+            _PdfNormalizerProvider(),
+            _ImageNormalizerProvider(),
+        )
+        self._providers = _provider_map(
+            providers,
+            required_ids=registry.normalizer_provider_ids,
+            kind="normalizer",
+        )
 
     def normalize(
         self,
@@ -368,272 +606,137 @@ class FormatNormalizer:
                 error_code="knowledge_password_required",
                 retryable=True,
             )
-        input_sha256 = _sha256_file_bounded(
-            probe.source_path,
-            max_bytes=MAX_SOURCE_BYTES,
+        request = NormalizationRequest(
+            probe=probe,
+            capability=capability,
+            work_dir=work_dir,
+            password=password,
             check_cancelled=check_cancelled,
-        )
-        source = probe.source_path
-        if probe.encrypted:
-            assert password is not None
-            source = self._decrypt(
-                probe,
-                work_dir=work_dir,
-                password=password,
+            input_sha256=_sha256_file_bounded(
+                probe.source_path,
+                max_bytes=MAX_SOURCE_BYTES,
                 check_cancelled=check_cancelled,
-            )
-        _check_cancelled(check_cancelled)
-
-        if capability.normalizer_backend == "python-codecs":
-            payload = _read_bytes_cooperatively(source, check_cancelled=check_cancelled)
-            decoded = _decode_text_payload(payload)
-            _check_cancelled(check_cancelled)
-            text = _normalize_text(decoded.text, check_cancelled=check_cancelled)
-            target = work_dir / "normalized.txt"
-            _write_text_cooperatively(target, text, check_cancelled=check_cancelled)
-            return NormalizedSource(
-                path=target,
-                source_format=capability.source_format,
-                parser_format=capability.parser_format,
-                descriptor=_normalization_descriptor(
-                    operation="decode_text",
-                    backend=capability.normalizer_backend,
-                    package=_runtime_package("python", sys.version.split()[0]),
-                    options={
-                        "decode_errors": "strict",
-                        "allowed_encodings": sorted(_TEXT_ENCODING_ALLOWLIST),
-                        "control_policy": "reject",
-                    },
-                    input_sha256=input_sha256,
-                    output_path=target,
-                    check_cancelled=check_cancelled,
-                    details={
-                        "encoding": decoded.encoding,
-                        "bom": decoded.bom,
-                        "newline": {
-                            "input": decoded.newline,
-                            "output": "lf",
-                        },
-                        "normalization": {
-                            "bom_removed": decoded.bom != "none",
-                            "newlines_normalized": decoded.newline not in {"lf", "none"},
-                            "unicode_normalization": "preserved",
-                        },
-                    },
-                ),
-            )
-
-        if capability.normalizer_backend == "libreoffice-doc-to-docx":
-            normalized = self._convert_doc(
-                source,
-                work_dir=work_dir,
-                check_cancelled=check_cancelled,
-            )
-            return NormalizedSource(
-                path=normalized,
-                source_format=capability.source_format,
-                parser_format=capability.parser_format,
-                descriptor=_normalization_descriptor(
-                    operation="decrypt_and_convert" if probe.encrypted else "convert",
-                    backend=capability.normalizer_backend,
-                    package=_runtime_package("libreoffice", "runtime-resolved"),
-                    options={
-                        "encrypted_input": probe.encrypted,
-                        "headless": True,
-                        "isolated_profile": True,
-                        "target_format": "docx",
-                    },
-                    input_sha256=input_sha256,
-                    output_path=normalized,
-                    check_cancelled=check_cancelled,
-                ),
-            )
-        if capability.normalizer_backend == "ooxml-identity":
-            package_facts = _verify_docx(source, check_cancelled=check_cancelled)
-            return NormalizedSource(
-                source,
-                capability.source_format,
-                capability.parser_format,
-                _normalization_descriptor(
-                    operation="decrypt" if probe.encrypted else "identity",
-                    backend="msoffcrypto" if probe.encrypted else capability.normalizer_backend,
-                    package=(
-                        _installed_package("msoffcrypto-tool")
-                        if probe.encrypted
-                        else _runtime_package("python-zipfile", sys.version.split()[0])
-                    ),
-                    options={
-                        "encrypted_input": probe.encrypted,
-                        "package_safety_verified": True,
-                        "entry_count": package_facts["container_entry_count"],
-                    },
-                    input_sha256=input_sha256,
-                    output_path=source,
-                    check_cancelled=check_cancelled,
-                ),
-            )
-        if capability.normalizer_backend == "pdf-identity":
-            _check_cancelled(check_cancelled)
-            return NormalizedSource(
-                source,
-                capability.source_format,
-                capability.parser_format,
-                _normalization_descriptor(
-                    operation="decrypt" if probe.encrypted else "identity",
-                    backend="pikepdf" if probe.encrypted else capability.normalizer_backend,
-                    package=_installed_package("pikepdf"),
-                    options={"encrypted_input": probe.encrypted, "repair": False},
-                    input_sha256=input_sha256,
-                    output_path=source,
-                    check_cancelled=check_cancelled,
-                ),
-            )
-        if capability.normalizer_backend == "pillow-image":
-            target = work_dir / "normalized-image.png"
-            _check_cancelled(check_cancelled)
-            try:
-                with Image.open(source) as image:
-                    normalized = ImageOps.exif_transpose(image)
-                    if normalized.mode not in {"RGB", "RGBA", "L"}:
-                        normalized = normalized.convert("RGB")
-                    normalized.save(target, format="PNG")
-            except (OSError, UnidentifiedImageError) as exc:
-                raise ValidationError("The image could not be normalized.") from exc
-            _check_cancelled(check_cancelled)
-            return NormalizedSource(
-                target,
-                capability.source_format,
-                capability.parser_format,
-                _normalization_descriptor(
-                    operation="normalize_image",
-                    backend=capability.normalizer_backend,
-                    package=_runtime_package("Pillow", pillow_version),
-                    options={
-                        "orientation": "exif_transposed",
-                        "pixel_encoding": "png",
-                        "source_format": capability.source_format,
-                    },
-                    input_sha256=input_sha256,
-                    output_path=target,
-                    check_cancelled=check_cancelled,
-                ),
-            )
-        raise ValidationError("No Knowledge normalizer is registered for this format.")
-
-    def _decrypt(
-        self,
-        probe: FileProbeResult,
-        *,
-        work_dir: Path,
-        password: str,
-        check_cancelled: CancellationCheck | None,
-    ) -> Path:
-        _check_cancelled(check_cancelled)
-        if probe.source_format == "pdf":
-            target = work_dir / "decrypted.pdf"
-            try:
-                with pikepdf.Pdf.open(probe.source_path, password=password) as document:
-                    document.save(target)
-            except (pikepdf.PasswordError, pikepdf.PdfError) as exc:
-                raise ValidationError(
-                    "The document password was not accepted.",
-                    error_code="knowledge_password_invalid",
-                    retryable=True,
-                ) from exc
-            _check_cancelled(check_cancelled)
-            return target
-        if probe.source_format not in {"doc", "docx"}:
-            raise ValidationError("Encrypted input is not supported for this format.")
-        target = work_dir / f"decrypted.{probe.source_format}"
-        try:
-            with probe.source_path.open("rb") as stream:
-                office = msoffcrypto.OfficeFile(stream)
-                office.load_key(password=password)
-                with target.open("wb") as output:
-                    office.decrypt(output)
-        except Exception as exc:
-            raise ValidationError(
-                "The document password was not accepted.",
-                error_code="knowledge_password_invalid",
-                retryable=True,
-            ) from exc
-        _check_cancelled(check_cancelled)
-        return target
-
-    def _convert_doc(
-        self,
-        source: Path,
-        *,
-        work_dir: Path,
-        check_cancelled: CancellationCheck | None,
-    ) -> Path:
-        _check_cancelled(check_cancelled)
-        executable = self._executable or _find_libreoffice()
-        if executable is None:
-            raise ValidationError(
-                "Importing legacy DOC requires LibreOffice.",
-                error_code="knowledge_office_converter_unavailable",
-                retryable=True,
-            )
-        profile = work_dir / "libreoffice-profile"
-        local_source = work_dir / "source.doc"
-        if source.resolve() != local_source.resolve():
-            _copy_file_cooperatively(
-                source,
-                local_source,
-                check_cancelled=check_cancelled,
-            )
-        command = [
-            str(executable),
-            "--headless",
-            f"-env:UserInstallation={profile.resolve().as_uri()}",
-            "--convert-to",
-            "docx:Office Open XML Text",
-            "--outdir",
-            str(work_dir),
-            str(local_source),
-        ]
-        _check_cancelled(check_cancelled)
-        try:
-            process = subprocess.Popen(
-                command,
-                cwd=str(work_dir),
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                **_no_console_process_kwargs(),
-            )
-        except OSError:
-            raise ValidationError(
-                "LibreOffice could not normalize the legacy DOC document.",
-                error_code="knowledge_office_conversion_failed",
-                retryable=True,
-            ) from None
-        returncode = _wait_for_process(
-            process,
-            timeout_seconds=_LIBREOFFICE_TIMEOUT_SECONDS,
-            check_cancelled=check_cancelled,
-            timeout_error=ValidationError(
-                "LibreOffice could not normalize the legacy DOC document.",
-                error_code="knowledge_office_conversion_failed",
-                retryable=True,
             ),
         )
-        output = work_dir / "source.docx"
-        if returncode != 0 or not output.is_file():
-            raise ValidationError(
-                "LibreOffice could not normalize the legacy DOC document.",
-                error_code="knowledge_office_conversion_failed",
-                retryable=True,
-            )
-        _verify_docx(output, check_cancelled=check_cancelled)
-        return output
+        return self._providers[capability.normalizer_provider_id].normalize(request)
+
+
+def _office_source(request: NormalizationRequest) -> Path:
+    if not request.probe.encrypted:
+        return request.probe.source_path
+    assert request.password is not None
+    target = request.work_dir / f"decrypted.{request.probe.source_format}"
+    try:
+        with request.probe.source_path.open("rb") as stream:
+            office = msoffcrypto.OfficeFile(stream)
+            office.load_key(password=request.password)
+            with target.open("wb") as output:
+                office.decrypt(output)
+    except Exception as exc:
+        raise ValidationError(
+            "The document password was not accepted.",
+            error_code="knowledge_password_invalid",
+            retryable=True,
+        ) from exc
+    _check_cancelled(request.check_cancelled)
+    return target
+
+
+def _decrypt_pdf(
+    source: Path,
+    *,
+    password: str,
+    work_dir: Path,
+    check_cancelled: CancellationCheck | None,
+) -> Path:
+    target = work_dir / "decrypted.pdf"
+    try:
+        with pikepdf.Pdf.open(source, password=password) as document:
+            document.save(target)
+    except (pikepdf.PasswordError, pikepdf.PdfError) as exc:
+        raise ValidationError(
+            "The document password was not accepted.",
+            error_code="knowledge_password_invalid",
+            retryable=True,
+        ) from exc
+    _check_cancelled(check_cancelled)
+    return target
+
+
+def _convert_legacy_office_source(
+    source: Path,
+    *,
+    profile: _OfficeConversionProfile,
+    executable: Path | None,
+    work_dir: Path,
+    check_cancelled: CancellationCheck | None,
+) -> Path:
+    executable = executable or _find_libreoffice()
+    if executable is None:
+        raise ValidationError(
+            f"Importing legacy {profile.source_display_name} requires LibreOffice.",
+            error_code=f"knowledge_{profile.source_format}_converter_unavailable",
+            retryable=True,
+        )
+    libreoffice_profile = work_dir / "libreoffice-profile"
+    local_source = work_dir / f"source.{profile.source_format}"
+    if source.resolve() != local_source.resolve():
+        _copy_file_cooperatively(source, local_source, check_cancelled=check_cancelled)
+    command = [
+        str(executable),
+        "--headless",
+        f"-env:UserInstallation={libreoffice_profile.resolve().as_uri()}",
+        "--convert-to",
+        profile.libreoffice_filter,
+        "--outdir",
+        str(work_dir),
+        str(local_source),
+    ]
+    try:
+        process = subprocess.Popen(
+            command,
+            cwd=str(work_dir),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            **_no_console_process_kwargs(),
+        )
+    except OSError:
+        raise ValidationError(
+            "LibreOffice could not normalize the legacy "
+            f"{profile.source_display_name} document.",
+            error_code=f"knowledge_{profile.source_format}_conversion_failed",
+            retryable=True,
+        ) from None
+    returncode = _wait_for_process(
+        process,
+        timeout_seconds=_LIBREOFFICE_TIMEOUT_SECONDS,
+        check_cancelled=check_cancelled,
+        timeout_error=ValidationError(
+            "LibreOffice could not normalize the legacy "
+            f"{profile.source_display_name} document.",
+            error_code=f"knowledge_{profile.source_format}_conversion_failed",
+            retryable=True,
+        ),
+    )
+    output = work_dir / f"source.{profile.target_format}"
+    if returncode != 0 or not output.is_file():
+        raise ValidationError(
+            "LibreOffice could not normalize the legacy "
+            f"{profile.source_display_name} document.",
+            error_code=f"knowledge_{profile.source_format}_conversion_failed",
+            retryable=True,
+        )
+    _verify_ooxml_package(
+        output,
+        profile.target_package,
+        check_cancelled=check_cancelled,
+    )
+    return output
 
 
 class ParserRouteProvider(Protocol):
-    route_id: str
-
-    def supports(self, parser_format: str) -> bool: ...
+    provider_id: str
 
     def plan(self, normalized: NormalizedSource, *, ocr_ready: bool) -> ParsePlan: ...
 
@@ -648,43 +751,96 @@ class ParserRouter:
         registry: KnowledgeFormatRegistry = KNOWLEDGE_FORMAT_REGISTRY,
     ) -> None:
         self._registry = registry
-        if providers is None:
-            builtins: dict[str, ParserRouteProvider] = {
-                "xenix-text": _TextRouteProvider(),
-                "docling-docx": _DocxRouteProvider(),
-                "docling-pdf-native": _PdfRouteProvider(),
-                "docling-image-shell": _ImageRouteProvider(),
-            }
-            try:
-                providers = tuple(
-                    builtins[route_id] for route_id in registry.parser_route_ids
-                )
-            except KeyError as exc:
-                raise ValueError(
-                    f"Knowledge parser route provider is missing: {exc.args[0]}"
-                ) from None
-        route_ids = [provider.route_id for provider in providers]
-        if len(route_ids) != len(set(route_ids)):
-            raise ValueError("Knowledge parser route provider IDs must be unique.")
-        self._providers = {provider.route_id: provider for provider in providers}
+        providers = providers or (
+            _TextRouteProvider(),
+            _DoclingOfficeRouteProvider(
+                provider_id="docx",
+                parser_format="docx",
+                route_id="docling-docx",
+            ),
+            _DoclingOfficeRouteProvider(
+                provider_id="pptx",
+                parser_format="pptx",
+                route_id="docling-pptx",
+            ),
+            _PdfRouteProvider(),
+            _ImageRouteProvider(),
+        )
+        self._providers = _provider_map(
+            providers,
+            required_ids=registry.route_provider_ids,
+            kind="parser route",
+        )
 
     @property
-    def registered_route_ids(self) -> frozenset[str]:
+    def registered_provider_ids(self) -> frozenset[str]:
         return frozenset(self._providers)
 
     def route(self, normalized: NormalizedSource, *, ocr_ready: bool) -> ParsePlan:
         capability = self._registry.capability_for_format(normalized.source_format)
         if capability is None or capability.parser_format != normalized.parser_format:
             raise ValidationError("No Knowledge parser route is registered for this format.")
-        provider = self._providers.get(capability.parser_route_id)
-        if provider is None or not provider.supports(normalized.parser_format):
-            raise ValidationError("No Knowledge parser route is registered for this format.")
+        provider = self._providers[capability.route_provider_id]
         return provider.plan(normalized, ocr_ready=ocr_ready)
 
 
+@dataclass(frozen=True)
+class ParserExecutionContext:
+    normalized: NormalizedSource
+    plan: ParsePlan
+    work_dir: Path
+    check_cancelled: CancellationCheck | None
+    ocr_executor: Any
+
+
+@dataclass(frozen=True)
+class ParsedContent:
+    document: Any
+    warnings: tuple[str, ...] = ()
+    projections: tuple[dict[str, Any], ...] = ()
+    ocr_projection_count: int = 0
+    ocr_attempted_count: int = 0
+    ocr_succeeded_count: int = 0
+    ocr_unavailable_count: int = 0
+    ocr_payload_hashes: tuple[tuple[int, str], ...] = ()
+
+
+class DocumentParserProvider(Protocol):
+    provider_id: str
+    uses_docling: bool
+    backend: str
+
+    def parse(self, context: ParserExecutionContext) -> ParsedContent: ...
+
+
 class ParseExecutor:
-    def __init__(self, ocr_service: PaddleOcrService | None = None) -> None:
+    def __init__(
+        self,
+        ocr_service: PaddleOcrService | None = None,
+        *,
+        registry: KnowledgeFormatRegistry = KNOWLEDGE_FORMAT_REGISTRY,
+        providers: tuple[DocumentParserProvider, ...] | None = None,
+    ) -> None:
         self._ocr = ocr_service
+        self._registry = registry
+        providers = providers or (
+            _TextParserProvider(),
+            _DoclingOfficeParserProvider(
+                provider_id="docx",
+                source_format="docx",
+            ),
+            _DoclingOfficeParserProvider(
+                provider_id="pptx",
+                source_format="pptx",
+            ),
+            _PdfParserProvider(),
+            _ImageParserProvider(),
+        )
+        self._providers = _provider_map(
+            providers,
+            required_ids=registry.parser_provider_ids,
+            kind="document parser",
+        )
 
     @property
     def ocr_ready(self) -> bool:
@@ -703,136 +859,54 @@ class ParseExecutor:
         check_cancelled: CancellationCheck | None = None,
     ) -> ParseResult:
         _check_cancelled(check_cancelled)
-        warnings: list[str] = []
-        projections: list[dict[str, Any]] = []
         ocr_ready = plan.ocr_ready
+        capability = self._registry.capability_for_format(normalized.source_format)
+        if (
+            capability is None
+            or capability.parser_format != normalized.parser_format
+            or plan.parser_format != normalized.parser_format
+        ):
+            raise ValidationError("The selected Knowledge parse plan is invalid.")
+        provider = self._providers[capability.parser_provider_id]
         parser_input_sha256 = _sha256_file_bounded(
             normalized.path,
             max_bytes=MAX_SOURCE_BYTES,
             check_cancelled=check_cancelled,
         )
-        ocr_projection_count = 0
-        ocr_attempted_count = 0
-        ocr_succeeded_count = 0
-        ocr_unavailable_count = 0
-        ocr_payload_hashes: list[tuple[int, str]] = []
         _check_cancelled(check_cancelled)
-        if normalized.parser_format == "txt":
-            document = _plain_text_docling_document(
-                normalized.path,
-                check_cancelled=check_cancelled,
-            )
-        elif normalized.parser_format == "docx":
-            document = _docling_convert(
-                normalized.path,
-                source_format="docx",
-                work_dir=work_dir,
-                check_cancelled=check_cancelled,
-            )
-        elif normalized.parser_format == "pdf":
-            document = _docling_convert(
-                normalized.path,
-                source_format="pdf",
-                work_dir=work_dir,
-                check_cancelled=check_cancelled,
-            )
-            missing_pages = [
-                unit.page - 1
-                for unit in plan.units
-                if unit.route_id == "paddleocr-page" and unit.page
-            ]
-            unavailable_pages = [
-                unit.page
-                for unit in plan.units
-                if unit.route_id == "text-projection-unavailable" and unit.page
-            ]
-            ocr_projection_count = len(missing_pages) + len(unavailable_pages)
-            if missing_pages:
+        needs_ocr = any(unit.route_id.startswith("paddleocr-") for unit in plan.units)
+        ocr_runtime_descriptor: dict[str, object] | None = None
+        with ExitStack() as stack:
+            ocr_executor: Any = self._ocr
+            if needs_ocr:
                 assert self._ocr is not None
-                page_result = _append_paddle_ocr_pages(
-                    document,
-                    pdf_path=normalized.path,
-                    page_indexes=missing_pages,
-                    work_dir=work_dir,
-                    ocr_service=self._ocr,
-                    check_cancelled=check_cancelled,
-                )
-                ocr_attempted_count += len(missing_pages)
-                ocr_succeeded_count += len(page_result.succeeded_pages)
-                unavailable_pages.extend(page_result.unavailable_pages)
-                ocr_payload_hashes.extend(page_result.payload_hashes)
-                if page_result.succeeded_pages:
-                    projections.append(
-                        {
-                            "kind": "ocr_text",
-                            "status": "ready",
-                            "pages": list(page_result.succeeded_pages),
-                            "items": page_result.item_count,
-                        }
-                    )
-            unavailable_pages = sorted(set(unavailable_pages))
-            ocr_unavailable_count = len(unavailable_pages)
-            if unavailable_pages:
-                warnings.append("ocr_projection_unavailable")
-                projections.append(
-                    {
-                        "kind": "ocr_text",
-                        "status": "unavailable",
-                        "pages": unavailable_pages,
-                    }
-                )
-        elif normalized.parser_format == "image":
-            document = _image_docling_document(
-                normalized.path,
-                check_cancelled=check_cancelled,
-            )
-            ocr_projection_count = 1
-            if ocr_ready:
-                assert self._ocr is not None
-                output_path = work_dir / "image-ocr.json"
-                ocr_attempted_count = 1
-                payload = _recognize_projection(
-                    self._ocr,
-                    normalized.path,
-                    output_path=output_path,
-                    check_cancelled=check_cancelled,
-                )
-                if payload is None:
-                    ocr_unavailable_count = 1
-                    warnings.append("ocr_projection_unavailable")
-                    projections.append({"kind": "ocr_text", "status": "unavailable"})
-                else:
-                    count = _append_ocr_text(document, payload, page_no=1)
-                    ocr_succeeded_count = 1
-                    ocr_payload_hashes.append(
-                        (
-                            1,
-                            _bounded_json_sha256(
-                                payload,
-                                label="OCR result",
-                                max_bytes=MAX_OCR_RESULT_BYTES,
-                            ),
+                open_session = getattr(self._ocr, "open_session", None)
+                if callable(open_session):
+                    ocr_executor = stack.enter_context(
+                        open_session(
+                            allowed_root=work_dir,
+                            log_path=work_dir / "paddle-ocr.log",
                         )
                     )
-                    projections.append(
-                        {"kind": "ocr_text", "status": "ready", "items": count}
-                    )
-            else:
-                ocr_unavailable_count = 1
-                warnings.append("ocr_projection_unavailable")
-                projections.append({"kind": "ocr_text", "status": "unavailable"})
-        else:  # pragma: no cover - router and executor evolve together
-            raise ValidationError("The selected Knowledge parse plan is invalid.")
+                ocr_runtime_descriptor = _ocr_runtime_payload(ocr_executor)
+            content = provider.parse(
+                ParserExecutionContext(
+                    normalized=normalized,
+                    plan=plan,
+                    work_dir=work_dir,
+                    check_cancelled=check_cancelled,
+                    ocr_executor=ocr_executor,
+                )
+            )
         _check_cancelled(check_cancelled)
-        parser_output_sha256 = _docling_document_sha256(document)
+        parser_output_sha256 = _docling_document_sha256(content.document)
         ocr_status = _ocr_status(
-            projection_count=ocr_projection_count,
-            succeeded_count=ocr_succeeded_count,
-            unavailable_count=ocr_unavailable_count,
+            projection_count=content.ocr_projection_count,
+            succeeded_count=content.ocr_succeeded_count,
+            unavailable_count=content.ocr_unavailable_count,
         )
-        parser_uses_docling = normalized.parser_format in {"docx", "pdf"}
         return ParseResult(
-            document=document,
+            document=content.document,
             pipeline={
                 "probe": dict(probe.facts),
                 "normalizer": dict(normalized.descriptor),
@@ -845,6 +919,7 @@ class ParseExecutor:
                             "route_id": unit.route_id,
                             "reason": unit.reason,
                             **({"page": unit.page} if unit.page is not None else {}),
+                            **({"evidence": unit.evidence} if unit.evidence else {}),
                         }
                         for unit in plan.units
                     ],
@@ -853,13 +928,9 @@ class ParseExecutor:
                     "content_ir": "DoclingDocument",
                     "version": 2,
                     "package": _installed_package(
-                        "docling" if parser_uses_docling else "docling-core"
+                        "docling" if provider.uses_docling else "docling-core"
                     ),
-                    "backend": (
-                        "docling-worker"
-                        if parser_uses_docling
-                        else f"xenix-{normalized.parser_format}-adapter"
-                    ),
+                    "backend": provider.backend,
                     "options": {
                         "merge_strategy": plan.merge_strategy,
                         "parser_format": normalized.parser_format,
@@ -869,94 +940,115 @@ class ParseExecutor:
                     "output_sha256": parser_output_sha256,
                 },
                 "ocr": {
-                    "service": "paddleocr",
-                    "package": _runtime_package("paddleocr", PADDLE_OCR_VERSION),
-                    "backend": "local-sidecar",
+                    "service": "paddle-inference",
+                    "package": _runtime_package(
+                        "paddle-inference",
+                        str(
+                            (ocr_runtime_descriptor or {}).get(
+                                "engine_version",
+                                "runtime-resolved",
+                            )
+                        ),
+                    ),
+                    "backend": "xenix-native-worker",
                     "options": {
                         "page_scoped": normalized.parser_format == "pdf",
                         "projection": "text",
-                        "protocol": SIDECAR_PROTOCOL_VERSION,
+                        "protocol": NATIVE_OCR_PROTOCOL_VERSION,
                     },
                     "status": ocr_status,
                     "ready": ocr_ready,
                     "input_sha256": parser_input_sha256,
-                    "output_sha256": _combined_projection_sha256(ocr_payload_hashes),
-                    "projection_count": ocr_projection_count,
-                    "attempted_count": ocr_attempted_count,
-                    "succeeded_count": ocr_succeeded_count,
-                    "unavailable_count": ocr_unavailable_count,
+                    "output_sha256": _combined_projection_sha256(
+                        content.ocr_payload_hashes
+                    ),
+                    "projection_count": content.ocr_projection_count,
+                    "attempted_count": content.ocr_attempted_count,
+                    "succeeded_count": content.ocr_succeeded_count,
+                    "unavailable_count": content.ocr_unavailable_count,
+                    **(
+                        {"runtime": ocr_runtime_descriptor}
+                        if ocr_runtime_descriptor is not None
+                        else {}
+                    ),
                 },
             },
-            warnings=warnings,
-            projections=projections,
+            warnings=list(content.warnings),
+            projections=list(content.projections),
         )
 
 
 class _TextRouteProvider:
-    route_id = "xenix-text"
-
-    def supports(self, parser_format: str) -> bool:
-        return parser_format == "txt"
+    provider_id = "text"
 
     def plan(self, normalized: NormalizedSource, *, ocr_ready: bool) -> ParsePlan:
         return ParsePlan(
             "txt",
             "txt",
-            (ParsePlanUnit("document", self.route_id, "decoded_text"),),
+            (ParsePlanUnit("document", "xenix-text", "decoded_text"),),
             "document",
             ocr_ready=ocr_ready,
         )
 
 
-class _DocxRouteProvider:
-    route_id = "docling-docx"
-
-    def supports(self, parser_format: str) -> bool:
-        return parser_format == "docx"
+class _DoclingOfficeRouteProvider:
+    def __init__(
+        self,
+        *,
+        provider_id: str,
+        parser_format: str,
+        route_id: str,
+    ) -> None:
+        self.provider_id = provider_id
+        self._parser_format = parser_format
+        self._route_id = route_id
 
     def plan(self, normalized: NormalizedSource, *, ocr_ready: bool) -> ParsePlan:
         return ParsePlan(
             normalized.source_format,
-            "docx",
-            (ParsePlanUnit("document", self.route_id, "validated_ooxml"),),
+            self._parser_format,
+            (ParsePlanUnit("document", self._route_id, "validated_ooxml"),),
             "document",
             ocr_ready=ocr_ready,
         )
 
 
 class _PdfRouteProvider:
-    route_id = "docling-pdf-native"
-
-    def supports(self, parser_format: str) -> bool:
-        return parser_format == "pdf"
+    provider_id = "pdf"
 
     def plan(self, normalized: NormalizedSource, *, ocr_ready: bool) -> ParsePlan:
-        page_routes = _pdf_page_routes(normalized.path)
         units: list[ParsePlanUnit] = []
-        for page, native_text in page_routes:
-            if native_text:
-                units.append(ParsePlanUnit("page", self.route_id, "native_text_sufficient", page))
+        for evidence in probe_pdf_pages(normalized.path):
+            payload = evidence.to_payload()
+            if evidence.text_state is PdfPageTextState.CREDIBLE:
+                route_id = "docling-pdf-native"
+                reason = "native_text_credible"
             elif ocr_ready:
-                units.append(ParsePlanUnit("page", "paddleocr-page", "native_text_insufficient", page))
+                route_id = (
+                    "paddleocr-page"
+                    if evidence.text_state is PdfPageTextState.ABSENT
+                    else "paddleocr-hybrid-page"
+                )
+                reason = f"native_text_{evidence.text_state.value}"
             else:
-                units.append(ParsePlanUnit("page", "text-projection-unavailable", "ocr_unavailable", page))
+                route_id = "text-projection-unavailable"
+                reason = f"ocr_unavailable_for_{evidence.text_state.value}_text"
+            units.append(ParsePlanUnit("page", route_id, reason, evidence.page, payload))
         return ParsePlan(
             "pdf",
             "pdf",
             tuple(units),
             "docling-document-plus-page-projections",
+            policy_version=2,
             ocr_ready=ocr_ready,
         )
 
 
 class _ImageRouteProvider:
-    route_id = "docling-image-shell"
-
-    def supports(self, parser_format: str) -> bool:
-        return parser_format == "image"
+    provider_id = "image"
 
     def plan(self, normalized: NormalizedSource, *, ocr_ready: bool) -> ParsePlan:
-        units = [ParsePlanUnit("image", self.route_id, "image_content_ir")]
+        units = [ParsePlanUnit("image", "docling-image-shell", "image_content_ir")]
         units.append(
             ParsePlanUnit(
                 "image",
@@ -970,6 +1062,167 @@ class _ImageRouteProvider:
             tuple(units),
             "image-with-optional-text-projection",
             ocr_ready=ocr_ready,
+        )
+
+
+class _TextParserProvider:
+    provider_id = "text"
+    uses_docling = False
+    backend = "xenix-txt-adapter"
+
+    def parse(self, context: ParserExecutionContext) -> ParsedContent:
+        return ParsedContent(
+            _plain_text_docling_document(
+                context.normalized.path,
+                check_cancelled=context.check_cancelled,
+            )
+        )
+
+
+class _DoclingOfficeParserProvider:
+    uses_docling = True
+    backend = "docling"
+
+    def __init__(self, *, provider_id: str, source_format: str) -> None:
+        self.provider_id = provider_id
+        self._source_format = source_format
+
+    def parse(self, context: ParserExecutionContext) -> ParsedContent:
+        return ParsedContent(
+            _docling_convert(
+                context.normalized.path,
+                source_format=self._source_format,
+                work_dir=context.work_dir,
+                check_cancelled=context.check_cancelled,
+            )
+        )
+
+
+class _PdfParserProvider:
+    provider_id = "pdf"
+    uses_docling = True
+    backend = "docling"
+
+    def parse(self, context: ParserExecutionContext) -> ParsedContent:
+        document = _docling_convert(
+            context.normalized.path,
+            source_format="pdf",
+            work_dir=context.work_dir,
+            check_cancelled=context.check_cancelled,
+        )
+        ocr_pages = [
+            unit.page - 1
+            for unit in context.plan.units
+            if unit.route_id in {"paddleocr-page", "paddleocr-hybrid-page"}
+            and unit.page
+        ]
+        unavailable_pages = [
+            unit.page
+            for unit in context.plan.units
+            if unit.route_id == "text-projection-unavailable" and unit.page
+        ]
+        projection_count = len(ocr_pages) + len(unavailable_pages)
+        warnings: list[str] = []
+        projections: list[dict[str, Any]] = []
+        succeeded_count = 0
+        payload_hashes: tuple[tuple[int, str], ...] = ()
+        if ocr_pages:
+            page_result = _append_paddle_ocr_pages(
+                document,
+                pdf_path=context.normalized.path,
+                page_indexes=ocr_pages,
+                work_dir=context.work_dir,
+                ocr_service=context.ocr_executor,
+                check_cancelled=context.check_cancelled,
+            )
+            succeeded_count = len(page_result.succeeded_pages)
+            unavailable_pages.extend(page_result.unavailable_pages)
+            payload_hashes = page_result.payload_hashes
+            if page_result.succeeded_pages:
+                projections.append(
+                    {
+                        "kind": "ocr_text",
+                        "status": "ready",
+                        "pages": list(page_result.succeeded_pages),
+                        "items": page_result.item_count,
+                    }
+                )
+        unavailable_pages = sorted(set(unavailable_pages))
+        if unavailable_pages:
+            warnings.append("ocr_projection_unavailable")
+            projections.append(
+                {
+                    "kind": "ocr_text",
+                    "status": "unavailable",
+                    "pages": unavailable_pages,
+                }
+            )
+        return ParsedContent(
+            document,
+            warnings=tuple(warnings),
+            projections=tuple(projections),
+            ocr_projection_count=projection_count,
+            ocr_attempted_count=len(ocr_pages),
+            ocr_succeeded_count=succeeded_count,
+            ocr_unavailable_count=len(unavailable_pages),
+            ocr_payload_hashes=payload_hashes,
+        )
+
+
+class _ImageParserProvider:
+    provider_id = "image"
+    uses_docling = False
+    backend = "xenix-image-adapter"
+
+    def parse(self, context: ParserExecutionContext) -> ParsedContent:
+        document = _image_docling_document(
+            context.normalized.path,
+            check_cancelled=context.check_cancelled,
+        )
+        if not context.plan.ocr_ready:
+            return ParsedContent(
+                document,
+                warnings=("ocr_projection_unavailable",),
+                projections=({"kind": "ocr_text", "status": "unavailable"},),
+                ocr_projection_count=1,
+                ocr_unavailable_count=1,
+            )
+        staged_image = (
+            context.work_dir / f"ocr-image{context.normalized.path.suffix.lower()}"
+        )
+        _copy_file_cooperatively(
+            context.normalized.path,
+            staged_image,
+            check_cancelled=context.check_cancelled,
+        )
+        payload = _recognize_projection(
+            context.ocr_executor,
+            staged_image,
+            output_path=context.work_dir / "image-ocr.json",
+            check_cancelled=context.check_cancelled,
+        )
+        if payload is None:
+            return ParsedContent(
+                document,
+                warnings=("ocr_projection_unavailable",),
+                projections=({"kind": "ocr_text", "status": "unavailable"},),
+                ocr_projection_count=1,
+                ocr_attempted_count=1,
+                ocr_unavailable_count=1,
+            )
+        count = _append_ocr_text(document, payload, page_no=1)
+        payload_hash = _bounded_json_sha256(
+            payload,
+            label="OCR result",
+            max_bytes=MAX_OCR_RESULT_BYTES,
+        )
+        return ParsedContent(
+            document,
+            projections=({"kind": "ocr_text", "status": "ready", "items": count},),
+            ocr_projection_count=1,
+            ocr_attempted_count=1,
+            ocr_succeeded_count=1,
+            ocr_payload_hashes=((1, payload_hash),),
         )
 
 
@@ -1027,40 +1280,6 @@ def _no_console_process_kwargs() -> dict[str, int]:
     if sys.platform != "win32":
         return {}
     return {"creationflags": int(getattr(subprocess, "CREATE_NO_WINDOW", 0))}
-
-
-def _docling_worker_command(
-    source_path: Path,
-    *,
-    source_format: str,
-    output_path: Path,
-) -> tuple[list[str], dict[str, str]]:
-    environment = dict(os.environ)
-    if getattr(sys, "frozen", False):
-        command = [
-            sys.executable,
-            "--knowledge-docling-worker",
-            source_format,
-            str(source_path),
-            str(output_path),
-        ]
-    else:
-        source_root = str(Path(__file__).resolve().parents[2])
-        existing_pythonpath = environment.get("PYTHONPATH")
-        environment["PYTHONPATH"] = (
-            source_root
-            if not existing_pythonpath
-            else os.pathsep.join([source_root, existing_pythonpath])
-        )
-        command = [
-            sys.executable,
-            "-m",
-            "xenix.services.knowledge_docling_worker",
-            source_format,
-            str(source_path),
-            str(output_path),
-        ]
-    return command, environment
 
 
 def _read_bytes_cooperatively(
@@ -1379,6 +1598,53 @@ def _callable_accepts_keyword(function: Any, keyword: str) -> bool:
     )
 
 
+def _ocr_runtime_payload(value: object) -> dict[str, object] | None:
+    descriptor = getattr(value, "runtime_descriptor", None)
+    if callable(descriptor):
+        descriptor = descriptor()
+    to_payload = getattr(descriptor, "to_payload", None)
+    if callable(to_payload):
+        payload = to_payload()
+        if isinstance(payload, dict):
+            descriptor = dict(payload)
+        else:
+            return None
+    if isinstance(descriptor, dict):
+        descriptor = dict(descriptor)
+    else:
+        return None
+    if descriptor.keys() != {
+        "generation_id",
+        "runtime_id",
+        "model_pack_id",
+        "engine",
+        "engine_version",
+        "protocol_version",
+        "manifest_sha256",
+    }:
+        return None
+    if any(
+        not isinstance(descriptor[key], str) or not descriptor[key]
+        for key in (
+            "generation_id",
+            "runtime_id",
+            "model_pack_id",
+            "engine",
+            "engine_version",
+        )
+    ):
+        return None
+    manifest_sha256 = descriptor["manifest_sha256"]
+    if (
+        not isinstance(manifest_sha256, str)
+        or len(manifest_sha256) != 64
+        or any(character not in "0123456789abcdef" for character in manifest_sha256)
+        or type(descriptor["protocol_version"]) is not int
+    ):
+        return None
+    return descriptor
+
+
 @dataclass(frozen=True)
 class _DecodedText:
     text: str
@@ -1388,20 +1654,31 @@ class _DecodedText:
     selection: str
 
 
-def _detected_format(header: bytes, *, expected_format: str) -> str:
-    if header.startswith(b"%PDF-"):
-        return "pdf"
-    if header.startswith(b"\x89PNG\r\n\x1a\n"):
-        return "png"
-    if header.startswith(b"\xff\xd8\xff"):
-        return "jpeg"
-    if header.startswith(_CFB_SIGNATURE):
-        if expected_format in {"doc", "docx"}:
-            return expected_format
-        return "cfb"
-    if header.startswith(b"PK\x03\x04"):
-        return "docx" if expected_format == "docx" else "zip"
-    return "txt" if expected_format == "txt" else "unknown"
+def _provider_map(
+    providers,
+    *,
+    required_ids: tuple[str, ...],
+    kind: str,
+) -> dict[str, Any]:
+    by_id: dict[str, Any] = {}
+    for provider in providers:
+        provider_id = str(getattr(provider, "provider_id", "")).strip().casefold()
+        if not provider_id or provider_id in by_id:
+            raise ValueError(f"Knowledge {kind} provider IDs must be unique.")
+        by_id[provider_id] = provider
+    missing = [provider_id for provider_id in required_ids if provider_id not in by_id]
+    if missing:
+        raise ValueError(
+            f"Knowledge {kind} providers are missing: {', '.join(missing)}"
+        )
+    return by_id
+
+
+def _format_mismatch() -> ValidationError:
+    return ValidationError(
+        "The selected file signature does not match its extension.",
+        error_code="knowledge_format_mismatch",
+    )
 
 
 def _probe_text(
@@ -1603,16 +1880,34 @@ def _probe_image(path: Path, *, expected_format: str) -> dict[str, Any]:
         raise ValidationError("The selected image is invalid.") from exc
 
 
-def _office_is_encrypted(path: Path) -> bool:
+def _inspect_office_file(path: Path) -> tuple[str | None, bool]:
     try:
         with path.open("rb") as stream:
-            return bool(msoffcrypto.OfficeFile(stream).is_encrypted())
+            office = msoffcrypto.OfficeFile(stream)
+            office_kind = {
+                "Doc97File": "doc",
+                "Ppt97File": "ppt",
+                "OOXMLFile": "ooxml",
+            }.get(type(office).__name__)
+            return office_kind, bool(office.is_encrypted())
     except Exception:
-        return False
+        return None, False
 
 
-def _verify_docx(
+def _ooxml_error(
+    profile: _OoxmlPackageProfile,
+    category: str,
+    detail: str,
+) -> ValidationError:
+    return ValidationError(
+        f"The selected {profile.display_name} {detail}.",
+        error_code=f"knowledge_{profile.source_format}_{category}",
+    )
+
+
+def _verify_ooxml_package(
     path: Path,
+    profile: _OoxmlPackageProfile,
     *,
     check_cancelled: CancellationCheck | None = None,
 ) -> dict[str, int]:
@@ -1620,10 +1915,11 @@ def _verify_docx(
     try:
         with ZipFile(path) as package:
             entries = package.infolist()
-            if len(entries) > MAX_DOCX_PACKAGE_ENTRIES:
-                raise ValidationError(
-                    "The selected DOCX contains too many package entries.",
-                    error_code="knowledge_docx_entry_limit",
+            if len(entries) > MAX_OOXML_PACKAGE_ENTRIES:
+                raise _ooxml_error(
+                    profile,
+                    "entry_limit",
+                    "contains too many package entries",
                 )
             names: set[str] = set()
             casefold_names: set[str] = set()
@@ -1631,41 +1927,51 @@ def _verify_docx(
             maximum_ratio = 1
             for entry in entries:
                 _check_cancelled(check_cancelled)
-                _validate_docx_member_path(entry.filename, is_directory=entry.is_dir())
+                _validate_ooxml_member_path(
+                    entry.filename,
+                    profile=profile,
+                    is_directory=entry.is_dir(),
+                )
                 folded = entry.filename.casefold()
                 if entry.filename in names or folded in casefold_names:
-                    raise ValidationError(
-                        "The selected DOCX contains ambiguous package entries.",
-                        error_code="knowledge_docx_entries_ambiguous",
+                    raise _ooxml_error(
+                        profile,
+                        "entries_ambiguous",
+                        "contains ambiguous package entries",
                     )
                 names.add(entry.filename)
                 casefold_names.add(folded)
                 if entry.flag_bits & 0x1:
-                    raise ValidationError(
-                        "The selected DOCX contains encrypted package entries.",
-                        error_code="knowledge_docx_entry_encrypted",
+                    raise _ooxml_error(
+                        profile,
+                        "entry_encrypted",
+                        "contains encrypted package entries",
                     )
                 mode = (entry.external_attr >> 16) & 0xFFFF
                 if mode and stat.S_ISLNK(mode):
-                    raise ValidationError(
-                        "The selected DOCX contains an unsafe package entry.",
-                        error_code="knowledge_docx_entry_unsafe",
+                    raise _ooxml_error(
+                        profile,
+                        "entry_unsafe",
+                        "contains an unsafe package entry",
                     )
                 if entry.file_size < 0 or entry.compress_size < 0:
-                    raise ValidationError(
-                        "The selected DOCX has invalid package sizes.",
-                        error_code="knowledge_docx_size_invalid",
+                    raise _ooxml_error(
+                        profile,
+                        "size_invalid",
+                        "has invalid package sizes",
                     )
-                if entry.file_size > MAX_DOCX_ENTRY_BYTES:
-                    raise ValidationError(
-                        "The selected DOCX package entry is too large.",
-                        error_code="knowledge_docx_entry_too_large",
+                if entry.file_size > MAX_OOXML_ENTRY_BYTES:
+                    raise _ooxml_error(
+                        profile,
+                        "entry_too_large",
+                        "package entry is too large",
                     )
                 expanded_bytes += entry.file_size
-                if expanded_bytes > MAX_DOCX_EXPANDED_BYTES:
-                    raise ValidationError(
-                        "The selected DOCX expands beyond the supported limit.",
-                        error_code="knowledge_docx_expansion_limit",
+                if expanded_bytes > MAX_OOXML_EXPANDED_BYTES:
+                    raise _ooxml_error(
+                        profile,
+                        "expansion_limit",
+                        "expands beyond the supported limit",
                     )
                 ratio = (
                     entry.file_size
@@ -1674,22 +1980,25 @@ def _verify_docx(
                 )
                 maximum_ratio = max(maximum_ratio, ratio)
                 if (
-                    entry.file_size >= _DOCX_RATIO_CHECK_MIN_BYTES
-                    and ratio > MAX_DOCX_COMPRESSION_RATIO
+                    entry.file_size >= _OOXML_RATIO_CHECK_MIN_BYTES
+                    and ratio > MAX_OOXML_COMPRESSION_RATIO
                 ):
-                    raise ValidationError(
-                        "The selected DOCX compression ratio is unsafe.",
-                        error_code="knowledge_docx_compression_ratio",
+                    raise _ooxml_error(
+                        profile,
+                        "compression_ratio",
+                        "compression ratio is unsafe",
                     )
-            if "word/document.xml" not in names or "[Content_Types].xml" not in names:
-                raise ValidationError(
-                    "The selected DOCX has the wrong Office package type.",
-                    error_code="knowledge_docx_package_invalid",
+            if profile.main_part not in names or "[Content_Types].xml" not in names:
+                raise _ooxml_error(
+                    profile,
+                    "package_invalid",
+                    "has the wrong Office package type",
                 )
     except (BadZipFile, OSError) as exc:
-        raise ValidationError(
-            "The selected DOCX is not a valid Office package.",
-            error_code="knowledge_docx_package_invalid",
+        raise _ooxml_error(
+            profile,
+            "package_invalid",
+            "is not a valid Office package",
         ) from exc
     _check_cancelled(check_cancelled)
     return {
@@ -1699,16 +2008,22 @@ def _verify_docx(
     }
 
 
-def _validate_docx_member_path(name: str, *, is_directory: bool) -> None:
+def _validate_ooxml_member_path(
+    name: str,
+    *,
+    profile: _OoxmlPackageProfile,
+    is_directory: bool,
+) -> None:
     if (
         not name
         or "\x00" in name
         or "\\" in name
-        or len(name.encode("utf-8")) > MAX_DOCX_MEMBER_NAME_BYTES
+        or len(name.encode("utf-8")) > MAX_OOXML_MEMBER_NAME_BYTES
     ):
-        raise ValidationError(
-            "The selected DOCX contains an unsafe package path.",
-            error_code="knowledge_docx_path_unsafe",
+        raise _ooxml_error(
+            profile,
+            "path_unsafe",
+            "contains an unsafe package path",
         )
     normalized = name[:-1] if is_directory and name.endswith("/") else name
     raw_parts = normalized.split("/")
@@ -1717,12 +2032,13 @@ def _validate_docx_member_path(name: str, *, is_directory: bool) -> None:
         not normalized
         or normalized.startswith("/")
         or relative.is_absolute()
-        or len(raw_parts) > MAX_DOCX_MEMBER_DEPTH
+        or len(raw_parts) > MAX_OOXML_MEMBER_DEPTH
         or any(part in {"", ".", ".."} or ":" in part for part in raw_parts)
     ):
-        raise ValidationError(
-            "The selected DOCX contains an unsafe package path.",
-            error_code="knowledge_docx_path_unsafe",
+        raise _ooxml_error(
+            profile,
+            "path_unsafe",
+            "contains an unsafe package path",
         )
 
 
@@ -1778,81 +2094,31 @@ def _docling_convert(
     work_dir: Path,
     check_cancelled: CancellationCheck | None = None,
 ):
-    from docling_core.types.doc import DoclingDocument
+    from .knowledge_docling import convert_document
 
     _check_cancelled(check_cancelled)
-    output_path = work_dir / f"docling-{source_format}-result.json"
-    output_path.unlink(missing_ok=True)
-    command, environment = _docling_worker_command(
-        path,
-        source_format=source_format,
-        output_path=output_path,
-    )
+    _ = work_dir
     try:
-        process = subprocess.Popen(
-            command,
-            cwd=str(work_dir),
-            env=environment,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            **_no_console_process_kwargs(),
-        )
-    except OSError:
+        document = convert_document(path, source_format=source_format)
+    except Exception as exc:
         raise ValidationError(
             "Docling could not parse the document.",
-            error_code="knowledge_docling_parse_failed",
-        ) from None
-    returncode = _wait_for_process(
-        process,
-        timeout_seconds=_DOCLING_TIMEOUT_SECONDS,
-        check_cancelled=check_cancelled,
-        timeout_error=ValidationError(
-            "Docling could not parse the document.",
-            error_code="knowledge_docling_parse_failed",
-        ),
-    )
-    if returncode != 0 or not output_path.is_file():
-        raise ValidationError(
-            "Docling could not parse the document.",
-            error_code="knowledge_docling_parse_failed",
-        )
-    _check_cancelled(check_cancelled)
-    try:
-        document = DoclingDocument.model_validate_json(output_path.read_bytes())
-    except Exception:
-        raise ValidationError(
-            "Docling could not parse the document.",
-            error_code="knowledge_docling_parse_failed",
-        ) from None
+            error_code="knowledge_docling_conversion_failed",
+            error_details={"diagnostic_code": _docling_diagnostic_code(exc)},
+            retryable=True,
+        ) from exc
     _check_cancelled(check_cancelled)
     return document
 
 
-def _pdf_page_routes(path: Path) -> list[tuple[int, bool]]:
-    import pypdfium2
-
-    try:
-        document = pypdfium2.PdfDocument(path)
-    except Exception as exc:
-        raise ValidationError("The PDF page inventory could not be read.") from exc
-    try:
-        routes: list[tuple[int, bool]] = []
-        for index in range(len(document)):
-            page = document[index]
-            text_page = None
-            try:
-                text_page = page.get_textpage()
-                text = text_page.get_text_range().strip()
-            finally:
-                if text_page is not None:
-                    text_page.close()
-                page.close()
-            useful = len("".join(character for character in text if character.isalnum())) >= 8
-            routes.append((index + 1, useful))
-        return routes
-    finally:
-        document.close()
+def _docling_diagnostic_code(exc: Exception) -> str:
+    if isinstance(exc, MemoryError):
+        return "docling_memory_error"
+    if isinstance(exc, (ImportError, ModuleNotFoundError)):
+        return "docling_dependency_error"
+    if isinstance(exc, OSError):
+        return "docling_runtime_error"
+    return "docling_conversion_error"
 
 
 def _append_paddle_ocr_pages(
@@ -1940,6 +2206,18 @@ def _append_ocr_text(document: Any, payload: Any, *, page_no: int) -> int:
 def _paddle_text_boxes(payload: Any) -> list[tuple[str, tuple[float, float, float, float]]]:
     matches: list[tuple[str, tuple[float, float, float, float]]] = []
     if isinstance(payload, dict):
+        regions = payload.get("regions")
+        if isinstance(regions, list):
+            for region in regions:
+                if not isinstance(region, dict):
+                    continue
+                matches.append(
+                    (
+                        str(region.get("text", "")),
+                        _polygon_bbox(region.get("polygon")),
+                    )
+                )
+            return matches
         texts = payload.get("rec_texts")
         polygons = payload.get("rec_polys") or payload.get("dt_polys") or []
         if isinstance(texts, list):

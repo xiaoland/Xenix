@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-from hashlib import sha256
 import logging
 from dataclasses import dataclass
 from typing import Sequence
@@ -18,6 +16,11 @@ from .knowledge_service import (
     KnowledgeSemanticIntegrityError,
     KnowledgeSemanticUnavailable,
 )
+from .knowledge_projection import (
+    CORPUS_FINGERPRINT_SCHEMA,
+    KnowledgeProjectionIdentity,
+    KnowledgeProjectionSnapshot,
+)
 from .knowledge_storage_maintenance import (
     KnowledgeStorageCleanupResult,
     KnowledgeStorageMaintenance,
@@ -27,14 +30,9 @@ from .knowledge_vector_store import (
     KnowledgeVectorStoreError,
     LanceKnowledgeVectorStore,
 )
-from .storage.models import (
-    KnowledgeUnitRow,
-    KnowledgeVectorGenerationRow,
-    generate_id,
-)
+from .storage.models import KnowledgeVectorGenerationRow, generate_id
 from .storage.repositories.knowledge import KnowledgeRepository
 
-_CORPUS_FINGERPRINT_SCHEMA = "xenix.knowledge-corpus/v1"
 LOGGER = logging.getLogger(__name__)
 
 
@@ -92,8 +90,9 @@ class KnowledgeSemanticService:
         *,
         library_id: str = "global",
     ) -> KnowledgeSemanticIndexState:
-        units = self._current_units(library_id)
-        corpus_fingerprint = self._corpus_fingerprint(units)
+        identity = self._current_projection_identity(library_id)
+        current_fingerprint = identity.corpus_fingerprint
+        unit_count = identity.unit_count
         try:
             operation = self._embedding_service.freeze()
         except EmbeddingValidationError:
@@ -102,22 +101,23 @@ class KnowledgeSemanticService:
             return KnowledgeSemanticIndexState(
                 configured=False,
                 profile_fingerprint=None,
-                corpus_fingerprint=corpus_fingerprint,
-                unit_count=len(units),
+                corpus_fingerprint=current_fingerprint,
+                unit_count=unit_count,
                 generation_id=None,
             )
         generation = self._usable_generation(
             library_id=library_id,
             profile_fingerprint=operation.profile.profile_fingerprint,
-            corpus_fingerprint=corpus_fingerprint,
+            corpus_fingerprint=current_fingerprint,
             dimensions=None,
-            units=units,
+            expected_unit_ids=identity.unit_ids,
+            expected_unit_count=unit_count,
         )
         return KnowledgeSemanticIndexState(
             configured=True,
             profile_fingerprint=operation.profile.profile_fingerprint,
-            corpus_fingerprint=corpus_fingerprint,
-            unit_count=len(units),
+            corpus_fingerprint=current_fingerprint,
+            unit_count=unit_count,
             generation_id=generation.id if generation is not None else None,
         )
 
@@ -165,7 +165,7 @@ class KnowledgeSemanticService:
             return (
                 operation.profile.profile_fingerprint
                 == candidates.profile_fingerprint
-                and self._corpus_fingerprint(self._current_units(library_id))
+                and self._current_corpus_fingerprint(library_id)
                 == candidates.corpus_fingerprint
             )
         except (KnowledgeSemanticUnavailable, KnowledgeSemanticIntegrityError):
@@ -189,17 +189,18 @@ class KnowledgeSemanticService:
         if operation is None:
             raise KnowledgeSemanticUnavailable()
         self._run_pending_maintenance()
-        units = self._current_units(library_id)
-        if not units:
+        identity = self._current_projection_identity(library_id)
+        if not identity.unit_ids:
             raise KnowledgeSemanticUnavailable()
 
-        corpus_fingerprint = self._corpus_fingerprint(units)
+        current_fingerprint = identity.corpus_fingerprint
         generation = self._usable_generation(
             library_id=library_id,
             profile_fingerprint=operation.profile.profile_fingerprint,
-            corpus_fingerprint=corpus_fingerprint,
+            corpus_fingerprint=current_fingerprint,
             dimensions=None,
-            units=units,
+            expected_unit_ids=identity.unit_ids,
+            expected_unit_count=identity.unit_count,
         )
         if generation is None:
             raise KnowledgeSemanticUnavailable()
@@ -219,8 +220,7 @@ class KnowledgeSemanticService:
             )
 
             if (
-                self._corpus_fingerprint(self._current_units(library_id))
-                != generation.corpus_fingerprint
+                self._current_projection_identity(library_id) != identity
             ):
                 raise KnowledgeSemanticUnavailable()
         return KnowledgeSemanticCandidates(
@@ -251,24 +251,28 @@ class KnowledgeSemanticService:
             raise KnowledgeSemanticUnavailable()
         self._run_pending_maintenance()
         with self._vector_store.lifecycle():
-            units = self._current_units(library_id)
-            if not units:
+            snapshot = self._current_projection_snapshot(library_id)
+            if not snapshot.units:
                 raise KnowledgeSemanticUnavailable()
+            identity = snapshot.identity
             profile = operation.profile
-            corpus_fingerprint = self._corpus_fingerprint(units)
+            current_fingerprint = identity.corpus_fingerprint
             existing = self._usable_generation(
                 library_id=library_id,
                 profile_fingerprint=profile.profile_fingerprint,
-                corpus_fingerprint=corpus_fingerprint,
+                corpus_fingerprint=current_fingerprint,
                 dimensions=None,
-                units=units,
+                expected_unit_ids=identity.unit_ids,
+                expected_unit_count=identity.unit_count,
             )
             if existing is not None and not force:
                 return existing
 
-            document_batch = operation.embed_texts([unit.text for unit in units])
+            document_batch = operation.embed_texts(
+                [unit.text for unit in snapshot.units]
+            )
             self._require_profile(document_batch.profile, profile)
-            if len(document_batch.vectors) != len(units):
+            if len(document_batch.vectors) != identity.unit_count:
                 raise KnowledgeSemanticIntegrityError()
             dimensions = document_batch.dimensions
 
@@ -278,23 +282,18 @@ class KnowledgeSemanticService:
                 records=[
                     KnowledgeVectorRecord(unit_id=unit.id, vector=vector)
                     for unit, vector in zip(
-                        units,
+                        snapshot.units,
                         document_batch.vectors,
                         strict=True,
                     )
                 ],
                 dimensions=dimensions,
-                corpus_fingerprint=corpus_fingerprint,
+                corpus_fingerprint=current_fingerprint,
                 profile_fingerprint=profile.profile_fingerprint,
             )
 
             published = False
             try:
-                if (
-                    self._corpus_fingerprint(self._current_units(library_id))
-                    != corpus_fingerprint
-                ):
-                    raise KnowledgeSemanticUnavailable()
                 current_operation = self._embedding_service.freeze()
                 if (
                     current_operation is None
@@ -306,16 +305,25 @@ class KnowledgeSemanticService:
                 row = KnowledgeVectorGenerationRow(
                     id=generation_id,
                     library_id=library_id,
-                    corpus_fingerprint=corpus_fingerprint,
+                    corpus_fingerprint=current_fingerprint,
                     profile_fingerprint=profile.profile_fingerprint,
                     provider_key=profile.provider_key,
                     model=profile.model,
                     dimensions=dimensions,
                     distance_metric="cosine",
                     relative_path=relative_path,
-                    unit_count=len(units),
+                    unit_count=identity.unit_count,
+                    corpus_fingerprint_schema=CORPUS_FINGERPRINT_SCHEMA,
                 )
                 with self._session_factory() as session:
+                    if (
+                        self._repository.current_projection_identity(
+                            session,
+                            library_id=library_id,
+                        )
+                        != identity
+                    ):
+                        raise KnowledgeSemanticUnavailable()
                     self._repository.create_vector_generation(session, row)
                     session.commit()
                     published = True
@@ -335,7 +343,8 @@ class KnowledgeSemanticService:
         profile_fingerprint: str,
         corpus_fingerprint: str,
         dimensions: int | None,
-        units: Sequence[KnowledgeUnitRow],
+        expected_unit_ids: Sequence[str],
+        expected_unit_count: int,
     ) -> KnowledgeVectorGenerationRow | None:
         with self._session_factory() as session:
             generations = self._repository.list_vector_generations(
@@ -344,28 +353,46 @@ class KnowledgeSemanticService:
                 profile_fingerprint=profile_fingerprint,
                 corpus_fingerprint=corpus_fingerprint,
             )
-        expected_unit_ids = [unit.id for unit in units]
         for generation in generations:
-            if (
+            metadata_matches = (
                 generation.distance_metric == "cosine"
                 and (dimensions is None or generation.dimensions == dimensions)
-                and generation.unit_count == len(units)
-                and self._vector_store.generation_is_usable(
+                and generation.corpus_fingerprint_schema == CORPUS_FINGERPRINT_SCHEMA
+                and generation.unit_count == expected_unit_count
+            )
+            if not metadata_matches:
+                continue
+            if self._vector_store.generation_is_usable(
                     generation.relative_path,
                     expected_generation_id=generation.id,
                     expected_corpus_fingerprint=corpus_fingerprint,
                     expected_profile_fingerprint=profile_fingerprint,
                     expected_unit_ids=expected_unit_ids,
-                    expected_count=len(units),
+                    expected_count=expected_unit_count,
                     expected_dimensions=generation.dimensions,
-                )
-            ):
+                ):
                 return generation
         return None
 
-    def _current_units(self, library_id: str) -> list[KnowledgeUnitRow]:
+    def _current_projection_identity(
+        self,
+        library_id: str,
+    ) -> KnowledgeProjectionIdentity:
         with self._session_factory() as session:
-            return self._repository.list_current_units(
+            return self._repository.current_projection_identity(
+                session,
+                library_id=library_id,
+            )
+
+    def _current_corpus_fingerprint(self, library_id: str) -> str:
+        return self._current_projection_identity(library_id).corpus_fingerprint
+
+    def _current_projection_snapshot(
+        self,
+        library_id: str,
+    ) -> KnowledgeProjectionSnapshot:
+        with self._session_factory() as session:
+            return self._repository.load_projection_snapshot(
                 session,
                 library_id=library_id,
             )
@@ -374,25 +401,3 @@ class KnowledgeSemanticService:
     def _require_profile(actual: EmbeddingProfile, expected: EmbeddingProfile) -> None:
         if actual.profile_fingerprint != expected.profile_fingerprint:
             raise KnowledgeSemanticIntegrityError()
-
-    @staticmethod
-    def _corpus_fingerprint(units: Sequence[KnowledgeUnitRow]) -> str:
-        payload = {
-            "schema": _CORPUS_FINGERPRINT_SCHEMA,
-            "units": [
-                {
-                    "id": unit.id,
-                    "document_id": unit.document_id,
-                    "generation_id": unit.canonical_generation_id,
-                    "text_sha256": sha256(unit.text.encode("utf-8")).hexdigest(),
-                }
-                for unit in units
-            ],
-        }
-        encoded = json.dumps(
-            payload,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
-        return sha256(encoded).hexdigest()

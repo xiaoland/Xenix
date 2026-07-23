@@ -24,12 +24,13 @@ from .knowledge_content_store import (
     KnowledgeContentStore,
 )
 from .knowledge_import_worker import (
-    InlineKnowledgeImportWorkerRunner,
     KnowledgeImportWorkerCancelled,
     KnowledgeImportWorkerCrashed,
     KnowledgeImportWorkerEvent,
+    KnowledgeImportWorkerLaunchFailed,
     KnowledgeImportWorkerRequest,
     KnowledgeImportWorkerRunner,
+    KnowledgeImportWorkerTimedOut,
     LocalKnowledgeImportWorkerRunner,
 )
 from .knowledge_import_storage_maintenance import (
@@ -45,7 +46,6 @@ from .knowledge_pipeline import (
     ParserRouter,
     _find_libreoffice,
 )
-from .paddle_ocr_service import PaddleOcrService
 from .knowledge_task_logs import KnowledgeTaskLogEntry, KnowledgeTaskLogStore
 from .storage.models import (
     ArtifactKind,
@@ -66,8 +66,10 @@ _TERMINAL_IMPORT_STATUSES = frozenset(
 _SAFE_IMPORT_ERRORS = {
     "knowledge_password_required": "A password is required to continue this import.",
     "knowledge_password_invalid": "The document password was not accepted.",
-    "knowledge_office_converter_unavailable": "LibreOffice is required to import this DOC file.",
-    "knowledge_office_conversion_failed": "The DOC file could not be converted.",
+    "knowledge_doc_converter_unavailable": "LibreOffice is required to import this DOC file.",
+    "knowledge_doc_conversion_failed": "The DOC file could not be converted.",
+    "knowledge_ppt_converter_unavailable": "LibreOffice is required to import this PPT file.",
+    "knowledge_ppt_conversion_failed": "The PPT file could not be converted.",
     "knowledge_format_unsupported": "This file type is not supported by the Knowledge Library.",
     "knowledge_format_mismatch": "The file signature does not match its extension.",
     "knowledge_pdf_invalid": "The PDF is structurally invalid.",
@@ -86,13 +88,25 @@ _SAFE_IMPORT_ERRORS = {
     "knowledge_docx_entry_too_large": "The DOCX package contains an entry that is too large.",
     "knowledge_docx_expansion_limit": "The expanded DOCX package is too large.",
     "knowledge_docx_compression_ratio": "The DOCX package compression ratio is unsafe.",
-    "knowledge_docling_parse_failed": "The document could not be parsed into canonical content.",
+    "knowledge_pptx_package_invalid": "The PPTX file is not a valid Office document.",
+    "knowledge_pptx_entry_limit": "The PPTX package contains too many entries.",
+    "knowledge_pptx_entries_ambiguous": "The PPTX package contains ambiguous entries.",
+    "knowledge_pptx_entry_encrypted": "The PPTX package contains an unsupported encrypted entry.",
+    "knowledge_pptx_entry_unsafe": "The PPTX package contains an unsafe entry.",
+    "knowledge_pptx_path_unsafe": "The PPTX package contains an unsafe path.",
+    "knowledge_pptx_size_invalid": "The PPTX package contains invalid size metadata.",
+    "knowledge_pptx_entry_too_large": "The PPTX package contains an entry that is too large.",
+    "knowledge_pptx_expansion_limit": "The expanded PPTX package is too large.",
+    "knowledge_pptx_compression_ratio": "The PPTX package compression ratio is unsafe.",
+    "knowledge_docling_conversion_failed": "The document could not be parsed into canonical content.",
     "knowledge_canonical_integrity_failed": "Canonical content failed integrity validation.",
     "knowledge_source_integrity_failed": "The app-owned source snapshot failed integrity validation.",
     "knowledge_source_reselection_required": "Select the source file again to retry this import.",
     "knowledge_import_not_retryable": "This import attempt cannot be retried.",
     "knowledge_import_cancelled": "The import was cancelled.",
     "knowledge_import_worker_crashed": "The import worker stopped unexpectedly.",
+    "knowledge_import_worker_launch_failed": "The import worker could not be started.",
+    "knowledge_import_worker_timed_out": "The import worker exceeded the allowed execution time.",
     "knowledge_import_failed": "The file could not be imported.",
 }
 
@@ -142,8 +156,6 @@ class KnowledgeImportService:
         paths: AppPaths,
         session_factory: sessionmaker,
         artifact_service: ArtifactService,
-        normalizer: FormatNormalizer | None = None,
-        ocr_service: PaddleOcrService | None = None,
         worker_runner: KnowledgeImportWorkerRunner | None = None,
         canonical_ready_notifier: Callable[[str, str, str | None], object] | None = None,
         start_worker: bool = True,
@@ -154,16 +166,7 @@ class KnowledgeImportService:
         self._store = KnowledgeContentStore(paths)
         self._task_logs = KnowledgeTaskLogStore(paths)
         self._probe = FileProbe()
-        self._worker_runner = worker_runner or (
-            InlineKnowledgeImportWorkerRunner(
-                paths,
-                normalizer=normalizer,
-                ocr_service=ocr_service,
-                store=self._store,
-            )
-            if normalizer is not None or ocr_service is not None
-            else LocalKnowledgeImportWorkerRunner()
-        )
+        self._worker_runner = worker_runner or LocalKnowledgeImportWorkerRunner()
         self._canonical_ready_notifier = canonical_ready_notifier
         self._queue: queue.Queue[str | object] = queue.Queue()
         self._passwords: dict[str, str] = {}
@@ -195,7 +198,7 @@ class KnowledgeImportService:
         suffix = source.suffix.casefold()
         if suffix not in SUPPORTED_KNOWLEDGE_SUFFIXES:
             raise ValidationError(
-                "Supported Knowledge formats are TXT, DOC, DOCX, PDF, JPEG, and PNG.",
+                self._probe.supported_formats_message,
                 error_code="knowledge_format_unsupported",
             )
         size = source.stat().st_size
@@ -485,6 +488,18 @@ class KnowledgeImportService:
             raise ValidationError(
                 _SAFE_IMPORT_ERRORS["knowledge_import_worker_crashed"],
                 error_code="knowledge_import_worker_crashed",
+                retryable=True,
+            ) from exc
+        except KnowledgeImportWorkerLaunchFailed as exc:
+            raise ValidationError(
+                _SAFE_IMPORT_ERRORS["knowledge_import_worker_launch_failed"],
+                error_code="knowledge_import_worker_launch_failed",
+                retryable=True,
+            ) from exc
+        except KnowledgeImportWorkerTimedOut as exc:
+            raise ValidationError(
+                _SAFE_IMPORT_ERRORS["knowledge_import_worker_timed_out"],
+                error_code="knowledge_import_worker_timed_out",
                 retryable=True,
             ) from exc
         if result.status == "cancelled":
@@ -907,6 +922,7 @@ class KnowledgeImportService:
             "normalizing",
             "routing",
             "parsing",
+            "canonicalizing",
             "publishing_canonical",
         }:
             self._advance(import_id, status="running", phase=event.phase)
@@ -991,8 +1007,10 @@ class KnowledgeImportService:
         needs_attention = code in {
             "knowledge_password_required",
             "knowledge_password_invalid",
-            "knowledge_office_converter_unavailable",
-            "knowledge_office_conversion_failed",
+            "knowledge_doc_converter_unavailable",
+            "knowledge_doc_conversion_failed",
+            "knowledge_ppt_converter_unavailable",
+            "knowledge_ppt_conversion_failed",
             "knowledge_source_reselection_required",
         }
         with self._session_factory() as session:

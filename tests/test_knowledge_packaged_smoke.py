@@ -1,7 +1,11 @@
+import json
 import os
 from pathlib import Path
 import subprocess
 import sys
+from tempfile import TemporaryDirectory
+
+import pytest
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.knowledge_packaged_smoke import run_knowledge_packaged_smoke
@@ -39,4 +43,25 @@ def test_knowledge_packaged_smoke_exercises_native_and_data_paths(monkeypatch, t
 
     run_knowledge_packaged_smoke(paths)
 
-    assert (paths.state / "knowledge-smoke.json").is_file()
+    marker = json.loads((paths.state / "knowledge-smoke.json").read_text())
+    assert marker["spawned_docx_import"] is True
+    assert marker["spawned_pptx_import"] is True
+
+
+@pytest.mark.skipif(
+    not os.environ.get("XENIX_KNOWLEDGE_OCR_SMOKE_ARCHIVE")
+    or not os.environ.get("XENIX_KNOWLEDGE_OCR_SMOKE_IMAGE"),
+    reason="real native OCR acceptance inputs are not configured",
+)
+def test_knowledge_packaged_smoke_reaches_lookup_through_real_native_ocr(
+    monkeypatch,
+) -> None:
+    with TemporaryDirectory(prefix="xk-real-") as temporary:
+        monkeypatch.setenv("XENIX_APP_HOME", str(Path(temporary) / "h"))
+        paths = ensure_app_dirs(get_app_paths())
+
+        run_knowledge_packaged_smoke(paths)
+
+        marker = json.loads((paths.state / "knowledge-smoke.json").read_text())
+        assert marker["paddle_native_activation"] is True
+        assert marker["paddle_native_retrieval"] is True

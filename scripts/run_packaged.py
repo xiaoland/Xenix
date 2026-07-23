@@ -44,15 +44,6 @@ def main() -> int:
         worker_main(sys.argv[2], sys.argv[3])
         return 0
 
-    if len(sys.argv) >= 2 and sys.argv[1] == "--knowledge-docling-worker":
-        import_start = time.perf_counter()
-        from xenix.services.knowledge_docling_worker import main as worker_main
-
-        _emit_startup_timing("run_packaged.import_knowledge_docling_worker", import_start)
-        if len(sys.argv) != 5:
-            return 2
-        return worker_main(sys.argv[2], sys.argv[3], sys.argv[4])
-
     import_start = time.perf_counter()
     from xenix.main import main as application_main
 

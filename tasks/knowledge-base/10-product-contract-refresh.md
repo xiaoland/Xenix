@@ -9,24 +9,28 @@ MVP exposes no Libraries management UI.
 
 ## MVP Promise
 
-- Inputs: TXT, DOCX, DOC, PDF, JPEG, and PNG.
+- Inputs: TXT, DOCX, DOC, PPTX, PPT, PDF, JPEG, and PNG.
 - Content IR: DoclingDocument JSON, wrapped by a Xenix-owned lifecycle envelope.
 - Legacy DOC: normalize to DOCX through a separately probed LibreOffice capability;
   never pretend Docling natively parses it. The repeatable PDF-vs-DOCX spike selected
   DOCX for picture retention while preserving body/table recall.
-- OCR: local PaddleOCR models, installed and health-checked through a one-click private
-  deployment flow. The OCR runtime may use an isolated Python 3.12/3.13 sidecar so the
-  desktop remains compatible with Python 3.14.
+- Presentations: parse PPTX directly through Docling; normalize legacy PPT to PPTX
+  through the same explicitly probed, bounded LibreOffice capability class while
+  retaining original-source provenance.
+- OCR: an optional Xenix-owned native worker built on official Paddle Inference C++
+  plus explicit model assets, installed and verified from one immutable archive.
+  No runtime Python, pip, or global model cache is involved.
 - Retrieval: keyword is available once text derivation is ready; semantic/hybrid are
   real selectable modes when independent Embedding settings and a current vector
   generation are usable. Explicit unavailable modes fail honestly.
 - Agent surface: one small `knowledge.lookup` Tool; Knowledge method is integrated
   into the three data Skills. Skill activation is guidance, not authorization.
-- UI: Knowledge Workspace is a secondary window; Import Queue is modeless.
+- UI: Knowledge Workspace is a secondary window; its `Task queue` is modeless;
+  file picker and Workspace drag/drop feed the same import submission operation.
 
 ## Non-goals
 
-Markdown, PPT/PPTX, VLM, multi-library UX, general knowledge graphs, elaborate audit
+Markdown, VLM, multi-library UX, general knowledge graphs, elaborate audit
 history, and recovery dashboards are outside MVP.
 
 ## Success Gate

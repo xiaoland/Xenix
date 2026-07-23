@@ -2,7 +2,7 @@
 
 ## Product Allowlist and Detection Rule
 
-The MVP accepts only TXT, DOC, DOCX, PDF, JPEG, and PNG. The allowlist is a product
+The MVP accepts only TXT, DOC, DOCX, PPT, PPTX, PDF, JPEG, and PNG. The allowlist is a product
 decision, not a mirror of every format supported by Docling. Markdown is deliberately
 rejected in MVP, because links, included resources, and local/remote resolution need
 their own authority/security design.
@@ -16,6 +16,8 @@ a mismatch is a bounded preflight/import error, never an optimistic parser fallb
 | TXT | binary/control check plus BOM/encoding candidates | decoded Unicode text + byte/line map | PlainText-to-Docling adapter | line + character/byte range |
 | DOCX | ZIP plus OOXML content/relationship entries | validated OOXML descriptor | Docling DOCX adapter | structural item/section/table cell; no invented page number |
 | DOC | CFB signature | versioned Office PDF or DOCX intermediate | Docling route for intermediate | source DOC + intermediate/page/region provenance |
+| PPTX | ZIP plus OOXML presentation/content entries | validated OOXML descriptor | Docling PPTX adapter | slide + structural item/table cell; no invented PDF page locator |
+| PPT | CFB signature | versioned LibreOffice PPTX intermediate | Docling PPTX adapter | source PPT + intermediate/slide/item provenance |
 | PDF | `%PDF-` plus bounded document/page inspection | PDF page inventory / optional named derived input | per-page Docling/OCR plan | original page + bounding box |
 | JPEG | JPEG signature and safe image metadata | orientation/pixel transform | Docling image/OCR adapter | source pixel bounding box |
 | PNG | PNG signature and safe image metadata | orientation/pixel transform | Docling image/OCR adapter | source pixel bounding box |
@@ -62,6 +64,13 @@ The intermediate is attempt-local and checksummed. Its converter/runtime/options
 the original source artifact relation go into the envelope. The converter uses a
 unique temporary profile, bounded subprocess, and cancellation policy. It never
 rewrites the source snapshot.
+
+## PPTX and Legacy PPT: One Presentation IR Route
+
+PPTX uses Docling's PowerPoint backend after bounded OOXML package validation. Legacy
+PPT uses a named, checksummed LibreOffice conversion to PPTX before the same parser
+route. Both retain original source format and normalization provenance; neither is
+treated as PDF, and embedded picture bytes never become searchable text Units.
 
 ## PDF: Route Per Page
 

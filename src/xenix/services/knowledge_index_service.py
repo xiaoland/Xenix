@@ -325,6 +325,11 @@ class KnowledgeIndexService:
                 generation_id = generation.id
                 profile_fingerprint = generation.profile_fingerprint
                 corpus_fingerprint = generation.corpus_fingerprint
+                current = self._semantic.inspect_index(library_id=library_id)
+                if current.generation_id != generation.id:
+                    raise RuntimeError(
+                        "Knowledge corpus changed before the vector task completed."
+                    )
             with self._session_factory() as session:
                 row = self._repository.get_index_task(session, task_id)
                 if row is None:

@@ -2,44 +2,111 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QEvent, QThreadPool, QTimer, Qt
+from PySide6.QtCore import QEvent, QObject, QRunnable, QThreadPool, QTimer, Qt, Signal
+from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QDialog,
     QFileDialog,
+    QHeaderView,
     QHBoxLayout,
     QInputDialog,
     QLabel,
     QLineEdit,
-    QListWidget,
-    QListWidgetItem,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
-    QHeaderView,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
 )
 
-from ..services.knowledge_import_service import KnowledgeImportService
-from ..services.knowledge_index_service import KnowledgeIndexService
-from ..services.knowledge_service import KnowledgeService
-from ..services.knowledge_pipeline import (
+from ..services.knowledge_formats import (
     SUPPORTED_KNOWLEDGE_SUFFIXES,
     knowledge_file_dialog_filter,
 )
-from ..services.knowledge_derivation_service import KnowledgeDerivationService
-from ..services.paddle_ocr_service import (
-    PaddleOcrDeploymentService,
-    PaddleOcrStatus,
-)
-from .ocr_deployment_tasks import OcrStatusTask
-from .knowledge_index_ui import KnowledgeIndexRebuildDialog
+
+if TYPE_CHECKING:
+    from ..services.knowledge_derivation_service import KnowledgeDerivationService
+    from ..services.knowledge_import_service import KnowledgeImportService
+    from ..services.knowledge_index_service import KnowledgeIndexService
+    from ..services.knowledge_service import KnowledgeService
+    from ..services.knowledge_task_query import KnowledgeTaskItem, KnowledgeTaskQueryService
+    from ..services.knowledge_workspace_service import (
+        KnowledgeWorkspaceService,
+        KnowledgeWorkspaceSnapshot,
+    )
+    from ..services.paddle_ocr_service import PaddleOcrDeploymentService
+    from .knowledge_index_ui import KnowledgeIndexRebuildDialog
 
 
-IMPORT_POLL_INTERVAL_MS = 500
+TASK_POLL_INTERVAL_MS = 500
+WORKSPACE_ACTIVE_POLL_INTERVAL_MS = 1_000
+
+
+class _SnapshotSignals(QObject):
+    finished = Signal(int, object)
+
+
+class _SnapshotTask(QRunnable):
+    def __init__(self, service: KnowledgeWorkspaceService, generation: int) -> None:
+        super().__init__()
+        self._service = service
+        self._generation = generation
+        self.signals = _SnapshotSignals()
+
+    def run(self) -> None:
+        try:
+            snapshot = self._service.snapshot()
+        except Exception:
+            snapshot = None
+        self.signals.finished.emit(self._generation, snapshot)
+
+
+class _TaskListSignals(QObject):
+    finished = Signal(int, object)
+
+
+class _TaskListLoad(QRunnable):
+    def __init__(self, query: KnowledgeTaskQueryService, generation: int) -> None:
+        super().__init__()
+        self._query = query
+        self._generation = generation
+        self.signals = _TaskListSignals()
+
+    def run(self) -> None:
+        try:
+            tasks = self._query.list_tasks()
+        except Exception:
+            tasks = []
+        self.signals.finished.emit(self._generation, tasks)
+
+
+class _KnowledgeFileDropAdapter(QObject):
+    """Project local file URLs into one Workspace submission callback."""
+
+    files_dropped = Signal(object)
+
+    def attach(self, target: QObject) -> None:
+        set_accept_drops = getattr(target, "setAcceptDrops", None)
+        if callable(set_accept_drops):
+            set_accept_drops(True)
+        target.installEventFilter(self)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if event.type() not in {QEvent.DragEnter, QEvent.DragMove, QEvent.Drop}:
+            return super().eventFilter(watched, event)
+        mime_data = getattr(event, "mimeData", lambda: None)()
+        paths = _local_file_drop_paths(mime_data)
+        if not paths:
+            event.ignore()
+            return True
+        event.acceptProposedAction()
+        if event.type() == QEvent.Drop:
+            self.files_dropped.emit(paths)
+        return True
 
 
 class KnowledgeImportLogDialog(QDialog):
@@ -55,7 +122,7 @@ class KnowledgeImportLogDialog(QDialog):
         self._close_button = QPushButton(self)
         self._close_button.clicked.connect(self.hide)
         self._refresh_timer = QTimer(self)
-        self._refresh_timer.setInterval(IMPORT_POLL_INTERVAL_MS)
+        self._refresh_timer.setInterval(TASK_POLL_INTERVAL_MS)
         self._refresh_timer.timeout.connect(self.refresh)
         layout = QVBoxLayout(self)
         layout.addWidget(self._content, 1)
@@ -85,19 +152,13 @@ class KnowledgeImportLogDialog(QDialog):
             self._content.setPlainText(self.tr("The import log could not be read."))
             return
         lines = [
-            "{timestamp}  {phase} — {event}".format(
-                timestamp=entry.timestamp,
-                phase=self._translated_phase(entry.phase),
-                event=self._translated_event(entry.event_code),
-            )
+            f"{entry.timestamp}  {self._translated_phase(entry.phase)} — "
+            f"{entry.event_code.replace('_', ' ')}"
             for entry in entries
         ]
         self._content.setPlainText(
             "\n".join(lines) if lines else self.tr("No import events have been recorded yet.")
         )
-        cursor = self._content.textCursor()
-        cursor.movePosition(cursor.MoveOperation.End)
-        self._content.setTextCursor(cursor)
 
     def _translated_phase(self, phase: str) -> str:
         translations = {
@@ -109,37 +170,10 @@ class KnowledgeImportLogDialog(QDialog):
             "parsing": self.tr("Document parsing"),
             "publishing_canonical": self.tr("Canonical publication"),
             "completed": self.tr("Completed"),
-            "needs_attention": self.tr("Needs attention"),
             "failed": self.tr("Failed"),
             "cancelled": self.tr("Cancelled"),
         }
-        return translations.get(phase, phase)
-
-    def _translated_event(self, event_code: str) -> str:
-        translations = {
-            "import_queued": self.tr("Import queued"),
-            "import_retry_queued": self.tr("Retry queued"),
-            "source_snapshot_started": self.tr("Source snapshot started"),
-            "source_snapshot_published": self.tr("Source snapshot published"),
-            "source_snapshot_verified": self.tr("Source snapshot verified"),
-            "source_probed": self.tr("Source format verified"),
-            "worker_started": self.tr("Import worker started"),
-            "normalization_started": self.tr("Normalization started"),
-            "routing_started": self.tr("Parser selected"),
-            "parsing_started": self.tr("Document parsing started"),
-            "canonical_write_started": self.tr("Canonical content write started"),
-            "worker_succeeded": self.tr("Import worker completed"),
-            "worker_failed": self.tr("Import worker reported a failure"),
-            "worker_cancelled": self.tr("Import worker cancelled"),
-            "worker_interrupted_for_shutdown": self.tr(
-                "Import paused while Xenix was closing"
-            ),
-            "import_completed": self.tr("Import completed"),
-            "document_reused": self.tr("Existing document reused"),
-            "cancellation_requested": self.tr("Cancellation requested"),
-            "import_cancelled": self.tr("Import cancelled"),
-        }
-        return translations.get(event_code, event_code.replace("_", " "))
+        return translations.get(phase, phase.replace("_", " "))
 
     def retranslate_ui(self) -> None:
         title = self.tr("Knowledge Import Log")
@@ -168,130 +202,151 @@ class KnowledgeImportLogDialog(QDialog):
         super().changeEvent(event)
 
 
-class KnowledgeImportQueueDialog(QDialog):
+class KnowledgeTaskQueueDialog(QDialog):
     def __init__(
         self,
+        *,
+        task_query: KnowledgeTaskQueryService,
         import_service: KnowledgeImportService,
-        derivation_service: KnowledgeDerivationService | None = None,
+        derivation_service: KnowledgeDerivationService | None,
+        index_service: KnowledgeIndexService | None,
         parent=None,
     ) -> None:
         super().__init__(parent)
         self.setWindowModality(Qt.NonModal)
         self.setAttribute(Qt.WA_DeleteOnClose, False)
-        self._service = import_service
-        self._derivation_service = derivation_service
+        self._query = task_query
+        self._imports = import_service
+        self._derivation = derivation_service
+        self._indexes = index_service
         self._log_dialog: KnowledgeImportLogDialog | None = None
-        self._list = QListWidget(self)
-        self._list.currentItemChanged.connect(self._sync_actions)
+        self._thread_pool = QThreadPool.globalInstance()
+        self._lifecycle_generation = 0
+        self._load_task: _TaskListLoad | None = None
+        self._load_pending = False
+        self._active = False
+        self._table = QTableWidget(0, 4, self)
+        self._table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self._table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self._table.setSelectionMode(QAbstractItemView.SingleSelection)
+        self._table.verticalHeader().setVisible(False)
+        self._table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        for column in (0, 2, 3):
+            self._table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeToContents)
+        self._table.currentItemChanged.connect(self._sync_actions)
         self._retry_button = QPushButton(self)
         self._retry_button.clicked.connect(self._retry_selected)
         self._cancel_button = QPushButton(self)
         self._cancel_button.clicked.connect(self._cancel_selected)
         self._view_log_button = QPushButton(self)
         self._view_log_button.clicked.connect(self._view_selected_log)
+        self._details_button = QPushButton(self)
+        self._details_button.clicked.connect(self._view_selected_details)
         self._close_button = QPushButton(self)
         self._close_button.clicked.connect(self.hide)
         self._refresh_timer = QTimer(self)
-        self._refresh_timer.setInterval(IMPORT_POLL_INTERVAL_MS)
+        self._refresh_timer.setInterval(TASK_POLL_INTERVAL_MS)
         self._refresh_timer.timeout.connect(self.refresh)
         layout = QVBoxLayout(self)
-        layout.addWidget(self._list)
+        layout.addWidget(self._table, 1)
         actions = QHBoxLayout()
-        actions.addWidget(self._retry_button)
-        actions.addWidget(self._cancel_button)
-        actions.addWidget(self._view_log_button)
+        for button in (
+            self._retry_button,
+            self._cancel_button,
+            self._view_log_button,
+            self._details_button,
+        ):
+            actions.addWidget(button)
         actions.addStretch(1)
         actions.addWidget(self._close_button)
         layout.addLayout(actions)
-        self.resize(620, 360)
+        self.resize(780, 420)
         self.retranslate_ui()
 
     def refresh(self) -> None:
-        selected = self._selected_import_id()
-        self._list.clear()
-        for item in self._service.list_imports():
-            status = self._translated_status(getattr(item, "status", None))
-            phase = self._translated_phase(getattr(item, "phase", None))
-            details = [
-                self.tr("Status: %1").replace("%1", status),
-                self.tr("Phase: %1").replace("%1", phase),
-            ]
-            if bool(getattr(item, "reused_existing", False)):
-                details.append(self.tr("Reused existing document"))
-            error_code = getattr(item, "error_code", None)
-            if isinstance(error_code, str) and error_code:
-                details.append(self._translated_error(error_code))
-            derivation = (
-                self._derivation_service.status_for_import(str(item.import_id))
-                if self._derivation_service is not None
-                else None
+        if not self._active:
+            return
+        if self._load_task is not None:
+            self._load_pending = True
+            return
+        task = _TaskListLoad(self._query, self._lifecycle_generation)
+        task.signals.finished.connect(self._on_tasks_loaded)
+        self._load_task = task
+        self._thread_pool.start(task)
+
+    def _on_tasks_loaded(self, generation: int, tasks: object) -> None:
+        self._load_task = None
+        if generation != self._lifecycle_generation or not self._active:
+            if self._active:
+                self._load_pending = False
+                self.refresh()
+            return
+        self._render_tasks(tasks if isinstance(tasks, list) else [])
+        if self._load_pending:
+            self._load_pending = False
+            self.refresh()
+
+    def _render_tasks(self, tasks: list[KnowledgeTaskItem]) -> None:
+        selected = self._selected_reference()
+        self._table.setRowCount(len(tasks))
+        selected_row = -1
+        for row_index, task in enumerate(tasks):
+            values = (
+                self._translated_kind(task.kind),
+                task.target,
+                self._translated_status(task.status),
+                task.updated_at.astimezone().strftime("%Y-%m-%d %H:%M"),
             )
-            if derivation is not None:
-                details.append(
-                    self.tr("Search index: %1").replace(
-                        "%1",
-                        self._translated_derivation(derivation.status, derivation.phase),
-                    )
-                )
-                if derivation.error_code:
-                    details.append(self._translated_error(derivation.error_code))
-            file_name = str(getattr(item, "file_name", self.tr("Knowledge document")))
-            row = QListWidgetItem(f"{file_name} — {' · '.join(details)}")
-            row.setData(Qt.UserRole, str(getattr(item, "import_id", "")))
-            row.setData(Qt.UserRole + 1, str(getattr(item, "status", "")))
-            row.setData(Qt.UserRole + 2, str(error_code or ""))
-            row.setData(Qt.UserRole + 3, bool(getattr(item, "retryable", False)))
-            row.setData(
-                Qt.UserRole + 4,
-                bool(derivation is not None and derivation.retryable),
-            )
-            self._list.addItem(row)
-            if selected and selected == str(getattr(item, "import_id", "")):
-                self._list.setCurrentItem(row)
+            for column, value in enumerate(values):
+                cell = QTableWidgetItem(value)
+                if column == 0:
+                    cell.setData(Qt.UserRole, task)
+                self._table.setItem(row_index, column, cell)
+            if task.reference == selected:
+                selected_row = row_index
+        if selected_row >= 0:
+            self._table.selectRow(selected_row)
         self._sync_actions()
+        if self._active:
+            self._refresh_timer.start()
+        else:
+            self._refresh_timer.stop()
 
-    def _selected_import_id(self) -> str | None:
-        item = self._list.currentItem()
-        if item is None:
+    def _selected_task(self) -> KnowledgeTaskItem | None:
+        row = self._table.currentRow()
+        if row < 0:
             return None
-        value = str(item.data(Qt.UserRole) or "")
-        return value or None
+        item = self._table.item(row, 0)
+        value = item.data(Qt.UserRole) if item is not None else None
+        return value if value is not None else None
 
-    def _view_selected_log(self) -> None:
-        item = self._list.currentItem()
-        if item is None:
-            return
-        import_id = str(item.data(Qt.UserRole) or "")
-        if not import_id:
-            return
-        if self._log_dialog is None:
-            self._log_dialog = KnowledgeImportLogDialog(self._service, self)
-        text = item.text()
-        file_name = text.split(" — ", 1)[0]
-        self._log_dialog.show_import(import_id, file_name)
+    def _selected_reference(self) -> str | None:
+        task = self._selected_task()
+        return task.reference if task is not None else None
 
     def _retry_selected(self) -> None:
-        item = self._list.currentItem()
-        if item is None:
+        task = self._selected_task()
+        if task is None or not task.can_retry:
             return
-        import_id = str(item.data(Qt.UserRole) or "")
-        error_code = str(item.data(Qt.UserRole + 2) or "")
-        if not import_id:
-            return
-        if bool(item.data(Qt.UserRole + 4)) and self._derivation_service is not None:
-            try:
-                self._derivation_service.retry_for_import(import_id)
-            except Exception:
-                QMessageBox.warning(
-                    self,
-                    self.tr("Knowledge Import Failed"),
-                    self.tr("The search index could not be retried."),
-                )
-            self.refresh()
-            return
+        try:
+            if task.owner == "derivation" and self._derivation is not None and task.import_id:
+                self._derivation.retry_for_import(task.import_id)
+            elif task.owner == "index" and self._indexes is not None:
+                self._indexes.enqueue_rebuild(task.index_kinds, trigger="manual")
+            elif task.import_id:
+                self._retry_import(task)
+        except Exception:
+            QMessageBox.warning(
+                self,
+                self.tr("Task Failed"),
+                self.tr("The selected task could not be retried."),
+            )
+        self.refresh()
+
+    def _retry_import(self, task: KnowledgeTaskItem) -> None:
         password: str | None = None
         source_path: Path | None = None
-        if error_code in {"knowledge_password_required", "knowledge_password_invalid"}:
+        if task.error_code in {"knowledge_password_required", "knowledge_password_invalid"}:
             password, accepted = QInputDialog.getText(
                 self,
                 self.tr("Document password"),
@@ -300,7 +355,7 @@ class KnowledgeImportQueueDialog(QDialog):
             )
             if not accepted or not password:
                 return
-        if error_code == "knowledge_source_reselection_required":
+        if task.error_code == "knowledge_source_reselection_required":
             selected, _filter = QFileDialog.getOpenFileName(
                 self,
                 self.tr("Select Knowledge Source"),
@@ -310,215 +365,104 @@ class KnowledgeImportQueueDialog(QDialog):
             if not selected:
                 return
             source_path = Path(selected)
-        try:
-            self._service.retry_import(
-                import_id,
-                password=password,
-                source_path=source_path,
-            )
-        except Exception:
-            QMessageBox.warning(
-                self,
-                self.tr("Knowledge Import Failed"),
-                self.tr("The import could not be retried."),
-            )
-        self.refresh()
+        self._imports.retry_import(task.import_id, password=password, source_path=source_path)
 
     def _cancel_selected(self) -> None:
-        item = self._list.currentItem()
-        if item is None:
-            return
-        import_id = str(item.data(Qt.UserRole) or "")
-        if import_id:
-            self._service.cancel_import(import_id)
+        task = self._selected_task()
+        if task is not None and task.can_cancel and task.import_id:
+            self._imports.cancel_import(task.import_id)
         self.refresh()
 
-    def _sync_actions(self, *_args) -> None:
-        item = self._list.currentItem()
-        status = str(item.data(Qt.UserRole + 1) or "") if item is not None else ""
-        retryable = bool(item.data(Qt.UserRole + 3)) if item is not None else False
-        derivation_retryable = (
-            bool(item.data(Qt.UserRole + 4)) if item is not None else False
-        )
-        self._retry_button.setEnabled(
-            bool(item is not None and (retryable or derivation_retryable))
-        )
-        self._cancel_button.setEnabled(status in {"queued", "running"})
-        self._view_log_button.setEnabled(item is not None)
+    def _view_selected_log(self) -> None:
+        task = self._selected_task()
+        if task is None or not task.can_view_log or not task.import_id:
+            return
+        if self._log_dialog is None:
+            self._log_dialog = KnowledgeImportLogDialog(self._imports, self)
+        self._log_dialog.show_import(task.import_id, task.target)
 
-    def _translated_status(self, status: object) -> str:
-        translations = {
+    def _view_selected_details(self) -> None:
+        task = self._selected_task()
+        if task is None:
+            return
+        details = self.tr("Phase: %1\nTrigger: %2").replace(
+            "%1", task.phase.replace("_", " ")
+        ).replace("%2", task.trigger.replace("_", " "))
+        if task.error_code:
+            details += "\n" + self.tr("Error: %1").replace("%1", task.error_code)
+        QMessageBox.information(self, self.tr("Task Details"), details)
+
+    def _sync_actions(self, *_args) -> None:
+        task = self._selected_task()
+        self._retry_button.setEnabled(bool(task and task.can_retry))
+        self._cancel_button.setEnabled(bool(task and task.can_cancel))
+        self._view_log_button.setEnabled(bool(task and task.can_view_log))
+        self._details_button.setEnabled(bool(task and task.can_view_details))
+
+    def _translated_kind(self, kind: str) -> str:
+        return {
+            "import": self.tr("Import"),
+            "content_preparation": self.tr("Content preparation"),
+            "index_build": self.tr("Index build"),
+        }.get(kind, kind)
+
+    def _translated_status(self, status: str) -> str:
+        return {
             "pending": self.tr("Pending"),
             "queued": self.tr("Queued"),
             "running": self.tr("In progress"),
-            "canonical_ready": self.tr("Canonical content ready"),
-            "retrieval_ready": self.tr("Ready for retrieval"),
+            "canonical_ready": self.tr("Preparing content"),
+            "retrieval_ready": self.tr("Ready"),
+            "succeeded": self.tr("Completed"),
             "needs_attention": self.tr("Needs attention"),
             "failed": self.tr("Failed"),
             "cancelled": self.tr("Cancelled"),
             "reused": self.tr("Reused"),
-        }
-        return translations.get(status, self.tr("Unknown status"))
-
-    def _translated_phase(self, phase: object) -> str:
-        translations = {
-            "queued": self.tr("Waiting in queue"),
-            "snapshot": self.tr("Copying source"),
-            "probing": self.tr("Checking file"),
-            "normalizing": self.tr("Normalizing document"),
-            "routing": self.tr("Selecting parser"),
-            "parsing": self.tr("Reading document"),
-            "publishing_canonical": self.tr("Saving canonical content"),
-            "derivation_queued": self.tr("Waiting to build search index"),
-            "deriving": self.tr("Building search index"),
-            "completed": self.tr("Completed"),
-            "no_text_projection": self.tr(
-                "Canonical content contains no searchable text"
-            ),
-            "derivation_failed": self.tr("Search index build failed"),
-            "needs_attention": self.tr("Needs attention"),
-            "failed": self.tr("Failed"),
-            "cancelled": self.tr("Cancelled"),
-            "source_snapshot_unavailable": self.tr("Source snapshot unavailable"),
-            "source_reselection_required": self.tr("Select the source file again"),
-        }
-        return translations.get(phase, self.tr("Unknown phase"))
-
-    def _translated_derivation(self, status: str, phase: str) -> str:
-        if status == "succeeded" and phase == "no_text_projection":
-            return self.tr("No searchable text")
-        translations = {
-            "queued": self.tr("Waiting"),
-            "running": self.tr("In progress"),
-            "succeeded": self.tr("Ready"),
-            "failed": self.tr("Failed"),
-        }
-        return translations.get(status, self.tr("Unknown status"))
-
-    def _translated_error(self, error_code: str) -> str:
-        translations = {
-            "knowledge_password_required": self.tr(
-                "A password is required to continue this import."
-            ),
-            "knowledge_password_invalid": self.tr(
-                "The document password was not accepted."
-            ),
-            "knowledge_office_converter_unavailable": self.tr(
-                "LibreOffice is required to import this DOC file."
-            ),
-            "knowledge_office_conversion_failed": self.tr(
-                "The DOC file could not be converted."
-            ),
-            "knowledge_format_unsupported": self.tr(
-                "This file type is not supported by the Knowledge Library."
-            ),
-            "knowledge_format_mismatch": self.tr(
-                "The file signature does not match its extension."
-            ),
-            "knowledge_pdf_invalid": self.tr("The PDF is structurally invalid."),
-            "knowledge_source_size_unsupported": self.tr(
-                "The file size is outside the supported range."
-            ),
-            "knowledge_text_encoding_unknown": self.tr(
-                "The TXT encoding could not be identified safely."
-            ),
-            "knowledge_text_encoding_invalid": self.tr(
-                "The TXT content is invalid for its encoding."
-            ),
-            "knowledge_text_controls_invalid": self.tr(
-                "The TXT file contains unsupported control characters."
-            ),
-            "knowledge_text_line_too_long": self.tr(
-                "The TXT file contains a line that is too long."
-            ),
-            "knowledge_docx_package_invalid": self.tr(
-                "The DOCX file is not a valid Office document."
-            ),
-            "knowledge_docx_entry_limit": self.tr(
-                "The DOCX package contains too many entries."
-            ),
-            "knowledge_docx_entries_ambiguous": self.tr(
-                "The DOCX package contains ambiguous entries."
-            ),
-            "knowledge_docx_entry_encrypted": self.tr(
-                "The DOCX package contains an unsupported encrypted entry."
-            ),
-            "knowledge_docx_entry_unsafe": self.tr(
-                "The DOCX package contains an unsafe entry."
-            ),
-            "knowledge_docx_path_unsafe": self.tr(
-                "The DOCX package contains an unsafe path."
-            ),
-            "knowledge_docx_size_invalid": self.tr(
-                "The DOCX package contains invalid size metadata."
-            ),
-            "knowledge_docx_entry_too_large": self.tr(
-                "The DOCX package contains an entry that is too large."
-            ),
-            "knowledge_docx_expansion_limit": self.tr(
-                "The expanded DOCX package is too large."
-            ),
-            "knowledge_docx_compression_ratio": self.tr(
-                "The DOCX package compression ratio is unsafe."
-            ),
-            "knowledge_docling_parse_failed": self.tr(
-                "The document could not be parsed into canonical content."
-            ),
-            "knowledge_canonical_integrity_failed": self.tr(
-                "Canonical content failed integrity validation."
-            ),
-            "knowledge_canonical_generation_missing": self.tr(
-                "Canonical content is unavailable for indexing."
-            ),
-            "knowledge_derivation_failed": self.tr(
-                "The search index could not be built."
-            ),
-            "knowledge_document_missing": self.tr(
-                "The imported document is unavailable for indexing."
-            ),
-            "knowledge_import_cancelled": self.tr("The import was cancelled."),
-            "knowledge_source_snapshot_unavailable": self.tr(
-                "The app-owned source snapshot is unavailable."
-            ),
-            "knowledge_source_integrity_failed": self.tr(
-                "The app-owned source snapshot failed integrity validation."
-            ),
-            "knowledge_source_reselection_required": self.tr(
-                "Select the source file again to retry this import."
-            ),
-            "knowledge_import_failed": self.tr("The file could not be imported."),
-        }
-        return translations.get(error_code, self.tr("The file could not be imported."))
+        }.get(status, self.tr("Unknown status"))
 
     def retranslate_ui(self) -> None:
-        self.setWindowTitle(self.tr("Knowledge Import Queue"))
+        self.setWindowTitle(self.tr("Task queue"))
+        self._table.setHorizontalHeaderLabels(
+            [self.tr("Type"), self.tr("Target"), self.tr("Status"), self.tr("Updated")]
+        )
         self._retry_button.setText(self.tr("Retry"))
         self._cancel_button.setText(self.tr("Cancel"))
         self._view_log_button.setText(self.tr("View log"))
+        self._details_button.setText(self.tr("Details"))
         self._close_button.setText(self.tr("Close"))
-        if self._log_dialog is not None:
-            self._log_dialog.retranslate_ui()
 
     def showEvent(self, event) -> None:
-        self.refresh()
-        self._refresh_timer.start()
+        self._active = True
+        self._lifecycle_generation += 1
         super().showEvent(event)
+        QTimer.singleShot(0, self.refresh)
 
     def hideEvent(self, event) -> None:
-        self._refresh_timer.stop()
+        self._deactivate()
         if self._log_dialog is not None:
             self._log_dialog.hide()
         super().hideEvent(event)
 
     def closeEvent(self, event) -> None:
-        self._refresh_timer.stop()
+        self._deactivate()
         super().closeEvent(event)
+
+    def _deactivate(self) -> None:
+        if self._active:
+            self._lifecycle_generation += 1
+        self._active = False
+        self._load_pending = False
+        self._refresh_timer.stop()
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == QEvent.LanguageChange:
             self.retranslate_ui()
             self.refresh()
         super().changeEvent(event)
+
+
+# Transitional import name for callers/tests while the user-visible concept is unified.
+KnowledgeImportQueueDialog = KnowledgeTaskQueueDialog
 
 
 class KnowledgeWorkspaceDialog(QDialog):
@@ -530,6 +474,8 @@ class KnowledgeWorkspaceDialog(QDialog):
         knowledge_service: KnowledgeService | None = None,
         knowledge_index_service: KnowledgeIndexService | None = None,
         ocr_deployment: PaddleOcrDeploymentService | None = None,
+        task_query_service: KnowledgeTaskQueryService | None = None,
+        workspace_service: KnowledgeWorkspaceService | None = None,
         open_knowledge_settings: Callable[[], None] | None = None,
         parent=None,
     ) -> None:
@@ -538,50 +484,53 @@ class KnowledgeWorkspaceDialog(QDialog):
         self.setAttribute(Qt.WA_DeleteOnClose, False)
         self._import_service = import_service
         self._derivation_service = derivation_service
-        self._knowledge_service = knowledge_service
         self._knowledge_index_service = knowledge_index_service
-        self._ocr_deployment = ocr_deployment
+        self._task_query = task_query_service
+        self._workspace_service = workspace_service
         self._open_knowledge_settings = open_knowledge_settings
-        self._queue_dialog: KnowledgeImportQueueDialog | None = None
+        self._queue_dialog: KnowledgeTaskQueueDialog | None = None
         self._index_dialog: KnowledgeIndexRebuildDialog | None = None
         self._thread_pool = QThreadPool.globalInstance()
         self._lifecycle_generation = 0
+        self._snapshot_task: _SnapshotTask | None = None
+        self._snapshot_pending = False
         self._active = False
-        self._cached_ocr_status: PaddleOcrStatus | None = None
-        self._ocr_status_task: OcrStatusTask | None = None
+        self._last_snapshot: KnowledgeWorkspaceSnapshot | None = None
+        self._drop_adapter = _KnowledgeFileDropAdapter(self)
+        self._drop_adapter.files_dropped.connect(self._submit_import_paths)
 
-        self._description = QLabel(self)
-        self._description.setWordWrap(True)
-        self._ocr_status = QLabel(self)
-        self._index_status = QLabel(self)
-        self._empty_state = QLabel(self)
-        self._empty_state.setAlignment(Qt.AlignCenter)
-        self._documents = QTableWidget(self)
-        self._documents.setColumnCount(4)
+        self._documents = QTableWidget(0, 4, self)
         self._documents.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self._documents.setSelectionBehavior(QAbstractItemView.SelectRows)
         self._documents.setSelectionMode(QAbstractItemView.SingleSelection)
         self._documents.verticalHeader().setVisible(False)
-        self._documents.horizontalHeader().setSectionResizeMode(
-            0, QHeaderView.Stretch
-        )
+        self._documents.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         for column in (1, 2, 3):
-            self._documents.horizontalHeader().setSectionResizeMode(
-                column, QHeaderView.ResizeToContents
-            )
+            self._documents.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeToContents)
+        self._empty_state = QLabel(self)
+        self._empty_state.setAlignment(Qt.AlignCenter)
+        self._footer_status = QLabel(self)
+        footer_font = self._footer_status.font()
+        footer_font.setPointSize(max(8, footer_font.pointSize() - 1))
+        self._footer_status.setFont(footer_font)
+        footer_palette = self._footer_status.palette()
+        footer_palette.setColor(QPalette.WindowText, footer_palette.color(QPalette.Mid))
+        self._footer_status.setPalette(footer_palette)
+
         self._import_button = QPushButton(self)
         self._queue_button = QPushButton(self)
         self._rebuild_button = QPushButton(self)
         self._settings_button = QPushButton(self)
         self._import_button.clicked.connect(self._choose_files)
-        self._queue_button.clicked.connect(self.open_import_queue)
+        self._queue_button.clicked.connect(self.open_task_queue)
         self._rebuild_button.clicked.connect(self._open_index_rebuild)
         self._settings_button.clicked.connect(self._open_settings)
         self._settings_button.setEnabled(self._open_knowledge_settings is not None)
         self._rebuild_button.setEnabled(self._knowledge_index_service is not None)
         self._refresh_timer = QTimer(self)
-        self._refresh_timer.setInterval(1_000)
+        self._refresh_timer.setInterval(WORKSPACE_ACTIVE_POLL_INTERVAL_MS)
         self._refresh_timer.timeout.connect(self.refresh_documents)
+
         buttons = QHBoxLayout()
         buttons.addWidget(self._import_button)
         buttons.addWidget(self._queue_button)
@@ -589,26 +538,33 @@ class KnowledgeWorkspaceDialog(QDialog):
         buttons.addStretch(1)
         buttons.addWidget(self._settings_button)
         layout = QVBoxLayout(self)
-        layout.addWidget(self._description)
-        layout.addWidget(self._ocr_status)
-        layout.addWidget(self._index_status)
         layout.addLayout(buttons)
         layout.addWidget(self._documents, 1)
         layout.addWidget(self._empty_state, 1)
+        layout.addWidget(self._footer_status)
+        for drop_target in (self, self._documents.viewport(), self._empty_state):
+            self._drop_adapter.attach(drop_target)
         self.resize(860, 520)
         self.retranslate_ui()
-        self.refresh_documents()
 
-    def open_import_queue(self) -> None:
+    def open_task_queue(self) -> None:
+        if self._task_query is None:
+            return
         if self._queue_dialog is None:
-            self._queue_dialog = KnowledgeImportQueueDialog(
-                self._import_service,
-                self._derivation_service,
-                self,
+            self._queue_dialog = KnowledgeTaskQueueDialog(
+                task_query=self._task_query,
+                import_service=self._import_service,
+                derivation_service=self._derivation_service,
+                index_service=self._knowledge_index_service,
+                parent=self,
             )
         self._queue_dialog.show()
         self._queue_dialog.raise_()
         self._queue_dialog.activateWindow()
+        self._queue_dialog.refresh()
+
+    def open_import_queue(self) -> None:
+        self.open_task_queue()
 
     def _choose_files(self) -> None:
         paths, _selected = QFileDialog.getOpenFileNames(
@@ -617,10 +573,12 @@ class KnowledgeWorkspaceDialog(QDialog):
             "",
             knowledge_file_dialog_filter(self.tr("Knowledge documents")),
         )
+        self._submit_import_paths(paths)
+
+    def _submit_import_paths(self, paths: list[str]) -> None:
         accepted = _accepted_import_paths(paths)
         if not accepted:
             return
-
         queued = False
         failed_count = 0
         for path in accepted:
@@ -630,14 +588,13 @@ class KnowledgeWorkspaceDialog(QDialog):
             except Exception:
                 failed_count += 1
         if queued:
-            self.open_import_queue()
+            self.open_task_queue()
+            self.refresh_documents()
         if failed_count:
             QMessageBox.warning(
                 self,
                 self.tr("Knowledge Import Failed"),
-                self.tr("%1 file(s) could not be queued for import.").replace(
-                    "%1", str(failed_count)
-                ),
+                self.tr("%1 file(s) could not be queued for import.").replace("%1", str(failed_count)),
             )
 
     def _open_settings(self) -> None:
@@ -648,26 +605,37 @@ class KnowledgeWorkspaceDialog(QDialog):
         if self._knowledge_index_service is None:
             return
         if self._index_dialog is None:
-            self._index_dialog = KnowledgeIndexRebuildDialog(
-                self._knowledge_index_service,
-                self,
-            )
-            self._index_dialog.submitted.connect(
-                lambda _task_id: self.refresh_documents()
-            )
+            from .knowledge_index_ui import KnowledgeIndexRebuildDialog
+
+            self._index_dialog = KnowledgeIndexRebuildDialog(self._knowledge_index_service, self)
+            self._index_dialog.submitted.connect(lambda _task_id: self.refresh_documents())
         self._index_dialog.open()
 
     def refresh_documents(self) -> None:
-        documents_unavailable = False
-        try:
-            documents = (
-                self._knowledge_service.list_documents()
-                if self._knowledge_service is not None
-                else []
-            )
-        except Exception:
-            documents = []
-            documents_unavailable = True
+        if not self._active or self._workspace_service is None:
+            return
+        if self._snapshot_task is not None:
+            self._snapshot_pending = True
+            return
+        generation = self._lifecycle_generation
+        task = _SnapshotTask(self._workspace_service, generation)
+        task.signals.finished.connect(self._on_snapshot_finished)
+        self._snapshot_task = task
+        self._thread_pool.start(task)
+
+    def _on_snapshot_finished(self, generation: int, snapshot: object) -> None:
+        self._snapshot_task = None
+        if generation != self._lifecycle_generation or not self._active:
+            return
+        if snapshot is not None:
+            self._last_snapshot = snapshot
+            self._render_snapshot(snapshot)
+        if self._snapshot_pending:
+            self._snapshot_pending = False
+            self.refresh_documents()
+
+    def _render_snapshot(self, snapshot: KnowledgeWorkspaceSnapshot) -> None:
+        documents = snapshot.documents
         self._documents.setRowCount(len(documents))
         for row_index, document in enumerate(documents):
             values = (
@@ -683,93 +651,55 @@ class KnowledgeWorkspaceDialog(QDialog):
         self._empty_state.setVisible(not has_documents)
         self._empty_state.setText(
             self.tr("Knowledge content is temporarily unavailable.")
-            if documents_unavailable
+            if not snapshot.documents_available
             else self.tr("No Knowledge documents yet. Import a file to get started.")
         )
-        self._render_index_status()
-
-    def _render_index_status(self) -> None:
-        if self._knowledge_index_service is None:
-            self._index_status.setText(self.tr("Knowledge index status is unavailable"))
-            return
-        try:
-            status = self._knowledge_index_service.status()
-        except Exception:
-            self._index_status.setText(self.tr("Knowledge index status is unavailable"))
-            return
-        self._index_status.setText(
-            self.tr("Keyword: %1  ·  Text vectors: %2")
-            .replace("%1", self._translated_index_state(status.keyword_state))
-            .replace(
-                "%2", self._translated_index_state(status.text_vector_state)
-            )
+        index = snapshot.indexes
+        keyword = self._translated_index_state(index.keyword_state) if index else self.tr("Unavailable")
+        vector = self._translated_index_state(index.text_vector_state) if index else self.tr("Unavailable")
+        ocr = self._translated_ocr_state(str(snapshot.ocr.state))
+        self._footer_status.setText(
+            self.tr("OCR: %1  ·  Keyword: %2  ·  Text vectors: %3")
+            .replace("%1", ocr)
+            .replace("%2", keyword)
+            .replace("%3", vector)
         )
+        if snapshot.has_active_work:
+            self._refresh_timer.start()
+        else:
+            self._refresh_timer.stop()
+
+    def _translated_ocr_state(self, state: str) -> str:
+        return {
+            "ready": self.tr("Ready"),
+            "checking": self.tr("Checking"),
+            "not_installed": self.tr("Not installed"),
+            "repair_required": self.tr("Repair required"),
+            "installing": self.tr("Installing"),
+            "failed": self.tr("Needs attention"),
+        }.get(state, self.tr("Unavailable"))
 
     def _translated_index_state(self, state: str) -> str:
-        translations = {
+        return {
             "ready": self.tr("Ready"),
             "building": self.tr("Building"),
             "needs_rebuild": self.tr("Needs rebuild"),
             "unavailable": self.tr("Unavailable"),
             "needs_attention": self.tr("Needs attention"),
-        }
-        return translations.get(state, self.tr("Unknown status"))
+        }.get(state, self.tr("Unknown status"))
 
     def _translated_content_state(self, state: str) -> str:
-        translations = {
+        return {
             "ready": self.tr("Searchable"),
             "processing": self.tr("Preparing search content"),
             "no_searchable_text": self.tr("No searchable text"),
             "needs_attention": self.tr("Needs attention"),
-        }
-        return translations.get(state, self.tr("Unknown status"))
-
-    def _schedule_ocr_status_probe(self) -> None:
-        if (
-            not self._active
-            or self._ocr_status_task is not None
-            or self._ocr_deployment is None
-        ):
-            return
-        generation = self._lifecycle_generation
-        task = OcrStatusTask(self._ocr_deployment, generation)
-        task.signals.finished.connect(self._on_ocr_status_finished)
-        self._ocr_status_task = task
-        self._thread_pool.start(task)
-
-    def _on_ocr_status_finished(self, generation: int, status: PaddleOcrStatus) -> None:
-        self._ocr_status_task = None
-        if generation != self._lifecycle_generation or not self._active:
-            if self._active:
-                self._schedule_ocr_status_probe()
-            return
-        self._cached_ocr_status = status
-        self._render_ocr_status()
-
-    def _render_ocr_status(self) -> None:
-        status = self._cached_ocr_status
-        if self._ocr_deployment is None:
-            text = self.tr("OCR settings are unavailable")
-        elif status is None:
-            text = self.tr("Checking local PaddleOCR status")
-        elif status.installed and status.models_ready:
-            text = self.tr("Local PaddleOCR is ready")
-        elif status.installed:
-            text = self.tr("Local PaddleOCR runtime is installed; models are not ready")
-        else:
-            text = self.tr("Local PaddleOCR is not installed")
-        self._ocr_status.setText(text)
+        }.get(state, self.tr("Unknown status"))
 
     def retranslate_ui(self) -> None:
         self.setWindowTitle(self.tr("Knowledge Workspace"))
-        self._description.setText(
-            self.tr(
-                "Import TXT, DOC, DOCX, PDF, JPEG, or PNG files. "
-                "Xenix indexes bounded evidence for Agent analysis."
-            )
-        )
         self._import_button.setText(self.tr("Import documents"))
-        self._queue_button.setText(self.tr("Import queue"))
+        self._queue_button.setText(self.tr("Task queue"))
         self._rebuild_button.setText(self.tr("Rebuild indexes"))
         self._settings_button.setText(self.tr("Settings"))
         self._documents.setHorizontalHeaderLabels(
@@ -780,25 +710,17 @@ class KnowledgeWorkspaceDialog(QDialog):
                 self.tr("Updated"),
             ]
         )
-        self._empty_state.setText(
-            self.tr("No Knowledge documents yet. Import a file to get started.")
-        )
-        self._render_ocr_status()
-        self.refresh_documents()
+        self._empty_state.setText(self.tr("No Knowledge documents yet. Import a file to get started."))
+        if self._last_snapshot is not None:
+            self._render_snapshot(self._last_snapshot)
         if self._queue_dialog is not None:
             self._queue_dialog.retranslate_ui()
-            self._queue_dialog.refresh()
-        if self._index_dialog is not None:
-            self._index_dialog.retranslate_ui()
 
     def showEvent(self, event) -> None:
         self._active = True
         self._lifecycle_generation += 1
-        self._render_ocr_status()
         super().showEvent(event)
-        self.refresh_documents()
-        self._refresh_timer.start()
-        self._schedule_ocr_status_probe()
+        QTimer.singleShot(0, self.refresh_documents)
 
     def hideEvent(self, event) -> None:
         self._deactivate()
@@ -812,6 +734,7 @@ class KnowledgeWorkspaceDialog(QDialog):
         if self._active:
             self._lifecycle_generation += 1
         self._active = False
+        self._snapshot_pending = False
         self._refresh_timer.stop()
         if self._queue_dialog is not None:
             self._queue_dialog.hide()
@@ -835,3 +758,22 @@ def _accepted_import_paths(paths: list[str]) -> list[Path]:
         seen.add(key)
         accepted.append(path)
     return accepted
+
+
+def _local_file_drop_paths(mime_data: object | None) -> list[str]:
+    if mime_data is None:
+        return []
+    urls = getattr(mime_data, "urls", lambda: ())()
+    return [
+        url.toLocalFile()
+        for url in urls
+        if url.isLocalFile() and url.toLocalFile()
+    ]
+
+
+__all__ = [
+    "KnowledgeImportLogDialog",
+    "KnowledgeImportQueueDialog",
+    "KnowledgeTaskQueueDialog",
+    "KnowledgeWorkspaceDialog",
+]

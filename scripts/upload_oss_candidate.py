@@ -35,15 +35,23 @@ def main() -> int:
     bucket = oss2.Bucket(auth, os.environ["OSS_ENDPOINT"], os.environ["OSS_BUCKET"])
     headers = {"x-oss-forbid-overwrite": "true"}
     for artifact in manifest["artifacts"]:
-        path = root / "dist" / "velopack" / artifact["name"]
-        if sha256(path) != artifact["sha256"]:
+        relative_path = Path(str(artifact["path"]))
+        if relative_path.is_absolute() or ".." in relative_path.parts:
+            raise RuntimeError(f"Unsafe release artifact path: {relative_path}")
+        path = (root / "dist" / relative_path).resolve()
+        path.relative_to((root / "dist").resolve())
+        if path.name != artifact["name"]:
+            raise RuntimeError(f"Release artifact name/path mismatch: {path}")
+        if path.stat().st_size != artifact["bytes"] or sha256(path) != artifact["sha256"]:
             raise RuntimeError(f"Local artifact hash changed: {path}")
         key = f"{prefix}/{path.name}"
-        if bucket.object_exists(key):
-            if object_sha256(bucket, key) != artifact["sha256"]:
-                raise RuntimeError(f"Conflicting candidate artifact: {key}")
-        else:
+        if not bucket.object_exists(key):
             bucket.put_object_from_file(key, str(path), headers=headers)
+        if (
+            bucket.get_object_meta(key).content_length != artifact["bytes"]
+            or object_sha256(bucket, key) != artifact["sha256"]
+        ):
+            raise RuntimeError(f"Candidate artifact verification failed: {key}")
     manifest_key = f"{prefix}/release-manifest.json"
     if bucket.object_exists(manifest_key):
         if object_sha256(bucket, manifest_key) != manifest_hash:

@@ -4,6 +4,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pytest
+
 
 def _load_script(name: str):
     path = Path(__file__).resolve().parents[1] / "scripts" / f"{name}.py"
@@ -64,3 +66,59 @@ def test_public_assets_project_from_manifest_artifacts() -> None:
         {"RelativeFileName": "xenix-Setup.exe", "Type": "Installer"},
         {"RelativeFileName": "xenix-full.nupkg", "Type": "Full"},
     ]
+
+
+def test_manifest_contract_includes_one_external_ocr_runtime() -> None:
+    manifest = {
+        "schema_version": 2,
+        "version": "1.1.0",
+        "unsigned": True,
+        "packaged_smoke": "passed",
+        "artifacts": [
+            {
+                "type": "desktop_release",
+                "path": "velopack/xenix-Setup.exe",
+                "name": "xenix-Setup.exe",
+                "bytes": 10,
+                "sha256": "a" * 64,
+            },
+            {
+                "type": "knowledge_ocr_runtime",
+                "path": "knowledge-ocr/xenix-ocr.zip",
+                "name": "xenix-ocr.zip",
+                "bytes": 20,
+                "sha256": "b" * 64,
+            },
+        ],
+    }
+
+    artifacts = publish_candidate.validated_artifacts(
+        manifest,
+        expected_version="1.1.0",
+    )
+
+    assert [item["type"] for item in artifacts] == [
+        "desktop_release",
+        "knowledge_ocr_runtime",
+    ]
+
+
+def test_manifest_contract_rejects_unsafe_or_missing_ocr_artifacts() -> None:
+    manifest = {
+        "schema_version": 2,
+        "version": "1.1.0",
+        "unsigned": True,
+        "packaged_smoke": "passed",
+        "artifacts": [
+            {
+                "type": "desktop_release",
+                "path": "../xenix-Setup.exe",
+                "name": "xenix-Setup.exe",
+                "bytes": 10,
+                "sha256": "a" * 64,
+            }
+        ],
+    }
+
+    with pytest.raises(RuntimeError, match="artifact identity"):
+        publish_candidate.validated_artifacts(manifest, expected_version="1.1.0")

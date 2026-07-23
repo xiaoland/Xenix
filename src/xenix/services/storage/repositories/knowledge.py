@@ -14,6 +14,14 @@ from ..models import (
     KnowledgeUnitRow,
     KnowledgeVectorGenerationRow,
 )
+from ...knowledge_projection import (
+    CORPUS_FINGERPRINT_SCHEMA,
+    KnowledgeProjectionIdentity,
+    KnowledgeProjectionMetadata,
+    KnowledgeProjectionSnapshot,
+    KnowledgeProjectionUnit,
+    RETRIEVAL_PROJECTION_VERSION,
+)
 
 
 class KnowledgeRepository:
@@ -84,6 +92,7 @@ class KnowledgeRepository:
                 select(KnowledgeUnitRow).where(KnowledgeUnitRow.document_id == document.id)
             ):
                 session.delete(row)
+            session.flush()
         for unit in units:
             session.add(unit)
         session.flush()
@@ -112,12 +121,14 @@ class KnowledgeRepository:
             "WHERE knowledge_unit_fts MATCH :query AND d.active=1 "
             "AND d.library_id=:library_id "
             "AND d.retrieval_status='ready' "
+            "AND d.retrieval_projection_version=:projection_version "
             "AND u.canonical_generation_id=d.retrieval_generation_id "
         )
         params: dict[str, object] = {
             "query": fts_query,
             "library_id": library_id,
             "limit": limit,
+            "projection_version": RETRIEVAL_PROJECTION_VERSION,
         }
         if document_ids:
             placeholders = ", ".join(f":document_{index}" for index in range(len(document_ids)))
@@ -164,6 +175,8 @@ class KnowledgeRepository:
                     KnowledgeDocumentRow.library_id == library_id,
                     KnowledgeDocumentRow.active.is_(True),
                     KnowledgeDocumentRow.retrieval_status == "ready",
+                    KnowledgeDocumentRow.retrieval_projection_version
+                    == RETRIEVAL_PROJECTION_VERSION,
                     KnowledgeUnitRow.canonical_generation_id
                     == KnowledgeDocumentRow.retrieval_generation_id,
                 )
@@ -175,13 +188,134 @@ class KnowledgeRepository:
             )
         )
 
+    def list_current_projection_metadata(
+        self,
+        session: Session,
+        *,
+        library_id: str,
+    ) -> list[KnowledgeProjectionMetadata]:
+        rows = session.exec(
+            select(
+                KnowledgeDocumentRow.id,
+                KnowledgeDocumentRow.retrieval_generation_id,
+                KnowledgeDocumentRow.retrieval_projection_version,
+                KnowledgeDocumentRow.retrieval_content_fingerprint,
+                KnowledgeDocumentRow.retrieval_unit_count,
+            )
+            .where(
+                KnowledgeDocumentRow.library_id == library_id,
+                KnowledgeDocumentRow.active.is_(True),
+                KnowledgeDocumentRow.retrieval_status == "ready",
+                KnowledgeDocumentRow.retrieval_projection_version
+                == RETRIEVAL_PROJECTION_VERSION,
+                KnowledgeDocumentRow.retrieval_generation_id.is_not(None),
+                KnowledgeDocumentRow.retrieval_content_fingerprint.is_not(None),
+                KnowledgeDocumentRow.retrieval_unit_count > 0,
+            )
+            .order_by(KnowledgeDocumentRow.id)
+        )
+        return [
+            KnowledgeProjectionMetadata(
+                document_id=str(row[0]),
+                retrieval_generation_id=str(row[1]),
+                projection_version=int(row[2]),
+                content_fingerprint=str(row[3]),
+                unit_count=int(row[4]),
+            )
+            for row in rows
+        ]
+
+    def current_projection_identity(
+        self,
+        session: Session,
+        *,
+        library_id: str,
+    ) -> KnowledgeProjectionIdentity:
+        return KnowledgeProjectionIdentity(
+            tuple(
+                self.list_current_projection_metadata(
+                    session,
+                    library_id=library_id,
+                )
+            )
+        )
+
+    def load_projection_snapshot(
+        self,
+        session: Session,
+        *,
+        library_id: str,
+    ) -> KnowledgeProjectionSnapshot:
+        """Read projection metadata and bodies from one SQLite snapshot/query."""
+
+        rows = session.execute(
+            text(
+                "SELECT d.id AS document_id, "
+                "d.retrieval_generation_id AS retrieval_generation_id, "
+                "d.retrieval_projection_version AS projection_version, "
+                "d.retrieval_content_fingerprint AS content_fingerprint, "
+                "d.retrieval_unit_count AS declared_unit_count, "
+                "u.id AS unit_id, u.canonical_generation_id AS unit_generation_id, "
+                "u.ordinal AS unit_ordinal, u.text AS unit_text "
+                "FROM knowledge_document AS d "
+                "LEFT JOIN knowledge_unit AS u ON u.document_id=d.id "
+                "AND u.canonical_generation_id=d.retrieval_generation_id "
+                "WHERE d.library_id=:library_id AND d.active=1 "
+                "AND d.retrieval_status='ready' "
+                "AND d.retrieval_projection_version=:projection_version "
+                "AND d.retrieval_generation_id IS NOT NULL "
+                "AND d.retrieval_content_fingerprint IS NOT NULL "
+                "AND d.retrieval_unit_count > 0 "
+                "ORDER BY d.id, u.ordinal, u.id"
+            ),
+            {
+                "library_id": library_id,
+                "projection_version": RETRIEVAL_PROJECTION_VERSION,
+            },
+        ).mappings()
+        metadata: list[KnowledgeProjectionMetadata] = []
+        units: list[KnowledgeProjectionUnit] = []
+        seen_documents: set[str] = set()
+        for row in rows:
+            document_id = str(row["document_id"])
+            generation_id = str(row["retrieval_generation_id"])
+            if document_id not in seen_documents:
+                metadata.append(
+                    KnowledgeProjectionMetadata(
+                        document_id=document_id,
+                        retrieval_generation_id=generation_id,
+                        projection_version=int(row["projection_version"]),
+                        content_fingerprint=str(row["content_fingerprint"]),
+                        unit_count=int(row["declared_unit_count"]),
+                    )
+                )
+                seen_documents.add(document_id)
+            if row["unit_id"] is None:
+                continue
+            units.append(
+                KnowledgeProjectionUnit(
+                    id=str(row["unit_id"]),
+                    document_id=document_id,
+                    canonical_generation_id=str(row["unit_generation_id"]),
+                    ordinal=int(row["unit_ordinal"]),
+                    text=str(row["unit_text"]),
+                )
+            )
+        return KnowledgeProjectionSnapshot(
+            identity=KnowledgeProjectionIdentity(tuple(metadata)),
+            units=tuple(units),
+        )
+
     def keyword_index_counts(
         self,
         session: Session,
         *,
         library_id: str,
     ) -> tuple[int, int]:
-        params = {"library_id": library_id}
+        params = {
+            "library_id": library_id,
+            "projection_version": RETRIEVAL_PROJECTION_VERSION,
+        }
         current = int(
             session.execute(
                 text(
@@ -189,6 +323,7 @@ class KnowledgeRepository:
                     "JOIN knowledge_document AS d ON d.id=u.document_id "
                     "WHERE d.library_id=:library_id AND d.active=1 "
                     "AND d.retrieval_status='ready' "
+                    "AND d.retrieval_projection_version=:projection_version "
                     "AND u.canonical_generation_id=d.retrieval_generation_id"
                 ),
                 params,
@@ -202,6 +337,7 @@ class KnowledgeRepository:
                     "JOIN knowledge_document AS d ON d.id=u.document_id "
                     "WHERE d.library_id=:library_id AND d.active=1 "
                     "AND d.retrieval_status='ready' "
+                    "AND d.retrieval_projection_version=:projection_version "
                     "AND u.canonical_generation_id=d.retrieval_generation_id"
                 ),
                 params,
@@ -232,9 +368,13 @@ class KnowledgeRepository:
                 "JOIN knowledge_document AS d ON d.id=u.document_id "
                 "WHERE d.library_id=:library_id AND d.active=1 "
                 "AND d.retrieval_status='ready' "
+                "AND d.retrieval_projection_version=:projection_version "
                 "AND u.canonical_generation_id=d.retrieval_generation_id"
             ),
-            {"library_id": library_id},
+            {
+                "library_id": library_id,
+                "projection_version": RETRIEVAL_PROJECTION_VERSION,
+            },
         )
         return max(0, int(result.rowcount or 0))
 
@@ -255,6 +395,8 @@ class KnowledgeRepository:
                     == profile_fingerprint,
                     KnowledgeVectorGenerationRow.corpus_fingerprint
                     == corpus_fingerprint,
+                    KnowledgeVectorGenerationRow.corpus_fingerprint_schema
+                    == CORPUS_FINGERPRINT_SCHEMA,
                 )
                 .order_by(KnowledgeVectorGenerationRow.created_at.desc())
             )

@@ -9,7 +9,7 @@ from xenix.i18n import TranslationManager
 from xenix.services.embedding_service import EmbeddingSettings, EmbeddingSettingsService
 from xenix.services.llm import LLMProviderConfig, LLMService, LLMSettings, LLMSettingsService
 from xenix.services.ml.worker_settings import MLWorkerSettingsService
-from xenix.services.paddle_ocr_service import PaddleOcrStatus
+from xenix.services.paddle_ocr_service import PaddleOcrState, PaddleOcrStatus
 from xenix.ui.settings_dialog import SettingsDialog, SettingsTab
 
 
@@ -140,13 +140,13 @@ def test_settings_dialog_targets_knowledge_tab_and_runs_ocr_setup_off_ui_thread(
 
         def status(self):
             self.status_thread_ids.append(threading.get_ident())
-            return PaddleOcrStatus(False, False)
+            return PaddleOcrStatus(PaddleOcrState.NOT_INSTALLED)
 
         def install(self, progress):
             self.install_thread_ids.append(threading.get_ident())
-            progress("downloading_python")
+            progress("downloading_bundle")
             progress("ready")
-            return PaddleOcrStatus(True, True)
+            return PaddleOcrStatus(PaddleOcrState.READY)
 
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())

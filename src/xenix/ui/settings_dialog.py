@@ -44,6 +44,7 @@ from ..services.knowledge_index_service import (
 )
 from ..services.paddle_ocr_service import (
     PaddleOcrDeploymentService,
+    PaddleOcrState,
     PaddleOcrStatus,
 )
 from ..services.update_service import UpdateService, UpdateState, UpdateStatus
@@ -578,10 +579,11 @@ class SettingsDialog(QDialog):
         if generation != self._lifecycle_generation or not self._active:
             return
         translations = {
-            "downloading_python": self.tr("Downloading embedded Python"),
-            "installing_pip": self.tr("Installing package manager"),
-            "installing_worker": self.tr("Installing OCR runtime"),
-            "downloading_models": self.tr("Preparing OCR models"),
+            "downloading_bundle": self.tr("Downloading OCR component"),
+            "extracting_bundle": self.tr("Unpacking OCR component"),
+            "verifying_bundle": self.tr("Verifying OCR component"),
+            "self_testing": self.tr("Testing OCR component"),
+            "activating_bundle": self.tr("Activating OCR component"),
             "ready": self.tr("Ready"),
         }
         translated = translations.get(phase, self.tr("Preparing local OCR"))
@@ -641,17 +643,26 @@ class SettingsDialog(QDialog):
         elif status is None:
             text = self.tr("Checking local PaddleOCR status")
             enabled = self._ocr_install_task is None
-        elif status.installed and status.models_ready:
+        elif status.state is PaddleOcrState.READY:
             text = self.tr("Local PaddleOCR is ready")
             enabled = self._ocr_install_task is None
-        elif status.installed:
-            text = self.tr(
-                "Local PaddleOCR runtime is installed; models are not ready"
-            )
+            self._ocr_setup_button.setText(self.tr("Reinstall local PaddleOCR"))
+        elif status.state is PaddleOcrState.REPAIR_REQUIRED:
+            text = self.tr("Local PaddleOCR requires repair")
             enabled = self._ocr_install_task is None
+            self._ocr_setup_button.setText(self.tr("Repair local PaddleOCR"))
+        elif status.state in {PaddleOcrState.INSTALLING, PaddleOcrState.CHECKING}:
+            text = self.tr("Preparing local PaddleOCR")
+            enabled = False
+            self._ocr_setup_button.setText(self.tr("Preparing local PaddleOCR"))
+        elif status.state is PaddleOcrState.FAILED:
+            text = self.tr("Local PaddleOCR setup needs attention")
+            enabled = self._ocr_install_task is None
+            self._ocr_setup_button.setText(self.tr("Try local PaddleOCR setup again"))
         else:
             text = self.tr("Local PaddleOCR is not installed")
             enabled = self._ocr_install_task is None
+            self._ocr_setup_button.setText(self.tr("Set up local PaddleOCR"))
         self._ocr_status_label.setText(text)
         self._ocr_setup_button.setEnabled(enabled)
 

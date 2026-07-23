@@ -177,13 +177,13 @@ def _create_v14_fixture(db_path: Path) -> None:
         connection.execute("PRAGMA user_version=14")
 
 
-def test_fresh_bootstrap_creates_v21_target_schema(monkeypatch, tmp_path: Path) -> None:
+def test_fresh_bootstrap_creates_v23_target_schema(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
 
-    assert context.schema_version == CURRENT_SCHEMA_VERSION == 21
-    assert get_user_version(context.engine) == 21
+    assert context.schema_version == CURRENT_SCHEMA_VERSION == 23
+    assert get_user_version(context.engine) == 23
     inspector = inspect(context.engine)
     tables = set(inspector.get_table_names())
     assert {"conversation_thread", "conversation_message", "artifact"}.issubset(tables)
@@ -244,7 +244,7 @@ def test_v14_upgrade_preserves_artifact_and_converts_complete_history(monkeypatc
     _create_v14_fixture(database_path(paths))
     context = StorageBootstrapService().initialize(paths)
 
-    assert context.schema_version == 21
+    assert context.schema_version == 23
     with context.session_factory() as session:
         artifact = session.get(ArtifactRow, "artifact-1")
         assert artifact is not None

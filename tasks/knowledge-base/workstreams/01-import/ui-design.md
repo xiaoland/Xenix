@@ -41,7 +41,8 @@ MainWindow header
 ## Import Queue Dialog Flow
 
 1. **Add files** opens the normal multi-file chooser with exactly the allowlisted
-   TXT/DOC/DOCX/PDF/JPEG/PNG filter; its drop zone accepts only local URLs.
+   TXT/DOC/DOCX/PPT/PPTX/PDF/JPEG/PNG filter. The Workspace shell and document list
+   accept local file URLs; picker and drop feed the same submission operation.
 2. The dialog locally removes duplicate selections while preserving user order and
    asks `preflight_imports` in a background service call. It never creates a source
    snapshot/artifact during preflight.

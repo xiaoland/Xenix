@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import tempfile
@@ -17,7 +18,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--timeout-seconds",
         type=float,
-        default=90.0,
+        default=240.0,
         help="Maximum time to wait for the packaged smoke test.",
     )
     return parser
@@ -41,6 +42,30 @@ def main() -> int:
         runtime_root = Path(runtime_home)
         environment = os.environ.copy()
         environment["XENIX_APP_HOME"] = str(runtime_root)
+        project_root = Path(__file__).resolve().parents[1]
+        catalog_path = project_root / "dist" / "knowledge-ocr" / "runtime_catalog.json"
+        ocr_archive: Path | None = None
+        if catalog_path.is_file():
+            catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+            artifact_name = str(catalog.get("artifact_name") or "")
+            candidate = catalog_path.parent / artifact_name
+            if candidate.is_file() and candidate.name == artifact_name:
+                ocr_archive = candidate.resolve()
+                environment["XENIX_KNOWLEDGE_OCR_SMOKE_ARCHIVE"] = str(ocr_archive)
+                golden_image = (
+                    project_root
+                    / "build"
+                    / "knowledge-ocr"
+                    / "downloads"
+                    / "golden_image.png"
+                )
+                if not golden_image.is_file():
+                    raise RuntimeError(
+                        "Native OCR packaged smoke requires the locked golden image."
+                    )
+                environment["XENIX_KNOWLEDGE_OCR_SMOKE_IMAGE"] = str(
+                    golden_image.resolve()
+                )
 
         completed = subprocess.run(
             [str(executable), "--smoke-test"],
@@ -67,6 +92,21 @@ def main() -> int:
         if missing:
             joined = ", ".join(str(path) for path in missing)
             raise RuntimeError(f"Packaged smoke test did not create expected runtime artifacts: {joined}")
+        marker = json.loads((runtime_root / "state" / "knowledge-smoke.json").read_text())
+        if marker.get("spawned_docx_import") is not True:
+            raise RuntimeError(
+                "Packaged smoke did not import DOCX through the spawned Knowledge worker."
+            )
+        if marker.get("spawned_pptx_import") is not True:
+            raise RuntimeError(
+                "Packaged smoke did not import PPTX through the spawned Knowledge worker."
+            )
+        if ocr_archive is not None and marker.get("paddle_native_activation") is not True:
+            raise RuntimeError("Packaged smoke did not activate the native Knowledge OCR archive.")
+        if ocr_archive is not None and marker.get("paddle_native_retrieval") is not True:
+            raise RuntimeError(
+                "Packaged smoke did not retrieve text from the native OCR import."
+            )
 
     print(f"Packaged smoke test passed for {executable}")
     return 0

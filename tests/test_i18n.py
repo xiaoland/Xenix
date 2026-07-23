@@ -102,6 +102,13 @@ def test_main_window_language_switch_updates_chat_shell(
         window._open_knowledge_workspace()
         workspace = window._knowledge_workspace
         assert workspace is not None
+        assert workspace._queue_button.text() == "Task queue"
+        workspace._queue_button.click()
+        task_queue = workspace._queue_dialog
+        assert task_queue is not None
+        assert task_queue.windowTitle() == "Task queue"
+        assert task_queue.tr("Task Failed") == "Task Failed"
+        assert task_queue.tr("Task Details") == "Task Details"
         workspace._settings_button.click()
         assert window._settings_dialog is settings
         assert settings._tabs.currentIndex() == 1
@@ -226,6 +233,10 @@ def test_main_window_language_switch_updates_chat_shell(
         assert settings._llm_thread_title_model_label.text() == "线程标题模型"
         assert settings._ml_workers_title_label.text() == "ML 工作器"
         assert settings._ml_workers_setup_button.text() == "添加 SSH 工作器..."
+        assert workspace._queue_button.text() == "任务队列"
+        assert task_queue.windowTitle() == "任务队列"
+        assert task_queue.tr("Task Failed") == "任务失败"
+        assert task_queue.tr("Task Details") == "任务详情"
         assert about.windowTitle() == "关于"
         assert about._open_logs_button.text() == "打开日志目录"
         assert about._build_commit_label.text() == "构建提交"
@@ -270,6 +281,10 @@ def test_main_window_language_switch_updates_chat_shell(
         assert settings._llm_thread_title_model_label.text() == "Thread title model"
         assert settings._ml_workers_title_label.text() == "ML workers"
         assert settings._ml_workers_setup_button.text() == "Add SSH worker..."
+        assert workspace._queue_button.text() == "Task queue"
+        assert task_queue.windowTitle() == "Task queue"
+        assert task_queue.tr("Task Failed") == "Task Failed"
+        assert task_queue.tr("Task Details") == "Task Details"
         assert about.windowTitle() == "About"
         assert about._open_logs_button.text() == "Open log directory"
         assert about._build_commit_label.text() == "Build commit"
