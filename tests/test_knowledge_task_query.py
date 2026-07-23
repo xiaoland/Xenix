@@ -89,6 +89,7 @@ def test_initial_content_preparation_is_folded_into_import_task(
                 trigger="manual",
                 status="queued",
                 phase="queued",
+                error_summary="Embedding provider rejected the request.",
                 created_at=now + timedelta(seconds=2),
                 updated_at=now + timedelta(seconds=2),
             )
@@ -107,6 +108,7 @@ def test_initial_content_preparation_is_folded_into_import_task(
         event.remove(storage.engine, "before_cursor_execute", record_statement)
 
     assert [task.kind for task in tasks] == ["index_build", "import"]
+    assert tasks[0].error_summary == "Embedding provider rejected the request."
     folded = tasks[1]
     assert folded.status == "failed"
     assert folded.owner == "derivation"

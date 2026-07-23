@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import sys
 import time
@@ -26,6 +27,33 @@ def _emit_startup_timing(event: str, start: float | None = None) -> None:
     print("\t".join(fields), file=sys.stderr, flush=True)
 
 
+def _configure_development_ocr_bundle_source(project_root: Path) -> None:
+    """Expose the generated local OCR archive as one explicit dev source."""
+
+    if any(
+        os.environ.get(name, "").strip()
+        for name in (
+            "XENIX_KNOWLEDGE_OCR_CATALOG",
+            "XENIX_KNOWLEDGE_OCR_ARTIFACT",
+        )
+    ):
+        return
+    catalog_path = project_root / "dist" / "knowledge-ocr" / "runtime_catalog.json"
+    try:
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        artifact_name = catalog.get("artifact_name") if isinstance(catalog, dict) else None
+    except (OSError, ValueError):
+        return
+    if (
+        not isinstance(artifact_name, str)
+        or not artifact_name
+        or Path(artifact_name).name != artifact_name
+    ):
+        return
+    os.environ["XENIX_KNOWLEDGE_OCR_CATALOG"] = str(catalog_path)
+    os.environ["XENIX_KNOWLEDGE_OCR_ARTIFACT"] = str(catalog_path.parent / artifact_name)
+
+
 def main() -> int:
     _emit_startup_timing("run_dev.main.start")
     project_root = Path(__file__).resolve().parents[1]
@@ -33,6 +61,8 @@ def main() -> int:
     if str(src_path) not in sys.path:
         sys.path.insert(0, str(src_path))
     _emit_startup_timing("run_dev.path.ready")
+    _configure_development_ocr_bundle_source(project_root)
+    _emit_startup_timing("run_dev.ocr_bundle_source.ready")
 
     if len(sys.argv) >= 2 and sys.argv[1] == "--analysis-lambda-worker":
         import_start = time.perf_counter()

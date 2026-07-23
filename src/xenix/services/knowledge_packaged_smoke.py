@@ -18,7 +18,11 @@ from .knowledge_import_service import KnowledgeImportService
 from .knowledge_import_worker import read_worker_result
 from .knowledge_service import KnowledgeService
 from .knowledge_vector_store import KnowledgeVectorRecord, LanceKnowledgeVectorStore
-from .paddle_ocr_service import PaddleOcrDeploymentService, PaddleOcrState
+from .paddle_ocr_service import (
+    PaddleOcrDeploymentService,
+    PaddleOcrState,
+    ReleasePaddleOcrBundleSource,
+)
 from .storage import StorageBootstrapService
 from .storage.layout import knowledge_import_result_path
 
@@ -194,8 +198,11 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
             shutil.copy2(ocr_archive, cached_archive)
             ocr_deployment = PaddleOcrDeploymentService(
                 smoke_paths,
-                release_config=ReleaseConfig(
-                    releases_oss_public_url="https://knowledge-ocr-smoke.invalid"
+                bundle_source=ReleasePaddleOcrBundleSource(
+                    catalog,
+                    ReleaseConfig(
+                        releases_oss_public_url="https://knowledge-ocr-smoke.invalid"
+                    ),
                 ),
             )
             phases: list[str] = []

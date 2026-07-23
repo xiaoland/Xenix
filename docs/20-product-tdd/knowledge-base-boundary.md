@@ -42,8 +42,13 @@ canonical-ready generation
 - Local OCR uses one optional, one-click-installed archive containing an
   Xenix-owned native worker built on official Paddle Inference C++, its complete
   dependency closure, and an explicitly identified model pack. Setup verifies the
-  embedded release catalog, archive, member manifest, protocol, and self-test before
-  atomic activation. `ready` additionally requires a freshness-bounded verification
+  catalog, archive, member manifest, protocol, and self-test before atomic
+  activation. Deployment consumes one bundle source that binds catalog authority to
+  either the generated local development archive or the immutable release origin;
+  transport cannot bypass deployment-owned integrity gates. `ready` additionally
+  requires a compact content-addressed generation directory and a self-test executed
+  at that final Windows path before active-pointer publication, plus a
+  freshness-bounded verification
   record produced by full member hashing and self-test; missing/stale evidence is
   refreshed off the UI thread. Canonical provenance records the exact runtime,
   generation, model pack, engine, protocol, and manifest identity actually used. It

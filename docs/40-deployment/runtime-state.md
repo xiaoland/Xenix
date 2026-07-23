@@ -42,7 +42,7 @@ Inspect evidence by symptom:
 | provider behavior | Agent settings and application log; never copy credentials into a report |
 | ML worker failure | worker settings, task log, local/remote validation result |
 | Knowledge import failure | Workspace `Task queue` state and its View Log event timeline; application log for coordinator/runtime diagnostics |
-| local OCR setup or repair failure | Knowledge Settings state, then the application log and the app-owned OCR staging/generation manifests; do not copy raw document content into support evidence |
+| local OCR setup or repair failure | Knowledge Settings typed setup reason, then the application log and the app-owned OCR staging/generation manifests; do not copy raw document content into support evidence |
 | missing dataset, model, or report | database registration plus referenced app-owned file |
 | semantic Knowledge lookup failure | Knowledge Settings index state/task error, then vector-generation metadata and its contained derived index; do not alter canonical objects |
 | telemetry failure | [Observability](observability.md) and local exporter errors |
@@ -108,6 +108,19 @@ the runtime can execute. A missing generation is `not installed`; an identified 
 invalid generation requires repair. Deleting the OCR cache removes a rebuildable
 optional capability, not Knowledge source/canonical content. Xenix does not use or
 clean `%USERPROFILE%/.paddlex`.
+
+Source development uses the generated catalog and exact archive under
+`dist/knowledge-ocr` as a local bundle source when no explicit OCR source override is
+present. This changes transport only: the same cache, digest, member-manifest,
+self-test, verification-record, and atomic-activation state machine remains
+authoritative. A missing local source, unavailable release origin, integrity failure,
+and self-test failure retain distinct content-free reason codes in Knowledge
+Settings; arbitrary exception text is not persisted or displayed.
+Generation directory names are fixed-length content addresses over the catalog's
+runtime, model-pack, and artifact identities. Descriptive identities stay in the
+manifest and active pointer. Setup self-tests the final generation path—not only a
+short staging path—before publishing `active.json`, so native Windows model-path
+failures cannot be reported as ready.
 
 Knowledge retrieval projection v3 uses deterministic Unit identities. The v22→v23
 migration preserves source/canonical content, clears active v2 retrieval pointers,

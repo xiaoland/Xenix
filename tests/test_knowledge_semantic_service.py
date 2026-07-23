@@ -273,7 +273,7 @@ def test_failed_or_stale_build_is_not_published(monkeypatch, tmp_path: Path) -> 
     seed_knowledge_text(knowledge, title="规则甲", text="规则正文：甲类按三期平均销量。")
     embedding.fail_documents = True
 
-    with pytest.raises(KnowledgeSemanticUnavailable):
+    with pytest.raises(EmbeddingValidationError):
         semantic.rebuild_generation()
     assert _generation_rows(storage) == []
 

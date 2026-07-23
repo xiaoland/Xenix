@@ -1,9 +1,9 @@
 # Knowledge Base Follow-up — Contract Realignment
 
-**Status:** Slice 01 closed; Slice 02 locally delivered; Slice 03 Phase H locally accepted
+**Status:** Slice 01 closed; Slice 02 locally delivered; Slice 03 Phase I locally accepted
 **Opened:** 2026-07-21
-**Posture:** Phase H delivery evidence passes; final coupled review remains;
-multimodal work is parked
+**Posture:** OCR source composition and vector-failure truth are repaired locally;
+the final coupled Slice 03 review remains open and multimodal work is parked
 
 ## Objective
 
@@ -37,10 +37,10 @@ admitted follow-up.
 - Only the active phase authorizes product-code changes. Each phase records its own
   Impact Handshake, preplay, verification, and remaining debt while the Slice-level
   scope stays intact. Commits still require Sir's explicit command.
-- Completion of one phase is not completion of its slice. After Phase H acceptance,
-  perform another global Import/Storage/Tool/UI/OCR/runtime/release/index review
-  because task execution, document lifecycle, index generations, settings, and
-  Agent evidence are coupled.
+- Completion of one phase is not completion of its slice. The global
+  Import/Storage/Tool/UI/OCR/runtime/release/index review remains open because task
+  execution, document lifecycle, index generations, settings, release transport,
+  and Agent evidence are coupled.
 
 ## Verification
 
@@ -114,13 +114,30 @@ admitted follow-up.
   boundary, distinguishes safe worker outcome/stage/diagnostic fields and parent
   launch/timeout/crash/result failures, exercises the real spawned named-PPTX path,
   and presents the Workspace-local label `Task queue` / `任务队列`.
+- The resumed review opened KB-D36–D37. Source-mode local OCR setup fails before
+  download because neither a runtime catalog nor release origin is composed into
+  `run_dev.py`; the UI then discards the structured failure. The original text-vector
+  task failed before LanceDB publication because its configured 64-item request
+  exceeded the selected provider/model's 20-item limit; semantic/index wrapping
+  collapsed the safe provider error into `knowledge_semantic_unavailable`. Sir then
+  authorized a configurable default of 20. The service default and current profile
+  now use 20; a manual 67-Unit rebuild publishes a 1024-dimensional generation in
+  four requests and strict semantic retrieval succeeds.
+- Phase I now gives OCR deployment one explicit bundle-source contract. Development
+  composes the exact generated local catalog/archive; frozen builds retain the same
+  deployment state machine with an immutable release source. Typed, content-free OCR
+  setup failures reach Knowledge Settings, and index tasks preserve safe Embedding
+  error codes plus actionable summaries without provider bodies. A real source-mode
+  install reached the selected native generation's `ready` state. Frozen acceptance
+  then exposed and repaired a final-path-only native model failure: compact
+  content-addressed generation paths are now self-tested before active publication,
+  and the rebuilt packaged native-OCR smoke passes.
 
 ## Next Step
 
-Resume the final global Import/Storage/Tool/UI/OCR/runtime/release/index review with
-Sir. Phase H source/full/package evidence passes, but a phase cannot close Slice 03
-or substitute for this coupled review. No commit or publication is authorized.
-Multimodal retrieval stays outside this slice.
+Resume the promised global Import/Storage/Tool/UI/OCR/runtime/release/index review
+with Sir. Phase I is locally accepted, but Slice 03 is not closed until that
+cross-workstream review is complete. Multimodal retrieval stays outside this slice.
 
 ## Packet Map
 
@@ -138,5 +155,8 @@ Multimodal retrieval stays outside this slice.
 - [Slice 03 evidence — local OCR runtime research](evidence/03-ocr-runtime-research.md)
 - [Slice 03 evidence — native OCR and operations implementation](evidence/03-native-runtime-implementation.md)
 - [Slice 03 evidence — legacy Unit/PPTX diagnostic](evidence/03-pptx-unit-diagnostic.md)
+- [Slice 03 evidence — OCR deployment and vector-task diagnosis](evidence/03-phase-i-runtime-index-diagnostic.md)
+- [Slice 03 evidence — current OCR Service topology](evidence/03-current-ocr-service-topology.md)
+- [Slice 03 evidence — Phase I implementation and acceptance](evidence/03-phase-i-implementation.md)
 - [Parked follow-up — multimodal retrieval design](slices/02-multimodal-retrieval.md)
 - [Original Knowledge Base delivery packet](../knowledge-base/README.md)

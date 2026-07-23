@@ -1,6 +1,6 @@
 # Slice 03 — Local OCR, Workspace Responsiveness, and Knowledge Operations
 
-**State:** Phase H locally accepted; final coupled review pending
+**State:** Phase I locally accepted; final coupled review pending
 **Opened:** 2026-07-22
 **Scope rule:** this is one admitted finding cohort with internal phases, not one
 slice per UI, runtime, storage, or migration change
@@ -102,6 +102,7 @@ weights retain a separate logical identity inside the MVP archive.
 | F — Structural convergence repair | Replace branch/race/status/process gaps with provider, snapshot, runtime-generation, and process-tree models; then run route-complete acceptance. | **Implemented and locally accepted.** Focused/full/package/native/live evidence passes; only the final Sir cross-workstream review remains. |
 | G — Presentation import completion | Admit PPT/PPTX through the provider graph and let the Workspace accept the same files through picker or drag/drop. | **Implemented and locally accepted.** Real PPT/PPTX/encrypted/named-fixture, picker/drop, full-suite, frozen worker, and package smoke evidence passes. |
 | H — Production import topology | Remove the redundant untested nested Docling boundary, preserve safe failure stages, prove the real spawned path with the named PPTX, and simplify the Workspace-local queue label. | **Implemented and locally accepted.** One spawned Import process now runs Docling directly; structured safe failure results, real named-PPTX spawn, frozen package exercise, and bilingual `Task queue` coverage pass. |
+| I — Runtime distribution and vector failure truth | Make local OCR setup executable in each supported application composition and preserve actionable, content-free Embedding failure evidence through the index task boundary. | **Implemented and locally accepted.** Batch size defaults to 20; safe Embedding failures reach index tasks; local/release OCR sources share one deployment state machine. Compact content-addressed generations are self-tested at their final path, and real source plus rebuilt frozen native-OCR acceptance pass. |
 
 Phases are implementation checkpoints only. Slice 03 closes as one cohort.
 
@@ -159,8 +160,14 @@ packaging, UI, test, and durable-document implementation on 2026-07-22. The
 PPT/PPTX and Workspace-drop Phase G scope was identified and explicitly started by
 Sir on 2026-07-23. The Phase H runtime diagnosis and task-packet update are complete;
 Sir explicitly started its product-code repair, which is now implemented and locally
-accepted. Neither permission authorizes a commit, publication, release, second
-destructive local-data reset, or multimodal scope. Commits remain separately gated.
+accepted. Sir explicitly started Phase I on 2026-07-23. Its Embedding
+default/current-profile repair, safe index-error projection, explicit OCR
+bundle-source composition, typed setup failure path, and real development install
+are implemented and locally accepted.
+
+None of these permissions authorizes publication, release, a second destructive
+local-data reset, or multimodal scope. The completed Phase H scope is committed as
+`b76a36e`; subsequent commits remain separately gated.
 
 ## Cross-slice Review Gate
 
@@ -171,6 +178,10 @@ Phase F repair. That final review exposed KB-D32–D33 and paused for Phase G. P
 now passes locally, but a real Workspace re-import exposed the production topology
 gap recorded in
 [Phase H evidence](../evidence/03-phase-h-import-failure.md). Its
-repository/package acceptance passes; resume the coupled
-Import/Storage/Tool/UI/OCR/runtime/release/index review with Sir before closing the
-slice.
+repository/package acceptance passes. The resumed review then exposed the
+source-mode OCR deployment and vector-task failure recorded in
+[Phase I diagnosis](../evidence/03-phase-i-runtime-index-diagnostic.md).
+[Phase I implementation evidence](../evidence/03-phase-i-implementation.md) records
+the accepted repair. Phase I no longer blocks the review, but Slice 03 remains open
+until the promised global Import/Storage/Tool/UI/OCR/runtime/release/index
+cross-review is completed with Sir.

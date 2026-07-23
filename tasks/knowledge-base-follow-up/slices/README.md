@@ -17,7 +17,7 @@ Impact Handshake revision.
 
 | Slice | State | Cohort | Completion boundary |
 | --- | --- | --- | --- |
-| [03 — Local OCR, Workspace responsiveness, and Knowledge operations](03-local-ocr-workspace-operations.md) | Phase H locally accepted; final coupled review pending | KB3-F01–F08 plus KB-D26–D35 | Resume the global Import/Storage/Tool/UI/OCR/runtime/release/index review with Sir before closure |
+| [03 — Local OCR, Workspace responsiveness, and Knowledge operations](03-local-ocr-workspace-operations.md) | Phase I locally accepted; coupled review pending | KB3-F01–F08 plus KB-D26–D38 | Complete the global Import/Storage/Tool/UI/OCR/runtime/release/index review |
 
 ## Prior Locally Delivered Slice
 
@@ -73,5 +73,15 @@ their Phase G implementation; focused/full/package/public-fixture evidence passe
 The real Workspace re-import then exposed KB-D34–D35. Sir started Phase H; the
 production process-topology, structured failure result, named-fixture regression,
 package smoke, and local queue naming repairs are implemented and locally accepted.
-The coupled review must now resume before Slice 03 closes.
+The resumed review exposed KB-D36–D37: source-mode OCR setup had no composed bundle
+source, and a provider batch-limit rejection was hidden behind a generic semantic
+task failure. Sir started Phase I. Batch size remains user-configurable and now
+defaults to 20; the current profile is 20, and a 67-Unit manual rebuild plus semantic
+retrieval pass. OCR now has an explicit local-or-release bundle source, development
+installation reaches native `ready`, and safe OCR/Embedding failures reach their
+existing UI/task presentation planes. Phase I is locally accepted. The coupled
+package gate additionally exposed KB-D38: staging-path self-test did not prove the
+long final native-model path. A compact content-addressed generation name and
+final-path self-test repaired it; fresh package plus real native OCR packaged smoke
+now pass. The coupled review must now resume before Slice 03 can close.
 Multimodal retrieval (`KB2-F06`) remains parked outside the active slice.

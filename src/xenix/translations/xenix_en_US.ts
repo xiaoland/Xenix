@@ -833,82 +833,87 @@ Trigger: %2</translation>
         <translation>Task Failed</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="393"/>
+        <location filename="../ui/knowledge_workspace.py" line="394"/>
+        <source>Details: %1</source>
+        <translation>Details: %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="397"/>
         <source>Task Details</source>
         <translation>Task Details</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="404"/>
+        <location filename="../ui/knowledge_workspace.py" line="408"/>
         <source>Import</source>
         <translation>Import</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="405"/>
+        <location filename="../ui/knowledge_workspace.py" line="409"/>
         <source>Content preparation</source>
         <translation>Content preparation</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="406"/>
+        <location filename="../ui/knowledge_workspace.py" line="410"/>
         <source>Index build</source>
         <translation>Index build</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="411"/>
+        <location filename="../ui/knowledge_workspace.py" line="415"/>
         <source>Pending</source>
         <translation>Pending</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="412"/>
+        <location filename="../ui/knowledge_workspace.py" line="416"/>
         <source>Queued</source>
         <translation>Queued</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="413"/>
+        <location filename="../ui/knowledge_workspace.py" line="417"/>
         <source>In progress</source>
         <translation>In progress</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="414"/>
+        <location filename="../ui/knowledge_workspace.py" line="418"/>
         <source>Preparing content</source>
         <translation>Preparing content</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="415"/>
+        <location filename="../ui/knowledge_workspace.py" line="419"/>
         <source>Ready</source>
         <translation>Ready</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="416"/>
+        <location filename="../ui/knowledge_workspace.py" line="420"/>
         <source>Completed</source>
         <translation>Completed</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="417"/>
+        <location filename="../ui/knowledge_workspace.py" line="421"/>
         <source>Needs attention</source>
         <translation>Needs attention</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="418"/>
+        <location filename="../ui/knowledge_workspace.py" line="422"/>
         <source>Failed</source>
         <translation>Failed</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="419"/>
+        <location filename="../ui/knowledge_workspace.py" line="423"/>
         <source>Cancelled</source>
         <translation>Cancelled</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="420"/>
+        <location filename="../ui/knowledge_workspace.py" line="424"/>
         <source>Reused</source>
         <translation>Reused</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="421"/>
+        <location filename="../ui/knowledge_workspace.py" line="425"/>
         <source>Unknown status</source>
         <translation>Unknown status</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="424"/>
+        <location filename="../ui/knowledge_workspace.py" line="428"/>
         <source>Task queue</source>
         <translation>Task queue</translation>
     </message>
@@ -917,47 +922,47 @@ Trigger: %2</translation>
         <translation type="vanished">Knowledge Task Queue</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="426"/>
+        <location filename="../ui/knowledge_workspace.py" line="430"/>
         <source>Type</source>
         <translation>Type</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="426"/>
+        <location filename="../ui/knowledge_workspace.py" line="430"/>
         <source>Target</source>
         <translation>Target</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="426"/>
+        <location filename="../ui/knowledge_workspace.py" line="430"/>
         <source>Status</source>
         <translation>Status</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="426"/>
+        <location filename="../ui/knowledge_workspace.py" line="430"/>
         <source>Updated</source>
         <translation>Updated</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="428"/>
+        <location filename="../ui/knowledge_workspace.py" line="432"/>
         <source>Retry</source>
         <translation>Retry</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="429"/>
+        <location filename="../ui/knowledge_workspace.py" line="433"/>
         <source>Cancel</source>
         <translation>Cancel</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="430"/>
+        <location filename="../ui/knowledge_workspace.py" line="434"/>
         <source>View log</source>
         <translation>View log</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="431"/>
+        <location filename="../ui/knowledge_workspace.py" line="435"/>
         <source>Details</source>
         <translation>Details</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="432"/>
+        <location filename="../ui/knowledge_workspace.py" line="436"/>
         <source>Close</source>
         <translation>Close</translation>
     </message>
@@ -965,33 +970,33 @@ Trigger: %2</translation>
 <context>
     <name>KnowledgeWorkspaceDialog</name>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="572"/>
+        <location filename="../ui/knowledge_workspace.py" line="576"/>
         <source>Import Knowledge</source>
         <translation>Import Knowledge</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="574"/>
+        <location filename="../ui/knowledge_workspace.py" line="578"/>
         <source>Knowledge documents</source>
         <translation>Knowledge documents</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="596"/>
+        <location filename="../ui/knowledge_workspace.py" line="600"/>
         <source>Knowledge Import Failed</source>
         <translation>Knowledge Import Failed</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="597"/>
+        <location filename="../ui/knowledge_workspace.py" line="601"/>
         <source>%1 file(s) could not be queued for import.</source>
         <translation>%1 file(s) could not be queued for import.</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="653"/>
+        <location filename="../ui/knowledge_workspace.py" line="657"/>
         <source>Knowledge content is temporarily unavailable.</source>
         <translation>Knowledge content is temporarily unavailable.</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="655"/>
-        <location filename="../ui/knowledge_workspace.py" line="713"/>
+        <location filename="../ui/knowledge_workspace.py" line="659"/>
+        <location filename="../ui/knowledge_workspace.py" line="717"/>
         <source>No Knowledge documents yet. Import a file to get started.</source>
         <translation>No Knowledge documents yet. Import a file to get started.</translation>
     </message>
@@ -1004,84 +1009,84 @@ Trigger: %2</translation>
         <translation type="vanished">Keyword: %1  ·  Text vectors: %2</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="674"/>
-        <location filename="../ui/knowledge_workspace.py" line="684"/>
+        <location filename="../ui/knowledge_workspace.py" line="678"/>
+        <location filename="../ui/knowledge_workspace.py" line="688"/>
         <source>Ready</source>
         <translation>Ready</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="685"/>
+        <location filename="../ui/knowledge_workspace.py" line="689"/>
         <source>Building</source>
         <translation>Building</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="686"/>
+        <location filename="../ui/knowledge_workspace.py" line="690"/>
         <source>Needs rebuild</source>
         <translation>Needs rebuild</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="658"/>
-        <location filename="../ui/knowledge_workspace.py" line="659"/>
-        <location filename="../ui/knowledge_workspace.py" line="680"/>
-        <location filename="../ui/knowledge_workspace.py" line="687"/>
+        <location filename="../ui/knowledge_workspace.py" line="662"/>
+        <location filename="../ui/knowledge_workspace.py" line="663"/>
+        <location filename="../ui/knowledge_workspace.py" line="684"/>
+        <location filename="../ui/knowledge_workspace.py" line="691"/>
         <source>Unavailable</source>
         <translation>Unavailable</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="662"/>
+        <location filename="../ui/knowledge_workspace.py" line="666"/>
         <source>OCR: %1  ·  Keyword: %2  ·  Text vectors: %3</source>
         <translation>OCR: %1  ·  Keyword: %2  ·  Text vectors: %3</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="675"/>
+        <location filename="../ui/knowledge_workspace.py" line="679"/>
         <source>Checking</source>
         <translation>Checking</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="676"/>
+        <location filename="../ui/knowledge_workspace.py" line="680"/>
         <source>Not installed</source>
         <translation>Not installed</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="677"/>
+        <location filename="../ui/knowledge_workspace.py" line="681"/>
         <source>Repair required</source>
         <translation>Repair required</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="678"/>
+        <location filename="../ui/knowledge_workspace.py" line="682"/>
         <source>Installing</source>
         <translation>Installing</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="679"/>
-        <location filename="../ui/knowledge_workspace.py" line="688"/>
-        <location filename="../ui/knowledge_workspace.py" line="696"/>
+        <location filename="../ui/knowledge_workspace.py" line="683"/>
+        <location filename="../ui/knowledge_workspace.py" line="692"/>
+        <location filename="../ui/knowledge_workspace.py" line="700"/>
         <source>Needs attention</source>
         <translation>Needs attention</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="689"/>
-        <location filename="../ui/knowledge_workspace.py" line="697"/>
+        <location filename="../ui/knowledge_workspace.py" line="693"/>
+        <location filename="../ui/knowledge_workspace.py" line="701"/>
         <source>Unknown status</source>
         <translation>Unknown status</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="693"/>
+        <location filename="../ui/knowledge_workspace.py" line="697"/>
         <source>Searchable</source>
         <translation>Searchable</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="694"/>
+        <location filename="../ui/knowledge_workspace.py" line="698"/>
         <source>Preparing search content</source>
         <translation>Preparing search content</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="695"/>
+        <location filename="../ui/knowledge_workspace.py" line="699"/>
         <source>No searchable text</source>
         <translation>No searchable text</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="702"/>
+        <location filename="../ui/knowledge_workspace.py" line="706"/>
         <source>Task queue</source>
         <translation>Task queue</translation>
     </message>
@@ -1110,7 +1115,7 @@ Trigger: %2</translation>
         <translation type="vanished">Local PaddleOCR is not installed</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="700"/>
+        <location filename="../ui/knowledge_workspace.py" line="704"/>
         <source>Knowledge Workspace</source>
         <translation>Knowledge Workspace</translation>
     </message>
@@ -1119,7 +1124,7 @@ Trigger: %2</translation>
         <translation type="vanished">Import TXT, DOC, DOCX, PDF, JPEG, or PNG files. Xenix indexes bounded evidence for Agent analysis.</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="701"/>
+        <location filename="../ui/knowledge_workspace.py" line="705"/>
         <source>Import documents</source>
         <translation>Import documents</translation>
     </message>
@@ -1128,32 +1133,32 @@ Trigger: %2</translation>
         <translation type="vanished">Import queue</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="703"/>
+        <location filename="../ui/knowledge_workspace.py" line="707"/>
         <source>Rebuild indexes</source>
         <translation>Rebuild indexes</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="704"/>
+        <location filename="../ui/knowledge_workspace.py" line="708"/>
         <source>Settings</source>
         <translation>Settings</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="707"/>
+        <location filename="../ui/knowledge_workspace.py" line="711"/>
         <source>Document</source>
         <translation>Document</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="708"/>
+        <location filename="../ui/knowledge_workspace.py" line="712"/>
         <source>Type</source>
         <translation>Type</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="709"/>
+        <location filename="../ui/knowledge_workspace.py" line="713"/>
         <source>Content status</source>
         <translation>Content status</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="710"/>
+        <location filename="../ui/knowledge_workspace.py" line="714"/>
         <source>Updated</source>
         <translation>Updated</translation>
     </message>
@@ -1301,9 +1306,9 @@ Trigger: %2</translation>
     <name>SettingsDialog</name>
     <message>
         <location filename="../ui/settings_dialog.py" line="502"/>
-        <location filename="../ui/settings_dialog.py" line="775"/>
-        <location filename="../ui/settings_dialog.py" line="800"/>
-        <location filename="../ui/settings_dialog.py" line="959"/>
+        <location filename="../ui/settings_dialog.py" line="797"/>
+        <location filename="../ui/settings_dialog.py" line="822"/>
+        <location filename="../ui/settings_dialog.py" line="981"/>
         <source>Settings</source>
         <translation>Settings</translation>
     </message>
@@ -1442,7 +1447,7 @@ Trigger: %2</translation>
     </message>
     <message>
         <location filename="../ui/settings_dialog.py" line="538"/>
-        <location filename="../ui/settings_dialog.py" line="665"/>
+        <location filename="../ui/settings_dialog.py" line="687"/>
         <source>Set up local PaddleOCR</source>
         <translation>Set up local PaddleOCR</translation>
     </message>
@@ -1509,7 +1514,7 @@ Trigger: %2</translation>
     </message>
     <message>
         <location filename="../ui/settings_dialog.py" line="587"/>
-        <location filename="../ui/settings_dialog.py" line="907"/>
+        <location filename="../ui/settings_dialog.py" line="929"/>
         <source>Ready</source>
         <translation>Ready</translation>
     </message>
@@ -1524,27 +1529,27 @@ Trigger: %2</translation>
         <translation>Local OCR setup: %1</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="611"/>
+        <location filename="../ui/settings_dialog.py" line="610"/>
         <source>Local OCR Setup Failed</source>
         <translation>Local OCR Setup Failed</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="612"/>
+        <location filename="../ui/settings_dialog.py" line="635"/>
         <source>Local OCR setup could not be completed.</source>
         <translation>Local OCR setup could not be completed.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="641"/>
+        <location filename="../ui/settings_dialog.py" line="663"/>
         <source>Local PaddleOCR service is unavailable</source>
         <translation>Local PaddleOCR service is unavailable</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="644"/>
+        <location filename="../ui/settings_dialog.py" line="666"/>
         <source>Checking local PaddleOCR status</source>
         <translation>Checking local PaddleOCR status</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="647"/>
+        <location filename="../ui/settings_dialog.py" line="669"/>
         <source>Local PaddleOCR is ready</source>
         <translation>Local PaddleOCR is ready</translation>
     </message>
@@ -1553,27 +1558,27 @@ Trigger: %2</translation>
         <translation type="vanished">Local PaddleOCR runtime is installed; models are not ready</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="663"/>
+        <location filename="../ui/settings_dialog.py" line="685"/>
         <source>Local PaddleOCR is not installed</source>
         <translation>Local PaddleOCR is not installed</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="697"/>
+        <location filename="../ui/settings_dialog.py" line="719"/>
         <source>English</source>
         <translation>English</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="698"/>
+        <location filename="../ui/settings_dialog.py" line="720"/>
         <source>Simplified Chinese</source>
         <translation>Simplified Chinese</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="722"/>
+        <location filename="../ui/settings_dialog.py" line="744"/>
         <source>Language Switch Failed</source>
         <translation>Language Switch Failed</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="723"/>
+        <location filename="../ui/settings_dialog.py" line="745"/>
         <source>Unable to switch the application language.
 
 {details}</source>
@@ -1582,44 +1587,44 @@ Trigger: %2</translation>
 {details}</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="788"/>
-        <location filename="../ui/settings_dialog.py" line="814"/>
+        <location filename="../ui/settings_dialog.py" line="810"/>
+        <location filename="../ui/settings_dialog.py" line="836"/>
         <source>Knowledge Indexes</source>
         <translation>Knowledge Indexes</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="816"/>
+        <location filename="../ui/settings_dialog.py" line="838"/>
         <source>Embedding settings were saved, but the vector rebuild could not be queued.</source>
         <translation>Embedding settings were saved, but the vector rebuild could not be queued.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="825"/>
+        <location filename="../ui/settings_dialog.py" line="847"/>
         <source>Rebuild text vectors?</source>
         <translation>Rebuild text vectors?</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="828"/>
+        <location filename="../ui/settings_dialog.py" line="850"/>
         <source>This change uses a different embedding space. Existing text vectors cannot be reused for current Knowledge content.</source>
         <translation>This change uses a different embedding space. Existing text vectors cannot be reused for current Knowledge content.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="833"/>
+        <location filename="../ui/settings_dialog.py" line="855"/>
         <source>Save and rebuild now</source>
         <translation>Save and rebuild now</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="837"/>
+        <location filename="../ui/settings_dialog.py" line="859"/>
         <source>Save; rebuild later</source>
         <translation>Save; rebuild later</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="884"/>
+        <location filename="../ui/settings_dialog.py" line="906"/>
         <source>Knowledge index service is unavailable</source>
         <translation>Knowledge index service is unavailable</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="789"/>
-        <location filename="../ui/settings_dialog.py" line="892"/>
+        <location filename="../ui/settings_dialog.py" line="811"/>
+        <location filename="../ui/settings_dialog.py" line="914"/>
         <source>Knowledge index status is unavailable</source>
         <translation>Knowledge index status is unavailable</translation>
     </message>
@@ -1649,80 +1654,110 @@ Trigger: %2</translation>
         <translation>Activating OCR component</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="649"/>
+        <location filename="../ui/settings_dialog.py" line="616"/>
+        <source>Local OCR is unavailable in this build.</source>
+        <translation>Local OCR is unavailable in this build.</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="618"/>
+        <source>Local OCR download source is unavailable.</source>
+        <translation>Local OCR download source is unavailable.</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="620"/>
+        <source>Local OCR component could not be downloaded.</source>
+        <translation>Local OCR component could not be downloaded.</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="622"/>
+        <source>Local OCR bundle source is unavailable.</source>
+        <translation>Local OCR bundle source is unavailable.</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="628"/>
+        <source>Local OCR component failed integrity verification.</source>
+        <translation>Local OCR component failed integrity verification.</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="634"/>
+        <source>Local OCR component failed its self-test.</source>
+        <translation>Local OCR component failed its self-test.</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="671"/>
         <source>Reinstall local PaddleOCR</source>
         <translation>Reinstall local PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="651"/>
+        <location filename="../ui/settings_dialog.py" line="673"/>
         <source>Local PaddleOCR requires repair</source>
         <translation>Local PaddleOCR requires repair</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="653"/>
+        <location filename="../ui/settings_dialog.py" line="675"/>
         <source>Repair local PaddleOCR</source>
         <translation>Repair local PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="655"/>
-        <location filename="../ui/settings_dialog.py" line="657"/>
+        <location filename="../ui/settings_dialog.py" line="677"/>
+        <location filename="../ui/settings_dialog.py" line="679"/>
         <source>Preparing local PaddleOCR</source>
         <translation>Preparing local PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="659"/>
+        <location filename="../ui/settings_dialog.py" line="681"/>
         <source>Local PaddleOCR setup needs attention</source>
         <translation>Local PaddleOCR setup needs attention</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="661"/>
+        <location filename="../ui/settings_dialog.py" line="683"/>
         <source>Try local PaddleOCR setup again</source>
         <translation>Try local PaddleOCR setup again</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="897"/>
+        <location filename="../ui/settings_dialog.py" line="919"/>
         <source>Keyword: %1
 Text vectors: %2</source>
         <translation>Keyword: %1
 Text vectors: %2</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="908"/>
+        <location filename="../ui/settings_dialog.py" line="930"/>
         <source>Building</source>
         <translation>Building</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="909"/>
+        <location filename="../ui/settings_dialog.py" line="931"/>
         <source>Needs rebuild</source>
         <translation>Needs rebuild</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="910"/>
+        <location filename="../ui/settings_dialog.py" line="932"/>
         <source>Unavailable</source>
         <translation>Unavailable</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="911"/>
+        <location filename="../ui/settings_dialog.py" line="933"/>
         <source>Needs attention</source>
         <translation>Needs attention</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="913"/>
+        <location filename="../ui/settings_dialog.py" line="935"/>
         <source>Unknown status</source>
         <translation>Unknown status</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="922"/>
+        <location filename="../ui/settings_dialog.py" line="944"/>
         <source>{local_count} local, {ssh_count} SSH, {slots} execution slot(s).</source>
         <translation>{local_count} local, {ssh_count} SSH, {slots} execution slot(s).</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1058"/>
+        <location filename="../ui/settings_dialog.py" line="1080"/>
         <source>Built into packaged app</source>
         <translation>Built into packaged app</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1109"/>
+        <location filename="../ui/settings_dialog.py" line="1131"/>
         <source>None</source>
         <translation>None</translation>
     </message>

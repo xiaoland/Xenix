@@ -14,7 +14,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path, PurePosixPath
-from typing import Callable
+from typing import Callable, Protocol
 from uuid import uuid4
 from zipfile import ZipFile, ZipInfo
 
@@ -37,6 +37,8 @@ _VERIFICATION_RECORD_NAME = "verification.json"
 _CATALOG_RESOURCE_NAME = "runtime_catalog.json"
 _VERIFICATION_SCHEMA_VERSION = 1
 _VERIFICATION_MAX_AGE_SECONDS = 24 * 60 * 60
+_CATALOG_OVERRIDE_ENV = "XENIX_KNOWLEDGE_OCR_CATALOG"
+_LOCAL_ARTIFACT_OVERRIDE_ENV = "XENIX_KNOWLEDGE_OCR_ARTIFACT"
 
 
 class PaddleOcrState(StrEnum):
@@ -110,6 +112,91 @@ class PaddleOcrBundleCatalog:
         )
 
 
+class PaddleOcrBundleSource(Protocol):
+    """Catalog authority plus one way to materialize its exact archive."""
+
+    @property
+    def catalog(self) -> PaddleOcrBundleCatalog: ...
+
+    def ensure_available(self) -> None:
+        """Fail with a safe typed error when this source cannot provide its archive."""
+
+    def materialize(self, destination: Path) -> None:
+        """Write the source artifact to one private destination."""
+
+
+@dataclass(frozen=True)
+class LocalPaddleOcrBundleSource:
+    """A development or smoke archive paired with its generated catalog."""
+
+    catalog: PaddleOcrBundleCatalog
+    artifact_path: Path
+
+    def ensure_available(self) -> None:
+        source = self.artifact_path
+        if source.name != self.catalog.artifact_name:
+            raise ValidationError(
+                "Local OCR bundle does not match its catalog.",
+                error_code="knowledge_ocr_bundle_source_mismatch",
+            )
+        if not source.is_file():
+            raise ValidationError(
+                "Local OCR bundle is unavailable.",
+                error_code="knowledge_ocr_bundle_source_unavailable",
+            )
+
+    def materialize(self, destination: Path) -> None:
+        source = self.artifact_path
+        self.ensure_available()
+        try:
+            with source.open("rb") as input_stream, destination.open("wb") as output:
+                shutil.copyfileobj(input_stream, output, length=1024 * 1024)
+                output.flush()
+                os.fsync(output.fileno())
+        except OSError as exc:
+            destination.unlink(missing_ok=True)
+            raise ValidationError(
+                "Local OCR bundle is unavailable.",
+                error_code="knowledge_ocr_bundle_source_unavailable",
+            ) from exc
+
+
+@dataclass(frozen=True)
+class ReleasePaddleOcrBundleSource:
+    """A catalog-owned archive resolved through the immutable release origin."""
+
+    catalog: PaddleOcrBundleCatalog
+    release_config: ReleaseConfig
+
+    def _artifact_url(self) -> str:
+        artifact_url = self.release_config.artifact_url(self.catalog.artifact_name)
+        if not artifact_url:
+            raise ValidationError(
+                "Local OCR download is unavailable in this build.",
+                error_code="knowledge_ocr_download_unavailable",
+            )
+        return artifact_url
+
+    def ensure_available(self) -> None:
+        self._artifact_url()
+
+    def materialize(self, destination: Path) -> None:
+        artifact_url = self._artifact_url()
+        try:
+            with urllib.request.urlopen(artifact_url, timeout=120) as response, destination.open(
+                "wb"
+            ) as output:
+                shutil.copyfileobj(response, output, length=1024 * 1024)
+                output.flush()
+                os.fsync(output.fileno())
+        except OSError as exc:
+            destination.unlink(missing_ok=True)
+            raise ValidationError(
+                "Local OCR component could not be downloaded.",
+                error_code="knowledge_ocr_download_failed",
+            ) from exc
+
+
 @dataclass(frozen=True)
 class PaddleOcrRuntime:
     generation_id: str
@@ -164,9 +251,12 @@ class PaddleOcrDeploymentService:
         self,
         paths: AppPaths,
         *,
+        bundle_source: PaddleOcrBundleSource | None = None,
         catalog: PaddleOcrBundleCatalog | None = None,
         release_config: ReleaseConfig | None = None,
     ) -> None:
+        if bundle_source is not None and (catalog is not None or release_config is not None):
+            raise ValueError("Bundle source cannot be combined with catalog or release configuration.")
         self._paths = paths
         self._root = paths.cache / "knowledge-ocr"
         self._bundles = self._root / "bundles"
@@ -174,14 +264,30 @@ class PaddleOcrDeploymentService:
         self._staging = self._root / "staging"
         self._active_path = self._root / _ACTIVE_MANIFEST_NAME
         self._verification_path = self._root / _VERIFICATION_RECORD_NAME
-        self._catalog = catalog if catalog is not None else _load_packaged_catalog()
-        self._release_config = release_config or load_release_config()
+        if bundle_source is not None:
+            self._bundle_source = bundle_source
+        elif catalog is not None:
+            # Keep the former catalog/release injection seam as an explicit
+            # release-source compatibility path for existing callers.
+            self._bundle_source = ReleasePaddleOcrBundleSource(
+                catalog,
+                release_config or load_release_config(),
+            )
+        else:
+            self._bundle_source = _load_default_bundle_source(
+                release_config or load_release_config()
+            )
         self._state_lock = threading.Lock()
         self._transient_status: PaddleOcrStatus | None = None
 
     @property
     def catalog(self) -> PaddleOcrBundleCatalog | None:
-        return self._catalog
+        source = self._bundle_source
+        return source.catalog if source is not None else None
+
+    @property
+    def bundle_source(self) -> PaddleOcrBundleSource | None:
+        return self._bundle_source
 
     def status_snapshot(self) -> PaddleOcrStatus:
         with self._state_lock:
@@ -194,9 +300,10 @@ class PaddleOcrDeploymentService:
             return PaddleOcrStatus(PaddleOcrState.NOT_INSTALLED, "runtime_missing")
         except (OSError, TypeError, ValueError):
             return PaddleOcrStatus(PaddleOcrState.REPAIR_REQUIRED, "runtime_manifest_invalid")
-        if self._catalog is not None and (
-            runtime.runtime_id != self._catalog.runtime_id
-            or runtime.model_pack_id != self._catalog.model_pack_id
+        catalog = self.catalog
+        if catalog is not None and (
+            runtime.runtime_id != catalog.runtime_id
+            or runtime.model_pack_id != catalog.model_pack_id
         ):
             return PaddleOcrStatus(
                 PaddleOcrState.REPAIR_REQUIRED,
@@ -227,18 +334,14 @@ class PaddleOcrDeploymentService:
         return self.status_snapshot()
 
     def install(self, progress: Callable[[str], None] | None = None) -> PaddleOcrStatus:
-        catalog = self._catalog
-        if catalog is None:
+        source = self._bundle_source
+        if source is None:
             raise ValidationError(
                 "Local OCR is unavailable in this build.",
                 error_code="knowledge_ocr_catalog_unavailable",
             )
-        artifact_url = self._release_config.artifact_url(catalog.artifact_name)
-        if not artifact_url:
-            raise ValidationError(
-                "Local OCR download is unavailable in this build.",
-                error_code="knowledge_ocr_download_unavailable",
-            )
+        source.ensure_available()
+        catalog = source.catalog
         report = progress or (lambda _phase: None)
         self._set_transient(PaddleOcrStatus(PaddleOcrState.INSTALLING, "starting"))
         staging_root = self._staging / uuid4().hex
@@ -246,7 +349,7 @@ class PaddleOcrDeploymentService:
             for directory in (self._root, self._bundles, self._downloads, self._staging):
                 directory.mkdir(parents=True, exist_ok=True)
             report("downloading_bundle")
-            archive = self._download_verified(artifact_url, catalog)
+            archive = self._materialize_verified_bundle(source)
             report("extracting_bundle")
             extracted = staging_root / "extracted"
             extracted.mkdir(parents=True)
@@ -259,9 +362,6 @@ class PaddleOcrDeploymentService:
                 expected_catalog=catalog,
                 verify_all_files=True,
             )
-            report("self_testing")
-            self._self_test(runtime)
-            report("activating_bundle")
             generation_path = self._bundles / runtime.generation_id
             if generation_path.exists():
                 _remove_private_tree(generation_path, root=self._bundles)
@@ -272,6 +372,16 @@ class PaddleOcrDeploymentService:
                 expected_catalog=catalog,
                 verify_all_files=False,
             )
+            report("self_testing")
+            try:
+                # Paddle resolves model members from their final filesystem path.
+                # A staging-path self-test cannot prove that the activated Windows
+                # path remains usable (notably around native path-length limits).
+                self._self_test(activated)
+            except Exception:
+                _remove_private_tree(generation_path, root=self._bundles)
+                raise
+            report("activating_bundle")
             _write_json_atomic(
                 self._active_path,
                 {
@@ -407,38 +517,28 @@ class PaddleOcrDeploymentService:
             if self._transient_status is not None and self._transient_status.state is state:
                 self._transient_status = None
 
-    def _download_verified(
+    def _materialize_verified_bundle(
         self,
-        url: str,
-        catalog: PaddleOcrBundleCatalog,
+        source: PaddleOcrBundleSource,
     ) -> Path:
+        catalog = source.catalog
+        source.ensure_available()
         target = self._downloads / catalog.artifact_name
-        if (
-            target.is_file()
-            and target.stat().st_size == catalog.artifact_bytes
-            and _sha256(target) == catalog.artifact_sha256
-        ):
+        if _matches_catalog_artifact(target, catalog):
             return target
         partial = target.with_suffix(target.suffix + ".part")
         partial.unlink(missing_ok=True)
         try:
-            with urllib.request.urlopen(url, timeout=120) as response, partial.open("wb") as output:
-                shutil.copyfileobj(response, output, length=1024 * 1024)
-                output.flush()
-                os.fsync(output.fileno())
+            source.materialize(partial)
+            if not _matches_catalog_artifact(partial, catalog):
+                raise ValidationError(
+                    "Local OCR bundle failed integrity verification.",
+                    error_code="knowledge_ocr_bundle_integrity_failed",
+                )
+            os.replace(partial, target)
         except Exception:
             partial.unlink(missing_ok=True)
             raise
-        if (
-            partial.stat().st_size != catalog.artifact_bytes
-            or _sha256(partial) != catalog.artifact_sha256
-        ):
-            partial.unlink(missing_ok=True)
-            raise ValidationError(
-                "Downloaded local OCR bundle failed integrity verification.",
-                error_code="knowledge_ocr_bundle_integrity_failed",
-            )
-        os.replace(partial, target)
         return target
 
     def _resolve_active_runtime(self, *, verify_all_files: bool = False) -> PaddleOcrRuntime:
@@ -746,8 +846,20 @@ class PaddleOcrService:
         return payload
 
 
+def _load_default_bundle_source(
+    release_config: ReleaseConfig,
+) -> PaddleOcrBundleSource | None:
+    catalog = _load_packaged_catalog()
+    if catalog is None:
+        return None
+    artifact_override = os.environ.get(_LOCAL_ARTIFACT_OVERRIDE_ENV, "").strip()
+    if artifact_override:
+        return LocalPaddleOcrBundleSource(catalog, Path(artifact_override))
+    return ReleasePaddleOcrBundleSource(catalog, release_config)
+
+
 def _load_packaged_catalog() -> PaddleOcrBundleCatalog | None:
-    override = os.environ.get("XENIX_KNOWLEDGE_OCR_CATALOG", "").strip()
+    override = os.environ.get(_CATALOG_OVERRIDE_ENV, "").strip()
     path = Path(override) if override else package_root() / "resources" / "knowledge_ocr" / _CATALOG_RESOURCE_NAME
     if not path.is_file():
         return None
@@ -755,6 +867,17 @@ def _load_packaged_catalog() -> PaddleOcrBundleCatalog | None:
         return PaddleOcrBundleCatalog.from_payload(_bounded_json_file(path))
     except (OSError, TypeError, ValueError):
         return None
+
+
+def _matches_catalog_artifact(path: Path, catalog: PaddleOcrBundleCatalog) -> bool:
+    try:
+        return (
+            path.is_file()
+            and path.stat().st_size == catalog.artifact_bytes
+            and _sha256(path) == catalog.artifact_sha256
+        )
+    except OSError:
+        return False
 
 
 def _validate_runtime_manifest(payload: object) -> dict[str, object]:
@@ -1122,7 +1245,18 @@ def _sha256(path: Path) -> str:
 
 
 def _generation_id(catalog: PaddleOcrBundleCatalog) -> str:
-    return f"{catalog.runtime_id}-{catalog.model_pack_id}-{catalog.artifact_sha256[:12]}"
+    identity = json.dumps(
+        {
+            "schema_version": 1,
+            "runtime_id": catalog.runtime_id,
+            "model_pack_id": catalog.model_pack_id,
+            "artifact_sha256": catalog.artifact_sha256,
+        },
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("ascii")
+    return f"ocr-{hashlib.sha256(identity).hexdigest()[:32]}"
 
 
 def _remove_private_tree(path: Path, *, root: Path) -> None:
@@ -1140,8 +1274,10 @@ def _no_console_creationflags() -> int:
 
 
 __all__ = [
+    "LocalPaddleOcrBundleSource",
     "NATIVE_OCR_PROTOCOL_VERSION",
     "PaddleOcrBundleCatalog",
+    "PaddleOcrBundleSource",
     "PaddleOcrDeploymentService",
     "PaddleOcrRuntime",
     "PaddleOcrRuntimeDescriptor",
@@ -1149,4 +1285,5 @@ __all__ = [
     "PaddleOcrSession",
     "PaddleOcrState",
     "PaddleOcrStatus",
+    "ReleasePaddleOcrBundleSource",
 ]

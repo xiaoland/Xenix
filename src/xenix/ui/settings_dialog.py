@@ -594,23 +594,45 @@ class SettingsDialog(QDialog):
     def _on_ocr_setup_finished(
         self,
         generation: int,
-        status: PaddleOcrStatus | None,
+        status: PaddleOcrStatus,
     ) -> None:
         self._ocr_install_task = None
-        if status is not None:
-            self._cached_ocr_status = status
+        self._cached_ocr_status = status
         if generation != self._lifecycle_generation or not self._active:
             if self._active:
                 self._schedule_ocr_status_probe()
             return
         self._ocr_setup_button.setEnabled(self._paddle_ocr_deployment is not None)
         self._render_ocr_status()
-        if status is None:
+        if status.state is PaddleOcrState.FAILED:
             QMessageBox.warning(
                 self,
                 self.tr("Local OCR Setup Failed"),
-                self.tr("Local OCR setup could not be completed."),
+                self._ocr_setup_failure_message(status.reason_code),
             )
+
+    def _ocr_setup_failure_message(self, reason_code: str | None) -> str:
+        if reason_code == "knowledge_ocr_catalog_unavailable":
+            return self.tr("Local OCR is unavailable in this build.")
+        if reason_code == "knowledge_ocr_download_unavailable":
+            return self.tr("Local OCR download source is unavailable.")
+        if reason_code == "knowledge_ocr_download_failed":
+            return self.tr("Local OCR component could not be downloaded.")
+        if reason_code == "knowledge_ocr_bundle_source_unavailable":
+            return self.tr("Local OCR bundle source is unavailable.")
+        if reason_code in {
+            "knowledge_ocr_bundle_source_mismatch",
+            "knowledge_ocr_bundle_integrity_failed",
+            "knowledge_ocr_bundle_invalid",
+        }:
+            return self.tr("Local OCR component failed integrity verification.")
+        if reason_code in {
+            "knowledge_ocr_self_test_failed",
+            "knowledge_ocr_initialize_failed",
+            "knowledge_ocr_worker_incompatible",
+        }:
+            return self.tr("Local OCR component failed its self-test.")
+        return self.tr("Local OCR setup could not be completed.")
 
     def _schedule_ocr_status_probe(self) -> None:
         if (

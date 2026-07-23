@@ -5,6 +5,7 @@ import pytest
 from PySide6.QtWidgets import QApplication, QLineEdit, QMessageBox
 
 from xenix.config import ensure_app_dirs, get_app_paths
+from xenix.exceptions import ValidationError
 from xenix.i18n import TranslationManager
 from xenix.services.embedding_service import EmbeddingSettings, EmbeddingSettingsService
 from xenix.services.llm import LLMProviderConfig, LLMService, LLMSettings, LLMSettingsService
@@ -181,6 +182,74 @@ def test_settings_dialog_targets_knowledge_tab_and_runs_ocr_setup_off_ui_thread(
         assert deployment.install_thread_ids
         assert all(value != threading.get_ident() for value in deployment.install_thread_ids)
         assert dialog._ocr_status_label.text() == "Local PaddleOCR is ready"
+    finally:
+        dialog.close()
+
+
+def test_ocr_setup_preserves_safe_failure_for_user_feedback(
+    monkeypatch,
+    tmp_path: Path,
+    app: QApplication,
+) -> None:
+    class Deployment:
+        def status(self):
+            return PaddleOcrStatus(PaddleOcrState.NOT_INSTALLED)
+
+        def install(self, _progress):
+            raise ValidationError(
+                "Local OCR download is unavailable in this build.",
+                error_code="knowledge_ocr_download_unavailable",
+            )
+
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    llm_settings_service = LLMSettingsService(paths)
+    translation_manager = TranslationManager(app, paths)
+    translation_manager.set_locale("en_US", persist=False)
+    warnings: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        QMessageBox,
+        "warning",
+        lambda _parent, title, message: warnings.append((title, message)),
+    )
+    dialog = SettingsDialog(
+        paths,
+        paths.logs / "xenix.log",
+        paths.state / "xenix.db",
+        translation_manager,
+        LLMService(llm_settings_service),
+        llm_settings_service,
+        MLWorkerSettingsService(paths),
+        EmbeddingSettingsService(paths),
+        paddle_ocr_deployment=Deployment(),
+    )
+
+    try:
+        dialog.show_tab(SettingsTab.KNOWLEDGE_BASE)
+        dialog.show()
+        assert dialog._thread_pool.waitForDone(2_000)
+        app.processEvents()
+
+        dialog._install_ocr()
+        assert dialog._thread_pool.waitForDone(2_000)
+        app.processEvents()
+
+        assert dialog._cached_ocr_status == PaddleOcrStatus(
+            PaddleOcrState.FAILED,
+            "knowledge_ocr_download_unavailable",
+        )
+        assert warnings == [
+            (
+                "Local OCR Setup Failed",
+                "Local OCR download source is unavailable.",
+            )
+        ]
+        assert dialog._ocr_setup_failure_message(
+            "knowledge_ocr_bundle_integrity_failed"
+        ) == "Local OCR component failed integrity verification."
+        assert dialog._ocr_setup_failure_message(
+            "knowledge_ocr_self_test_failed"
+        ) == "Local OCR component failed its self-test."
     finally:
         dialog.close()
 

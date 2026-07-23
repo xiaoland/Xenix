@@ -30,6 +30,7 @@ TEXT_PREPARATION_VERSION = "nfkc-trim-v1"
 EMBEDDING_ADAPTER_VERSION = "openai-compatible-v1"
 MAX_EMBEDDING_TEXT_CHARS = 12_000
 MAX_EMBEDDING_DIMENSIONS = 65_536
+DEFAULT_EMBEDDING_BATCH_SIZE = 20
 
 _MAX_RESPONSE_BYTES = 32 * 1024 * 1024
 _PROFILE_SCHEMA = "xenix.embedding-profile/v1"
@@ -63,7 +64,12 @@ class EmbeddingSettings(BaseModel):
         ge=1,
         le=MAX_EMBEDDING_DIMENSIONS,
     )
-    batch_size: int = Field(default=64, strict=True, ge=1, le=2_048)
+    batch_size: int = Field(
+        default=DEFAULT_EMBEDDING_BATCH_SIZE,
+        strict=True,
+        ge=1,
+        le=2_048,
+    )
     timeout_seconds: int = Field(default=120, strict=True, ge=1, le=3_600)
 
     @field_validator("provider_key", "model")

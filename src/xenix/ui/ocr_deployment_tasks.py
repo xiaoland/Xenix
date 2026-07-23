@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import logging
+
 from PySide6.QtCore import QObject, QRunnable, Signal
 
+from ..exceptions import ValidationError
 from ..services.paddle_ocr_service import (
     PaddleOcrDeploymentService,
     PaddleOcrState,
     PaddleOcrStatus,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 
 class OcrStatusSignals(QObject):
@@ -55,8 +60,16 @@ class OcrInstallTask(QRunnable):
             status = self._deployment.install(
                 lambda phase: self.signals.phase.emit(self._generation, phase)
             )
-        except Exception:
-            status = None
+        except Exception as exc:
+            code = (
+                exc.error_code
+                if isinstance(exc, ValidationError)
+                and isinstance(exc.error_code, str)
+                and exc.error_code.startswith("knowledge_ocr_")
+                else "knowledge_ocr_setup_failed"
+            )
+            LOGGER.warning("Local OCR setup failed: %s", code)
+            status = PaddleOcrStatus(PaddleOcrState.FAILED, code)
         self.signals.finished.emit(self._generation, status)
 
 

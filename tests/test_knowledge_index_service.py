@@ -11,6 +11,7 @@ from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.embedding_service import (
     EmbeddingBatch,
     EmbeddingSettings,
+    EmbeddingValidationError,
     embedding_profile_from_settings,
 )
 from xenix.services.knowledge_index_service import (
@@ -46,6 +47,8 @@ class _EmbeddingSession:
     def embed_texts(self, texts: Sequence[str]) -> EmbeddingBatch:
         values = tuple(texts)
         self._owner.calls.append(values)
+        if self._owner.failure is not None:
+            raise self._owner.failure
         if self._owner.fail:
             raise RuntimeError("provider failure")
         return EmbeddingBatch(
@@ -59,6 +62,7 @@ class _Embedding:
         self._settings = settings
         self.calls: list[tuple[str, ...]] = []
         self.fail = False
+        self.failure: Exception | None = None
 
     def freeze(self):
         settings = self._settings.load()
@@ -270,6 +274,36 @@ def test_old_vector_failure_does_not_override_a_later_successful_generation(
     status = indexes.status()
     assert status.text_vector_state == "needs_rebuild"
     assert status.error_code is None
+
+
+def test_vector_task_preserves_safe_embedding_provider_failure(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    storage, _settings, embedding, _semantic, knowledge, indexes = _services(
+        monkeypatch,
+        tmp_path,
+    )
+    seed_knowledge_text(knowledge, title="规则", text="规则正文：三周需求。")
+    embedding.failure = EmbeddingValidationError(
+        "Embedding provider rejected the request.",
+        error_code="embedding_provider_http_error",
+        error_details={"status_code": 400},
+    )
+    task_id = indexes.enqueue_rebuild(
+        (KnowledgeIndexKind.TEXT_VECTOR,),
+        trigger="manual",
+    )
+
+    completed = indexes.rebuild_now(task_id)
+
+    assert completed.status == "failed"
+    assert completed.error_code == "embedding_provider_http_error"
+    assert completed.error_summary == (
+        "Embedding provider rejected the request (HTTP 400). "
+        "Check the model and Batch size setting."
+    )
+    assert indexes.status().text_vector_state == "needs_attention"
 
 
 def test_vector_task_cannot_succeed_after_its_published_corpus_is_superseded(

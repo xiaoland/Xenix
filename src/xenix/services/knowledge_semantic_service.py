@@ -131,7 +131,12 @@ class KnowledgeSemanticService:
             return self._rebuild_generation(library_id=library_id, force=force)
         except (KnowledgeSemanticUnavailable, KnowledgeSemanticIntegrityError):
             raise
-        except (EmbeddingValidationError, KnowledgeVectorStoreError) as exc:
+        except EmbeddingValidationError:
+            # Index orchestration is allowed to project the embedding adapter's
+            # bounded, content-free failure. Interactive retrieval still exposes
+            # only Knowledge-domain availability below.
+            raise
+        except KnowledgeVectorStoreError as exc:
             raise KnowledgeSemanticUnavailable() from exc
         except Exception as exc:
             raise KnowledgeSemanticIntegrityError() from exc

@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 from PySide6.QtCore import QCoreApplication, QMimeData, QPoint, QPointF, Qt, QUrl
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
-from PySide6.QtWidgets import QApplication, QFileDialog
+from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from xenix.services.knowledge_index_service import KnowledgeIndexOverview
 from xenix.services.knowledge_service import KnowledgeDocumentSummary
@@ -270,14 +270,18 @@ def test_knowledge_task_queue_unifies_task_kinds_and_capability_actions(monkeypa
             reference="index:3",
             kind="index_build",
             target="Text vector index",
-            status="queued",
-            phase="queued",
+            status="failed",
+            phase="failed",
             trigger="manual",
             updated_at=now,
-            error_code=None,
+            error_code="embedding_provider_http_error",
             owner="index",
             owner_id="3",
             import_id=None,
+            error_summary=(
+                "Embedding provider rejected the request (HTTP 400). "
+                "Check the model and Batch size setting."
+            ),
             index_kinds=("text_vector",),
         ),
     ]
@@ -311,6 +315,16 @@ def test_knowledge_task_queue_unifies_task_kinds_and_capability_actions(monkeypa
     assert not queue._retry_button.isEnabled()
     queue._cancel_button.click()
     assert imports.cancelled == ["1"]
+    details: list[str] = []
+    monkeypatch.setattr(
+        QMessageBox,
+        "information",
+        lambda _parent, _title, message: details.append(message),
+    )
+    queue._table.selectRow(2)
+    queue._view_selected_details()
+    assert details and "embedding_provider_http_error" in details[0]
+    assert "Batch size" in details[0]
     queue.close()
 
 

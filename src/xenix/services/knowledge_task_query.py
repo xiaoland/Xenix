@@ -27,6 +27,7 @@ class KnowledgeTaskItem:
     owner: str
     owner_id: str
     import_id: str | None
+    error_summary: str | None = None
     index_kinds: tuple[str, ...] = ()
     can_cancel: bool = False
     can_retry: bool = False
@@ -192,6 +193,7 @@ class KnowledgeTaskQueryService:
                     owner="index",
                     owner_id=row.id,
                     import_id=None,
+                    error_summary=row.error_summary,
                     index_kinds=tuple(row.index_kinds_payload),
                     can_retry=row.status == "failed",
                     can_view_log=False,

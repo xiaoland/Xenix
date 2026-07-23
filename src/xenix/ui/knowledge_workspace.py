@@ -390,6 +390,10 @@ class KnowledgeTaskQueueDialog(QDialog):
         ).replace("%2", task.trigger.replace("_", " "))
         if task.error_code:
             details += "\n" + self.tr("Error: %1").replace("%1", task.error_code)
+        if task.error_summary:
+            details += "\n" + self.tr("Details: %1").replace(
+                "%1", task.error_summary
+            )
         QMessageBox.information(self, self.tr("Task Details"), details)
 
     def _sync_actions(self, *_args) -> None:

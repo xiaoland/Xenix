@@ -1,9 +1,9 @@
 # Slice 03 — Detailed Implementation Plan
 
-**State:** Phases B–H locally accepted; final coupled review pending
+**State:** Phases B–I locally accepted; final coupled review pending
 **Decision date:** 2026-07-22
 **Selected OCR backend:** official Paddle Inference C++ on Windows x64
-**Slice boundary:** one Slice 03 with Phases B–H; these phases are not independent
+**Slice boundary:** one Slice 03 with Phases B–I; these phases are not independent
 slices and cannot silently drop another admitted finding
 
 ## Outcome
@@ -585,9 +585,8 @@ binary or a forward repair release, not database downgrade.
 Implementation and local repository/package/native/live-benchmark evidence are
 complete. The carried global review opened KB-D26–D31; Sir admitted the Phase F
 Impact Handshake and all six repairs now have executable evidence. The attempted
-final review then opened Phase G, so the closure gate is now Phase G acceptance plus
-a resumed coupled Import/Storage/Tool/UI/OCR/runtime/release/index review with Sir.
-A commit remains a second, separate explicit command and has not been authorized.
+final review then opened Phase G. The completed Phase H scope was later committed as
+`b76a36e`; publication and final Slice 03 closure remain separately gated.
 
 ## Phase G — Presentation Import Completion
 
@@ -617,7 +616,7 @@ A commit remains a second, separate explicit command and has not been authorized
    deduplication, enqueue, queue opening, refresh, and bounded failure feedback.
    `KnowledgeImportService` remains the final file/admission authority.
 
-### Candidate Impact Handshake
+### Accepted Impact Handshake
 
 **Address and object:** `knowledge_formats.py`, provider implementations and Office
 helpers in `knowledge_pipeline.py`, `knowledge_docling.py`, Knowledge import
@@ -662,8 +661,9 @@ release-ready promise.
   passed in 140.6 seconds under the then-current direct Docling-helper proof; Phase H
   supersedes that evidence with spawned Import-worker DOCX/PPTX proof.
 
-Sir explicitly started Phase G on 2026-07-23. Implementation evidence is complete;
-commit, publication, and final Slice 03 closure remain separately gated.
+Sir explicitly started Phase G on 2026-07-23. Implementation evidence is complete
+and its resulting scope is included in `b76a36e`; publication and final Slice 03
+closure remain separately gated.
 
 ## Phase H — Production Import Topology and Local Queue Naming
 
@@ -736,6 +736,100 @@ session. A fresh 100,429,503-byte executable builds in 1,093.4 seconds; frozen
 packaged smoke passes in 133.5 seconds and requires spawned DOCX/PPTX import plus
 PPTX Derivation→lookup. Static checks and `git diff --check` pass.
 
-Phase H is locally accepted. The final coupled
-Import/Storage/Tool/UI/OCR/runtime/release/index review with Sir, commit, and
-publication remain separately gated.
+Phase H is locally accepted and committed in `b76a36e`. The final coupled
+Import/Storage/Tool/UI/OCR/runtime/release/index review with Sir and publication
+remain separately gated.
+
+## Phase I — Runtime Distribution and Vector Failure Truth
+
+### Diagnosed causes
+
+The active application is a source `scripts/run_dev.py` process. Its package root has
+no generated `resources/knowledge_ocr/runtime_catalog.json`,
+`XENIX_KNOWLEDGE_OCR_CATALOG` is unset, and no release origin is configured.
+`PaddleOcrDeploymentService.install()` therefore fails at
+`knowledge_ocr_catalog_unavailable` before creating a download or staging directory.
+Supplying only the catalog would reveal the next missing input,
+`knowledge_ocr_download_unavailable`. The 205,199,992-byte native archive and
+generated catalog in `dist/knowledge-ocr` have matching size and SHA-256, so the
+failure is above the native runtime.
+
+The current corpus-change vector task starts from one ready projection with 67
+bounded Units and fails before any LanceDB generation or SQLite generation row is
+published. Its Embedding profile requests 64 inputs per HTTP batch. The selected
+`qwen3.7-text-embedding` service accepts 20; bounded direct probes succeed at 20 and
+return HTTP 400 at 21. `KnowledgeSemanticService` converts the leaf
+`EmbeddingValidationError` into a generic semantic-unavailable error, and
+`KnowledgeIndexService` persists only that generic code and summary.
+
+### Candidate Impact Handshake
+
+**Address and object:** OCR bundle-source/release composition in
+`paddle_ocr_service.py`, `release_config.py`, `run_dev.py`, packaging and packaged
+smoke; typed setup-task results and Knowledge Settings copy/logging; Embedding
+request batching guidance, semantic/index error projection, task presentation, and
+focused deployment/provider/index tests.
+
+**State diff:** application-mode-dependent implicit catalog/release lookup → one
+explicit bundle-source contract that supplies catalog identity plus local or remote
+artifact access; swallowed OCR exception → typed content-free setup outcome;
+provider rejection collapsed into semantic unavailability → one safe leaf error
+projected through the existing index-task code/summary fields. The Embedding portion
+is now implemented: Batch size remains an explicit user setting with a default of
+20, and the current profile was corrected from 64 to 20 without changing vector-space
+compatibility.
+
+**Blast radius:** source/debug OCR setup, frozen/public release artifact resolution,
+Knowledge Settings failure feedback, index-task retry copy, and Embedding request
+batching. No SQLite migration, canonical IR, Unit identity, LanceDB schema, Tool
+schema, model fingerprint, multimodal behavior, or native worker protocol change is
+currently proposed.
+
+**Invariants:** catalog/manifest/hash/self-test still gate activation; source mode
+does not silently trust arbitrary archives; release and local transports share one
+deployment state machine; no API key, document text, provider response body, or
+vector is logged/persisted; provider-specific limits are not hard-coded into the
+generic OpenAI-compatible protocol; batching-policy changes do not falsely
+invalidate compatible vectors; retries never delete the prior failed task.
+
+**Verification:** source composition installs the exact generated local archive and
+reaches native READY; frozen composition installs the same identity through its
+release source; missing catalog/source and hash/self-test failures retain distinct
+safe UI/task diagnostics; the 67-Unit corpus rebuilds as `20+20+20+7`, publishes one
+1024-dimensional generation, and reaches strict semantic readiness; a fake provider
+rejection preserves safe HTTP/error/stage evidence without request bodies; focused,
+full, package, and package-smoke gates pass before the coupled review resumes.
+
+### Current gate
+
+Sir authorized the commit followed by diagnosis. Commit
+`b76a36e feat(knowledge): complete slice 03 operations and native OCR` contains the
+completed Slice 03 Phase H scope. The Phase I findings and vector repair are recorded
+in [runtime/index diagnostic evidence](../evidence/03-phase-i-runtime-index-diagnostic.md).
+Sir then authorized the configurable/default-20 Embedding change and current-profile
+update. The 67-Unit manual task succeeds, publishes a 1024-dimensional generation,
+and explicit semantic retrieval returns results. The
+[current OCR Service topology](../evidence/03-current-ocr-service-topology.md)
+confirmed that process/runtime-generation boundaries were sound and isolated the
+remaining source-composition and safe UI error-projection repair.
+
+Sir explicitly started Phase I on 2026-07-23. Deployment now receives one
+`PaddleOcrBundleSource`: development composes the exact generated local archive and
+catalog, while frozen/default composition uses the catalog with the immutable release
+origin. The shared deployment state machine retains outer size/SHA, safe extraction,
+member-manifest, protocol, self-test, and atomic-generation gates. The setup task
+projects only typed `knowledge_ocr_*` failures to translated Settings copy.
+
+Index rebuild orchestration now retains safe `embedding_*` leaf failures and
+content-free summaries in its existing task row/read model; interactive semantic
+lookup still maps adapter failures to the Knowledge-domain availability contract. A
+real source-mode install reached native `ready`, the focused Phase I cohort passed,
+and the configured 67-Unit vector rebuild plus strict semantic query remain green.
+The first fresh frozen smoke then exposed KB-D38: a staging-path self-test could
+pass before the runtime moved beneath an overlong descriptive generation directory,
+where Paddle could no longer resolve `.pdiparams`. Generation paths are now compact
+content addresses, self-test runs on the final path before active-pointer
+publication, and the rebuilt packaged native-OCR smoke passes.
+See [Phase I implementation evidence](../evidence/03-phase-i-implementation.md).
+Phase I is locally accepted; the final coupled review and any commit/publication
+remain separately gated.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import subprocess
 import sys
@@ -14,6 +15,7 @@ from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import ValidationError
 from xenix.release_config import ReleaseConfig
 from xenix.services.paddle_ocr_service import (
+    LocalPaddleOcrBundleSource,
     NATIVE_OCR_PROTOCOL_VERSION,
     PaddleOcrBundleCatalog,
     PaddleOcrDeploymentService,
@@ -22,8 +24,10 @@ from xenix.services.paddle_ocr_service import (
     PaddleOcrSession,
     PaddleOcrState,
     PaddleOcrStatus,
+    ReleasePaddleOcrBundleSource,
     _safe_extract_zip,
 )
+from scripts.run_dev import _configure_development_ocr_bundle_source
 
 
 RUNTIME_ID = "paddle-inference-3.3.0-paddleocr-3.7.0-win-x64"
@@ -82,6 +86,16 @@ def _catalog(archive: Path) -> PaddleOcrBundleCatalog:
         runtime_id=RUNTIME_ID,
         model_pack_id=MODEL_PACK_ID,
     )
+
+
+def _write_runtime_archive(source: Path, archive: Path) -> None:
+    with ZipFile(archive, "w") as package:
+        for path in sorted(source.rglob("*")):
+            if path.is_file():
+                package.write(
+                    path,
+                    (Path("xenix-knowledge-ocr") / path.relative_to(source)).as_posix(),
+                )
 
 
 def _paths(monkeypatch, tmp_path: Path):
@@ -177,7 +191,7 @@ def test_status_snapshot_uses_a_fresh_verification_record_without_rescanning_bun
     assert deployment.status_snapshot().state is PaddleOcrState.READY
 
 
-def test_install_verifies_and_atomically_activates_one_bundle(
+def test_local_bundle_source_verifies_and_atomically_activates_one_bundle(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -185,22 +199,17 @@ def test_install_verifies_and_atomically_activates_one_bundle(
     source = tmp_path / "bundle-source" / "xenix-knowledge-ocr"
     _runtime_tree(source)
     archive = tmp_path / "xenix-knowledge-ocr.zip"
-    with ZipFile(archive, "w") as package:
-        for path in sorted(source.rglob("*")):
-            if path.is_file():
-                package.write(path, (Path("xenix-knowledge-ocr") / path.relative_to(source)).as_posix())
+    _write_runtime_archive(source, archive)
     catalog = _catalog(archive)
     deployment = PaddleOcrDeploymentService(
         paths,
-        catalog=catalog,
-        release_config=ReleaseConfig(releases_oss_public_url="https://releases.example.test"),
+        bundle_source=LocalPaddleOcrBundleSource(catalog, archive),
     )
-    monkeypatch.setattr(deployment, "_download_verified", lambda *_args: archive)
-    self_tests: list[str] = []
+    self_tests: list[PaddleOcrRuntime] = []
     monkeypatch.setattr(
         deployment,
         "_self_test",
-        lambda runtime: self_tests.append(runtime.generation_id),
+        lambda runtime: self_tests.append(runtime),
     )
     phases: list[str] = []
 
@@ -216,7 +225,160 @@ def test_install_verifies_and_atomically_activates_one_bundle(
         "ready",
     ]
     assert len(self_tests) == 1
-    assert deployment.open_runtime().runtime_id == RUNTIME_ID
+    tested_runtime = self_tests[0]
+    assert tested_runtime.generation_path.parent == paths.cache / "knowledge-ocr" / "bundles"
+    assert tested_runtime.generation_path.name.startswith("ocr-")
+    assert len(tested_runtime.generation_path.name) == 36
+    assert deployment.open_runtime() == tested_runtime
+
+
+def test_activation_self_test_failure_does_not_publish_or_retain_generation(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    paths = _paths(monkeypatch, tmp_path)
+    source = tmp_path / "bundle-source" / "xenix-knowledge-ocr"
+    _runtime_tree(source)
+    archive = tmp_path / "xenix-knowledge-ocr.zip"
+    _write_runtime_archive(source, archive)
+    deployment = PaddleOcrDeploymentService(
+        paths,
+        bundle_source=LocalPaddleOcrBundleSource(_catalog(archive), archive),
+    )
+
+    def reject_final_runtime(runtime: PaddleOcrRuntime) -> None:
+        assert runtime.generation_path.parent == paths.cache / "knowledge-ocr" / "bundles"
+        raise ValidationError(
+            "Final runtime path failed.",
+            error_code="knowledge_ocr_self_test_failed",
+        )
+
+    monkeypatch.setattr(deployment, "_self_test", reject_final_runtime)
+
+    with pytest.raises(ValidationError) as caught:
+        deployment.install()
+
+    assert caught.value.error_code == "knowledge_ocr_self_test_failed"
+    assert not (paths.cache / "knowledge-ocr" / "active.json").exists()
+    assert list((paths.cache / "knowledge-ocr" / "bundles").iterdir()) == []
+
+
+def test_local_bundle_source_rejects_an_archive_that_misses_catalog_hash(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    paths = _paths(monkeypatch, tmp_path)
+    source = tmp_path / "bundle-source" / "xenix-knowledge-ocr"
+    _runtime_tree(source)
+    archive = tmp_path / "xenix-knowledge-ocr.zip"
+    _write_runtime_archive(source, archive)
+    catalog = _catalog(archive)
+    archive.write_bytes(archive.read_bytes() + b"unexpected")
+    deployment = PaddleOcrDeploymentService(
+        paths,
+        bundle_source=LocalPaddleOcrBundleSource(catalog, archive),
+    )
+
+    with pytest.raises(ValidationError) as caught:
+        deployment.install()
+
+    assert caught.value.error_code == "knowledge_ocr_bundle_integrity_failed"
+    assert not (paths.cache / "knowledge-ocr" / "active.json").exists()
+
+
+def test_release_bundle_source_downloads_and_activates_the_catalog_artifact(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    paths = _paths(monkeypatch, tmp_path)
+    source = tmp_path / "bundle-source" / "xenix-knowledge-ocr"
+    _runtime_tree(source)
+    archive = tmp_path / "xenix-knowledge-ocr.zip"
+    _write_runtime_archive(source, archive)
+    catalog = _catalog(archive)
+    requested: list[tuple[str, int]] = []
+
+    def fetch(url: str, *, timeout: int) -> io.BytesIO:
+        requested.append((url, timeout))
+        return io.BytesIO(archive.read_bytes())
+
+    monkeypatch.setattr("xenix.services.paddle_ocr_service.urllib.request.urlopen", fetch)
+    deployment = PaddleOcrDeploymentService(
+        paths,
+        bundle_source=ReleasePaddleOcrBundleSource(
+            catalog,
+            ReleaseConfig(releases_oss_public_url="https://releases.example.test"),
+        ),
+    )
+    monkeypatch.setattr(deployment, "_self_test", lambda _runtime: None)
+
+    assert deployment.install().state is PaddleOcrState.READY
+    assert requested == [
+        (f"https://releases.example.test/{catalog.artifact_name}", 120)
+    ]
+
+
+def test_release_bundle_source_requires_a_release_origin(monkeypatch, tmp_path: Path) -> None:
+    paths = _paths(monkeypatch, tmp_path)
+    catalog = PaddleOcrBundleCatalog(
+        artifact_name="xenix-knowledge-ocr.zip",
+        artifact_bytes=1,
+        artifact_sha256="a" * 64,
+        protocol_version=NATIVE_OCR_PROTOCOL_VERSION,
+        runtime_id=RUNTIME_ID,
+        model_pack_id=MODEL_PACK_ID,
+    )
+    deployment = PaddleOcrDeploymentService(
+        paths,
+        bundle_source=ReleasePaddleOcrBundleSource(catalog, ReleaseConfig()),
+    )
+
+    with pytest.raises(ValidationError) as caught:
+        deployment.install()
+
+    assert caught.value.error_code == "knowledge_ocr_download_unavailable"
+
+
+def test_run_dev_composes_dist_archive_as_a_local_bundle_source(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "project"
+    source = project_root / "bundle-source" / "xenix-knowledge-ocr"
+    _runtime_tree(source)
+    archive = (
+        project_root
+        / "dist"
+        / "knowledge-ocr"
+        / "xenix-knowledge-ocr.zip"
+    )
+    archive.parent.mkdir(parents=True)
+    _write_runtime_archive(source, archive)
+    catalog = _catalog(archive)
+    (archive.parent / "runtime_catalog.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "artifact_name": catalog.artifact_name,
+                "artifact_bytes": catalog.artifact_bytes,
+                "artifact_sha256": catalog.artifact_sha256,
+                "protocol_version": catalog.protocol_version,
+                "runtime_id": catalog.runtime_id,
+                "model_pack_id": catalog.model_pack_id,
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("XENIX_KNOWLEDGE_OCR_CATALOG", raising=False)
+    monkeypatch.delenv("XENIX_KNOWLEDGE_OCR_ARTIFACT", raising=False)
+
+    _configure_development_ocr_bundle_source(project_root)
+
+    paths = _paths(monkeypatch, tmp_path)
+    deployment = PaddleOcrDeploymentService(paths)
+    assert isinstance(deployment.bundle_source, LocalPaddleOcrBundleSource)
+    assert deployment.bundle_source.catalog == catalog
+    assert deployment.bundle_source.artifact_path == archive
 
 
 def test_corrupt_active_pointer_requires_repair(monkeypatch, tmp_path: Path) -> None:

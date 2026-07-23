@@ -50,6 +50,7 @@ class KnowledgeIndexTaskView:
     status: str
     phase: str
     error_code: str | None
+    error_summary: str | None
 
 
 class KnowledgeIndexService:
@@ -278,6 +279,7 @@ class KnowledgeIndexService:
                 status=row.status,
                 phase=row.phase,
                 error_code=row.error_code,
+                error_summary=row.error_summary,
             )
             for row in rows
         ]
@@ -346,9 +348,7 @@ class KnowledgeIndexService:
                 session.commit()
                 return _task_view(row)
         except Exception as exc:
-            code = getattr(exc, "error_code", None)
-            if not isinstance(code, str) or not code.startswith("knowledge_"):
-                code = "knowledge_index_rebuild_failed"
+            code, summary = _safe_task_failure(exc)
             with self._session_factory() as session:
                 row = self._repository.get_index_task(session, task_id)
                 if row is None:
@@ -356,7 +356,7 @@ class KnowledgeIndexService:
                 row.status = "failed"
                 row.phase = "failed"
                 row.error_code = code
-                row.error_summary = "Knowledge index rebuild could not be completed."
+                row.error_summary = summary
                 row.updated_at = utc_now()
                 self._repository.save_index_task(session, row)
                 session.commit()
@@ -427,7 +427,41 @@ def _task_view(row: KnowledgeIndexTaskRow) -> KnowledgeIndexTaskView:
         status=row.status,
         phase=row.phase,
         error_code=row.error_code,
+        error_summary=row.error_summary,
     )
+
+
+def _safe_task_failure(exc: Exception) -> tuple[str, str]:
+    code = getattr(exc, "error_code", None)
+    if not isinstance(code, str) or not code.startswith(("knowledge_", "embedding_")):
+        return (
+            "knowledge_index_rebuild_failed",
+            "Knowledge index rebuild could not be completed.",
+        )
+    if code == "embedding_provider_http_error":
+        details = getattr(exc, "error_details", {})
+        status_code = details.get("status_code") if isinstance(details, dict) else None
+        status = (
+            f" (HTTP {status_code})"
+            if isinstance(status_code, int) and not isinstance(status_code, bool)
+            else ""
+        )
+        return (
+            code,
+            "Embedding provider rejected the request"
+            f"{status}. Check the model and Batch size setting.",
+        )
+    if code == "embedding_provider_unavailable":
+        return (
+            code,
+            "Embedding provider is unavailable. Check the endpoint and network connection.",
+        )
+    if code.startswith("embedding_"):
+        return (
+            code,
+            "Embedding could not be completed. Check the Knowledge Base embedding settings.",
+        )
+    return code, "Knowledge index rebuild could not be completed."
 
 
 __all__ = [
