@@ -4,7 +4,6 @@ import logging
 import os
 import re
 import sys
-import threading
 import time
 from collections.abc import Callable
 from datetime import datetime
@@ -272,13 +271,18 @@ def _recover_storage_bootstrap(
     raise error
 
 
-def _load_runtime_imports() -> SimpleNamespace:
+def _load_runtime_imports(
+    *,
+    module_loaded: Callable[[], None] | None = None,
+) -> SimpleNamespace:
     runtime_start = time.perf_counter()
 
     def load_module(module_name: str):
         module_start = time.perf_counter()
         module = import_module(module_name)
         _emit_startup_timing("runtime_import.module", module_start, module=module_name)
+        if module_loaded is not None:
+            module_loaded()
         return module
 
     agent_harness = load_module("xenix.services.agent.harness_service")
@@ -388,33 +392,13 @@ def _load_runtime_imports_with_events(
         _emit_startup_timing("runtime_import.no_splash_wait", load_start)
         return runtime
 
-    completed = threading.Event()
-    result: SimpleNamespace | None = None
-    error: BaseException | None = None
-
-    def load() -> None:
-        nonlocal error, result
-        try:
-            result = _load_runtime_imports()
-        except BaseException as exc:
-            error = exc
-        finally:
-            completed.set()
-
     load_start = time.perf_counter()
-    thread = threading.Thread(target=load, name="xenix-startup-imports", daemon=True)
-    thread.start()
-    while not completed.is_set():
+    def process_module_boundary() -> None:
         app.processEvents(QEventLoop.ProcessEventsFlag.AllEvents, 50)
-        completed.wait(0.016)
-    thread.join()
+
+    result = _load_runtime_imports(module_loaded=process_module_boundary)
     app.processEvents()
     _emit_startup_timing("runtime_import.splash_wait", load_start)
-
-    if error is not None:
-        raise error
-    if result is None:
-        raise RuntimeError("Runtime imports did not produce a result.")
     return result
 
 

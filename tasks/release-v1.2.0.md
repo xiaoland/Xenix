@@ -66,6 +66,24 @@ queue, index lifecycle, Workspace loading model, and document removal behavior.
 - The lifecycle regressions pass, and the full App/UI cohort now completes as
   `60 passed` in 86.08 seconds. `pdm run check` also passes on the corrected
   release tree.
+- Candidate run `30076677241` then exposed a second ownership defect in the
+  non-UI cohort: a Knowledge task-queue query remained on Qt's global thread
+  pool after its window closed, while the next `MainWindow` lifecycle disposed
+  the shared SQLite runtime. The resulting native access violation occurred in
+  `KnowledgeTaskQueryService.list_tasks`, before packaging or OSS upload.
+- Knowledge Workspace, task queue, and Settings background work now belongs to
+  dialog-local pools. Accepted `MainWindow` closure quiesces those owners before
+  emitting the application-runtime shutdown signal, so service disposal cannot
+  overtake a UI task.
+- Cross-order local verification also exposed that the startup splash previously
+  imported process-global Python modules and C extensions on a daemon thread.
+  PySide's import hook can abort natively under that topology. Runtime imports
+  now remain on the application thread and pump Qt events at each module
+  boundary, preserving splash responsiveness without concurrent module
+  initialization.
+- The corrected tree passes the cross-order Knowledge/Settings/MainWindow/i18n
+  cohort (`89 passed`), then the complete repository gate as `636 passed, 4
+  skipped` plus the isolated `60 passed` MainWindow cohort.
 - No v1.2.0 candidate artifact or public publication exists yet.
 
 ## Release Notes
@@ -82,5 +100,6 @@ queue, index lifecycle, Workspace loading model, and document removal behavior.
 
 ## Next Step
 
-Commit the application-lifetime correction, move the unpublished annotated
-`v1.2.0` tag with a remote lease, and rerun the protected candidate workflow.
+Verify and commit the dialog-task ownership correction, move the unpublished
+annotated `v1.2.0` tag with a remote lease, and rerun the protected candidate
+workflow.

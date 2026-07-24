@@ -476,6 +476,7 @@ def test_startup_runtime_import_wait_keeps_splash_pulse_animating(monkeypatch, t
 
     real_load_runtime_imports = app_module._load_runtime_imports
     captured_phases = []
+    import_thread_ids = []
 
     class ProbeSplash(StartupSplash):
         def show_centered(self) -> None:
@@ -485,11 +486,14 @@ def test_startup_runtime_import_wait_keeps_splash_pulse_animating(monkeypatch, t
             captured_phases.append(self._pulse_bar._phase)
             super().close()
 
-    def slow_load_runtime_imports():
+    def slow_load_runtime_imports(*, module_loaded=None):
+        import_thread_ids.append(threading.get_ident())
         deadline = time.perf_counter() + 0.12
         while time.perf_counter() < deadline:
             time.sleep(0.01)
-        return real_load_runtime_imports()
+        if module_loaded is not None:
+            module_loaded()
+        return real_load_runtime_imports(module_loaded=module_loaded)
 
     monkeypatch.setattr(app_module, "StartupSplash", ProbeSplash)
     monkeypatch.setattr(app_module, "_load_runtime_imports", slow_load_runtime_imports)
@@ -498,6 +502,7 @@ def test_startup_runtime_import_wait_keeps_splash_pulse_animating(monkeypatch, t
     try:
         assert captured_phases
         assert captured_phases[-1] > 0.0
+        assert import_thread_ids == [threading.get_ident()]
     finally:
         window.close()
         app.processEvents()

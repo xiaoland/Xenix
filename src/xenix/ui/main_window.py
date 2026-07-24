@@ -275,6 +275,10 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event) -> None:  # type: ignore[override]
         super().closeEvent(event)
         if event.isAccepted():
+            if self._knowledge_workspace is not None:
+                self._knowledge_workspace.shutdown()
+            if self._settings_dialog is not None:
+                self._settings_dialog.shutdown()
             self.closing.emit()
 
     def retranslate_ui(self) -> None:

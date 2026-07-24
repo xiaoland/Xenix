@@ -287,7 +287,8 @@ class KnowledgeTaskQueueDialog(QDialog):
         self._derivation = derivation_service
         self._indexes = index_service
         self._log_dialog: KnowledgeImportLogDialog | None = None
-        self._thread_pool = QThreadPool.globalInstance()
+        self._thread_pool = QThreadPool(self)
+        self._shutdown = False
         self._lifecycle_generation = 0
         self._load_task: _TaskListLoad | None = None
         self._load_pending = False
@@ -331,7 +332,7 @@ class KnowledgeTaskQueueDialog(QDialog):
         self.retranslate_ui()
 
     def refresh(self) -> None:
-        if not self._active:
+        if self._shutdown or not self._active:
             return
         if self._load_task is not None:
             self._load_pending = True
@@ -503,6 +504,10 @@ class KnowledgeTaskQueueDialog(QDialog):
         self._close_button.setText(self.tr("Close"))
 
     def showEvent(self, event) -> None:
+        if self._shutdown:
+            super().showEvent(event)
+            self.hide()
+            return
         self._active = True
         self._lifecycle_generation += 1
         super().showEvent(event)
@@ -512,10 +517,12 @@ class KnowledgeTaskQueueDialog(QDialog):
         self._deactivate()
         if self._log_dialog is not None:
             self._log_dialog.hide()
+        self._thread_pool.waitForDone()
         super().hideEvent(event)
 
     def closeEvent(self, event) -> None:
         self._deactivate()
+        self._thread_pool.waitForDone()
         super().closeEvent(event)
 
     def _deactivate(self) -> None:
@@ -524,6 +531,16 @@ class KnowledgeTaskQueueDialog(QDialog):
         self._active = False
         self._load_pending = False
         self._refresh_timer.stop()
+
+    def shutdown(self) -> None:
+        """Quiesce UI-owned tasks before their application services are closed."""
+        if self._shutdown:
+            return
+        self._shutdown = True
+        self._deactivate()
+        if self._log_dialog is not None:
+            self._log_dialog.hide()
+        self._thread_pool.waitForDone()
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == QEvent.LanguageChange:
@@ -563,7 +580,8 @@ class KnowledgeWorkspaceDialog(QDialog):
         self._open_knowledge_settings = open_knowledge_settings
         self._queue_dialog: KnowledgeTaskQueueDialog | None = None
         self._index_dialog: KnowledgeIndexRebuildDialog | None = None
-        self._thread_pool = QThreadPool.globalInstance()
+        self._thread_pool = QThreadPool(self)
+        self._shutdown = False
         self._lifecycle_generation = 0
         self._request_sequence = 0
         self._documents_request_id: int | None = None
@@ -698,7 +716,7 @@ class KnowledgeWorkspaceDialog(QDialog):
         self._index_dialog.open()
 
     def refresh_documents(self) -> None:
-        if not self._active or self._workspace_service is None:
+        if self._shutdown or not self._active or self._workspace_service is None:
             return
         self._refresh_document_list()
         self._refresh_workspace_status()
@@ -1041,6 +1059,10 @@ class KnowledgeWorkspaceDialog(QDialog):
             self._queue_dialog.retranslate_ui()
 
     def showEvent(self, event) -> None:
+        if self._shutdown:
+            super().showEvent(event)
+            self.hide()
+            return
         self._active = True
         self._lifecycle_generation += 1
         if self._last_documents is None:
@@ -1051,10 +1073,12 @@ class KnowledgeWorkspaceDialog(QDialog):
 
     def hideEvent(self, event) -> None:
         self._deactivate()
+        self._thread_pool.waitForDone()
         super().hideEvent(event)
 
     def closeEvent(self, event) -> None:
         self._deactivate()
+        self._thread_pool.waitForDone()
         super().closeEvent(event)
 
     def _deactivate(self) -> None:
@@ -1070,6 +1094,16 @@ class KnowledgeWorkspaceDialog(QDialog):
             self._queue_dialog.hide()
         if self._index_dialog is not None:
             self._index_dialog.hide()
+
+    def shutdown(self) -> None:
+        """Quiesce UI-owned tasks before their application services are closed."""
+        if self._shutdown:
+            return
+        self._shutdown = True
+        self._deactivate()
+        if self._queue_dialog is not None:
+            self._queue_dialog.shutdown()
+        self._thread_pool.waitForDone()
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == QEvent.LanguageChange:
