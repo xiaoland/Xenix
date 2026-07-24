@@ -256,18 +256,87 @@ def test_interactive_startup_does_not_synchronously_flush_observability(
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
-
-    def fail_flush() -> None:
-        raise AssertionError("interactive startup must not synchronously flush observability")
-
-    monkeypatch.setattr("xenix.app.flush_observability", fail_flush)
+    flush_calls = []
+    monkeypatch.setattr(
+        "xenix.app.flush_observability",
+        lambda: flush_calls.append("flush"),
+    )
 
     app, window = build_main_window(show=True, show_splash=False)
     try:
         assert window.isVisible()
+        assert flush_calls == []
     finally:
         window.close()
         app.processEvents()
+    assert flush_calls == ["flush"]
+
+
+def test_closing_reused_main_window_stops_application_owned_knowledge_workers(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    worker_names = {
+        "xenix-knowledge-derivation",
+        "xenix-knowledge-import",
+        "xenix-knowledge-index",
+    }
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+
+    for iteration in range(2):
+        baseline = set(threading.enumerate())
+        monkeypatch.setenv(
+            "XENIX_APP_HOME",
+            str(tmp_path / f"xenix-home-{iteration}"),
+        )
+        app, window = build_main_window(show=False, show_splash=False)
+        owned_workers = [
+            thread
+            for thread in threading.enumerate()
+            if thread not in baseline and thread.name in worker_names
+        ]
+        assert sorted(thread.name for thread in owned_workers) == sorted(
+            worker_names
+        )
+
+        window.close()
+        app.processEvents()
+
+        assert all(not thread.is_alive() for thread in owned_workers)
+
+
+def test_failed_main_window_construction_stops_application_owned_knowledge_workers(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    worker_names = {
+        "xenix-knowledge-derivation",
+        "xenix-knowledge-import",
+        "xenix-knowledge-index",
+    }
+    baseline = set(threading.enumerate())
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    constructed_workers: list[threading.Thread] = []
+
+    class FailingMainWindow:
+        def __init__(self, **_kwargs) -> None:
+            constructed_workers.extend(
+                thread
+                for thread in threading.enumerate()
+                if thread not in baseline and thread.name in worker_names
+            )
+            raise RuntimeError("main window construction failed")
+
+    monkeypatch.setattr("xenix.ui.main_window.MainWindow", FailingMainWindow)
+
+    with pytest.raises(RuntimeError, match="main window construction failed"):
+        build_main_window(show=False, show_splash=False)
+
+    assert sorted(thread.name for thread in constructed_workers) == sorted(
+        worker_names
+    )
+    assert all(not thread.is_alive() for thread in constructed_workers)
 
 
 def test_startup_observability_flush_remains_explicitly_available(

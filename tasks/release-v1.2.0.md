@@ -56,6 +56,16 @@ queue, index lifecycle, Workspace loading model, and document removal behavior.
 - The same v1.2.0 source, packaged locally with the verified native OCR bundle,
   subsequently passed `pdm run smoke-package`; the CI-only failure remains
   non-reproducible, so the diagnostic projection is retained for the next candidate.
+- Candidate run `30070534998` passed identity, checks, and the non-UI cohort
+  (`635 passed, 4 skipped`) but was cancelled after the UI cohort exceeded 75
+  minutes. Its cancellation dump exposed one application-lifetime defect:
+  repeated `build_main_window()` calls reused one `QApplication` while each
+  window started three Knowledge workers that were only stopped by
+  `aboutToQuit`. Closing a window now notifies the application composition root,
+  which performs the same idempotent shutdown; startup unwind uses that owner too.
+- The lifecycle regressions pass, and the full App/UI cohort now completes as
+  `60 passed` in 86.08 seconds. `pdm run check` also passes on the corrected
+  release tree.
 - No v1.2.0 candidate artifact or public publication exists yet.
 
 ## Release Notes
@@ -72,6 +82,5 @@ queue, index lifecycle, Workspace loading model, and document removal behavior.
 
 ## Next Step
 
-Run the local release gate, commit the release identity, create annotated tag
-`v1.2.0`, push the release commit to `origin/develop`, and run the protected
-candidate workflow for that tag.
+Commit the application-lifetime correction, move the unpublished annotated
+`v1.2.0` tag with a remote lease, and rerun the protected candidate workflow.

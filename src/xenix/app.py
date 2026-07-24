@@ -450,6 +450,7 @@ def build_main_window(
 
     startup_scope = None
     startup_span_active = False
+    runtime_shutdown: Callable[[], None] | None = None
     try:
         _update_startup_stage(app, splash, StartupStage.PREPARING_APP_DATA)
         step_start = time.perf_counter()
@@ -538,8 +539,17 @@ def build_main_window(
         knowledge_import_service = None
         knowledge_derivation_service = None
         knowledge_index_service = None
+        runtime_shutdown_started = False
+        runtime_shutdown_connected = False
 
         def shutdown_runtime() -> None:
+            nonlocal runtime_shutdown_connected, runtime_shutdown_started
+            if runtime_shutdown_started:
+                return
+            runtime_shutdown_started = True
+            if runtime_shutdown_connected:
+                app.aboutToQuit.disconnect(shutdown_runtime)
+                runtime_shutdown_connected = False
             if knowledge_import_service is not None:
                 knowledge_import_service.shutdown()
             if knowledge_derivation_service is not None:
@@ -549,7 +559,7 @@ def build_main_window(
             context.engine.dispose()
             flush_observability()
 
-        app.aboutToQuit.connect(shutdown_runtime)
+        runtime_shutdown = shutdown_runtime
 
         _update_startup_stage(app, splash, StartupStage.LOADING_WORKBENCH)
         step_start = time.perf_counter()
@@ -639,6 +649,9 @@ def build_main_window(
             ),
         )
         _emit_startup_timing("main_window.construct", step_start)
+        app.aboutToQuit.connect(shutdown_runtime)
+        runtime_shutdown_connected = True
+        window.closing.connect(shutdown_runtime)
 
         _update_startup_stage(app, splash, StartupStage.READY)
         _hold_startup_splash(app, splash, splash_hold_ms)
@@ -662,7 +675,10 @@ def build_main_window(
         if startup_span_active and startup_scope is not None:
             startup_scope.__exit__(*sys.exc_info())
             startup_span_active = False
-        flush_observability()
+        if runtime_shutdown is None:
+            flush_observability()
+        else:
+            runtime_shutdown()
         _close_startup_splash(app, splash)
         raise
 
