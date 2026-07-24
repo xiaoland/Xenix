@@ -84,6 +84,13 @@ queue, index lifecycle, Workspace loading model, and document removal behavior.
 - The corrected tree passes the cross-order Knowledge/Settings/MainWindow/i18n
   cohort (`89 passed`), then the complete repository gate as `636 passed, 4
   skipped` plus the isolated `60 passed` MainWindow cohort.
+- Candidate run `30078564319` passed identity, checks, and the complete suite,
+  then built and verified native OCR and the frozen application. Its packaged
+  smoke exposed a contract error in the acceptance harness before OSS upload:
+  `import_file()` promises Canonical Ready, while the post-commit
+  Import→Derivation notification is independently handed off. The smoke required
+  the derivation row synchronously and raced that handoff. It now waits with a
+  bounded timeout for derivation visibility without coupling the two services.
 - No v1.2.0 candidate artifact or public publication exists yet.
 
 ## Release Notes

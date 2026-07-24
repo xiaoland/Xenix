@@ -9,7 +9,10 @@ from tempfile import TemporaryDirectory
 import pytest
 
 from xenix.config import ensure_app_dirs, get_app_paths
-from xenix.services.knowledge_packaged_smoke import run_knowledge_packaged_smoke
+from xenix.services.knowledge_packaged_smoke import (
+    _wait_for_derivation_handoff,
+    run_knowledge_packaged_smoke,
+)
 
 
 def _load_packaged_smoke_verifier():
@@ -104,6 +107,32 @@ assert ET.tostring(root, encoding=\"unicode\").startswith(\"<svg\")
     )
 
     assert completed.returncode == 0, completed.stderr
+
+
+def test_packaged_smoke_waits_for_async_derivation_handoff() -> None:
+    expected = object()
+
+    class EventuallyVisibleDerivation:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def status_for_import(self, import_id: str):
+            assert import_id == "import-1"
+            self.calls += 1
+            return expected if self.calls > 1 else None
+
+    service = EventuallyVisibleDerivation()
+
+    assert (
+        _wait_for_derivation_handoff(
+            service,
+            "import-1",
+            failure_message="handoff unavailable",
+            timeout=1,
+        )
+        is expected
+    )
+    assert service.calls == 2
 
 
 def test_knowledge_packaged_smoke_exercises_native_and_data_paths(monkeypatch, tmp_path: Path) -> None:

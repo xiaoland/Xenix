@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -13,7 +14,10 @@ from ..config import AppPaths, ensure_app_dirs
 from ..release_config import ReleaseConfig
 from .artifact_service import ArtifactService
 from .knowledge_content_store import KnowledgeContentStore
-from .knowledge_derivation_service import KnowledgeDerivationService
+from .knowledge_derivation_service import (
+    KnowledgeDerivationService,
+    KnowledgeDerivationView,
+)
 from .knowledge_document_lifecycle_service import KnowledgeDocumentLifecycleService
 from .knowledge_import_service import KnowledgeImportService
 from .knowledge_import_worker import read_worker_result
@@ -150,9 +154,11 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
                     )
                 imported_by_format[source_format] = imported
             presentation_import = imported_by_format["pptx"]
-            derivation_view = derivation.status_for_import(presentation_import.import_id)
-            if derivation_view is None:
-                raise RuntimeError("Spawned PPTX derivation was not queued.")
+            derivation_view = _wait_for_derivation_handoff(
+                derivation,
+                presentation_import.import_id,
+                failure_message="Spawned PPTX derivation was not queued.",
+            )
             derived = derivation.derive_now(derivation_view.job_id)
             matches = knowledge.lookup("presentation worker smoke", top_k=5)
             if (
@@ -266,9 +272,11 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
             )
             try:
                 imported = importer.import_file(import_image, timeout=180)
-                derivation_view = derivation.status_for_import(imported.import_id)
-                if derivation_view is None:
-                    raise RuntimeError("Native OCR derivation was not queued.")
+                derivation_view = _wait_for_derivation_handoff(
+                    derivation,
+                    imported.import_id,
+                    failure_message="Native OCR derivation was not queued.",
+                )
                 derived = derivation.derive_now(derivation_view.job_id)
                 if not derived.retrieval_ready:
                     raise RuntimeError("Native OCR retrieval projection is unavailable.")
@@ -312,6 +320,23 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
         ),
         encoding="utf-8",
     )
+
+
+def _wait_for_derivation_handoff(
+    service: KnowledgeDerivationService,
+    import_id: str,
+    *,
+    failure_message: str,
+    timeout: float = 10.0,
+) -> KnowledgeDerivationView:
+    """Wait for the post-commit Import→Derivation handoff to become visible."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        view = service.status_for_import(import_id)
+        if view is not None:
+            return view
+        time.sleep(0.02)
+    raise RuntimeError(failure_message)
 
 
 def _write_simple_pdf(path: Path, text: str) -> None:
