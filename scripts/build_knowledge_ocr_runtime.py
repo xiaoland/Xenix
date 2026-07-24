@@ -108,16 +108,8 @@ def _run(command: list[str], *, cwd: Path | None = None) -> None:
     subprocess.run(command, cwd=cwd, check=True)
 
 
-def _resolve_cmake() -> str:
-    configured = os.environ.get("XENIX_CMAKE", "").strip()
-    if configured:
-        path = Path(configured).resolve()
-        if path.is_file():
-            return str(path)
-        raise RuntimeError("XENIX_CMAKE does not name an existing executable.")
-    discovered = shutil.which("cmake")
-    if discovered:
-        return discovered
+def _visual_studio_installations() -> list[Path]:
+    candidates: list[Path] = []
     vswhere = (
         Path(os.environ.get("ProgramFiles(x86)", "C:/Program Files (x86)"))
         / "Microsoft Visual Studio"
@@ -128,7 +120,7 @@ def _resolve_cmake() -> str:
         result = subprocess.run(
             [
                 str(vswhere),
-                "-latest",
+                "-all",
                 "-products",
                 "*",
                 "-requires",
@@ -136,13 +128,50 @@ def _resolve_cmake() -> str:
                 "-property",
                 "installationPath",
             ],
-            check=True,
+            check=False,
             capture_output=True,
             text=True,
         )
-        installation = result.stdout.strip()
+        if result.returncode == 0:
+            candidates.extend(
+                Path(line.strip())
+                for line in result.stdout.splitlines()
+                if line.strip()
+            )
+    for environment, default in (
+        ("ProgramFiles", "C:/Program Files"),
+        ("ProgramFiles(x86)", "C:/Program Files (x86)"),
+    ):
+        root = Path(os.environ.get(environment, default)) / "Microsoft Visual Studio"
+        if root.is_dir():
+            candidates.extend(
+                path
+                for path in root.glob("*/*")
+                if path.is_dir() and path.name != "Installer"
+            )
+    unique: list[Path] = []
+    seen: set[Path] = set()
+    for candidate in candidates:
+        resolved = candidate.resolve()
+        if resolved not in seen and resolved.is_dir():
+            seen.add(resolved)
+            unique.append(resolved)
+    return unique
+
+
+def _resolve_cmake() -> str:
+    configured = os.environ.get("XENIX_CMAKE", "").strip()
+    if configured:
+        path = Path(configured).resolve()
+        if path.is_file():
+            return str(path)
+        raise RuntimeError("XENIX_CMAKE does not name an existing executable.")
+    discovered = shutil.which("cmake")
+    if discovered:
+        return discovered
+    for installation in _visual_studio_installations():
         candidate = (
-            Path(installation)
+            installation
             / "Common7"
             / "IDE"
             / "CommonExtensions"
@@ -362,19 +391,23 @@ def _resolve_vcomp(
     environment = os.environ.get("XENIX_VCOMP140_PATH", "").strip()
     if environment:
         candidates.append(Path(environment).resolve())
-    program_files = Path(
-        os.environ.get("ProgramFiles(x86)", "C:/Program Files (x86)")
-    )
-    redist = program_files / "Microsoft Visual Studio"
-    if redist.is_dir():
-        candidates.extend(
-            sorted(
-                redist.glob(
-                    "*/**/VC/Redist/MSVC/*/x64/Microsoft.VC143.OpenMP/vcomp140.dll"
-                ),
-                reverse=True,
-            )
+    for installation in _visual_studio_installations():
+        redist = installation / "VC" / "Redist" / "MSVC"
+        locked = (
+            redist
+            / toolchain["vcomp140_version"]
+            / "x64"
+            / "Microsoft.VC143.OpenMP"
+            / "vcomp140.dll"
         )
+        candidates.append(locked)
+        if redist.is_dir():
+            candidates.extend(
+                sorted(
+                    redist.glob("*/x64/Microsoft.VC143.OpenMP/vcomp140.dll"),
+                    reverse=True,
+                )
+            )
     system_root = Path(os.environ.get("SystemRoot", "C:/Windows"))
     candidates.append(system_root / "System32" / "vcomp140.dll")
     checked: set[Path] = set()

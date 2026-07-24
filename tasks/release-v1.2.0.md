@@ -43,7 +43,12 @@ queue, index lifecycle, Workspace loading model, and document removal behavior.
 - `pyproject.toml` declares `1.2.0`.
 - The clean release worktree passes `pdm run check`, the 633-test non-UI suite
   (`633 passed, 4 skipped`), and the 58-test App/UI entry suite.
-- No v1.2.0 tag, candidate, or public publication exists yet.
+- Candidate run `30065002770` passed identity, check, and the complete suite, then
+  failed before any OSS upload because its non-Developer-Shell runner did not expose
+  the locked Visual C++ OpenMP redistributable through `VCToolsRedistDir` or
+  `System32`. The worker itself compiled successfully. The build resolver now uses
+  Visual Studio installation metadata and the locked redistributable identity.
+- No v1.2.0 candidate artifact or public publication exists yet.
 
 ## Release Notes
 

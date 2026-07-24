@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -67,3 +68,49 @@ def test_native_worker_source_owns_only_bounded_stdio_protocol() -> None:
     assert 'operation == "shutdown"' in source
     assert "sqlite" not in source.casefold()
     assert "http" not in source.casefold()
+
+
+def test_vcomp_resolver_uses_visual_studio_installation_metadata(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    build = _build_module()
+    program_files_x86 = tmp_path / "Program Files (x86)"
+    vswhere = (
+        program_files_x86
+        / "Microsoft Visual Studio"
+        / "Installer"
+        / "vswhere.exe"
+    )
+    vswhere.parent.mkdir(parents=True)
+    vswhere.write_bytes(b"vswhere")
+    installation = tmp_path / "Program Files" / "Microsoft Visual Studio" / "2022" / "Enterprise"
+    payload = b"locked vcomp runtime"
+    vcomp = (
+        installation
+        / "VC"
+        / "Redist"
+        / "MSVC"
+        / "14.44.35211.0"
+        / "x64"
+        / "Microsoft.VC143.OpenMP"
+        / "vcomp140.dll"
+    )
+    vcomp.parent.mkdir(parents=True)
+    vcomp.write_bytes(payload)
+    toolchain = {
+        "vcomp140_version": "14.44.35211.0",
+        "vcomp140_bytes": len(payload),
+        "vcomp140_sha256": hashlib.sha256(payload).hexdigest(),
+    }
+
+    class _Completed:
+        returncode = 0
+        stdout = str(installation)
+
+    monkeypatch.setenv("ProgramFiles(x86)", str(program_files_x86))
+    monkeypatch.setenv("ProgramFiles", str(tmp_path / "empty-program-files"))
+    monkeypatch.setenv("SystemRoot", str(tmp_path / "empty-windows"))
+    monkeypatch.setattr(build.subprocess, "run", lambda *_args, **_kwargs: _Completed())
+
+    assert build._resolve_vcomp(None, toolchain) == vcomp.resolve()
