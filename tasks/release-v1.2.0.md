@@ -48,6 +48,14 @@ queue, index lifecycle, Workspace loading model, and document removal behavior.
   the locked Visual C++ OpenMP redistributable through `VCToolsRedistDir` or
   `System32`. The worker itself compiled successfully. The build resolver now uses
   Visual Studio installation metadata and the locked redistributable identity.
+- Candidate run `30066768248` proved that fix by building and verifying the native
+  OCR archive, then passed PyInstaller but returned exit code 1 from frozen smoke.
+  The wrapper had destroyed its temporary runtime while reporting only that code.
+  It now emits a bounded, secret-redacted error projection and Knowledge marker
+  before cleanup; the stale pre-conversation-cutover hidden import was also removed.
+- The same v1.2.0 source, packaged locally with the verified native OCR bundle,
+  subsequently passed `pdm run smoke-package`; the CI-only failure remains
+  non-reproducible, so the diagnostic projection is retained for the next candidate.
 - No v1.2.0 candidate artifact or public publication exists yet.
 
 ## Release Notes

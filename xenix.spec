@@ -69,7 +69,6 @@ a = Analysis(
         "xenix._generated_release_config",
         "xenix.services.agent.chatbot_events",
         "xenix.services.agent.completion_guard",
-        "xenix.services.agent.conversation_store",
         "xenix.services.agent.harness_service",
         "xenix.services.agent.lazy_tools",
         "xenix.services.agent.providers",
