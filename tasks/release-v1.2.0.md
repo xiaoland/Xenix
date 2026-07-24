@@ -1,5 +1,10 @@
 # v1.2.0 Release Packet
 
+## Status
+
+Completed on 2026-07-24. The immutable `v1.2.0` tag and published candidate both
+identify release commit `9fccee1a6a930995f70deff203c5f3a9a2cac366`.
+
 ## Objective
 
 Publish Xenix Native v1.2.0 from the accepted Knowledge Base implementation,
@@ -91,7 +96,30 @@ queue, index lifecycle, Workspace loading model, and document removal behavior.
   Import→Derivation notification is independently handed off. The smoke required
   the derivation row synchronously and raced that handoff. It now waits with a
   bounded timeout for derivation visibility without coupling the two services.
-- No v1.2.0 candidate artifact or public publication exists yet.
+- Candidate run `30082556318` was cancelled while the App/UI cohort was still
+  progressing. Its completed log later showed that the non-UI cohort had passed
+  as `637 passed, 4 skipped`; the cancellation, not a test failure, produced the
+  subsequent access-violation dump.
+- Candidate run `30086692198` passed the complete test gate, native OCR build,
+  packaged smoke, and installer construction. It was cancelled during the
+  long-running private OSS upload, before a candidate manifest was committed.
+- Candidate run `30092294272` completed successfully from tag `v1.2.0`. It
+  passed the non-UI cohort as `637 passed, 4 skipped`, the App/UI cohort as
+  `60 passed`, packaged smoke, native OCR and installer construction, private
+  OSS upload, and full object SHA-256 verification.
+- The accepted candidate identity is version `1.2.0` with manifest SHA-256
+  `e1f1868cf3761ccd3a336f4591e9e980ceed5cbcb6e0baa0d62a04318b4e4647`.
+- Publish run `30099493578` was rejected before runner allocation because the
+  protected `native-publish` environment admits `main`, not tag refs. It
+  executed no publication code and changed no public object.
+- Publish run `30099580045` was therefore dispatched from `main` with the exact
+  accepted candidate version and digest. It completed successfully and recorded
+  rollback snapshot
+  `published/publication-history/20260724T140742Z/`.
+- Post-publication probes confirmed the `1.2.0` Full package in both channel
+  feeds, HTTP 200 for the stable Setup alias with `Cache-Control: no-cache`, and
+  HTTP 206 for a one-byte range request. The public Full package is
+  `767,606,653` bytes and the stable Setup alias is `772,086,653` bytes.
 
 ## Release Notes
 
@@ -107,6 +135,6 @@ queue, index lifecycle, Workspace loading model, and document removal behavior.
 
 ## Next Step
 
-Verify and commit the dialog-task ownership correction, move the unpublished
-annotated `v1.2.0` tag with a remote lease, and rerun the protected candidate
-workflow.
+No release action remains. Future product work starts from the published
+`v1.2.0` baseline; any rollback must use the recorded publication-history
+snapshot through the protected `Native Publish` workflow.
