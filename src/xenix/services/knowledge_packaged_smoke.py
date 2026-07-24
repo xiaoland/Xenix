@@ -14,6 +14,7 @@ from ..release_config import ReleaseConfig
 from .artifact_service import ArtifactService
 from .knowledge_content_store import KnowledgeContentStore
 from .knowledge_derivation_service import KnowledgeDerivationService
+from .knowledge_document_lifecycle_service import KnowledgeDocumentLifecycleService
 from .knowledge_import_service import KnowledgeImportService
 from .knowledge_import_worker import read_worker_result
 from .knowledge_service import KnowledgeService
@@ -114,11 +115,18 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
             start_worker=False,
         )
         knowledge = KnowledgeService(storage.session_factory)
+        artifacts = ArtifactService(storage.session_factory)
         importer = KnowledgeImportService(
             paths=smoke_paths,
             session_factory=storage.session_factory,
-            artifact_service=ArtifactService(storage.session_factory),
+            artifact_service=artifacts,
             canonical_ready_notifier=derivation.enqueue_generation,
+        )
+        lifecycle = KnowledgeDocumentLifecycleService(
+            paths=smoke_paths,
+            session_factory=storage.session_factory,
+            artifact_service=artifacts,
+            content_cleanup=importer.cleanup_storage_orphans,
         )
         try:
             imported_by_format = {}
@@ -153,6 +161,24 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
                 or "presentation worker smoke" not in matches[0].quote.casefold()
             ):
                 raise RuntimeError("Spawned PPTX import did not reach Knowledge lookup.")
+            source_bytes = worker_pptx.read_bytes()
+            lifecycle.remove_document(presentation_import.document_id)
+            if knowledge.lookup("presentation worker smoke", top_k=5):
+                raise RuntimeError(
+                    "Removed Knowledge document remained reachable through lookup."
+                )
+            if worker_pptx.read_bytes() != source_bytes:
+                raise RuntimeError(
+                    "Knowledge document removal changed the user source file."
+                )
+            reimported = importer.import_file(worker_pptx, timeout=180)
+            if (
+                reimported.document_id == presentation_import.document_id
+                or reimported.reused_existing
+            ):
+                raise RuntimeError(
+                    "Removed Knowledge document did not re-import as a fresh identity."
+                )
         finally:
             importer.shutdown()
             derivation.shutdown()
@@ -275,6 +301,8 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
                 "import_worker_spawn": True,
                 "spawned_docx_import": True,
                 "spawned_pptx_import": True,
+                "document_removal": True,
+                "same_sha_reimport": True,
                 "lancedb": True,
                 "paddle_native_deployment": True,
                 "paddle_native_activation": native_ocr_activated,

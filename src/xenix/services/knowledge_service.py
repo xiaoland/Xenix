@@ -29,6 +29,7 @@ class KnowledgeUnitInput:
 
 @dataclass(frozen=True)
 class KnowledgeDocumentSummary:
+    document_id: str
     title: str
     source_format: str
     content_state: str
@@ -153,6 +154,7 @@ class KnowledgeService:
             )
         return [
             KnowledgeDocumentSummary(
+                document_id=row.id,
                 title=row.title,
                 source_format=row.source_format or "unknown",
                 content_state=_document_content_state(row.retrieval_status),

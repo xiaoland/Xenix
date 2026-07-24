@@ -46,6 +46,8 @@ def test_knowledge_packaged_smoke_exercises_native_and_data_paths(monkeypatch, t
     marker = json.loads((paths.state / "knowledge-smoke.json").read_text())
     assert marker["spawned_docx_import"] is True
     assert marker["spawned_pptx_import"] is True
+    assert marker["document_removal"] is True
+    assert marker["same_sha_reimport"] is True
 
 
 @pytest.mark.skipif(

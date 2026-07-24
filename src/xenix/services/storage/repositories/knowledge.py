@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import datetime
 
 from sqlalchemy import text
 from sqlmodel import Session, select
@@ -22,6 +24,13 @@ from ...knowledge_projection import (
     KnowledgeProjectionUnit,
     RETRIEVAL_PROJECTION_VERSION,
 )
+
+
+@dataclass(frozen=True)
+class KnowledgeDocumentRemovalLineage:
+    import_ids: tuple[str, ...]
+    source_artifact_ids: tuple[str, ...]
+    vector_generation_ids: tuple[str, ...]
 
 
 class KnowledgeRepository:
@@ -69,6 +78,187 @@ class KnowledgeRepository:
                 )
             )
         )
+
+    def claim_document_for_removal(
+        self,
+        session: Session,
+        *,
+        library_id: str,
+        document_id: str,
+        updated_at: datetime,
+    ) -> bool:
+        result = session.execute(
+            text(
+                "UPDATE knowledge_document "
+                "SET active=0, updated_at=:updated_at "
+                "WHERE id=:document_id AND library_id=:library_id AND active=1 "
+                "AND NOT EXISTS ("
+                "SELECT 1 FROM knowledge_import AS i "
+                "WHERE (i.document_id=:document_id "
+                "OR i.planned_document_id=:document_id) "
+                "AND i.status IN ('pending', 'queued', 'running')"
+                ") "
+                "AND NOT EXISTS ("
+                "SELECT 1 FROM knowledge_derivation AS d "
+                "WHERE d.document_id=:document_id "
+                "AND d.status IN ('pending', 'queued', 'running')"
+                ")"
+            ),
+            {
+                "document_id": document_id,
+                "library_id": library_id,
+                "updated_at": updated_at,
+            },
+        )
+        return int(result.rowcount or 0) == 1
+
+    def document_has_active_work(
+        self,
+        session: Session,
+        *,
+        document_id: str,
+    ) -> bool:
+        row = session.execute(
+            text(
+                "SELECT EXISTS("
+                "SELECT 1 FROM knowledge_import AS i "
+                "WHERE (i.document_id=:document_id "
+                "OR i.planned_document_id=:document_id) "
+                "AND i.status IN ('pending', 'queued', 'running') "
+                "UNION ALL "
+                "SELECT 1 FROM knowledge_derivation AS d "
+                "WHERE d.document_id=:document_id "
+                "AND d.status IN ('pending', 'queued', 'running')"
+                ")"
+            ),
+            {"document_id": document_id},
+        ).first()
+        return bool(row and row[0])
+
+    def remove_claimed_document(
+        self,
+        session: Session,
+        *,
+        library_id: str,
+        document_id: str,
+    ) -> KnowledgeDocumentRemovalLineage:
+        session.expire_all()
+        document = session.get(KnowledgeDocumentRow, document_id)
+        if (
+            document is None
+            or document.library_id != library_id
+            or document.active
+        ):
+            raise ValueError("Knowledge document is not claimed for removal.")
+
+        imports = list(
+            session.exec(
+                select(KnowledgeImportRow).where(
+                    (KnowledgeImportRow.document_id == document_id)
+                    | (KnowledgeImportRow.planned_document_id == document_id)
+                )
+            )
+        )
+        generations = list(
+            session.exec(
+                select(KnowledgeCanonicalGenerationRow).where(
+                    KnowledgeCanonicalGenerationRow.document_id == document_id
+                )
+            )
+        )
+        vector_generations = list(
+            session.exec(
+                select(KnowledgeVectorGenerationRow).where(
+                    KnowledgeVectorGenerationRow.library_id == library_id
+                )
+            )
+        )
+        import_ids = tuple(row.id for row in imports)
+        artifact_ids = tuple(
+            dict.fromkeys(
+                artifact_id
+                for artifact_id in (
+                    document.source_artifact_id,
+                    *(row.source_artifact_id for row in imports),
+                    *(row.source_artifact_id for row in generations),
+                )
+                if artifact_id
+            )
+        )
+
+        session.execute(
+            text(
+                "DELETE FROM knowledge_unit_fts WHERE unit_id IN ("
+                "SELECT id FROM knowledge_unit WHERE document_id=:document_id)"
+            ),
+            {"document_id": document_id},
+        )
+        session.execute(
+            text("DELETE FROM knowledge_unit WHERE document_id=:document_id"),
+            {"document_id": document_id},
+        )
+        session.execute(
+            text("DELETE FROM knowledge_derivation WHERE document_id=:document_id"),
+            {"document_id": document_id},
+        )
+        session.execute(
+            text(
+                "DELETE FROM knowledge_canonical_generation "
+                "WHERE document_id=:document_id"
+            ),
+            {"document_id": document_id},
+        )
+        if import_ids:
+            placeholders = ", ".join(
+                f":import_{index}" for index in range(len(import_ids))
+            )
+            session.execute(
+                text(f"DELETE FROM knowledge_import WHERE id IN ({placeholders})"),
+                {
+                    f"import_{index}": import_id
+                    for index, import_id in enumerate(import_ids)
+                },
+            )
+        session.execute(
+            text("DELETE FROM knowledge_document WHERE id=:document_id AND active=0"),
+            {"document_id": document_id},
+        )
+        session.execute(
+            text(
+                "DELETE FROM knowledge_vector_generation "
+                "WHERE library_id=:library_id"
+            ),
+            {"library_id": library_id},
+        )
+        session.flush()
+        return KnowledgeDocumentRemovalLineage(
+            import_ids=import_ids,
+            source_artifact_ids=artifact_ids,
+            vector_generation_ids=tuple(row.id for row in vector_generations),
+        )
+
+    def artifact_is_referenced(
+        self,
+        session: Session,
+        *,
+        artifact_id: str,
+    ) -> bool:
+        row = session.execute(
+            text(
+                "SELECT EXISTS("
+                "SELECT 1 FROM knowledge_document "
+                "WHERE source_artifact_id=:artifact_id "
+                "UNION ALL "
+                "SELECT 1 FROM knowledge_import "
+                "WHERE source_artifact_id=:artifact_id "
+                "UNION ALL "
+                "SELECT 1 FROM knowledge_canonical_generation "
+                "WHERE source_artifact_id=:artifact_id"
+                ")"
+            ),
+            {"artifact_id": artifact_id},
+        ).first()
+        return bool(row and row[0])
 
     def replace_units(
         self,

@@ -1,9 +1,9 @@
 # Slice 03 — Detailed Implementation Plan
 
-**State:** Phases B–I locally accepted; final coupled review pending
+**State:** Complete; Slice 03 closed by Sir on 2026-07-24
 **Decision date:** 2026-07-22
 **Selected OCR backend:** official Paddle Inference C++ on Windows x64
-**Slice boundary:** one Slice 03 with Phases B–I; these phases are not independent
+**Slice boundary:** one Slice 03 with Phases B–K; these phases are not independent
 slices and cannot silently drop another admitted finding
 
 ## Outcome
@@ -27,11 +27,15 @@ Slice 03 is complete only when all of the following are true:
    value and pass the final-answer-oriented Knowledge benchmark.
 7. TXT, DOC/DOCX, PPT/PPTX, PDF, JPEG, and PNG share the complete capability graph,
    and file-picker/drop inputs converge before task enqueue.
+8. The Workspace can hard-remove one selected logical document and its Xenix-owned
+   searchable/application lineage without touching the user-selected source file;
+   same-content re-import remains possible.
 
 This slice does **not** add multimodal embeddings, PP-StructureV3, VLM, a generic
-application-wide task table, or a second Agent Tool result plane. PPT/PPTX were
-admitted later by Sir in Phase G; that decision supersedes the original non-goal but
-does not rewrite historical Phase B–F evidence.
+application-wide task table, a second Agent Tool result plane, document undo,
+soft-delete/tombstone history, or a deletion Agent Tool. PPT/PPTX were admitted
+later by Sir in Phase G; that decision supersedes the original non-goal but does not
+rewrite historical Phase B–F evidence.
 
 ## Locked Design Decisions
 
@@ -833,3 +837,217 @@ publication, and the rebuilt packaged native-OCR smoke passes.
 See [Phase I implementation evidence](../evidence/03-phase-i-implementation.md).
 Phase I is locally accepted; the final coupled review and any commit/publication
 remain separately gated.
+
+## Phase J — Progressive Workspace Loading
+
+### Confirmed cause
+
+The document viewport does not have a loading state. Construction/retranslation
+sets `No Knowledge documents yet` before any service result exists. On first show,
+one `_SnapshotTask` serially reads documents, task summary, OCR, and index status,
+then emits only the completed aggregate. Live read-only timings are:
+
+```text
+documents  17.53 ms
+tasks       6.75 ms
+OCR         2.34 ms
+indexes  2168.22 ms (cold)
+```
+
+The cold index cost is legitimate strict generation verification, including first
+LanceDB/PyArrow loading. It should not define document-list latency.
+
+### Candidate Impact Handshake
+
+**Address and object:** `KnowledgeWorkspaceService` presentation queries;
+`KnowledgeWorkspaceDialog` document viewport/footer state and background tasks;
+English/Chinese loading copy; Workspace UI/service tests; Slice 03 evidence.
+
+**State diff:** one all-or-nothing Workspace snapshot and false initial empty state
+→ independently completed document-list and footer-status DTOs inside the same
+Workspace presentation boundary; implicit `rowCount == 0` meaning both loading and
+empty → explicit `cold | loading | ready | empty | unavailable` document state;
+refresh blanking → stale-while-refresh for the last successful list.
+
+**Blast radius:** Workspace background task/lifecycle-generation handling,
+LanguageChange rendering, first-open/refresh tests, and footer timing. No SQLite,
+Knowledge document lifecycle, task/index/OCR authority, retrieval, Agent Tool,
+Embedding, or package contract changes.
+
+**Invariants:** only a completed empty document query may show empty-library copy;
+document failure shows unavailable; first load visibly shows loading; a slow or
+failed status query cannot withhold/erase documents; late results from a hidden or
+superseded window remain ignored; strict index status remains truthful and may load
+later in the footer; no polling task survives close.
+
+**Verification:** a blocked status query still allows the document row to render;
+a blocked first document query shows translated loading copy, never empty copy;
+empty/unavailable results diverge correctly; refresh retains prior rows; hide/reopen
+generation tests cover both operations; cold timing proves the list no longer waits
+for vector verification; i18n, focused UI/service, static, and full gates pass.
+
+### Current gate
+
+KB-D39 is diagnosed and recorded in
+[Workspace loading evidence](../evidence/03-phase-j-workspace-loading-diagnostic.md).
+Sir explicitly started the coupled Phase J/K implementation. The Workspace now
+loads document and footer projections independently, renders explicit
+loading/empty/unavailable states, preserves successful rows during refresh, and
+rejects hidden or superseded results by request and lifecycle generation. Focused
+UI/i18n, complete repository, app-entry, static, package, and frozen-smoke gates
+pass. Phase J is locally accepted; implementation evidence is recorded with Phase K
+below.
+
+## Phase K — Document Removal
+
+### Current topology and selected semantics
+
+The Workspace lists `KnowledgeDocumentSummary` values with no stable command
+identity and has no removal action. `KnowledgeService` is deliberately
+retrieval-only. SQLite foreign keys from Unit, Import, Canonical Generation, and
+Derivation rows have no cascade behavior; FTS rows require explicit removal;
+ArtifactService has registration but no owner-aware unregister contract; import
+task logs live outside SQLite; and a published Lance generation represents an
+entire immutable Library corpus.
+
+Phase K adopts **hard application-state removal**, not a hidden inactive/tombstone
+history. “Delete document” means:
+
+1. remove the logical document from Xenix and make it unreachable to keyword,
+   semantic, and hybrid retrieval;
+2. remove its Unit/FTS, canonical-generation, derivation, import-attempt, source
+   Artifact registration, and import-log lineage;
+3. invalidate vector generations for the affected Library because any of them may
+   encode the removed document;
+4. reclaim source/canonical/vector bytes only after their Xenix ownership and lack
+   of remaining references are proven; and
+5. leave the user-selected original file untouched and allow a later same-SHA
+   import to create a fresh logical document.
+
+The command rejects a document with a related queued/running Import or Derivation
+using a typed `knowledge_document_busy` result. It does not silently cancel work or
+compose cancellation plus deletion into a second state machine. Library-wide index
+work need not block deletion: frozen corpus identity and pre-publication rechecks
+already prevent an old build from becoming current.
+
+Admission and the busy check are one guarded SQLite writer operation, not a
+check-then-delete race. The transaction first claims the still-active document only
+when no related Import/Derivation is active, using `active=false` as an uncommitted
+removal claim; it then performs the ordered hard delete before commit. Rollback
+restores `active=true`, while a successful commit leaves no tombstone row.
+Derivation/import finalization must treat a missing or inactive document as
+superseded/missing and may never recreate or publish into the claimed identity.
+
+### Target topology
+
+```text
+Workspace selected row
+  -> KnowledgeDocumentLifecycleService.remove(library_id, document_id)
+       -> validate exact active document + no active document work
+       -> one SQLite transaction
+            FTS rows
+            -> Units
+            -> Derivation attempts
+            -> Canonical generations
+            -> Import attempts
+            -> Knowledge-owned Artifact registrations with no remaining FK
+            -> Document
+            -> affected Library vector-generation metadata
+       -> post-commit owned-storage maintenance
+            import logs + proven-orphan source/canonical/vector bytes
+       -> KnowledgeIndexService.notify_corpus_changed(library_id)
+            `-- coalesced text-vector rebuild only if configured content remains
+```
+
+The SQLite commit is the visibility cutover. Physical cleanup is best effort after
+that commit and may be retried by the existing safe maintenance paths; cleanup
+failure cannot resurrect the document or make an old vector generation current.
+The source/canonical CAS remains content-addressed, so removal never deletes a blob
+still referenced by another Library, document, or attempt.
+
+### Candidate Impact Handshake
+
+**Address and object:** a new Knowledge document-lifecycle command service;
+explicitly ordered repository deletion; owner-aware Artifact unregister seam;
+import-log and source/canonical/vector maintenance; vector-generation invalidation
+and corpus-change notification; Phase J's Workspace document DTO/state; selected-row
+item context-menu action and confirmation; application composition; Product
+TDD/deployment owner docs; storage/service/UI/package tests.
+
+**State diff:** read-only title/format/status summaries with no command target →
+Workspace-only document DTOs carrying stable `document_id`; no removal command →
+one exact-library lifecycle operation; independent manual row/file deletion risk →
+transactional retrieval cutover plus reference-proven owned-byte cleanup; stale
+whole-corpus vectors retained as candidates → all affected Library vector metadata
+invalidated before a coalesced rebuild.
+
+**Blast radius:** document listing/selection, Knowledge SQLite repository ordering,
+FTS correctness, completed import/preparation history, Artifact registration,
+Knowledge task-log directories, CAS maintenance, semantic status/generations,
+index-task coalescing, translations, composition shutdown/tests, and the durable
+Knowledge/storage deletion contract. Agent Tool arguments/results, user source
+files, OCR/Embedding settings, format routing, canonical IR schema, and
+multi-library UI remain unchanged. No schema migration is required for the selected
+hard-delete design.
+
+**Invariants:** `KnowledgeService` stays retrieval-only; UI never mutates SQL/files
+directly; the command verifies `library_id` and stable `document_id`; cancel leaves
+all state unchanged; active document work yields a typed busy error; after a
+successful command returns, no new lookup can return the document; no FTS or
+Artifact FK orphan remains; an old/racing vector build cannot publish for the new
+corpus; other documents and libraries remain searchable; cleanup never follows an
+untrusted path or removes a referenced CAS object; the original selected source
+path is never modified; no deletion capability is advertised to the Agent.
+
+**UI contract:** Phase J first gives the viewport explicit loading/ready states and
+a Workspace DTO with internal identity. Phase K adds no toolbar delete button.
+Right-clicking a concrete Knowledge-content list item targets the row under the
+pointer and opens an item context menu containing `Delete`; right-clicking empty
+viewport space cannot expose or execute deletion. Choosing `Delete` opens a
+window-modal destructive confirmation naming that document. The copy states that
+Xenix's copy, search data, and related task entries will be removed, the original
+file remains, and the action cannot be undone. The service remains authoritative
+for whether active work makes the document temporarily busy. The command runs off
+the UI thread; dismissing either menu or confirmation performs no service call;
+success refreshes documents/footer/task queue; missing/busy/failure results use
+bounded translated copy and never optimistically report success.
+
+**Verification:**
+
+1. import and derive a real TXT fixture, build keyword/vector retrieval, delete it,
+   and prove list plus keyword/semantic/hybrid surfaces cannot return it;
+2. delete one of two documents, rebuild, and prove only the remaining document's
+   deterministic Unit identities occur in the new vector generation;
+3. force a vector publication race and prove the old corpus cannot publish after
+   deletion while one coalesced rebuild targets the new corpus;
+4. prove ordered deletion leaves `PRAGMA foreign_key_check` clean, removes FTS
+   postings and task-feed lineage, and invalidates affected vector metadata;
+5. prove shared source CAS bytes survive another live reference, unreferenced
+   source/canonical/vector bytes become maintenance-owned orphans, and the original
+   user file still exists byte-for-byte;
+6. prove busy Import/Derivation rejects with no partial deletion and that a later
+   same-SHA import succeeds as a fresh document;
+7. prove the item under the pointer—not a stale prior selection—is the command
+   target; blank-area right-click and dismissed menu perform no call; cover
+   confirm/cancel, in-flight UI state, stale/hidden result suppression,
+   success/failure refresh, and English/Chinese `LanguageChange`;
+8. pass focused storage/service/index/UI tests, static checks, full suites, and a
+   frozen smoke that imports, derives, removes, verifies lookup absence, and
+   re-imports without touching its external fixture.
+
+### Current gate
+
+KB-D40 is admitted and the read-only topology/design evidence is recorded in
+[the Phase K document-removal design](../evidence/03-phase-k-document-removal-design.md).
+Sir explicitly started the coupled Phase J/K implementation. The new lifecycle
+service performs the guarded transactional retrieval cutover, owner-verified
+Artifact release, post-commit maintenance, and affected-Library vector convergence.
+The item context menu, confirmation, off-thread command, and typed failure copy are
+implemented without adding a toolbar or Agent action. Focused lifecycle tests prove
+lookup absence, busy rejection, shared-CAS preservation, vector rebuild, original
+file preservation, and same-SHA re-import. The complete repository and app-entry
+gates pass; a fresh executable plus frozen smoke exercises removal and re-import.
+See [Phase J/K implementation evidence](../evidence/03-phase-j-k-implementation.md).
+Phase K is locally accepted. Sir accepted the final coupled result, closed the
+complete Knowledge follow-up task, and authorized this implementation commit on
+2026-07-24. The v1.2.0 release is a separate workstream.

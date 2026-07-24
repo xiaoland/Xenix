@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 import time
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,9 +12,16 @@ from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from xenix.services.knowledge_index_service import KnowledgeIndexOverview
+from xenix.services.knowledge_document_lifecycle_service import KnowledgeDocumentBusy
 from xenix.services.knowledge_service import KnowledgeDocumentSummary
 from xenix.services.knowledge_task_query import KnowledgeTaskItem, KnowledgeTaskSummary
-from xenix.services.knowledge_workspace_service import KnowledgeWorkspaceSnapshot
+from xenix.services.knowledge_workspace_service import (
+    KnowledgeWorkspaceDocument,
+    KnowledgeWorkspaceDocuments,
+    KnowledgeWorkspaceDocumentsState,
+    KnowledgeWorkspaceSnapshot,
+    KnowledgeWorkspaceStatus,
+)
 from xenix.services.paddle_ocr_service import PaddleOcrState, PaddleOcrStatus
 from xenix.ui.knowledge_workspace import KnowledgeWorkspaceDialog, _accepted_import_paths
 
@@ -53,16 +61,71 @@ class _TaskQuery:
 
 
 class _SnapshotService:
-    def __init__(self, snapshot: KnowledgeWorkspaceSnapshot, *, block=None) -> None:
+    def __init__(
+        self,
+        snapshot: KnowledgeWorkspaceSnapshot,
+        *,
+        block=None,
+        document_block=None,
+        status_block=None,
+    ) -> None:
         self.value = snapshot
-        self.block = block
-        self.calls: list[int] = []
+        self.document_block = document_block or block
+        self.status_block = status_block
+        self.document_result: KnowledgeWorkspaceDocuments | None = None
+        self.document_calls: list[int] = []
+        self.status_calls: list[int] = []
 
-    def snapshot(self):
-        self.calls.append(threading.get_ident())
-        if self.block is not None:
-            self.block()
-        return self.value
+    def load_documents(self):
+        self.document_calls.append(threading.get_ident())
+        if self.document_block is not None:
+            self.document_block()
+        if self.document_result is not None:
+            return self.document_result
+        documents = tuple(
+            KnowledgeWorkspaceDocument(
+                document_id=item.document_id,
+                title=item.title,
+                source_format=item.source_format,
+                content_state=item.content_state,
+                imported_at=item.imported_at,
+                updated_at=item.updated_at,
+            )
+            for item in self.value.documents
+        )
+        return KnowledgeWorkspaceDocuments(
+            state=(
+                KnowledgeWorkspaceDocumentsState.READY
+                if documents
+                else KnowledgeWorkspaceDocumentsState.EMPTY
+            ),
+            items=documents,
+        )
+
+    def load_status(self):
+        self.status_calls.append(threading.get_ident())
+        if self.status_block is not None:
+            self.status_block()
+        return KnowledgeWorkspaceStatus(
+            tasks=self.value.tasks,
+            ocr=self.value.ocr,
+            indexes=self.value.indexes,
+        )
+
+
+class _DocumentLifecycle:
+    def __init__(self, *, error: Exception | None = None, on_remove=None) -> None:
+        self.error = error
+        self.on_remove = on_remove
+        self.calls: list[tuple[str, int]] = []
+
+    def remove_document(self, document_id: str):
+        self.calls.append((document_id, threading.get_ident()))
+        if self.error is not None:
+            raise self.error
+        if self.on_remove is not None:
+            self.on_remove()
+        return SimpleNamespace(document_id=document_id)
 
 
 def _snapshot(*, active: int = 0) -> KnowledgeWorkspaceSnapshot:
@@ -70,6 +133,7 @@ def _snapshot(*, active: int = 0) -> KnowledgeWorkspaceSnapshot:
     return KnowledgeWorkspaceSnapshot(
         documents=(
             KnowledgeDocumentSummary(
+                document_id="document-1",
                 title="运营规则",
                 source_format="pdf",
                 content_state="ready",
@@ -96,7 +160,35 @@ def _drain(workspace: KnowledgeWorkspaceDialog, app: QApplication) -> None:
     deadline = time.monotonic() + 3
     while time.monotonic() < deadline:
         app.processEvents()
-        if workspace._snapshot_task is None and workspace._last_snapshot is not None:
+        if (
+            workspace._documents_request_id is None
+            and workspace._status_request_id is None
+            and workspace._last_documents is not None
+            and workspace._last_status is not None
+        ):
+            break
+        time.sleep(0.005)
+    app.processEvents()
+
+
+def _drain_documents(workspace: KnowledgeWorkspaceDialog, app: QApplication) -> None:
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        app.processEvents()
+        if (
+            workspace._documents_request_id is None
+            and workspace._last_documents is not None
+        ):
+            break
+        time.sleep(0.005)
+    app.processEvents()
+
+
+def _drain_removal(workspace: KnowledgeWorkspaceDialog, app: QApplication) -> None:
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        app.processEvents()
+        if workspace._removal_task is None:
             break
         time.sleep(0.005)
     app.processEvents()
@@ -150,9 +242,106 @@ def test_workspace_shows_shell_before_background_snapshot_and_has_no_description
     assert workspace.isVisible()
     assert not hasattr(workspace, "_description")
     assert started.wait(2)
-    assert service.calls[0] != threading.get_ident()
+    assert service.document_calls[0] != threading.get_ident()
     release.set()
     _drain(workspace, app)
+    workspace.close()
+
+
+def test_workspace_first_document_load_shows_loading_never_false_empty(
+    monkeypatch,
+) -> None:
+    app = _app(monkeypatch)
+    started = threading.Event()
+    release = threading.Event()
+
+    def block_documents() -> None:
+        started.set()
+        assert release.wait(2)
+
+    workspace = KnowledgeWorkspaceDialog(
+        import_service=_ImportService(),
+        task_query_service=_TaskQuery(),
+        workspace_service=_SnapshotService(
+            _snapshot(),
+            document_block=block_documents,
+        ),
+    )
+    workspace.show()
+    app.processEvents()
+
+    assert started.wait(2)
+    assert workspace._empty_state.isVisible()
+    assert workspace._empty_state.text() == "Loading Knowledge documents…"
+    assert "No Knowledge documents" not in workspace._empty_state.text()
+    release.set()
+    _drain(workspace, app)
+    workspace.close()
+
+
+def test_workspace_document_rows_do_not_wait_for_slow_footer_status(
+    monkeypatch,
+) -> None:
+    app = _app(monkeypatch)
+    status_started = threading.Event()
+    status_release = threading.Event()
+
+    def block_status() -> None:
+        status_started.set()
+        assert status_release.wait(2)
+
+    workspace = KnowledgeWorkspaceDialog(
+        import_service=_ImportService(),
+        task_query_service=_TaskQuery(),
+        workspace_service=_SnapshotService(
+            _snapshot(),
+            status_block=block_status,
+        ),
+    )
+    workspace.show()
+    app.processEvents()
+    assert status_started.wait(2)
+    _drain_documents(workspace, app)
+
+    assert workspace._documents.rowCount() == 1
+    assert workspace._documents.item(0, 0).text() == "运营规则"
+    assert workspace._footer_status.text() == "Loading Knowledge status…"
+    status_release.set()
+    _drain(workspace, app)
+    workspace.close()
+
+
+def test_workspace_distinguishes_unavailable_from_empty_and_retains_stale_rows(
+    monkeypatch,
+) -> None:
+    app = _app(monkeypatch)
+    service = _SnapshotService(_snapshot())
+    workspace = KnowledgeWorkspaceDialog(
+        import_service=_ImportService(),
+        task_query_service=_TaskQuery(),
+        workspace_service=service,
+    )
+    workspace.show()
+    _drain(workspace, app)
+    assert workspace._documents.rowCount() == 1
+
+    service.document_result = KnowledgeWorkspaceDocuments(
+        state=KnowledgeWorkspaceDocumentsState.UNAVAILABLE,
+        items=(),
+    )
+    workspace.refresh_documents()
+    _drain_documents(workspace, app)
+
+    assert workspace._documents.isVisible()
+    assert workspace._documents.rowCount() == 1
+    assert not workspace._empty_state.isVisible()
+
+    workspace._last_documents = None
+    workspace._document_state = type(workspace._document_state).LOADING
+    workspace.refresh_documents()
+    _drain_documents(workspace, app)
+    assert not workspace._documents.isVisible()
+    assert workspace._empty_state.text() == "Knowledge content is temporarily unavailable."
     workspace.close()
 
 
@@ -179,6 +368,151 @@ def test_workspace_lists_documents_and_places_quiet_status_in_footer(monkeypatch
     assert not workspace._refresh_timer.isActive()
     workspace._settings_button.click()
     assert opened == [True]
+    workspace.close()
+
+
+def test_document_context_menu_targets_item_under_pointer_and_ignores_blank_space(
+    monkeypatch,
+) -> None:
+    app = _app(monkeypatch)
+    first = _snapshot()
+    documents = (
+        replace(
+            first.documents[0],
+            document_id="document-1",
+            title="第一份规则",
+        ),
+        replace(
+            first.documents[0],
+            document_id="document-2",
+            title="第二份规则",
+        ),
+    )
+    service = _SnapshotService(replace(first, documents=documents))
+    lifecycle = _DocumentLifecycle()
+    workspace = KnowledgeWorkspaceDialog(
+        import_service=_ImportService(),
+        task_query_service=_TaskQuery(),
+        workspace_service=service,
+        document_lifecycle_service=lifecycle,
+    )
+    workspace.show()
+    _drain(workspace, app)
+    workspace._documents.selectRow(0)
+    captured: list[KnowledgeWorkspaceDocument] = []
+    monkeypatch.setattr(workspace, "_confirm_document_removal", captured.append)
+    monkeypatch.setattr(
+        workspace,
+        "_exec_document_context_menu",
+        lambda menu, _position: menu.actions()[0],
+    )
+
+    second_item = workspace._documents.item(1, 0)
+    workspace._show_document_context_menu(
+        workspace._documents.visualItemRect(second_item).center()
+    )
+
+    assert workspace._documents.currentRow() == 1
+    assert [item.document_id for item in captured] == ["document-2"]
+
+    menu_calls: list[bool] = []
+    monkeypatch.setattr(
+        workspace,
+        "_exec_document_context_menu",
+        lambda _menu, _position: menu_calls.append(True),
+    )
+    workspace._show_document_context_menu(
+        QPoint(
+            workspace._documents.viewport().width() - 2,
+            workspace._documents.viewport().height() - 2,
+        )
+    )
+    assert menu_calls == []
+    workspace.close()
+
+
+def test_confirmed_context_removal_runs_off_ui_thread_and_refreshes(
+    monkeypatch,
+) -> None:
+    app = _app(monkeypatch)
+    service = _SnapshotService(_snapshot())
+
+    def remove_from_service() -> None:
+        service.document_result = KnowledgeWorkspaceDocuments(
+            state=KnowledgeWorkspaceDocumentsState.EMPTY,
+            items=(),
+        )
+
+    lifecycle = _DocumentLifecycle(on_remove=remove_from_service)
+    workspace = KnowledgeWorkspaceDialog(
+        import_service=_ImportService(),
+        task_query_service=_TaskQuery(),
+        workspace_service=service,
+        document_lifecycle_service=lifecycle,
+    )
+    workspace.show()
+    _drain(workspace, app)
+    monkeypatch.setattr(QMessageBox, "exec", lambda _message: 0)
+    monkeypatch.setattr(
+        QMessageBox,
+        "clickedButton",
+        lambda message: next(
+            button
+            for button in message.buttons()
+            if message.buttonRole(button) == QMessageBox.DestructiveRole
+        ),
+    )
+
+    document = workspace._document_at_row(0)
+    assert document is not None
+    workspace._confirm_document_removal(document)
+    _drain_removal(workspace, app)
+    _drain_documents(workspace, app)
+
+    assert lifecycle.calls[0][0] == "document-1"
+    assert lifecycle.calls[0][1] != threading.get_ident()
+    assert workspace._documents.rowCount() == 0
+    assert workspace._empty_state.text() == (
+        "No Knowledge documents yet. Import a file to get started."
+    )
+    workspace.close()
+
+
+def test_busy_document_removal_restores_row_and_shows_bounded_message(
+    monkeypatch,
+) -> None:
+    app = _app(monkeypatch)
+    warnings: list[tuple[str, str]] = []
+    workspace = KnowledgeWorkspaceDialog(
+        import_service=_ImportService(),
+        task_query_service=_TaskQuery(),
+        workspace_service=_SnapshotService(_snapshot()),
+        document_lifecycle_service=_DocumentLifecycle(
+            error=KnowledgeDocumentBusy()
+        ),
+    )
+    workspace.show()
+    _drain(workspace, app)
+    monkeypatch.setattr(
+        QMessageBox,
+        "warning",
+        lambda _parent, title, text: warnings.append((title, text)),
+    )
+
+    document = workspace._document_at_row(0)
+    assert document is not None
+    workspace._start_document_removal(document)
+    _drain_removal(workspace, app)
+
+    assert workspace._documents.rowCount() == 1
+    assert workspace._documents.item(0, 2).text() == "Searchable"
+    assert warnings == [
+        (
+            "Delete document",
+            "This document is still being imported or prepared. "
+            "Wait for the task to finish, then try again.",
+        )
+    ]
     workspace.close()
 
 
@@ -223,10 +557,13 @@ def test_hidden_workspace_ignores_late_snapshot_and_reopen_uses_new_generation(
     assert started.wait(2)
     workspace.hide()
     release.set()
-    _drain(workspace, app)
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline and workspace._document_tasks:
+        app.processEvents()
+        time.sleep(0.005)
     assert workspace._documents.rowCount() == 0
 
-    service.block = None
+    service.document_block = None
     workspace.show()
     _drain(workspace, app)
     assert workspace._documents.rowCount() == 1

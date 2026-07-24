@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import math
 import queue
 import threading
@@ -21,6 +22,7 @@ from .storage.models import KnowledgeIndexTaskRow, utc_now
 from .storage.repositories.knowledge import KnowledgeRepository
 
 _STOP = object()
+LOGGER = logging.getLogger(__name__)
 _INDEX_ORDER = ("keyword", "text_vector")
 _TRIGGERS = frozenset({"manual", "corpus_change", "settings_change"})
 
@@ -140,6 +142,18 @@ class KnowledgeIndexService:
             trigger="corpus_change",
             library_id=library_id,
         )
+
+    def reconcile_removed_corpus(self, library_id: str = "global") -> str | None:
+        """Reclaim invalidated vector bytes, then rebuild only when still useful."""
+
+        try:
+            self._semantic.cleanup_storage()
+        except Exception:
+            LOGGER.warning(
+                "Knowledge vector cleanup was deferred after document removal",
+                extra={"event_name": "knowledge.index.removal_cleanup_deferred"},
+            )
+        return self.notify_corpus_changed(library_id)
 
     def embedding_change_requires_confirmation(
         self,

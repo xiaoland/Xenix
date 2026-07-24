@@ -1,6 +1,6 @@
 # Slice 03 — Local OCR, Workspace Responsiveness, and Knowledge Operations
 
-**State:** Phase I locally accepted; final coupled review pending
+**State:** Closed by Sir on 2026-07-24
 **Opened:** 2026-07-22
 **Scope rule:** this is one admitted finding cohort with internal phases, not one
 slice per UI, runtime, storage, or migration change
@@ -12,7 +12,8 @@ runtime-installed Python/PaddleOCR environment with a versioned local OCR runtim
 bundle; distinguish missing, incompatible, repairable, and ready OCR states; expose
 import, derivation, and index activity through one query plane rendered as
 `Task queue`; and move global Knowledge status into a quiet footer below the
-document list.
+document list. Let the user remove one selected logical document without deleting
+the original source file or leaving searchable/indexed application state behind.
 
 The target is retrieval usefulness, not a general recovery or audit platform. Task
 and status metadata remain only as rich as needed to keep Knowledge content
@@ -62,6 +63,12 @@ searchable and user operations understandable.
 9. File picker and drag-and-drop are presentation inputs to one Workspace submission
    operation. A drop adapter may extract local file URLs and provide affordance, but
    it does not probe files, enqueue tasks, or become a second allowlist authority.
+10. Document removal is one service-owned lifecycle command, not a widget-side row
+    deletion and not a new Agent Tool. MVP hard-removes the selected document's
+    Xenix-owned lifecycle/retrieval lineage, invalidates affected vector generations,
+    and reclaims only content whose lack of references can be proven. It never
+    mutates or deletes the user-selected source file and introduces no undo,
+    tombstone, recovery, or audit product.
 
 ## Target Topology
 
@@ -69,6 +76,10 @@ searchable and user operations understandable.
 Knowledge Workspace
   |-- immediate window shell
   |-- async document/status snapshot ----> bounded SQLite metadata
+  |-- remove selected document ----------> document-lifecycle command
+  |                                         |-- SQLite/FTS cutover
+  |                                         |-- vector invalidation/rebuild
+  |                                         `-- owned-byte reclamation
   |-- Task queue -----------------------> task-feed query service
   |                                         |-- import attempts
   |                                         |-- derivation attempts
@@ -103,6 +114,8 @@ weights retain a separate logical identity inside the MVP archive.
 | G — Presentation import completion | Admit PPT/PPTX through the provider graph and let the Workspace accept the same files through picker or drag/drop. | **Implemented and locally accepted.** Real PPT/PPTX/encrypted/named-fixture, picker/drop, full-suite, frozen worker, and package smoke evidence passes. |
 | H — Production import topology | Remove the redundant untested nested Docling boundary, preserve safe failure stages, prove the real spawned path with the named PPTX, and simplify the Workspace-local queue label. | **Implemented and locally accepted.** One spawned Import process now runs Docling directly; structured safe failure results, real named-PPTX spawn, frozen package exercise, and bilingual `Task queue` coverage pass. |
 | I — Runtime distribution and vector failure truth | Make local OCR setup executable in each supported application composition and preserve actionable, content-free Embedding failure evidence through the index task boundary. | **Implemented and locally accepted.** Batch size defaults to 20; safe Embedding failures reach index tasks; local/release OCR sources share one deployment state machine. Compact content-addressed generations are self-tested at their final path, and real source plus rebuilt frozen native-OCR acceptance pass. |
+| J — Progressive Workspace loading | Stop optional footer/index work from withholding the document list, and distinguish loading from a truly empty Library. | **Implemented and locally accepted.** Independent projections, explicit viewport states, stale-while-refresh, request/lifecycle generations, UI/i18n, full, package, and smoke gates pass. |
+| K — Document removal | Remove one selected logical document, all of its searchable/application-owned lineage, and incompatible vector generations without touching the user's source file. | **Implemented and locally accepted.** Guarded lifecycle cutover, owner-aware cleanup, vector convergence, item context menu, focused/full/package/frozen-smoke evidence pass. |
 
 Phases are implementation checkpoints only. Slice 03 closes as one cohort.
 
@@ -168,6 +181,9 @@ are implemented and locally accepted.
 None of these permissions authorizes publication, release, a second destructive
 local-data reset, or multimodal scope. The completed Phase H scope is committed as
 `b76a36e`; subsequent commits remain separately gated.
+Sir explicitly started Phase J/K. Their product code, tests, translations, frozen
+smoke, and durable contracts are implemented and locally accepted. Commit and
+publication remain separately gated.
 
 ## Cross-slice Review Gate
 
@@ -182,6 +198,8 @@ repository/package acceptance passes. The resumed review then exposed the
 source-mode OCR deployment and vector-task failure recorded in
 [Phase I diagnosis](../evidence/03-phase-i-runtime-index-diagnostic.md).
 [Phase I implementation evidence](../evidence/03-phase-i-implementation.md) records
-the accepted repair. Phase I no longer blocks the review, but Slice 03 remains open
-until the promised global Import/Storage/Tool/UI/OCR/runtime/release/index
-cross-review is completed with Sir.
+the accepted repair. KB-D39 and KB-D40 are now implemented and locally accepted as
+Phases J/K; their evidence is in
+[Phase J/K implementation evidence](../evidence/03-phase-j-k-implementation.md).
+Sir accepted the final Import/Storage/Tool/UI/OCR/runtime/release/index coupled
+result and closed Slice 03 and the complete Knowledge follow-up task on 2026-07-24.

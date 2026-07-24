@@ -13,22 +13,12 @@ the slice, withdraw the remaining findings, or skip the final cross-workstream r
 New findings related to the current cohort join the active slice through an explicit
 Impact Handshake revision.
 
-## Active Slice
-
-| Slice | State | Cohort | Completion boundary |
-| --- | --- | --- | --- |
-| [03 — Local OCR, Workspace responsiveness, and Knowledge operations](03-local-ocr-workspace-operations.md) | Phase I locally accepted; coupled review pending | KB3-F01–F08 plus KB-D26–D38 | Complete the global Import/Storage/Tool/UI/OCR/runtime/release/index review |
-
-## Prior Locally Delivered Slice
-
-| Slice | State | Carry-forward |
-| --- | --- | --- |
-| [02 — Knowledge operations, workspace, and index control](02-knowledge-operations-workspace-indexes.md) | Locally verified and committed; global cross-review pending | Slice 03 supersedes the import-specific Queue UI decision and carries the global review into Phase E. |
-
 ## Closed Slices
 
 | Slice | State | Closure note |
 | --- | --- | --- |
+| [03 — Local OCR, Workspace responsiveness, and Knowledge operations](03-local-ocr-workspace-operations.md) | Closed by Sir on 2026-07-24 | Phases A–K, the coupled Import/Storage/Tool/UI/OCR/runtime/release/index review, complete tests, package, and frozen smoke were accepted. |
+| [02 — Knowledge operations, workspace, and index control](02-knowledge-operations-workspace-indexes.md) | Closed through Slice 03 on 2026-07-24 | Slice 03 resolved the carried queue, lifecycle, runtime, index, and global-review findings. |
 | [01 — Known-findings realignment](01-known-findings-realignment.md) | Closed by Sir on 2026-07-22 | All local A–G evidence passed. The original two live cells remain historical failures; the carried `KB2-F01` oracle repair and later configured-provider rerun now pass without rewriting that history. |
 
 ## Internal Phase Map for Slice 01
@@ -53,12 +43,12 @@ inside Slice 01. No phase receives an independent “slice complete” claim.
 | A — Import process and logs | Locally verified | Move one import attempt's heavy execution behind a spawned process while the parent retains publication authority; expose bounded task logs | KB2-F02 |
 | B — Workspace and settings information architecture | Locally verified, including bilingual visual QA | List logical documents; make Knowledge own Embedding/OCR/index settings and direct navigation | KB2-F03, KB2-F05 |
 | C — Index compatibility and rebuild control | Locally verified | Remove surprise lookup-time builds; confirm compatibility-changing settings; add observable automatic/manual rebuild jobs | KB2-F04, KB2-F07 |
-| D — Outcome and cross-workstream acceptance | Live outcome and local delivery passed; global findings pending disposition | Repair the carried Agent-answer residual, run delivery evidence, and review Import/Storage/Tool/UI/runtime topology as one system | KB2-F01 and all active Slice 02 findings |
+| D — Outcome and cross-workstream acceptance | Closed through Slice 03 | Repair the carried Agent-answer residual, run delivery evidence, and review Import/Storage/Tool/UI/runtime topology as one system | KB2-F01 and all active Slice 02 findings |
 
-## Current Gate
+## Closure
 
-Slice 01 is closed with its failed benchmark evidence intact. Slice 02 is locally
-verified and committed, while its global review remains explicit. Sir opened Slice
+Slice 01 is closed with its failed benchmark evidence intact. Slice 02 was locally
+verified and committed before its carried global review continued in Slice 03. Sir opened Slice
 03 on 2026-07-22 and authorized task-packet work plus one local Knowledge-data reset
 and PPTX diagnostic, deletion of the unreleased Python sidecar, and a disposable
 official Paddle C++ compatibility spike. The spike passed on the selected PP-OCRv6
@@ -83,5 +73,15 @@ existing UI/task presentation planes. Phase I is locally accepted. The coupled
 package gate additionally exposed KB-D38: staging-path self-test did not prove the
 long final native-model path. A compact content-addressed generation name and
 final-path self-test repaired it; fresh package plus real native OCR packaged smoke
-now pass. The coupled review must now resume before Slice 03 can close.
-Multimodal retrieval (`KB2-F06`) remains parked outside the active slice.
+now pass. That coupled review then continued through the later findings below.
+Sir then reported KB-D39 and admitted KB-D40. Sir explicitly started their coupled
+Phase J/K implementation. The document viewport now loads independently from the
+footer and distinguishes loading/empty/unavailable without discarding the last
+successful rows. A dedicated lifecycle command—not the retrieval service or
+widget—now hard-removes one exact, non-busy document, invalidates affected vectors,
+and reclaims only proven-unreferenced app-owned state. The user source is preserved,
+right-click targets the item under the pointer, and no toolbar or Agent delete
+action exists. Focused, complete repository, app-entry, static, fresh package, and
+frozen-smoke gates pass. Sir accepted the coupled result, closed Slice 03 and the
+whole Knowledge follow-up task, and authorized its commit on 2026-07-24. Multimodal
+retrieval (`KB2-F06`) remains parked outside this completed task.

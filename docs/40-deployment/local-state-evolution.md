@@ -43,6 +43,15 @@ unknown, corrupt, link-like, referenced, and out-of-root shapes remain untouched
 This authority is separate from vector reconciliation and never deletes vector
 generations or arbitrary staging entries.
 
+Knowledge document removal uses the same ownership boundaries but is not startup
+recovery. One guarded SQLite transaction is the visibility cutover: it removes the
+document's searchable and completed lifecycle lineage, releases only unreferenced
+Knowledge-owned source Artifact registrations, and invalidates affected Library
+vector-generation metadata. Import logs and source/canonical/vector bytes are then
+best-effort post-commit maintenance. A cleanup failure is safe to retry through the
+existing owner-specific maintenance paths and must not restore SQLite visibility.
+The original user-selected file is outside every cleanup root.
+
 Observable Knowledge index tasks are SQLite business metadata, not Lance authority.
 When their table is introduced, use a fixed forward migration and prove both the
 prior supported fixture and fresh bootstrap. Queued/running rows recovered after an

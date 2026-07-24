@@ -15,6 +15,14 @@ class ArtifactRepository:
     def get(self, session: Session, artifact_id: str) -> ArtifactRow | None:
         return session.get(ArtifactRow, artifact_id)
 
+    def delete(self, session: Session, artifact_id: str) -> bool:
+        row = self.get(session, artifact_id)
+        if row is None:
+            return False
+        session.delete(row)
+        session.flush()
+        return True
+
     def list_by_kind(self, session: Session, kind) -> list[ArtifactRow]:
         statement = (
             select(ArtifactRow)

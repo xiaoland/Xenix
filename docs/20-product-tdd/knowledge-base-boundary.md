@@ -5,7 +5,7 @@
 Xenix exposes one global Knowledge Library in MVP while retaining an internal
 library identity for future multiple-library instances. The Knowledge Workspace is
 a secondary window; its Workspace-local `Task queue` is modeless. Import, retrieval,
-and Agent use remain service-owned rather than UI-owned.
+document lifecycle, and Agent use remain service-owned rather than UI-owned.
 
 ```text
 local file
@@ -116,6 +116,15 @@ canonical-ready generation
   FTS rows. `KnowledgeService` is retrieval-only; test corpus seeders remain outside
   production code. A benchmark fixture enters through Import and canonical
   derivation rather than manufacturing a ready corpus.
+- `KnowledgeDocumentLifecycleService` owns user-requested document removal. It
+  atomically removes the exact inactive-claimed document's FTS/Unit and completed
+  import/derivation/canonical lineage, releases only unreferenced Knowledge-owned
+  source Artifact registrations, and invalidates vector-generation metadata for
+  the affected Library. Active import or derivation work yields a typed busy result.
+  Post-commit maintenance may reclaim proven-orphan app-owned source, canonical,
+  task-log, and vector bytes; it never mutates the user-selected original file.
+  When compatible content remains, the existing index owner receives one coalesced
+  corpus-change notification.
 
 ## Agent Contract
 
@@ -135,12 +144,22 @@ generation. Explicit semantic/hybrid mode reports typed unavailability unless th
 exact current profile/corpus generation exists; `auto` may use keyword under the
 bounded fallback rule above.
 
-The Knowledge Workspace lists logical documents. Its service-owned `Task queue`
+The Knowledge Workspace lists logical documents. The document viewport and the
+footer status are independent background projections: first load is explicitly
+loading, only a completed empty document query may show empty-library copy, and
+slow/failing OCR or index status cannot withhold or erase the last successful
+document list. Its service-owned `Task queue`
 folds import plus initial content preparation into one intent row, shows independent
 content preparation and index builds separately, and exposes only the actions
 supported by each owning service. This is a presentation/query plane over separate
 lifecycle authorities, not a generic task authority; internal `KnowledgeTask*`
 identities remain domain-specific.
+Right-clicking a concrete document item exposes `Delete` for that item. The
+confirmation names the document, states that the imported copy/search/task state
+will be removed, preserves the original file, and states that removal cannot be
+undone. Removal runs through the lifecycle service off the UI thread; the Workspace
+does not issue SQL or filesystem mutations and no deletion operation is exposed to
+the Agent.
 The Workspace shell and document-list viewport accept local file drops. Drag/drop
 and the file picker feed one ordered, deduplicated submission operation; the drop
 adapter extracts local URLs only, while `KnowledgeImportService` remains the
@@ -171,8 +190,11 @@ activation is methodology, not authorization, and does not grant a new tool scop
 - Independent embedding settings/wire contract and production composition:
   `tests/test_embedding_service.py`, `tests/test_settings_dialog.py`, and
   `tests/test_agent_composition.py`.
-- Workspace and queue composition: `tests/test_knowledge_import_ui.py` and
-  `tests/test_knowledge_task_query.py`. Picker/drop parity is covered by the former.
+- Workspace loading, item removal, and queue composition:
+  `tests/test_knowledge_import_ui.py`, `tests/test_knowledge_document_lifecycle.py`,
+  and `tests/test_knowledge_task_query.py`. Picker/drop parity is covered by the
+  first; the lifecycle suite proves retrieval cutover, reference-aware CAS cleanup,
+  vector invalidation/rebuild, and same-SHA re-import.
 - Import process/log and index lifecycle boundaries:
   `tests/test_knowledge_import_worker.py`, `tests/test_knowledge_index_service.py`,
   and `tests/test_settings_dialog.py`.
@@ -194,8 +216,8 @@ An image may be canonical-ready while retrieval remains unavailable when local O
 is absent or yields no text. Passwords for encrypted documents are attempt-local and
 never persisted. Source-size, image-pixel, TXT, DOCX package, subprocess, canonical,
 OCR-result, provider-response, Unit, query, and Tool-result limits have executable
-boundary tests. Document refresh/removal UX, hierarchy-aware quality enrichment,
-and bounded retention of superseded healthy Lance generations remain later work;
-they do not change current lookup correctness. The live semantic Agent case still
-requires explicit subject LLM and Embedding settings and grades only final answer
-surfaces, never Tool telemetry.
+boundary tests. Hierarchy-aware quality enrichment and bounded retention of
+superseded healthy Lance generations remain later work; they do not change current
+lookup correctness. The live semantic Agent case still requires explicit subject
+LLM and Embedding settings and grades only final answer surfaces, never Tool
+telemetry.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -15,6 +16,7 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QLabel,
     QLineEdit,
+    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
@@ -29,14 +31,19 @@ from ..services.knowledge_formats import (
 )
 
 if TYPE_CHECKING:
+    from ..services.knowledge_document_lifecycle_service import (
+        KnowledgeDocumentLifecycleService,
+    )
     from ..services.knowledge_derivation_service import KnowledgeDerivationService
     from ..services.knowledge_import_service import KnowledgeImportService
     from ..services.knowledge_index_service import KnowledgeIndexService
     from ..services.knowledge_service import KnowledgeService
     from ..services.knowledge_task_query import KnowledgeTaskItem, KnowledgeTaskQueryService
     from ..services.knowledge_workspace_service import (
+        KnowledgeWorkspaceDocument,
+        KnowledgeWorkspaceDocuments,
         KnowledgeWorkspaceService,
-        KnowledgeWorkspaceSnapshot,
+        KnowledgeWorkspaceStatus,
     )
     from ..services.paddle_ocr_service import PaddleOcrDeploymentService
     from .knowledge_index_ui import KnowledgeIndexRebuildDialog
@@ -46,23 +53,83 @@ TASK_POLL_INTERVAL_MS = 500
 WORKSPACE_ACTIVE_POLL_INTERVAL_MS = 1_000
 
 
-class _SnapshotSignals(QObject):
-    finished = Signal(int, object)
+class _WorkspaceLoadSignals(QObject):
+    finished = Signal(int, int, object)
 
 
-class _SnapshotTask(QRunnable):
-    def __init__(self, service: KnowledgeWorkspaceService, generation: int) -> None:
+class _DocumentsLoadTask(QRunnable):
+    def __init__(
+        self,
+        service: KnowledgeWorkspaceService,
+        generation: int,
+        request_id: int,
+    ) -> None:
         super().__init__()
         self._service = service
         self._generation = generation
-        self.signals = _SnapshotSignals()
+        self._request_id = request_id
+        self.signals = _WorkspaceLoadSignals()
 
     def run(self) -> None:
         try:
-            snapshot = self._service.snapshot()
+            result = self._service.load_documents()
         except Exception:
-            snapshot = None
-        self.signals.finished.emit(self._generation, snapshot)
+            result = None
+        self.signals.finished.emit(self._generation, self._request_id, result)
+
+
+class _StatusLoadTask(QRunnable):
+    def __init__(
+        self,
+        service: KnowledgeWorkspaceService,
+        generation: int,
+        request_id: int,
+    ) -> None:
+        super().__init__()
+        self._service = service
+        self._generation = generation
+        self._request_id = request_id
+        self.signals = _WorkspaceLoadSignals()
+
+    def run(self) -> None:
+        try:
+            result = self._service.load_status()
+        except Exception:
+            result = None
+        self.signals.finished.emit(self._generation, self._request_id, result)
+
+
+class _DocumentRemovalSignals(QObject):
+    finished = Signal(int, object)
+
+
+class _DocumentRemovalTask(QRunnable):
+    def __init__(
+        self,
+        service: KnowledgeDocumentLifecycleService,
+        generation: int,
+        document_id: str,
+    ) -> None:
+        super().__init__()
+        self._service = service
+        self._generation = generation
+        self._document_id = document_id
+        self.signals = _DocumentRemovalSignals()
+
+    def run(self) -> None:
+        try:
+            result: object = self._service.remove_document(self._document_id)
+        except Exception as exc:
+            result = exc
+        self.signals.finished.emit(self._generation, result)
+
+
+class _DocumentViewportState(StrEnum):
+    COLD = "cold"
+    LOADING = "loading"
+    READY = "ready"
+    EMPTY = "empty"
+    UNAVAILABLE = "unavailable"
 
 
 class _TaskListSignals(QObject):
@@ -480,6 +547,7 @@ class KnowledgeWorkspaceDialog(QDialog):
         ocr_deployment: PaddleOcrDeploymentService | None = None,
         task_query_service: KnowledgeTaskQueryService | None = None,
         workspace_service: KnowledgeWorkspaceService | None = None,
+        document_lifecycle_service: KnowledgeDocumentLifecycleService | None = None,
         open_knowledge_settings: Callable[[], None] | None = None,
         parent=None,
     ) -> None:
@@ -491,15 +559,25 @@ class KnowledgeWorkspaceDialog(QDialog):
         self._knowledge_index_service = knowledge_index_service
         self._task_query = task_query_service
         self._workspace_service = workspace_service
+        self._document_lifecycle = document_lifecycle_service
         self._open_knowledge_settings = open_knowledge_settings
         self._queue_dialog: KnowledgeTaskQueueDialog | None = None
         self._index_dialog: KnowledgeIndexRebuildDialog | None = None
         self._thread_pool = QThreadPool.globalInstance()
         self._lifecycle_generation = 0
-        self._snapshot_task: _SnapshotTask | None = None
-        self._snapshot_pending = False
+        self._request_sequence = 0
+        self._documents_request_id: int | None = None
+        self._status_request_id: int | None = None
+        self._document_tasks: dict[int, _DocumentsLoadTask] = {}
+        self._status_tasks: dict[int, _StatusLoadTask] = {}
+        self._documents_pending = False
+        self._status_pending = False
+        self._removal_task: _DocumentRemovalTask | None = None
+        self._removing_document_id: str | None = None
         self._active = False
-        self._last_snapshot: KnowledgeWorkspaceSnapshot | None = None
+        self._document_state = _DocumentViewportState.COLD
+        self._last_documents: KnowledgeWorkspaceDocuments | None = None
+        self._last_status: KnowledgeWorkspaceStatus | None = None
         self._drop_adapter = _KnowledgeFileDropAdapter(self)
         self._drop_adapter.files_dropped.connect(self._submit_import_paths)
 
@@ -508,6 +586,10 @@ class KnowledgeWorkspaceDialog(QDialog):
         self._documents.setSelectionBehavior(QAbstractItemView.SelectRows)
         self._documents.setSelectionMode(QAbstractItemView.SingleSelection)
         self._documents.verticalHeader().setVisible(False)
+        self._documents.setContextMenuPolicy(Qt.CustomContextMenu)
+        self._documents.customContextMenuRequested.connect(
+            self._show_document_context_menu
+        )
         self._documents.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         for column in (1, 2, 3):
             self._documents.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeToContents)
@@ -618,60 +700,299 @@ class KnowledgeWorkspaceDialog(QDialog):
     def refresh_documents(self) -> None:
         if not self._active or self._workspace_service is None:
             return
-        if self._snapshot_task is not None:
-            self._snapshot_pending = True
+        self._refresh_document_list()
+        self._refresh_workspace_status()
+
+    def _next_request_id(self) -> int:
+        self._request_sequence += 1
+        return self._request_sequence
+
+    def _refresh_document_list(self) -> None:
+        if self._documents_request_id is not None:
+            self._documents_pending = True
             return
+        if self._last_documents is None:
+            self._document_state = _DocumentViewportState.LOADING
+            self._render_document_state()
         generation = self._lifecycle_generation
-        task = _SnapshotTask(self._workspace_service, generation)
-        task.signals.finished.connect(self._on_snapshot_finished)
-        self._snapshot_task = task
+        request_id = self._next_request_id()
+        task = _DocumentsLoadTask(
+            self._workspace_service,
+            generation,
+            request_id,
+        )
+        task.signals.finished.connect(self._on_documents_finished)
+        self._documents_request_id = request_id
+        self._document_tasks[request_id] = task
         self._thread_pool.start(task)
 
-    def _on_snapshot_finished(self, generation: int, snapshot: object) -> None:
-        self._snapshot_task = None
+    def _refresh_workspace_status(self) -> None:
+        if self._status_request_id is not None:
+            self._status_pending = True
+            return
+        generation = self._lifecycle_generation
+        request_id = self._next_request_id()
+        task = _StatusLoadTask(
+            self._workspace_service,
+            generation,
+            request_id,
+        )
+        task.signals.finished.connect(self._on_status_finished)
+        self._status_request_id = request_id
+        self._status_tasks[request_id] = task
+        self._thread_pool.start(task)
+
+    def _on_documents_finished(
+        self,
+        generation: int,
+        request_id: int,
+        result: object,
+    ) -> None:
+        self._document_tasks.pop(request_id, None)
+        if request_id != self._documents_request_id:
+            return
+        self._documents_request_id = None
         if generation != self._lifecycle_generation or not self._active:
             return
-        if snapshot is not None:
-            self._last_snapshot = snapshot
-            self._render_snapshot(snapshot)
-        if self._snapshot_pending:
-            self._snapshot_pending = False
-            self.refresh_documents()
+        from ..services.knowledge_workspace_service import (
+            KnowledgeWorkspaceDocuments,
+            KnowledgeWorkspaceDocumentsState,
+        )
 
-    def _render_snapshot(self, snapshot: KnowledgeWorkspaceSnapshot) -> None:
-        documents = snapshot.documents
+        if isinstance(result, KnowledgeWorkspaceDocuments):
+            if result.state is KnowledgeWorkspaceDocumentsState.UNAVAILABLE:
+                self._document_state = _DocumentViewportState.UNAVAILABLE
+            elif result.items:
+                self._last_documents = result
+                self._document_state = _DocumentViewportState.READY
+            else:
+                self._last_documents = result
+                self._document_state = _DocumentViewportState.EMPTY
+        else:
+            self._document_state = _DocumentViewportState.UNAVAILABLE
+        self._render_document_state()
+        if self._documents_pending:
+            self._documents_pending = False
+            self._refresh_document_list()
+
+    def _on_status_finished(
+        self,
+        generation: int,
+        request_id: int,
+        result: object,
+    ) -> None:
+        self._status_tasks.pop(request_id, None)
+        if request_id != self._status_request_id:
+            return
+        self._status_request_id = None
+        if generation != self._lifecycle_generation or not self._active:
+            return
+        from ..services.knowledge_workspace_service import KnowledgeWorkspaceStatus
+
+        if isinstance(result, KnowledgeWorkspaceStatus):
+            self._last_status = result
+        self._render_status()
+        if self._status_pending:
+            self._status_pending = False
+            self._refresh_workspace_status()
+
+    def _render_document_state(self) -> None:
+        documents = self._last_documents.items if self._last_documents is not None else ()
+        selected_document_id = self._selected_document_id()
         self._documents.setRowCount(len(documents))
+        selected_row = -1
         for row_index, document in enumerate(documents):
             values = (
                 document.title,
                 document.source_format.upper(),
-                self._translated_content_state(document.content_state),
+                (
+                    self.tr("Removing…")
+                    if document.document_id == self._removing_document_id
+                    else self._translated_content_state(document.content_state)
+                ),
                 document.updated_at.astimezone().strftime("%Y-%m-%d %H:%M"),
             )
             for column, value in enumerate(values):
-                self._documents.setItem(row_index, column, QTableWidgetItem(value))
-        has_documents = bool(documents)
-        self._documents.setVisible(has_documents)
-        self._empty_state.setVisible(not has_documents)
-        self._empty_state.setText(
-            self.tr("Knowledge content is temporarily unavailable.")
-            if not snapshot.documents_available
-            else self.tr("No Knowledge documents yet. Import a file to get started.")
+                item = QTableWidgetItem(value)
+                if column == 0:
+                    item.setData(Qt.UserRole, document)
+                self._documents.setItem(row_index, column, item)
+            if document.document_id == selected_document_id:
+                selected_row = row_index
+        if selected_row >= 0:
+            self._documents.selectRow(selected_row)
+
+        has_stale_documents = bool(documents)
+        show_documents = (
+            self._document_state is _DocumentViewportState.READY
+            or (
+                self._document_state
+                in {
+                    _DocumentViewportState.LOADING,
+                    _DocumentViewportState.UNAVAILABLE,
+                }
+                and has_stale_documents
+            )
         )
-        index = snapshot.indexes
+        self._documents.setVisible(show_documents)
+        self._empty_state.setVisible(not show_documents)
+        if self._document_state in {
+            _DocumentViewportState.COLD,
+            _DocumentViewportState.LOADING,
+        }:
+            self._empty_state.setText(self.tr("Loading Knowledge documents…"))
+        elif self._document_state is _DocumentViewportState.UNAVAILABLE:
+            self._empty_state.setText(
+                self.tr("Knowledge content is temporarily unavailable.")
+            )
+        else:
+            self._empty_state.setText(
+                self.tr("No Knowledge documents yet. Import a file to get started.")
+            )
+
+    def _render_status(self) -> None:
+        status = self._last_status
+        if status is None:
+            self._footer_status.setText(self.tr("Loading Knowledge status…"))
+            self._refresh_timer.stop()
+            return
+        index = status.indexes
         keyword = self._translated_index_state(index.keyword_state) if index else self.tr("Unavailable")
         vector = self._translated_index_state(index.text_vector_state) if index else self.tr("Unavailable")
-        ocr = self._translated_ocr_state(str(snapshot.ocr.state))
+        ocr = self._translated_ocr_state(str(status.ocr.state))
         self._footer_status.setText(
             self.tr("OCR: %1  ·  Keyword: %2  ·  Text vectors: %3")
             .replace("%1", ocr)
             .replace("%2", keyword)
             .replace("%3", vector)
         )
-        if snapshot.has_active_work:
+        if status.has_active_work and self._active:
             self._refresh_timer.start()
         else:
             self._refresh_timer.stop()
+
+    def _selected_document_id(self) -> str | None:
+        document = self._selected_document()
+        return document.document_id if document is not None else None
+
+    def _selected_document(self) -> KnowledgeWorkspaceDocument | None:
+        row = self._documents.currentRow()
+        return self._document_at_row(row)
+
+    def _document_at_row(self, row: int) -> KnowledgeWorkspaceDocument | None:
+        if row < 0:
+            return None
+        item = self._documents.item(row, 0)
+        document = item.data(Qt.UserRole) if item is not None else None
+        return document if document is not None else None
+
+    def _show_document_context_menu(self, position) -> None:
+        item = self._documents.itemAt(position)
+        if item is None or self._document_lifecycle is None:
+            return
+        document = self._document_at_row(item.row())
+        if document is None:
+            return
+        self._documents.selectRow(item.row())
+        menu = QMenu(self)
+        delete_action = menu.addAction(self.tr("Delete"))
+        delete_action.setEnabled(self._removal_task is None)
+        selected_action = self._exec_document_context_menu(
+            menu,
+            self._documents.viewport().mapToGlobal(position)
+        )
+        if selected_action is delete_action:
+            self._confirm_document_removal(document)
+
+    @staticmethod
+    def _exec_document_context_menu(menu: QMenu, global_position):
+        return menu.exec(global_position)
+
+    def _confirm_document_removal(
+        self,
+        document: KnowledgeWorkspaceDocument,
+    ) -> None:
+        if self._removal_task is not None:
+            return
+        message = QMessageBox(self)
+        message.setIcon(QMessageBox.Warning)
+        message.setWindowTitle(self.tr("Delete document"))
+        message.setText(
+            self.tr('Delete “%1” from the Knowledge Library?').replace(
+                "%1",
+                document.title,
+            )
+        )
+        message.setInformativeText(
+            self.tr(
+                "Xenix will remove its imported copy, search data, and related "
+                "task entries. The original file will remain unchanged. "
+                "This action cannot be undone."
+            )
+        )
+        delete_button = message.addButton(
+            self.tr("Delete"),
+            QMessageBox.DestructiveRole,
+        )
+        cancel_button = message.addButton(QMessageBox.Cancel)
+        message.setDefaultButton(cancel_button)
+        message.exec()
+        if message.clickedButton() is delete_button:
+            self._start_document_removal(document)
+
+    def _start_document_removal(
+        self,
+        document: KnowledgeWorkspaceDocument,
+    ) -> None:
+        if self._document_lifecycle is None or self._removal_task is not None:
+            return
+        self._removing_document_id = document.document_id
+        self._render_document_state()
+        task = _DocumentRemovalTask(
+            self._document_lifecycle,
+            self._lifecycle_generation,
+            document.document_id,
+        )
+        task.signals.finished.connect(self._on_document_removal_finished)
+        self._removal_task = task
+        self._thread_pool.start(task)
+
+    def _on_document_removal_finished(
+        self,
+        generation: int,
+        result: object,
+    ) -> None:
+        self._removal_task = None
+        self._removing_document_id = None
+        if not self._active:
+            return
+        if generation != self._lifecycle_generation:
+            self.refresh_documents()
+            return
+        if isinstance(result, Exception):
+            self._render_document_state()
+            error_code = getattr(result, "error_code", None)
+            if error_code == "knowledge_document_busy":
+                text = self.tr(
+                    "This document is still being imported or prepared. "
+                    "Wait for the task to finish, then try again."
+                )
+            elif error_code == "knowledge_document_not_found":
+                text = self.tr(
+                    "This document is no longer in the Knowledge Library."
+                )
+                self.refresh_documents()
+            else:
+                text = self.tr("The document could not be deleted.")
+            QMessageBox.warning(
+                self,
+                self.tr("Delete document"),
+                text,
+            )
+            return
+        self.refresh_documents()
+        if self._queue_dialog is not None and self._queue_dialog.isVisible():
+            self._queue_dialog.refresh()
 
     def _translated_ocr_state(self, state: str) -> str:
         return {
@@ -714,15 +1035,17 @@ class KnowledgeWorkspaceDialog(QDialog):
                 self.tr("Updated"),
             ]
         )
-        self._empty_state.setText(self.tr("No Knowledge documents yet. Import a file to get started."))
-        if self._last_snapshot is not None:
-            self._render_snapshot(self._last_snapshot)
+        self._render_document_state()
+        self._render_status()
         if self._queue_dialog is not None:
             self._queue_dialog.retranslate_ui()
 
     def showEvent(self, event) -> None:
         self._active = True
         self._lifecycle_generation += 1
+        if self._last_documents is None:
+            self._document_state = _DocumentViewportState.LOADING
+            self._render_document_state()
         super().showEvent(event)
         QTimer.singleShot(0, self.refresh_documents)
 
@@ -738,7 +1061,10 @@ class KnowledgeWorkspaceDialog(QDialog):
         if self._active:
             self._lifecycle_generation += 1
         self._active = False
-        self._snapshot_pending = False
+        self._documents_request_id = None
+        self._status_request_id = None
+        self._documents_pending = False
+        self._status_pending = False
         self._refresh_timer.stop()
         if self._queue_dialog is not None:
             self._queue_dialog.hide()

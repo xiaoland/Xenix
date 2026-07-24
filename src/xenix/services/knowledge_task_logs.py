@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import shutil
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -99,6 +101,29 @@ class KnowledgeTaskLogStore:
                     error_code="knowledge_import_log_invalid",
                 ) from exc
         return tuple(entries[-_MAX_RETURNED_EVENTS:])
+
+    def remove(self, import_id: str) -> bool:
+        """Remove one app-owned import task directory without following links."""
+
+        _require_task_id(import_id)
+        task_root = knowledge_import_task_root(self._paths, import_id)
+        expected_parent = knowledge_import_task_root(self._paths, "0" * 32).parent
+        absolute_task_root = Path(os.path.abspath(task_root))
+        absolute_parent = Path(os.path.abspath(expected_parent))
+        if absolute_task_root.parent != absolute_parent:
+            raise ValidationError("Knowledge task log path is invalid.")
+        with self._lock:
+            if task_root.is_symlink():
+                return False
+            if not task_root.exists():
+                return True
+            if not task_root.is_dir():
+                return False
+            try:
+                shutil.rmtree(task_root)
+            except OSError:
+                return False
+        return not task_root.exists()
 
 
 def _read_entries(path: Path) -> list[KnowledgeTaskLogEntry]:

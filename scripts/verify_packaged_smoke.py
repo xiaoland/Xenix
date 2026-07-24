@@ -101,6 +101,14 @@ def main() -> int:
             raise RuntimeError(
                 "Packaged smoke did not import PPTX through the spawned Knowledge worker."
             )
+        if marker.get("document_removal") is not True:
+            raise RuntimeError(
+                "Packaged smoke did not remove a Knowledge document through its lifecycle service."
+            )
+        if marker.get("same_sha_reimport") is not True:
+            raise RuntimeError(
+                "Packaged smoke did not re-import removed Knowledge content as a fresh identity."
+            )
         if ocr_archive is not None and marker.get("paddle_native_activation") is not True:
             raise RuntimeError("Packaged smoke did not activate the native Knowledge OCR archive.")
         if ocr_archive is not None and marker.get("paddle_native_retrieval") is not True:

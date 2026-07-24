@@ -1,9 +1,9 @@
 # Knowledge Base Follow-up — Contract Realignment
 
-**Status:** Slice 01 closed; Slice 02 locally delivered; Slice 03 Phase I locally accepted
+**Status:** Completed and closed by Sir on 2026-07-24
 **Opened:** 2026-07-21
-**Posture:** OCR source composition and vector-failure truth are repaired locally;
-the final coupled Slice 03 review remains open and multimodal work is parked
+**Posture:** All admitted Knowledge follow-up slices and the final coupled review are
+accepted; multimodal work remains parked outside this completed task
 
 ## Objective
 
@@ -37,10 +37,10 @@ admitted follow-up.
 - Only the active phase authorizes product-code changes. Each phase records its own
   Impact Handshake, preplay, verification, and remaining debt while the Slice-level
   scope stays intact. Commits still require Sir's explicit command.
-- Completion of one phase is not completion of its slice. The global
-  Import/Storage/Tool/UI/OCR/runtime/release/index review remains open because task
+- Completion of one phase is not completion of its slice. The final
+  Import/Storage/Tool/UI/OCR/runtime/release/index review was required because task
   execution, document lifecycle, index generations, settings, release transport,
-  and Agent evidence are coupled.
+  and Agent evidence are coupled; Sir accepted that coupled result on 2026-07-24.
 
 ## Verification
 
@@ -132,12 +132,31 @@ admitted follow-up.
   then exposed and repaired a final-path-only native model failure: compact
   content-addressed generation paths are now self-tested before active publication,
   and the rebuilt packaged native-OCR smoke passes.
+- After Phase I commit `ac283b1`, KB-D39 was confirmed. The document query is about
+  17.53 ms, but the first strict vector status costs about 2168.22 ms and the atomic
+  Workspace snapshot withholds the list until both complete. The viewport meanwhile
+  rendered the empty-library copy before any result existed. Phase J now uses
+  independent document/footer projections, explicit viewport states,
+  stale-while-refresh, and lifecycle/request generations. Its diagnosis is recorded in
+  [its diagnostic evidence](evidence/03-phase-j-workspace-loading-diagnostic.md).
+- Sir then admitted document removal as Phase K. `KnowledgeService` remains
+  retrieval-only; a new lifecycle service performs one guarded SQLite cutover,
+  reference-aware Artifact/CAS cleanup, vector invalidation/rebuild notification,
+  and typed busy rejection. The Workspace exposes the operation only through the
+  exact item's right-click menu and translated destructive confirmation. Its design
+  is recorded in
+  [the document-removal design](evidence/03-phase-k-document-removal-design.md).
+- Phases J/K pass focused, complete repository (`633 passed, 3 skipped`), app-entry
+  (`58 passed`), static, fresh package, and frozen-smoke gates. Frozen smoke proves
+  spawned import/derivation/lookup, removal, lookup absence, original-file
+  preservation, and same-SHA fresh re-import. See
+  [implementation evidence](evidence/03-phase-j-k-implementation.md).
 
-## Next Step
+## Closure
 
-Resume the promised global Import/Storage/Tool/UI/OCR/runtime/release/index review
-with Sir. Phase I is locally accepted, but Slice 03 is not closed until that
-cross-workstream review is complete. Multimodal retrieval stays outside this slice.
+Sir accepted the complete Knowledge follow-up result and authorized its commit on
+2026-07-24. All admitted slices are closed. Multimodal retrieval remains a parked
+future task. The next product workstream is the separately scoped v1.2.0 release.
 
 ## Packet Map
 
@@ -158,5 +177,8 @@ cross-workstream review is complete. Multimodal retrieval stays outside this sli
 - [Slice 03 evidence — OCR deployment and vector-task diagnosis](evidence/03-phase-i-runtime-index-diagnostic.md)
 - [Slice 03 evidence — current OCR Service topology](evidence/03-current-ocr-service-topology.md)
 - [Slice 03 evidence — Phase I implementation and acceptance](evidence/03-phase-i-implementation.md)
+- [Slice 03 evidence — Workspace loading diagnosis](evidence/03-phase-j-workspace-loading-diagnostic.md)
+- [Slice 03 evidence — document-removal design](evidence/03-phase-k-document-removal-design.md)
+- [Slice 03 evidence — Phase J/K implementation and acceptance](evidence/03-phase-j-k-implementation.md)
 - [Parked follow-up — multimodal retrieval design](slices/02-multimodal-retrieval.md)
 - [Original Knowledge Base delivery packet](../knowledge-base/README.md)

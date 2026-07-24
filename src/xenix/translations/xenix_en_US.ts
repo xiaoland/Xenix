@@ -266,52 +266,52 @@
 <context>
     <name>KnowledgeImportLogDialog</name>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="152"/>
+        <location filename="../ui/knowledge_workspace.py" line="219"/>
         <source>The import log could not be read.</source>
         <translation>The import log could not be read.</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="160"/>
+        <location filename="../ui/knowledge_workspace.py" line="227"/>
         <source>No import events have been recorded yet.</source>
         <translation>No import events have been recorded yet.</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="165"/>
+        <location filename="../ui/knowledge_workspace.py" line="232"/>
         <source>Queued</source>
         <translation>Queued</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="166"/>
+        <location filename="../ui/knowledge_workspace.py" line="233"/>
         <source>Source snapshot</source>
         <translation>Source snapshot</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="167"/>
+        <location filename="../ui/knowledge_workspace.py" line="234"/>
         <source>File probe</source>
         <translation>File probe</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="168"/>
+        <location filename="../ui/knowledge_workspace.py" line="235"/>
         <source>Normalization</source>
         <translation>Normalization</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="169"/>
+        <location filename="../ui/knowledge_workspace.py" line="236"/>
         <source>Parser routing</source>
         <translation>Parser routing</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="170"/>
+        <location filename="../ui/knowledge_workspace.py" line="237"/>
         <source>Document parsing</source>
         <translation>Document parsing</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="171"/>
+        <location filename="../ui/knowledge_workspace.py" line="238"/>
         <source>Canonical publication</source>
         <translation>Canonical publication</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="172"/>
+        <location filename="../ui/knowledge_workspace.py" line="239"/>
         <source>Completed</source>
         <translation>Completed</translation>
     </message>
@@ -320,12 +320,12 @@
         <translation type="vanished">Needs attention</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="173"/>
+        <location filename="../ui/knowledge_workspace.py" line="240"/>
         <source>Failed</source>
         <translation>Failed</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="174"/>
+        <location filename="../ui/knowledge_workspace.py" line="241"/>
         <source>Cancelled</source>
         <translation>Cancelled</translation>
     </message>
@@ -406,17 +406,17 @@
         <translation type="vanished">Import cancelled</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="179"/>
+        <location filename="../ui/knowledge_workspace.py" line="246"/>
         <source>Knowledge Import Log</source>
         <translation>Knowledge Import Log</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="181"/>
+        <location filename="../ui/knowledge_workspace.py" line="248"/>
         <source>Knowledge Import Log — %1</source>
         <translation>Knowledge Import Log — %1</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="183"/>
+        <location filename="../ui/knowledge_workspace.py" line="250"/>
         <source>Close</source>
         <translation>Close</translation>
     </message>
@@ -787,39 +787,39 @@
         <translation type="vanished">Knowledge Task Failed</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="342"/>
+        <location filename="../ui/knowledge_workspace.py" line="409"/>
         <source>The selected task could not be retried.</source>
         <translation>The selected task could not be retried.</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="352"/>
+        <location filename="../ui/knowledge_workspace.py" line="419"/>
         <source>Document password</source>
         <translation>Document password</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="353"/>
+        <location filename="../ui/knowledge_workspace.py" line="420"/>
         <source>Enter the password for this document. It will not be saved.</source>
         <translation>Enter the password for this document. It will not be saved.</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="361"/>
+        <location filename="../ui/knowledge_workspace.py" line="428"/>
         <source>Select Knowledge Source</source>
         <translation>Select Knowledge Source</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="363"/>
+        <location filename="../ui/knowledge_workspace.py" line="430"/>
         <source>Knowledge documents</source>
         <translation>Knowledge documents</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="388"/>
+        <location filename="../ui/knowledge_workspace.py" line="455"/>
         <source>Phase: %1
 Trigger: %2</source>
         <translation>Phase: %1
 Trigger: %2</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="392"/>
+        <location filename="../ui/knowledge_workspace.py" line="459"/>
         <source>Error: %1</source>
         <translation>Error: %1</translation>
     </message>
@@ -828,92 +828,92 @@ Trigger: %2</translation>
         <translation type="vanished">Knowledge Task Details</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="341"/>
+        <location filename="../ui/knowledge_workspace.py" line="408"/>
         <source>Task Failed</source>
         <translation>Task Failed</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="394"/>
+        <location filename="../ui/knowledge_workspace.py" line="461"/>
         <source>Details: %1</source>
         <translation>Details: %1</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="397"/>
+        <location filename="../ui/knowledge_workspace.py" line="464"/>
         <source>Task Details</source>
         <translation>Task Details</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="408"/>
+        <location filename="../ui/knowledge_workspace.py" line="475"/>
         <source>Import</source>
         <translation>Import</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="409"/>
+        <location filename="../ui/knowledge_workspace.py" line="476"/>
         <source>Content preparation</source>
         <translation>Content preparation</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="410"/>
+        <location filename="../ui/knowledge_workspace.py" line="477"/>
         <source>Index build</source>
         <translation>Index build</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="415"/>
+        <location filename="../ui/knowledge_workspace.py" line="482"/>
         <source>Pending</source>
         <translation>Pending</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="416"/>
+        <location filename="../ui/knowledge_workspace.py" line="483"/>
         <source>Queued</source>
         <translation>Queued</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="417"/>
+        <location filename="../ui/knowledge_workspace.py" line="484"/>
         <source>In progress</source>
         <translation>In progress</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="418"/>
+        <location filename="../ui/knowledge_workspace.py" line="485"/>
         <source>Preparing content</source>
         <translation>Preparing content</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="419"/>
+        <location filename="../ui/knowledge_workspace.py" line="486"/>
         <source>Ready</source>
         <translation>Ready</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="420"/>
+        <location filename="../ui/knowledge_workspace.py" line="487"/>
         <source>Completed</source>
         <translation>Completed</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="421"/>
+        <location filename="../ui/knowledge_workspace.py" line="488"/>
         <source>Needs attention</source>
         <translation>Needs attention</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="422"/>
+        <location filename="../ui/knowledge_workspace.py" line="489"/>
         <source>Failed</source>
         <translation>Failed</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="423"/>
+        <location filename="../ui/knowledge_workspace.py" line="490"/>
         <source>Cancelled</source>
         <translation>Cancelled</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="424"/>
+        <location filename="../ui/knowledge_workspace.py" line="491"/>
         <source>Reused</source>
         <translation>Reused</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="425"/>
+        <location filename="../ui/knowledge_workspace.py" line="492"/>
         <source>Unknown status</source>
         <translation>Unknown status</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="428"/>
+        <location filename="../ui/knowledge_workspace.py" line="495"/>
         <source>Task queue</source>
         <translation>Task queue</translation>
     </message>
@@ -922,47 +922,47 @@ Trigger: %2</translation>
         <translation type="vanished">Knowledge Task Queue</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="430"/>
+        <location filename="../ui/knowledge_workspace.py" line="497"/>
         <source>Type</source>
         <translation>Type</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="430"/>
+        <location filename="../ui/knowledge_workspace.py" line="497"/>
         <source>Target</source>
         <translation>Target</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="430"/>
+        <location filename="../ui/knowledge_workspace.py" line="497"/>
         <source>Status</source>
         <translation>Status</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="430"/>
+        <location filename="../ui/knowledge_workspace.py" line="497"/>
         <source>Updated</source>
         <translation>Updated</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="432"/>
+        <location filename="../ui/knowledge_workspace.py" line="499"/>
         <source>Retry</source>
         <translation>Retry</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="433"/>
+        <location filename="../ui/knowledge_workspace.py" line="500"/>
         <source>Cancel</source>
         <translation>Cancel</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="434"/>
+        <location filename="../ui/knowledge_workspace.py" line="501"/>
         <source>View log</source>
         <translation>View log</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="435"/>
+        <location filename="../ui/knowledge_workspace.py" line="502"/>
         <source>Details</source>
         <translation>Details</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="436"/>
+        <location filename="../ui/knowledge_workspace.py" line="503"/>
         <source>Close</source>
         <translation>Close</translation>
     </message>
@@ -970,33 +970,32 @@ Trigger: %2</translation>
 <context>
     <name>KnowledgeWorkspaceDialog</name>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="576"/>
+        <location filename="../ui/knowledge_workspace.py" line="658"/>
         <source>Import Knowledge</source>
         <translation>Import Knowledge</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="578"/>
+        <location filename="../ui/knowledge_workspace.py" line="660"/>
         <source>Knowledge documents</source>
         <translation>Knowledge documents</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="600"/>
+        <location filename="../ui/knowledge_workspace.py" line="682"/>
         <source>Knowledge Import Failed</source>
         <translation>Knowledge Import Failed</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="601"/>
+        <location filename="../ui/knowledge_workspace.py" line="683"/>
         <source>%1 file(s) could not be queued for import.</source>
         <translation>%1 file(s) could not be queued for import.</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="657"/>
+        <location filename="../ui/knowledge_workspace.py" line="846"/>
         <source>Knowledge content is temporarily unavailable.</source>
         <translation>Knowledge content is temporarily unavailable.</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="659"/>
-        <location filename="../ui/knowledge_workspace.py" line="717"/>
+        <location filename="../ui/knowledge_workspace.py" line="850"/>
         <source>No Knowledge documents yet. Import a file to get started.</source>
         <translation>No Knowledge documents yet. Import a file to get started.</translation>
     </message>
@@ -1009,84 +1008,136 @@ Trigger: %2</translation>
         <translation type="vanished">Keyword: %1  ·  Text vectors: %2</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="678"/>
-        <location filename="../ui/knowledge_workspace.py" line="688"/>
+        <location filename="../ui/knowledge_workspace.py" line="999"/>
+        <location filename="../ui/knowledge_workspace.py" line="1009"/>
         <source>Ready</source>
         <translation>Ready</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="689"/>
+        <location filename="../ui/knowledge_workspace.py" line="1010"/>
         <source>Building</source>
         <translation>Building</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="690"/>
+        <location filename="../ui/knowledge_workspace.py" line="1011"/>
         <source>Needs rebuild</source>
         <translation>Needs rebuild</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="662"/>
-        <location filename="../ui/knowledge_workspace.py" line="663"/>
-        <location filename="../ui/knowledge_workspace.py" line="684"/>
-        <location filename="../ui/knowledge_workspace.py" line="691"/>
+        <location filename="../ui/knowledge_workspace.py" line="860"/>
+        <location filename="../ui/knowledge_workspace.py" line="861"/>
+        <location filename="../ui/knowledge_workspace.py" line="1005"/>
+        <location filename="../ui/knowledge_workspace.py" line="1012"/>
         <source>Unavailable</source>
         <translation>Unavailable</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="666"/>
+        <location filename="../ui/knowledge_workspace.py" line="809"/>
+        <source>Removing…</source>
+        <translation>Removing…</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="843"/>
+        <source>Loading Knowledge documents…</source>
+        <translation>Loading Knowledge documents…</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="856"/>
+        <source>Loading Knowledge status…</source>
+        <translation>Loading Knowledge status…</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="864"/>
         <source>OCR: %1  ·  Keyword: %2  ·  Text vectors: %3</source>
         <translation>OCR: %1  ·  Keyword: %2  ·  Text vectors: %3</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="679"/>
+        <location filename="../ui/knowledge_workspace.py" line="898"/>
+        <location filename="../ui/knowledge_workspace.py" line="934"/>
+        <source>Delete</source>
+        <translation>Delete</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="919"/>
+        <location filename="../ui/knowledge_workspace.py" line="989"/>
+        <source>Delete document</source>
+        <translation>Delete document</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="921"/>
+        <source>Delete “%1” from the Knowledge Library?</source>
+        <translation>Delete “%1” from the Knowledge Library?</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="928"/>
+        <source>Xenix will remove its imported copy, search data, and related task entries. The original file will remain unchanged. This action cannot be undone.</source>
+        <translation>Xenix will remove its imported copy, search data, and related task entries. The original file will remain unchanged. This action cannot be undone.</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="977"/>
+        <source>This document is still being imported or prepared. Wait for the task to finish, then try again.</source>
+        <translation>This document is still being imported or prepared. Wait for the task to finish, then try again.</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="982"/>
+        <source>This document is no longer in the Knowledge Library.</source>
+        <translation>This document is no longer in the Knowledge Library.</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="986"/>
+        <source>The document could not be deleted.</source>
+        <translation>The document could not be deleted.</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="1000"/>
         <source>Checking</source>
         <translation>Checking</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="680"/>
+        <location filename="../ui/knowledge_workspace.py" line="1001"/>
         <source>Not installed</source>
         <translation>Not installed</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="681"/>
+        <location filename="../ui/knowledge_workspace.py" line="1002"/>
         <source>Repair required</source>
         <translation>Repair required</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="682"/>
+        <location filename="../ui/knowledge_workspace.py" line="1003"/>
         <source>Installing</source>
         <translation>Installing</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="683"/>
-        <location filename="../ui/knowledge_workspace.py" line="692"/>
-        <location filename="../ui/knowledge_workspace.py" line="700"/>
+        <location filename="../ui/knowledge_workspace.py" line="1004"/>
+        <location filename="../ui/knowledge_workspace.py" line="1013"/>
+        <location filename="../ui/knowledge_workspace.py" line="1021"/>
         <source>Needs attention</source>
         <translation>Needs attention</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="693"/>
-        <location filename="../ui/knowledge_workspace.py" line="701"/>
+        <location filename="../ui/knowledge_workspace.py" line="1014"/>
+        <location filename="../ui/knowledge_workspace.py" line="1022"/>
         <source>Unknown status</source>
         <translation>Unknown status</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="697"/>
+        <location filename="../ui/knowledge_workspace.py" line="1018"/>
         <source>Searchable</source>
         <translation>Searchable</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="698"/>
+        <location filename="../ui/knowledge_workspace.py" line="1019"/>
         <source>Preparing search content</source>
         <translation>Preparing search content</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="699"/>
+        <location filename="../ui/knowledge_workspace.py" line="1020"/>
         <source>No searchable text</source>
         <translation>No searchable text</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="706"/>
+        <location filename="../ui/knowledge_workspace.py" line="1027"/>
         <source>Task queue</source>
         <translation>Task queue</translation>
     </message>
@@ -1115,7 +1166,7 @@ Trigger: %2</translation>
         <translation type="vanished">Local PaddleOCR is not installed</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="704"/>
+        <location filename="../ui/knowledge_workspace.py" line="1025"/>
         <source>Knowledge Workspace</source>
         <translation>Knowledge Workspace</translation>
     </message>
@@ -1124,7 +1175,7 @@ Trigger: %2</translation>
         <translation type="vanished">Import TXT, DOC, DOCX, PDF, JPEG, or PNG files. Xenix indexes bounded evidence for Agent analysis.</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="705"/>
+        <location filename="../ui/knowledge_workspace.py" line="1026"/>
         <source>Import documents</source>
         <translation>Import documents</translation>
     </message>
@@ -1133,32 +1184,32 @@ Trigger: %2</translation>
         <translation type="vanished">Import queue</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="707"/>
+        <location filename="../ui/knowledge_workspace.py" line="1028"/>
         <source>Rebuild indexes</source>
         <translation>Rebuild indexes</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="708"/>
+        <location filename="../ui/knowledge_workspace.py" line="1029"/>
         <source>Settings</source>
         <translation>Settings</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="711"/>
+        <location filename="../ui/knowledge_workspace.py" line="1032"/>
         <source>Document</source>
         <translation>Document</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="712"/>
+        <location filename="../ui/knowledge_workspace.py" line="1033"/>
         <source>Type</source>
         <translation>Type</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="713"/>
+        <location filename="../ui/knowledge_workspace.py" line="1034"/>
         <source>Content status</source>
         <translation>Content status</translation>
     </message>
     <message>
-        <location filename="../ui/knowledge_workspace.py" line="714"/>
+        <location filename="../ui/knowledge_workspace.py" line="1035"/>
         <source>Updated</source>
         <translation>Updated</translation>
     </message>
@@ -1166,138 +1217,138 @@ Trigger: %2</translation>
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../ui/main_window.py" line="267"/>
+        <location filename="../ui/main_window.py" line="275"/>
         <source>Xenix Native</source>
         <translation>Xenix Native</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="268"/>
+        <location filename="../ui/main_window.py" line="276"/>
         <source>Xenix</source>
         <translation>Xenix</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="269"/>
+        <location filename="../ui/main_window.py" line="277"/>
         <source>Settings</source>
         <translation>Settings</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="270"/>
+        <location filename="../ui/main_window.py" line="278"/>
         <source>Knowledge</source>
         <translation>Knowledge</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="271"/>
+        <location filename="../ui/main_window.py" line="279"/>
         <source>History</source>
         <translation>History</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="273"/>
+        <location filename="../ui/main_window.py" line="281"/>
         <source>New thread</source>
         <translation>New thread</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="350"/>
+        <location filename="../ui/main_window.py" line="358"/>
         <source>Knowledge Workspace</source>
         <translation>Knowledge Workspace</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="351"/>
+        <location filename="../ui/main_window.py" line="359"/>
         <source>Knowledge services are not available.</source>
         <translation>Knowledge services are not available.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="477"/>
+        <location filename="../ui/main_window.py" line="488"/>
         <source>The selected source path is not a file.</source>
         <translation>The selected source path is not a file.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="660"/>
-        <location filename="../ui/main_window.py" line="677"/>
+        <location filename="../ui/main_window.py" line="671"/>
+        <location filename="../ui/main_window.py" line="688"/>
         <source>Opening link...</source>
         <translation>Opening link...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="678"/>
+        <location filename="../ui/main_window.py" line="689"/>
         <source>Open Link</source>
         <translation>Open Link</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="732"/>
+        <location filename="../ui/main_window.py" line="743"/>
         <source>The submitted message is being prepared and cannot be stopped.</source>
         <translation>The submitted message is being prepared and cannot be stopped.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="745"/>
+        <location filename="../ui/main_window.py" line="756"/>
         <source>Stopped.</source>
         <translation>Stopped.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="801"/>
+        <location filename="../ui/main_window.py" line="812"/>
         <source>Rename</source>
         <translation>Rename</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="802"/>
+        <location filename="../ui/main_window.py" line="813"/>
         <source>Generate title...</source>
         <translation>Generate title...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="803"/>
+        <location filename="../ui/main_window.py" line="814"/>
         <source>Copy thread ID</source>
         <translation>Copy thread ID</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="804"/>
+        <location filename="../ui/main_window.py" line="815"/>
         <source>Delete</source>
         <translation>Delete</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="829"/>
+        <location filename="../ui/main_window.py" line="840"/>
         <source>Rename Thread</source>
         <translation>Rename Thread</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="830"/>
-        <location filename="../ui/main_window.py" line="897"/>
+        <location filename="../ui/main_window.py" line="841"/>
+        <location filename="../ui/main_window.py" line="908"/>
         <source>Thread name</source>
         <translation>Thread name</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="846"/>
-        <location filename="../ui/main_window.py" line="877"/>
-        <location filename="../ui/main_window.py" line="907"/>
-        <location filename="../ui/main_window.py" line="917"/>
+        <location filename="../ui/main_window.py" line="857"/>
+        <location filename="../ui/main_window.py" line="888"/>
+        <location filename="../ui/main_window.py" line="918"/>
+        <location filename="../ui/main_window.py" line="928"/>
         <source>Generate Thread Title</source>
         <translation>Generate Thread Title</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="847"/>
+        <location filename="../ui/main_window.py" line="858"/>
         <source>Thread title model is not configured.</source>
         <translation>Thread title model is not configured.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="870"/>
+        <location filename="../ui/main_window.py" line="881"/>
         <source>Generating thread title...</source>
         <translation>Generating thread title...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="896"/>
+        <location filename="../ui/main_window.py" line="907"/>
         <source>Apply Generated Title</source>
         <translation>Apply Generated Title</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="932"/>
-        <location filename="../ui/main_window.py" line="940"/>
+        <location filename="../ui/main_window.py" line="943"/>
+        <location filename="../ui/main_window.py" line="951"/>
         <source>Delete Thread</source>
         <translation>Delete Thread</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="933"/>
+        <location filename="../ui/main_window.py" line="944"/>
         <source>Stop the current run before deleting this thread.</source>
         <translation>Stop the current run before deleting this thread.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="941"/>
+        <location filename="../ui/main_window.py" line="952"/>
         <source>Delete &quot;{title}&quot;? This action cannot be undone.</source>
         <translation>Delete &quot;{title}&quot;? This action cannot be undone.</translation>
     </message>
@@ -2451,12 +2502,12 @@ State file: {state_path}</translation>
         <translation>Buy license</translation>
     </message>
     <message>
-        <location filename="../app.py" line="782"/>
+        <location filename="../app.py" line="800"/>
         <source>Unable to start Xenix</source>
         <translation>Unable to start Xenix</translation>
     </message>
     <message>
-        <location filename="../app.py" line="783"/>
+        <location filename="../app.py" line="801"/>
         <source>Xenix could not finish startup.
 
 {error}</source>

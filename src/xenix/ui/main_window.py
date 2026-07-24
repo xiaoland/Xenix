@@ -50,6 +50,9 @@ from .tool_call_detail_view import ToolCallDetailView
 
 if TYPE_CHECKING:
     from ..services.knowledge_derivation_service import KnowledgeDerivationService
+    from ..services.knowledge_document_lifecycle_service import (
+        KnowledgeDocumentLifecycleService,
+    )
     from ..services.knowledge_import_service import KnowledgeImportService
     from ..services.knowledge_index_service import KnowledgeIndexService
     from ..services.knowledge_service import KnowledgeService
@@ -118,6 +121,8 @@ class MainWindow(QMainWindow):
         paddle_ocr_deployment: PaddleOcrDeploymentService | None = None,
         knowledge_task_query_service: KnowledgeTaskQueryService | None = None,
         knowledge_workspace_service: KnowledgeWorkspaceService | None = None,
+        knowledge_document_lifecycle_service: KnowledgeDocumentLifecycleService
+        | None = None,
     ) -> None:
         super().__init__()
         self._paths = paths
@@ -141,6 +146,9 @@ class MainWindow(QMainWindow):
         self._paddle_ocr_deployment = paddle_ocr_deployment
         self._knowledge_task_query_service = knowledge_task_query_service
         self._knowledge_workspace_service = knowledge_workspace_service
+        self._knowledge_document_lifecycle_service = (
+            knowledge_document_lifecycle_service
+        )
         self._agent_thread_id: str | None = None
         self._active_pending_message_id: str | None = None
         self._active_submission_id: str | None = None
@@ -362,6 +370,9 @@ class MainWindow(QMainWindow):
                 ocr_deployment=self._paddle_ocr_deployment,
                 task_query_service=self._knowledge_task_query_service,
                 workspace_service=self._knowledge_workspace_service,
+                document_lifecycle_service=(
+                    self._knowledge_document_lifecycle_service
+                ),
                 open_knowledge_settings=lambda: self._open_settings(
                     tab=SettingsTab.KNOWLEDGE_BASE
                 ),

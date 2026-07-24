@@ -176,7 +176,7 @@ class KnowledgeImportService:
         self._mutation_lock = threading.RLock()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
-        self._cleanup_storage_orphans()
+        self.cleanup_storage_orphans()
         pending = self._recover_imports()
         if start_worker:
             self._thread = threading.Thread(
@@ -851,7 +851,9 @@ class KnowledgeImportService:
             session.commit()
         return pending
 
-    def _cleanup_storage_orphans(self) -> None:
+    def cleanup_storage_orphans(self) -> None:
+        """Reclaim only source/canonical objects with no live SQLite authority."""
+
         root = knowledge_root(self._paths)
         canonical_paths: list[str] = []
         source_paths: list[str] = []
@@ -859,6 +861,7 @@ class KnowledgeImportService:
             imports = list(session.exec(select(KnowledgeImportRow)))
             documents = list(session.exec(select(KnowledgeDocumentRow)))
             generations = list(session.exec(select(KnowledgeCanonicalGenerationRow)))
+            registered_artifacts = list(session.exec(select(ArtifactRow)))
             source_artifact_ids = {
                 artifact_id
                 for artifact_id in (
@@ -871,6 +874,11 @@ class KnowledgeImportService:
             for artifact_id in source_artifact_ids:
                 artifact = session.get(ArtifactRow, artifact_id)
                 if artifact is not None and _is_current_source_cas_reference(
+                    Path(artifact.absolute_path), root
+                ):
+                    source_paths.append(artifact.absolute_path)
+            for artifact in registered_artifacts:
+                if _is_current_source_cas_reference(
                     Path(artifact.absolute_path), root
                 ):
                     source_paths.append(artifact.absolute_path)

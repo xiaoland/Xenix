@@ -125,6 +125,19 @@ class ArtifactService:
         )
         return self._artifacts.create(session, row)
 
+    def unregister_artifact_in_session(
+        self,
+        session: Session,
+        artifact_id: str,
+    ) -> bool:
+        """Remove one registration inside an owner-coordinated transaction.
+
+        This does not delete bytes. The calling content owner must first remove all
+        durable references and separately reclaim only storage that it owns.
+        """
+
+        return self._artifacts.delete(session, artifact_id)
+
     def resolve_uri(self, uri: str) -> ResolvedArtifact:
         parsed = urlparse(uri)
         if parsed.scheme != "artifact":

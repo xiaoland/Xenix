@@ -103,6 +103,10 @@ def test_main_window_language_switch_updates_chat_shell(
         workspace = window._knowledge_workspace
         assert workspace is not None
         assert workspace._queue_button.text() == "Task queue"
+        assert workspace.tr("Delete") == "Delete"
+        assert workspace.tr("Delete document") == "Delete document"
+        assert workspace.tr("Loading Knowledge documents…") == "Loading Knowledge documents…"
+        assert workspace.tr("Loading Knowledge status…") == "Loading Knowledge status…"
         workspace._queue_button.click()
         task_queue = workspace._queue_dialog
         assert task_queue is not None
@@ -234,6 +238,10 @@ def test_main_window_language_switch_updates_chat_shell(
         assert settings._ml_workers_title_label.text() == "ML 工作器"
         assert settings._ml_workers_setup_button.text() == "添加 SSH 工作器..."
         assert workspace._queue_button.text() == "任务队列"
+        assert workspace.tr("Delete") == "删除"
+        assert workspace.tr("Delete document") == "删除文档"
+        assert workspace.tr("Loading Knowledge documents…") == "正在加载知识库内容…"
+        assert workspace.tr("Loading Knowledge status…") == "正在加载知识库状态…"
         assert task_queue.windowTitle() == "任务队列"
         assert task_queue.tr("Task Failed") == "任务失败"
         assert task_queue.tr("Task Details") == "任务详情"
@@ -282,6 +290,10 @@ def test_main_window_language_switch_updates_chat_shell(
         assert settings._ml_workers_title_label.text() == "ML workers"
         assert settings._ml_workers_setup_button.text() == "Add SSH worker..."
         assert workspace._queue_button.text() == "Task queue"
+        assert workspace.tr("Delete") == "Delete"
+        assert workspace.tr("Delete document") == "Delete document"
+        assert workspace.tr("Loading Knowledge documents…") == "Loading Knowledge documents…"
+        assert workspace.tr("Loading Knowledge status…") == "Loading Knowledge status…"
         assert task_queue.windowTitle() == "Task queue"
         assert task_queue.tr("Task Failed") == "Task Failed"
         assert task_queue.tr("Task Details") == "Task Details"

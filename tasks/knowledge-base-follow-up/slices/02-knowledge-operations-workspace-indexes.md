@@ -1,6 +1,6 @@
 # Slice 02 — Knowledge Operations, Workspace, and Index Control
 
-**State:** Phases A–D locally verified; global review with Sir pending
+**State:** Closed through Slice 03 by Sir on 2026-07-24
 **Opened:** 2026-07-22
 **Scope rule:** this is one slice with internal phases, not one slice per finding
 
@@ -393,12 +393,12 @@ Sir approved this boundary, including the recommended decisions, on 2026-07-22.
 | UI → Services | Workspace lists logical documents; Queue lists attempts/logs; Knowledge Settings owns Embedding/OCR/index state; shared stable navigation and background OCR/index work keep UI authority-free. | Coherent |
 | Runtime/package | Startup recovery requeues interrupted derived tasks, shutdown preserves parent authority, hidden imports/resources are frozen, and packaged smoke exercises the spawned worker. | Coherent |
 
-The remaining closure gate is the requested global review **with Sir** across the
-three Knowledge workstreams. Multimodal retrieval remains parked and is not smuggled
-into this result.
+The requested global review across the Knowledge workstreams continued through
+Slice 03. Sir accepted the coupled result and closed the complete follow-up task on
+2026-07-24. Multimodal retrieval remains parked and was not smuggled into this
+result.
 
-## Next Step
+## Closure
 
-Review Import, Storage, Tool, UI, and runtime as one topology with Sir before Slice
-02 closes. Sir authorized organizing the completed work into one implementation
-commit and one documentation commit on 2026-07-22.
+Slice 02 is closed through the accepted Slice 03 convergence and final review. Its
+historical implementation and documentation commits remain unchanged.
