@@ -108,6 +108,26 @@ def validated_artifacts(manifest: object, *, expected_version: str) -> list[dict
     return validated
 
 
+def partition_artifacts(
+    artifacts: list[dict],
+) -> tuple[list[dict], list[dict], list[dict]]:
+    feeds = [item for item in artifacts if item["name"] in FEED_NAMES]
+    setups = [
+        item
+        for item in artifacts
+        if item["type"] == "desktop_release"
+        and item["name"].endswith("-Setup.exe")
+    ]
+    if len(setups) != 1:
+        raise RuntimeError("Candidate must contain exactly one Windows Setup.")
+    feed_names = {item["name"] for item in feeds}
+    if feed_names != FEED_NAMES or any(item["type"] != "update_feed" for item in feeds):
+        raise RuntimeError("Candidate update feed set is invalid.")
+    excluded_names = FEED_NAMES | {setups[0]["name"]}
+    immutable = [item for item in artifacts if item["name"] not in excluded_names]
+    return immutable, feeds, setups
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", required=True)
@@ -124,9 +144,7 @@ def main() -> int:
     manifest = json.loads(manifest_bytes)
     artifacts = validated_artifacts(manifest, expected_version=args.version)
     artifact_names = {item["name"] for item in artifacts}
-    immutable = [item for item in artifacts if item["name"] not in FEED_NAMES]
-    feeds = [item for item in artifacts if item["name"] in FEED_NAMES]
-    setups = [item for item in artifacts if "Setup" in item["name"]]
+    immutable, feeds, setups = partition_artifacts(artifacts)
     for item in artifacts:
         candidate_key = f"{candidate_prefix}/{item['name']}"
         if (
