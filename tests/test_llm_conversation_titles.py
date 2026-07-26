@@ -12,7 +12,6 @@ from xenix.services.llm import (
     AppendUserMessageInput,
     LLMConversationService,
     ProviderResponse,
-    SourceAttachmentBlock,
     TextBlock,
 )
 from xenix.services.storage import StorageBootstrapService

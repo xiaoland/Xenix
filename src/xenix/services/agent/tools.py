@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import csv
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Generic, TypeVar, cast
 
 import pandas as pd
 from pydantic import ValidationError as PydanticValidationError
@@ -21,6 +20,7 @@ from ..artifact_service import (
     build_artifact_uri,
 )
 from ..data_cleaning import (
+    CleanOperation,
     CleanDatasetInput,
     DataCleaningService,
     cleaning_operation_group_names,
@@ -37,12 +37,13 @@ from ..dataset_inspection import detect_source_format, load_dataframe
 from ..dataset_export_service import DatasetExportService
 from ..dataset_service import DatasetService
 from ..ml.registry import get_model_catalog_entry, list_model_catalog, list_model_keys
-from ..ml.types import EvaluationKind, ModelFamily, ModelTaskKind
+from ..ml.types import EvaluationKind, ModelCatalogEntry, ModelFamily, ModelTaskKind
 from ..ml_service import (
     ApplyWithFilesInput,
     CreateColumnBindingInput,
     FitWithEvaluateInput,
     MLService,
+    InlineApplyRowsInput as ServiceInlineApplyRowsInput,
     TuneWithEvaluateInput,
 )
 from ..preprocessing_worker import LocalPreprocessingWorkerRunner, PreprocessingWorkerRunner
@@ -52,11 +53,33 @@ from ..storage.models import (
     MLTaskRow,
     MLTaskStatus,
     MLTaskType,
-    ProblemKind,
     TrainedModelRow,
 )
-from ..llm.tooling import AgentToolSpec, ToolExecutionContext, ToolSuccess
+from ..llm.tooling import (
+    AgentTool as TypedAgentTool,
+    AgentToolRegistry as LLMToolRegistry,
+    AgentToolSpec,
+    ToolExecutionContext,
+    ToolSuccess,
+)
 from ..llm.xenix_table_text import render_xenix_table_tool_result
+from .tool_inputs import (
+    AgentToolInput,
+    AnalysisGraphInput,
+    AnalysisLambdaInput as AnalysisLambdaToolInput,
+    DataCleanInput,
+    DataCleanMetadataInput,
+    DataFeatureSelectInput,
+    DataIntegrateInput,
+    DataQueryInput as DataQueryToolInput,
+    DataTokenizeInput,
+    DataTransformInput as DataTransformToolInput,
+    ModelApplyInput,
+    ModelHyperTrainInput,
+    ModelMetadataInput,
+    ModelTaskQueryInput,
+    ModelTrainInput,
+)
 from .tool_presentations import DEFAULT_TOOL_PRESENTATION, ToolPresentation, tool_presentation_for_name
 
 
@@ -86,14 +109,61 @@ MAX_CLEANING_REPORT_COLUMN_NAME_CHARS = 96
 MODEL_HYPER_TRAIN_GRACE_SECONDS = 60.0
 
 
-ToolHandler = Callable[[dict[str, Any], ToolExecutionContext], ToolSuccess]
+ToolInputT = TypeVar("ToolInputT", bound=AgentToolInput)
+ToolHandler = Callable[[ToolInputT, ToolExecutionContext], ToolSuccess]
 
 
 @dataclass(frozen=True)
-class AgentTool:
-    spec: AgentToolSpec
-    handler: ToolHandler
+class ConcreteAgentTool(Generic[ToolInputT]):
+    registration: TypedAgentTool[ToolInputT]
     presentation: ToolPresentation = DEFAULT_TOOL_PRESENTATION
+
+    @property
+    def spec(self) -> AgentToolSpec:
+        return self.registration.spec
+
+
+def _index_agent_tools(
+    tools: Iterable[ConcreteAgentTool[Any]],
+) -> dict[str, ConcreteAgentTool[Any]]:
+    """Build the concrete Tool index without permitting identity collisions."""
+
+    indexed: dict[str, ConcreteAgentTool[Any]] = {}
+    provider_name_owners: dict[str, str] = {}
+    for tool in tools:
+        tool_name = tool.spec.name
+        if tool_name in indexed:
+            raise ValidationError(f"Tool '{tool_name}' is already registered.")
+        provider_name = tool.spec.provider_name
+        owner = provider_name_owners.get(provider_name)
+        if owner is not None:
+            raise ValidationError(
+                f"Provider tool name '{provider_name}' is already registered by '{owner}'."
+            )
+        indexed[tool_name] = tool
+        provider_name_owners[provider_name] = tool_name
+    return indexed
+
+
+def _tool_input_error_message(exc: PydanticValidationError) -> str:
+    error: dict[str, Any] = dict(next(iter(exc.errors(include_url=False)), {}))
+    context = error.get("ctx")
+    if isinstance(context, dict) and isinstance(context.get("error"), ValueError):
+        return str(context["error"])
+    location = error.get("loc")
+    field_name = (
+        str(location[0])
+        if isinstance(location, tuple | list) and location
+        else "Tool input"
+    )
+    message = str(error.get("msg") or "is invalid.")
+    if field_name == "id_columns":
+        return "data.tokenize id_columns must be a list of strings."
+    if field_name == "text_column_index":
+        return "data.tokenize text_column_index must be a zero-based integer."
+    if field_name == "id_column_indexes":
+        return "data.tokenize id_column_indexes must contain zero-based integers."
+    return f"{field_name}: {message}"
 
 
 class AgentToolRegistry:
@@ -126,9 +196,8 @@ class AgentToolRegistry:
         _ = dataset_export_service
         self._preprocessing_worker_runner = preprocessing_worker_runner or LocalPreprocessingWorkerRunner()
         self._model_key_aliases = self._build_model_key_aliases()
-        self._tools = {
-            tool.spec.name: tool
-            for tool in (
+        self._tools = _index_agent_tools(
+            (
                 self._build_data_integrate_tool(),
                 self._build_analysis_graph_tool(),
                 # analysis.lambda is intentionally retained in code but not registered
@@ -146,12 +215,12 @@ class AgentToolRegistry:
                 self._build_model_apply_tool(),
                 self._build_model_task_query_tool(),
             )
-        }
+        )
 
     def list_specs(self) -> list[AgentToolSpec]:
         return [tool.spec for tool in self._tools.values()]
 
-    def register_with_llm(self, registry) -> None:
+    def register_with_llm(self, registry: LLMToolRegistry) -> None:
         """Inject concrete implementations into the LLM-owned registry.
 
         This class remains a composition-time factory for domain-backed
@@ -159,10 +228,7 @@ class AgentToolRegistry:
         """
 
         for tool in self._tools.values():
-            def implementation(arguments, context, handler=tool.handler):
-                return handler(arguments, context)
-
-            registry.register(tool.spec, implementation)
+            registry.register(tool.registration)
 
     def tool_presentation(self, tool_name: str) -> ToolPresentation:
         tool = self._tools.get(tool_name)
@@ -180,746 +246,255 @@ class AgentToolRegistry:
         tool = self._tools.get(tool_name)
         if tool is None:
             raise ValidationError(f"Tool '{tool_name}' is not registered.")
-        result = tool.handler(arguments, context)
+        try:
+            input_data = tool.registration.input_model.model_validate(arguments)
+        except PydanticValidationError as exc:
+            raise ValidationError(_tool_input_error_message(exc)) from None
+        result = tool.registration.implementation(input_data, context)
         self._raise_if_cancelled(context)
+        if not isinstance(result, ToolSuccess):
+            raise ValidationError("Concrete Agent Tool returned an unsupported outcome.")
         return result
 
-    def _build_data_integrate_tool(self) -> AgentTool:
-        return AgentTool(
-            spec=AgentToolSpec(
-                name="data.integrate",
-                provider_name="data_integrate",
-                description="Combine two or more registered datasets into a generated derived dataset.",
-                parameters_schema={
-                    "type": "object",
-                    "properties": {
-                        "dataset_ids": {"type": "array", "items": {"type": "string"}, "minItems": 2},
-                        "name": {"type": "string"},
-                    },
-                    "required": ["dataset_ids"],
-                    "additionalProperties": False,
-                },
+    def _tool(
+        self,
+        *,
+        name: str,
+        provider_name: str,
+        description: str,
+        input_model: type[ToolInputT],
+        handler: ToolHandler[ToolInputT],
+        provider_field_enums: tuple[tuple[str, tuple[str, ...]], ...] = (),
+    ) -> ConcreteAgentTool[ToolInputT]:
+        return ConcreteAgentTool(
+            registration=TypedAgentTool(
+                name=name,
+                provider_name=provider_name,
+                description=description,
+                input_model=input_model,
+                implementation=handler,
+                provider_field_enums=provider_field_enums,
             ),
+            presentation=tool_presentation_for_name(name),
+        )
+
+    def _build_data_integrate_tool(self) -> ConcreteAgentTool[DataIntegrateInput]:
+        return self._tool(
+            name="data.integrate",
+            provider_name="data_integrate",
+            description="Combine two or more registered datasets into a generated derived dataset.",
+            input_model=DataIntegrateInput,
             handler=self._data_integrate,
-            presentation=tool_presentation_for_name("data.integrate"),
         )
 
-    def _build_analysis_graph_tool(self) -> AgentTool:
-        return AgentTool(
-            spec=AgentToolSpec(
-                name="analysis.graph",
-                provider_name="analysis_graph",
-                description=(
-                    "Draw one bounded static SVG artifact for a registered dataset. Pass exactly one graph mode: "
-                    "`spec` for ordinary Vega-Lite charts, or `wordcloud_spec` for the dedicated word-cloud path. "
-                    "`wordcloud_spec` is the dedicated word-cloud path and expects an upstream chart-ready "
-                    "frequency table from data.query or data.transform."
-                ),
-                parameters_schema={
-                    "type": "object",
-                    "properties": {
-                        "dataset_id": {
-                            "type": "string",
-                            "description": (
-                                "Use one registered dataset. For word clouds, this dataset should already be a "
-                                "chart-ready frequency table."
-                            ),
-                        },
-                        "spec": {
-                            "type": "object",
-                            "description": (
-                                "Vega-Lite chart specification. Xenix injects dataset values before rendering. "
-                                "Use standard Vega-Lite mark, encoding, transform, layer, facet, concat, repeat, "
-                                "config, and params fields. Do not include data or datasets, and do not use this "
-                                "field for word clouds."
-                            ),
-                            "properties": {
-                                "$schema": {"type": "string", "description": "Optional Vega-Lite schema URL."},
-                                "width": {"type": "number", "description": "Chart width in pixels."},
-                                "height": {"type": "number", "description": "Chart height in pixels."},
-                                "title": {
-                                    "description": "Optional chart title string or Vega-Lite title object.",
-                                },
-                                "mark": {
-                                    "description": "Vega-Lite mark string or mark definition object.",
-                                },
-                                "encoding": {
-                                    "type": "object",
-                                    "description": "Vega-Lite channel encodings such as x, y, color, tooltip, and text.",
-                                },
-                                "transform": {
-                                    "type": "array",
-                                    "description": "Optional Vega-Lite transforms for lightweight chart shaping.",
-                                },
-                                "layer": {
-                                    "type": "array",
-                                    "description": "Optional Vega-Lite layers.",
-                                },
-                                "facet": {"type": "object", "description": "Optional Vega-Lite facet definition."},
-                                "repeat": {"type": "object", "description": "Optional Vega-Lite repeat definition."},
-                                "hconcat": {"type": "array", "description": "Optional horizontal concat views."},
-                                "vconcat": {"type": "array", "description": "Optional vertical concat views."},
-                                "concat": {"type": "array", "description": "Optional concat views."},
-                                "spec": {"type": "object", "description": "Nested Vega-Lite view for facet/repeat."},
-                                "config": {"type": "object", "description": "Optional Vega-Lite configuration."},
-                                "params": {"type": "array", "description": "Optional Vega-Lite params."},
-                            },
-                            "additionalProperties": True,
-                        },
-                        "wordcloud_spec": {
-                            "type": "object",
-                            "description": (
-                                "Dedicated word-cloud configuration. Use data.query or data.transform first to "
-                                "produce chart-ready rows, usually exact columns `word` and `count`. For Chinese "
-                                "text, segment upstream first; do not pass raw sentences or expect analysis.graph "
-                                "to tokenize them."
-                            ),
-                            "properties": {
-                                "title": {
-                                    "type": "string",
-                                    "description": "Optional visible word-cloud title.",
-                                },
-                                "word_field": {
-                                    "type": "string",
-                                    "description": "Word column name. Default is `word`.",
-                                },
-                                "count_field": {
-                                    "type": "string",
-                                    "description": "Positive count column name. Default is `count`.",
-                                },
-                                "top_n": {
-                                    "type": "integer",
-                                    "minimum": 20,
-                                    "maximum": 80,
-                                    "description": "Render only the top 20-80 terms for readability. Default is 80.",
-                                },
-                                "width": {
-                                    "type": "integer",
-                                    "minimum": 200,
-                                    "maximum": 1600,
-                                    "description": "Word-cloud width in pixels.",
-                                },
-                                "height": {
-                                    "type": "integer",
-                                    "minimum": 160,
-                                    "maximum": 1200,
-                                    "description": "Word-cloud height in pixels.",
-                                },
-                                "prefer_horizontal": {
-                                    "type": "number",
-                                    "minimum": 0.8,
-                                    "maximum": 1.0,
-                                    "description": "Keep at least 80% of terms horizontal. Default is 0.85.",
-                                },
-                                "font_size_range": {
-                                    "type": "array",
-                                    "minItems": 2,
-                                    "maxItems": 2,
-                                    "items": {"type": "number"},
-                                    "description": (
-                                        "Optional [min, max] font-size range. Default is [12, 56], or [10, 42] "
-                                        "for denser clouds."
-                                    ),
-                                },
-                                "color_mode": {
-                                    "type": "string",
-                                    "enum": ["rank_tier", "field"],
-                                    "description": (
-                                        "Use `rank_tier` for restrained 2-3 color ranking. Use `field` only when "
-                                        "an upstream low-cardinality field already encodes category, sentiment, or source."
-                                    ),
-                                },
-                                "color_field": {
-                                    "type": "string",
-                                    "description": "Required only when color_mode is `field`.",
-                                },
-                                "palette": {
-                                    "type": "array",
-                                    "items": {"type": "string"},
-                                    "description": "Optional restrained color palette for rank tiers or semantic groups.",
-                                },
-                            },
-                            "additionalProperties": False,
-                        },
-                    },
-                    "required": ["dataset_id"],
-                    "additionalProperties": False,
-                },
+    def _build_analysis_graph_tool(self) -> ConcreteAgentTool[AnalysisGraphInput]:
+        return self._tool(
+            name="analysis.graph",
+            provider_name="analysis_graph",
+            description=(
+                "Draw one bounded static SVG artifact for a registered dataset. Pass exactly one graph mode: "
+                "`spec` for ordinary Vega-Lite charts, or `wordcloud_spec` for the dedicated word-cloud path. "
+                "`wordcloud_spec` is the dedicated word-cloud path and expects an upstream chart-ready "
+                "frequency table from data.query or data.transform."
             ),
+            input_model=AnalysisGraphInput,
             handler=self._analysis_graph,
-            presentation=tool_presentation_for_name("analysis.graph"),
         )
 
-    def _build_analysis_lambda_tool(self) -> AgentTool:
-        return AgentTool(
-            spec=AgentToolSpec(
-                name="analysis.lambda",
-                provider_name="analysis_lambda",
-                description=(
-                    "Run a one-off Python analysis function over registered datasets. "
-                    "The code must define analyze(ctx, inputs, params) and return any JSON-serializable dict. "
-                    "inputs is a mapping from dataset alias to pandas DataFrame; inputs[alias].read() also returns "
-                    "that DataFrame. Supported imports: pandas/pd, numpy/np, matplotlib/plt, scipy, statsmodels, "
-                    "sklearn, xgboost, lightgbm, math, statistics, datetime, json, io, collections, itertools, "
-                    "functools, and typing. Do not import seaborn or arbitrary packages. Use ctx.artifact.create(...) "
-                    "for generated artifacts: ctx.artifact.create(name, content), ctx.artifact.create(content, name=...), "
-                    "or ctx.artifact.create(name=..., content=...); content may be a pandas DataFrame, SVG/text string, "
-                    "bytes/io.BytesIO, or matplotlib Figure. value=... is accepted as an alias for content=...."
-                ),
-                parameters_schema={
-                    "type": "object",
-                    "properties": {
-                        "code": {"type": "string"},
-                        "datasets": {
-                            "type": "object",
-                            "additionalProperties": {"type": "string"},
-                            "description": "Mapping from dataset alias to registered dataset_id.",
-                        },
-                        "params": {"type": "object"},
-                        "manifest": {"type": "object"},
-                    },
-                    "required": ["code", "datasets"],
-                    "additionalProperties": False,
-                },
+    def _build_analysis_lambda_tool(
+        self,
+    ) -> ConcreteAgentTool[AnalysisLambdaToolInput]:
+        return self._tool(
+            name="analysis.lambda",
+            provider_name="analysis_lambda",
+            description=(
+                "Run a one-off Python analysis function over registered datasets. "
+                "The code must define analyze(ctx, inputs, params) and return any JSON-serializable dict. "
+                "inputs is a mapping from dataset alias to pandas DataFrame; inputs[alias].read() also returns "
+                "that DataFrame. Supported imports: pandas/pd, numpy/np, matplotlib/plt, scipy, statsmodels, "
+                "sklearn, xgboost, lightgbm, math, statistics, datetime, json, io, collections, itertools, "
+                "functools, and typing. Do not import seaborn or arbitrary packages. Use ctx.artifact.create(...) "
+                "for generated artifacts: ctx.artifact.create(name, content), ctx.artifact.create(content, name=...), "
+                "or ctx.artifact.create(name=..., content=...); content may be a pandas DataFrame, SVG/text string, "
+                "bytes/io.BytesIO, or matplotlib Figure. value=... is accepted as an alias for content=...."
             ),
+            input_model=AnalysisLambdaToolInput,
             handler=self._analysis_lambda,
-            presentation=tool_presentation_for_name("analysis.lambda"),
         )
 
-    def _build_data_clean_tool(self) -> AgentTool:
-        cleaning_operation_schema = {
-            "type": "object",
-            "properties": {
-                "operation": {"type": "string"},
-                "params": {"type": "object"},
-            },
-            "required": ["operation"],
-            "additionalProperties": False,
-        }
-        return AgentTool(
-            spec=AgentToolSpec(
-                name="data.clean",
-                provider_name="data_clean",
-                description=(
-                    "Create a new derived dataset by applying atomic predefined cleaning operations "
-                    "to one registered dataset. Prefer zero-based column_index or column_indexes from "
-                    "data.query; use data.clean.metadata only for unfamiliar operations or parameters. "
-                    "After missing.drop_high_missing_columns or encoding.one_hot, use names or a new "
-                    "data.query/data.clean call before using indexes."
-                ),
-                parameters_schema={
-                    "type": "object",
-                    "properties": {
-                        "dataset_id": {"type": "string"},
-                        "name": {"type": "string"},
-                        "operations": {"type": "array", "items": cleaning_operation_schema},
-                    },
-                    "required": ["dataset_id"],
-                    "additionalProperties": False,
-                },
+    def _build_data_clean_tool(self) -> ConcreteAgentTool[DataCleanInput]:
+        return self._tool(
+            name="data.clean",
+            provider_name="data_clean",
+            description=(
+                "Create a new derived dataset by applying atomic predefined cleaning operations "
+                "to one registered dataset. Prefer zero-based column_index or column_indexes from "
+                "data.query; use data.clean.metadata only for unfamiliar operations or parameters. "
+                "After missing.drop_high_missing_columns or encoding.one_hot, use names or a new "
+                "data.query/data.clean call before using indexes."
             ),
+            input_model=DataCleanInput,
             handler=self._data_clean,
-            presentation=tool_presentation_for_name("data.clean"),
         )
 
-    def _build_data_clean_metadata_tool(self) -> AgentTool:
-        return AgentTool(
-            spec=AgentToolSpec(
-                name="data.clean.metadata",
-                provider_name="data_clean_metadata",
-                description=(
-                    "Return a compact data.clean operation catalog. Request only relevant groups when an "
-                    "operation or parameter is uncertain."
-                ),
-                parameters_schema={
-                    "type": "object",
-                    "properties": {
-                        "groups": {
-                            "type": "array",
-                            "items": {
-                                "type": "string",
-                                "enum": list(cleaning_operation_group_names()),
-                            },
-                        },
-                    },
-                    "additionalProperties": False,
-                },
+    def _build_data_clean_metadata_tool(
+        self,
+    ) -> ConcreteAgentTool[DataCleanMetadataInput]:
+        return self._tool(
+            name="data.clean.metadata",
+            provider_name="data_clean_metadata",
+            description=(
+                "Return a compact data.clean operation catalog. Request only relevant groups when an "
+                "operation or parameter is uncertain."
             ),
+            input_model=DataCleanMetadataInput,
             handler=self._data_clean_metadata,
-            presentation=tool_presentation_for_name("data.clean.metadata"),
+            provider_field_enums=(
+                ("groups", cleaning_operation_group_names()),
+            ),
         )
 
-    def _build_data_tokenize_tool(self) -> AgentTool:
-        return AgentTool(
-            spec=AgentToolSpec(
-                name="data.tokenize",
-                provider_name="data_tokenize",
-                description=(
-                    "Create a new derived dataset by tokenizing one Chinese text column with the stable "
-                    "Xenix profile zh_business_v1. Use output=token_text to keep source rows and append "
-                    "token_text for downstream text models, or output=token_rows to explode one token per row. "
-                    "Select the text and optional identifier columns by names or zero-based source indexes; "
-                    "do not mix the two forms for one selector."
-                ),
-                parameters_schema={
-                    "type": "object",
-                    "properties": {
-                        "dataset_id": {"type": "string"},
-                        "name": {"type": "string"},
-                        "text_column": {
-                            "type": "string",
-                            "description": (
-                                "Chinese text column name to segment. Use either text_column or "
-                                "text_column_index, never both."
-                            ),
-                        },
-                        "text_column_index": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "description": (
-                                "Preferred zero-based Chinese text column index from the source schema. "
-                                "Use either text_column_index or text_column, never both."
-                            ),
-                        },
-                        "id_columns": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": (
-                                "Optional identifier column names preserved in token_rows output. Use either "
-                                "id_columns or id_column_indexes, never both."
-                            ),
-                        },
-                        "id_column_indexes": {
-                            "type": "array",
-                            "items": {"type": "integer", "minimum": 0},
-                            "description": (
-                                "Preferred zero-based identifier column indexes from the source schema, "
-                                "preserved in token_rows output. Use either id_column_indexes or id_columns, "
-                                "never both."
-                            ),
-                        },
-                        "output": {
-                            "type": "string",
-                            "enum": ["token_text", "token_rows"],
-                            "description": "Choose token_text for model-ready rows or token_rows for one-token-per-row analysis.",
-                        },
-                        "tokenizer_profile": {
-                            "type": "string",
-                            "enum": ["zh_business_v1"],
-                            "description": "Stable Chinese-first tokenization profile owned by Xenix.",
-                        },
-                    },
-                    # Keep conditional selector requirements in the handler: several providers reject
-                    # JSON Schema oneOf/anyOf even though the fields are portable scalar properties.
-                    "required": ["dataset_id"],
-                    "additionalProperties": False,
-                },
+    def _build_data_tokenize_tool(self) -> ConcreteAgentTool[DataTokenizeInput]:
+        return self._tool(
+            name="data.tokenize",
+            provider_name="data_tokenize",
+            description=(
+                "Create a new derived dataset by tokenizing one Chinese text column with the stable "
+                "Xenix profile zh_business_v1. Use output=token_text to keep source rows and append "
+                "token_text for downstream text models, or output=token_rows to explode one token per row. "
+                "Select the text and optional identifier columns by names or zero-based source indexes; "
+                "do not mix the two forms for one selector."
             ),
+            input_model=DataTokenizeInput,
             handler=self._data_tokenize,
-            presentation=tool_presentation_for_name("data.tokenize"),
         )
 
-    def _build_data_query_tool(self) -> AgentTool:
-        binding_schema = {
-            "type": "object",
-            "properties": {
-                "alias": {
-                    "type": "string",
-                    "description": "SQL table alias for this registered dataset, such as orders or customers.",
-                },
-                "dataset_id": {
-                    "type": "string",
-                    "description": "Registered dataset id bound to this SQL alias.",
-                },
-            },
-            "required": ["alias", "dataset_id"],
-        }
-        return AgentTool(
-            spec=AgentToolSpec(
-                name="data.query",
-                provider_name="data_query",
-                description=(
-                    "Run a read-only SELECT/CTE query over registered datasets. "
-                    "Pass either dataset_id for one input aliased as input, or bindings for explicit SQL aliases. "
-                    "At least one input source is required. If both are present, bindings wins. "
-                    "When column_reference=indexes, each bound relation exposes zero-based c0, c1, ... SQL "
-                    "columns instead of source names; use this for punctuation-heavy or Unicode headers. "
-                    "During a cleaning pass, emit at most one data.query call per model response; batch related "
-                    "evidence in one compact query and wait for its result before any focused follow-up. "
-                    "Returns bounded rows and does not create a derived dataset or artifact."
-                ),
-                parameters_schema={
-                    "type": "object",
-                    "properties": {
-                        "dataset_id": {
-                            "type": "string",
-                            "description": (
-                                "Use for one input dataset, which will be available in SQL as input. "
-                                "Pass either dataset_id or bindings; if both are present, bindings wins."
-                            ),
-                        },
-                        "bindings": {
-                            "type": "array",
-                            "items": binding_schema,
-                            "minItems": 1,
-                            "description": (
-                                "Highest-priority input source. Use for one or more registered datasets "
-                                "with explicit SQL aliases."
-                            ),
-                        },
-                        "sql": {
-                            "type": "string",
-                            "description": "Read-only SELECT or CTE query to execute.",
-                        },
-                        "column_reference": {
-                            "type": "string",
-                            "enum": ["names", "indexes"],
-                            "description": (
-                                "names is the default source-header mode. indexes exposes each bound relation "
-                                "as c0, c1, ... using the zero-based indexes returned by data.query."
-                            ),
-                        },
-                        "limit": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 200,
-                            "description": "Maximum number of rows to return in the bounded result.",
-                        },
-                    },
-                    "required": ["sql"],
-                },
+    def _build_data_query_tool(self) -> ConcreteAgentTool[DataQueryToolInput]:
+        return self._tool(
+            name="data.query",
+            provider_name="data_query",
+            description=(
+                "Run a read-only SELECT/CTE query over registered datasets. "
+                "Pass either dataset_id for one input aliased as input, or bindings for explicit SQL aliases. "
+                "At least one input source is required. If both are present, bindings wins. "
+                "When column_reference=indexes, each bound relation exposes zero-based c0, c1, ... SQL "
+                "columns instead of source names; use this for punctuation-heavy or Unicode headers. "
+                "During a cleaning pass, emit at most one data.query call per model response; batch related "
+                "evidence in one compact query and wait for its result before any focused follow-up. "
+                "Returns bounded rows and does not create a derived dataset or artifact."
             ),
+            input_model=DataQueryToolInput,
             handler=self._data_query,
-            presentation=tool_presentation_for_name("data.query"),
         )
 
-    def _build_data_transform_tool(self) -> AgentTool:
-        binding_schema = {
-            "type": "object",
-            "properties": {
-                "alias": {
-                    "type": "string",
-                    "description": "SQL table alias for this registered dataset, such as orders or customers.",
-                },
-                "dataset_id": {
-                    "type": "string",
-                    "description": "Registered dataset id bound to this SQL alias.",
-                },
-            },
-            "required": ["alias", "dataset_id"],
-        }
-        return AgentTool(
-            spec=AgentToolSpec(
-                name="data.transform",
-                provider_name="data_transform",
-                description=(
-                    "Create a new derived dataset from bounded DuckDB SQL over registered datasets. "
-                    "Use dataset_id for one input aliased as input, or bindings for explicit aliases. "
-                    "At least one input source is required. If both are present, bindings wins. "
-                    "When column_reference=indexes, each bound relation exposes zero-based c0, c1, ... SQL "
-                    "columns instead of source names; use this for punctuation-heavy or Unicode headers. "
-                    "For multi-statement scripts, create or leave a final TEMP relation named output; "
-                    "Xenix materializes SELECT * FROM output."
-                ),
-                parameters_schema={
-                    "type": "object",
-                    "properties": {
-                        "dataset_id": {
-                            "type": "string",
-                            "description": (
-                                "Use for one input dataset, which will be available in SQL as input. "
-                                "Pass either dataset_id or bindings; if both are present, bindings wins."
-                            ),
-                        },
-                        "bindings": {
-                            "type": "array",
-                            "items": binding_schema,
-                            "minItems": 1,
-                            "description": (
-                                "Highest-priority input source. Use for one or more registered datasets "
-                                "with explicit SQL aliases."
-                            ),
-                        },
-                        "sql": {
-                            "type": "string",
-                            "description": (
-                                "DuckDB SQL script. It may use SELECT/CTE or bounded temporary-table steps, "
-                                "but must leave a final relation named output."
-                            ),
-                        },
-                        "column_reference": {
-                            "type": "string",
-                            "enum": ["names", "indexes"],
-                            "description": (
-                                "names is the default source-header mode. indexes exposes each bound relation "
-                                "as c0, c1, ... using the zero-based indexes returned by data.query."
-                            ),
-                        },
-                        "name": {
-                            "type": "string",
-                            "description": "Optional name for the generated transformed dataset.",
-                        },
-                    },
-                    "required": ["sql"],
-                },
+    def _build_data_transform_tool(
+        self,
+    ) -> ConcreteAgentTool[DataTransformToolInput]:
+        return self._tool(
+            name="data.transform",
+            provider_name="data_transform",
+            description=(
+                "Create a new derived dataset from bounded DuckDB SQL over registered datasets. "
+                "Use dataset_id for one input aliased as input, or bindings for explicit aliases. "
+                "At least one input source is required. If both are present, bindings wins. "
+                "When column_reference=indexes, each bound relation exposes zero-based c0, c1, ... SQL "
+                "columns instead of source names; use this for punctuation-heavy or Unicode headers. "
+                "For multi-statement scripts, create or leave a final TEMP relation named output; "
+                "Xenix materializes SELECT * FROM output."
             ),
+            input_model=DataTransformToolInput,
             handler=self._data_transform,
-            presentation=tool_presentation_for_name("data.transform"),
         )
 
-    def _build_data_feature_select_tool(self) -> AgentTool:
-        role_binding_schema = {
-            "type": "object",
-            "properties": {
-                "role": {
-                    "type": "string",
-                    "description": "Semantic role such as feature, target, or partial_target.",
-                },
-                "columns": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Legacy exact dataset column names assigned to this semantic role.",
-                },
-                "column_indexes": {
-                    "type": "array",
-                    "items": {"type": "integer", "minimum": 0},
-                    "description": (
-                        "Preferred zero-based dataset column indexes returned by data.query. "
-                        "Use either column_indexes or columns, never both."
-                    ),
-                },
-            },
-            "required": ["role"],
-        }
-        return AgentTool(
-            spec=AgentToolSpec(
-                name="data.feature.select",
-                provider_name="data_feature_select",
-                description=(
-                    "Bind registered dataset columns to semantic roles required by a model/analyzer. "
-                    "Prefer per-role zero-based column_indexes from data.query; Xenix resolves them against the "
-                    "current dataset schema and persists canonical names."
-                ),
-                parameters_schema={
-                    "type": "object",
-                    "properties": {
-                        "dataset_id": {
-                            "type": "string",
-                            "description": "Registered dataset id whose columns will be role-bound.",
-                        },
-                        "model_key": {
-                            "type": "string",
-                            "description": "Optional chosen model key to pre-align role validation and later training.",
-                        },
-                        "role_bindings": {
-                            "type": "array",
-                            "items": role_binding_schema,
-                            "description": "Semantic role bindings to persist for later model training or apply.",
-                        },
-                    },
-                    "required": ["dataset_id", "role_bindings"],
-                },
+    def _build_data_feature_select_tool(
+        self,
+    ) -> ConcreteAgentTool[DataFeatureSelectInput]:
+        return self._tool(
+            name="data.feature.select",
+            provider_name="data_feature_select",
+            description=(
+                "Bind registered dataset columns to semantic roles required by a model/analyzer. "
+                "Prefer per-role zero-based column_indexes from data.query; Xenix resolves them against the "
+                "current dataset schema and persists canonical names."
             ),
+            input_model=DataFeatureSelectInput,
             handler=self._data_feature_select,
-            presentation=tool_presentation_for_name("data.feature.select"),
         )
 
-    def _build_model_metadata_tool(self) -> AgentTool:
-        return AgentTool(
-            spec=AgentToolSpec(
-                name="model.metadata",
-                provider_name="model_metadata",
-                description=(
-                    "Browse a lightweight model directory by model_family, or inspect one chosen model's role "
-                    "and parameter schema with model_key."
-                ),
-                parameters_schema={
-                    "type": "object",
-                    "properties": {
-                        "model_key": {
-                            "type": "string",
-                            "description": (
-                                "Inspect one chosen model. Accepts a canonical model key or a simple alias. "
-                                "Returns role schemas and param_schema by default."
-                            ),
-                        },
-                        "model_family": {
-                            "type": "string",
-                            "enum": [family.value for family in ModelFamily],
-                            "description": (
-                                "Browse lightweight candidate models in one family such as supervised, "
-                                "clustering, anomaly_detection, association_rules, recommendation, "
-                                "or text_analysis."
-                            ),
-                        },
-                        "include_param_grid_schema": {
-                            "type": "boolean",
-                            "description": (
-                                "Only use with model_key. When true, also return param_grid_schema for "
-                                "hyperparameter tuning."
-                            ),
-                        },
-                    },
-                },
+    def _build_model_metadata_tool(self) -> ConcreteAgentTool[ModelMetadataInput]:
+        return self._tool(
+            name="model.metadata",
+            provider_name="model_metadata",
+            description=(
+                "Browse a lightweight model directory by model_family, or inspect one chosen model's role "
+                "and parameter schema with model_key."
             ),
+            input_model=ModelMetadataInput,
             handler=self._model_metadata,
-            presentation=tool_presentation_for_name("model.metadata"),
         )
 
-    def _build_model_train_tool(self) -> AgentTool:
-        return AgentTool(
-            spec=AgentToolSpec(
-                name="model.train",
-                provider_name="model_train",
-                description=(
-                    "Train and evaluate one or more models for a persisted dataset column role binding. "
-                    "Use model.metadata with model_family to browse candidates, then inspect one model_key for "
-                    "parameter detail."
-                ),
-                parameters_schema={
-                    "type": "object",
-                    "properties": {
-                        "binding_id": {
-                            "type": "string",
-                            "description": "Column role-binding id returned by data.feature.select.",
-                        },
-                        "models": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "One or more chosen model keys or aliases to train.",
-                        },
-                        "params_by_model": {
-                            "type": "object",
-                            "description": "Optional per-model parameter objects keyed by model key.",
-                        },
-                        "run_name": {
-                            "type": "string",
-                            "description": "Optional human-readable run name.",
-                        },
-                    },
-                    "required": ["binding_id", "models"],
-                },
+    def _build_model_train_tool(self) -> ConcreteAgentTool[ModelTrainInput]:
+        return self._tool(
+            name="model.train",
+            provider_name="model_train",
+            description=(
+                "Train and evaluate one or more models for a persisted dataset column role binding. "
+                "Use model.metadata with model_family to browse candidates, then inspect one model_key for "
+                "parameter detail."
             ),
+            input_model=ModelTrainInput,
             handler=self._model_train,
-            presentation=tool_presentation_for_name("model.train"),
         )
 
-    def _build_model_hyper_train_tool(self) -> AgentTool:
-        return AgentTool(
-            spec=AgentToolSpec(
-                name="model.hyper_train",
-                provider_name="model_hyper_train",
-                description=(
-                    "Run hyperparameter training for one or more models. "
-                    "Use model.metadata with model_family to browse candidates, then inspect one model_key with "
-                    "include_param_grid_schema=true."
-                ),
-                parameters_schema={
-                    "type": "object",
-                    "properties": {
-                        "binding_id": {
-                            "type": "string",
-                            "description": "Column role-binding id returned by data.feature.select.",
-                        },
-                        "param_grids_by_model": {
-                            "type": "object",
-                            "description": "Per-model tuning grids keyed by model key.",
-                        },
-                        "run_name": {
-                            "type": "string",
-                            "description": "Optional human-readable run name.",
-                        },
-                    },
-                    "required": ["binding_id", "param_grids_by_model"],
-                },
+    def _build_model_hyper_train_tool(
+        self,
+    ) -> ConcreteAgentTool[ModelHyperTrainInput]:
+        return self._tool(
+            name="model.hyper_train",
+            provider_name="model_hyper_train",
+            description=(
+                "Run hyperparameter training for one or more models. "
+                "Use model.metadata with model_family to browse candidates, then inspect one model_key with "
+                "include_param_grid_schema=true."
             ),
+            input_model=ModelHyperTrainInput,
             handler=self._model_hyper_train,
-            presentation=tool_presentation_for_name("model.hyper_train"),
         )
 
-    def _build_model_apply_tool(self) -> AgentTool:
-        return AgentTool(
-            spec=AgentToolSpec(
-                name="model.apply",
-                provider_name="model_apply",
-                description="Apply a trained model to registered dataset or artifact inputs, or inline rows.",
-                parameters_schema={
-                    "type": "object",
-                    "properties": {
-                        "trained_model_id": {"type": "string"},
-                        "input_sources": {"type": "array", "items": {"type": "string"}},
-                        "input_rows": {
-                            "type": "object",
-                            "properties": {
-                                "header_index_map": {
-                                    "type": "object",
-                                    "additionalProperties": {"type": "integer", "minimum": 0},
-                                },
-                                "data": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": ["string", "number", "boolean", "null"],
-                                        },
-                                    },
-                                },
-                            },
-                            "required": ["header_index_map", "data"],
-                            "additionalProperties": False,
-                        },
-                    },
-                    "required": ["trained_model_id"],
-                    "additionalProperties": False,
-                },
-            ),
+    def _build_model_apply_tool(self) -> ConcreteAgentTool[ModelApplyInput]:
+        return self._tool(
+            name="model.apply",
+            provider_name="model_apply",
+            description="Apply a trained model to registered dataset or artifact inputs, or inline rows.",
+            input_model=ModelApplyInput,
             handler=self._model_apply,
-            presentation=tool_presentation_for_name("model.apply"),
         )
 
-    def _build_model_task_query_tool(self) -> AgentTool:
-        return AgentTool(
-            spec=AgentToolSpec(
-                name="model.task.query",
-                provider_name="model_task_query",
-                description="Query ML task status, metadata, artifacts, errors, and logs by explicit task ids.",
-                parameters_schema={
-                    "type": "object",
-                    "properties": {
-                        "task_ids": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "minItems": 1,
-                            "description": "One or more explicit ML task ids to inspect.",
-                        },
-                        "include_logs": {
-                            "type": "boolean",
-                            "description": "Set true to include bounded task logs in the response.",
-                        },
-                        "max_log_entries": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 1000,
-                            "description": "Maximum number of log entries to return per task when include_logs is true.",
-                        },
-                    },
-                    "required": ["task_ids"],
-                },
-            ),
+    def _build_model_task_query_tool(
+        self,
+    ) -> ConcreteAgentTool[ModelTaskQueryInput]:
+        return self._tool(
+            name="model.task.query",
+            provider_name="model_task_query",
+            description="Query ML task status, metadata, artifacts, errors, and logs by explicit task ids.",
+            input_model=ModelTaskQueryInput,
             handler=self._model_task_query,
-            presentation=tool_presentation_for_name("model.task.query"),
         )
 
-    def _data_integrate(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
+    def _data_integrate(
+        self,
+        input_data: DataIntegrateInput,
+        context: ToolExecutionContext,
+    ) -> ToolSuccess:
         self._raise_if_cancelled(context)
-        raw_dataset_ids = arguments.get("dataset_ids")
-        if not isinstance(raw_dataset_ids, list) or len(raw_dataset_ids) < 2:
-            raise ValidationError("data.integrate requires at least two dataset ids.")
-        datasets = [self._dataset_service.get_dataset(str(dataset_id)) for dataset_id in raw_dataset_ids]
+        datasets = [
+            self._dataset_service.get_dataset(dataset_id)
+            for dataset_id in input_data.dataset_ids
+        ]
         frames = [self._load_frame(Path(dataset.source_path).expanduser().resolve()) for dataset in datasets]
         output_dir = self._paths.artifacts / "datasets" / "integrated"
         output_dir.mkdir(parents=True, exist_ok=True)
-        name = str(arguments.get("name") or "Integrated dataset").strip() or "Integrated dataset"
+        name = input_data.name or "Integrated dataset"
         output_path = output_dir / f"{self._slug(name)}-{int(time.time())}.csv"
         pd.concat(frames, ignore_index=True).to_csv(output_path, index=False)
         input_dataset_ids = [dataset.id for dataset in datasets]
@@ -933,23 +508,23 @@ class AgentToolRegistry:
         payload["input_dataset_ids"] = input_dataset_ids
         return self._tabular_tool_success("data.integrate", payload)
 
-    def _analysis_graph(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
+    def _analysis_graph(
+        self,
+        input_data: AnalysisGraphInput,
+        context: ToolExecutionContext,
+    ) -> ToolSuccess:
         self._raise_if_cancelled(context)
-        unsupported_keys = sorted(set(arguments) - {"dataset_id", "spec", "wordcloud_spec"})
-        if unsupported_keys:
-            raise ValidationError("analysis.graph does not accept: " + ", ".join(unsupported_keys))
-        dataset_id = self._require_string(arguments, "dataset_id")
-        dataset = self._dataset_service.get_dataset(dataset_id)
-        has_spec = "spec" in arguments
-        has_wordcloud_spec = "wordcloud_spec" in arguments
-        if has_spec == has_wordcloud_spec:
-            raise ValidationError("analysis.graph requires exactly one of spec or wordcloud_spec.")
-        raw_spec = arguments.get("spec")
-        raw_wordcloud_spec = arguments.get("wordcloud_spec")
-        if has_spec and not isinstance(raw_spec, dict):
-            raise ValidationError("analysis.graph spec must be a Vega-Lite object.")
-        if has_wordcloud_spec and not isinstance(raw_wordcloud_spec, dict):
-            raise ValidationError("analysis.graph wordcloud_spec must be an object.")
+        dataset = self._dataset_service.get_dataset(input_data.dataset_id)
+        raw_spec = (
+            input_data.spec.model_dump(by_alias=True, exclude_none=True)
+            if input_data.spec is not None
+            else None
+        )
+        raw_wordcloud_spec = (
+            input_data.wordcloud_spec.model_dump(exclude_none=True)
+            if input_data.wordcloud_spec is not None
+            else None
+        )
         graph_result = self._analysis_graph_service.graph_dataset(
             GraphDatasetInput(
                 source_path=dataset.source_path,
@@ -983,27 +558,14 @@ class AgentToolRegistry:
         }
         return ToolSuccess(value=payload)
 
-    def _analysis_lambda(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
+    def _analysis_lambda(
+        self,
+        input_data: AnalysisLambdaToolInput,
+        context: ToolExecutionContext,
+    ) -> ToolSuccess:
         self._raise_if_cancelled(context)
-        unsupported_keys = sorted(set(arguments) - {"code", "datasets", "params", "manifest"})
-        if unsupported_keys:
-            raise ValidationError("analysis.lambda does not accept: " + ", ".join(unsupported_keys))
-        raw_datasets = arguments.get("datasets")
-        if not isinstance(raw_datasets, dict) or not raw_datasets:
-            raise ValidationError("analysis.lambda datasets must be a non-empty object.")
-        params = arguments.get("params") or {}
-        if not isinstance(params, dict):
-            raise ValidationError("analysis.lambda params must be an object.")
-        manifest = arguments.get("manifest") or {}
-        if not isinstance(manifest, dict):
-            raise ValidationError("analysis.lambda manifest must be an object.")
-
         datasets: list[AnalysisLambdaDataset] = []
-        for raw_alias, raw_dataset_id in raw_datasets.items():
-            alias = str(raw_alias or "").strip()
-            dataset_id = str(raw_dataset_id or "").strip()
-            if not alias or not dataset_id:
-                raise ValidationError("analysis.lambda datasets must map non-empty aliases to dataset ids.")
+        for alias, dataset_id in input_data.datasets.items():
             dataset = self._dataset_service.get_dataset(dataset_id)
             datasets.append(
                 AnalysisLambdaDataset(
@@ -1016,10 +578,10 @@ class AgentToolRegistry:
 
         lambda_result = self._analysis_lambda_service.run_lambda(
             AnalysisLambdaInput(
-                code=self._require_string(arguments, "code"),
+                code=input_data.code,
                 datasets=datasets,
-                params=params,
-                manifest=manifest,
+                params=input_data.params,
+                manifest=input_data.manifest,
             ),
             cancel_requested=context.cancel_requested,
         )
@@ -1067,19 +629,20 @@ class AgentToolRegistry:
         }
         return ToolSuccess(value=payload)
 
-    def _data_clean(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
+    def _data_clean(
+        self,
+        input_data: DataCleanInput,
+        context: ToolExecutionContext,
+    ) -> ToolSuccess:
         self._raise_if_cancelled(context)
-        unsupported_keys = sorted(set(arguments) - {"dataset_id", "name", "operations"})
-        if unsupported_keys:
-            raise ValidationError("data.clean does not accept: " + ", ".join(unsupported_keys))
-        dataset_id = self._require_string(arguments, "dataset_id")
-        dataset = self._dataset_service.get_dataset(dataset_id)
-        name = str(arguments.get("name") or f"{dataset.name} cleaned").strip() or f"{dataset.name} cleaned"
-        operations = arguments.get("operations") or []
-        if not isinstance(operations, list):
-            raise ValidationError("operations must be a list.")
+        dataset = self._dataset_service.get_dataset(input_data.dataset_id)
+        name = input_data.name or f"{dataset.name} cleaned"
+        operations = [
+            operation.model_dump(mode="python")
+            for operation in input_data.operations
+        ]
         if not operations:
-            report = {
+            report: dict[str, Any] = {
                 "row_count_before": None,
                 "row_count_after": None,
                 "rows_removed": 0,
@@ -1101,7 +664,10 @@ class AgentToolRegistry:
             clean_input = CleanDatasetInput(
                 source_path=dataset.source_path,
                 name=name,
-                operations=operations,
+                operations=[
+                    CleanOperation(**operation)
+                    for operation in operations
+                ],
             )
         except PydanticValidationError as exc:
             raise ValidationError("operations must contain objects with operation and optional params.") from exc
@@ -1121,87 +687,47 @@ class AgentToolRegistry:
         payload["cleaning_report"] = self._compact_cleaning_report(clean_result.report)
         return self._tabular_tool_success("data.clean", payload)
 
-    def _data_clean_metadata(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
+    def _data_clean_metadata(
+        self,
+        input_data: DataCleanMetadataInput,
+        context: ToolExecutionContext,
+    ) -> ToolSuccess:
         self._raise_if_cancelled(context)
-        unsupported_keys = sorted(set(arguments) - {"groups"})
-        if unsupported_keys:
-            raise ValidationError("data.clean.metadata does not accept: " + ", ".join(unsupported_keys))
-        groups = self._optional_string_list(arguments, "groups")
+        groups: list[str] = (
+            list(input_data.groups)
+            if input_data.groups is not None
+            else []
+        )
         payload = cleaning_operation_metadata(groups)
         return ToolSuccess(value=payload)
 
-    def _data_tokenize(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
+    def _data_tokenize(
+        self,
+        input_data: DataTokenizeInput,
+        context: ToolExecutionContext,
+    ) -> ToolSuccess:
         self._raise_if_cancelled(context)
-        unsupported_keys = sorted(
-            set(arguments)
-            - {
-                "dataset_id",
-                "name",
-                "text_column",
-                "text_column_index",
-                "id_columns",
-                "id_column_indexes",
-                "output",
-                "tokenizer_profile",
-            }
-        )
-        if unsupported_keys:
-            raise ValidationError("data.tokenize does not accept: " + ", ".join(unsupported_keys))
-        dataset_id = self._require_string(arguments, "dataset_id")
-        dataset = self._dataset_service.get_dataset(dataset_id)
+        dataset = self._dataset_service.get_dataset(input_data.dataset_id)
         default_name = f"{dataset.name} tokenized"
-        name = str(arguments.get("name") or default_name).strip() or default_name
-
-        text_column = arguments.get("text_column")
-        text_column_index = arguments.get("text_column_index")
-        if text_column is not None and text_column_index is not None:
-            raise ValidationError(
-                "data.tokenize accepts either text_column or text_column_index, not both."
-            )
-        if text_column is None and text_column_index is None:
-            raise ValidationError("data.tokenize requires text_column or text_column_index.")
-        if text_column is not None and (not isinstance(text_column, str) or not text_column.strip()):
-            raise ValidationError("data.tokenize text_column must be a non-empty string.")
-        if text_column_index is not None and (
-            isinstance(text_column_index, bool)
-            or not isinstance(text_column_index, int)
-            or text_column_index < 0
-        ):
-            raise ValidationError("data.tokenize text_column_index must be a zero-based integer.")
-
-        id_columns = arguments.get("id_columns")
-        id_column_indexes = arguments.get("id_column_indexes")
-        if id_columns is not None and id_column_indexes is not None:
-            raise ValidationError(
-                "data.tokenize accepts either id_columns or id_column_indexes, not both."
-            )
-        if id_columns is not None and (
-            not isinstance(id_columns, list) or not all(isinstance(item, str) for item in id_columns)
-        ):
-            raise ValidationError("data.tokenize id_columns must be a list of strings.")
-        if id_column_indexes is not None:
-            if not isinstance(id_column_indexes, list):
-                raise ValidationError("data.tokenize id_column_indexes must be a list of integers.")
-            if any(
-                isinstance(item, bool) or not isinstance(item, int) or item < 0
-                for item in id_column_indexes
-            ):
-                raise ValidationError(
-                    "data.tokenize id_column_indexes must contain zero-based integers."
-                )
+        name = input_data.name or default_name
         tokenize_result = self._data_tokenization_service.tokenize_dataset(
             TokenizeDatasetInput(
                 source_path=dataset.source_path,
                 name=name,
-                text_column=text_column,
-                text_column_index=text_column_index,
-                id_columns=id_columns,
-                id_column_indexes=id_column_indexes,
-                output=str(arguments.get("output") or "token_text"),
-                tokenizer_profile=str(arguments.get("tokenizer_profile") or "zh_business_v1"),
+                text_column=input_data.text_column,
+                text_column_index=input_data.text_column_index,
+                id_columns=input_data.id_columns,
+                id_column_indexes=input_data.id_column_indexes,
+                output=input_data.output,
+                tokenizer_profile=input_data.tokenizer_profile,
             )
         )
-        row_count = int(tokenize_result.report.get("output_row_count", 0))
+        raw_row_count = tokenize_result.report.get("output_row_count", 0)
+        row_count = (
+            raw_row_count
+            if isinstance(raw_row_count, int) and not isinstance(raw_row_count, bool)
+            else 0
+        )
         payload = self._register_generated_dataset_result(
             context,
             output_path=Path(tokenize_result.output_path),
@@ -1214,19 +740,21 @@ class AgentToolRegistry:
         payload["tokenization_report"] = tokenize_result.report
         return self._tabular_tool_success("data.tokenize", payload)
 
-    def _data_query(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
+    def _data_query(
+        self,
+        input_data: DataQueryToolInput,
+        context: ToolExecutionContext,
+    ) -> ToolSuccess:
         self._raise_if_cancelled(context)
         bindings = self._resolve_sql_bindings(
-            arguments,
-            tool_name="data.query",
-            bindings_take_precedence=True,
+            input_data,
         )
         query_result = self._data_transform_service.query(
             DataQueryInput(
                 bindings=bindings,
-                sql=self._require_string(arguments, "sql"),
-                limit=self._optional_integer(arguments, "limit", default=50),
-                column_reference=self._column_reference_mode(arguments, tool_name="data.query"),
+                sql=input_data.sql,
+                limit=input_data.limit,
+                column_reference=input_data.column_reference,
             )
         )
         payload = {
@@ -1238,24 +766,24 @@ class AgentToolRegistry:
         }
         return self._tabular_tool_success("data.query", payload)
 
-    def _data_transform(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
+    def _data_transform(
+        self,
+        input_data: DataTransformToolInput,
+        context: ToolExecutionContext,
+    ) -> ToolSuccess:
         self._raise_if_cancelled(context)
-        bindings = self._resolve_sql_bindings(
-            arguments,
-            tool_name="data.transform",
-            bindings_take_precedence=True,
-        )
+        bindings = self._resolve_sql_bindings(input_data)
         input_dataset_ids = [binding.dataset_id for binding in bindings]
         default_name = "Transformed dataset"
         if len(bindings) == 1:
             default_name = f"{self._dataset_service.get_dataset(bindings[0].dataset_id).name} transformed"
-        name = str(arguments.get("name") or default_name).strip() or default_name
+        name = input_data.name or default_name
         transform_result = self._data_transform_service.transform(
             DataTransformInput(
                 bindings=bindings,
-                sql=self._require_string(arguments, "sql"),
+                sql=input_data.sql,
                 name=name,
-                column_reference=self._column_reference_mode(arguments, tool_name="data.transform"),
+                column_reference=input_data.column_reference,
             )
         )
         derived_from_dataset_id = input_dataset_ids[0] if len(set(input_dataset_ids)) == 1 else None
@@ -1276,19 +804,20 @@ class AgentToolRegistry:
         payload["input_dataset_ids"] = input_dataset_ids
         return self._tabular_tool_success("data.transform", payload)
 
-    def _data_feature_select(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
+    def _data_feature_select(
+        self,
+        input_data: DataFeatureSelectInput,
+        context: ToolExecutionContext,
+    ) -> ToolSuccess:
         self._raise_if_cancelled(context)
-        dataset_id = self._require_string(arguments, "dataset_id")
-        role_bindings = arguments.get("role_bindings")
-        if not isinstance(role_bindings, list):
-            raise ValidationError("data.feature.select requires role_bindings.")
-        if not all(isinstance(item, dict) for item in role_bindings):
-            raise ValidationError("data.feature.select role_bindings must contain objects.")
         binding = self._ml_service.create_column_binding(
             CreateColumnBindingInput(
-                dataset_id=dataset_id,
-                model_key=str(arguments.get("model_key") or "").strip() or None,
-                role_bindings=[dict(item) for item in role_bindings],
+                dataset_id=input_data.dataset_id,
+                model_key=input_data.model_key,
+                role_bindings=[
+                    role_binding.model_dump(mode="python", exclude_none=True)
+                    for role_binding in input_data.role_bindings
+                ],
             )
         )
         return ToolSuccess(
@@ -1302,45 +831,33 @@ class AgentToolRegistry:
             },
         )
 
-    def _model_metadata(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
+    def _model_metadata(
+        self,
+        input_data: ModelMetadataInput,
+        context: ToolExecutionContext,
+    ) -> ToolSuccess:
         self._raise_if_cancelled(context)
-        raw_model_key = str(arguments.get("model_key") or "").strip()
-        raw_model_keys = self._optional_string_list(arguments, "model_keys")
-        if raw_model_key and raw_model_keys:
-            raise ValidationError("model.metadata accepts either model_key or model_keys, not both.")
-
         detail_model_key: str | None = None
-        if raw_model_key:
-            detail_model_key = self._normalize_model_keys([raw_model_key], field_name="model_key")[0]
-        elif raw_model_keys:
-            model_keys = self._normalize_model_keys(raw_model_keys, field_name="model_keys")
-            if len(model_keys) != 1:
-                raise ValidationError(
-                    "model.metadata accepts only one model_key for parameter detail. "
-                    "Use narrowing filters such as model_family for directory discovery."
-                )
-            detail_model_key = model_keys[0]
-
-        model_family = str(arguments.get("model_family") or "").strip()
-        if model_family:
-            try:
-                selected_model_family = ModelFamily(model_family)
-            except ValueError as exc:
-                raise ValidationError(f"Unknown model_family '{model_family}'.") from exc
+        if input_data.model_key is not None:
+            detail_model_key = self._normalize_model_keys(
+                [input_data.model_key],
+                field_name="model_key",
+            )[0]
 
         detail_query = detail_model_key is not None
-        has_directory_filter = bool(model_family)
-        if not detail_query and not has_directory_filter:
-            raise ValidationError(
-                "model.metadata requires model_key or model_family."
-            )
 
         if detail_query:
+            assert detail_model_key is not None
             catalog_entries = [get_model_catalog_entry(detail_model_key)]
         else:
             catalog_entries = list_model_catalog()
 
-        if model_family:
+        selected_model_family = (
+            ModelFamily(input_data.model_family)
+            if input_data.model_family is not None
+            else None
+        )
+        if selected_model_family is not None:
             catalog_entries = [
                 entry for entry in catalog_entries if entry.model_family == selected_model_family
             ]
@@ -1356,17 +873,8 @@ class AgentToolRegistry:
                 entry.model_key,
             ),
         )
-        include_param_grid_schema = self._optional_boolean(
-            arguments,
-            "include_param_grid_schema",
-            default=False,
-        )
-        legacy_include_param_schema = self._optional_boolean(
-            arguments,
-            "include_param_schema",
-            default=False,
-        )
-        include_param_schema = detail_query or include_param_grid_schema or legacy_include_param_schema
+        include_param_grid_schema = input_data.include_param_grid_schema
+        include_param_schema = detail_query or include_param_grid_schema
         if not detail_query:
             include_param_schema = False
             include_param_grid_schema = False
@@ -1385,15 +893,19 @@ class AgentToolRegistry:
         }
         return ToolSuccess(value=payload)
 
-    def _model_train(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
+    def _model_train(
+        self,
+        input_data: ModelTrainInput,
+        context: ToolExecutionContext,
+    ) -> ToolSuccess:
         self._raise_if_cancelled(context)
-        binding_id = self._require_string(arguments, "binding_id")
+        binding_id = input_data.binding_id
         models = self._normalize_model_keys(
-            self._require_string_list(arguments, "models"),
+            input_data.models,
             field_name="models",
         )
         params_by_model = self._normalize_model_mapping(
-            arguments.get("params_by_model"),
+            input_data.params_by_model,
             field_name="params_by_model",
         )
         binding = self._ml_service.get_column_binding(binding_id)
@@ -1404,7 +916,7 @@ class AgentToolRegistry:
             created = self._ml_service.fit_with_evaluate(
                 FitWithEvaluateInput(
                     binding_id=binding_id,
-                    run_name=str(arguments.get("run_name") or ""),
+                    run_name=input_data.run_name,
                     model_key=model_key,
                     params=dict(params_by_model.get(model_key) or {}),
                 )
@@ -1432,14 +944,15 @@ class AgentToolRegistry:
         }
         return ToolSuccess(value=payload)
 
-    def _model_hyper_train(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
+    def _model_hyper_train(
+        self,
+        input_data: ModelHyperTrainInput,
+        context: ToolExecutionContext,
+    ) -> ToolSuccess:
         self._raise_if_cancelled(context)
-        binding_id = self._require_string(arguments, "binding_id")
-        grids = arguments.get("param_grids_by_model")
-        if not isinstance(grids, dict) or not grids:
-            raise ValidationError("model.hyper_train requires param_grids_by_model.")
+        binding_id = input_data.binding_id
         normalized_grids = self._normalize_model_mapping(
-            grids,
+            input_data.param_grids_by_model,
             field_name="param_grids_by_model",
             require_hyperparameter_tuning=True,
         )
@@ -1451,7 +964,7 @@ class AgentToolRegistry:
             created = self._ml_service.tune_with_evaluate(
                 TuneWithEvaluateInput(
                     binding_id=binding_id,
-                    run_name=str(arguments.get("run_name") or ""),
+                    run_name=input_data.run_name,
                     model_key=model_key,
                     param_grid=dict(grid),
                 )
@@ -1479,23 +992,24 @@ class AgentToolRegistry:
         }
         return ToolSuccess(value=payload)
 
-    def _model_apply(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
+    def _model_apply(
+        self,
+        input_data: ModelApplyInput,
+        context: ToolExecutionContext,
+    ) -> ToolSuccess:
         self._raise_if_cancelled(context)
-        trained_model_id = self._require_string(arguments, "trained_model_id")
-        resolved_input_files = self._resolve_apply_input_sources(self._optional_string_list(arguments, "input_sources"))
-        input_rows = arguments.get("input_rows")
-        if input_rows is not None and not isinstance(input_rows, dict):
-            raise ValidationError("input_rows must be an object.")
-        if not resolved_input_files and input_rows is None:
-            raise ValidationError("model.apply requires input_sources or input_rows.")
-        try:
-            apply_input = ApplyWithFilesInput(
-                trained_model_id=trained_model_id,
-                input_files=resolved_input_files,
-                input_rows=input_rows,
-            )
-        except PydanticValidationError as exc:
-            raise ValidationError("input_rows must contain header_index_map and data.") from exc
+        resolved_input_files = self._resolve_apply_input_sources(input_data.input_sources)
+        apply_input = ApplyWithFilesInput(
+            trained_model_id=input_data.trained_model_id,
+            input_files=resolved_input_files,
+            input_rows=(
+                ServiceInlineApplyRowsInput(
+                    **input_data.input_rows.model_dump(mode="python")
+                )
+                if input_data.input_rows is not None
+                else None
+            ),
+        )
         task = self._ml_service.apply(apply_input)
         completed_task = self._wait_for_task_or_none(
             task.id,
@@ -1556,68 +1070,46 @@ class AgentToolRegistry:
             raise ValidationError("Apply input dataset source file is missing.")
         return dataset.source_path
 
-    def _model_task_query(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolSuccess:
+    def _model_task_query(
+        self,
+        input_data: ModelTaskQueryInput,
+        context: ToolExecutionContext,
+    ) -> ToolSuccess:
         self._raise_if_cancelled(context)
-        task_ids = self._require_string_list(arguments, "task_ids")
-        include_logs = bool(arguments.get("include_logs"))
-        try:
-            max_log_entries = int(
-                arguments.get("max_log_entries") if arguments.get("max_log_entries") is not None else 200
-            )
-        except (TypeError, ValueError) as exc:
-            raise ValidationError("max_log_entries must be an integer.") from exc
-        if max_log_entries < 0:
-            raise ValidationError("max_log_entries must be greater than or equal to 0.")
-        if max_log_entries > 1000:
-            raise ValidationError("max_log_entries must be less than or equal to 1000.")
-
         tasks = [
             self._ml_task_details_payload(
                 task_id,
-                include_logs=include_logs,
-                max_log_entries=max_log_entries,
+                include_logs=input_data.include_logs,
+                max_log_entries=input_data.max_log_entries,
             )
-            for task_id in task_ids
+            for task_id in input_data.task_ids
         ]
         payload = {
-            "task_ids": task_ids,
+            "task_ids": input_data.task_ids,
             "tasks": tasks,
         }
         return ToolSuccess(value=payload)
 
     def _resolve_sql_bindings(
         self,
-        arguments: dict[str, Any],
-        *,
-        tool_name: str,
-        bindings_take_precedence: bool = False,
+        input_data: DataQueryToolInput | DataTransformToolInput,
     ) -> list[DatasetSqlBinding]:
-        raw_bindings = arguments.get("bindings")
-        raw_dataset_id = str(arguments.get("dataset_id") or "").strip()
-        if raw_bindings:
-            if raw_dataset_id and not bindings_take_precedence:
-                raise ValidationError(f"{tool_name} accepts dataset_id for one input or bindings for multiple inputs.")
-            if not isinstance(raw_bindings, list):
-                raise ValidationError(f"{tool_name} bindings must be a list.")
+        if input_data.bindings is not None:
             bindings: list[DatasetSqlBinding] = []
-            for raw_binding in raw_bindings:
-                if not isinstance(raw_binding, dict):
-                    raise ValidationError(f"{tool_name} bindings must contain objects.")
-                alias = str(raw_binding.get("alias") or "").strip()
-                dataset_id = str(raw_binding.get("dataset_id") or "").strip()
-                if not alias or not dataset_id:
-                    raise ValidationError(f"{tool_name} bindings require alias and dataset_id.")
-                dataset = self._dataset_service.get_dataset(dataset_id)
+            for input_binding in input_data.bindings:
+                dataset = self._dataset_service.get_dataset(input_binding.dataset_id)
                 bindings.append(
                     DatasetSqlBinding(
-                        alias=alias,
+                        alias=input_binding.alias,
                         dataset_id=dataset.id,
                         source_path=dataset.source_path,
                     )
                 )
             return bindings
 
-        dataset_id = self._require_string(arguments, "dataset_id")
+        dataset_id = input_data.dataset_id
+        if dataset_id is None:
+            raise AssertionError("Validated SQL Tool input must own an input source.")
         dataset = self._dataset_service.get_dataset(dataset_id)
         return [
             DatasetSqlBinding(
@@ -1626,18 +1118,6 @@ class AgentToolRegistry:
                 source_path=dataset.source_path,
             )
         ]
-
-    @staticmethod
-    def _column_reference_mode(arguments: dict[str, Any], *, tool_name: str) -> str:
-        value = arguments.get("column_reference")
-        if value is None:
-            return "names"
-        if not isinstance(value, str):
-            raise ValidationError(f"{tool_name}.column_reference must be 'names' or 'indexes'.")
-        normalized = value.strip()
-        if normalized not in {"names", "indexes"}:
-            raise ValidationError(f"{tool_name}.column_reference must be 'names' or 'indexes'.")
-        return normalized
 
     def _query_columns_payload(self, columns: list[dict[str, str]]) -> dict[str, Any]:
         rows = [
@@ -1968,7 +1448,13 @@ class AgentToolRegistry:
             time.sleep(0.1)
         return None
 
-    def _wait_for_task(self, task_id: str, *, context: ToolExecutionContext, timeout_seconds: float = 120.0):
+    def _wait_for_task(
+        self,
+        task_id: str,
+        *,
+        context: ToolExecutionContext,
+        timeout_seconds: float = 120.0,
+    ) -> MLTaskRow:
         task = self._wait_for_task_or_none(task_id, context=context, timeout_seconds=timeout_seconds)
         if task is None:
             raise ValidationError(f"Timed out waiting for ML task '{task_id}'.")
@@ -2158,7 +1644,7 @@ class AgentToolRegistry:
         for key in ("manual_training", "hyperparameter_tuning", "evaluate_model", "apply_model"):
             value = request_payload.get(key)
             if isinstance(value, dict) and isinstance(value.get("model_key"), str):
-                return value["model_key"]
+                return cast(str, value["model_key"])
         return None
 
     def _follow_up_task_ids(self, task: MLTaskRow) -> list[str]:
@@ -2283,7 +1769,7 @@ class AgentToolRegistry:
 
     def _model_catalog_payload(
         self,
-        entry,
+        entry: ModelCatalogEntry,
         *,
         detail_query: bool,
         include_param_schema: bool,
@@ -2420,7 +1906,7 @@ class AgentToolRegistry:
         aliases.update(_MODEL_KEY_ALIAS_OVERRIDES)
         return aliases
 
-    def _model_entry_alias_tokens(self, entry) -> set[str]:
+    def _model_entry_alias_tokens(self, entry: ModelCatalogEntry) -> set[str]:
         leaf_key = entry.model_key.split(".", 1)[-1]
         values = {
             entry.model_key,
@@ -2442,7 +1928,7 @@ class AgentToolRegistry:
                     tokens.update(self._model_key_alias_tokens(stripped))
         return tokens
 
-    def _model_alias_priority(self, entry) -> int:
+    def _model_alias_priority(self, entry: ModelCatalogEntry) -> int:
         if entry.evaluation_kind is EvaluationKind.REGRESSION:
             return 0
         if entry.evaluation_kind is EvaluationKind.CLASSIFICATION:
@@ -2476,46 +1962,6 @@ class AgentToolRegistry:
             "Call model.metadata to inspect available canonical model keys. "
             f"Available keys: {', '.join(list_model_keys())}."
         )
-
-    def _require_string(self, arguments: dict[str, Any], key: str) -> str:
-        value = str(arguments.get(key) or "").strip()
-        if not value:
-            raise ValidationError(f"{key} is required.")
-        return value
-
-    def _require_string_list(self, arguments: dict[str, Any], key: str) -> list[str]:
-        values = arguments.get(key)
-        if not isinstance(values, list):
-            raise ValidationError(f"{key} must be a list.")
-        normalized = [str(value).strip() for value in values if str(value).strip()]
-        if not normalized:
-            raise ValidationError(f"{key} cannot be empty.")
-        return normalized
-
-    def _optional_string_list(self, arguments: dict[str, Any], key: str) -> list[str]:
-        values = arguments.get(key)
-        if values is None:
-            return []
-        if not isinstance(values, list):
-            raise ValidationError(f"{key} must be a list.")
-        return [str(value).strip() for value in values if str(value).strip()]
-
-    def _optional_integer(self, arguments: dict[str, Any], key: str, *, default: int) -> int:
-        value = arguments.get(key)
-        if value is None:
-            return default
-        try:
-            return int(value)
-        except (TypeError, ValueError) as exc:
-            raise ValidationError(f"{key} must be an integer.") from exc
-
-    def _optional_boolean(self, arguments: dict[str, Any], key: str, *, default: bool) -> bool:
-        value = arguments.get(key)
-        if value is None:
-            return default
-        if isinstance(value, bool):
-            return value
-        raise ValidationError(f"{key} must be a boolean.")
 
     def _slug(self, value: str) -> str:
         normalized = "".join(char.lower() if char.isalnum() else "-" for char in value).strip("-")

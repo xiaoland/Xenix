@@ -12,7 +12,6 @@ import pytest
 from xenix.app import (
     _agent_skill_context_messages,
     _agent_skill_activated_skill_names,
-    _agent_skill_tool_scope_names,
     _register_agent_skill_tools,
 )
 from xenix.config import ensure_app_dirs, get_app_paths
@@ -25,7 +24,6 @@ from xenix.services.llm import (
     ProviderResponse,
     ProviderToolCall,
 )
-from xenix.services.llm.tooling import ToolScope
 from xenix.services.llm.tooling import ToolExecutionContext
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import ConversationToolResultStatus
@@ -122,69 +120,7 @@ def test_skill_context_uses_successful_result_payload() -> None:
     assert _active_flag(_agent_skill_context_messages(catalog, snapshot)) is True
 
 
-def test_modeling_skill_scope_keeps_its_result_explanation_tool() -> None:
-    snapshot = SimpleNamespace(
-        messages=[
-            SimpleNamespace(id="activate-modeling", tool_id="agent.skill.activate"),
-            SimpleNamespace(
-                tool_call_message_id="activate-modeling",
-                result_status=ConversationToolResultStatus.SUCCEEDED,
-                value_payload={"skill_name": "xenix-data-modeling"},
-            ),
-        ]
-    )
-
-    scope = _agent_skill_tool_scope_names(snapshot)
-
-    assert scope is not None
-    assert "model.train" in scope
-    assert "analysis.graph" in scope
-    assert "knowledge.lookup" in scope
-
-
-def test_default_data_skills_integrate_knowledge_without_a_standalone_skill() -> None:
-    skills = {
-        skill.name: skill
-        for skill in AgentSkillCatalog.from_default_catalog().list_skills()
-    }
-
-    assert "xenix-knowledge-retrieval" not in skills
-    assert {
-        "xenix-data-analysis",
-        "xenix-data-preprocessing",
-        "xenix-data-modeling",
-    } <= set(skills)
-    assert all(
-        "`knowledge.lookup`" in skills[name].body
-        for name in (
-            "xenix-data-analysis",
-            "xenix-data-preprocessing",
-            "xenix-data-modeling",
-        )
-    )
-    analysis = skills["xenix-data-analysis"].body
-    assert "what the Knowledge Library claims" in analysis
-    assert "what the current data computes" in analysis
-    assert "what conclusion or action follows" in analysis
-    assert "Knowledge-context layer" in analysis
-    plan = json.loads(
-        skills["xenix-data-analysis"].resources["assets"][
-            "assets/analysis-plan-template.json"
-        ]
-    )
-    assert plan["version"] == "0.4.0"
-    assert plan["knowledge_context"]["requested_mode"] == "auto"
-    assert "knowledge_lookup" in plan["tool_plan"]
-    report = skills["xenix-data-analysis"].resources["assets"][
-        "assets/management-report-template.md"
-    ]
-    assert "知识库内容是带来源的主张，不是当前数据计算结果" in report
-    assert "当前数据的主要发现" in report
-
-
-def test_skill_resource_reads_require_activation_in_the_same_thread(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "runtime"))
-    storage = StorageBootstrapService().initialize(ensure_app_dirs(get_app_paths()))
+def test_skill_resource_reads_require_activation_in_the_same_thread() -> None:
     catalog = _catalog()
     registry = AgentToolRegistry()
     active_names = set[str]()

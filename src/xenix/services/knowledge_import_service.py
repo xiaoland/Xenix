@@ -37,9 +37,9 @@ from .knowledge_import_storage_maintenance import (
     KnowledgeImportStorageMaintenance,
     KnowledgeImportStorageMaintenanceError,
 )
+from .knowledge_formats import SUPPORTED_KNOWLEDGE_SUFFIXES
 from .knowledge_pipeline import (
     MAX_SOURCE_BYTES,
-    SUPPORTED_KNOWLEDGE_SUFFIXES,
     FileProbe,
     FileProbeResult,
     FormatNormalizer,

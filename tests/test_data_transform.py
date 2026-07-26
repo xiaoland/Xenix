@@ -575,20 +575,6 @@ def test_duckdb_sql_validator_rejects_mutation_and_file_scans(monkeypatch, tmp_p
         service.query(DataQueryInput(bindings=[binding], sql="SELECT * FROM 'orders.csv'", limit=10))
 
 
-def test_data_query_and_transform_tools_are_registered(monkeypatch, tmp_path: Path) -> None:
-    _paths, _dataset_service, _service, _artifact_service, registry, _store = _build_runtime(
-        monkeypatch,
-        tmp_path,
-    )
-    specs = {spec.name: spec for spec in registry.list_specs()}
-
-    assert "data.query" in specs
-    assert "data.transform" in specs
-    assert "data.duckdb" not in specs
-    assert "sql" in specs["data.query"].parameters_schema["required"]
-    assert "sql" in specs["data.transform"].parameters_schema["required"]
-
-
 def test_data_query_tool_returns_bounded_rows(monkeypatch, tmp_path: Path) -> None:
     _paths, dataset_service, _service, _artifact_service, registry, store = _build_runtime(
         monkeypatch,

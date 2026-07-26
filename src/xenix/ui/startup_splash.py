@@ -216,7 +216,7 @@ class StartupSplash(QWidget):
             QPointF(panel.left() + 590, panel.top() + 88),
             QPointF(panel.left() + 558, panel.top() + 190),
         ]
-        for start, end in zip(nodes, nodes[1:]):
+        for start, end in zip(nodes, nodes[1:], strict=False):
             painter.drawLine(start, end)
         for index, point in enumerate(nodes):
             color = QColor(accent if index == 1 else green if index == 3 else graphite)

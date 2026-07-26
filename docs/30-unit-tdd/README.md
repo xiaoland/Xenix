@@ -29,6 +29,9 @@ Chatbot events, UI code, and integration tests.
   staging and performs Tool invocation/finalization. A Tool's direct returned
   value is the canonical ToolResult value: tabular Tools return XTT before the
   boundary receives it, and a typed ToolFailure remains that same value.
+  Production Tool input is admitted through the Tool's strict Pydantic model;
+  its provider schema is derived through the LLM-owned portable projector and
+  is not a second schema authority.
   Harness must consume the resulting snapshot and decide only whether the new
   final frontier needs the next sample.
 - **Projection:** First run the pure structural snapshot projection. Then, and

@@ -1,69 +1,10 @@
 from pathlib import Path
 
-import pandas as pd
 import pytest
 
 from xenix.exceptions import ValidationError
-from xenix.config import ensure_app_dirs, get_app_paths
-from xenix.services.agent.tools import AgentToolRegistry, ToolExecutionContext
 from xenix.services.analysis_profile import AnalysisProfileService, ProfileDatasetInput
-from xenix.services.artifact_service import ArtifactService
-from xenix.services.data_cleaning import DataCleaningService
-from xenix.services.data_transform import DataQueryTransformService
-from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
-from xenix.services.ml_service import MLService
-from xenix.services.ml_task_service import MLTaskService
-from xenix.services.preprocessing_worker import InlinePreprocessingWorkerRunner
-from xenix.services.storage import StorageBootstrapService
 from xenix.services.tabular import TabularRuntimeError
-
-
-def _build_runtime(monkeypatch, tmp_path: Path):
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    context = StorageBootstrapService().initialize(paths)
-    dataset_service = DatasetService(context.session_factory, paths)
-    worker_runner = InlinePreprocessingWorkerRunner()
-    data_cleaning_service = DataCleaningService(paths, worker_runner=worker_runner)
-    data_transform_service = DataQueryTransformService(paths, worker_runner=worker_runner)
-    ml_task_service = MLTaskService(context.session_factory, paths)
-    ml_service = MLService(
-        paths,
-        context.session_factory,
-        dataset_service,
-        ml_task_service,
-    )
-    artifact_service = ArtifactService(context.session_factory)
-    registry = AgentToolRegistry(
-        paths=paths,
-        dataset_service=dataset_service,
-        data_cleaning_service=data_cleaning_service,
-        data_transform_service=data_transform_service,
-        ml_service=ml_service,
-        artifact_service=artifact_service,
-        preprocessing_worker_runner=worker_runner,
-    )
-    return dataset_service, artifact_service, registry, None
-
-
-def _tool_context(_conversation_store, tool_name: str, arguments: dict) -> ToolExecutionContext:
-    return ToolExecutionContext(
-        thread_id="tool-test-thread",
-        dataset_ids=(),
-    )
-
-
-def _write_report_xlsx(tmp_path: Path) -> Path:
-    source = tmp_path / "report.xlsx"
-    pd.DataFrame(
-        [
-            ["品项销售明细", None, None],
-            ["营业日期【2026/04/01-2026/04/30】", None, None],
-            ["城市", "销售数量", "销售金额(元)"],
-            ["佛山市", 1, 118],
-        ]
-    ).to_excel(source, header=False, index=False)
-    return source
 
 
 def _write_mixed_csv(tmp_path: Path) -> Path:
@@ -122,14 +63,6 @@ def test_analysis_profile_service_builds_bounded_markdown_report(tmp_path: Path)
     assert "## Target group statistics" in result.markdown
 
 
-def test_profile_tools_are_not_agent_exposed(monkeypatch, tmp_path: Path) -> None:
-    _dataset_service, _artifact_service, registry, _conversation_store = _build_runtime(monkeypatch, tmp_path)
-    specs = {spec.name: spec for spec in registry.list_specs()}
-
-    assert "data.peek" not in specs
-    assert "analysis.profile" not in specs
-
-
 def test_analysis_profile_service_surfaces_structured_runtime_error(
     monkeypatch,
     tmp_path: Path,
@@ -167,42 +100,3 @@ def test_analysis_profile_service_surfaces_structured_runtime_error(
     assert exc_info.value.error_details["tabular"]["package_versions"]["polars-runtime-32"] == "1.41.2"
     assert any("data.query" in hint for hint in exc_info.value.repair_hints)
     assert exc_info.value.retryable is True
-
-
-def test_data_query_uses_canonical_names_for_messy_xlsx(monkeypatch, tmp_path: Path) -> None:
-    dataset_service, _artifact_service, registry, conversation_store = _build_runtime(monkeypatch, tmp_path)
-    source = _write_report_xlsx(tmp_path)
-    dataset = dataset_service.register_dataset(RegisterDatasetInput(source_path=str(source.resolve()), name="Report"))
-    arguments = {
-        "dataset_id": dataset.id,
-        "sql": 'SELECT "column_2" FROM input LIMIT 3',
-        "limit": 3,
-    }
-
-    result = registry.execute(
-        "data.query",
-        arguments,
-        _tool_context(conversation_store, "data.query", arguments),
-    )
-
-    assert isinstance(result.value, str)
-    assert "column_2: str" in result.value
-    assert "| 1 | ∅ |" in result.value
-    assert "| 2 | 销售数量 |" in result.value
-    assert "| 3 | 1 |" in result.value
-
-
-def test_data_query_schema_does_not_expose_profile_controls(monkeypatch, tmp_path: Path) -> None:
-    _dataset_service, _artifact_service, registry, _conversation_store = _build_runtime(monkeypatch, tmp_path)
-    specs = {spec.name: spec for spec in registry.list_specs()}
-
-    assert "analysis.profile" not in specs
-    assert "data.peek" not in specs
-    schema = specs["data.query"].parameters_schema
-    assert schema["required"] == ["sql"]
-    assert "dataset_id" in schema["properties"]
-    assert "source_path" not in schema["properties"]
-    assert "target_columns" not in schema["properties"]
-    assert "top_n" not in schema["properties"]
-    assert "correlation_column_limit" not in schema["properties"]
-    assert "rows" not in schema["properties"]

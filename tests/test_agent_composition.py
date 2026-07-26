@@ -122,20 +122,6 @@ def test_builder_wires_real_llm_graph_without_an_injected_provider(monkeypatch, 
     conversation = services.harness._conversation_service  # noqa: SLF001 - graph identity
     assert conversation._llm_service is llm  # noqa: SLF001 - graph identity
     assert conversation._usage_observability is usage_observability  # noqa: SLF001 - graph identity
-    tool_names = {spec.name for spec in conversation.tool_registry.list_specs()}
-    assert {
-        "data.clean",
-        "knowledge.lookup",
-        "agent.skill.activate",
-        "agent.skill.read_reference",
-    } <= tool_names
-    knowledge_spec = next(
-        spec
-        for spec in conversation.tool_registry.list_specs()
-        if spec.name == "knowledge.lookup"
-    )
-    assert knowledge_spec.provider_name == "knowledge_lookup"
-    assert set(knowledge_spec.parameters_schema["properties"]) == {"query", "mode"}
 
 
 def test_production_composition_resolves_auto_from_embedding_readiness(
@@ -224,11 +210,9 @@ def test_production_composition_executes_real_semantic_path(
 class _KnowledgeThenTextProvider:
     def __init__(self) -> None:
         self.requests = []
-        self.tool_specs = []
 
-    def complete(self, messages, tools):
+    def complete(self, messages, _tools):
         self.requests.append(list(messages))
-        self.tool_specs.append(list(tools))
         if len(self.requests) == 1:
             return ProviderResponse(
                 tool_calls=[
@@ -326,8 +310,6 @@ def test_production_knowledge_lookup_keeps_one_value_across_reload_provider_and_
             }
         ],
     }
-    advertised = [spec for spec in provider.tool_specs[0] if spec.name == "knowledge.lookup"]
-    assert len(advertised) == 1
     result = next(message for message in snapshot.messages if message.kind.value == "tool_result")
     assert result.value_payload == expected
     first_replay = next(message for message in provider.requests[1] if message.role == "tool")

@@ -5,7 +5,7 @@ from importlib import import_module
 from typing import Mapping
 from urllib.parse import urlsplit, urlunsplit
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 
 RELEASES_OSS_PUBLIC_URL_ENV = "RELEASES_OSS_PUBLIC_URL"
@@ -57,8 +57,8 @@ class ReleaseConfig(BaseModel):
         mode="before",
     )
     @classmethod
-    def _normalize_urls(cls, value: object, info) -> str:
-        return _normalized_http_url(str(value or ""), name=info.field_name)
+    def _normalize_urls(cls, value: object, info: ValidationInfo) -> str:
+        return _normalized_http_url(str(value or ""), name=info.field_name or "URL")
 
     @field_validator(
         "trial_llm_api_key",

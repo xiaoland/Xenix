@@ -55,61 +55,109 @@ from .models.text_analysis import (
     TokenizedTextSimilarityService,
     TokenizedTextTopicModelingService,
 )
-from .types import ModelCatalogEntry, ModelServiceBase
+from .types import ModelCatalogEntry, ModelServiceBase, parse_model_key
 
-_MODEL_SERVICES: dict[str, type[ModelServiceBase]] = {
-    service.key: service
-    for service in (
-        LinearRegressionService,
-        LassoRegressionService,
-        ElasticNetRegressionService,
-        RidgeRegressionService,
-        BayesianRidgeRegressionService,
-        KNeighborsRegressionService,
-        DecisionTreeRegressionService,
-        GradientBoostingRegressionService,
-        HistGradientBoostingRegressionService,
-        AdaBoostRegressionService,
-        XGBoostRegressionService,
-        LightGBMRegressionService,
-        SVRRegressionService,
-        MLPRegressionService,
-        PolynomialRegressionService,
-        RandomForestRegressionService,
-        LogisticRegressionService,
-        NaiveBayesClassificationService,
-        MultinomialNBClassificationService,
-        KNeighborsClassificationService,
-        DecisionTreeClassificationService,
-        GradientBoostingClassificationService,
-        HistGradientBoostingClassificationService,
-        AdaBoostClassificationService,
-        XGBoostClassificationService,
-        LightGBMClassificationService,
-        RandomForestClassificationService,
-        ExtraTreesClassificationService,
-        SVCClassificationService,
-        CalibratedLinearSVCClassificationService,
-        MLPClassificationService,
-        LabelPropagationClassificationService,
-        LabelSpreadingClassificationService,
-        SelfTrainingClassificationService,
-        BirchClusteringService,
-        GaussianMixtureClusteringService,
-        KMeansClusteringService,
-        MiniBatchKMeansClusteringService,
-        DBSCANClusteringService,
-        IsolationForestAnomalyService,
-        LocalOutlierFactorAnomalyService,
-        ApyoriAssociationRulesService,
-        MlxtendAssociationRulesService,
-        ItemSimilarityRecommendationService,
-        TokenizedTextClassificationService,
-        TokenizedTextClusteringService,
-        TokenizedTextTopicModelingService,
-        TokenizedTextSimilarityService,
-    )
-}
+
+def _build_model_service_registry(
+    services: tuple[type[ModelServiceBase], ...],
+) -> dict[str, type[ModelServiceBase]]:
+    if not services:
+        raise ValueError("The model service registry must contain at least one service.")
+
+    registry: dict[str, type[ModelServiceBase]] = {}
+    for service in services:
+        if not isinstance(service, type) or not issubclass(service, ModelServiceBase):
+            raise TypeError(f"Invalid model service registration: {service!r}.")
+        model_key = service.key
+        parse_model_key(model_key)
+        if model_key in registry:
+            first_service = registry[model_key]
+            raise ValueError(
+                f"Duplicate model key {model_key!r} for "
+                f"{first_service.__name__} and {service.__name__}."
+            )
+        catalog_entry = service.catalog_entry()
+        if not isinstance(catalog_entry, ModelCatalogEntry):
+            raise TypeError(
+                f"Model service {service.__name__} returned an invalid catalog entry."
+            )
+        if catalog_entry.model_key != model_key:
+            raise ValueError(
+                f"Model service {service.__name__} catalog key "
+                f"{catalog_entry.model_key!r} does not match {model_key!r}."
+            )
+        expected_param_schema = service.params_model.model_json_schema()
+        if catalog_entry.param_schema != expected_param_schema:
+            raise ValueError(
+                f"Model service {service.__name__} catalog parameter schema "
+                "must be derived from params_model."
+            )
+        expected_grid_schema = (
+            service.param_grid_model.model_json_schema()
+            if service.param_grid_model is not None
+            else None
+        )
+        if catalog_entry.param_grid_schema != expected_grid_schema:
+            raise ValueError(
+                f"Model service {service.__name__} catalog grid schema "
+                "must be derived from param_grid_model."
+            )
+        registry[model_key] = service
+    return registry
+
+
+_MODEL_SERVICE_TYPES: tuple[type[ModelServiceBase], ...] = (
+    LinearRegressionService,
+    LassoRegressionService,
+    ElasticNetRegressionService,
+    RidgeRegressionService,
+    BayesianRidgeRegressionService,
+    KNeighborsRegressionService,
+    DecisionTreeRegressionService,
+    GradientBoostingRegressionService,
+    HistGradientBoostingRegressionService,
+    AdaBoostRegressionService,
+    XGBoostRegressionService,
+    LightGBMRegressionService,
+    SVRRegressionService,
+    MLPRegressionService,
+    PolynomialRegressionService,
+    RandomForestRegressionService,
+    LogisticRegressionService,
+    NaiveBayesClassificationService,
+    MultinomialNBClassificationService,
+    KNeighborsClassificationService,
+    DecisionTreeClassificationService,
+    GradientBoostingClassificationService,
+    HistGradientBoostingClassificationService,
+    AdaBoostClassificationService,
+    XGBoostClassificationService,
+    LightGBMClassificationService,
+    RandomForestClassificationService,
+    ExtraTreesClassificationService,
+    SVCClassificationService,
+    CalibratedLinearSVCClassificationService,
+    MLPClassificationService,
+    LabelPropagationClassificationService,
+    LabelSpreadingClassificationService,
+    SelfTrainingClassificationService,
+    BirchClusteringService,
+    GaussianMixtureClusteringService,
+    KMeansClusteringService,
+    MiniBatchKMeansClusteringService,
+    DBSCANClusteringService,
+    IsolationForestAnomalyService,
+    LocalOutlierFactorAnomalyService,
+    ApyoriAssociationRulesService,
+    MlxtendAssociationRulesService,
+    ItemSimilarityRecommendationService,
+    TokenizedTextClassificationService,
+    TokenizedTextClusteringService,
+    TokenizedTextTopicModelingService,
+    TokenizedTextSimilarityService,
+)
+
+_MODEL_SERVICES = _build_model_service_registry(_MODEL_SERVICE_TYPES)
 
 
 def get_model_service(model_key: str) -> type[ModelServiceBase]:

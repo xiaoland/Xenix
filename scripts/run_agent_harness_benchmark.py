@@ -17,6 +17,7 @@ def main(argv: list[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     return run_pytest(
         [
+            "--direct",
             "-p",
             _PYTEST_PLUGIN,
             _BENCHMARK_ROOT,

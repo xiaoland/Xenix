@@ -8,7 +8,7 @@ benchmark process.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -187,6 +187,10 @@ def build_headless_agent_services(
             conversation.get_thread_snapshot(thread_id)
         ),
     )
+    validate_agent_skill_tool_scopes(
+        (spec.name for spec in llm_tools.list_specs()),
+        skill_names=(skill.name for skill in skill_catalog.list_skills()),
+    )
     conversation.discard_stale_pending_messages()
 
     harness = AgentHarnessService(
@@ -218,14 +222,9 @@ def register_agent_skill_tools(
 ) -> None:
     """Register catalog-backed Skill operations with the LLM-owned registry."""
 
-    from .skill_catalog import AGENT_SKILL_READ_REFERENCE_TOOL_NAME
-
-    activation = catalog.activation_tool_spec()
+    activation = catalog.activation_tool()
     if activation is not None:
-        registry.register(
-            activation,
-            lambda arguments, _context: catalog.activate(str(arguments["name"])),
-        )
+        registry.register(activation)
 
     def active_skill_names(context: Any) -> set[str]:
         if activated_skill_names_provider is None:
@@ -233,20 +232,11 @@ def register_agent_skill_tools(
         return set(activated_skill_names_provider(context.thread_id))
 
     all_skill_names = {skill.name for skill in catalog.list_skills()}
-    for spec in catalog.resource_tool_specs(activated_skill_names=all_skill_names):
-        if spec.name == AGENT_SKILL_READ_REFERENCE_TOOL_NAME:
-            implementation = lambda arguments, _context: catalog.read_reference(
-                skill_name=str(arguments["skill_name"]),
-                path=str(arguments["path"]),
-                activated_skill_names=active_skill_names(_context),
-            )
-        else:
-            implementation = lambda arguments, _context: catalog.read_asset(
-                skill_name=str(arguments["skill_name"]),
-                path=str(arguments["path"]),
-                activated_skill_names=active_skill_names(_context),
-            )
-        registry.register(spec, implementation)
+    for tool in catalog.resource_tools(
+        activated_skill_names=all_skill_names,
+        active_skill_names_provider=active_skill_names,
+    ):
+        registry.register(tool)
 
 
 def agent_skill_activated_skill_names(snapshot: Any) -> set[str]:
@@ -290,3 +280,29 @@ def agent_skill_tool_scope_names(snapshot: Any) -> tuple[str, ...] | None:
         if skill_name in active:
             names.extend(skill_tools)
     return tuple(dict.fromkeys(names))
+
+
+def validate_agent_skill_tool_scopes(
+    registered_tool_names: Iterable[str],
+    *,
+    skill_names: Iterable[str] | None = None,
+) -> None:
+    """Reject production Skill scopes that advertise an unregistered Tool."""
+
+    registered = set(registered_tool_names)
+    configured_skills = (
+        set(_AGENT_SKILL_TOOL_NAMES)
+        if skill_names is None
+        else set(skill_names) & set(_AGENT_SKILL_TOOL_NAMES)
+    )
+    referenced: set[str] = set()
+    if configured_skills:
+        referenced.update(_AGENT_SKILL_COMMON_TOOL_NAMES)
+    for skill_name in configured_skills:
+        referenced.update(_AGENT_SKILL_TOOL_NAMES[skill_name])
+    missing = sorted(referenced - registered)
+    if missing:
+        raise RuntimeError(
+            "Agent Skill Tool scopes reference unregistered Tools: "
+            + ", ".join(missing)
+        )

@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Iterable
+from pydantic import BaseModel, ConfigDict, StrictStr, model_validator
 
 
-@dataclass(frozen=True)
-class KnowledgeFormatCapability:
+class KnowledgeFormatCapability(BaseModel):
     """One complete source-format route through the document pipeline."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
     source_format: str
     display_name: str
-    suffixes: tuple[str, ...]
+    suffixes: tuple[StrictStr, ...]
     media_type: str
     probe_provider_id: str
     normalizer_provider_id: str
@@ -18,61 +18,102 @@ class KnowledgeFormatCapability:
     route_provider_id: str
     parser_provider_id: str
 
+    @model_validator(mode="after")
+    def _validate_capability(self) -> KnowledgeFormatCapability:
+        if (
+            not self.source_format
+            or self.source_format != self.source_format.strip().casefold()
+        ):
+            raise ValueError("Knowledge source formats must be normalized.")
+        if not self.display_name.strip():
+            raise ValueError("Knowledge format display names must be non-empty.")
+        if not self.media_type.strip():
+            raise ValueError("Knowledge format media types must be non-empty.")
+        if (
+            not self.parser_format
+            or self.parser_format != self.parser_format.strip().casefold()
+        ):
+            raise ValueError("Knowledge parser formats must be normalized.")
+        provider_ids = (
+            self.probe_provider_id,
+            self.normalizer_provider_id,
+            self.route_provider_id,
+            self.parser_provider_id,
+        )
+        if any(
+            not provider_id
+            or provider_id != provider_id.strip().casefold()
+            for provider_id in provider_ids
+        ):
+            raise ValueError("Knowledge format provider IDs must be normalized.")
+        if not self.suffixes:
+            raise ValueError("Knowledge format capabilities require suffixes.")
+        if any(
+            len(suffix) < 2
+            or not suffix.startswith(".")
+            or suffix != suffix.strip().casefold()
+            for suffix in self.suffixes
+        ):
+            raise ValueError("Knowledge format suffixes must be normalized extensions.")
+        return self
+
+
+class KnowledgeFormatCatalog(BaseModel):
+    """Strict immutable document owning the complete format capability contract."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    version: int = 1
+    capabilities: tuple[KnowledgeFormatCapability, ...]
+
+    @model_validator(mode="after")
+    def _validate_catalog(self) -> KnowledgeFormatCatalog:
+        if self.version < 1:
+            raise ValueError(
+                "Knowledge format catalog version must be a positive integer."
+            )
+        if not self.capabilities:
+            raise ValueError("Knowledge format catalog cannot be empty.")
+
+        source_formats: set[str] = set()
+        suffixes: set[str] = set()
+        for capability in self.capabilities:
+            if capability.source_format in source_formats:
+                raise ValueError("Knowledge source formats must be unique.")
+            source_formats.add(capability.source_format)
+            for suffix in capability.suffixes:
+                if suffix in suffixes:
+                    raise ValueError("Knowledge format suffixes must be unique.")
+                suffixes.add(suffix)
+        return self
+
 
 class KnowledgeFormatRegistry:
-    """Validated immutable product-format registry with derived UI/admission views."""
+    """Indexed query interface over one validated format catalog."""
 
-    def __init__(
-        self,
-        capabilities: Iterable[KnowledgeFormatCapability],
-        *,
-        version: int = 1,
-    ) -> None:
-        if type(version) is not int or version < 1:
-            raise ValueError(
-                "Knowledge format registry version must be a positive integer."
-            )
-        ordered = tuple(capabilities)
-        if not ordered:
-            raise ValueError("Knowledge format registry cannot be empty.")
-        by_format: dict[str, KnowledgeFormatCapability] = {}
-        by_suffix: dict[str, KnowledgeFormatCapability] = {}
-        for capability in ordered:
-            source_format = capability.source_format.strip().casefold()
-            if not source_format or source_format in by_format:
-                raise ValueError("Knowledge source formats must be unique and non-empty.")
-            if capability.source_format != source_format:
-                raise ValueError("Knowledge source formats must be normalized.")
-            provider_ids = (
-                capability.probe_provider_id,
-                capability.normalizer_provider_id,
-                capability.route_provider_id,
-                capability.parser_provider_id,
-            )
-            if any(not value or value != value.strip().casefold() for value in provider_ids):
-                raise ValueError("Knowledge format provider IDs must be normalized.")
-            if not capability.suffixes:
-                raise ValueError("Knowledge format capabilities require suffixes.")
-            for suffix in capability.suffixes:
-                normalized_suffix = suffix.casefold()
-                if suffix != normalized_suffix or not suffix.startswith("."):
-                    raise ValueError("Knowledge format suffixes must be normalized extensions.")
-                if normalized_suffix in by_suffix:
-                    raise ValueError("Knowledge format suffixes must be unique.")
-                by_suffix[normalized_suffix] = capability
-            by_format[source_format] = capability
-        self._capabilities = ordered
-        self._by_format = by_format
-        self._by_suffix = by_suffix
-        self._version = version
+    def __init__(self, catalog: KnowledgeFormatCatalog) -> None:
+        self._catalog = catalog
+        self._by_format = {
+            capability.source_format: capability
+            for capability in catalog.capabilities
+        }
+        self._by_suffix = {
+            suffix: capability
+            for capability in catalog.capabilities
+            for suffix in capability.suffixes
+        }
+
+    @property
+    def catalog(self) -> KnowledgeFormatCatalog:
+        return self._catalog
 
     @property
     def version(self) -> int:
-        return self._version
+        return self._catalog.version
 
     @property
     def capabilities(self) -> tuple[KnowledgeFormatCapability, ...]:
-        return self._capabilities
+        return self._catalog.capabilities
 
     @property
     def supported_suffixes(self) -> frozenset[str]:
@@ -80,23 +121,39 @@ class KnowledgeFormatRegistry:
 
     @property
     def probe_provider_ids(self) -> tuple[str, ...]:
-        return tuple(dict.fromkeys(item.probe_provider_id for item in self._capabilities))
+        return tuple(
+            dict.fromkeys(
+                item.probe_provider_id for item in self._catalog.capabilities
+            )
+        )
 
     @property
     def normalizer_provider_ids(self) -> tuple[str, ...]:
-        return tuple(dict.fromkeys(item.normalizer_provider_id for item in self._capabilities))
+        return tuple(
+            dict.fromkeys(
+                item.normalizer_provider_id for item in self._catalog.capabilities
+            )
+        )
 
     @property
     def route_provider_ids(self) -> tuple[str, ...]:
-        return tuple(dict.fromkeys(item.route_provider_id for item in self._capabilities))
+        return tuple(
+            dict.fromkeys(
+                item.route_provider_id for item in self._catalog.capabilities
+            )
+        )
 
     @property
     def parser_provider_ids(self) -> tuple[str, ...]:
-        return tuple(dict.fromkeys(item.parser_provider_id for item in self._capabilities))
+        return tuple(
+            dict.fromkeys(
+                item.parser_provider_id for item in self._catalog.capabilities
+            )
+        )
 
     @property
     def display_names(self) -> tuple[str, ...]:
-        return tuple(item.display_name for item in self._capabilities)
+        return tuple(item.display_name for item in self._catalog.capabilities)
 
     def capability_for_suffix(self, suffix: str) -> KnowledgeFormatCapability | None:
         return self._by_suffix.get(suffix.casefold())
@@ -107,7 +164,7 @@ class KnowledgeFormatRegistry:
     def file_dialog_filter(self, label: str = "Knowledge documents") -> str:
         patterns = " ".join(
             f"*{suffix}"
-            for capability in self._capabilities
+            for capability in self._catalog.capabilities
             for suffix in capability.suffixes
         )
         display_label = label.strip() or "Knowledge documents"
@@ -119,85 +176,106 @@ class KnowledgeFormatRegistry:
         return f"Supported Knowledge formats are {joined}."
 
 
-KNOWLEDGE_FORMAT_REGISTRY = KnowledgeFormatRegistry(
-    (
+KNOWLEDGE_FORMAT_CATALOG = KnowledgeFormatCatalog(
+    version=2,
+    capabilities=(
         KnowledgeFormatCapability(
-            "txt", "TXT", (".txt",), "text/plain",
-            "text", "text", "txt", "text", "text",
+            source_format="txt",
+            display_name="TXT",
+            suffixes=(".txt",),
+            media_type="text/plain",
+            probe_provider_id="text",
+            normalizer_provider_id="text",
+            parser_format="txt",
+            route_provider_id="text",
+            parser_provider_id="text",
         ),
         KnowledgeFormatCapability(
-            "doc",
-            "DOC",
-            (".doc",),
-            "application/msword",
-            "cfb-word",
-            "doc-to-docx",
-            "docx",
-            "docx",
-            "docx",
+            source_format="doc",
+            display_name="DOC",
+            suffixes=(".doc",),
+            media_type="application/msword",
+            probe_provider_id="cfb-word",
+            normalizer_provider_id="doc-to-docx",
+            parser_format="docx",
+            route_provider_id="docx",
+            parser_provider_id="docx",
         ),
         KnowledgeFormatCapability(
-            "docx",
-            "DOCX",
-            (".docx",),
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "ooxml-word",
-            "docx",
-            "docx",
-            "docx",
-            "docx",
+            source_format="docx",
+            display_name="DOCX",
+            suffixes=(".docx",),
+            media_type=(
+                "application/vnd.openxmlformats-officedocument."
+                "wordprocessingml.document"
+            ),
+            probe_provider_id="ooxml-word",
+            normalizer_provider_id="docx",
+            parser_format="docx",
+            route_provider_id="docx",
+            parser_provider_id="docx",
         ),
         KnowledgeFormatCapability(
-            "ppt",
-            "PPT",
-            (".ppt",),
-            "application/vnd.ms-powerpoint",
-            "cfb-presentation",
-            "ppt-to-pptx",
-            "pptx",
-            "pptx",
-            "pptx",
+            source_format="ppt",
+            display_name="PPT",
+            suffixes=(".ppt",),
+            media_type="application/vnd.ms-powerpoint",
+            probe_provider_id="cfb-presentation",
+            normalizer_provider_id="ppt-to-pptx",
+            parser_format="pptx",
+            route_provider_id="pptx",
+            parser_provider_id="pptx",
         ),
         KnowledgeFormatCapability(
-            "pptx",
-            "PPTX",
-            (".pptx",),
-            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            "ooxml-presentation",
-            "pptx",
-            "pptx",
-            "pptx",
-            "pptx",
+            source_format="pptx",
+            display_name="PPTX",
+            suffixes=(".pptx",),
+            media_type=(
+                "application/vnd.openxmlformats-officedocument."
+                "presentationml.presentation"
+            ),
+            probe_provider_id="ooxml-presentation",
+            normalizer_provider_id="pptx",
+            parser_format="pptx",
+            route_provider_id="pptx",
+            parser_provider_id="pptx",
         ),
         KnowledgeFormatCapability(
-            "pdf", "PDF", (".pdf",), "application/pdf",
-            "pdf", "pdf", "pdf", "pdf", "pdf",
+            source_format="pdf",
+            display_name="PDF",
+            suffixes=(".pdf",),
+            media_type="application/pdf",
+            probe_provider_id="pdf",
+            normalizer_provider_id="pdf",
+            parser_format="pdf",
+            route_provider_id="pdf",
+            parser_provider_id="pdf",
         ),
         KnowledgeFormatCapability(
-            "jpeg",
-            "JPEG",
-            (".jpg", ".jpeg"),
-            "image/jpeg",
-            "image",
-            "image",
-            "image",
-            "image",
-            "image",
+            source_format="jpeg",
+            display_name="JPEG",
+            suffixes=(".jpg", ".jpeg"),
+            media_type="image/jpeg",
+            probe_provider_id="image",
+            normalizer_provider_id="image",
+            parser_format="image",
+            route_provider_id="image",
+            parser_provider_id="image",
         ),
         KnowledgeFormatCapability(
-            "png",
-            "PNG",
-            (".png",),
-            "image/png",
-            "image",
-            "image",
-            "image",
-            "image",
-            "image",
+            source_format="png",
+            display_name="PNG",
+            suffixes=(".png",),
+            media_type="image/png",
+            probe_provider_id="image",
+            normalizer_provider_id="image",
+            parser_format="image",
+            route_provider_id="image",
+            parser_provider_id="image",
         ),
     ),
-    version=2,
 )
+KNOWLEDGE_FORMAT_REGISTRY = KnowledgeFormatRegistry(KNOWLEDGE_FORMAT_CATALOG)
 SUPPORTED_KNOWLEDGE_SUFFIXES = KNOWLEDGE_FORMAT_REGISTRY.supported_suffixes
 
 
@@ -206,9 +284,11 @@ def knowledge_file_dialog_filter(label: str = "Knowledge documents") -> str:
 
 
 __all__ = [
+    "KNOWLEDGE_FORMAT_CATALOG",
     "KNOWLEDGE_FORMAT_REGISTRY",
     "SUPPORTED_KNOWLEDGE_SUFFIXES",
     "KnowledgeFormatCapability",
+    "KnowledgeFormatCatalog",
     "KnowledgeFormatRegistry",
     "knowledge_file_dialog_filter",
 ]

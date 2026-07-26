@@ -142,7 +142,7 @@ def test_cancelled_provider_completion_finishes_without_resurrecting_pending_mes
     worker.join(timeout=2)
 
     assert not worker.is_alive()
-    assert outcome and getattr(outcome[-1], "is_final") is True
+    assert outcome and outcome[-1].is_final is True
     snapshot = outcome[-1].snapshot
     assert snapshot is not None
     assert [message.kind.value for message in snapshot.messages] == ["user"]

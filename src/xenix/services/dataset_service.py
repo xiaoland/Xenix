@@ -17,9 +17,7 @@ from ..config import AppPaths
 from ..exceptions import NotFoundError, ValidationError
 from .dataset_inspection import (
     DatasetAttachmentMetadata,
-    DatasetColumnKind,
     DatasetInspection,
-    DatasetColumnMetadata,
     InspectDatasetInput,
     detect_source_format,
     inspect_attachment_metadata_file,
@@ -187,7 +185,7 @@ class DatasetService:
             materialized: list[_MaterializedDataset] = []
             written_paths: list[Path] = []
             try:
-                for index, spec in enumerate(frame_specs):
+                for spec in frame_specs:
                     dataset_id = uuid4().hex
                     sheet_name = str(spec["sheet_name"]) if spec.get("sheet_name") is not None else None
                     dataset_name = name

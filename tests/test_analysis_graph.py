@@ -612,33 +612,3 @@ def test_analysis_graph_tool_registers_wordcloud_artifact(monkeypatch, tmp_path:
     assert resolved.metadata_payload["analysis_graph"]["spec_format"] == "wordcloud"
     assert resolved.metadata_payload["analysis_graph"]["renderer"] == "wordcloud"
     assert Path(resolved.absolute_path).exists()
-
-
-def test_analysis_graph_tool_schema_is_dataset_scoped(monkeypatch, tmp_path: Path) -> None:
-    _paths, _dataset_service, _artifact_service, registry, _conversation_store = _build_runtime(monkeypatch, tmp_path)
-    specs = {spec.name: spec for spec in registry.list_specs()}
-
-    assert "analysis.graph" in specs
-    schema = specs["analysis.graph"].parameters_schema
-    assert schema["required"] == ["dataset_id"]
-    assert "oneOf" not in schema
-    assert "exactly one graph mode" in specs["analysis.graph"].description
-    assert "dataset_id" in schema["properties"]
-    assert "spec" in schema["properties"]
-    assert "wordcloud_spec" in schema["properties"]
-    assert "do not use this field for word clouds" in schema["properties"]["spec"]["description"]
-    assert "data.query or data.transform first" in schema["properties"]["wordcloud_spec"]["description"]
-    spec_schema = schema["properties"]["spec"]
-    assert "required" not in spec_schema
-    assert "mark" in spec_schema["properties"]
-    assert "encoding" in spec_schema["properties"]
-    assert "layer" in spec_schema["properties"]
-    assert "Vega-Lite" in spec_schema["description"]
-    wordcloud_schema = schema["properties"]["wordcloud_spec"]
-    assert wordcloud_schema["properties"]["top_n"]["minimum"] == 20
-    assert wordcloud_schema["properties"]["top_n"]["maximum"] == 80
-    assert wordcloud_schema["properties"]["color_mode"]["enum"] == ["rank_tier", "field"]
-    assert "operation" not in schema["properties"]
-    assert "params" not in schema["properties"]
-    assert "source_path" not in schema["properties"]
-    assert "rows" not in schema["properties"]

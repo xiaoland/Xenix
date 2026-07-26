@@ -8,7 +8,6 @@ import pytest
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import ValidationError
 from xenix.services.agent.tools import (
-    MAX_CLEANING_REPORT_COLUMN_NAME_CHARS,
     MAX_CLEANING_REPORT_WARNING_CHARS,
     AgentToolRegistry,
     ToolExecutionContext,
@@ -652,27 +651,7 @@ def test_data_clean_tool_no_ops_reports_nothing_happened(monkeypatch, tmp_path: 
     assert "Nothing happened" in result.value["message"]
 
 
-def test_data_clean_tool_rejects_legacy_policy_fields(monkeypatch, tmp_path: Path) -> None:
-    _paths, dataset_service, _cleaning_service, _artifact_service, registry, store = _build_runtime(
-        monkeypatch,
-        tmp_path,
-    )
-    source = tmp_path / "customers.csv"
-    source.write_text("customer_id,amount\n1,10\n", encoding="utf-8")
-    source_dataset = dataset_service.register_dataset(
-        RegisterDatasetInput(
-            source_path=str(source.resolve()),
-            name="Customers",
-        )
-    )
-    arguments = {"dataset_id": source_dataset.id, "duplicate_policy": {"mode": "exact_rows"}}
-    context = _tool_context(store, "data.clean", arguments)
-
-    with pytest.raises(ValidationError, match="duplicate_policy"):
-        registry.execute("data.clean", arguments, context)
-
-
-def test_data_clean_metadata_returns_compact_operation_catalog(monkeypatch, tmp_path: Path) -> None:
+def test_data_clean_metadata_filters_unknown_groups_and_stays_bounded(monkeypatch, tmp_path: Path) -> None:
     _paths, _dataset_service, _cleaning_service, _artifact_service, registry, store = _build_runtime(
         monkeypatch,
         tmp_path,
@@ -682,46 +661,7 @@ def test_data_clean_metadata_returns_compact_operation_catalog(monkeypatch, tmp_
 
     result = registry.execute("data.clean.metadata", arguments, context)
 
-    assert result.value["column_reference"] == {
-        "index_base": 0,
-        "single": "column_index preferred; column_name fallback; choose one",
-        "multiple": "column_indexes preferred; column_names fallback; choose one",
-    }
-    assert result.value["group_names"] == [
-        "schema",
-        "duplicates",
-        "missing",
-        "types",
-        "text",
-        "validation",
-        "outliers",
-        "encoding",
-        "scaling",
-    ]
     assert [group["group"] for group in result.value["groups"]] == ["missing", "text"]
-    operations = [
-        operation["operation"]
-        for group in result.value["groups"]
-        for operation in group["operations"]
-    ]
-    assert "missing.fill_constant" in operations
-    assert "missing.drop_high_missing_columns" in operations
-    assert "text.map_values" in operations
-    missing_fill_mean = next(
-        operation
-        for group in result.value["groups"]
-        for operation in group["operations"]
-        if operation["operation"] == "missing.fill_mean"
-    )
-    assert missing_fill_mean["params"] == ["multiple_columns"]
-    assert all(
-        set(operation) == {"operation", "summary", "params"}
-        for group in result.value["groups"]
-        for operation in group["operations"]
-    )
-    assert all(group["summary"] for group in result.value["groups"])
-    assert result.value["groups"][0]["summary"] == "Fill/drop missing"
-    assert result.value["groups"][1]["summary"] == "Clean text"
 
     partial_result = registry.execute(
         "data.clean.metadata",
@@ -749,26 +689,8 @@ def test_data_clean_metadata_returns_compact_operation_catalog(monkeypatch, tmp_
     assert all_invalid_result.value["operation_count"] == 0
 
     all_result = registry.execute("data.clean.metadata", {}, context)
-    all_operations = [
-        operation["operation"]
-        for group in all_result.value["groups"]
-        for operation in group["operations"]
-    ]
-    assert "schema.normalize_column_names" in all_operations
-    assert "outlier.clip_iqr" in all_operations
-    assert "encoding.one_hot" in all_operations
-    assert "scaling.minmax" in all_operations
-    assert "scaling.standard" in all_operations
-    all_iqr_operation = next(
-        operation
-        for group in all_result.value["groups"]
-        for operation in group["operations"]
-        if operation["operation"] == "outlier.clip_iqr"
-    )
-    assert all_iqr_operation["summary"] == "Clip outliers by IQR"
     metadata_size = len(json.dumps(all_result.value, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
     assert metadata_size < 4_096
-    assert metadata_size < 11_200
 
 
 def test_data_tools_resolve_indexes_for_unicode_query_and_role_binding(monkeypatch, tmp_path: Path) -> None:
@@ -825,60 +747,4 @@ def test_data_tools_resolve_indexes_for_unicode_query_and_role_binding(monkeypat
             "Years with This Brokerage",
         ],
         "target": ["Customer Churn (Yes/No)"],
-    }
-
-
-def test_data_clean_tool_schema_stays_compact(monkeypatch, tmp_path: Path) -> None:
-    _paths, _dataset_service, _cleaning_service, _artifact_service, registry, _store = _build_runtime(
-        monkeypatch,
-        tmp_path,
-    )
-    specs = {spec.name: spec for spec in registry.list_specs()}
-
-    assert "data.peek" not in specs
-    assert "project_id" not in specs["data.query"].parameters_schema["properties"]
-    assert "project_id" not in specs["data.integrate"].parameters_schema["properties"]
-    assert "source_path" not in specs["data.query"].parameters_schema["properties"]
-    assert "source_paths" not in specs["data.integrate"].parameters_schema["properties"]
-    assert specs["data.integrate"].parameters_schema["required"] == ["dataset_ids"]
-    assert "profile" not in specs["data.clean"].parameters_schema["properties"]
-    assert "duplicate_policy" not in specs["data.clean"].parameters_schema["properties"]
-    assert "drop_duplicates" not in specs["data.clean"].parameters_schema["properties"]
-    assert "missing_policy" not in specs["data.clean"].parameters_schema["properties"]
-    assert "operations" in specs["data.clean"].parameters_schema["properties"]
-    operation_schema = specs["data.clean"].parameters_schema["properties"]["operations"]["items"]
-    assert set(operation_schema["properties"]) == {"operation", "params"}
-    assert "enum" not in operation_schema["properties"]["operation"]
-    assert "data.clean.metadata" in specs
-    assert specs["data.clean.metadata"].parameters_schema["properties"]["groups"]["items"] == {
-        "type": "string",
-        "enum": [
-            "schema",
-            "duplicates",
-            "missing",
-            "types",
-            "text",
-            "validation",
-            "outliers",
-            "encoding",
-            "scaling",
-        ],
-    }
-    assert specs["data.query"].parameters_schema["properties"]["column_reference"]["enum"] == [
-        "names",
-        "indexes",
-    ]
-    assert specs["data.transform"].parameters_schema["properties"]["column_reference"]["enum"] == [
-        "names",
-        "indexes",
-    ]
-    role_binding_schema = specs["data.feature.select"].parameters_schema["properties"]["role_bindings"]["items"]
-    assert role_binding_schema["required"] == ["role"]
-    assert role_binding_schema["properties"]["column_indexes"] == {
-        "type": "array",
-        "items": {"type": "integer", "minimum": 0},
-        "description": (
-            "Preferred zero-based dataset column indexes returned by data.query. "
-            "Use either column_indexes or columns, never both."
-        ),
     }

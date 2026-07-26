@@ -222,13 +222,13 @@ def _redirect_directory(link: Path, target: Path, *, kind: str) -> None:
     )
     if completed.returncode != 0:
         pytest.skip("directory junctions are unavailable")
-    assert getattr(link, "is_junction")()
+    assert link.is_junction()
 
 
 def _remove_directory_link(link: Path) -> None:
     if link.is_symlink():
         link.unlink()
-    elif bool(getattr(link, "is_junction", lambda: False)()):
+    elif link.is_junction():
         link.rmdir()
 
 

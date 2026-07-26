@@ -33,8 +33,14 @@
 
 - `pdm install` installs project dependencies.
 - `pdm run dev` runs the desktop application.
-- `pdm run test` runs the test suite.
-- `pdm run check` compiles the source tree to catch syntax errors.
+- `pdm run test` runs the manifest-owned test topology.
+- `pdm run pytest --promotion-shard <name>` runs one Promotion semantic shard;
+  `pdm run pytest --direct <pytest selectors/options>` is the explicit targeted
+  single-process route.
+- `pdm run lint` runs Ruff over source, tests, scripts, and benchmarks.
+- `pdm run typecheck` runs the strict Mypy slice over typed boundary modules.
+- `pdm run check` regenerates/checks Agent Skills, runs Ruff and Mypy, validates
+  the test manifest and native OCR lock, then compiles the Python tree.
 - `pdm run i18n-extract` and `pdm run i18n-compile` update Qt translations.
 - `pdm run package` builds the Windows bundle.
 - `pdm run smoke-package` verifies the packaged executable.

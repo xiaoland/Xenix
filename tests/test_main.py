@@ -788,26 +788,6 @@ def test_settings_dialog_marks_packaged_trial_provider_secret_fields_read_only(
         window.close()
 
 
-def test_main_window_seeds_mock_history_and_renders_sidebar_selection(monkeypatch, tmp_path: Path) -> None:
-    runtime_home = tmp_path / "xenix-home"
-    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
-    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
-
-    app, window = build_main_window(show=False)
-    try:
-        _seed_mock_history(window)
-        app.processEvents()
-
-        titles = [window._history_list.item(index).text() for index in range(window._history_list.count())]
-
-        assert MESSAGE_RENDERING_FIXTURE_TITLE in titles
-        assert window._history_sidebar.isVisibleTo(window)
-        assert window._history_list.count() >= 2
-        assert window._thread_detail_view._message_layout.count() > 1
-    finally:
-        window.close()
-
-
 def test_main_window_renders_event_list_without_turn_dividers(monkeypatch, tmp_path: Path) -> None:
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")

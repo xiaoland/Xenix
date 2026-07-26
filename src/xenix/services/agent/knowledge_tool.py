@@ -2,73 +2,31 @@ from __future__ import annotations
 
 from typing import Any
 
-from ...exceptions import ValidationError
 from ..knowledge_service import (
-    MAX_KNOWLEDGE_QUERY_CHARS,
     KnowledgeRetrievalUnavailable,
     KnowledgeService,
 )
-from ..llm import AgentToolSpec, ToolFailure, ToolSuccess
+from ..llm import ToolFailure, ToolSuccess
+from ..llm.tooling import AgentTool, ToolExecutionContext
+from .tool_inputs import KnowledgeLookupInput
 
 KNOWLEDGE_LOOKUP_TOOL_NAME = "knowledge.lookup"
-_LOOKUP_ARGUMENTS = frozenset({"query", "mode"})
-_LOOKUP_MODES = ("auto", "keyword", "semantic", "hybrid")
 _RESULT_LIMIT = 5
 _MAX_SOURCE_CHARS = 240
 _MAX_EXCERPT_CHARS = 1600
 
 
-def knowledge_lookup_tool_spec() -> AgentToolSpec:
-    return AgentToolSpec(
-        name=KNOWLEDGE_LOOKUP_TOOL_NAME,
-        provider_name="knowledge_lookup",
-        description=(
-            "Search the user's Knowledge Library for business rules, definitions, "
-            "assumptions, and experience relevant to the current data task. Ask in "
-            "business language; choose a retrieval mode only when useful, and use "
-            "returned source excerpts as guidance alongside computed data evidence."
-        ),
-        parameters_schema={
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": MAX_KNOWLEDGE_QUERY_CHARS,
-                    "description": (
-                        "The business question, rule, definition, assumption, or "
-                        "experience needed for the current analysis, preprocessing, "
-                        "or modeling task. Do not provide SQL or internal IDs."
-                    ),
-                },
-                "mode": {
-                    "type": "string",
-                    "enum": list(_LOOKUP_MODES),
-                    "default": "auto",
-                    "description": (
-                        "Retrieval mode: 'auto' selects the best ready mode; "
-                        "'keyword' matches explicit terms and phrases; 'semantic' "
-                        "matches meaning when wording differs; 'hybrid' combines "
-                        "term and meaning matches. Semantic or hybrid can return a "
-                        "typed unavailable result when that capability is not ready."
-                    ),
-                },
-            },
-            "required": ["query"],
-            "additionalProperties": False,
-        },
-    )
-
-
-def register_knowledge_lookup_tool(registry: Any, service: KnowledgeService) -> None:
-    def lookup(arguments: dict[str, Any], _context: Any):
+def knowledge_lookup_tool(service: KnowledgeService) -> AgentTool[KnowledgeLookupInput]:
+    def lookup(
+        input_data: KnowledgeLookupInput,
+        _context: ToolExecutionContext,
+    ) -> ToolSuccess | ToolFailure:
         try:
-            query, mode = _validated_lookup_arguments(arguments)
-        except ValidationError as exc:
-            return ToolFailure(code="invalid_knowledge_lookup", message=str(exc))
-
-        try:
-            result = service.retrieve(query, mode=mode, top_k=_RESULT_LIMIT)
+            result = service.retrieve(
+                input_data.query,
+                mode=input_data.mode,
+                top_k=_RESULT_LIMIT,
+            )
         except KnowledgeRetrievalUnavailable as exc:
             return ToolFailure(
                 code=exc.error_code or "knowledge_retrieval_mode_unavailable",
@@ -90,33 +48,22 @@ def register_knowledge_lookup_tool(registry: Any, service: KnowledgeService) -> 
             }
         )
 
-    registry.register(knowledge_lookup_tool_spec(), lookup)
+    return AgentTool(
+        name=KNOWLEDGE_LOOKUP_TOOL_NAME,
+        provider_name="knowledge_lookup",
+        description=(
+            "Search the user's Knowledge Library for business rules, definitions, "
+            "assumptions, and experience relevant to the current data task. Ask in "
+            "business language; choose a retrieval mode only when useful, and use "
+            "returned source excerpts as guidance alongside computed data evidence."
+        ),
+        input_model=KnowledgeLookupInput,
+        implementation=lookup,
+    )
 
 
-def _validated_lookup_arguments(arguments: dict[str, Any]) -> tuple[str, str]:
-    if set(arguments) - _LOOKUP_ARGUMENTS:
-        raise ValidationError("knowledge.lookup accepts only 'query' and 'mode'.")
-
-    raw_query = arguments.get("query")
-    if not isinstance(raw_query, str):
-        raise ValidationError("Knowledge query must be a string.")
-    query = raw_query.strip()
-    if not query:
-        raise ValidationError("Knowledge query is required.")
-    if len(query) > MAX_KNOWLEDGE_QUERY_CHARS:
-        raise ValidationError(
-            f"Knowledge query must not exceed {MAX_KNOWLEDGE_QUERY_CHARS} characters."
-        )
-
-    raw_mode = arguments.get("mode", "auto")
-    if not isinstance(raw_mode, str):
-        raise ValidationError("Knowledge retrieval mode must be a string.")
-    mode = raw_mode.strip().lower()
-    if mode not in _LOOKUP_MODES:
-        raise ValidationError(
-            "Knowledge retrieval mode must be auto, keyword, semantic, or hybrid."
-        )
-    return query, mode
+def register_knowledge_lookup_tool(registry: Any, service: KnowledgeService) -> None:
+    registry.register(knowledge_lookup_tool(service))
 
 
 def _public_results(matches: list[Any]) -> list[dict[str, str]]:

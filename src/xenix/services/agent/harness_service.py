@@ -402,10 +402,16 @@ class AgentHarnessService:
                         client_submission_id=client_submission_id,
                     )
                     try:
+                        def record_retry(
+                            retry: LLMRetryEvent,
+                            event_log: list[dict[str, Any]] = retry_events,
+                        ) -> None:
+                            event_log.append(_retry_payload(retry))
+
                         pending = self._conversation_service.complete_pending_sampling(
                             pending_message_id=active_pending_id,
                             provider=self._provider,
-                            retry_callback=lambda retry: retry_events.append(_retry_payload(retry)),
+                            retry_callback=record_retry,
                         )
                     except ThreadPausedError:
                         yield from self._paused_pending_events(

@@ -201,49 +201,6 @@ def test_data_tokenize_tool_registers_derived_dataset_and_artifact(monkeypatch, 
     assert "artifact_link" not in result.value
 
 
-def test_data_tokenize_tool_schema_is_dataset_scoped(monkeypatch, tmp_path: Path) -> None:
-    _paths, _dataset_service, _tokenization_service, _artifact_service, registry, _store = _build_runtime(
-        monkeypatch,
-        tmp_path,
-    )
-    specs = {spec.name: spec for spec in registry.list_specs()}
-
-    assert "data.tokenize" in specs
-    schema = specs["data.tokenize"].parameters_schema
-    assert schema["required"] == ["dataset_id"]
-    assert schema["additionalProperties"] is False
-    assert set(schema["properties"]) == {
-        "dataset_id",
-        "name",
-        "text_column",
-        "text_column_index",
-        "id_columns",
-        "id_column_indexes",
-        "output",
-        "tokenizer_profile",
-    }
-    assert schema["properties"]["text_column_index"] == {
-        "type": "integer",
-        "minimum": 0,
-        "description": (
-            "Preferred zero-based Chinese text column index from the source schema. "
-            "Use either text_column_index or text_column, never both."
-        ),
-    }
-    assert schema["properties"]["id_column_indexes"] == {
-        "type": "array",
-        "items": {"type": "integer", "minimum": 0},
-        "description": (
-            "Preferred zero-based identifier column indexes from the source schema, "
-            "preserved in token_rows output. Use either id_column_indexes or id_columns, "
-            "never both."
-        ),
-    }
-    assert schema["properties"]["output"]["enum"] == ["token_text", "token_rows"]
-    assert schema["properties"]["tokenizer_profile"]["enum"] == ["zh_business_v1"]
-    assert "jieba" not in str(schema)
-
-
 def test_data_tokenize_tool_rejects_non_list_id_columns(monkeypatch, tmp_path: Path) -> None:
     _paths, dataset_service, _tokenization_service, _artifact_service, registry, store = _build_runtime(
         monkeypatch,

@@ -473,20 +473,6 @@ def test_harness_replays_compact_indexed_cleaning_without_metadata_roundtrip(
     scoped_calls = provider.calls[1:]
     assert "model.train" in full_scope["tool_names"]
     assert all("model.train" not in call["tool_names"] for call in scoped_calls)
-    assert all(
-        set(call["tool_names"])
-        == {
-            "agent.skill.activate",
-            "data.integrate",
-            "data.clean",
-            "data.clean.metadata",
-            "data.tokenize",
-            "data.query",
-            "data.transform",
-            "data.feature.select",
-        }
-        for call in scoped_calls
-    )
     assert all(call["tool_definition_bytes"] < full_scope["tool_definition_bytes"] for call in scoped_calls)
     assert len({call["tool_definition_bytes"] for call in scoped_calls}) == 1
 

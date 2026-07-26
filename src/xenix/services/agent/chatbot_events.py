@@ -145,12 +145,12 @@ def project_chatbot_events(
 ) -> list[ChatbotEvent]:
     """Project final typed Messages; provisional sampling is intentionally hidden."""
     messages = sorted(
-        (message for message in getattr(snapshot, "messages", [])
+        (message for message in snapshot.messages
          if _kind_value(getattr(message, "kind", None)) != "pending_llm_sampling"),
         key=lambda message: getattr(message, "sequence_index", 0),
     )
     result_by_call = {
-        str(getattr(message, "tool_call_message_id")): message
+        str(message.tool_call_message_id): message
         for message in messages
         if _kind_value(getattr(message, "kind", None)) == "tool_result"
         and getattr(message, "tool_call_message_id", None)

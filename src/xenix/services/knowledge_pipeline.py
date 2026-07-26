@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import codecs
 import hashlib
-import io
 import inspect
 import json
 import shutil
@@ -11,12 +10,13 @@ import subprocess
 import sys
 import time
 import unicodedata
+from collections.abc import Callable, Iterable
 from contextlib import ExitStack
 from dataclasses import dataclass, field
 from importlib.metadata import PackageNotFoundError, version as package_version
 from pathlib import Path
 from pathlib import PurePosixPath
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol, TypeVar
 from zipfile import BadZipFile, ZipFile
 
 import msoffcrypto
@@ -27,10 +27,8 @@ from PIL import Image, ImageOps, UnidentifiedImageError, __version__ as pillow_v
 from ..exceptions import ValidationError
 from .knowledge_formats import (
     KNOWLEDGE_FORMAT_REGISTRY,
-    SUPPORTED_KNOWLEDGE_SUFFIXES,
     KnowledgeFormatCapability,
     KnowledgeFormatRegistry,
-    knowledge_file_dialog_filter,
 )
 from .knowledge_pdf import PdfPageTextState, probe_pdf_pages
 from .paddle_ocr_service import (
@@ -75,6 +73,7 @@ _OCR_PROJECTION_FAILURES = (
 )
 
 CancellationCheck = Callable[[], object]
+_ProviderT = TypeVar("_ProviderT")
 
 
 @dataclass(frozen=True)
@@ -1655,21 +1654,35 @@ class _DecodedText:
 
 
 def _provider_map(
-    providers,
+    providers: Iterable[_ProviderT],
     *,
     required_ids: tuple[str, ...],
     kind: str,
-) -> dict[str, Any]:
-    by_id: dict[str, Any] = {}
+) -> dict[str, _ProviderT]:
+    by_id: dict[str, _ProviderT] = {}
     for provider in providers:
-        provider_id = str(getattr(provider, "provider_id", "")).strip().casefold()
-        if not provider_id or provider_id in by_id:
+        provider_id = getattr(provider, "provider_id", None)
+        if (
+            not isinstance(provider_id, str)
+            or not provider_id
+            or provider_id != provider_id.strip().casefold()
+        ):
+            raise ValueError(
+                f"Knowledge {kind} provider IDs must be normalized strings."
+            )
+        if provider_id in by_id:
             raise ValueError(f"Knowledge {kind} provider IDs must be unique.")
         by_id[provider_id] = provider
     missing = [provider_id for provider_id in required_ids if provider_id not in by_id]
     if missing:
         raise ValueError(
             f"Knowledge {kind} providers are missing: {', '.join(missing)}"
+        )
+    unused = sorted(set(by_id) - set(required_ids))
+    if unused:
+        raise ValueError(
+            f"Knowledge {kind} providers have no format capability: "
+            + ", ".join(unused)
         )
     return by_id
 

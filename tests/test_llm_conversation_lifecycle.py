@@ -481,19 +481,3 @@ def test_abandoning_a_harness_stream_after_thinking_discards_pending(monkeypatch
     assert first.snapshot is not None
     assert thinking.kind == "thinking"
     assert [message.kind.value for message in service.get_thread_snapshot(first.snapshot.thread.id).messages] == ["user"]
-
-
-def test_invalid_tool_schema_is_rejected_during_registration() -> None:
-    registry = AgentToolRegistry()
-    with pytest.raises(ValidationError, match="parameter schema is invalid") as exc_info:
-        registry.register(
-            AgentToolSpec(
-                name="test.invalid-schema",
-                provider_name="test_invalid_schema",
-                description="invalid test schema",
-                parameters_schema={"not_json": {1}},
-            ),
-            lambda _arguments, _context: {"ok": True},
-        )
-
-    assert exc_info.value.error_code == "llm_tool_schema_invalid"

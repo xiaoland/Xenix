@@ -45,6 +45,12 @@ Tool modules.
 - `LLMConversationService` is the sole canonical Thread/Message writer. It
   owns the provider-facing transcript, pending/final Message lifecycle, and
   the `AgentTool` protocol, registry, scope validation, and invocation.
+- A production AgentTool's strict typed input model is the single call-contract
+  authority. The provider-facing JSON Schema is a bounded portable projection
+  of that model, never a separately maintained definition; invocation validates
+  the admitted arguments into that model before calling its typed
+  implementation. Cross-field rules remain model validation rather than
+  provider-schema combinators.
 - Agent Harness owns transient application coordination only: source import,
   the decision to sample, Thread-pause requests, and snapshot-to-Chatbot-event
   projection. It does not directly write or mutate canonical Messages, dispatch

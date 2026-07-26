@@ -7,16 +7,15 @@ import hashlib
 import json
 import re
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
-from typing import Any, Protocol, TypeAlias
+from dataclasses import dataclass, field
+from typing import Any, Generic, TypeAlias, TypeVar, cast, overload
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
-from pydantic import Field, field_validator
+from pydantic import BaseModel, Field, ValidationError as PydanticValidationError, field_validator
 from sqlmodel import SQLModel
 
 from ...exceptions import ValidationError
-from .xenix_table_text import render_xenix_table_tool_result
 
 
 MAX_TOOL_CALLS = 16
@@ -199,15 +198,286 @@ class ToolFailure:
 ToolInvocationOutcome: TypeAlias = ToolSuccess | ToolFailure
 
 
-class AgentToolImplementation(Protocol):
-    def __call__(self, arguments: dict[str, Any], context: ToolExecutionContext) -> ToolInvocationOutcome:
-        """Execute one validated call and return the direct canonical outcome."""
+ToolInputT = TypeVar("ToolInputT")
+ModelInputT = TypeVar("ModelInputT", bound=BaseModel)
+
+
+AgentToolImplementation: TypeAlias = Callable[
+    [ToolInputT, ToolExecutionContext],
+    ToolInvocationOutcome,
+]
+
+
+@dataclass(frozen=True)
+class AgentTool(Generic[ModelInputT]):
+    """Typed Tool registration whose provider schema is a derived projection."""
+
+    name: str
+    provider_name: str
+    description: str
+    input_model: type[ModelInputT]
+    implementation: AgentToolImplementation[ModelInputT]
+    provider_field_enums: tuple[tuple[str, tuple[str, ...]], ...] = field(
+        default_factory=tuple
+    )
+
+    @property
+    def spec(self) -> AgentToolSpec:
+        return AgentToolSpec(
+            name=self.name,
+            provider_name=self.provider_name,
+            description=self.description,
+            parameters_schema=project_provider_tool_schema(
+                self.input_model,
+                field_enums=dict(self.provider_field_enums),
+            ),
+        )
 
 
 @dataclass(frozen=True)
 class RegisteredTool:
     spec: AgentToolSpec
-    implementation: AgentToolImplementation
+    implementation: AgentToolImplementation[Any]
+    input_model: type[BaseModel] | None = None
+
+
+_FORBIDDEN_PROVIDER_SCHEMA_KEYWORDS = frozenset(
+    {
+        "allOf",
+        "anyOf",
+        "dependentRequired",
+        "dependentSchemas",
+        "else",
+        "if",
+        "not",
+        "oneOf",
+        "then",
+    }
+)
+_SIMPLE_JSON_TYPES = frozenset(
+    {"array", "boolean", "integer", "null", "number", "object", "string"}
+)
+
+
+def project_provider_tool_schema(
+    input_model: type[BaseModel],
+    *,
+    field_enums: Mapping[str, Iterable[str]] | None = None,
+) -> dict[str, Any]:
+    """Project a Pydantic input authority into the portable provider subset."""
+
+    raw_schema = input_model.model_json_schema(mode="validation")
+    raw_defs = raw_schema.get("$defs", {})
+    if not isinstance(raw_defs, dict):
+        raise ValidationError(
+            "Tool parameter schema is invalid.",
+            error_code="llm_tool_schema_invalid",
+        )
+    projected = cast(
+        dict[str, Any],
+        _project_provider_schema_node(
+            raw_schema,
+            definitions=raw_defs,
+            resolving=(),
+        ),
+    )
+    projected.pop("$defs", None)
+    if projected.get("type") != "object" or projected.get("additionalProperties") is not False:
+        raise ValidationError(
+            "Tool input models must project to a closed top-level object.",
+            error_code="llm_tool_schema_invalid",
+        )
+
+    properties = projected.get("properties")
+    if not isinstance(properties, dict):
+        raise ValidationError(
+            "Tool parameter schema is invalid.",
+            error_code="llm_tool_schema_invalid",
+        )
+    for field_name, raw_values in (field_enums or {}).items():
+        field_schema = properties.get(field_name)
+        values = tuple(dict.fromkeys(raw_values))
+        enum_schema = field_schema
+        if (
+            isinstance(field_schema, dict)
+            and field_schema.get("type") == "array"
+            and isinstance(field_schema.get("items"), dict)
+        ):
+            enum_schema = field_schema["items"]
+        if (
+            not values
+            or not isinstance(enum_schema, dict)
+            or enum_schema.get("type") != "string"
+        ):
+            raise ValidationError(
+                "Tool provider enum projection is invalid.",
+                error_code="llm_tool_schema_invalid",
+            )
+        enum_schema["enum"] = list(values)
+
+    _reject_nonportable_provider_schema(projected)
+    return projected
+
+
+def _project_provider_schema_node(
+    raw_node: Any,
+    *,
+    definitions: dict[str, Any],
+    resolving: tuple[str, ...],
+) -> Any:
+    if isinstance(raw_node, list):
+        return [
+            _project_provider_schema_node(
+                item,
+                definitions=definitions,
+                resolving=resolving,
+            )
+            for item in raw_node
+        ]
+    if not isinstance(raw_node, dict):
+        return copy.deepcopy(raw_node)
+
+    node = copy.deepcopy(raw_node)
+    reference = node.pop("$ref", None)
+    if reference is not None:
+        if not isinstance(reference, str) or not reference.startswith("#/$defs/"):
+            raise ValidationError(
+                "Tool parameter schema contains an unsupported reference.",
+                error_code="llm_tool_schema_invalid",
+            )
+        definition_name = reference.removeprefix("#/$defs/")
+        if definition_name in resolving or definition_name not in definitions:
+            raise ValidationError(
+                "Tool parameter schema contains an invalid reference.",
+                error_code="llm_tool_schema_invalid",
+            )
+        target = _project_provider_schema_node(
+            definitions[definition_name],
+            definitions=definitions,
+            resolving=(*resolving, definition_name),
+        )
+        if not isinstance(target, dict):
+            raise ValidationError(
+                "Tool parameter schema contains an invalid reference.",
+                error_code="llm_tool_schema_invalid",
+            )
+        target.update(node)
+        node = target
+
+    for combinator in ("anyOf", "oneOf", "allOf"):
+        if combinator not in node:
+            continue
+        raw_variants = node.pop(combinator)
+        if not isinstance(raw_variants, list) or not raw_variants:
+            raise ValidationError(
+                "Tool parameter schema contains an unsupported combinator.",
+                error_code="llm_tool_schema_invalid",
+            )
+        variants = [
+            _project_provider_schema_node(
+                variant,
+                definitions=definitions,
+                resolving=resolving,
+            )
+            for variant in raw_variants
+        ]
+        collapsed = _collapse_provider_schema_union(variants, combinator=combinator)
+        collapsed.update(node)
+        if collapsed.get("default") is None:
+            collapsed.pop("default", None)
+        node = collapsed
+
+    projected: dict[str, Any] = {}
+    for key, value in node.items():
+        if key == "$defs":
+            continue
+        if key == "title" and isinstance(value, str):
+            continue
+        if key == "const":
+            projected["enum"] = [copy.deepcopy(value)]
+            continue
+        if key == "properties":
+            if not isinstance(value, dict):
+                raise ValidationError(
+                    "Tool parameter schema properties are invalid.",
+                    error_code="llm_tool_schema_invalid",
+                )
+            projected[key] = {
+                property_name: _project_provider_schema_node(
+                    property_schema,
+                    definitions=definitions,
+                    resolving=resolving,
+                )
+                for property_name, property_schema in value.items()
+            }
+            continue
+        projected[key] = _project_provider_schema_node(
+            value,
+            definitions=definitions,
+            resolving=resolving,
+        )
+    return projected
+
+
+def _collapse_provider_schema_union(
+    variants: list[Any],
+    *,
+    combinator: str,
+) -> dict[str, Any]:
+    if combinator == "allOf" and len(variants) == 1 and isinstance(variants[0], dict):
+        return variants[0]
+    if combinator == "allOf":
+        raise ValidationError(
+            "Tool parameter schema contains an unsupported combinator.",
+            error_code="llm_tool_schema_invalid",
+        )
+    if not all(isinstance(variant, dict) for variant in variants):
+        raise ValidationError(
+            "Tool parameter schema contains an unsupported union.",
+            error_code="llm_tool_schema_invalid",
+        )
+
+    typed_variants = [
+        variant
+        for variant in variants
+        if isinstance(variant.get("type"), str)
+        and variant["type"] in _SIMPLE_JSON_TYPES
+    ]
+    if len(typed_variants) != len(variants):
+        raise ValidationError(
+            "Tool parameter schema contains an unsupported union.",
+            error_code="llm_tool_schema_invalid",
+        )
+
+    non_null = [variant for variant in typed_variants if variant["type"] != "null"]
+    if len(non_null) == 1 and len(non_null) != len(typed_variants):
+        return cast(dict[str, Any], non_null[0])
+    if all(set(variant) <= {"type"} for variant in typed_variants):
+        types = list(dict.fromkeys(variant["type"] for variant in typed_variants))
+        if "number" in types and "integer" in types:
+            types.remove("integer")
+        return {"type": types[0] if len(types) == 1 else types}
+    raise ValidationError(
+        "Tool parameter schema contains an unsupported union.",
+        error_code="llm_tool_schema_invalid",
+    )
+
+
+def _reject_nonportable_provider_schema(value: Any) -> None:
+    if isinstance(value, list):
+        for item in value:
+            _reject_nonportable_provider_schema(item)
+        return
+    if not isinstance(value, dict):
+        return
+    forbidden = _FORBIDDEN_PROVIDER_SCHEMA_KEYWORDS & set(value)
+    if forbidden or "$ref" in value or "$defs" in value:
+        raise ValidationError(
+            "Tool parameter schema contains unsupported provider keywords.",
+            error_code="llm_tool_schema_invalid",
+        )
+    for item in value.values():
+        _reject_nonportable_provider_schema(item)
 
 
 def _freeze_tool_spec(spec: AgentToolSpec) -> tuple[AgentToolSpec, Draft202012Validator]:
@@ -279,9 +549,47 @@ class AgentToolRegistry:
         self._validators: dict[str, Draft202012Validator] = {}
         values = (tools or {}).values() if isinstance(tools, Mapping) else (tools or ())
         for tool in values:
-            self.register(tool.spec, tool.implementation)
+            self._register(
+                tool.spec,
+                tool.implementation,
+                input_model=tool.input_model,
+            )
 
-    def register(self, spec: AgentToolSpec, implementation: AgentToolImplementation) -> None:
+    @overload
+    def register(self, tool: AgentTool[ModelInputT], implementation: None = None) -> None: ...
+
+    @overload
+    def register(
+        self,
+        tool: AgentToolSpec,
+        implementation: AgentToolImplementation[dict[str, Any]],
+    ) -> None: ...
+
+    def register(
+        self,
+        tool: AgentTool[Any] | AgentToolSpec,
+        implementation: AgentToolImplementation[Any] | None = None,
+    ) -> None:
+        if isinstance(tool, AgentTool):
+            if implementation is not None:
+                raise TypeError("Typed AgentTool registration already owns its implementation.")
+            self._register(
+                tool.spec,
+                tool.implementation,
+                input_model=tool.input_model,
+            )
+            return
+        if implementation is None:
+            raise TypeError("Legacy AgentToolSpec registration requires an implementation.")
+        self._register(tool, implementation, input_model=None)
+
+    def _register(
+        self,
+        spec: AgentToolSpec,
+        implementation: AgentToolImplementation[Any],
+        *,
+        input_model: type[BaseModel] | None,
+    ) -> None:
         if spec.name in self._tools:
             raise ValidationError(f"Tool '{spec.name}' is already registered.")
         owner = self._provider_names.get(spec.provider_name)
@@ -293,6 +601,7 @@ class AgentToolRegistry:
         self._tools[registered_spec.name] = RegisteredTool(
             spec=registered_spec,
             implementation=implementation,
+            input_model=input_model,
         )
         self._provider_names[registered_spec.provider_name] = registered_spec.name
         self._validators[registered_spec.name] = validator
@@ -315,6 +624,7 @@ class AgentToolRegistry:
         return RegisteredTool(
             spec=tool.spec.model_copy(deep=True),
             implementation=tool.implementation,
+            input_model=tool.input_model,
         )
 
     def validate_call(
@@ -325,6 +635,21 @@ class AgentToolRegistry:
         arguments: dict[str, Any],
         scope: ToolScope | None = None,
     ) -> None:
+        self._admit_call(
+            tool_name=tool_name,
+            provider_name=provider_name,
+            arguments=arguments,
+            scope=scope,
+        )
+
+    def _admit_call(
+        self,
+        *,
+        tool_name: str,
+        provider_name: str,
+        arguments: dict[str, Any],
+        scope: ToolScope | None,
+    ) -> BaseModel | dict[str, Any]:
         tool = self.get(tool_name)
         if tool.spec.provider_name != provider_name:
             raise ValidationError(
@@ -333,6 +658,19 @@ class AgentToolRegistry:
         if scope is not None and scope.tool_names and tool_name not in scope.tool_names:
             raise ValidationError(f"Tool '{tool_name}' is outside the advertised scope.")
         ensure_bounded_json(arguments, label=f"Tool call '{tool_name}' arguments")
+        if tool.input_model is not None:
+            try:
+                return tool.input_model.model_validate(arguments)
+            except PydanticValidationError as exc:
+                raise ValidationError(
+                    "Tool arguments do not match the registered input model.",
+                    error_code="llm_tool_arguments_invalid",
+                    error_details={
+                        "schema_keyword": _pydantic_error_schema_keyword(exc)
+                    },
+                    retryable=False,
+                ) from None
+
         validator = self._validators[tool_name]
         validation_error = next(validator.iter_errors(arguments), None)
         if validation_error is not None:
@@ -345,6 +683,7 @@ class AgentToolRegistry:
                 error_details={"schema_keyword": keyword},
                 retryable=False,
             )
+        return copy.deepcopy(arguments)
 
     def invoke(
         self,
@@ -355,20 +694,41 @@ class AgentToolRegistry:
         context: ToolExecutionContext,
         scope: ToolScope | None = None,
     ) -> ToolInvocationOutcome:
-        self.validate_call(
+        validated_arguments = self._admit_call(
             tool_name=tool_name,
             provider_name=provider_name,
             arguments=arguments,
             scope=scope,
         )
         tool = self.get(tool_name)
-        outcome = tool.implementation(copy.deepcopy(arguments), context)
+        outcome = tool.implementation(validated_arguments, context)
         if isinstance(outcome, (ToolSuccess, ToolFailure)):
             return outcome
         # Existing injected integrations may still return a direct JSON value.
         # It is normalized once at the LLM-owned Tool interface, never wrapped
         # into a second raw-payload representation.
         return ToolSuccess(value=outcome)
+
+
+def _pydantic_error_schema_keyword(exc: PydanticValidationError) -> str:
+    first_error: dict[str, Any] = dict(
+        next(iter(exc.errors(include_url=False)), {})
+    )
+    error_type = first_error.get("type")
+    if error_type == "missing":
+        return "required"
+    if error_type == "extra_forbidden":
+        return "additionalProperties"
+    if error_type == "literal_error":
+        return "enum"
+    if isinstance(error_type, str):
+        if error_type.endswith("_type"):
+            return "type"
+        if error_type in {"greater_than", "greater_than_equal"}:
+            return "minimum"
+        if error_type in {"less_than", "less_than_equal"}:
+            return "maximum"
+    return "schema"
 
 
 def canonical_json_bytes(value: Any) -> bytes:

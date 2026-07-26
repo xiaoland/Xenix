@@ -21,7 +21,7 @@ from typing import Any
 
 from pydantic import field_validator
 from sqlalchemy.orm import sessionmaker
-from sqlmodel import Field, SQLModel, Session, select
+from sqlmodel import Field, SQLModel, select
 
 from ...exceptions import NotFoundError, ValidationError
 from ...observability import (

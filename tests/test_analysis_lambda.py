@@ -202,15 +202,13 @@ def test_analysis_lambda_service_times_out_bad_code(monkeypatch, tmp_path: Path)
         lambda_service.run_lambda(input_data)
 
 
-def test_analysis_lambda_tool_is_not_registered(monkeypatch, tmp_path: Path) -> None:
+def test_agent_registry_rejects_unregistered_tool(monkeypatch, tmp_path: Path) -> None:
     _dataset_service, registry, conversation_store, _lambda_service = _build_runtime(monkeypatch, tmp_path)
-    specs = {spec.name: spec for spec in registry.list_specs()}
     arguments = {
         "code": "def analyze(ctx, inputs, params):\n    return {}\n",
         "datasets": {"sales": "dataset-1"},
     }
 
-    assert "analysis.lambda" not in specs
     with pytest.raises(ValidationError, match="not registered"):
         registry.execute(
             "analysis.lambda",

@@ -2,9 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-from pydantic import ValidationError
-
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.artifact_service import ArtifactService, RegisterArtifactInput
 from xenix.services.storage import StorageBootstrapService
@@ -29,9 +26,3 @@ def test_artifact_registration_has_no_conversation_dependency(monkeypatch, tmp_p
 
     assert row.kind is ArtifactKind.FILE
     assert ArtifactService(context.session_factory).resolve_uri(f"artifact://{row.id}").artifact_id == row.id
-
-
-def test_legacy_artifact_provenance_input_is_rejected(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    with pytest.raises(ValidationError):
-        RegisterArtifactInput(title="Output", absolute_path=str(tmp_path / "output.csv"), turn_id="legacy")

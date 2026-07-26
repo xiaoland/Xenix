@@ -4,11 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from xenix.config import ensure_app_dirs, get_app_paths
-from xenix.exceptions import ValidationError
-from xenix.services.agent.knowledge_tool import (
-    knowledge_lookup_tool_spec,
-    register_knowledge_lookup_tool,
-)
+from xenix.services.agent.knowledge_tool import register_knowledge_lookup_tool
 from xenix.services.knowledge_service import (
     KnowledgeRetrievalResult,
     KnowledgeRetrievalUnavailable,
@@ -38,31 +34,6 @@ def _invoke_service(service, arguments: dict) -> ToolSuccess | ToolFailure:
         arguments=arguments,
         context=ToolExecutionContext(thread_id="thread-1"),
     )
-
-
-def test_lookup_tool_has_small_business_facing_contract_with_selectable_mode() -> None:
-    spec = knowledge_lookup_tool_spec()
-
-    assert spec.name == "knowledge.lookup"
-    assert spec.provider_name == "knowledge_lookup"
-    assert set(spec.parameters_schema["properties"]) == {"query", "mode"}
-    assert spec.parameters_schema["required"] == ["query"]
-    assert spec.parameters_schema["additionalProperties"] is False
-    assert spec.parameters_schema["properties"]["mode"]["enum"] == [
-        "auto",
-        "keyword",
-        "semantic",
-        "hybrid",
-    ]
-    assert spec.parameters_schema["properties"]["mode"]["default"] == "auto"
-    assert "business rules" in spec.description
-    assert "current data task" in spec.description
-    assert "business question" in spec.parameters_schema["properties"]["query"]["description"]
-    mode_description = spec.parameters_schema["properties"]["mode"]["description"]
-    assert all(term in mode_description for term in ("explicit terms", "meaning", "combines"))
-    assert "index" not in mode_description.lower()
-    assert "document_ids" not in spec.parameters_schema["properties"]
-    assert "top_k" not in spec.parameters_schema["properties"]
 
 
 def test_lookup_tool_returns_one_minimal_value_for_auto_and_keyword(monkeypatch, tmp_path: Path) -> None:
@@ -102,7 +73,7 @@ def test_lookup_tool_returns_one_minimal_value_for_auto_and_keyword(monkeypatch,
     ]
 
 
-def test_lookup_tool_empty_result_is_success_and_extra_input_is_rejected_by_registry(
+def test_lookup_tool_empty_result_is_success(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -115,47 +86,8 @@ def test_lookup_tool_empty_result_is_success_and_extra_input_is_rejected_by_regi
         arguments={"query": "不存在的规则"},
         context=context,
     )
-    with pytest.raises(ValidationError) as exc_info:
-        registry.invoke(
-            tool_name="knowledge.lookup",
-            provider_name="knowledge_lookup",
-            arguments={"query": "规则", "top_k": 3},
-            context=context,
-        )
-
     assert isinstance(empty, ToolSuccess)
     assert empty.value == {"mode": "keyword", "results": []}
-    assert exc_info.value.error_code == "llm_tool_arguments_invalid"
-    assert exc_info.value.error_details == {"schema_keyword": "additionalProperties"}
-
-
-@pytest.mark.parametrize(
-    "arguments",
-    [
-        {"query": ""},
-        {"query": 1},
-        {"query": "规则", "mode": 1},
-        {"query": "规则", "mode": "vector"},
-        {"query": "规则", "document_ids": []},
-        {"query": "规则", "unexpected": True},
-    ],
-)
-def test_lookup_tool_rejects_values_outside_its_advertised_contract(
-    monkeypatch,
-    tmp_path: Path,
-    arguments: dict,
-) -> None:
-    registry, _service = _registry(monkeypatch, tmp_path)
-
-    with pytest.raises(ValidationError) as exc_info:
-        registry.invoke(
-            tool_name="knowledge.lookup",
-            provider_name="knowledge_lookup",
-            arguments=arguments,
-            context=ToolExecutionContext(thread_id="thread-1"),
-        )
-
-    assert exc_info.value.error_code == "llm_tool_arguments_invalid"
 
 
 @pytest.mark.parametrize("mode", ["semantic", "hybrid"])

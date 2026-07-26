@@ -10,7 +10,6 @@ import pytest
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.embedding_service import (
-    DEFAULT_EMBEDDING_BATCH_SIZE,
     MAX_EMBEDDING_DIMENSIONS,
     MAX_EMBEDDING_TEXT_CHARS,
     EmbeddingSettings,
@@ -52,14 +51,15 @@ def _enabled_settings(**updates: object) -> EmbeddingSettings:
     return EmbeddingSettings(**values)
 
 
-def test_embedding_settings_default_to_disabled_and_use_independent_file(monkeypatch, tmp_path: Path) -> None:
+def test_missing_embedding_settings_disable_requests(monkeypatch, tmp_path: Path) -> None:
     settings_service = _settings_service(monkeypatch, tmp_path)
     adapter = OpenAICompatibleEmbeddingService(settings_service)
 
-    assert settings_service.settings_path.name == "embedding_settings.json"
-    default_settings = settings_service.load()
-    assert default_settings.enabled is False
-    assert default_settings.batch_size == DEFAULT_EMBEDDING_BATCH_SIZE == 20
+    def unexpected_request(*_args, **_kwargs):
+        raise AssertionError("disabled embedding must not send a request")
+
+    monkeypatch.setattr(urllib.request, "urlopen", unexpected_request)
+
     assert adapter.configured_profile() is None
     with pytest.raises(EmbeddingValidationError) as exc_info:
         adapter.embed_texts(["hello"])

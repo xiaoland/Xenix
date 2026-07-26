@@ -7,11 +7,13 @@ from pathlib import Path
 import msoffcrypto
 import pikepdf
 import pytest
+from docling_core.types.doc import DocItemLabel, DoclingDocument
 from docx import Document
 from PIL import Image
 from pptx import Presentation
 from sqlmodel import select
 
+import xenix.services.knowledge_pipeline as pipeline_module
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import ValidationError
 from xenix.services.artifact_service import ArtifactService
@@ -226,7 +228,15 @@ def test_startup_reclaims_bundle_published_before_database_commit(
 
 
 def test_encrypted_pdf_password_is_transient_and_retryable(monkeypatch, tmp_path: Path) -> None:
-    paths, storage, importer, derivation, knowledge = _runtime(monkeypatch, tmp_path)
+    _stub_docling_conversion(
+        monkeypatch,
+        "Rain inventory uses three week demand",
+    )
+    paths, storage, importer, derivation, knowledge = _runtime(
+        monkeypatch,
+        tmp_path,
+        inline_runner=True,
+    )
     clear = tmp_path / "clear.pdf"
     encrypted = tmp_path / "encrypted.pdf"
     _write_simple_pdf(clear, "Rain inventory uses three week demand")
@@ -264,7 +274,15 @@ def test_encrypted_pdf_password_is_transient_and_retryable(monkeypatch, tmp_path
 
 
 def test_encrypted_docx_decrypts_in_attempt_only(monkeypatch, tmp_path: Path) -> None:
-    _paths, _storage, importer, derivation, knowledge = _runtime(monkeypatch, tmp_path)
+    _stub_docling_conversion(
+        monkeypatch,
+        "会员渠道毛利率不得低于百分之十八。",
+    )
+    _paths, _storage, importer, derivation, knowledge = _runtime(
+        monkeypatch,
+        tmp_path,
+        inline_runner=True,
+    )
     clear = tmp_path / "clear.docx"
     encrypted = tmp_path / "secret.docx"
     document = Document()
@@ -288,7 +306,15 @@ def test_encrypted_docx_decrypts_in_attempt_only(monkeypatch, tmp_path: Path) ->
 
 
 def test_encrypted_pptx_decrypts_in_attempt_only(monkeypatch, tmp_path: Path) -> None:
-    _paths, _storage, importer, derivation, knowledge = _runtime(monkeypatch, tmp_path)
+    _stub_docling_conversion(
+        monkeypatch,
+        "重点客户活动必须提前准备五周安全库存。",
+    )
+    _paths, _storage, importer, derivation, knowledge = _runtime(
+        monkeypatch,
+        tmp_path,
+        inline_runner=True,
+    )
     clear = tmp_path / "clear.pptx"
     encrypted = tmp_path / "secret.pptx"
     presentation = Presentation()
@@ -521,6 +547,15 @@ def _wait_for_derivation_job(
                     return row
         time.sleep(0.02)
     raise AssertionError("canonical publication did not enqueue derivation")
+
+
+def _stub_docling_conversion(monkeypatch, text: str) -> None:
+    def convert(*_args, **_kwargs) -> DoclingDocument:
+        document = DoclingDocument(name="encrypted-document")
+        document.add_text(label=DocItemLabel.PARAGRAPH, text=text)
+        return document
+
+    monkeypatch.setattr(pipeline_module, "_docling_convert", convert)
 
 
 def _wait_for_derivation_status(

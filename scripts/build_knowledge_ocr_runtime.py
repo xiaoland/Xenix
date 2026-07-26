@@ -11,9 +11,18 @@ import tarfile
 import urllib.request
 import zipfile
 from pathlib import Path
-from typing import Any, BinaryIO
+from typing import Any, BinaryIO, Literal, Self, cast
 from uuid import uuid4
 from urllib.parse import urlparse
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError as PydanticValidationError,
+    field_validator,
+    model_validator,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,6 +33,133 @@ DEFAULT_OUTPUT_ROOT = ROOT / "dist" / "knowledge-ocr"
 MAX_PROTOCOL_MESSAGE_BYTES = 16 * 1024 * 1024
 ARCHIVE_TIMESTAMP = (2026, 1, 1, 0, 0, 0)
 RUNTIME_DIRECTORY = "xenix-knowledge-ocr"
+REQUIRED_DOWNLOADS = {
+    "paddle_inference",
+    "opencv",
+    "detection_model",
+    "recognition_model",
+    "abseil",
+    "clipper",
+    "nlohmann",
+    "dirent",
+    "golden_image",
+}
+
+
+class _LockDocument(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+
+def _validated_https_url(value: str) -> str:
+    if value != value.strip():
+        raise ValueError("URL must not contain surrounding whitespace.")
+    parsed = urlparse(value)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise ValueError("URL must be absolute HTTPS.")
+    return value
+
+
+class PaddleOcrSourceLock(_LockDocument):
+    repository: str
+    commit: str = Field(pattern=r"^[0-9a-f]{40}$")
+
+    @field_validator("repository")
+    @classmethod
+    def _repository_must_be_https(cls, value: str) -> str:
+        return _validated_https_url(value)
+
+
+class DownloadLock(_LockDocument):
+    url: str
+    bytes: int = Field(gt=0)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @field_validator("url")
+    @classmethod
+    def _url_must_be_https(cls, value: str) -> str:
+        return _validated_https_url(value)
+
+
+class ToolchainLock(_LockDocument):
+    cmake_minimum: str = Field(min_length=1)
+    generator: str = Field(min_length=1)
+    architecture: str = Field(min_length=1)
+    vcomp140_version: str = Field(min_length=1)
+    vcomp140_bytes: int = Field(gt=0)
+    vcomp140_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @field_validator(
+        "cmake_minimum",
+        "generator",
+        "architecture",
+        "vcomp140_version",
+    )
+    @classmethod
+    def _values_must_be_trimmed(cls, value: str) -> str:
+        if value != value.strip():
+            raise ValueError("Toolchain values must not contain surrounding whitespace.")
+        return value
+
+
+class KnowledgeOcrRuntimeLock(_LockDocument):
+    schema_version: Literal[1]
+    protocol_version: Literal[2]
+    runtime_id: str
+    model_pack_id: str
+    paddleocr: PaddleOcrSourceLock
+    downloads: dict[str, DownloadLock]
+    toolchain: ToolchainLock
+    runtime_files: list[str]
+
+    @field_validator("runtime_id", "model_pack_id")
+    @classmethod
+    def _identity_must_be_a_file_name(cls, value: str) -> str:
+        if not value or value != value.strip() or Path(value).name != value:
+            raise ValueError("Runtime identities must be non-empty file names.")
+        return value
+
+    @field_validator("downloads")
+    @classmethod
+    def _downloads_must_be_complete(
+        cls,
+        value: dict[str, DownloadLock],
+    ) -> dict[str, DownloadLock]:
+        if set(value) != REQUIRED_DOWNLOADS:
+            raise ValueError("Required download closure is incomplete.")
+        return value
+
+    @model_validator(mode="after")
+    def _runtime_files_must_be_complete(self) -> Self:
+        if (
+            not self.runtime_files
+            or len(self.runtime_files) != len(set(self.runtime_files))
+            or any(
+                not name
+                or name != name.strip()
+                or name in {".", ".."}
+                or Path(name).name != name
+                for name in self.runtime_files
+            )
+        ):
+            raise ValueError("Runtime files must be unique non-empty file names.")
+        return self
+
+
+class KnowledgeOcrRuntimeCatalog(_LockDocument):
+    schema_version: Literal[1]
+    artifact_name: str
+    artifact_bytes: int = Field(gt=0)
+    artifact_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    protocol_version: Literal[2]
+    runtime_id: str
+    model_pack_id: str
+
+    @field_validator("artifact_name")
+    @classmethod
+    def _artifact_name_must_be_safe(cls, value: str) -> str:
+        if not value or value in {".", ".."} or Path(value).name != value:
+            raise ValueError("Artifact name must be a safe file name.")
+        return value
 
 
 def sha256_file(path: Path) -> str:
@@ -34,56 +170,25 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def load_lock(path: Path = LOCK_PATH) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    required = {
-        "schema_version",
-        "protocol_version",
-        "runtime_id",
-        "model_pack_id",
-        "paddleocr",
-        "downloads",
-        "toolchain",
-        "runtime_files",
-    }
-    if not isinstance(payload, dict) or payload.keys() != required:
-        raise RuntimeError("Knowledge OCR lock shape is invalid.")
-    if payload["schema_version"] != 1 or payload["protocol_version"] != 2:
-        raise RuntimeError("Knowledge OCR lock version is unsupported.")
-    downloads = payload["downloads"]
-    if not isinstance(downloads, dict) or not downloads:
-        raise RuntimeError("Knowledge OCR downloads are missing.")
-    for name, item in downloads.items():
-        if (
-            not isinstance(name, str)
-            or not isinstance(item, dict)
-            or item.keys() != {"url", "bytes", "sha256"}
-            or not isinstance(item["url"], str)
-            or not item["url"].startswith("https://")
-            or type(item["bytes"]) is not int
-            or item["bytes"] < 1
-            or not _is_sha256(item["sha256"])
-        ):
-            raise RuntimeError(f"Knowledge OCR download lock is invalid: {name}")
-    runtime_files = payload["runtime_files"]
-    if (
-        not isinstance(runtime_files, list)
-        or len(runtime_files) != len(set(runtime_files))
-        or any(Path(str(name)).name != name for name in runtime_files)
-    ):
-        raise RuntimeError("Knowledge OCR runtime file closure is invalid.")
-    return payload
+def load_lock(path: Path = LOCK_PATH) -> KnowledgeOcrRuntimeLock:
+    try:
+        lock = KnowledgeOcrRuntimeLock.model_validate_json(
+            path.read_text(encoding="utf-8")
+        )
+    except (OSError, PydanticValidationError) as exc:
+        raise RuntimeError(f"Knowledge OCR runtime lock is invalid: {path}") from exc
+    return lock
 
 
-def download_locked(name: str, item: dict[str, Any], cache: Path) -> Path:
-    suffix = Path(urlparse(item["url"]).path).suffix or ".bin"
+def download_locked(name: str, item: DownloadLock, cache: Path) -> Path:
+    suffix = Path(urlparse(item.url).path).suffix or ".bin"
     target = cache / f"{name}{suffix}"
     cache.mkdir(parents=True, exist_ok=True)
     if _matches_lock(target, item):
         return target
     partial = target.with_name(f".{target.name}.{uuid4().hex}.part")
     try:
-        with urllib.request.urlopen(item["url"], timeout=120) as response, partial.open(
+        with urllib.request.urlopen(item.url, timeout=120) as response, partial.open(
             "wb"
         ) as output:
             shutil.copyfileobj(response, output, length=1024 * 1024)
@@ -95,11 +200,11 @@ def download_locked(name: str, item: dict[str, Any], cache: Path) -> Path:
     return target
 
 
-def _matches_lock(path: Path, item: dict[str, Any]) -> bool:
+def _matches_lock(path: Path, item: DownloadLock) -> bool:
     return (
         path.is_file()
-        and path.stat().st_size == item["bytes"]
-        and sha256_file(path) == item["sha256"]
+        and path.stat().st_size == item.bytes
+        and sha256_file(path) == item.sha256
     )
 
 
@@ -186,8 +291,8 @@ def _resolve_cmake() -> str:
     raise RuntimeError("CMake was not found; install the Visual Studio C++ CMake tools.")
 
 
-def _prepare_source(lock: dict[str, Any], source: Path) -> Path:
-    expected_commit = lock["paddleocr"]["commit"]
+def _prepare_source(lock: KnowledgeOcrRuntimeLock, source: Path) -> Path:
+    expected_commit = lock.paddleocr.commit
     if not source.exists():
         _run(
             [
@@ -195,7 +300,7 @@ def _prepare_source(lock: dict[str, Any], source: Path) -> Path:
                 "clone",
                 "--filter=blob:none",
                 "--no-checkout",
-                lock["paddleocr"]["repository"],
+                lock.paddleocr.repository,
                 str(source),
             ]
         )
@@ -316,7 +421,7 @@ def _extract_inputs(
 
 
 def _build_worker(
-    lock: dict[str, Any],
+    lock: KnowledgeOcrRuntimeLock,
     *,
     work: Path,
     source: Path,
@@ -326,7 +431,7 @@ def _build_worker(
     build = work / "cmake"
     if build.exists():
         shutil.rmtree(build)
-    toolchain = lock["toolchain"]
+    toolchain = lock.toolchain
     cmake = _resolve_cmake()
     _run(
         [
@@ -336,9 +441,9 @@ def _build_worker(
             "-B",
             str(build),
             "-G",
-            toolchain["generator"],
+            toolchain.generator,
             "-A",
-            toolchain["architecture"],
+            toolchain.architecture,
             f"-DXENIX_PADDLEOCR_SOURCE={source}",
             f"-DPADDLE_LIB={paddle_root}",
             f"-DOPENCV_DIR={opencv_root}",
@@ -370,10 +475,10 @@ def _find_unique(root: Path, name: str) -> Path:
     return candidates[0]
 
 
-def _verify_vcomp(path: Path, toolchain: dict[str, Any]) -> None:
+def _verify_vcomp(path: Path, toolchain: ToolchainLock) -> None:
     if (
-        path.stat().st_size != toolchain["vcomp140_bytes"]
-        or sha256_file(path) != toolchain["vcomp140_sha256"]
+        path.stat().st_size != toolchain.vcomp140_bytes
+        or sha256_file(path) != toolchain.vcomp140_sha256
     ):
         raise RuntimeError(
             "vcomp140.dll does not match the pinned MSVC redistributable; "
@@ -383,7 +488,7 @@ def _verify_vcomp(path: Path, toolchain: dict[str, Any]) -> None:
 
 def _resolve_vcomp(
     configured: Path | None,
-    toolchain: dict[str, Any],
+    toolchain: ToolchainLock,
 ) -> Path:
     candidates: list[Path] = []
     if configured is not None:
@@ -395,7 +500,7 @@ def _resolve_vcomp(
         redist = installation / "VC" / "Redist" / "MSVC"
         locked = (
             redist
-            / toolchain["vcomp140_version"]
+            / toolchain.vcomp140_version
             / "x64"
             / "Microsoft.VC143.OpenMP"
             / "vcomp140.dll"
@@ -427,7 +532,7 @@ def _resolve_vcomp(
 
 
 def _stage_runtime(
-    lock: dict[str, Any],
+    lock: KnowledgeOcrRuntimeLock,
     *,
     work: Path,
     worker: Path,
@@ -444,11 +549,12 @@ def _stage_runtime(
     runtime.mkdir(parents=True)
     build_root = work / "cmake"
     dependency_roots = [build_root, paddle_root, opencv_root]
-    for name in lock["runtime_files"]:
+    for name in lock.runtime_files:
+        source: Path | None
         if name == "xenix-ocr.exe":
             source = worker
         elif name == "vcomp140.dll":
-            _verify_vcomp(vcomp140, lock["toolchain"])
+            _verify_vcomp(vcomp140, lock.toolchain)
             source = vcomp140
         else:
             source = next(
@@ -484,9 +590,9 @@ def _stage_runtime(
     files = [_file_entry(path, runtime) for path in sorted(runtime.rglob("*")) if path.is_file()]
     manifest = {
         "schema_version": 1,
-        "protocol_version": lock["protocol_version"],
-        "runtime_id": lock["runtime_id"],
-        "model_pack_id": lock["model_pack_id"],
+        "protocol_version": lock.protocol_version,
+        "runtime_id": lock.runtime_id,
+        "model_pack_id": lock.model_pack_id,
         "engine": "paddle-inference",
         "engine_version": "3.3.0",
         "architecture": "windows-x86_64",
@@ -549,7 +655,7 @@ def _request(
 ) -> Any:
     assert process.stdin is not None and process.stdout is not None
     _write_frame(
-        process.stdin,
+        cast(BinaryIO, process.stdin),
         {
             "protocol_version": 2,
             "request_id": request_id,
@@ -557,7 +663,7 @@ def _request(
             "arguments": arguments,
         },
     )
-    response = _read_frame(process.stdout)
+    response = _read_frame(cast(BinaryIO, process.stdout))
     if response.get("request_id") != request_id or response.get("ok") is not True:
         raise RuntimeError(f"Native OCR protocol request failed: {operation}")
     return response.get("result")
@@ -633,18 +739,22 @@ def write_deterministic_archive(runtime: Path, destination: Path) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def write_catalog(lock: dict[str, Any], archive: Path, destination: Path) -> None:
-    payload = {
-        "schema_version": 1,
-        "artifact_name": archive.name,
-        "artifact_bytes": archive.stat().st_size,
-        "artifact_sha256": sha256_file(archive),
-        "protocol_version": lock["protocol_version"],
-        "runtime_id": lock["runtime_id"],
-        "model_pack_id": lock["model_pack_id"],
-    }
+def write_catalog(
+    lock: KnowledgeOcrRuntimeLock,
+    archive: Path,
+    destination: Path,
+) -> None:
+    payload = KnowledgeOcrRuntimeCatalog(
+        schema_version=1,
+        artifact_name=archive.name,
+        artifact_bytes=archive.stat().st_size,
+        artifact_sha256=sha256_file(archive),
+        protocol_version=lock.protocol_version,
+        runtime_id=lock.runtime_id,
+        model_pack_id=lock.model_pack_id,
+    )
     destination.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        json.dumps(payload.model_dump(mode="json"), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
         newline="\n",
     )
@@ -657,41 +767,27 @@ def verify_output(args: argparse.Namespace) -> tuple[Path, Path]:
     catalog = output / "runtime_catalog.json"
     if not catalog.is_file():
         raise RuntimeError("Cached Knowledge OCR runtime catalog is missing.")
-    payload = json.loads(catalog.read_text(encoding="utf-8"))
-    expected_keys = {
-        "schema_version",
-        "artifact_name",
-        "artifact_bytes",
-        "artifact_sha256",
-        "protocol_version",
-        "runtime_id",
-        "model_pack_id",
-    }
-    if not isinstance(payload, dict) or payload.keys() != expected_keys:
-        raise RuntimeError("Cached Knowledge OCR runtime catalog shape is invalid.")
+    try:
+        payload = KnowledgeOcrRuntimeCatalog.model_validate_json(
+            catalog.read_text(encoding="utf-8")
+        )
+    except (OSError, PydanticValidationError) as exc:
+        raise RuntimeError("Cached Knowledge OCR runtime catalog is invalid.") from exc
     if (
-        payload["schema_version"] != 1
-        or payload["protocol_version"] != lock["protocol_version"]
-        or payload["runtime_id"] != lock["runtime_id"]
-        or payload["model_pack_id"] != lock["model_pack_id"]
+        payload.protocol_version != lock.protocol_version
+        or payload.runtime_id != lock.runtime_id
+        or payload.model_pack_id != lock.model_pack_id
     ):
         raise RuntimeError("Cached Knowledge OCR runtime identity is invalid.")
-    artifact_name = payload["artifact_name"]
-    if (
-        not isinstance(artifact_name, str)
-        or Path(artifact_name).name != artifact_name
-        or artifact_name in {"", ".", ".."}
-    ):
-        raise RuntimeError("Cached Knowledge OCR runtime artifact name is unsafe.")
-    archive = output / artifact_name
+    archive = output / payload.artifact_name
     if (
         not archive.is_file()
-        or archive.stat().st_size != payload["artifact_bytes"]
-        or sha256_file(archive) != payload["artifact_sha256"]
+        or archive.stat().st_size != payload.artifact_bytes
+        or sha256_file(archive) != payload.artifact_sha256
     ):
         raise RuntimeError("Cached Knowledge OCR runtime artifact is corrupt.")
 
-    golden = download_locked("golden_image", lock["downloads"]["golden_image"], cache)
+    golden = download_locked("golden_image", lock.downloads["golden_image"], cache)
     verification = args.work_dir.resolve() / "cached-output-verification"
     shutil.rmtree(verification, ignore_errors=True)
     try:
@@ -714,7 +810,7 @@ def build(args: argparse.Namespace) -> tuple[Path, Path]:
     output.mkdir(parents=True, exist_ok=True)
     downloads = {
         name: download_locked(name, item, cache)
-        for name, item in lock["downloads"].items()
+        for name, item in lock.downloads.items()
     }
     source = _prepare_source(lock, work / "PaddleOCR")
     paddle, opencv, detection, recognition = _extract_inputs(downloads, work, source)
@@ -725,7 +821,7 @@ def build(args: argparse.Namespace) -> tuple[Path, Path]:
         paddle_root=paddle,
         opencv_root=opencv,
     )
-    vcomp = _resolve_vcomp(args.vcomp140, lock["toolchain"])
+    vcomp = _resolve_vcomp(args.vcomp140, lock.toolchain)
     runtime = _stage_runtime(
         lock,
         work=work,
@@ -737,16 +833,12 @@ def build(args: argparse.Namespace) -> tuple[Path, Path]:
         vcomp140=vcomp,
     )
     verify_runtime(runtime, downloads["golden_image"])
-    artifact_name = f"xenix-knowledge-ocr-win-x64-{lock['runtime_id']}.zip"
+    artifact_name = f"xenix-knowledge-ocr-win-x64-{lock.runtime_id}.zip"
     archive = output / artifact_name
     write_deterministic_archive(runtime, archive)
     catalog = output / "runtime_catalog.json"
     write_catalog(lock, archive, catalog)
     return archive, catalog
-
-
-def _is_sha256(value: object) -> bool:
-    return isinstance(value, str) and len(value) == 64 and set(value) <= set("0123456789abcdef")
 
 
 def parse_args() -> argparse.Namespace:
@@ -755,16 +847,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--cache-dir", type=Path, default=DEFAULT_WORK_ROOT / "downloads")
     parser.add_argument("--vcomp140", type=Path)
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--verify-output",
         action="store_true",
         help="Verify a cached output archive, including its native OCR self-test.",
+    )
+    mode.add_argument(
+        "--check-lock",
+        action="store_true",
+        help="Validate the pinned lock without downloading or building the runtime.",
     )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    if args.check_lock:
+        load_lock()
+        print(f"Knowledge OCR lock is valid: {LOCK_PATH}")
+        return 0
     archive, catalog = verify_output(args) if args.verify_output else build(args)
     print(archive)
     print(catalog)

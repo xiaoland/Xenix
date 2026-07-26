@@ -200,7 +200,7 @@ accepts a re-baseline; timeout must not be set equal to the performance budget.
 - Release Readiness has targeted coverage for both Settings/Knowledge Workspace
   open orders, UI-owned thread-pool quiescence, application-owned Knowledge worker
   shutdown, and post-close SQLite integrity access.
-- Repository verification now passes:
+- Before the test-topology correction, repository verification passed:
   - final target set: `20 passed`;
   - full non-UI suite: `646 passed, 4 skipped`;
   - full MainWindow suite: `62 passed`;
@@ -221,6 +221,74 @@ accepts a re-baseline; timeout must not be set equal to the performance budget.
   `Promotion Contract` and `Native CI Gate` jobs. The current repository has zero
   qualifying samples and no Native Release workflow on the default branch, which
   correctly leaves both timing acceptances open.
+- Promotion PR #111 produced the first new-topology run (`30193238273`).
+  `Promotion Contract` passed, but all three Python jobs hit the 30-minute job
+  timeout and were cancelled; `Native CI Gate` therefore failed. The run took
+  about 30 minutes 27 seconds and exceeded the `25 min` single-run budget.
+- The failure was cumulative test cost, not an assertion failure or one hung
+  case. At audit time the suite collected 718 cases across 74 files and about
+  26,000 lines of test code. Per-job installation costs about 3.3-4.0 minutes;
+  pytest consumed the remainder. Python 3.12 completed the 650-pass/4-skip
+  non-UI cohort in 23 minutes 46 seconds, then only 20 of 64 MainWindow cases
+  before cancellation.
+- The rejected pseudo-static pass has been replaced locally rather than merely
+  renamed. `check_agent_contracts.py`, `check_ml_catalog.py`, and
+  `check_knowledge_formats.py` are absent, and `test_suites.py` no longer shells
+  out to pytest collection. Moving assertions between runners is no longer
+  treated as static analysis.
+- A read-only tool spike selected Ruff and Mypy. Ruff covered the repository
+  with a small high-signal rule set. A full basic BasedPyright scan reported
+  about `1,040` errors and a full Mypy scan about `737`; both were too noisy to
+  create an honest all-source gate without a suppression baseline. The adopted
+  Mypy gate is instead `strict` over explicit typed boundary modules, uses the
+  Pydantic plugin, and contains no baseline or blanket application-code ignore.
+- `pdm run check` now names the proof layers truthfully: generated Agent Skill
+  consistency, Ruff, strict Mypy, native OCR lock and test-manifest preflights,
+  then Python compilation. Translation compilation remains a test/build
+  preflight and is no longer described as lint or type analysis.
+- Strict Pydantic construction now owns the test topology manifest, Knowledge
+  format catalog/provider closure, ML catalog declarations and registry
+  invariants, native OCR lock/catalog documents, and all production Agent Tool
+  inputs. Provider Tool schemas are derived portable projections of the input
+  models; invocation validates into the same model before calling a typed
+  handler. Exact schema/census pytest assertions are not a second authority.
+- Test deletion was reviewed by proof method, not only by line count. Runtime
+  persistence projection, privacy-compatible legacy reads, archive/cache
+  integrity, worker lifecycle, migration, and data-loss boundaries remain
+  behavioral tests because Ruff, Mypy, and Pydantic construction cannot prove
+  those cross-boundary effects.
+- `tests/suites.toml` now owns four semantic shards and five clean process cohorts.
+  Native CI derives a `3 Python versions x 4 shards` matrix from it; exactly one
+  shard per version runs the repository check, MainWindow remains isolated, and
+  JUnit reporting no longer changes execution topology.
+- The earlier first pass still provides a useful provisional performance
+  measurement: all local Python 3.14 shards passed as `682 passed, 3 skipped`.
+  Wall times were
+  `59.8 s` for analysis/data, `241.8 s` for Knowledge, `44.0 s` for Agent/LLM,
+  `72.0 s` for MainWindow, and `152.8 s` for platform/release.
+- Corrected local acceptance now passes as `695 passed, 3 skipped` across the
+  same four semantic shards and five processes:
+  - analysis/data: `110 passed` in `78.26 s`;
+  - Knowledge: `213 passed, 3 skipped` in `250.38 s`;
+  - Agent/LLM: `165 passed` in `59.78 s`;
+  - MainWindow: `63 passed` in `88.92 s`;
+  - platform/release: `144 passed` in `183.45 s`.
+  The composite repository check completed in about `9 s`; translation compile,
+  lock consistency, workflow YAML parsing, and `git diff --check` also passed.
+- One deliberately concurrent local four-shard run produced a single missing
+  derivation-view assertion after the named 53 MB PPTX import while all other
+  Knowledge cases passed. The same case passed alone in `21.99 s`, and the
+  complete Knowledge shard then passed alone in `250.38 s`. This is recorded as
+  local resource-contention evidence rather than silently discarded; remote
+  Promotion jobs use separate runners, and the first new run must confirm it
+  does not recur.
+- The local critical shard remains Knowledge at about `4.2 min`, down from the
+  original `5.5 min` cohort. With the observed GitHub install baseline, the
+  estimated Promotion controlled critical path is about `7.5-8.5 min`. This is
+  not yet an accepted timing sample; PR #111 must be rerun on all frozen Python
+  versions and scheduling of all 12 jobs must be observed.
+- Detailed deletion rationale, protected proofs, implementation evidence, and
+  timing live in `evidence/first-promotion-ci-audit.md`.
 - Historical evidence and the simplified final simulation live in
   `evidence/v1.2.0-postmortem.md` and `evidence/final-design-review.md`.
 
@@ -234,12 +302,18 @@ accepts a re-baseline; timeout must not be set equal to the performance budget.
   evidence rather than prior assumption.
 - The exact separately authorized rollback automation remains outside the normal
   Tag release workflow; rehearsal must not mutate the production feed.
+- Whether the implemented 12-job Promotion matrix enters one scheduling wave on
+  GitHub-hosted Windows runners. If account concurrency serializes it materially,
+  the topology must be reconsidered from observed queue and controlled timings.
+- Whether further deletion is justified after the first value pass. Migration,
+  storage/data-loss, worker termination, publication immutability, OCR
+  supply-chain, and Agent/LLM authority boundaries remain explicitly protected
+  from performance-driven deletion.
 
 ## Next Step
 
-Use the v1.3.0 `develop -> main` promotion PR as the first qualifying Native CI
-run. Stop after CI evidence is confirmed: do not merge the promotion PR, create
-the tag, enter the release Environment, or publish artifacts until the user
-resumes. Afterward apply/audit GitHub controls in dependency order; all three
-slices remain open until a safe cold release and interrupted same-tag retry
-produce timing evidence.
+Local corrected-topology acceptance is complete. Delivery branch:
+`codex/cicd-static-analysis-pydantic`. Review and merge that branch into
+`develop` through the normal branch workflow before refreshing Promotion PR
+#111. Do not merge the promotion PR, create `v1.3.0`, enter the release
+Environment, or publish artifacts until Native CI passes and the user resumes.

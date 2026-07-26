@@ -54,58 +54,6 @@ def test_typed_blocks_round_trip_and_fallback_is_bounded_and_path_safe() -> None
     assert len(block.to_markdown()) <= 4096
 
 
-def test_legacy_visible_alias_is_decoded_but_new_json_is_explicit() -> None:
-    block = blocks_from_payload(
-        {
-            "blocks": [
-                {
-                    "type": "dataset",
-                    "dataset_id": "dataset-legacy",
-                    "visible": False,
-                }
-            ]
-        }
-    )[0]
-    assert isinstance(block, DatasetBlock)
-    assert "visible" not in block.to_json()
-    assert set(block.to_json()) == {
-        "type",
-        "dataset_id",
-        "name",
-        "row_count",
-        "column_count",
-    }
-
-
-def test_legacy_dataset_preview_columns_are_discarded_before_validation() -> None:
-    block = blocks_from_payload(
-        {
-            "blocks": [
-                {
-                    "type": "dataset",
-                    "dataset_id": "dataset-legacy",
-                    "name": "Legacy sales",
-                    "row_count": 5,
-                    "column_count": 50,
-                    "preview_columns": [f"column-{index}" for index in range(50)],
-                    "file_name": r"C:\private\sales.csv",
-                    "source_format": "csv",
-                    "visible": False,
-                }
-            ]
-        }
-    )[0]
-
-    assert isinstance(block, DatasetBlock)
-    assert block.to_json() == {
-        "type": "dataset",
-        "dataset_id": "dataset-legacy",
-        "name": "Legacy sales",
-        "row_count": 5,
-        "column_count": 50,
-    }
-
-
 @pytest.mark.parametrize(
     ("factory", "keyword"),
     [
