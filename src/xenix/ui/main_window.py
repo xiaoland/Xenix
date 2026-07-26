@@ -278,6 +278,8 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event) -> None:  # type: ignore[override]
         super().closeEvent(event)
         if event.isAccepted():
+            if self._software_update_controller is not None:
+                self._software_update_controller.shutdown()
             if self._knowledge_workspace is not None:
                 self._knowledge_workspace.shutdown()
             if self._settings_dialog is not None:
@@ -306,11 +308,6 @@ class MainWindow(QMainWindow):
         if event.type() == QEvent.LanguageChange:
             self.retranslate_ui()
         super().changeEvent(event)
-
-    def closeEvent(self, event) -> None:
-        if self._software_update_controller is not None:
-            self._software_update_controller.shutdown()
-        super().closeEvent(event)
 
     def _sync_model_picker_options(self) -> None:
         options = [
