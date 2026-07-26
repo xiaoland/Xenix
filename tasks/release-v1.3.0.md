@@ -32,8 +32,8 @@ promotion and tag-triggered release path as its first production rehearsal.
 - `origin/develop` contains `931450f` and the CI/CD simplification commits.
 - The promotion PR has the required topology: same-repository `develop` head and
   `main` base.
-- `Promotion Contract`, Python 3.12/3.13/3.14 jobs, and `Native CI Gate` all pass
-  on the final promotion head.
+- All four Python 3.14.2 semantic shards and the stable `Native CI Gate` pass on
+  the final promotion head.
 - The CI timing report records controlled, queue, and calendar durations; this
   first run is evidence but does not by itself satisfy the five-run acceptance
   sample.

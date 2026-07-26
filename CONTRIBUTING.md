@@ -12,8 +12,8 @@
 - `develop` is the mutable integration line. An ordinary push to `develop` does not
   run Native CI.
 - Promote accepted work through one same-repository GitHub PR whose head is
-  `develop` and base is `main`. Native CI runs on that PR and its stable
-  `Native CI Gate` check is required before merge.
+  `develop` and base is `main`. Native CI is scoped to PRs targeting `main`; its
+  stable `Native CI Gate` check is required before merge.
 - Do not locally merge `develop` into `main` and push the result. Do not open
   feature-branch PRs directly to `main`.
 - A merged promotion makes its resulting `main` state release-eligible but does not
@@ -31,6 +31,7 @@
 
 ## Development Commands
 
+- Python `3.14.2` is the project and packaged runtime.
 - `pdm install` installs project dependencies.
 - `pdm run dev` runs the desktop application.
 - `pdm run test` runs the manifest-owned test topology.

@@ -71,7 +71,7 @@ def test_run_timing_separates_queue_controlled_and_calendar_clocks() -> None:
     assert value.calendar_minutes == 23
 
 
-def test_promotion_samples_require_new_contract_and_gate_jobs(
+def test_promotion_samples_require_stable_gate_job(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -89,7 +89,6 @@ def test_promotion_samples_require_new_contract_and_gate_jobs(
             records,
             {
                 "jobs": [
-                    {"name": "Promotion Contract", "conclusion": "success"},
                     {"name": "Native CI Gate", "conclusion": "success"},
                 ]
             },
@@ -106,7 +105,7 @@ def test_promotion_samples_require_new_contract_and_gate_jobs(
         repository="xiaoland/Xenix",
         workflow="native-ci.yml",
         limit=10,
-        required_jobs={"Promotion Contract", "Native CI Gate"},
+        required_jobs={"Native CI Gate"},
     )
 
     assert [item.run_id for item in selected] == [42]

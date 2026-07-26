@@ -13,9 +13,10 @@ directly through an idempotent, feed-last protocol.
 - Task-packet authoring is approved. Do not change contributor documentation,
   workflows, release scripts, GitHub rulesets/Environments, OSS objects, or public
   feeds without a later slice-specific Impact Handshake and explicit start.
-- `develop` is the mutable integration line. `main` receives work only through a
-  same-repository `develop -> main` GitHub promotion PR; do not locally merge and
-  directly push the result to `main`.
+- `develop` is the mutable integration line. The documented release path promotes
+  it through a same-repository `develop -> main` GitHub PR; do not locally merge
+  and directly push the result to `main`. Treat the head-branch convention as a
+  review/process rule, not a dedicated CI job.
 - Native CI is promotion evidence. It runs while a `develop -> main` PR exists, not
   for each unaccompanied push to `develop` or ordinary push to `main`.
 - A `vX.Y.Z` tag may target any release-capable completed promotion result in
@@ -47,10 +48,21 @@ directly through an idempotent, feed-last protocol.
 
 ## Approved Direction
 
-- Document and enforce the `develop -> main` promotion path.
-- Trigger Native CI for that promotion PR only. Expose one stable aggregate
-  required check and reject a PR whose base is not `main` or whose head is not the
-  same repository's `develop`.
+- Document the `develop -> main` promotion path. GitHub's PR target filter
+  enforces `base=main`; contributor guidance and review own the normal
+  `head=develop` convention. Exact release eligibility remains independently
+  enforced by tag preflight.
+- Trigger Native CI for PRs targeting `main`. Run four semantic test shards in
+  parallel and expose one stable aggregate job named `Native CI Gate`; do not add
+  separate Promotion Contract or dynamic Test Topology jobs.
+- Run all four Windows jobs on the single packaged runtime, Python `3.14.2`.
+  Xenix Native is a
+  frozen desktop application, not a Python package, and makes no multi-interpreter
+  support promise.
+- Execute `pdm run check` once, then run each manifest-owned shard on its own
+  Windows runner. Keep the five clean-process cohorts, including MainWindow
+  isolation. Declare the four stable shard names directly in workflow YAML;
+  dynamic matrix generation does not justify a separate Linux job.
 - Require PR/status checks for `main`; prevent direct pushes. Protect `v*` tags from
   movement and deletion.
 - Let `push.tags: [v*]` start the only native release workflow.
@@ -100,8 +112,10 @@ daily work
   from `develop` through promotion PR to tag-triggered public release.
 - An unaccompanied `develop` push does not run Native CI. Opening or updating the
   promotion PR does.
-- A direct push or feature-branch PR cannot change `main`; the stable Native CI gate
-  is required before promotion.
+- A direct push cannot change `main`; every PR targeting `main` must pass the
+  stable `Native CI Gate`. Review rejects a non-`develop` release promotion, and
+  tag preflight independently prevents such a merge from becoming release
+  authority.
 - A tag may select an older completed promotion result after `main` advances, but a
   side-branch ancestor, direct-push commit, partial rebase sequence, version
   mismatch, or pre-protocol commit fails the mandatory local secretless preflight.
@@ -217,10 +231,9 @@ accepts a re-baseline; timeout must not be set equal to the performance budget.
 - The accepted v1.2.0 baseline remains about 110 minutes, including about 47
   minutes for upload/remote verification. No new-run timing sample exists yet, so
   none of the execution budgets is accepted.
-- `release-timings` now filters qualifying Promotion samples by the new
-  `Promotion Contract` and `Native CI Gate` jobs. The current repository has zero
-  qualifying samples and no Native Release workflow on the default branch, which
-  correctly leaves both timing acceptances open.
+- `release-timings` now filters qualifying Promotion samples by the stable
+  `Native CI Gate`. Runs from the superseded workflow remain historical evidence
+  rather than qualifying samples.
 - Promotion PR #111 produced the first new-topology run (`30193238273`).
   `Promotion Contract` passed, but all three Python jobs hit the 30-minute job
   timeout and were cancelled; `Native CI Gate` therefore failed. The run took
@@ -282,11 +295,52 @@ accepts a re-baseline; timeout must not be set equal to the performance budget.
   local resource-contention evidence rather than silently discarded; remote
   Promotion jobs use separate runners, and the first new run must confirm it
   does not recur.
-- The local critical shard remains Knowledge at about `4.2 min`, down from the
-  original `5.5 min` cohort. With the observed GitHub install baseline, the
-  estimated Promotion controlled critical path is about `7.5-8.5 min`. This is
-  not yet an accepted timing sample; PR #111 must be rerun on all frozen Python
-  versions and scheduling of all 12 jobs must be observed.
+- Before the ROI correction, the local critical shard was Knowledge at about
+  `4.2 min` and the observed GitHub install baseline suggested a controlled
+  critical path of about `7.5-8.5 min`. That estimate remains useful, but the
+  associated 12-job multi-version topology is rejected.
+- Commit `d715689` was fast-forwarded to `origin/develop` and triggered PR #111
+  run `30203158407` using the then-current 12-job topology. Before treating that
+  run as acceptance, ROI review rejected the topology itself.
+- Python compatibility and release runtime are now one authority: the project is
+  to require exactly Python `3.14.2`, matching Native CI and Native Release.
+  Supporting 3.12/3.13 has no product value because users receive a frozen runtime.
+- The accepted next topology is four parallel Windows shards on Python 3.14.2
+  plus one inexpensive stable `Native CI Gate`. The former `Promotion Contract`,
+  dynamic `Test Topology`, 3-version axis, and multi-version baseline workflow
+  are superseded.
+- GitHub Environment rules are not a replacement for the removed jobs:
+  Environments protect deployment approval, Secrets, and deployable refs. Native
+  CI is a secretless PR proof and must not wait on a deployment authority.
+- Exact Python 3.14.6 exposed a local bootstrap distinction. The installed
+  PDM 2.26.6 carries `pbs-installer 2025.12.5` and lists standard managed CPython
+  only through 3.14.2. An isolated probe of PDM 2.28.0 with the latest available
+  `pbs-installer 2026.7.18` still listed only free-threaded
+  `cpython@3.14.6t`, not standard `cpython@3.14.6`. Upgrading PDM therefore does
+  not by itself make the required standard runtime PDM-downloadable.
+- The ad-hoc local workaround was removed completely: the portable interpreter,
+  its PDM-created `.venv`, download/archive, Winget temporary directory, and
+  failed-install log are absent; the pre-existing system Python remains 3.14.0.
+- The temporary recommendation to introduce the official Python Install Manager
+  is superseded. The selected exact runtime is standard CPython 3.14.2, the
+  highest standard patch in the existing PDM-managed catalog; PDM therefore owns
+  interpreter acquisition, project selection, venv, lock, and dependencies.
+- The user proposed Python 3.14.0 to keep bootstrap inside the existing PDM path,
+  then accepted 3.14.2 because it has the same PDM-managed operational cost and
+  includes two maintenance releases. The toolchain decision is closed.
+- PDM 2.26.6 successfully installed and selected its managed standard
+  `cpython@3.14.2`; it created the project `.venv`, resolved the exact 3.14.2
+  lock, and installed 185 frozen packages without an external interpreter
+  bootstrap.
+- The four-runner workflow, exact Runtime/Release pin, timing filter, manifest
+  simplification, and durable documentation are implemented locally. Validation
+  passes on Python 3.14.2: `pdm run check`, lock consistency, workflow YAML
+  parsing, translation compilation, 17 focused release/workflow tests, 40
+  cross-shard representative tests, application smoke, and `git diff --check`.
+- Superseded run `30203158407` is cancelled. Before cancellation, all four
+  Python 3.14.6 shards had independently passed; the remaining multi-version
+  work was discarded. This is supporting topology evidence, not a qualifying
+  sample for the final 3.14.2 workflow.
 - Detailed deletion rationale, protected proofs, implementation evidence, and
   timing live in `evidence/first-promotion-ci-audit.md`.
 - Historical evidence and the simplified final simulation live in
@@ -302,9 +356,10 @@ accepts a re-baseline; timeout must not be set equal to the performance budget.
   evidence rather than prior assumption.
 - The exact separately authorized rollback automation remains outside the normal
   Tag release workflow; rehearsal must not mutate the production feed.
-- Whether the implemented 12-job Promotion matrix enters one scheduling wave on
-  GitHub-hosted Windows runners. If account concurrency serializes it materially,
-  the topology must be reconsidered from observed queue and controlled timings.
+- Whether the four-runner, single-runtime topology meets the existing median
+  `<=18 min` and tail `<=25 min` budgets after the already completed test-value
+  reduction. The partial superseded run observed Python 3.14 shard completion in
+  roughly 7-10 minutes, but only a new clean run is acceptance evidence.
 - Whether further deletion is justified after the first value pass. Migration,
   storage/data-loss, worker termination, publication immutability, OCR
   supply-chain, and Agent/LLM authority boundaries remain explicitly protected
@@ -312,8 +367,8 @@ accepts a re-baseline; timeout must not be set equal to the performance budget.
 
 ## Next Step
 
-Local corrected-topology acceptance is complete. Delivery branch:
-`codex/cicd-static-analysis-pydantic`. Review and merge that branch into
-`develop` through the normal branch workflow before refreshing Promotion PR
-#111. Do not merge the promotion PR, create `v1.3.0`, enter the release
-Environment, or publish artifacts until Native CI passes and the user resumes.
+The locally accepted implementation is delivered through `develop`. Observe the
+newest PR #111 Native CI run as the first qualifying four-runner, Python 3.14.2
+sample and stop after its result is recorded. Do not merge the promotion PR,
+create `v1.3.0`, enter the release Environment, or publish artifacts until Native
+CI passes and the user resumes.

@@ -196,9 +196,10 @@ Retain the following proof families:
   schema rejection before persistence, and secret redaction;
 - persisted legacy/historical user data reopening without silent rewriting.
 
-## Proposed Promotion Topology
+## Superseded Sharded Promotion Topology
 
-Keep the public DAG simple:
+The first audit proposed the following topology. Later ROI review rejected it;
+this section remains only as decision history:
 
 ```text
 Promotion Contract
@@ -210,8 +211,8 @@ Tests [Python version x semantic shard]
 Native CI Gate
 ```
 
-Recommended first topology is full coverage on Python 3.12, 3.13, and 3.14 with
-four semantic shards:
+The superseded recommendation was full coverage on Python 3.12, 3.13, and 3.14
+with four semantic shards:
 
 1. `analysis-data`;
 2. `knowledge`;
@@ -242,7 +243,7 @@ the release rehearsal. Exact-Tag-SHA Release Readiness should remain a focused,
 high-value proof plus packaged smoke rather than another accidental monolithic
 Promotion suite.
 
-## Acceptance
+## Superseded Sharded-Topology Acceptance
 
 - every retained case satisfies the value rule;
 - every collected Promotion case belongs to exactly one semantic shard;
@@ -418,3 +419,57 @@ still require Promotion PR evidence.
 Workflow YAML parses successfully. `actionlint` is unavailable in this local
 environment, so workflow-specific lint remains for CI or a provisioned
 workstation.
+
+## Promotion Topology ROI Correction
+
+Run `30203158407` was triggered after corrected typed contracts and test-value
+work reached `origin/develop`, but it still used three Python versions, four
+semantic shards, a Promotion Contract job, a dynamic Test Topology job, and a
+separate aggregate gate. That topology is rejected before acceptance:
+
+- Xenix Native ships one frozen Python runtime; it is not a
+  package executed under a user-selected interpreter. Repeating the full suite on
+  3.12 and 3.13 protects no shipped artifact.
+- The Promotion Contract duplicated authority. GitHub's PR filter already selects
+  `base=main`; durable contributor guidance and review own the normal
+  `head=develop` convention, while exact tag preflight still rejects a release
+  whose `main` commit is not a completed same-repository `develop -> main`
+  promotion.
+- The Test Topology job existed only to manufacture a dynamic matrix. Four stable
+  shard names can be declared directly in workflow YAML while
+  `scripts/test_suites.py` continues to validate manifest ownership and
+  `pdm run test --promotion-shard` preserves five clean-process cohorts.
+- An Environment is not a substitute. Environment rules protect deployments,
+  approval, Secrets, and deployable refs; applying one to secretless PR tests
+  would add the wrong authority and latency.
+- With four matrix executions, a seconds-long aggregate `Native CI Gate` earns
+  its cost by providing one stable required context even if shard composition
+  later changes.
+
+The accepted replacement is:
+
+```text
+PR targeting main
+        |
+        v
+Tests [4 semantic shards, Windows, Python 3.14.2]
+  - install per runner
+  - pdm run check once
+  - pdm run test --promotion-shard
+  - upload reports
+        |
+        v
+Native CI Gate (stable aggregate)
+```
+
+The project declaration is to use exact `requires-python = "==3.14.2"`, with
+Mypy, CI, Release, contributor documentation, and the lock aligned to that one
+runtime. Python 3.14.2 is the highest standard CPython available through the
+existing PDM-managed python-build-standalone catalog; it avoids an external
+bootstrap authority. The multi-version baseline workflow and dynamic
+matrix-generation job are to be deleted, not retained under new names.
+
+The superseded run already showed the Python 3.14 shards completing in roughly
+7-10 minutes. The replacement consumes four Windows runners instead of twelve
+while retaining shard-level wall-time reduction. A new PR #111 run must supply
+actual acceptance evidence.

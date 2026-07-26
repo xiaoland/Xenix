@@ -54,10 +54,17 @@ release-protocol-compatible history.
 
 ### Promotion
 
-Native CI exists only for an active same-repository `develop -> main` PR. A stable
-aggregate check gates merge. An ordinary push to `develop` or `main` does not run
-Native CI or release. Main rules forbid direct push; tag rules forbid moving or
-deleting `v*`.
+Native CI runs for PRs targeting `main`; the documented release path uses a
+same-repository `develop -> main` PR. Four semantic shards run in parallel on
+Windows with the exact packaged Python `3.14.2`; one shard performs repository
+checks and every shard uploads reports. A seconds-long aggregate job exposes the
+stable required context `Native CI Gate`. There is no Promotion Contract, dynamic
+Test Topology job, or Python-version matrix.
+
+The base branch is enforced by the GitHub event filter. The `develop` head
+convention belongs to contributor guidance and review, while tag preflight
+independently enforces the stricter release-eligibility contract. Main rules
+forbid direct push; tag rules forbid moving or deleting `v*`.
 
 ### Release
 

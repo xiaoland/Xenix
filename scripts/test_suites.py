@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import argparse
-import json
 import re
 import tomllib
 from pathlib import Path, PurePosixPath
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, StrictBool, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -38,7 +37,6 @@ class TestCohort(_ManifestDocument):
 
 
 class TestShard(_ManifestDocument):
-    run_check: StrictBool
     cohorts: dict[str, TestCohort]
 
     @field_validator("cohorts")
@@ -89,16 +87,6 @@ class TestSuiteManifest(_ManifestDocument):
                         )
                     owners[test_path] = (shard_name, cohort_name)
 
-        check_owners = [
-            shard_name
-            for shard_name, shard in self.shards.items()
-            if shard.run_check
-        ]
-        if len(check_owners) != 1:
-            raise ValueError(
-                "Exactly one semantic shard must own the static check "
-                "in each Python matrix."
-            )
         return self
 
     @property
@@ -174,23 +162,11 @@ def main() -> int:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("check")
-    subparsers.add_parser("matrix")
     list_parser = subparsers.add_parser("list")
     list_parser.add_argument("shard")
     args = parser.parse_args()
 
     manifest = load_test_suite_manifest()
-    if args.command == "matrix":
-        print(
-            json.dumps(
-                [
-                    {"name": shard_name, "run_check": shard.run_check}
-                    for shard_name, shard in manifest.shards.items()
-                ],
-                separators=(",", ":"),
-            )
-        )
-        return 0
     if args.command == "list":
         print(
             "\n".join(

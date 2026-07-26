@@ -164,7 +164,7 @@ def build_report(
             repository=repository,
             workflow="native-ci.yml",
             limit=limit,
-            required_jobs={"Promotion Contract", "Native CI Gate"},
+            required_jobs={"Native CI Gate"},
         )
     except RuntimeError as exc:
         promotion_runs = []

@@ -13,9 +13,9 @@ Setup.
 ## Promotion and Release Authority
 
 `develop` is the integration line. Promote it through a same-repository
-`develop -> main` pull request. Only that PR runs Native CI; its stable
-`Native CI Gate` check is required. Do not locally merge and push `main`, and do
-not use a feature branch as the head of a `main` PR.
+`develop -> main` pull request. Native CI is scoped to PRs targeting `main`; its
+stable `Native CI Gate` check is required. Do not locally merge and push `main`,
+and do not use a feature branch as the head of a `main` PR.
 
 Merging the promotion PR creates a release-eligible `main` result but publishes
 nothing. The only release authorization is a pushed immutable

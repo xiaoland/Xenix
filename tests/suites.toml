@@ -1,7 +1,6 @@
 version = 1
 
 [shards.analysis-data]
-run_check = true
 
 [shards.analysis-data.cohorts.analysis-data]
 paths = [
@@ -18,7 +17,6 @@ paths = [
 ]
 
 [shards.knowledge]
-run_check = false
 
 [shards.knowledge.cohorts.knowledge]
 paths = [
@@ -46,7 +44,6 @@ paths = [
 ]
 
 [shards.agent-llm-ui]
-run_check = false
 
 [shards.agent-llm-ui.cohorts.agent-llm-ui]
 paths = [
@@ -76,7 +73,6 @@ paths = [
 ]
 
 [shards.platform-release]
-run_check = false
 
 [shards.platform-release.cohorts.platform-release]
 paths = [

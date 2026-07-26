@@ -30,7 +30,7 @@ High-risk storage, runtime, packaging, Agent Harness, ML lifecycle, and Chatbot 
 
 ## Development Workflow
 
-- Runtime and tooling: Python `3.12`–`3.14`, PDM, PySide6/Qt Widgets, pytest, and PyInstaller.
+- Runtime and tooling: Python `3.14.2`, PDM, PySide6/Qt Widgets, pytest, and PyInstaller.
 - Install/run: `pdm install`, then `pdm run dev`.
 - Verify the full manifest topology with `pdm run test`; use `pdm run pytest --direct <pytest selectors/options>` for a focused single-process run. Also run `pdm run check` and `pdm run smoke`; package with `pdm run package` and verify with `pdm run smoke-package`. Use these PDM entries instead of bare `pytest` so repository setup and isolated temp paths apply.
 - Diagnostics: `pdm run diagnostic-bundle`; use GammaRay when available for widget hierarchy, properties, geometry, visibility, and events.

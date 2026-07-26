@@ -140,7 +140,7 @@ def _release_fixture(tmp_path: Path, *, version: str = "1.2.0"):
         },
         "unsigned": True,
         "packaged_smoke": "passed",
-        "toolchain": {"python": "3.14.6"},
+        "toolchain": {"python": "3.14.2"},
         "release_toml_sha256": "b" * 64,
         "lock_sha256": "c" * 64,
         "artifacts": artifacts,
