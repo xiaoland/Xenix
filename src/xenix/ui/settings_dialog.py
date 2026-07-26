@@ -6,7 +6,6 @@ from pathlib import Path
 from PySide6.QtCore import QEvent, QThreadPool, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QApplication,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -25,7 +24,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..build_info import BUILD_COMMIT, BUILD_COMMIT_DISPLAY
+from ..build_info import APP_VERSION, BUILD_COMMIT, BUILD_COMMIT_DISPLAY
 from ..config import AppPaths
 from ..i18n import TranslationManager
 from ..services.embedding_service import EmbeddingSettings, EmbeddingSettingsService
@@ -47,7 +46,7 @@ from ..services.paddle_ocr_service import (
     PaddleOcrState,
     PaddleOcrStatus,
 )
-from ..services.update_service import UpdateService, UpdateState, UpdateStatus
+from ..services.update_service import UpdateService
 from .ocr_deployment_tasks import OcrInstallTask, OcrStatusTask
 from .knowledge_index_ui import KnowledgeIndexRebuildDialog
 from .ssh_worker_setup_wizard import SshWorkerSetupWizard
@@ -60,8 +59,7 @@ class SettingsTab(StrEnum):
 
 
 class AboutDialog(QDialog):
-    _update_finished = Signal(object)
-    _quit_for_update = Signal()
+    software_update_requested = Signal()
 
     def __init__(
         self,
@@ -69,14 +67,15 @@ class AboutDialog(QDialog):
         paths: AppPaths,
         log_path: Path,
         db_path: Path,
-        update_service: UpdateService | None = None,
+        software_updates_available: bool = False,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._paths = paths
         self._log_path = log_path
         self._db_path = db_path
-        self._update_service = update_service
+        self._software_updates_available = software_updates_available
+        self._update_operation_active = False
 
         self._runtime_card = QFrame()
         self._runtime_card.setFrameShape(QFrame.StyledPanel)
@@ -88,16 +87,17 @@ class AboutDialog(QDialog):
         self._artifacts_label = QLabel()
         self._database_label = QLabel()
         self._current_log_file_label = QLabel()
+        self._app_version_label = QLabel()
         self._build_commit_label = QLabel()
         self._open_logs_button = QPushButton()
         self._check_updates_button = QPushButton()
-        self._update_status_value = QLabel()
 
         self._app_home_value = QLabel(str(self._paths.home))
         self._state_value = QLabel(str(self._paths.state))
         self._artifacts_value = QLabel(str(self._paths.artifacts))
         self._database_value = QLabel(str(self._db_path))
         self._current_log_file_value = QLabel(str(self._log_path))
+        self._app_version_value = QLabel(APP_VERSION)
         self._build_commit_value = QLabel(BUILD_COMMIT_DISPLAY)
         if BUILD_COMMIT_DISPLAY != BUILD_COMMIT:
             self._build_commit_value.setToolTip(BUILD_COMMIT)
@@ -118,6 +118,7 @@ class AboutDialog(QDialog):
             self._artifacts_value,
             self._database_value,
             self._current_log_file_value,
+            self._app_version_value,
             self._build_commit_value,
         ):
             value_label.setWordWrap(True)
@@ -127,6 +128,7 @@ class AboutDialog(QDialog):
         self._runtime_card_layout.addRow(self._artifacts_label, self._artifacts_value)
         self._runtime_card_layout.addRow(self._database_label, self._database_value)
         self._runtime_card_layout.addRow(self._current_log_file_label, self._current_log_file_value)
+        self._runtime_card_layout.addRow(self._app_version_label, self._app_version_value)
         self._runtime_card_layout.addRow(self._build_commit_label, self._build_commit_value)
 
         layout.addWidget(self._runtime_card)
@@ -138,9 +140,9 @@ class AboutDialog(QDialog):
 
     def _wire_events(self) -> None:
         self._open_logs_button.clicked.connect(self._open_logs_dir)
-        self._check_updates_button.clicked.connect(self._check_for_updates)
-        self._update_finished.connect(self._handle_update_status)
-        self._quit_for_update.connect(QApplication.instance().quit)
+        self._check_updates_button.clicked.connect(
+            self.software_update_requested.emit
+        )
 
     def retranslate_ui(self) -> None:
         self.setWindowTitle(self.tr("About"))
@@ -149,11 +151,13 @@ class AboutDialog(QDialog):
         self._artifacts_label.setText(self.tr("Artifacts"))
         self._database_label.setText(self.tr("Database"))
         self._current_log_file_label.setText(self.tr("Current log file"))
+        self._app_version_label.setText(self.tr("App version"))
         self._build_commit_label.setText(self.tr("Build commit"))
         self._open_logs_button.setText(self.tr("Open log directory"))
         self._check_updates_button.setText(self.tr("Check for updates"))
-        if self._update_service is None:
-            self._check_updates_button.setEnabled(False)
+        self._check_updates_button.setEnabled(
+            self._software_updates_available and not self._update_operation_active
+        )
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == QEvent.LanguageChange:
@@ -163,59 +167,18 @@ class AboutDialog(QDialog):
     def _open_logs_dir(self) -> None:
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._paths.logs)))
 
-    def _run_update_operation(self, operation) -> None:
-        self._check_updates_button.setEnabled(False)
-
-        def run() -> None:
-            try:
-                result = operation()
-            except Exception as exc:
-                result = UpdateStatus(UpdateState.FAILED, "", message=str(exc))
-            self._update_finished.emit(result)
-
-        import threading
-
-        threading.Thread(target=run, name="xenix-update", daemon=True).start()
-
-    def _check_for_updates(self) -> None:
-        if self._update_service is not None:
-            self._run_update_operation(self._update_service.check)
-
-    def _handle_update_status(self, status: UpdateStatus) -> None:
-        self._check_updates_button.setEnabled(True)
-        if status.state is UpdateState.UNAVAILABLE:
-            QMessageBox.information(self, self.tr("Updates"), self.tr("Updates are unavailable in this build."))
-        elif status.state is UpdateState.IDLE:
-            QMessageBox.information(self, self.tr("Updates"), self.tr("Xenix is up to date."))
-        elif status.state is UpdateState.FAILED:
-            QMessageBox.warning(self, self.tr("Updates"), status.message)
-        elif status.state is UpdateState.UPDATE_AVAILABLE and self._update_service is not None:
-            answer = QMessageBox.question(
-                self,
-                self.tr("Update available"),
-                self.tr("Xenix {version} is available. Download it now?").format(version=status.target_version),
-            )
-            if answer == QMessageBox.Yes:
-                self._run_update_operation(self._update_service.download)
-        elif status.state is UpdateState.READY and self._update_service is not None:
-            answer = QMessageBox.question(
-                self,
-                self.tr("Update ready"),
-                self.tr("Restart Xenix now to apply version {version}?").format(version=status.target_version),
-            )
-            if answer == QMessageBox.Yes:
-                self._run_update_operation(lambda: self._apply_update(status))
-
-    def _apply_update(self, status: UpdateStatus) -> UpdateStatus:
-        assert self._update_service is not None
-        self._update_service.apply(self._quit_for_update.emit)
-        return UpdateStatus(UpdateState.APPLYING, status.installed_version, status.target_version)
+    def set_update_operation_active(self, active: bool) -> None:
+        self._update_operation_active = active
+        self._check_updates_button.setEnabled(
+            self._software_updates_available and not active
+        )
 
 
 class SettingsDialog(QDialog):
     agent_settings_saved = Signal()
     embedding_settings_saved = Signal()
     ml_worker_settings_saved = Signal()
+    software_update_requested = Signal()
 
     def __init__(
         self,
@@ -230,7 +193,7 @@ class SettingsDialog(QDialog):
         update_service: UpdateService | None = None,
         paddle_ocr_deployment: PaddleOcrDeploymentService | None = None,
         knowledge_index_service: KnowledgeIndexService | None = None,
-        parent: QDialog | None = None,
+        parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._paths = paths
@@ -241,7 +204,8 @@ class SettingsDialog(QDialog):
         self._llm_settings_service = llm_settings_service
         self._embedding_settings_service = embedding_settings_service
         self._ml_worker_settings_service = ml_worker_settings_service
-        self._update_service = update_service
+        self._software_updates_available = update_service is not None
+        self._update_operation_active = False
         self._paddle_ocr_deployment = paddle_ocr_deployment
         self._knowledge_index_service = knowledge_index_service
         self._provider_configs: list[LLMProviderConfig] = []
@@ -751,12 +715,23 @@ class SettingsDialog(QDialog):
                 paths=self._paths,
                 log_path=self._log_path,
                 db_path=self._db_path,
-                update_service=self._update_service,
+                software_updates_available=self._software_updates_available,
                 parent=self,
+            )
+            self._about_dialog.software_update_requested.connect(
+                self.software_update_requested.emit
+            )
+            self._about_dialog.set_update_operation_active(
+                self._update_operation_active
             )
         self._about_dialog.show()
         self._about_dialog.raise_()
         self._about_dialog.activateWindow()
+
+    def set_update_operation_active(self, active: bool) -> None:
+        self._update_operation_active = active
+        if self._about_dialog is not None:
+            self._about_dialog.set_update_operation_active(active)
 
     def _load_agent_settings(self) -> None:
         settings = self._llm_settings_service.load()

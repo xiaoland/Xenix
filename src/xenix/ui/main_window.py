@@ -46,6 +46,7 @@ from .icons import plus_icon
 from .layout_debug import dump_layout_if_enabled
 from .native_widgets import emphasize_label
 from .settings_dialog import SettingsDialog, SettingsTab
+from .software_update import SoftwareUpdateController
 from .tool_call_detail_view import ToolCallDetailView
 
 if TYPE_CHECKING:
@@ -139,6 +140,11 @@ class MainWindow(QMainWindow):
         self._dataset_service = dataset_service
         self._ml_service = ml_service
         self._update_service = update_service
+        self._software_update_controller = (
+            SoftwareUpdateController(self, update_service)
+            if update_service is not None
+            else None
+        )
         self._knowledge_import_service = knowledge_import_service
         self._knowledge_derivation_service = knowledge_derivation_service
         self._knowledge_service = knowledge_service
@@ -206,17 +212,14 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self.retranslate_ui()
         self._sync_model_picker_options()
-        if self._update_service is not None and self._update_service.status.state.value != "unavailable":
-            QTimer.singleShot(1000, self._check_updates_in_background)
-
-    def _check_updates_in_background(self) -> None:
-        if self._update_service is None:
-            return
-        threading.Thread(
-            target=self._update_service.check,
-            name="xenix-update-auto-check",
-            daemon=True,
-        ).start()
+        if (
+            self._software_update_controller is not None
+            and self._software_update_controller.can_auto_check
+        ):
+            QTimer.singleShot(
+                1000,
+                self._software_update_controller.start_background_check,
+            )
 
     def _setup_ui(self) -> None:
         root = QWidget(self)
@@ -285,12 +288,19 @@ class MainWindow(QMainWindow):
         if self._knowledge_workspace is not None:
             self._knowledge_workspace.retranslate_ui()
         self._retranslate_service_link_progress()
+        if self._software_update_controller is not None:
+            self._software_update_controller.retranslate_ui()
         self._sync_model_picker_options()
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == QEvent.LanguageChange:
             self.retranslate_ui()
         super().changeEvent(event)
+
+    def closeEvent(self, event) -> None:
+        if self._software_update_controller is not None:
+            self._software_update_controller.shutdown()
+        super().closeEvent(event)
 
     def _sync_model_picker_options(self) -> None:
         options = [
@@ -346,6 +356,16 @@ class MainWindow(QMainWindow):
                 parent=self,
             )
             self._settings_dialog.agent_settings_saved.connect(self._reload_agent_provider)
+            if self._software_update_controller is not None:
+                self._settings_dialog.software_update_requested.connect(
+                    self._software_update_controller.request_update
+                )
+                self._software_update_controller.operation_active_changed.connect(
+                    self._settings_dialog.set_update_operation_active
+                )
+                self._settings_dialog.set_update_operation_active(
+                    self._software_update_controller.active
+                )
         self._settings_dialog.show_tab(tab)
         self._settings_dialog.show()
         self._settings_dialog.raise_()

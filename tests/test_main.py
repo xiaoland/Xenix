@@ -6,13 +6,15 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import xenix.services.update_service as update_service_module
 from PySide6.QtCore import QEvent, QMimeData, QPoint, QPointF, Qt, QUrl
 from PySide6.QtGui import QPalette, QPixmap, QTextDocument
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QFrame, QMessageBox, QTextBrowser, QWidget
+from shiboken6 import isValid
 
 from xenix.app import TrialLockStartupExit, _prompt_trial_lock, build_main_window, quarantine_database
-from xenix.build_info import BUILD_COMMIT_DISPLAY
+from xenix.build_info import APP_VERSION, BUILD_COMMIT_DISPLAY
 from xenix.main import main
 from xenix.services.agent import (
     AgentHarnessStreamEvent,
@@ -35,6 +37,7 @@ from xenix.services.llm import (
 )
 from xenix.services.storage.migrations import CURRENT_SCHEMA_VERSION
 from xenix.services.storage.models import ArtifactKind, ConversationMessageKind, ConversationMessageRow
+from xenix.services.update_service import UpdateState, UpdateStatus
 from xenix.trial_lock import TrialLockCheck, TrialLockReason
 from xenix.ui import icons as ui_icons
 from xenix.ui.chatbot import _format_token_count, _render_svg_preview_pixmap
@@ -453,6 +456,7 @@ def test_main_window_keeps_settings_entry_on_thread_detail_view_shell(monkeypatc
         app.processEvents()
 
         assert window._settings_dialog._about_dialog is not None
+        assert window._settings_dialog._about_dialog._app_version_value.text() == APP_VERSION
         assert window._settings_dialog._about_dialog._build_commit_value.text() == BUILD_COMMIT_DISPLAY
     finally:
         if window._settings_dialog is not None:
@@ -460,6 +464,157 @@ def test_main_window_keeps_settings_entry_on_thread_detail_view_shell(monkeypatc
                 window._settings_dialog._about_dialog.close()
             window._settings_dialog.close()
         window.close()
+
+
+@pytest.mark.parametrize("download_succeeds", [True, False])
+def test_software_update_download_uses_main_owned_modeless_progress(
+    monkeypatch,
+    tmp_path: Path,
+    download_succeeds: bool,
+) -> None:
+    class ControlledUpdateService:
+        def __init__(self, *_args, **_kwargs) -> None:
+            self.status = UpdateStatus(UpdateState.UNAVAILABLE, APP_VERSION)
+            self.download_started = threading.Event()
+            self.release_download = threading.Event()
+            self.download_finished = threading.Event()
+            self.download_thread_id: int | None = None
+
+        def check(self) -> UpdateStatus:
+            self.status = UpdateStatus(
+                UpdateState.UPDATE_AVAILABLE,
+                APP_VERSION,
+                "9.9.9",
+            )
+            return self.status
+
+        def download(self, progress) -> UpdateStatus:
+            self.download_thread_id = threading.get_ident()
+            progress(37)
+            self.download_started.set()
+            try:
+                if not self.release_download.wait(2):
+                    raise TimeoutError("test did not release the download")
+                if download_succeeds:
+                    progress(82)
+                    self.status = UpdateStatus(
+                        UpdateState.READY,
+                        APP_VERSION,
+                        "9.9.9",
+                        progress=100,
+                    )
+                else:
+                    self.status = UpdateStatus(
+                        UpdateState.FAILED,
+                        APP_VERSION,
+                        "9.9.9",
+                        message="download failed",
+                    )
+                return self.status
+            finally:
+                self.download_finished.set()
+
+    runtime_home = tmp_path / "xenix-home"
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+    monkeypatch.setattr(
+        update_service_module,
+        "UpdateService",
+        ControlledUpdateService,
+    )
+    question_titles: list[str] = []
+    warnings: list[str] = []
+
+    def answer_question(_parent, title, _message):
+        question_titles.append(str(title))
+        return QMessageBox.Yes if len(question_titles) == 1 else QMessageBox.No
+
+    monkeypatch.setattr(QMessageBox, "question", answer_question)
+    monkeypatch.setattr(
+        QMessageBox,
+        "warning",
+        lambda _parent, _title, message: warnings.append(str(message)),
+    )
+
+    app, window = build_main_window(show=True)
+    service = window._update_service
+    update_controller = window._software_update_controller
+    assert isinstance(service, ControlledUpdateService)
+    assert update_controller is not None
+
+    def wait_until(predicate, *, timeout: float = 2.0) -> None:
+        deadline = time.monotonic() + timeout
+        while not predicate():
+            app.processEvents()
+            if time.monotonic() >= deadline:
+                pytest.fail("timed out waiting for software-update UI state")
+            time.sleep(0.005)
+
+    try:
+        window._open_settings()
+        settings = window._settings_dialog
+        assert settings is not None
+        settings._open_about_dialog()
+        about = settings._about_dialog
+        assert about is not None
+
+        about._check_updates_button.click()
+        wait_until(
+            lambda: (
+                service.download_started.is_set()
+                and update_controller.progress_dialog is not None
+                and update_controller.progress_dialog.value() == 37
+            )
+        )
+
+        progress_dialog = update_controller.progress_dialog
+        assert progress_dialog is not None
+        assert progress_dialog.parentWidget() is window
+        assert progress_dialog.minimum() == 0
+        assert progress_dialog.maximum() == 100
+        assert progress_dialog.windowModality() == Qt.NonModal
+        assert progress_dialog.isModal() is False
+        assert progress_dialog.thread() is app.thread()
+        assert service.download_thread_id != threading.get_ident()
+
+        about.close()
+        settings.close()
+        app.processEvents()
+        assert progress_dialog.isVisible()
+
+        service.release_download.set()
+        wait_until(
+            lambda: (
+                service.download_finished.is_set()
+                and update_controller.progress_dialog is None
+                and (
+                    len(question_titles) == 2
+                    if download_succeeds
+                    else warnings == ["download failed"]
+                )
+            )
+        )
+
+        assert progress_dialog.isVisible() is False
+        assert about._check_updates_button.isEnabled()
+        if download_succeeds:
+            assert question_titles == ["Update available", "Update ready"]
+            assert warnings == []
+        else:
+            assert question_titles == ["Update available"]
+            assert warnings == ["download failed"]
+
+        update_controller._show_progress("10.0.0")
+        shutdown_progress = update_controller.progress_dialog
+        assert shutdown_progress is not None
+        window.close()
+        app.processEvents()
+        assert update_controller.progress_dialog is None
+        assert isValid(shutdown_progress) is False
+    finally:
+        service.release_download.set()
+        window.close()
+        app.processEvents()
 
 
 def test_settings_dialog_marks_packaged_trial_provider_secret_fields_read_only(

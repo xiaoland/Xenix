@@ -7,6 +7,7 @@ from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QApplication
 
 from xenix.app import build_main_window
+from xenix.build_info import APP_VERSION
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.i18n import (
     DEFAULT_LOCALE,
@@ -127,7 +128,20 @@ def test_main_window_language_switch_updates_chat_shell(
         assert about is not None
         assert about.windowTitle() == "About"
         assert about._open_logs_button.text() == "Open log directory"
+        assert about._app_version_label.text() == "App version"
+        assert about._app_version_value.text() == APP_VERSION
         assert about._build_commit_label.text() == "Build commit"
+        assert window._software_update_controller is not None
+        window._software_update_controller._show_progress("9.9.9")
+        assert window._software_update_controller.progress_dialog is not None
+        assert (
+            window._software_update_controller.progress_dialog.windowTitle()
+            == "Software Update"
+        )
+        assert (
+            window._software_update_controller.progress_dialog.labelText()
+            == "Downloading Xenix 9.9.9..."
+        )
         assert window.tr("Generate title...") == "Generate title..."
         assert window.tr("Copy thread ID") == "Copy thread ID"
         assert window.tr("Generating thread title...") == "Generating thread title..."
@@ -247,7 +261,19 @@ def test_main_window_language_switch_updates_chat_shell(
         assert task_queue.tr("Task Details") == "任务详情"
         assert about.windowTitle() == "关于"
         assert about._open_logs_button.text() == "打开日志目录"
+        assert about._app_version_label.text() == "应用版本"
+        assert about._app_version_value.text() == APP_VERSION
         assert about._build_commit_label.text() == "构建提交"
+        assert window._software_update_controller is not None
+        assert window._software_update_controller.progress_dialog is not None
+        assert (
+            window._software_update_controller.progress_dialog.windowTitle()
+            == "软件更新"
+        )
+        assert (
+            window._software_update_controller.progress_dialog.labelText()
+            == "正在下载 Xenix 9.9.9..."
+        )
         assert window.tr("Generate title...") == "生成标题..."
         assert window.tr("Copy thread ID") == "复制线程 ID"
         assert window.tr("Generating thread title...") == "正在生成线程标题..."
@@ -299,7 +325,19 @@ def test_main_window_language_switch_updates_chat_shell(
         assert task_queue.tr("Task Details") == "Task Details"
         assert about.windowTitle() == "About"
         assert about._open_logs_button.text() == "Open log directory"
+        assert about._app_version_label.text() == "App version"
+        assert about._app_version_value.text() == APP_VERSION
         assert about._build_commit_label.text() == "Build commit"
+        assert window._software_update_controller is not None
+        assert window._software_update_controller.progress_dialog is not None
+        assert (
+            window._software_update_controller.progress_dialog.windowTitle()
+            == "Software Update"
+        )
+        assert (
+            window._software_update_controller.progress_dialog.labelText()
+            == "Downloading Xenix 9.9.9..."
+        )
         assert window.tr("Generate title...") == "Generate title..."
         assert window.tr("Copy thread ID") == "Copy thread ID"
         assert window.tr("Generating thread title...") == "Generating thread title..."
@@ -319,6 +357,8 @@ def test_main_window_language_switch_updates_chat_shell(
         assert usage_item._label.text() == "↑ 9.8k (1.9k cached) · ↓ 2.6k"
         assert read_saved_locale(paths) == "en_US"
     finally:
+        if window._software_update_controller is not None:
+            window._software_update_controller._close_progress()
         window._close_service_link_progress_if_idle()
         if window._settings_dialog is not None:
             if window._settings_dialog._about_dialog is not None:

@@ -36,6 +36,10 @@ supports, and what uncertainty remains.
 6. Open the Knowledge Workspace, select or drop TXT, DOC/DOCX, PPT/PPTX, PDF, JPEG,
    or PNG material, and let the Agent apply relevant saved knowledge through
    source-linked lookup.
+7. Open About to review the installed Xenix version and manually check for
+   software updates. A confirmed download reports percentage progress in a
+   modeless window before the user explicitly chooses whether to restart and
+   apply it.
 
 ## Rules and Scope
 
