@@ -108,16 +108,8 @@ def _run(command: list[str], *, cwd: Path | None = None) -> None:
     subprocess.run(command, cwd=cwd, check=True)
 
 
-def _resolve_cmake() -> str:
-    configured = os.environ.get("XENIX_CMAKE", "").strip()
-    if configured:
-        path = Path(configured).resolve()
-        if path.is_file():
-            return str(path)
-        raise RuntimeError("XENIX_CMAKE does not name an existing executable.")
-    discovered = shutil.which("cmake")
-    if discovered:
-        return discovered
+def _visual_studio_installations() -> list[Path]:
+    candidates: list[Path] = []
     vswhere = (
         Path(os.environ.get("ProgramFiles(x86)", "C:/Program Files (x86)"))
         / "Microsoft Visual Studio"
@@ -128,7 +120,7 @@ def _resolve_cmake() -> str:
         result = subprocess.run(
             [
                 str(vswhere),
-                "-latest",
+                "-all",
                 "-products",
                 "*",
                 "-requires",
@@ -136,13 +128,50 @@ def _resolve_cmake() -> str:
                 "-property",
                 "installationPath",
             ],
-            check=True,
+            check=False,
             capture_output=True,
             text=True,
         )
-        installation = result.stdout.strip()
+        if result.returncode == 0:
+            candidates.extend(
+                Path(line.strip())
+                for line in result.stdout.splitlines()
+                if line.strip()
+            )
+    for environment, default in (
+        ("ProgramFiles", "C:/Program Files"),
+        ("ProgramFiles(x86)", "C:/Program Files (x86)"),
+    ):
+        root = Path(os.environ.get(environment, default)) / "Microsoft Visual Studio"
+        if root.is_dir():
+            candidates.extend(
+                path
+                for path in root.glob("*/*")
+                if path.is_dir() and path.name != "Installer"
+            )
+    unique: list[Path] = []
+    seen: set[Path] = set()
+    for candidate in candidates:
+        resolved = candidate.resolve()
+        if resolved not in seen and resolved.is_dir():
+            seen.add(resolved)
+            unique.append(resolved)
+    return unique
+
+
+def _resolve_cmake() -> str:
+    configured = os.environ.get("XENIX_CMAKE", "").strip()
+    if configured:
+        path = Path(configured).resolve()
+        if path.is_file():
+            return str(path)
+        raise RuntimeError("XENIX_CMAKE does not name an existing executable.")
+    discovered = shutil.which("cmake")
+    if discovered:
+        return discovered
+    for installation in _visual_studio_installations():
         candidate = (
-            Path(installation)
+            installation
             / "Common7"
             / "IDE"
             / "CommonExtensions"
@@ -362,19 +391,23 @@ def _resolve_vcomp(
     environment = os.environ.get("XENIX_VCOMP140_PATH", "").strip()
     if environment:
         candidates.append(Path(environment).resolve())
-    program_files = Path(
-        os.environ.get("ProgramFiles(x86)", "C:/Program Files (x86)")
-    )
-    redist = program_files / "Microsoft Visual Studio"
-    if redist.is_dir():
-        candidates.extend(
-            sorted(
-                redist.glob(
-                    "*/**/VC/Redist/MSVC/*/x64/Microsoft.VC143.OpenMP/vcomp140.dll"
-                ),
-                reverse=True,
-            )
+    for installation in _visual_studio_installations():
+        redist = installation / "VC" / "Redist" / "MSVC"
+        locked = (
+            redist
+            / toolchain["vcomp140_version"]
+            / "x64"
+            / "Microsoft.VC143.OpenMP"
+            / "vcomp140.dll"
         )
+        candidates.append(locked)
+        if redist.is_dir():
+            candidates.extend(
+                sorted(
+                    redist.glob("*/x64/Microsoft.VC143.OpenMP/vcomp140.dll"),
+                    reverse=True,
+                )
+            )
     system_root = Path(os.environ.get("SystemRoot", "C:/Windows"))
     candidates.append(system_root / "System32" / "vcomp140.dll")
     checked: set[Path] = set()
@@ -617,6 +650,61 @@ def write_catalog(lock: dict[str, Any], archive: Path, destination: Path) -> Non
     )
 
 
+def verify_output(args: argparse.Namespace) -> tuple[Path, Path]:
+    lock = load_lock()
+    output = args.output_dir.resolve()
+    cache = args.cache_dir.resolve()
+    catalog = output / "runtime_catalog.json"
+    if not catalog.is_file():
+        raise RuntimeError("Cached Knowledge OCR runtime catalog is missing.")
+    payload = json.loads(catalog.read_text(encoding="utf-8"))
+    expected_keys = {
+        "schema_version",
+        "artifact_name",
+        "artifact_bytes",
+        "artifact_sha256",
+        "protocol_version",
+        "runtime_id",
+        "model_pack_id",
+    }
+    if not isinstance(payload, dict) or payload.keys() != expected_keys:
+        raise RuntimeError("Cached Knowledge OCR runtime catalog shape is invalid.")
+    if (
+        payload["schema_version"] != 1
+        or payload["protocol_version"] != lock["protocol_version"]
+        or payload["runtime_id"] != lock["runtime_id"]
+        or payload["model_pack_id"] != lock["model_pack_id"]
+    ):
+        raise RuntimeError("Cached Knowledge OCR runtime identity is invalid.")
+    artifact_name = payload["artifact_name"]
+    if (
+        not isinstance(artifact_name, str)
+        or Path(artifact_name).name != artifact_name
+        or artifact_name in {"", ".", ".."}
+    ):
+        raise RuntimeError("Cached Knowledge OCR runtime artifact name is unsafe.")
+    archive = output / artifact_name
+    if (
+        not archive.is_file()
+        or archive.stat().st_size != payload["artifact_bytes"]
+        or sha256_file(archive) != payload["artifact_sha256"]
+    ):
+        raise RuntimeError("Cached Knowledge OCR runtime artifact is corrupt.")
+
+    golden = download_locked("golden_image", lock["downloads"]["golden_image"], cache)
+    verification = args.work_dir.resolve() / "cached-output-verification"
+    shutil.rmtree(verification, ignore_errors=True)
+    try:
+        _safe_extract_zip(archive, verification)
+        runtime = verification / RUNTIME_DIRECTORY
+        if not runtime.is_dir():
+            raise RuntimeError("Cached Knowledge OCR archive layout is invalid.")
+        verify_runtime(runtime, golden)
+    finally:
+        shutil.rmtree(verification, ignore_errors=True)
+    return archive, catalog
+
+
 def build(args: argparse.Namespace) -> tuple[Path, Path]:
     lock = load_lock()
     work = args.work_dir.resolve()
@@ -667,11 +755,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--cache-dir", type=Path, default=DEFAULT_WORK_ROOT / "downloads")
     parser.add_argument("--vcomp140", type=Path)
+    parser.add_argument(
+        "--verify-output",
+        action="store_true",
+        help="Verify a cached output archive, including its native OCR self-test.",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
-    archive, catalog = build(parse_args())
+    args = parse_args()
+    archive, catalog = verify_output(args) if args.verify_output else build(args)
     print(archive)
     print(catalog)
     return 0

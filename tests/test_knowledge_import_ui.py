@@ -706,6 +706,41 @@ def test_visible_idle_task_queue_refreshes_when_reopened(monkeypatch) -> None:
     queue.close()
 
 
+def test_workspace_shutdown_waits_for_its_task_queue_query(monkeypatch) -> None:
+    app = _app(monkeypatch)
+    query_started = threading.Event()
+    release_query = threading.Event()
+
+    class BlockingTaskQuery:
+        def list_tasks(self):
+            query_started.set()
+            release_query.wait(timeout=2)
+            return []
+
+    workspace = KnowledgeWorkspaceDialog(
+        import_service=_ImportService(),
+        task_query_service=BlockingTaskQuery(),
+        workspace_service=_SnapshotService(_snapshot()),
+    )
+    workspace.open_task_queue()
+    queue = workspace._queue_dialog
+    assert queue is not None
+    assert query_started.wait(timeout=2)
+    assert queue._thread_pool is not workspace._thread_pool
+
+    release_timer = threading.Timer(0.05, release_query.set)
+    release_timer.start()
+    started_at = time.monotonic()
+    workspace.shutdown()
+    elapsed = time.monotonic() - started_at
+    release_timer.join(timeout=1)
+    app.processEvents()
+
+    assert elapsed >= 0.04
+    assert queue._thread_pool.activeThreadCount() == 0
+    assert workspace._thread_pool.activeThreadCount() == 0
+
+
 def test_file_selection_uses_lightweight_format_registry_and_opens_task_queue(
     monkeypatch,
     tmp_path: Path,

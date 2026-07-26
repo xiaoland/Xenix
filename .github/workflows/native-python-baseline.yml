@@ -33,7 +33,7 @@ jobs:
           XENIX_TRIAL_LOCK_STATE_SECRET: "non-production-baseline-stable-secret"
           XENIX_TRIAL_PURCHASE_URL: "https://example.invalid/purchase"
         run: |
-          $elapsed = Measure-Command { pdm run release-candidate }
+          $elapsed = Measure-Command { pdm run release-build }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $manifest = Get-Content dist/release-manifest.json -Raw | ConvertFrom-Json
           $manifest | Add-Member package_seconds ([math]::Round($elapsed.TotalSeconds, 2))

@@ -1,0 +1,191 @@
+name: Native Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-release-publication
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Release Identity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      version: ${{ steps.identity.outputs.version }}
+      tag: ${{ steps.identity.outputs.tag }}
+      commit: ${{ steps.identity.outputs.commit }}
+      promotion_pr: ${{ steps.identity.outputs.promotion_pr }}
+      protocol_version: ${{ steps.identity.outputs.protocol_version }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+      - name: Fetch main authority
+        run: git fetch --no-tags origin main:refs/remotes/origin/main
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.14.6"
+      - name: Verify tag and promotion identity
+        id: identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python scripts/verify_release_identity.py
+          --require-tag
+          --require-promotion
+          --repository "${{ github.repository }}"
+
+  release:
+    name: Build, Verify, Publish
+    needs: preflight
+    runs-on: windows-2022
+    timeout-minutes: 120
+    environment: native-release
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      XENIX_RELEASE_BUILD: "1"
+      XENIX_PUBLIC_RELEASE_BUILD: "1"
+      XENIX_RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
+      XENIX_PROMOTION_PR: ${{ needs.preflight.outputs.promotion_pr }}
+      XENIX_BUILD_COMMIT: ${{ needs.preflight.outputs.commit }}
+      RELEASES_OSS_PUBLIC_URL: ${{ vars.RELEASES_OSS_PUBLIC_URL }}
+      XENIX_TRIAL_LLM_BASE_URL: ${{ vars.XENIX_TRIAL_LLM_BASE_URL }}
+      XENIX_TRIAL_LLM_API_KEY: ${{ secrets.XENIX_TRIAL_LLM_API_KEY }}
+      XENIX_TRIAL_LLM_MODEL: ${{ vars.XENIX_TRIAL_LLM_MODEL }}
+      XENIX_TRIAL_LOCK_DAYS: ${{ vars.XENIX_TRIAL_LOCK_DAYS }}
+      XENIX_TRIAL_LOCK_STATE_SECRET: ${{ secrets.XENIX_TRIAL_LOCK_STATE_SECRET }}
+      XENIX_TRIAL_PURCHASE_URL: ${{ vars.XENIX_TRIAL_PURCHASE_URL }}
+      XENIX_OTEL_EXPORT_TRACES: ${{ vars.XENIX_OTEL_EXPORT_TRACES }}
+      XENIX_OTEL_EXPORT_METRICS: ${{ vars.XENIX_OTEL_EXPORT_METRICS }}
+      XENIX_OTEL_EXPORT_LOGS: ${{ vars.XENIX_OTEL_EXPORT_LOGS }}
+      OTEL_SDK_DISABLED: ${{ vars.OTEL_SDK_DISABLED }}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${{ vars.OTEL_EXPORTER_OTLP_ENDPOINT }}
+      OTEL_EXPORTER_OTLP_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_PROTOCOL }}
+      OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: ${{ vars.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT }}
+      OTEL_EXPORTER_OTLP_TRACES_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_TRACES_PROTOCOL }}
+      OTEL_EXPORTER_OTLP_TRACES_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_TRACES_HEADERS }}
+      OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: ${{ vars.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT }}
+      OTEL_EXPORTER_OTLP_METRICS_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_METRICS_PROTOCOL }}
+      OTEL_EXPORTER_OTLP_METRICS_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_METRICS_HEADERS }}
+      OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: ${{ vars.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT }}
+      OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: ${{ vars.OTEL_EXPORTER_OTLP_LOGS_PROTOCOL }}
+      OTEL_EXPORTER_OTLP_LOGS_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_LOGS_HEADERS }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+      - name: Fetch main authority
+        run: git fetch --no-tags origin main:refs/remotes/origin/main
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.14.6"
+          cache: pip
+      - run: python -m pip install pdm==2.26.6
+      - run: pdm install --frozen-lockfile -G :all
+      - run: dotnet tool restore
+      - name: Re-verify exact release identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          pdm run release-identity
+          --require-tag
+          --require-promotion
+          --repository "${{ github.repository }}"
+      - run: pdm run check
+      - run: pdm run i18n-compile
+      - name: Release readiness tests
+        run: pdm run pytest --junitxml=release-pytest.xml
+
+      - name: Restore locked OCR inputs
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: build/knowledge-ocr/downloads
+          key: knowledge-ocr-inputs-v1-${{ runner.os }}-${{ hashFiles('native/knowledge_ocr/runtime.lock.json') }}
+      - name: Restore verified OCR output
+        id: ocr-output-cache
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: dist/knowledge-ocr
+          key: knowledge-ocr-output-v1-${{ runner.os }}-vs2022-${{ hashFiles('native/knowledge_ocr/**', 'scripts/build_knowledge_ocr_runtime.py', 'release.toml') }}
+      - name: Build or verify native OCR runtime
+        shell: pwsh
+        run: |
+          $verified = $false
+          if ("${{ steps.ocr-output-cache.outputs.cache-hit }}" -eq "true") {
+            pdm run build-knowledge-ocr --verify-output
+            $verified = $LASTEXITCODE -eq 0
+            if (-not $verified) {
+              Remove-Item -LiteralPath "dist/knowledge-ocr" -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
+          if (-not $verified) {
+            pdm run build-knowledge-ocr
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Package and verify release
+        run: pdm run release-package
+      - name: Publish directly to OSS
+        id: publish
+        env:
+          ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
+          ALIYUN_ACCESS_KEY_SECRET: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
+          OSS_ENDPOINT: ${{ vars.OSS_ENDPOINT }}
+          OSS_BUCKET: ${{ vars.OSS_BUCKET }}
+        run: >-
+          pdm run release-publish
+          --tag "${{ needs.preflight.outputs.tag }}"
+          --commit "${{ needs.preflight.outputs.commit }}"
+          --promotion-pr "${{ needs.preflight.outputs.promotion_pr }}"
+          --repository "${{ github.repository }}"
+      - name: Write release status
+        if: always()
+        shell: pwsh
+        env:
+          RELEASE_JOB_STATUS: ${{ job.status }}
+          RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
+          RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.preflight.outputs.commit }}
+          PROMOTION_PR: ${{ needs.preflight.outputs.promotion_pr }}
+          ROLLBACK_HISTORY: ${{ steps.publish.outputs.rollback_history }}
+          PUBLICATION_SECONDS: ${{ steps.publish.outputs.publication_seconds }}
+          VISIBILITY_SECONDS: ${{ steps.publish.outputs.visibility_seconds }}
+        run: |
+          @"
+          ## Native Release
+
+          - status: ``$env:RELEASE_JOB_STATUS``
+          - version: ``$env:RELEASE_VERSION``
+          - tag: ``$env:RELEASE_TAG``
+          - commit: ``$env:RELEASE_COMMIT``
+          - promotion PR: ``#$env:PROMOTION_PR``
+          - run attempt: ``${{ github.run_attempt }}``
+          - publication: ``$env:PUBLICATION_SECONDS s``
+          - visibility/final verification: ``$env:VISIBILITY_SECONDS s``
+          - rollback history: ``$env:ROLLBACK_HISTORY``
+          "@ >> $env:GITHUB_STEP_SUMMARY
+      - name: Preserve non-secret release evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-release-${{ needs.preflight.outputs.tag }}-attempt-${{ github.run_attempt }}
+          path: |
+            release-pytest.xml
+            dist/knowledge-ocr/runtime_catalog.json
+            dist/release-manifest.json
+            dist/release-publication-timing.json
+          if-no-files-found: warn
+          retention-days: 30

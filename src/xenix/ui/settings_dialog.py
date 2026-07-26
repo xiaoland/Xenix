@@ -214,7 +214,8 @@ class SettingsDialog(QDialog):
         self._embedding_settings_snapshot = EmbeddingSettings()
         self._ssh_worker_wizard: SshWorkerSetupWizard | None = None
         self._about_dialog: AboutDialog | None = None
-        self._thread_pool = QThreadPool.globalInstance()
+        self._thread_pool = QThreadPool(self)
+        self._shutdown = False
         self._lifecycle_generation = 0
         self._active = False
         self._cached_ocr_status: PaddleOcrStatus | None = None
@@ -529,7 +530,11 @@ class SettingsDialog(QDialog):
         self._tabs.setCurrentIndex(self._tab_indexes[SettingsTab(tab)])
 
     def _install_ocr(self) -> None:
-        if self._paddle_ocr_deployment is None or self._ocr_install_task is not None:
+        if (
+            self._shutdown
+            or self._paddle_ocr_deployment is None
+            or self._ocr_install_task is not None
+        ):
             return
         self._ocr_setup_button.setEnabled(False)
         generation = self._lifecycle_generation
@@ -600,7 +605,8 @@ class SettingsDialog(QDialog):
 
     def _schedule_ocr_status_probe(self) -> None:
         if (
-            not self._active
+            self._shutdown
+            or not self._active
             or self._paddle_ocr_deployment is None
             or self._ocr_status_task is not None
             or self._ocr_install_task is not None
@@ -653,6 +659,10 @@ class SettingsDialog(QDialog):
         self._ocr_setup_button.setEnabled(enabled)
 
     def showEvent(self, event) -> None:
+        if self._shutdown:
+            super().showEvent(event)
+            self.hide()
+            return
         self._active = True
         self._lifecycle_generation += 1
         self._render_ocr_status()
@@ -676,6 +686,14 @@ class SettingsDialog(QDialog):
         self._knowledge_refresh_timer.stop()
         if self._index_dialog is not None:
             self._index_dialog.hide()
+
+    def shutdown(self) -> None:
+        """Quiesce UI-owned tasks before their application services are closed."""
+        if self._shutdown:
+            return
+        self._shutdown = True
+        self._deactivate_ocr()
+        self._thread_pool.waitForDone()
 
     def _reload_language_options(self) -> None:
         current_locale = self._translation_manager.current_locale()

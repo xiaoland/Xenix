@@ -4,7 +4,6 @@ import logging
 import os
 import re
 import sys
-import threading
 import time
 from collections.abc import Callable
 from datetime import datetime
@@ -272,13 +271,18 @@ def _recover_storage_bootstrap(
     raise error
 
 
-def _load_runtime_imports() -> SimpleNamespace:
+def _load_runtime_imports(
+    *,
+    module_loaded: Callable[[], None] | None = None,
+) -> SimpleNamespace:
     runtime_start = time.perf_counter()
 
     def load_module(module_name: str):
         module_start = time.perf_counter()
         module = import_module(module_name)
         _emit_startup_timing("runtime_import.module", module_start, module=module_name)
+        if module_loaded is not None:
+            module_loaded()
         return module
 
     agent_harness = load_module("xenix.services.agent.harness_service")
@@ -388,33 +392,13 @@ def _load_runtime_imports_with_events(
         _emit_startup_timing("runtime_import.no_splash_wait", load_start)
         return runtime
 
-    completed = threading.Event()
-    result: SimpleNamespace | None = None
-    error: BaseException | None = None
-
-    def load() -> None:
-        nonlocal error, result
-        try:
-            result = _load_runtime_imports()
-        except BaseException as exc:
-            error = exc
-        finally:
-            completed.set()
-
     load_start = time.perf_counter()
-    thread = threading.Thread(target=load, name="xenix-startup-imports", daemon=True)
-    thread.start()
-    while not completed.is_set():
+    def process_module_boundary() -> None:
         app.processEvents(QEventLoop.ProcessEventsFlag.AllEvents, 50)
-        completed.wait(0.016)
-    thread.join()
+
+    result = _load_runtime_imports(module_loaded=process_module_boundary)
     app.processEvents()
     _emit_startup_timing("runtime_import.splash_wait", load_start)
-
-    if error is not None:
-        raise error
-    if result is None:
-        raise RuntimeError("Runtime imports did not produce a result.")
     return result
 
 
@@ -450,6 +434,7 @@ def build_main_window(
 
     startup_scope = None
     startup_span_active = False
+    runtime_shutdown: Callable[[], None] | None = None
     try:
         _update_startup_stage(app, splash, StartupStage.PREPARING_APP_DATA)
         step_start = time.perf_counter()
@@ -538,8 +523,17 @@ def build_main_window(
         knowledge_import_service = None
         knowledge_derivation_service = None
         knowledge_index_service = None
+        runtime_shutdown_started = False
+        runtime_shutdown_connected = False
 
         def shutdown_runtime() -> None:
+            nonlocal runtime_shutdown_connected, runtime_shutdown_started
+            if runtime_shutdown_started:
+                return
+            runtime_shutdown_started = True
+            if runtime_shutdown_connected:
+                app.aboutToQuit.disconnect(shutdown_runtime)
+                runtime_shutdown_connected = False
             if knowledge_import_service is not None:
                 knowledge_import_service.shutdown()
             if knowledge_derivation_service is not None:
@@ -549,7 +543,7 @@ def build_main_window(
             context.engine.dispose()
             flush_observability()
 
-        app.aboutToQuit.connect(shutdown_runtime)
+        runtime_shutdown = shutdown_runtime
 
         _update_startup_stage(app, splash, StartupStage.LOADING_WORKBENCH)
         step_start = time.perf_counter()
@@ -639,6 +633,9 @@ def build_main_window(
             ),
         )
         _emit_startup_timing("main_window.construct", step_start)
+        app.aboutToQuit.connect(shutdown_runtime)
+        runtime_shutdown_connected = True
+        window.closing.connect(shutdown_runtime)
 
         _update_startup_stage(app, splash, StartupStage.READY)
         _hold_startup_splash(app, splash, splash_hold_ms)
@@ -662,7 +659,10 @@ def build_main_window(
         if startup_span_active and startup_scope is not None:
             startup_scope.__exit__(*sys.exc_info())
             startup_span_active = False
-        flush_observability()
+        if runtime_shutdown is None:
+            flush_observability()
+        else:
+            runtime_shutdown()
         _close_startup_splash(app, splash)
         raise
 

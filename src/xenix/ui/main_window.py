@@ -92,6 +92,7 @@ class _PendingComposerSubmission:
 
 
 class MainWindow(QMainWindow):
+    closing = Signal()
     _harness_failed = Signal(str)
     _harness_stream_event = Signal(object)
     _thread_title_generated = Signal(str, str)
@@ -273,6 +274,15 @@ class MainWindow(QMainWindow):
         if current_item is not None:
             self._open_history_thread(current_item)
         dump_layout_if_enabled(root, reason="main-window-setup")
+
+    def closeEvent(self, event) -> None:  # type: ignore[override]
+        super().closeEvent(event)
+        if event.isAccepted():
+            if self._knowledge_workspace is not None:
+                self._knowledge_workspace.shutdown()
+            if self._settings_dialog is not None:
+                self._settings_dialog.shutdown()
+            self.closing.emit()
 
     def retranslate_ui(self) -> None:
         self.setWindowTitle(self.tr("Xenix Native"))

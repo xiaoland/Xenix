@@ -39,7 +39,7 @@ or release authority.
   executable; the official Windows runtime requires colocated DLLs and model files.
 - The OCR cache is rebuildable. Readiness requires the exact catalog, runtime,
   model-pack, member-manifest, and protocol identities, not mere file presence.
-- A release candidate includes the OCR bundle as a typed immutable release artifact;
+- A release includes the OCR bundle as a typed immutable release artifact;
   the app installer itself does not embed the large runtime.
 - The unreleased Python sidecar has no migration or compatibility path.
 - This decision admits general text detection and recognition only. Structured

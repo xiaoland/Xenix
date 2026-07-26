@@ -259,18 +259,139 @@ def test_interactive_startup_does_not_synchronously_flush_observability(
     runtime_home = tmp_path / "xenix-home"
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
-
-    def fail_flush() -> None:
-        raise AssertionError("interactive startup must not synchronously flush observability")
-
-    monkeypatch.setattr("xenix.app.flush_observability", fail_flush)
+    flush_calls = []
+    monkeypatch.setattr(
+        "xenix.app.flush_observability",
+        lambda: flush_calls.append("flush"),
+    )
 
     app, window = build_main_window(show=True, show_splash=False)
     try:
         assert window.isVisible()
+        assert flush_calls == []
     finally:
         window.close()
         app.processEvents()
+    assert flush_calls == ["flush"]
+
+
+def test_closing_reused_main_window_stops_application_owned_knowledge_workers(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    worker_names = {
+        "xenix-knowledge-derivation",
+        "xenix-knowledge-import",
+        "xenix-knowledge-index",
+    }
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+
+    for iteration in range(2):
+        baseline = set(threading.enumerate())
+        monkeypatch.setenv(
+            "XENIX_APP_HOME",
+            str(tmp_path / f"xenix-home-{iteration}"),
+        )
+        app, window = build_main_window(show=False, show_splash=False)
+        owned_workers = [
+            thread
+            for thread in threading.enumerate()
+            if thread not in baseline and thread.name in worker_names
+        ]
+        assert sorted(thread.name for thread in owned_workers) == sorted(
+            worker_names
+        )
+
+        window.close()
+        app.processEvents()
+
+        assert all(not thread.is_alive() for thread in owned_workers)
+
+
+@pytest.mark.parametrize(
+    "open_order",
+    [
+        ("settings", "knowledge"),
+        ("knowledge", "settings"),
+    ],
+)
+def test_secondary_windows_quiesce_in_both_open_orders(
+    monkeypatch,
+    tmp_path: Path,
+    open_order: tuple[str, str],
+) -> None:
+    runtime_home = tmp_path / "-".join(open_order)
+    worker_names = {
+        "xenix-knowledge-derivation",
+        "xenix-knowledge-import",
+        "xenix-knowledge-index",
+    }
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+    baseline = set(threading.enumerate())
+    app, window = build_main_window(show=False, show_splash=False)
+
+    for secondary in open_order:
+        if secondary == "settings":
+            window._open_settings()
+        else:
+            window._open_knowledge_workspace()
+        app.processEvents()
+
+    settings = window._settings_dialog
+    workspace = window._knowledge_workspace
+    assert settings is not None
+    assert workspace is not None
+    owned_workers = [
+        thread
+        for thread in threading.enumerate()
+        if thread not in baseline and thread.name in worker_names
+    ]
+
+    window.close()
+    app.processEvents()
+
+    assert settings._shutdown is True
+    assert workspace._shutdown is True
+    assert settings._thread_pool.activeThreadCount() == 0
+    assert workspace._thread_pool.activeThreadCount() == 0
+    assert all(not thread.is_alive() for thread in owned_workers)
+    with sqlite3.connect(runtime_home / "state" / "xenix.db") as connection:
+        assert connection.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+
+
+def test_failed_main_window_construction_stops_application_owned_knowledge_workers(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    worker_names = {
+        "xenix-knowledge-derivation",
+        "xenix-knowledge-import",
+        "xenix-knowledge-index",
+    }
+    baseline = set(threading.enumerate())
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    constructed_workers: list[threading.Thread] = []
+
+    class FailingMainWindow:
+        def __init__(self, **_kwargs) -> None:
+            constructed_workers.extend(
+                thread
+                for thread in threading.enumerate()
+                if thread not in baseline and thread.name in worker_names
+            )
+            raise RuntimeError("main window construction failed")
+
+    monkeypatch.setattr("xenix.ui.main_window.MainWindow", FailingMainWindow)
+
+    with pytest.raises(RuntimeError, match="main window construction failed"):
+        build_main_window(show=False, show_splash=False)
+
+    assert sorted(thread.name for thread in constructed_workers) == sorted(
+        worker_names
+    )
+    assert all(not thread.is_alive() for thread in constructed_workers)
 
 
 def test_startup_observability_flush_remains_explicitly_available(
@@ -410,6 +531,7 @@ def test_startup_runtime_import_wait_keeps_splash_pulse_animating(monkeypatch, t
 
     real_load_runtime_imports = app_module._load_runtime_imports
     captured_phases = []
+    import_thread_ids = []
 
     class ProbeSplash(StartupSplash):
         def show_centered(self) -> None:
@@ -419,11 +541,14 @@ def test_startup_runtime_import_wait_keeps_splash_pulse_animating(monkeypatch, t
             captured_phases.append(self._pulse_bar._phase)
             super().close()
 
-    def slow_load_runtime_imports():
+    def slow_load_runtime_imports(*, module_loaded=None):
+        import_thread_ids.append(threading.get_ident())
         deadline = time.perf_counter() + 0.12
         while time.perf_counter() < deadline:
             time.sleep(0.01)
-        return real_load_runtime_imports()
+        if module_loaded is not None:
+            module_loaded()
+        return real_load_runtime_imports(module_loaded=module_loaded)
 
     monkeypatch.setattr(app_module, "StartupSplash", ProbeSplash)
     monkeypatch.setattr(app_module, "_load_runtime_imports", slow_load_runtime_imports)
@@ -432,6 +557,7 @@ def test_startup_runtime_import_wait_keeps_splash_pulse_animating(monkeypatch, t
     try:
         assert captured_phases
         assert captured_phases[-1] > 0.0
+        assert import_thread_ids == [threading.get_ident()]
     finally:
         window.close()
         app.processEvents()
