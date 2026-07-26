@@ -182,9 +182,9 @@ accepts a re-baseline; timeout must not be set equal to the performance budget.
 
 ## Current Truth
 
-- Slice implementation is active in clean linked worktree
-  `Xenix_native-cicd` on `codex/cicd-simplification`; it is not committed, pushed,
-  merged, or applied to GitHub/OSS.
+- The implementation is committed on `codex/cicd-simplification`, published to
+  GitHub, and fast-forwarded into `origin/develop`. The local `develop` worktree
+  has merge-pulled that state while preserving product commit `931450f`.
 - Repository code now defines `develop -> main` promotion CI with stable
   `Native CI Gate`, exact-tag/promotion preflight, and a read-only audit for the
   required main/tag rulesets plus `native-release` Environment policy.
@@ -209,10 +209,11 @@ accepts a re-baseline; timeout must not be set equal to the performance budget.
 - A first full run had one unrelated encrypted-PDF import timeout while Docling
   loaded weights under concurrent suite load; the isolated case passed in `22 s`
   and the final full run passed. No test timeout was changed.
-- GitHub production truth is still the old state: current active rulesets do not
-  require promotion/status checks; `native-release` is not configured; old
-  Environments remain. These controls cannot be activated until the new workflow
-  exists on GitHub and its stable check context has run.
+- GitHub production controls are still the old state: current active rulesets do
+  not require promotion/status checks; `native-release` is not configured; old
+  Environments remain. The workflow now exists on `develop`; its first
+  `develop -> main` promotion run will establish the stable check context needed
+  before those controls can be activated.
 - The accepted v1.2.0 baseline remains about 110 minutes, including about 47
   minutes for upload/remote verification. No new-run timing sample exists yet, so
   none of the execution budgets is accepted.
@@ -236,7 +237,9 @@ accepts a re-baseline; timeout must not be set equal to the performance budget.
 
 ## Next Step
 
-Finish local static/full validation and review the diff. After explicit commit/push
-authorization, publish the implementation branch, open its PR, then apply/audit
-GitHub controls in dependency order. Only after a safe cold release and interrupted
-same-tag retry produce timing/evidence can all three slices be accepted.
+Use the v1.3.0 `develop -> main` promotion PR as the first qualifying Native CI
+run. Stop after CI evidence is confirmed: do not merge the promotion PR, create
+the tag, enter the release Environment, or publish artifacts until the user
+resumes. Afterward apply/audit GitHub controls in dependency order; all three
+slices remain open until a safe cold release and interrupted same-tag retry
+produce timing evidence.
