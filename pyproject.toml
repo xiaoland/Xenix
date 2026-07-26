@@ -63,7 +63,11 @@ smoke-package = "python scripts/verify_packaged_smoke.py"
 velopack = "python scripts/package_velopack.py"
 release-manifest = "python scripts/write_release_manifest.py"
 release-identity = "python scripts/verify_release_identity.py"
-release-candidate = { composite = ["build-knowledge-ocr", "package", "smoke-package", "velopack", "release-manifest"] }
+release-controls-audit = "python scripts/audit_release_controls.py"
+release-timings = "python scripts/report_native_workflow_timings.py"
+release-package = { composite = ["package", "smoke-package", "velopack", "release-manifest"] }
+release-build = { composite = ["build-knowledge-ocr", "package", "smoke-package", "velopack", "release-manifest"] }
+release-publish = "python scripts/publish_oss_release.py"
 dist = "python scripts/build_distribution_zip.py"
 pytest = "python scripts/run_pytest.py"
 test = { composite = ["i18n-compile", "python scripts/run_pytest.py"] }

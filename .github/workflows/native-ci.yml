@@ -2,17 +2,34 @@ name: Native CI
 
 on:
   pull_request:
-    paths-ignore: ["website/**"]
-  push:
     branches: [main]
-    paths-ignore: ["website/**"]
 
 permissions:
   contents: read
 
 jobs:
+  promotion-contract:
+    name: Promotion Contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require same-repository develop to main
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          test "$HEAD_REF" = "develop"
+          test "$HEAD_REPOSITORY" = "$REPOSITORY"
+          test "$BASE_REF" = "main"
+
   test:
+    name: Python ${{ matrix.python }}
+    needs: promotion-contract
     runs-on: windows-2022
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -27,3 +44,19 @@ jobs:
       - run: pdm install --frozen-lockfile -G :all
       - run: pdm run check
       - run: pdm run test
+
+  gate:
+    name: Native CI Gate
+    if: always()
+    needs: [promotion-contract, test]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every promotion check
+        shell: bash
+        env:
+          CONTRACT_RESULT: ${{ needs.promotion-contract.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+        run: |
+          test "$CONTRACT_RESULT" = "success"
+          test "$TEST_RESULT" = "success"

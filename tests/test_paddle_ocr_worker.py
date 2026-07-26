@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -54,6 +55,48 @@ def test_runtime_archive_is_deterministic_and_catalog_binds_exact_bytes(tmp_path
     assert payload["artifact_name"] == "first.zip"
     assert payload["artifact_bytes"] == first.stat().st_size
     assert payload["artifact_sha256"] == build.sha256_file(first)
+
+
+def test_cached_runtime_restore_revalidates_archive_and_native_self_test(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    build = _build_module()
+    output = tmp_path / "output"
+    output.mkdir()
+    staged_runtime = tmp_path / "runtime"
+    staged_runtime.mkdir()
+    (staged_runtime / "xenix-ocr.exe").write_bytes(b"worker")
+    archive = output / "xenix-knowledge-ocr.zip"
+    build.write_deterministic_archive(staged_runtime, archive)
+    build.write_catalog(build.load_lock(), archive, output / "runtime_catalog.json")
+    golden = tmp_path / "golden.png"
+    golden.write_bytes(b"image")
+    verified: list[tuple[Path, Path]] = []
+    monkeypatch.setattr(
+        build,
+        "download_locked",
+        lambda *_args, **_kwargs: golden,
+    )
+    monkeypatch.setattr(
+        build,
+        "verify_runtime",
+        lambda runtime, image: verified.append((runtime, image)),
+    )
+
+    restored_archive, catalog = build.verify_output(
+        SimpleNamespace(
+            output_dir=output,
+            cache_dir=tmp_path / "downloads",
+            work_dir=tmp_path / "work",
+        )
+    )
+
+    assert restored_archive == archive
+    assert catalog == output / "runtime_catalog.json"
+    assert len(verified) == 1
+    assert verified[0][0].name == build.RUNTIME_DIRECTORY
+    assert verified[0][1] == golden
 
 
 def test_native_worker_source_owns_only_bounded_stdio_protocol() -> None:

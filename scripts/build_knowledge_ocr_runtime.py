@@ -650,6 +650,61 @@ def write_catalog(lock: dict[str, Any], archive: Path, destination: Path) -> Non
     )
 
 
+def verify_output(args: argparse.Namespace) -> tuple[Path, Path]:
+    lock = load_lock()
+    output = args.output_dir.resolve()
+    cache = args.cache_dir.resolve()
+    catalog = output / "runtime_catalog.json"
+    if not catalog.is_file():
+        raise RuntimeError("Cached Knowledge OCR runtime catalog is missing.")
+    payload = json.loads(catalog.read_text(encoding="utf-8"))
+    expected_keys = {
+        "schema_version",
+        "artifact_name",
+        "artifact_bytes",
+        "artifact_sha256",
+        "protocol_version",
+        "runtime_id",
+        "model_pack_id",
+    }
+    if not isinstance(payload, dict) or payload.keys() != expected_keys:
+        raise RuntimeError("Cached Knowledge OCR runtime catalog shape is invalid.")
+    if (
+        payload["schema_version"] != 1
+        or payload["protocol_version"] != lock["protocol_version"]
+        or payload["runtime_id"] != lock["runtime_id"]
+        or payload["model_pack_id"] != lock["model_pack_id"]
+    ):
+        raise RuntimeError("Cached Knowledge OCR runtime identity is invalid.")
+    artifact_name = payload["artifact_name"]
+    if (
+        not isinstance(artifact_name, str)
+        or Path(artifact_name).name != artifact_name
+        or artifact_name in {"", ".", ".."}
+    ):
+        raise RuntimeError("Cached Knowledge OCR runtime artifact name is unsafe.")
+    archive = output / artifact_name
+    if (
+        not archive.is_file()
+        or archive.stat().st_size != payload["artifact_bytes"]
+        or sha256_file(archive) != payload["artifact_sha256"]
+    ):
+        raise RuntimeError("Cached Knowledge OCR runtime artifact is corrupt.")
+
+    golden = download_locked("golden_image", lock["downloads"]["golden_image"], cache)
+    verification = args.work_dir.resolve() / "cached-output-verification"
+    shutil.rmtree(verification, ignore_errors=True)
+    try:
+        _safe_extract_zip(archive, verification)
+        runtime = verification / RUNTIME_DIRECTORY
+        if not runtime.is_dir():
+            raise RuntimeError("Cached Knowledge OCR archive layout is invalid.")
+        verify_runtime(runtime, golden)
+    finally:
+        shutil.rmtree(verification, ignore_errors=True)
+    return archive, catalog
+
+
 def build(args: argparse.Namespace) -> tuple[Path, Path]:
     lock = load_lock()
     work = args.work_dir.resolve()
@@ -700,11 +755,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--cache-dir", type=Path, default=DEFAULT_WORK_ROOT / "downloads")
     parser.add_argument("--vcomp140", type=Path)
+    parser.add_argument(
+        "--verify-output",
+        action="store_true",
+        help="Verify a cached output archive, including its native OCR self-test.",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
-    archive, catalog = build(parse_args())
+    args = parse_args()
+    archive, catalog = verify_output(args) if args.verify_output else build(args)
     print(archive)
     print(catalog)
     return 0

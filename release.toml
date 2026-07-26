@@ -1,3 +1,6 @@
+[release]
+protocol_version = 1
+
 [application]
 pack_id = "dev.lanzhijiang.xenix"
 title = "Xenix"

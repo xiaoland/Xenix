@@ -305,6 +305,58 @@ def test_closing_reused_main_window_stops_application_owned_knowledge_workers(
         assert all(not thread.is_alive() for thread in owned_workers)
 
 
+@pytest.mark.parametrize(
+    "open_order",
+    [
+        ("settings", "knowledge"),
+        ("knowledge", "settings"),
+    ],
+)
+def test_secondary_windows_quiesce_in_both_open_orders(
+    monkeypatch,
+    tmp_path: Path,
+    open_order: tuple[str, str],
+) -> None:
+    runtime_home = tmp_path / "-".join(open_order)
+    worker_names = {
+        "xenix-knowledge-derivation",
+        "xenix-knowledge-import",
+        "xenix-knowledge-index",
+    }
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
+    baseline = set(threading.enumerate())
+    app, window = build_main_window(show=False, show_splash=False)
+
+    for secondary in open_order:
+        if secondary == "settings":
+            window._open_settings()
+        else:
+            window._open_knowledge_workspace()
+        app.processEvents()
+
+    settings = window._settings_dialog
+    workspace = window._knowledge_workspace
+    assert settings is not None
+    assert workspace is not None
+    owned_workers = [
+        thread
+        for thread in threading.enumerate()
+        if thread not in baseline and thread.name in worker_names
+    ]
+
+    window.close()
+    app.processEvents()
+
+    assert settings._shutdown is True
+    assert workspace._shutdown is True
+    assert settings._thread_pool.activeThreadCount() == 0
+    assert workspace._thread_pool.activeThreadCount() == 0
+    assert all(not thread.is_alive() for thread in owned_workers)
+    with sqlite3.connect(runtime_home / "state" / "xenix.db") as connection:
+        assert connection.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+
+
 def test_failed_main_window_construction_stops_application_owned_knowledge_workers(
     monkeypatch,
     tmp_path: Path,
