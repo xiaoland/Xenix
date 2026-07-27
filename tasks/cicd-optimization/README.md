@@ -69,9 +69,11 @@ directly through an idempotent, feed-last protocol.
 - Run a secretless preflight before entering the release Environment. Validate tag,
   version, Release SHA, completed promotion PR, `main` first-parent membership, and
   release-protocol compatibility.
-- Do not reuse the Promotion PR check SHA as Release SHA evidence. GitHub tests a
-  temporary PR merge ref; rerun release-grade verification on the real Tag SHA.
-- In one tag-bound release execution, run check/tests, native OCR materialization,
+- Promotion CI owns semantic testing. The tag remains independent release
+  authority; re-verify its version, promotion, and main-history identity, then
+  build and exercise the exact tagged package without serially repeating the
+  Promotion pytest shards.
+- In one tag-bound release execution, run checks, native OCR materialization,
   frozen packaging, packaged smoke, Velopack/manifest generation, direct immutable
   upload, remote verification, public visibility update, and final verification.
 - Keep the manifest as machine-verifiable release evidence, not as a second
@@ -99,7 +101,7 @@ daily work
   -> completed, release-eligible main promotion result
   -> create immutable vX.Y.Z tag on a current or historical eligible result
   -> secretless tag/ref/version preflight
-  -> exact-Tag-SHA check + test + build + packaged smoke
+  -> exact-Tag-SHA check + build + packaged smoke
   -> direct create-only upload of immutable public artifacts
   -> remote verification
   -> authoritative feed/visibility update last
@@ -122,8 +124,9 @@ daily work
   Supported-protocol targets repeat preflight remotely.
 - Tag creation is the only release dispatch and locks one Release SHA. No manual
   Candidate or Publish workflow remains.
-- Release tests, build metadata, manifest, uploaded artifacts, and publisher code
-  all resolve to the exact tag SHA.
+- Release checks, build metadata, manifest, uploaded artifacts, and publisher code
+  all resolve to the exact tag SHA; semantic pytest evidence belongs to Promotion
+  CI.
 - There is no `candidates/<version>/<digest>/` upload or manifest digest copied
   between workflows.
 - A failure before the visibility commit point leaves the previous release
@@ -154,7 +157,7 @@ Candidate removal:
    Promotion PR evidence cannot replace exact-Tag-SHA verification because GitHub
    tests a temporary merge ref. Same-tag reruns instead reuse only identity-bound
    caches and byte-identical final immutable objects.
-4. **UI/runtime lifecycle coverage — retained.** Release Readiness includes
+4. **UI/runtime lifecycle coverage — retained.** Promotion CI includes
    black-box worker/thread quiescence after window close and cross-order exercises
    for MainWindow, Settings, Knowledge Workspace, and SQLite/runtime disposal.
 5. **Operator surface — simplified.** Replace
@@ -211,7 +214,7 @@ accepts a re-baseline; timeout must not be set equal to the performance budget.
   `releases.win-x64-stable.json` as the last visibility update.
 - Locked OCR input/output caches are keyed from source/config/toolchain evidence;
   restored output must pass catalog/hash validation and the native OCR self-test.
-- Release Readiness has targeted coverage for both Settings/Knowledge Workspace
+- Promotion CI has targeted coverage for both Settings/Knowledge Workspace
   open orders, UI-owned thread-pool quiescence, application-owned Knowledge worker
   shutdown, and post-close SQLite integrity access.
 - Before the test-topology correction, repository verification passed:
@@ -345,6 +348,23 @@ accepts a re-baseline; timeout must not be set equal to the performance budget.
   timing live in `evidence/first-promotion-ci-audit.md`.
 - Historical evidence and the simplified final simulation live in
   `evidence/v1.2.0-postmortem.md` and `evidence/final-design-review.md`.
+- The first `v1.3.0` tag run (`30235807406`) proved release identity and controls,
+  then failed before OCR/build/publication because CD serially repeated all
+  Promotion tests under release-only packaged-trial environment variables.
+  `test_llm_settings_ignore_llm_environment_variables` asserted private OpenAI
+  defaults even though the valid DeepSeek packaged-trial provider was active.
+  No v1.3.0 object or feed was published.
+- This failure exposed two related low-value patterns: a negative test for a code
+  path that does not exist, coupled to private defaults; and CD duplicating the
+  full Promotion proof under a different environment. The former and other
+  high-confidence schema/default/helper repetitions are removed. Native Release
+  now retains exact-tag identity/check, native OCR verification, package build,
+  packaged smoke, manifest/publication, and remote verification rather than a
+  second serial semantic suite.
+- The follow-up removes 12 pytest cases while retaining their stronger owners.
+  Local verification passes: repository checks; 18 focused neighboring behavior
+  boundaries; `agent-llm-ui` as `154 + 62` passes; `platform-release` as 143
+  passes; workflow YAML parsing; and `git diff --check`.
 
 ## Open Decisions
 

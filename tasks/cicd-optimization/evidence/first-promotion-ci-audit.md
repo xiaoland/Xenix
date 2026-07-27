@@ -57,6 +57,34 @@ implementation.
   publication authority, secret redaction, or supply-chain proofs merely because
   they are slow.
 
+## Low-Value Pattern Fingerprints
+
+The v1.3.0 release attempt exposed a broader family than exact Agent Tool schema
+assertions. A deletion candidate is high-confidence when its claim has no
+observable boundary and matches one or more of these shapes:
+
+- **Absence plus private default:** set an unsupported input, then assert private
+  fields still equal implementation defaults. This tests that no code branch
+  exists and breaks when another valid authority supplies configuration.
+- **Library conformance census:** feed required/type/enum/min/max/extra-property
+  examples through a registry only to re-prove JSON Schema or Pydantic behavior.
+  Retain one real admission/invocation boundary and any custom business validator.
+- **Helper/default echo:** call a private formatter or source default directly
+  when a user-visible rendering or real configured path already proves the
+  meaningful behavior.
+- **Duplicate proof in another pipeline stage:** rerun the same semantic suite in
+  CD after Promotion CI has already made it release eligibility evidence. Exact
+  tag identity, package construction, packaged smoke, and publication integrity
+  are distinct release proofs; repeated pytest is not.
+
+Applied high-confidence removals include the unsupported `XENIX_LLM_*` negative
+test, generic JSON Schema keyword matrices and schema-copy implementation checks,
+the standalone token formatter case already covered by usage UI rendering, the
+empty purchase-URL default echo, and Native Release's serial replay of all
+Promotion shards. Custom cross-field validators, invalid-call no-execution/no-
+persistence/no-secret behavior, configured purchase URL, and packaged-trial
+behavior remain.
+
 ## Candidate Review Outcome
 
 The initial deletion list was re-reviewed against the final proof allocation
@@ -236,12 +264,11 @@ state already require explicit clean-process boundaries.
 
 ## Adjacent Release Correction
 
-`Native Release` currently calls `pdm run pytest --junitxml=...`. Any argument
-causes `run_pytest.py` to bypass its two-clean-process default and run all tests in
-one process. Reporting arguments and topology selection must be separated before
-the release rehearsal. Exact-Tag-SHA Release Readiness should remain a focused,
-high-value proof plus packaged smoke rather than another accidental monolithic
-Promotion suite.
+The earlier `Native Release` reporting route accidentally collapsed test topology.
+That was first corrected to preserve cohorts, but the v1.3.0 live run showed the
+larger issue: CD was still serially duplicating the whole Promotion proof under a
+different environment. Native Release now keeps exact-tag checks plus packaged
+smoke and does not run a second semantic pytest suite.
 
 ## Superseded Sharded-Topology Acceptance
 

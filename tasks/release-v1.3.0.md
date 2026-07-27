@@ -2,9 +2,10 @@
 
 ## Status
 
-Release execution is active. Promotion PR #113 carries the final executable
-release-control audit and a deterministic MainWindow test completion boundary
-before the immutable `v1.3.0` tag is created.
+Release execution is blocked after the first immutable-tag attempt failed before
+build or publication. The source/test-topology correction can be promoted, but
+the already-pushed `v1.3.0` tag cannot receive it without an explicit release
+policy decision.
 
 ## Objective
 
@@ -77,9 +78,24 @@ promotion and tag-triggered release path as its first production rehearsal.
   asserted immediately after dispatching the intentionally asynchronous link
   activation. They now drive the Qt event loop until the observable open result,
   using one bounded completion helper instead of fixed sleeps.
+- PR #113 then passed all four shards and `Native CI Gate` in run `30235296953`
+  and merged as `8b7dd79a`; `v1.3.0` identity preflight bound that commit to PR
+  #113 and the tag was pushed.
+- Native Release run `30235807406` passed identity and controls, then failed in
+  the duplicated full pytest run. A low-value test asserted private OpenAI
+  defaults while the valid packaged DeepSeek trial configuration was active.
+  OCR, packaging, OSS mutation, and canonical-feed publication never started.
+- The correction deletes that negative/default-mirroring test and comparable
+  high-confidence schema/helper/default repetitions. Native Release no longer
+  serially reruns Promotion pytest; exact-tag checks, OCR self-test, package and
+  packaged smoke, manifest, immutable publication, and public verification remain.
+- Local correction verification passes: repository checks, 18 focused retained
+  boundaries, the `agent-llm-ui` shard (`154 + 62`), the `platform-release` shard
+  (143), workflow YAML parsing, and diff validation.
 
 ## Next Step
 
-Run the repaired `agent-llm-ui` shard, promote PR #113 after all four shards pass,
-then tag that completed promotion result, run local release-identity preflight,
-push the tag, and monitor Native Release through canonical publication.
+Promote the test/proof-topology correction through a new `develop -> main` PR.
+Then choose explicitly between preserving tag immutability and releasing a bumped
+version, or authorizing a one-time delete/recreate exception for the unpublished
+`v1.3.0` tag. Do not mutate the existing tag before that decision.

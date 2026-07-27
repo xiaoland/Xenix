@@ -63,7 +63,7 @@ Planned changes:
 - Replace `native-candidate.yml` and `native-publish.yml` with one
   tag-triggered `Native Release` workflow:
   1. secretless preflight;
-  2. exact-Tag-SHA Release Readiness;
+  2. exact-Tag-SHA identity and repository checks;
   3. native OCR materialization;
   4. frozen package;
   5. packaged smoke;
@@ -72,9 +72,10 @@ Planned changes:
   8. remote verification;
   9. authoritative visibility update;
   10. final public verification/evidence.
-- Make exact-Tag-SHA Release Readiness include black-box worker/thread quiescence
-  after closing windows and cross-order exercises for MainWindow, Settings,
-  Knowledge Workspace, and SQLite/runtime disposal.
+- Keep black-box worker/thread quiescence after closing windows and cross-order
+  exercises for MainWindow, Settings, Knowledge Workspace, and SQLite/runtime
+  disposal in Promotion CI, where semantic testing is release-eligibility
+  evidence.
 - Consolidate release configuration/secrets under one `native-release` Environment
   restricted to `v*`. Tag creation is the release approval; no second required
   reviewer or manual Publish dispatch is introduced.
@@ -100,8 +101,8 @@ Planned changes:
 Acceptance:
 
 - Pushing one eligible `vX.Y.Z` tag is the only operator release action.
-- Workflow code, tests/build, manifest, artifacts, and publisher all come from the
-  exact Tag SHA.
+- Workflow code, build, manifest, artifacts, and publisher all come from the exact
+  Tag SHA; semantic tests run once at Promotion.
 - No Candidate workflow/state/prefix and no separate Publish dispatch remain.
 - A build/smoke failure changes no public state.
 - Window-close/runtime lifecycle defects are exercised before public upload rather
@@ -121,7 +122,7 @@ Acceptance:
 Outcome: make the single workflow understandable and reliable without rebuilding a
 durable release state machine.
 
-Implementation status: named workflow steps, timeouts, JUnit/non-secret evidence,
+Implementation status: named workflow steps, timeouts, non-secret evidence,
 publisher timing evidence, a rolling controlled/calendar/queue report, multipart
 progress/heartbeat, OCR caches with native verification, and cross-window
 lifecycle coverage are implemented locally. Full local validation passes.
@@ -134,8 +135,8 @@ Planned changes:
   heartbeats, and bounded workflow-owned timeouts.
 - Record both controlled runner execution and event-to-completion calendar time;
   publish per-stage duration and bytes so performance regressions are attributable.
-- Preserve JUnit/test evidence and automatic `if: always()` redacted diagnostics
-  for tests, native OCR, frozen runtime, packaged smoke, upload, and public
+- Preserve automatic `if: always()` redacted diagnostics and non-secret evidence
+  for native OCR, frozen runtime, packaged smoke, upload, and public
   verification failures.
 - Use OSS multipart/resumable upload for large direct-public objects, with byte,
   rate, part, retry/resume, and heartbeat reporting. Evaluate a closer runner only

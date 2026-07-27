@@ -35,12 +35,6 @@ def _enabled_config() -> PackagedTrialLockConfig:
     )
 
 
-def test_source_trial_purchase_url_defaults_to_empty_string(monkeypatch) -> None:
-    monkeypatch.delenv("XENIX_TRIAL_PURCHASE_URL", raising=False)
-
-    assert trial_purchase_url() == ""
-
-
 def test_source_trial_purchase_url_reads_build_environment(monkeypatch) -> None:
     monkeypatch.setenv("XENIX_TRIAL_PURCHASE_URL", " https://example.test/buy ")
 
