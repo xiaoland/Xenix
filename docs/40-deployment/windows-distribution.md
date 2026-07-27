@@ -113,6 +113,11 @@ The app package embeds only the native OCR catalog. The manifest admits the OCR
 archive from its approved output root as a typed artifact and fails if catalog
 and archive identity disagree.
 
+The OCR catalog names its archive by runtime ID plus the archive's complete
+SHA-256. The public object key is therefore content-addressed: separate build
+bytes can coexist safely, while each packaged client remains bound to one exact
+catalog hash.
+
 Packaged smoke installs the already-built locked OCR generation offline, runs its
 native self-test and golden-image recognition through the spawned Knowledge
 worker, imports the image, derives bounded Units, reaches keyword lookup, and

@@ -7,7 +7,9 @@ not part of the desktop application's Python environment.
 Run `pdm run build-knowledge-ocr` from a Developer PowerShell with the pinned MSVC
 toolchain available. The build verifies every downloaded byte, applies the reviewed
 compatibility patch, executes the real stdio protocol checks, and writes the
-deterministic archive plus `runtime_catalog.json` under `dist/knowledge-ocr/`.
+normalized archive plus `runtime_catalog.json` under `dist/knowledge-ocr/`. The
+archive name includes its complete SHA-256, so rebuilt runtime bytes never collide
+with an earlier immutable object that has the same logical runtime ID.
 
 The application downloads only that Xenix-built archive from its configured release
 origin. It never installs Python, pip, Paddle packages, or models on an end-user
