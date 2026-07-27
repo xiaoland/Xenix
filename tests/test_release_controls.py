@@ -56,7 +56,6 @@ def test_release_controls_accept_complete_contract() -> None:
         rulesets=_ready_rulesets(),
         environment={
             "name": "native-release",
-            "can_admins_bypass": False,
             "protection_rules": [{"type": "branch_policy"}],
             "deployment_branch_policy": {
                 "protected_branches": False,

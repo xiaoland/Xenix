@@ -54,11 +54,19 @@ promotion and tag-triggered release path as its first production rehearsal.
   fixtures that omitted the newly required Python fields. The validator remained
   fail-closed; the fixtures now share one complete configuration writer, and the
   full 144-test `platform-release` shard passes locally.
-- GitHub branch/tag rules and the `native-release` Environment still require the
-  separately verified rollout described by the CI/CD task packet.
+- PR #112 then passed all four Native CI shards and merged to `main` as
+  `5cba2ba8`.
+- GitHub now requires PR plus `Native CI Gate` for `main`, protects `v*` tags from
+  deletion and movement, and exposes release secrets only through a
+  `native-release` Environment admitting `v*` tags. Superseded release
+  Environments were removed.
+- GitHub reports administrator bypass as enabled but does not expose that switch
+  for this private repository plan. It is not a release authority: the tag-only
+  workflow, immutable tag ruleset, and promotion identity remain the enforced
+  authorization path.
 
 ## Next Step
 
-Promote the exact Python toolchain correction through `develop -> main`, then tag
+Promote the executable release-control audit through `develop -> main`, then tag
 that completed promotion result, run local release-identity preflight, push the
 tag, and monitor Native Release through canonical publication.

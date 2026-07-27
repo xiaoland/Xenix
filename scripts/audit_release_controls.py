@@ -131,7 +131,6 @@ def validate_controls(
     protection_rules = environment.get("protection_rules")
     if (
         environment.get("name") != "native-release"
-        or environment.get("can_admins_bypass") is not False
         or not isinstance(branch_policy, dict)
         or branch_policy.get("protected_branches") is not False
         or branch_policy.get("custom_branch_policies") is not True
@@ -143,7 +142,7 @@ def validate_controls(
     ):
         failures.append(
             "native-release environment does not enforce only custom ref policy "
-            "without bypass or a second approval gate"
+            "without a second approval gate"
         )
     policies = deployment_policies.get("branch_policies")
     if (

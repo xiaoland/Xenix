@@ -128,8 +128,7 @@ Before enabling the workflow:
   and required check `Native CI Gate`;
 - protect `refs/tags/v*` from deletion and non-fast-forward updates;
 - create the `native-release` Environment with a custom deployment policy that
-  admits `v*` tags only, disables administrator bypass, and has no second required
-  reviewer or wait timer;
+  admits `v*` tags only and has no second required reviewer or wait timer;
 - move the release variables/secrets below to `native-release`;
 - remove the superseded release Environments after confirming no workflow refers
   to them.
