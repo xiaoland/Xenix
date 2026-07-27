@@ -50,6 +50,10 @@ promotion and tag-triggered release path as its first production rehearsal.
   `release.toml` still recorded `3.14.6`; publishing from that state would make
   the immutable release manifest false.
 - `v1.3.0` remains unused locally and remotely, and no release workflow has run.
+- PR #112's first Native CI attempt exposed three release-identity behavior
+  fixtures that omitted the newly required Python fields. The validator remained
+  fail-closed; the fixtures now share one complete configuration writer, and the
+  full 144-test `platform-release` shard passes locally.
 - GitHub branch/tag rules and the `native-release` Environment still require the
   separately verified rollout described by the CI/CD task packet.
 
