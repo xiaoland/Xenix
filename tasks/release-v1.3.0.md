@@ -2,8 +2,8 @@
 
 ## Status
 
-Release execution is active. Promotion PR #111 passed Native CI and was merged,
-but release preflight found a Python toolchain identity drift that must be promoted
+Release execution is active. Promotion PR #113 carries the final executable
+release-control audit and a deterministic MainWindow test completion boundary
 before the immutable `v1.3.0` tag is created.
 
 ## Objective
@@ -54,11 +54,32 @@ promotion and tag-triggered release path as its first production rehearsal.
   fixtures that omitted the newly required Python fields. The validator remained
   fail-closed; the fixtures now share one complete configuration writer, and the
   full 144-test `platform-release` shard passes locally.
-- GitHub branch/tag rules and the `native-release` Environment still require the
-  separately verified rollout described by the CI/CD task packet.
+- PR #112 then passed all four Native CI shards and merged to `main` as
+  `5cba2ba8`.
+- GitHub now requires PR plus `Native CI Gate` for `main`, protects `v*` tags from
+  deletion and movement, and exposes release secrets only through a
+  `native-release` Environment admitting `v*` tags. Superseded release
+  Environments were removed.
+- GitHub reports administrator bypass as enabled but does not expose that switch
+  for this private repository plan. It is not a release authority: the tag-only
+  workflow, immutable tag ruleset, and promotion identity remain the enforced
+  authorization path.
+- PR #113 run `30233380523` passed `analysis-data`, `knowledge`, and
+  `platform-release`. `agent-llm-ui` received an attachment-import FAILED event
+  before the Harness terminal error reached the UI, so the test could fail while
+  its daemon submission thread was still crossing the following MainWindow test
+  boundary; the job then reached its 30-minute limit.
+- The attachment-failure test now waits for both the FAILED presentation and the
+  terminal submission boundary. Native CI also prints each executing test name,
+  so a future hard timeout identifies the active contract without replacing the
+  existing four-shard topology.
+- The first repaired local shard run then exposed three artifact-link tests that
+  asserted immediately after dispatching the intentionally asynchronous link
+  activation. They now drive the Qt event loop until the observable open result,
+  using one bounded completion helper instead of fixed sleeps.
 
 ## Next Step
 
-Promote the exact Python toolchain correction through `develop -> main`, then tag
-that completed promotion result, run local release-identity preflight, push the
-tag, and monitor Native Release through canonical publication.
+Run the repaired `agent-llm-ui` shard, promote PR #113 after all four shards pass,
+then tag that completed promotion result, run local release-identity preflight,
+push the tag, and monitor Native Release through canonical publication.

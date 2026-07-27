@@ -35,6 +35,7 @@ jobs:
         run: >-
           pdm run test
           --promotion-shard "${{ matrix.shard }}"
+          -vv
           --junitxml "pytest-${{ matrix.shard }}.xml"
       - name: Preserve test report
         if: always()
