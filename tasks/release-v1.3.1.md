@@ -2,9 +2,9 @@
 
 ## Status
 
-Ready for the `develop -> main` Promotion PR. The accepted CI/test portfolio and
-headed Agent Harness benchmark have unlocked the v1.3.1 version mutation. Tag
-creation and release execution still wait for the promoted Native CI result.
+Consumed by a safe publication failure. `v1.3.1` remains immutable at main
+promotion commit `6760286f`; it is not publicly visible because the publisher
+failed before updating the canonical feed.
 
 ## Objective
 
@@ -15,8 +15,8 @@ proportionate to the product and the redesigned proof portfolio passes.
 
 - Never move or delete `v1.3.0`; it remains the immutable identity of the failed,
   unpublished attempt.
-- Do not create `v1.3.1`, enter the release Environment, or mutate OSS/public
-  feeds before the redesigned Native CI passes on the promotion PR.
+- Never move or delete `v1.3.1`, overwrite its uploaded package, or overwrite the
+  conflicting shared OCR object.
 - Preserve the promoted product/release history and use a new
   `develop -> main` Promotion PR for the accepted CI/test architecture.
 - Preserve unrelated user worktree changes.
@@ -27,9 +27,9 @@ proportionate to the product and the redesigned proof portfolio passes.
 - Boundary models and static analysis own input-shape facts; semantic tests own
   user outcomes, state, side effects, and trust-boundary failure behavior.
 - The agreed Promotion duration budgets pass the required qualifying sample.
-- A final promoted main result declares v1.3.1 and passes release identity
-  preflight before the immutable tag is pushed.
-- Native Release publishes and publicly verifies v1.3.1 without moving v1.3.0.
+- The canonical feed remains v1.2.0.
+- The successor release uses a content-addressed OCR object key and does not
+  mutate either conflicting object.
 
 ## Current Truth
 
@@ -42,10 +42,14 @@ proportionate to the product and the redesigned proof portfolio passes.
 - Local acceptance passed `pdm run test`, `pdm run check`, and `pdm run smoke`.
   The visible benchmark also exercised real file import, the configured external
   LLM, chart work, and knowledge retrieval through the actual desktop UI.
-- `pyproject.toml` now declares `1.3.1`; the immutable tag remains uncreated.
+- PR #115 passed Native CI and produced main promotion commit `6760286f`.
+- Local and remote release identity checks bound `v1.3.1` to that commit and PR.
+- Native OCR build, package, and packaged smoke passed in run `30258978782`.
+- The publisher uploaded and verified the v1.3.1 full package, then failed closed
+  because the current OCR archive and an existing immutable OCR object shared a
+  runtime-only key but had different size and SHA-256.
+- The canonical feed still declares v1.2.0; v1.3.1 never became visible.
 
 ## Next Step
 
-Promote this result through a `develop -> main` PR, require Native CI to pass,
-then create and locally verify `v1.3.1` on the eligible main promotion result
-before pushing the immutable tag.
+Publish the content-addressing correction as a new v1.3.2 promotion and release.

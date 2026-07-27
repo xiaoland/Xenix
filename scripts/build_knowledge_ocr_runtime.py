@@ -46,6 +46,10 @@ REQUIRED_DOWNLOADS = {
 }
 
 
+def _content_addressed_artifact_name(runtime_id: str, artifact_sha256: str) -> str:
+    return f"xenix-knowledge-ocr-win-x64-{runtime_id}-{artifact_sha256}.zip"
+
+
 class _LockDocument(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
@@ -160,6 +164,18 @@ class KnowledgeOcrRuntimeCatalog(_LockDocument):
         if not value or value in {".", ".."} or Path(value).name != value:
             raise ValueError("Artifact name must be a safe file name.")
         return value
+
+    @model_validator(mode="after")
+    def _artifact_name_must_match_content_identity(self) -> Self:
+        expected = _content_addressed_artifact_name(
+            self.runtime_id,
+            self.artifact_sha256,
+        )
+        if self.artifact_name != expected:
+            raise ValueError(
+                "Artifact name must include the runtime and content identities."
+            )
+        return self
 
 
 def sha256_file(path: Path) -> str:
@@ -716,13 +732,18 @@ def verify_runtime(runtime: Path, golden_image: Path) -> None:
     log.unlink(missing_ok=True)
 
 
-def write_deterministic_archive(runtime: Path, destination: Path) -> None:
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary = destination.with_name(f".{destination.name}.{uuid4().hex}.tmp")
+def write_content_addressed_archive(
+    runtime: Path,
+    output: Path,
+    *,
+    runtime_id: str,
+) -> Path:
+    output.mkdir(parents=True, exist_ok=True)
+    temporary = output / f".knowledge-ocr-{uuid4().hex}.zip"
     try:
         with zipfile.ZipFile(
             temporary,
-            "w",
+            "x",
             compression=zipfile.ZIP_DEFLATED,
             compresslevel=9,
         ) as package:
@@ -734,7 +755,19 @@ def write_deterministic_archive(runtime: Path, destination: Path) -> None:
                 info.compress_type = zipfile.ZIP_DEFLATED
                 info.external_attr = 0o100644 << 16
                 package.writestr(info, path.read_bytes(), compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
-        os.replace(temporary, destination)
+        artifact_sha256 = sha256_file(temporary)
+        destination = output / _content_addressed_artifact_name(
+            runtime_id,
+            artifact_sha256,
+        )
+        if destination.exists():
+            if sha256_file(destination) != artifact_sha256:
+                raise RuntimeError(
+                    "Knowledge OCR content-addressed artifact conflicts with existing output."
+                )
+        else:
+            os.replace(temporary, destination)
+        return destination
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -833,9 +866,11 @@ def build(args: argparse.Namespace) -> tuple[Path, Path]:
         vcomp140=vcomp,
     )
     verify_runtime(runtime, downloads["golden_image"])
-    artifact_name = f"xenix-knowledge-ocr-win-x64-{lock.runtime_id}.zip"
-    archive = output / artifact_name
-    write_deterministic_archive(runtime, archive)
+    archive = write_content_addressed_archive(
+        runtime,
+        output,
+        runtime_id=lock.runtime_id,
+    )
     catalog = output / "runtime_catalog.json"
     write_catalog(lock, archive, catalog)
     return archive, catalog
