@@ -1,6 +1,7 @@
 import sqlite3
 import threading
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -74,6 +75,22 @@ def _seed_mock_history(window) -> None:
     current_item = window._history_list.currentItem()
     if current_item is not None:
         window._open_history_thread(current_item)
+
+
+def _process_events_until(
+    app: QApplication,
+    condition: Callable[[], bool],
+    *,
+    timeout: float = 2.0,
+) -> bool:
+    deadline = time.perf_counter() + timeout
+    while time.perf_counter() < deadline:
+        app.processEvents()
+        if condition():
+            return True
+        time.sleep(0.01)
+    app.processEvents()
+    return condition()
 
 
 def _sqlite_user_version(db_path: Path) -> int:
@@ -1044,9 +1061,11 @@ def test_thread_detail_view_renders_tool_image_artifact_preview(monkeypatch, tmp
         assert f'href="{rendered_uri}"' in detail_html
 
         item._detail_browser.anchorClicked.emit(QUrl(rendered_uri))
-        app.processEvents()
 
-        assert opened_paths == [artifact_path.resolve()]
+        assert _process_events_until(
+            app,
+            lambda: opened_paths == [artifact_path.resolve()],
+        )
     finally:
         window.close()
 
@@ -2243,12 +2262,15 @@ def test_main_window_import_failure_keeps_composer_and_marks_the_failed_tag(
         view._editor.setPlainText("Analyze this.")
         view._handle_button_clicked()
 
-        for _ in range(40):
-            app.processEvents()
+        def import_failed_and_submission_ended() -> bool:
             state = view._attachment_states.get(resolved_path)
-            if state is not None and state.status.value == AttachmentImportStatus.FAILED.value:
-                break
-            time.sleep(0.01)
+            return (
+                state is not None
+                and state.status.value == AttachmentImportStatus.FAILED.value
+                and window._active_submission_id is None
+            )
+
+        assert _process_events_until(app, import_failed_and_submission_ended)
 
         state = view._attachment_states[resolved_path]
         assert state.status.value == AttachmentImportStatus.FAILED.value
@@ -2646,9 +2668,11 @@ def test_thread_detail_view_artifact_link_resolves_and_opens_file(monkeypatch, t
         assert f'href="{rendered_uri}"' in html
 
         bubble.link_activated.emit(rendered_uri)
-        app.processEvents()
 
-        assert opened_paths == [artifact_path.resolve()]
+        assert _process_events_until(
+            app,
+            lambda: opened_paths == [artifact_path.resolve()],
+        )
     finally:
         window.close()
 
@@ -2726,9 +2750,11 @@ def test_thread_detail_view_renders_inline_image_artifact_preview(monkeypatch, t
         assert f'src="{rendered_uri}"' in html
 
         QTest.mouseClick(bubble._browser.viewport(), Qt.LeftButton, Qt.NoModifier, QPoint(20, 20))
-        app.processEvents()
 
-        assert opened_paths == [artifact_path.resolve()]
+        assert _process_events_until(
+            app,
+            lambda: opened_paths == [artifact_path.resolve()],
+        )
     finally:
         window.close()
 
