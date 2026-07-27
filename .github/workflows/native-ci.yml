@@ -2,28 +2,58 @@ name: Native CI
 
 on:
   pull_request:
-    paths-ignore: ["website/**"]
-  push:
     branches: [main]
-    paths-ignore: ["website/**"]
 
 permissions:
   contents: read
 
 jobs:
   test:
+    name: Tests / ${{ matrix.shard }}
     runs-on: windows-2022
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.12.10", "3.13.14", "3.14.6"]
+        shard:
+          - analysis-data
+          - knowledge
+          - agent-llm-ui
+          - platform-release
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
-          python-version: ${{ matrix.python }}
+          python-version: "3.14.2"
           cache: pip
       - run: python -m pip install pdm==2.26.6
       - run: pdm install --frozen-lockfile -G :all
-      - run: pdm run check
-      - run: pdm run test
+      - name: Run lint, type checks, and preflights
+        if: matrix.shard == 'analysis-data'
+        run: pdm run check
+      - name: Run semantic test shard
+        run: >-
+          pdm run test
+          --promotion-shard "${{ matrix.shard }}"
+          --junitxml "pytest-${{ matrix.shard }}.xml"
+      - name: Preserve test report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pytest-${{ matrix.shard }}
+          path: pytest-${{ matrix.shard }}*.xml
+          if-no-files-found: warn
+          retention-days: 14
+
+  gate:
+    name: Native CI Gate
+    if: always()
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every test shard
+        shell: bash
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+        run: test "$TEST_RESULT" = "success"

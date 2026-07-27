@@ -1,3 +1,4 @@
+import re
 import sqlite3
 from pathlib import Path
 
@@ -7,8 +8,6 @@ import pytest
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import ValidationError
-from xenix.services.agent import ConversationStore
-from xenix.services.agent.conversation_store import CreateToolCallInput, StartTurnInput
 from xenix.services.agent.tools import AgentToolRegistry, ToolExecutionContext
 from xenix.services.artifact_service import ArtifactService
 from xenix.services.data_cleaning import DataCleaningService
@@ -20,7 +19,7 @@ from xenix.services.data_transform import (
 )
 from xenix.services.dataset_export_service import DatasetExportService
 from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
-from xenix.services.dataset_inspection import detect_source_format, load_dataframe
+from xenix.services.dataset_inspection import detect_source_format, inspect_dataset_file, load_dataframe
 from xenix.services.ml_service import MLService
 from xenix.services.ml_task_service import MLTaskService
 from xenix.services.preprocessing_worker import InlinePreprocessingWorkerRunner
@@ -53,31 +52,13 @@ def _build_runtime(monkeypatch, tmp_path: Path):
         artifact_service=artifact_service,
         preprocessing_worker_runner=worker_runner,
     )
-    conversation_store = ConversationStore(context.session_factory)
-    return paths, dataset_service, data_transform_service, artifact_service, registry, conversation_store
+    return paths, dataset_service, data_transform_service, artifact_service, registry, None
 
 
-def _tool_context(conversation_store: ConversationStore, tool_name: str, arguments: dict) -> ToolExecutionContext:
-    thread = conversation_store.create_thread()
-    turn, _message = conversation_store.start_turn(
-        StartTurnInput(
-            thread_id=thread.id,
-            user_content_blocks=[{"type": "text", "text": "Query this dataset."}],
-        )
-    )
-    _tool_message, tool_call = conversation_store.create_tool_call(
-        CreateToolCallInput(
-            thread_id=thread.id,
-            turn_id=turn.id,
-            tool_name=tool_name,
-            arguments_payload=arguments,
-        )
-    )
+def _tool_context(_conversation_store, tool_name: str, arguments: dict) -> ToolExecutionContext:
     return ToolExecutionContext(
-        thread_id=thread.id,
-        turn_id=turn.id,
-        tool_call_id=tool_call.id,
-        dataset_ids=[],
+        thread_id="tool-test-thread",
+        dataset_ids=(),
     )
 
 
@@ -109,6 +90,12 @@ def _read_dataset_frame(path: str | Path) -> pd.DataFrame:
     return load_dataframe(source_path, detect_source_format(source_path))
 
 
+def _xtt_metadata(value: str, key: str) -> str:
+    match = re.search(rf"^{re.escape(key)}: (.+)$", value, re.MULTILINE)
+    assert match is not None, f"missing XTT metadata field {key!r}: {value}"
+    return match.group(1)
+
+
 def test_data_integrate_tool_uses_dataset_ids_and_returns_artifact_id(monkeypatch, tmp_path: Path) -> None:
     _paths, dataset_service, _service, artifact_service, registry, store = _build_runtime(
         monkeypatch,
@@ -124,17 +111,18 @@ def test_data_integrate_tool_uses_dataset_ids_and_returns_artifact_id(monkeypatc
         _tool_context(store, "data.integrate", arguments),
     )
 
-    derived_dataset = dataset_service.get_dataset(result.payload["dataset_id"])
+    assert isinstance(result.value, str)
+    derived_dataset = dataset_service.get_dataset(_xtt_metadata(result.value, "dataset_id"))
     assert _read_dataset_frame(derived_dataset.source_path)["order_id"].tolist() == [1, 2]
-    assert result.payload["input_dataset_ids"] == [orders.id, more_orders.id]
-    assert "dataset_uri" not in result.payload
-    assert "artifact_uri" not in result.payload
-    artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
+    assert f"input_dataset_ids: [{orders.id}, {more_orders.id}]" in result.value
+    assert "dataset_uri" not in result.value
+    assert "artifact_uri" not in result.value
+    artifact = artifact_service.resolve_uri(f"artifact://{_xtt_metadata(result.value, 'artifact_id')}")
     assert artifact.metadata_payload["dataset_id"] == derived_dataset.id
     assert artifact.metadata_payload["dataset_export"]["dataset_id"] == derived_dataset.id
     assert Path(artifact.absolute_path).suffix == ".xlsx"
     assert pd.read_excel(artifact.absolute_path)["order_id"].tolist() == [1, 2]
-    assert "source_path" not in result.payload["inspection"]
+    assert "source_path" not in result.value
 
 
 def test_data_query_service_runs_read_only_select(monkeypatch, tmp_path: Path) -> None:
@@ -180,6 +168,155 @@ def test_data_query_service_runs_read_only_select(monkeypatch, tmp_path: Path) -
     assert result.validation_summary["bindings"] == ["orders"]
 
 
+def test_data_query_service_keeps_names_mode_compatible_after_indexed_execution(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _paths, _dataset_service, service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "unicode-orders.csv"
+    source.write_text(
+        '"客户 名称","金额(元)",c0\n'
+        '"阿兰",10,"source-c0"\n',
+        encoding="utf-8",
+    )
+    binding = DatasetSqlBinding(
+        alias="orders",
+        dataset_id="orders-id",
+        source_path=str(source.resolve()),
+    )
+
+    indexed = service.query(
+        DataQueryInput(
+            bindings=[binding],
+            sql="SELECT c0 AS customer, c1 AS amount, c2 AS source_c0 FROM orders",
+            column_reference="indexes",
+        )
+    )
+    named = service.query(
+        DataQueryInput(
+            bindings=[binding],
+            sql='SELECT "客户 名称" AS customer, c0 AS source_c0 FROM orders',
+        )
+    )
+
+    assert indexed.rows == [{"customer": "阿兰", "amount": 10, "source_c0": "source-c0"}]
+    assert named.rows == [{"customer": "阿兰", "source_c0": "source-c0"}]
+
+
+@pytest.mark.parametrize("source_format", ["csv", "parquet", "xlsx"])
+def test_data_query_service_indexes_registered_columns_for_each_source_format(
+    monkeypatch,
+    tmp_path: Path,
+    source_format: str,
+) -> None:
+    _paths, _dataset_service, service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / f"unicode-orders.{source_format}"
+    if source_format == "csv":
+        source.write_text('"客户 名称","金额(元)"\n"阿兰",10\n', encoding="utf-8")
+    elif source_format == "parquet":
+        with duckdb.connect(database=":memory:") as connection:
+            connection.execute(
+                "COPY (SELECT '阿兰' AS \"客户 名称\", 10 AS \"金额(元)\") TO ? (FORMAT PARQUET)",
+                [str(source)],
+            )
+    else:
+        pd.DataFrame({"客户 名称": ["阿兰"], "金额(元)": [10]}).to_excel(source, index=False)
+
+    result = service.query(
+        DataQueryInput(
+            bindings=[
+                DatasetSqlBinding(
+                    alias="orders",
+                    dataset_id="orders-id",
+                    source_path=str(source.resolve()),
+                )
+            ],
+            sql="SELECT c0 AS customer, c1 AS amount FROM orders",
+            column_reference="indexes",
+        )
+    )
+
+    expected_amount: int | str = "10" if source_format == "xlsx" else 10
+    assert result.rows == [{"customer": "阿兰", "amount": expected_amount}]
+
+
+def test_direct_source_schema_matches_indexed_sql_for_malformed_csv(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _paths, _dataset_service, service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "messy-direct.csv"
+    source.write_text("city,city,amount\n佛山,广州,10\n", encoding="utf-8")
+
+    inspection = inspect_dataset_file(source)
+    assert inspection.preview_columns == ["city", "column_2", "amount"]
+    assert [column.name for column in inspection.columns] == inspection.preview_columns
+
+    result = service.query(
+        DataQueryInput(
+            bindings=[
+                DatasetSqlBinding(
+                    alias="input",
+                    dataset_id="direct-id",
+                    source_path=str(source.resolve()),
+                )
+            ],
+            sql="SELECT c0 AS city_a, c1 AS city_b, c2 AS amount FROM input",
+            column_reference="indexes",
+        )
+    )
+
+    assert result.rows == [{"city_a": "佛山", "city_b": "广州", "amount": 10}]
+
+
+def test_data_query_service_indexed_columns_support_multiple_bindings(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _paths, _dataset_service, service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    orders_source = tmp_path / "orders.csv"
+    orders_source.write_text('"订单号","金额(元)"\n1,10\n2,5\n', encoding="utf-8")
+    customers_source = tmp_path / "customers.csv"
+    customers_source.write_text('"订单号","城市"\n1,"佛山"\n2,"广州"\n', encoding="utf-8")
+
+    result = service.query(
+        DataQueryInput(
+            bindings=[
+                DatasetSqlBinding(
+                    alias="orders",
+                    dataset_id="orders-id",
+                    source_path=str(orders_source.resolve()),
+                ),
+                DatasetSqlBinding(
+                    alias="customers",
+                    dataset_id="customers-id",
+                    source_path=str(customers_source.resolve()),
+                ),
+            ],
+            sql=(
+                "SELECT customers.c1 AS city, orders.c1 AS amount "
+                "FROM orders JOIN customers ON orders.c0 = customers.c0 "
+                "ORDER BY orders.c0"
+            ),
+            column_reference="indexes",
+        )
+    )
+
+    assert result.rows == [{"city": "佛山", "amount": 10}, {"city": "广州", "amount": 5}]
+
+
 def test_data_transform_service_materializes_parquet(monkeypatch, tmp_path: Path) -> None:
     _paths, _dataset_service, service, _artifact_service, _registry, _store = _build_runtime(
         monkeypatch,
@@ -217,6 +354,35 @@ def test_data_transform_service_materializes_parquet(monkeypatch, tmp_path: Path
     assert Path(result.output_path).suffix == ".parquet"
     assert result.transform_report["sql"].startswith("SELECT customer_id")
     assert result.transform_report["bindings"] == [{"alias": "input", "dataset_id": "customers-id"}]
+
+
+def test_data_transform_service_supports_indexed_unicode_columns(monkeypatch, tmp_path: Path) -> None:
+    _paths, _dataset_service, service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "customers.csv"
+    source.write_text('"客户 名称","金额(元)"\n"阿兰",10\n"博文",5\n', encoding="utf-8")
+
+    result = service.transform(
+        DataTransformInput(
+            bindings=[
+                DatasetSqlBinding(
+                    alias="input",
+                    dataset_id="customers-id",
+                    source_path=str(source.resolve()),
+                )
+            ],
+            sql="SELECT c0 AS customer, c1 * 2 AS doubled_amount FROM input ORDER BY c1 DESC",
+            name="Indexed customer totals",
+            column_reference="indexes",
+        )
+    )
+
+    assert _read_dataset_frame(result.output_path).to_dict(orient="records") == [
+        {"customer": "阿兰", "doubled_amount": 20.0},
+        {"customer": "博文", "doubled_amount": 10.0},
+    ]
 
 
 def test_data_transform_service_does_not_fetch_full_output_dataframe(monkeypatch, tmp_path: Path) -> None:
@@ -409,20 +575,6 @@ def test_duckdb_sql_validator_rejects_mutation_and_file_scans(monkeypatch, tmp_p
         service.query(DataQueryInput(bindings=[binding], sql="SELECT * FROM 'orders.csv'", limit=10))
 
 
-def test_data_query_and_transform_tools_are_registered(monkeypatch, tmp_path: Path) -> None:
-    _paths, _dataset_service, _service, _artifact_service, registry, _store = _build_runtime(
-        monkeypatch,
-        tmp_path,
-    )
-    specs = {spec.name: spec for spec in registry.list_specs()}
-
-    assert "data.query" in specs
-    assert "data.transform" in specs
-    assert "data.duckdb" not in specs
-    assert "sql" in specs["data.query"].parameters_schema["required"]
-    assert "sql" in specs["data.transform"].parameters_schema["required"]
-
-
 def test_data_query_tool_returns_bounded_rows(monkeypatch, tmp_path: Path) -> None:
     _paths, dataset_service, _service, _artifact_service, registry, store = _build_runtime(
         monkeypatch,
@@ -442,23 +594,17 @@ def test_data_query_tool_returns_bounded_rows(monkeypatch, tmp_path: Path) -> No
 
     result = registry.execute("data.query", arguments, _tool_context(store, "data.query", arguments))
 
-    assert result.payload["returned_row_count"] == 2
-    assert result.payload["total_row_count"] == 3
-    assert result.payload["truncated"] is True
-    assert list(result.payload) == ["columns", "rows", "returned_row_count", "total_row_count", "truncated"]
-    assert result.payload["columns"] == {
-        "_schema": {"name": 0, "type": 1, "index": 2},
-        "data": [["order_id", "int64", 0], ["amount", "int64", 1]],
-    }
-    assert result.payload["rows"] == {
-        "_schema": {"order_id": 0, "amount": 1},
-        "data": [[3, 30], [2, 20]],
-    }
-    assert "bindings" not in result.payload
-    assert "input_dataset_ids" not in result.payload
-    assert "limit" not in result.payload
-    assert "validation_summary" not in result.payload
-    assert not hasattr(result, "content_blocks")
+    assert isinstance(result.value, str)
+    assert "shape: 2 rows × 2 columns" in result.value
+    assert "returned_rows: 2" in result.value
+    assert "total_rows: 3" in result.value
+    assert "truncated: true" in result.value
+    assert "| 1 | 3 | 30 |" in result.value
+    assert "| 2 | 2 | 20 |" in result.value
+    assert "bindings:" not in result.value
+    assert "input_dataset_ids:" not in result.value
+    assert "limit:" not in result.value
+    assert "validation_summary:" not in result.value
 
 
 def test_data_query_tool_uses_bindings_when_dataset_id_is_also_present(monkeypatch, tmp_path: Path) -> None:
@@ -486,9 +632,10 @@ def test_data_query_tool_uses_bindings_when_dataset_id_is_also_present(monkeypat
 
     result = registry.execute("data.query", arguments, _tool_context(store, "data.query", arguments))
 
-    assert result.payload["rows"]["_schema"] == {"order_id": 0, "amount": 1}
-    assert result.payload["rows"]["data"] == [[2, 20]]
-    assert result.payload["total_row_count"] == 1
+    assert isinstance(result.value, str)
+    assert "shape: 1 rows × 2 columns" in result.value
+    assert "| 1 | 2 | 20 |" in result.value
+    assert "total_rows: 1" in result.value
 
 
 def test_data_query_tool_accepts_canonical_names_for_messy_xlsx(monkeypatch, tmp_path: Path) -> None:
@@ -505,15 +652,12 @@ def test_data_query_tool_accepts_canonical_names_for_messy_xlsx(monkeypatch, tmp
 
     result = registry.execute("data.query", arguments, _tool_context(store, "data.query", arguments))
 
-    assert result.payload["columns"] == {
-        "_schema": {"name": 0, "type": 1, "index": 2},
-        "data": [["column_2", "str", 0]],
-    }
-    assert result.payload["rows"] == {
-        "_schema": {"column_2": 0},
-        "data": [[None], ["销售数量"], ["1"]],
-    }
-    assert result.payload["total_row_count"] == 3
+    assert isinstance(result.value, str)
+    assert "column_2: str" in result.value
+    assert "| 1 | ∅ |" in result.value
+    assert "| 2 | 销售数量 |" in result.value
+    assert "| 3 | 1 |" in result.value
+    assert "total_rows: 3" in result.value
 
 
 def test_data_transform_tool_registers_derived_dataset_and_returns_artifact_id(monkeypatch, tmp_path: Path) -> None:
@@ -538,28 +682,26 @@ def test_data_transform_tool_registers_derived_dataset_and_returns_artifact_id(m
         arguments,
         _tool_context(store, "data.transform", arguments),
     )
-    derived_dataset = dataset_service.get_dataset(result.payload["dataset_id"])
+    assert isinstance(result.value, str)
+    derived_dataset = dataset_service.get_dataset(_xtt_metadata(result.value, "dataset_id"))
     frame = _read_dataset_frame(derived_dataset.source_path)
 
     assert derived_dataset.derived_from_dataset_id == dataset.id
-    assert "dataset_uri" not in result.payload
-    assert "artifact_uri" not in result.payload
-    artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
+    assert "dataset_uri" not in result.value
+    assert "artifact_uri" not in result.value
+    artifact = artifact_service.resolve_uri(f"artifact://{_xtt_metadata(result.value, 'artifact_id')}")
     assert artifact.metadata_payload["dataset_id"] == derived_dataset.id
     assert artifact.metadata_payload["dataset_export"]["source_path"] == derived_dataset.source_path
     assert pd.read_excel(artifact.absolute_path).to_dict(orient="records") == [
         {"customer_id": 1, "total_amount": 25},
         {"customer_id": 2, "total_amount": 5},
     ]
-    assert result.payload["row_count"] == 2
+    assert "row_count: 2" in result.value
     assert frame.to_dict(orient="records") == [
         {"customer_id": 1, "total_amount": 25.0},
         {"customer_id": 2, "total_amount": 5.0},
     ]
-    assert (
-        result.payload["transform_report"]["validation_summary"]["requires_output_relation"]
-        == "output"
-    )
+    assert "transform_report:" not in result.value
 
 
 def test_data_transform_tool_records_multi_input_lineage_in_result(monkeypatch, tmp_path: Path) -> None:
@@ -597,10 +739,11 @@ def test_data_transform_tool_records_multi_input_lineage_in_result(monkeypatch, 
         arguments,
         _tool_context(store, "data.transform", arguments),
     )
-    derived_dataset = dataset_service.get_dataset(result.payload["dataset_id"])
+    assert isinstance(result.value, str)
+    derived_dataset = dataset_service.get_dataset(_xtt_metadata(result.value, "dataset_id"))
 
     assert derived_dataset.derived_from_dataset_id is None
-    assert result.payload["input_dataset_ids"] == [orders.id, customers.id]
-    assert "dataset_uri" not in result.payload
-    artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
+    assert f"input_dataset_ids: [{orders.id}, {customers.id}]" in result.value
+    assert "dataset_uri" not in result.value
+    artifact = artifact_service.resolve_uri(f"artifact://{_xtt_metadata(result.value, 'artifact_id')}")
     assert artifact.metadata_payload["input_dataset_ids"] == [orders.id, customers.id]

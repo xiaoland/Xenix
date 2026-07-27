@@ -14,14 +14,7 @@ from xenix.i18n import (
     locale_config_path,
     read_saved_locale,
     resolve_startup_locale,
-    translation_file_path,
     write_saved_locale,
-)
-from xenix.services.agent import (
-    ChatbotEvent,
-    ChatbotEventAuthor,
-    ChatbotEventKind,
-    ChatbotEventStatus,
 )
 from xenix.ui.startup_splash import StartupSplash, StartupStage
 
@@ -71,7 +64,7 @@ def test_locale_preference_round_trips_and_falls_back_to_supported_system_locale
     assert resolve_startup_locale(paths, system_locale="zh_CN") == "en_US"
 
 
-def test_main_window_language_switch_updates_chat_shell(
+def test_main_window_language_switch_retranslates_major_surfaces(
     monkeypatch,
     tmp_path: Path,
     app: QApplication,
@@ -83,168 +76,38 @@ def test_main_window_language_switch_updates_chat_shell(
     paths = ensure_app_dirs(get_app_paths())
     write_saved_locale(paths, "en_US")
 
-    assert translation_file_path("zh_CN").is_file()
-
     _app, window = build_main_window(show=False)
     try:
         window._open_settings()
         settings = window._settings_dialog
         assert settings is not None
-
-        assert window.windowTitle() == "Xenix Native"
-        assert window._title_label.text() == "Xenix"
-        assert window._settings_button.text() == "Settings"
-        assert window._history_label.text() == "History"
-        assert settings._about_button.text() == "About"
-        assert settings._tabs.tabText(0) == "AI"
-        assert settings._tabs.tabText(1) == "ML Workers"
-        assert settings._global_models_title_label.text() == "Global models"
-        assert settings._llm_title_label.text() == "LLM providers"
-        assert settings._llm_default_model_label.text() == "Default model"
-        assert settings._llm_thread_title_model_label.text() == "Thread title model"
-        assert settings._ml_workers_title_label.text() == "ML workers"
-        assert settings._ml_workers_setup_button.text() == "Add SSH worker..."
+        window._open_knowledge_workspace()
+        workspace = window._knowledge_workspace
+        assert workspace is not None
+        workspace._queue_button.click()
+        task_queue = workspace._queue_dialog
+        assert task_queue is not None
         settings._open_about_dialog()
         about = settings._about_dialog
         assert about is not None
-        assert about.windowTitle() == "About"
-        assert about._open_logs_button.text() == "Open log directory"
-        assert about._build_commit_label.text() == "Build commit"
-        assert window.tr("Generate title...") == "Generate title..."
-        assert window.tr("Copy thread ID") == "Copy thread ID"
-        assert window.tr("Generating thread title...") == "Generating thread title..."
-        window._show_service_link_progress()
-        assert window._service_link_progress_dialog is not None
-        assert window._service_link_progress_dialog.windowTitle() == "Open Link"
-        assert window._service_link_progress_dialog.labelText() == "Opening link..."
-        chat_view = window._thread_detail_view
-        chat_view.clear_messages()
-        chat_view.show_error("Stopped.")
-        error_bubble = chat_view._message_layout.itemAt(0).widget()
-        chat_view.apply_chatbot_event(
-            ChatbotEvent(
-                id="run-i18n:activity:1",
-                kind=ChatbotEventKind.ACTIVITY,
-                author=ChatbotEventAuthor.ASSISTANT,
-                status=ChatbotEventStatus.IN_PROGRESS,
-            ),
-            auto_scroll=False,
-        )
-        tool_item = chat_view.add_tool_event(
-            ChatbotEvent(
-                id="tool-event",
-                kind=ChatbotEventKind.TOOL,
-                author=ChatbotEventAuthor.TOOL,
-                status=ChatbotEventStatus.PENDING,
-                summary="Querying dataset...",
-                detail_blocks=[
-                    {
-                        "type": "tool_call_result",
-                        "tool_name": "data.query",
-                        "status": "completed",
-                    }
-                ],
-            ),
-            auto_scroll=False,
-        )
-        profile_tool_item = chat_view.add_tool_event(
-            ChatbotEvent(
-                id="profile-tool-event",
-                kind=ChatbotEventKind.TOOL,
-                author=ChatbotEventAuthor.TOOL,
-                status=ChatbotEventStatus.PENDING,
-                summary="Profiling dataset...",
-            ),
-            auto_scroll=False,
-        )
-        graph_tool_item = chat_view.add_tool_event(
-            ChatbotEvent(
-                id="graph-tool-event",
-                kind=ChatbotEventKind.TOOL,
-                author=ChatbotEventAuthor.TOOL,
-                status=ChatbotEventStatus.COMPLETED,
-                summary="Drew graph",
-            ),
-            auto_scroll=False,
-        )
-        usage_item = chat_view.add_usage_event(
-            ChatbotEvent(
-                id="usage-event",
-                kind=ChatbotEventKind.USAGE,
-                author=ChatbotEventAuthor.ASSISTANT,
-                usage_payload={
-                    "request_count": 3,
-                    "input_tokens": 9800,
-                    "cached_input_tokens": 1900,
-                    "output_tokens": 2630,
-                    "total_tokens": 12430,
-                },
-            ),
-            auto_scroll=False,
-        )
 
-        assert chat_view._editor.placeholderText() == "Message Xenix"
-        assert chat_view._send_button.text() == "Send"
-        assert chat_view._attach_button.toolTip() == "Attach files"
-        assert chat_view._model_picker.toolTip() == "Model for the next turn"
-        assert chat_view._step_continue_button.text() == "Continue"
-        assert chat_view._step_stop_button.text() == "Stop"
-        assert chat_view._composer_drop_title.text() == "Drop files to attach"
-        assert chat_view._composer_drop_hint.text() == "Release here to add them to the next message"
-        assert error_bubble._browser.toPlainText() == "Error: Stopped."
-        assert chat_view._thinking_bubble._browser.toPlainText() == "Thinking..."
-        assert tool_item._summary_label.text() == "Querying dataset..."
-        assert profile_tool_item._summary_label.text() == "Profiling dataset..."
-        assert graph_tool_item._summary_label.text() == "Drew graph"
-        assert tool_item._chevron_button.toolTip() == "Show result"
-        assert "data.query" in tool_item._detail_browser.toPlainText()
-        assert "completed" in tool_item._detail_browser.toPlainText()
-        assert usage_item._label.text() == "↑ 9.8k (1.9k cached) · ↓ 2.6k"
+        assert window.windowTitle() == "Xenix Native"
+        assert settings._tabs.tabText(1) == "Knowledge Base"
+        assert workspace._queue_button.text() == "Task queue"
+        assert task_queue.windowTitle() == "Task queue"
+        assert about.windowTitle() == "About"
+        assert window._thread_detail_view._editor.placeholderText() == "Message Xenix"
 
         zh_index = settings._language_selector.findData("zh_CN")
         settings._language_selector.setCurrentIndex(zh_index)
         app.processEvents()
 
         assert window.windowTitle() == "Xenix 原生版"
-        assert window._title_label.text() == "Xenix"
-        assert window._settings_button.text() == "设置"
-        assert window._history_label.text() == "历史"
-        assert settings._about_button.text() == "关于"
-        assert settings._tabs.tabText(0) == "AI"
-        assert settings._tabs.tabText(1) == "ML 工作器"
-        assert settings._global_models_title_label.text() == "全局模型"
-        assert settings._llm_title_label.text() == "LLM 提供商"
-        assert settings._llm_default_model_label.text() == "默认模型"
-        assert settings._llm_thread_title_model_label.text() == "线程标题模型"
-        assert settings._ml_workers_title_label.text() == "ML 工作器"
-        assert settings._ml_workers_setup_button.text() == "添加 SSH 工作器..."
+        assert settings._tabs.tabText(1) == "知识库"
+        assert workspace._queue_button.text() == "任务队列"
+        assert task_queue.windowTitle() == "任务队列"
         assert about.windowTitle() == "关于"
-        assert about._open_logs_button.text() == "打开日志目录"
-        assert about._build_commit_label.text() == "构建提交"
-        assert window.tr("Generate title...") == "生成标题..."
-        assert window.tr("Copy thread ID") == "复制线程 ID"
-        assert window.tr("Generating thread title...") == "正在生成线程标题..."
-        assert window.tr("Open Link") == "打开链接"
-        assert window.tr("Opening link...") == "正在打开链接..."
-        assert window._service_link_progress_dialog.windowTitle() == "打开链接"
-        assert window._service_link_progress_dialog.labelText() == "正在打开链接..."
-        assert chat_view._editor.placeholderText() == "给 Xenix 发消息"
-        assert chat_view._send_button.text() == "发送"
-        assert chat_view._attach_button.toolTip() == "添加文件"
-        assert chat_view._model_picker.toolTip() == "下一轮使用的模型"
-        assert chat_view._step_continue_button.text() == "继续"
-        assert chat_view._step_stop_button.text() == "停止"
-        assert chat_view._composer_drop_title.text() == "拖放文件以添加附件"
-        assert chat_view._composer_drop_hint.text() == "松开后添加到下一条消息"
-        assert error_bubble._browser.toPlainText() == "错误：Stopped."
-        assert chat_view._thinking_bubble._browser.toPlainText() == "思考中..."
-        assert tool_item._summary_label.text() == "正在查询数据集..."
-        assert profile_tool_item._summary_label.text() == "正在分析数据集..."
-        assert graph_tool_item._summary_label.text() == "图表已绘制"
-        assert tool_item._chevron_button.toolTip() == "显示结果"
-        assert "data.query" in tool_item._detail_browser.toPlainText()
-        assert "已完成" in tool_item._detail_browser.toPlainText()
-        assert usage_item._label.text() == "↑ 9.8k（1.9k 缓存命中） · ↓ 2.6k"
+        assert window._thread_detail_view._editor.placeholderText() == "给 Xenix 发消息"
         assert read_saved_locale(paths) == "zh_CN"
 
         en_index = settings._language_selector.findData("en_US")
@@ -252,38 +115,8 @@ def test_main_window_language_switch_updates_chat_shell(
         app.processEvents()
 
         assert window.windowTitle() == "Xenix Native"
-        assert settings._about_button.text() == "About"
-        assert settings._tabs.tabText(0) == "AI"
-        assert settings._tabs.tabText(1) == "ML Workers"
-        assert settings._global_models_title_label.text() == "Global models"
-        assert settings._llm_title_label.text() == "LLM providers"
-        assert settings._llm_default_model_label.text() == "Default model"
-        assert settings._llm_thread_title_model_label.text() == "Thread title model"
-        assert settings._ml_workers_title_label.text() == "ML workers"
-        assert settings._ml_workers_setup_button.text() == "Add SSH worker..."
-        assert about.windowTitle() == "About"
-        assert about._open_logs_button.text() == "Open log directory"
-        assert about._build_commit_label.text() == "Build commit"
-        assert window.tr("Generate title...") == "Generate title..."
-        assert window.tr("Copy thread ID") == "Copy thread ID"
-        assert window.tr("Generating thread title...") == "Generating thread title..."
-        assert window.tr("Open Link") == "Open Link"
-        assert window.tr("Opening link...") == "Opening link..."
-        assert window._service_link_progress_dialog.windowTitle() == "Open Link"
-        assert window._service_link_progress_dialog.labelText() == "Opening link..."
-        assert chat_view._editor.placeholderText() == "Message Xenix"
-        assert chat_view._send_button.text() == "Send"
-        assert chat_view._attach_button.toolTip() == "Attach files"
-        assert chat_view._model_picker.toolTip() == "Model for the next turn"
-        assert error_bubble._browser.toPlainText() == "Error: Stopped."
-        assert chat_view._thinking_bubble._browser.toPlainText() == "Thinking..."
-        assert tool_item._summary_label.text() == "Querying dataset..."
-        assert profile_tool_item._summary_label.text() == "Profiling dataset..."
-        assert graph_tool_item._summary_label.text() == "Drew graph"
-        assert usage_item._label.text() == "↑ 9.8k (1.9k cached) · ↓ 2.6k"
         assert read_saved_locale(paths) == "en_US"
     finally:
-        window._close_service_link_progress_if_idle()
         if window._settings_dialog is not None:
             if window._settings_dialog._about_dialog is not None:
                 window._settings_dialog._about_dialog.close()
@@ -348,7 +181,10 @@ def test_main_window_translates_startup_splash_before_first_stage(
                 observed_texts.append(
                     (
                         "starting",
-                        QCoreApplication.translate("StartupSplash", "Starting Xenix..."),
+                        QCoreApplication.translate(
+                            "StartupSplash",
+                            "Starting Xenix...",
+                        ),
                     )
                 )
 

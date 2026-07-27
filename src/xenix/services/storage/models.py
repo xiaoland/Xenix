@@ -5,7 +5,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import Column, Enum as SQLAlchemyEnum, JSON
+from sqlalchemy import Column, Enum as SQLAlchemyEnum, Index, JSON, UniqueConstraint, text
 from sqlmodel import Field, SQLModel
 
 DEFAULT_AGENT_INTERFACE_LOCALE = "en_US"
@@ -91,57 +91,16 @@ class MLTaskArtifactKind(StrEnum):
     OTHER = "other"
 
 
-class AgentTurnStatus(StrEnum):
-    OPEN = "open"
-    ENDED = "ended"
-    CANCELLED = "cancelled"
-
-
-class AgentMessageKind(StrEnum):
-    SYSTEM = "system"
+class ConversationMessageKind(StrEnum):
     USER = "user"
+    CLIENT_CONTROL = "client_control"
     ASSISTANT = "assistant"
     TOOL_CALL = "tool_call"
-    TOOL_CALL_RESULT = "tool_call_result"
+    TOOL_RESULT = "tool_result"
+    PENDING_LLM_SAMPLING = "pending_llm_sampling"
 
 
-class AgentMessageStatus(StrEnum):
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-
-class AgentMessageAuthor(StrEnum):
-    USER = "user"
-    ASSISTANT = "assistant"
-    SYSTEM = "system"
-    TOOL = "tool"
-
-
-class AgentRunStatus(StrEnum):
-    RUNNING = "running"
-    AWAITING_CONFIRMATION = "awaiting_confirmation"
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-
-class AgentToolCallStatus(StrEnum):
-    REQUESTED = "requested"
-    RUNNING = "running"
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-
-class AgentProviderRequestKind(StrEnum):
-    PRIMARY = "primary"
-    GUARD = "guard"
-
-
-class AgentProviderRequestStatus(StrEnum):
-    RUNNING = "running"
+class ConversationToolResultStatus(StrEnum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     CANCELLED = "cancelled"
@@ -291,8 +250,8 @@ class MLTaskArtifactRow(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utc_now)
 
 
-class AgentThreadRow(SQLModel, table=True):
-    __tablename__ = "agent_thread"
+class ConversationThreadRow(SQLModel, table=True):
+    __tablename__ = "conversation_thread"
 
     id: str = Field(default_factory=generate_id, primary_key=True)
     title: str | None = Field(default=None, index=True)
@@ -302,164 +261,81 @@ class AgentThreadRow(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
-class AgentTurnRow(SQLModel, table=True):
-    __tablename__ = "agent_turn"
+class ConversationMessageRow(SQLModel, table=True):
+    __tablename__ = "conversation_message"
+    __table_args__ = (
+        UniqueConstraint("thread_id", "sequence_index", name="uq_conversation_message_thread_sequence"),
+        UniqueConstraint("thread_id", "client_submission_id", name="uq_conversation_message_client_submission"),
+        UniqueConstraint("tool_call_message_id", name="uq_conversation_message_tool_result_call"),
+        Index(
+            "ux_conversation_message_pending_thread",
+            "thread_id",
+            unique=True,
+            sqlite_where=text("kind = 'pending_llm_sampling'"),
+        ),
+    )
 
     id: str = Field(default_factory=generate_id, primary_key=True)
-    thread_id: str = Field(foreign_key="agent_thread.id", index=True)
+    thread_id: str = Field(foreign_key="conversation_thread.id", index=True)
     sequence_index: int = Field(index=True)
-    status: AgentTurnStatus = Field(default=AgentTurnStatus.OPEN, index=True)
-    user_message_id: str | None = Field(default=None, foreign_key="agent_message.id", index=True)
-    created_at: datetime = Field(default_factory=utc_now)
-    ended_at: datetime | None = None
-    updated_at: datetime = Field(default_factory=utc_now)
-
-
-class AgentMessageRow(SQLModel, table=True):
-    __tablename__ = "agent_message"
-
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    thread_id: str = Field(foreign_key="agent_thread.id", index=True)
-    turn_id: str | None = Field(default=None, foreign_key="agent_turn.id", index=True)
-    sequence_index: int = Field(index=True)
-    kind: AgentMessageKind = Field(index=True)
-    ui_author: AgentMessageAuthor = Field(index=True)
-    content_blocks: list[dict[str, Any]] = Field(
-        default_factory=list,
-        sa_column=Column(JSON, nullable=False),
-    )
-    provider_payload: dict[str, Any] = Field(
-        default_factory=dict,
-        sa_column=Column(JSON, nullable=False),
-    )
-    status: AgentMessageStatus = Field(
-        default=AgentMessageStatus.COMPLETED,
+    kind: ConversationMessageKind = Field(
         sa_column=Column(
             SQLAlchemyEnum(
-                AgentMessageStatus,
+                ConversationMessageKind,
                 values_callable=lambda enum_class: [member.value for member in enum_class],
             ),
             nullable=False,
             index=True,
         ),
     )
-    created_at: datetime = Field(default_factory=utc_now)
-    updated_at: datetime = Field(default_factory=utc_now)
-    finalized_at: datetime | None = None
-
-
-class AgentRunRow(SQLModel, table=True):
-    __tablename__ = "agent_run"
-
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    thread_id: str = Field(foreign_key="agent_thread.id", index=True)
-    turn_id: str = Field(foreign_key="agent_turn.id", index=True)
-    status: AgentRunStatus = Field(default=AgentRunStatus.RUNNING, index=True)
-    provider_name: str | None = Field(default=None, index=True)
-    started_at: datetime = Field(default_factory=utc_now)
-    finished_at: datetime | None = None
-    error_summary: str | None = None
-    usage_payload: dict[str, Any] | None = Field(
-        default=None,
-        sa_column=Column(JSON, nullable=True),
-    )
-
-
-class AgentToolCallRow(SQLModel, table=True):
-    __tablename__ = "agent_tool_call"
-
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    thread_id: str = Field(foreign_key="agent_thread.id", index=True)
-    turn_id: str = Field(foreign_key="agent_turn.id", index=True)
-    request_message_id: str = Field(foreign_key="agent_message.id", index=True)
-    result_message_id: str | None = Field(default=None, foreign_key="agent_message.id", index=True)
-    tool_name: str = Field(index=True)
-    status: AgentToolCallStatus = Field(default=AgentToolCallStatus.REQUESTED, index=True)
-    arguments_payload: dict[str, Any] = Field(
+    client_submission_id: str | None = Field(default=None, index=True)
+    content_payload: dict[str, Any] = Field(
         default_factory=dict,
         sa_column=Column(JSON, nullable=False),
     )
-    result_payload: dict[str, Any] | None = Field(
+    text: str | None = None
+    reasoning: str | None = None
+    refusal: str | None = None
+    provider_call_id: str | None = Field(default=None, index=True)
+    tool_id: str | None = Field(default=None, index=True)
+    contract_version: str | None = None
+    arguments_payload: dict[str, Any] | None = Field(
+        default=None,
+        sa_column=Column(JSON, nullable=True),
+    )
+    scope_fingerprint: str | None = None
+    tool_call_message_id: str | None = Field(
+        default=None,
+        foreign_key="conversation_message.id",
+        index=True,
+    )
+    result_status: ConversationToolResultStatus | None = Field(
+        default=None,
+        sa_column=Column(
+            SQLAlchemyEnum(
+                ConversationToolResultStatus,
+                values_callable=lambda enum_class: [member.value for member in enum_class],
+            ),
+            nullable=True,
+            index=True,
+        ),
+    )
+    # Tool Results are direct JSON values.  A tabular result can therefore be
+    # canonical Xenix Table Text (a string), while other Tools may return a
+    # JSON object/array/scalar.  SQLite's existing JSON column already admits
+    # every one of these values; this is a logical contract widening only.
+    value_payload: Any | None = Field(
         default=None,
         sa_column=Column(JSON, nullable=True),
     )
     error_summary: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
-    updated_at: datetime = Field(default_factory=utc_now)
-
-
-class AgentTurnCompletionGuardRow(SQLModel, table=True):
-    __tablename__ = "agent_turn_completion_guard"
-
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    turn_id: str = Field(foreign_key="agent_turn.id", index=True)
-    attempt_index: int
-    input: dict[str, Any] = Field(
-        default_factory=dict,
-        sa_column=Column(JSON, nullable=False),
-    )
-    output: dict[str, Any] = Field(
-        default_factory=dict,
-        sa_column=Column(JSON, nullable=False),
-    )
-    created_at: datetime = Field(default_factory=utc_now)
-
-
-class AgentProviderRequestRow(SQLModel, table=True):
-    __tablename__ = "agent_provider_request"
-
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    thread_id: str = Field(foreign_key="agent_thread.id", index=True)
-    turn_id: str = Field(foreign_key="agent_turn.id", index=True)
-    run_id: str | None = Field(default=None, foreign_key="agent_run.id", index=True)
-    provider_name: str | None = Field(default=None, index=True)
-    model: str | None = Field(default=None, index=True)
-    request_kind: AgentProviderRequestKind = Field(
-        default=AgentProviderRequestKind.PRIMARY,
-        sa_column=Column(
-            SQLAlchemyEnum(
-                AgentProviderRequestKind,
-                values_callable=lambda enum_class: [member.value for member in enum_class],
-            ),
-            nullable=False,
-            index=True,
-        ),
-    )
-    status: AgentProviderRequestStatus = Field(
-        default=AgentProviderRequestStatus.RUNNING,
-        sa_column=Column(
-            SQLAlchemyEnum(
-                AgentProviderRequestStatus,
-                values_callable=lambda enum_class: [member.value for member in enum_class],
-            ),
-            nullable=False,
-            index=True,
-        ),
-    )
-    input_message_ids: list[str] = Field(
-        default_factory=list,
-        sa_column=Column(JSON, nullable=False),
-    )
-    output_message_ids: list[str] = Field(
-        default_factory=list,
-        sa_column=Column(JSON, nullable=False),
-    )
-    usage_payload: dict[str, Any] | None = Field(
-        default=None,
-        sa_column=Column(JSON, nullable=True),
-    )
-    created_at: datetime = Field(default_factory=utc_now)
-    completed_at: datetime | None = None
 
 
 class ArtifactRow(SQLModel, table=True):
     __tablename__ = "artifact"
 
     id: str = Field(default_factory=generate_id, primary_key=True)
-    thread_id: str | None = Field(default=None, foreign_key="agent_thread.id", index=True)
-    turn_id: str | None = Field(default=None, foreign_key="agent_turn.id", index=True)
-    message_id: str | None = Field(default=None, foreign_key="agent_message.id", index=True)
-    tool_call_id: str | None = Field(default=None, foreign_key="agent_tool_call.id", index=True)
     kind: ArtifactKind = Field(default=ArtifactKind.OTHER, index=True)
     title: str = Field(index=True)
     absolute_path: str
@@ -475,6 +351,215 @@ class ArtifactRow(SQLModel, table=True):
     )
     ready_to_open: bool = True
     created_at: datetime = Field(default_factory=utc_now)
+
+
+class KnowledgeDocumentRow(SQLModel, table=True):
+    """Current searchable identity for one document in a Knowledge Library."""
+
+    __tablename__ = "knowledge_document"
+    __table_args__ = (
+        UniqueConstraint(
+            "library_id",
+            "source_sha256",
+            name="uq_knowledge_document_library_source_sha256",
+        ),
+    )
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    library_id: str = Field(default="global", index=True)
+    title: str = Field(index=True)
+    source_artifact_id: str | None = Field(default=None, foreign_key="artifact.id", index=True)
+    source_sha256: str | None = Field(default=None, index=True)
+    source_format: str | None = Field(default=None, index=True)
+    canonical_path: str | None = None
+    canonical_generation_id: str = Field(default_factory=generate_id, index=True)
+    retrieval_generation_id: str | None = Field(default=None, index=True)
+    retrieval_status: str = Field(default="pending", index=True)
+    retrieval_projection_version: int | None = Field(default=None, index=True)
+    retrieval_content_fingerprint: str | None = Field(default=None, index=True)
+    retrieval_unit_count: int = Field(default=0)
+    active: bool = Field(default=True, index=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class KnowledgeUnitRow(SQLModel, table=True):
+    """Bounded source-linked text that can be returned by Knowledge lookup."""
+
+    __tablename__ = "knowledge_unit"
+    __table_args__ = (
+        UniqueConstraint(
+            "document_id",
+            "canonical_generation_id",
+            "ordinal",
+            name="uq_knowledge_unit_generation_ordinal",
+        ),
+    )
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    document_id: str = Field(foreign_key="knowledge_document.id", index=True)
+    canonical_generation_id: str = Field(index=True)
+    ordinal: int = Field(index=True)
+    text: str
+    search_text: str
+    locator_payload: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class KnowledgeVectorGenerationRow(SQLModel, table=True):
+    """Published immutable vector projection for one exact library corpus/profile."""
+
+    __tablename__ = "knowledge_vector_generation"
+    __table_args__ = (
+        Index(
+            "ix_knowledge_vector_generation_lookup",
+            "library_id",
+            "profile_fingerprint",
+            "corpus_fingerprint",
+            "created_at",
+        ),
+    )
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    library_id: str = Field(default="global", index=True)
+    corpus_fingerprint: str = Field(index=True)
+    profile_fingerprint: str = Field(index=True)
+    provider_key: str
+    model: str
+    dimensions: int
+    distance_metric: str = "cosine"
+    relative_path: str
+    unit_count: int
+    corpus_fingerprint_schema: int = Field(default=3, index=True)
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class KnowledgeIndexTaskRow(SQLModel, table=True):
+    """Observable rebuild attempt for derived Knowledge search projections."""
+
+    __tablename__ = "knowledge_index_task"
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    library_id: str = Field(default="global", index=True)
+    index_kinds_payload: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    trigger: str = Field(index=True)
+    status: str = Field(default="queued", index=True)
+    phase: str = Field(default="queued", index=True)
+    profile_fingerprint: str | None = Field(default=None, index=True)
+    corpus_fingerprint: str | None = Field(default=None, index=True)
+    vector_generation_id: str | None = Field(default=None, index=True)
+    error_code: str | None = Field(default=None, index=True)
+    error_summary: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class KnowledgeImportRow(SQLModel, table=True):
+    """User-visible lifecycle of one Knowledge source import attempt."""
+
+    __tablename__ = "knowledge_import"
+    __table_args__ = (
+        UniqueConstraint(
+            "planned_document_id",
+            "attempt_number",
+            name="uq_knowledge_import_planned_document_attempt",
+        ),
+    )
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    library_id: str = Field(default="global", index=True)
+    original_file_name: str
+    source_format: str = Field(index=True)
+    source_sha256: str | None = Field(default=None, index=True)
+    status: str = Field(default="pending", index=True)
+    phase: str = Field(default="queued", index=True)
+    attempt_number: int = 1
+    retry_of: str | None = Field(default=None, index=True)
+    planned_document_id: str | None = Field(default=None, index=True)
+    document_id: str | None = Field(default=None, foreign_key="knowledge_document.id", index=True)
+    source_artifact_id: str | None = Field(default=None, foreign_key="artifact.id", index=True)
+    canonical_generation_id: str | None = Field(default=None, index=True)
+    canonical_path: str | None = None
+    envelope_sha256: str | None = None
+    content_ir_sha256: str | None = None
+    reused_existing: bool = False
+    error_code: str | None = Field(default=None, index=True)
+    error_summary: str | None = None
+    retryable: bool = False
+    cancel_requested: bool = False
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class KnowledgeCanonicalGenerationRow(SQLModel, table=True):
+    """Immutable metadata binding one verified canonical content bundle."""
+
+    __tablename__ = "knowledge_canonical_generation"
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    document_id: str = Field(foreign_key="knowledge_document.id", index=True)
+    import_id: str | None = Field(default=None, foreign_key="knowledge_import.id", index=True)
+    source_artifact_id: str | None = Field(default=None, foreign_key="artifact.id", index=True)
+    library_id: str = Field(default="global", index=True)
+    source_sha256: str = Field(index=True)
+    source_format: str = Field(index=True)
+    media_type: str | None = None
+    display_name: str
+    envelope_sha256: str = Field(index=True)
+    content_ir_sha256: str = Field(index=True)
+    relative_path: str
+    schema_version: int = 2
+    pipeline_payload: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    warnings_payload: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    compatibility_state: str = Field(default="verified", index=True)
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class KnowledgeDerivationRow(SQLModel, table=True):
+    """One service-owned attempt to derive retrieval state from a canonical generation."""
+
+    __tablename__ = "knowledge_derivation"
+    __table_args__ = (
+        Index(
+            "ix_knowledge_derivation_lookup",
+            "document_id",
+            "canonical_generation_id",
+            "created_at",
+        ),
+    )
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    document_id: str = Field(foreign_key="knowledge_document.id", index=True)
+    canonical_generation_id: str = Field(
+        foreign_key="knowledge_canonical_generation.id",
+        index=True,
+    )
+    import_id: str | None = Field(default=None, foreign_key="knowledge_import.id", index=True)
+    status: str = Field(default="queued", index=True)
+    phase: str = Field(default="queued", index=True)
+    attempt_number: int = 1
+    retry_of: str | None = Field(
+        default=None,
+        foreign_key="knowledge_derivation.id",
+        index=True,
+    )
+    error_code: str | None = Field(default=None, index=True)
+    error_summary: str | None = None
+    retryable: bool = False
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
 
 class TrainedModelRow(SQLModel, table=True):

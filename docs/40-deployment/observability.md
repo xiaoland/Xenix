@@ -8,6 +8,19 @@ Developers and support operators use this runbook to inspect local logs, enable 
 
 Xenix writes JSON Lines to `logs/xenix.log` under the active runtime home. The file rotates at approximately 1 MB and retains three backups. Logs may contain local paths and diagnostic context; handle them as sensitive support evidence.
 
+LLM token usage has a separate `logs/llm-usage.jsonl` journal with the same
+bounded rotation. It contains only normalized token counts plus hashed
+correlation keys, so the UI can reproject a retained usage overview after a
+Thread is reopened. It contains no prompt, raw provider payload, raw Thread or
+Message id, Tool Result, or replay state. Missing or rotated journal data hides
+that overview only; it must never repair conversation state, Tool execution, or
+provider history.
+
+When OTLP metrics are enabled, the same normalized usage counts may also leave
+the device as metrics, tagged with operation and a hashed model key. They still
+contain no prompt, raw provider payload, Thread/Message id, or Tool Result, but
+their retention and access control are owned by the configured telemetry backend.
+
 `config/telemetry.json` stores a randomly generated persistent install id. It is not derived from machine identity, but it correlates activity across runs and therefore remains sensitive.
 
 ## OTLP Enablement
@@ -26,4 +39,4 @@ After enabling a signal, perform one identifiable application action and confirm
 
 Interactive startup uses batch processing and does not synchronously flush after showing the main window. A slow or unreachable backend should not block Qt input; process-exit smoke and diagnostics may flush for deterministic evidence.
 
-For source diagnosis, disable a signal with its Xenix override or remove its endpoint and restart. For an installed release, change the protected candidate build configuration and publish a new version; changing the user's process environment is intentionally not a supported remote reconfiguration path. Disable remote logs independently before traces or metrics, confirm normal interaction, confirm exporter failures stop, and verify intended remaining signals still arrive.
+For source diagnosis, disable a signal with its Xenix override or remove its endpoint and restart. For an installed release, change the protected release build configuration and publish a new version; changing the user's process environment is intentionally not a supported remote reconfiguration path. Disable remote logs independently before traces or metrics, confirm normal interaction, confirm exporter failures stop, and verify intended remaining signals still arrive.

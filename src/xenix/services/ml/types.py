@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import re
 from abc import ABC, abstractmethod
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ..storage.models import ProblemKind
 
@@ -51,11 +52,38 @@ class ColumnRoleKind(StrEnum):
     MANY_COLUMNS = "many_columns"
 
 
-class ModelRoleDefinition(BaseModel):
+_MODEL_KEY_SEGMENT = re.compile(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*\Z")
+
+
+def parse_model_key(model_key: object) -> tuple[str, ...]:
+    if not isinstance(model_key, str) or not model_key.strip():
+        raise ValueError("Model key must be a non-empty string.")
+    segments = tuple(model_key.split("."))
+    if len(segments) < 2 or any(
+        _MODEL_KEY_SEGMENT.fullmatch(segment) is None for segment in segments
+    ):
+        raise ValueError(
+            f"Model key {model_key!r} must be dot-separated lower_snake_case segments."
+        )
+    return segments
+
+
+class _CatalogDeclaration(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+
+class ModelRoleDefinition(_CatalogDeclaration):
     name: str
     kind: ColumnRoleKind
     required: bool = True
     description: str = ""
+
+    @field_validator("name")
+    @classmethod
+    def _name_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Role name must not be blank.")
+        return value
 
 
 class ColumnRoleBinding(BaseModel):
@@ -66,18 +94,36 @@ class ColumnRoleBinding(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class ModelRoleSchema(BaseModel):
-    roles: list[ModelRoleDefinition] = Field(default_factory=list)
+class ModelRoleSchema(_CatalogDeclaration):
+    roles: list[ModelRoleDefinition]
     additional_roles: bool = False
 
+    @model_validator(mode="after")
+    def _roles_must_be_present_and_unique(self) -> Self:
+        if not self.roles:
+            raise ValueError("Role schema must contain at least one role.")
+        role_names = [role.name for role in self.roles]
+        if len(set(role_names)) != len(role_names):
+            raise ValueError("Role schema must not contain duplicate role names.")
+        return self
 
-class ModelResultContract(BaseModel):
-    train_result_kinds: list[str] = Field(default_factory=list)
-    apply_result_kinds: list[str] = Field(default_factory=list)
-    preview_kinds: list[str] = Field(default_factory=list)
+
+class ModelResultContract(_CatalogDeclaration):
+    train_result_kinds: list[str]
+    apply_result_kinds: list[str]
+    preview_kinds: list[str]
+
+    @field_validator("train_result_kinds", "apply_result_kinds", "preview_kinds")
+    @classmethod
+    def _result_kinds_must_not_be_empty_or_blank(cls, value: list[str]) -> list[str]:
+        if not value:
+            raise ValueError("Result kinds must not be empty.")
+        if any(not kind.strip() for kind in value):
+            raise ValueError("Result kinds must not contain blank values.")
+        return value
 
 
-class ModelCatalogEntry(BaseModel):
+class ModelCatalogEntry(_CatalogDeclaration):
     model_key: str
     display_name: str
     problem_kind: ProblemKind | None = None
@@ -96,6 +142,32 @@ class ModelCatalogEntry(BaseModel):
     result_contract: ModelResultContract
     param_schema: dict[str, Any]
     param_grid_schema: dict[str, Any] | None = None
+
+    @field_validator("model_key")
+    @classmethod
+    def _model_key_must_be_valid(cls, value: str) -> str:
+        parse_model_key(value)
+        return value
+
+    @model_validator(mode="after")
+    def _catalog_contracts_must_be_consistent(self) -> Self:
+        has_grid_schema = self.param_grid_schema is not None
+        if self.supports_hyperparameter_tuning != has_grid_schema:
+            raise ValueError(
+                "supports_hyperparameter_tuning must match "
+                "param_grid_schema availability."
+            )
+
+        if self.evaluation_kind is EvaluationKind.SUMMARY:
+            if self.summary_metric_name is None or not self.summary_metric_name.strip():
+                raise ValueError(
+                    "Summary evaluation requires a non-blank summary_metric_name."
+                )
+        elif self.summary_metric_name is not None:
+            raise ValueError(
+                "summary_metric_name is only valid for summary evaluation."
+            )
+        return self
 
 
 class ModelServiceBase(ABC):
@@ -120,15 +192,32 @@ class ModelServiceBase(ABC):
 
     @classmethod
     def catalog_entry(cls) -> ModelCatalogEntry:
-        model_family = cls.model_family or cls._default_model_family()
-        model_task_kind = cls.model_task_kind or cls._default_model_task_kind()
-        evaluation_kind = cls.evaluation_kind or cls._default_evaluation_kind()
+        model_family = (
+            cls.model_family
+            if cls.model_family is not None
+            else cls._default_model_family()
+        )
+        model_task_kind = (
+            cls.model_task_kind
+            if cls.model_task_kind is not None
+            else cls._default_model_task_kind()
+        )
+        evaluation_kind = (
+            cls.evaluation_kind
+            if cls.evaluation_kind is not None
+            else cls._default_evaluation_kind()
+        )
+        summary_metric_name = (
+            cls.summary_metric_name
+            if cls.summary_metric_name is not None
+            else cls._default_summary_metric_name(model_task_kind)
+        )
         return ModelCatalogEntry(
             model_key=cls.key,
             display_name=cls.display_name,
             problem_kind=cls.problem_kind,
             evaluation_kind=evaluation_kind,
-            summary_metric_name=cls.summary_metric_name or cls._default_summary_metric_name(model_task_kind),
+            summary_metric_name=summary_metric_name,
             model_family=model_family,
             model_task_kind=model_task_kind,
             family=cls.family,
@@ -268,7 +357,10 @@ class ModelServiceBase(ABC):
                 apply_result_kinds=["table"],
                 preview_kinds=["model", "table", "file"],
             )
-        return ModelResultContract()
+        raise ValueError(
+            f"Model '{cls.key}' has no default result contract for "
+            f"{model_task_kind.value!r}."
+        )
 
     @classmethod
     @abstractmethod

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from ..llm.providers import (
     AgentProvider,
-    AgentToolSpec,
     OpenAICompatibleChatProvider,
     ProviderMessage,
     ProviderResponse,
@@ -12,6 +11,7 @@ from ..llm.providers import (
     extract_reasoning_content,
     request,
 )
+from ..llm.tooling import AgentToolSpec
 
 __all__ = [
     "AgentProvider",

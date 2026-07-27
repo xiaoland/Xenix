@@ -15,7 +15,7 @@ description: >-
   transformation, or role binding is not ready.
 license: MIT
 metadata:
-  version: "0.3.0"
+  version: "0.4.0"
   product: "Xenix"
   language: "zh-CN"
   runtime: "tool-only; no script execution"
@@ -36,6 +36,7 @@ Xenix Agent has no script execution environment. Use only available Xenix tools:
 - `model.apply` for scoring, prediction, probability output, and batch application.
 - `model.task.query` for background model task status.
 - `analysis.graph` only for model-result explanation charts when chart-ready data exists.
+- `knowledge.lookup` for saved target definitions, business constraints, threshold policies, review rules, and interpretation guidance.
 
 ## Non-negotiable rules
 
@@ -46,20 +47,22 @@ Xenix Agent has no script execution environment. Use only available Xenix tools:
 5. Do not claim the model is suitable for automatic decisions unless threshold, risk, compliance, and human-review boundaries are explicit.
 6. If the dataset needs cleaning, derived features, joins, transformations, or role binding preparation, activate `xenix-data-preprocessing`.
 7. If the user only needs descriptive analysis, charts, association discovery, or a management report, activate `xenix-data-analysis`.
+8. A Knowledge excerpt is a source claim, not label truth, model performance, causal evidence, or authorization for an automatic decision.
 
 ## Default workflow
 
 1. Clarify or infer the modeling objective: classification, regression, scoring, ranking, semi-supervised labeling, text analysis, or model application.
 2. Use `data.query` to profile target distribution, feature availability, missingness, outliers, class balance, and leakage risks.
-3. If the task is text classification, text clustering, topic modeling, or similarity retrieval, require a tokenized text dataset first; activate `xenix-data-preprocessing` if the source still contains raw Chinese sentences.
-4. Ask for confirmation when multiple targets are plausible, the target semantics are unclear, missing labels may mean either “negative” or “unlabeled”, or the business threshold is sensitive.
-5. Use `data.feature.select` to bind roles: target, partial_target when applicable, text/text_id when applicable, features, and excluded fields with reasons.
-6. Call `model.metadata` with `model_family` to browse candidates, then call it again with one `model_key` to inspect role schema and parameters.
-7. Train an interpretable baseline with `model.train`.
-8. Interpret baseline metrics in business terms. Stop when data quality, label quality, sample size, tokenization quality, or leakage blocks a credible model.
-9. Use `model.hyper_train` only for one or two plausible candidates with a small search space.
-10. Use `model.apply` for scored records, probabilities, ranking, prediction output, cluster/topic assignment, or similarity retrieval against new rows.
-11. Explain model output as decision support, not truth. Include assumptions, fields used/excluded, metrics, threshold policy, risk notes, and next data needed.
+3. When saved knowledge may define the target, constraints, threshold, human-review policy, or interpretation, call `knowledge.lookup` with a compact business-language query and prefer `mode: "auto"`. Keep its claim separate from current-data and model evidence.
+4. If the task is text classification, text clustering, topic modeling, or similarity retrieval, require a tokenized text dataset first; activate `xenix-data-preprocessing` if the source still contains raw Chinese sentences.
+5. Ask for confirmation when multiple targets are plausible, the target semantics are unclear, missing labels may mean either “negative” or “unlabeled”, or the business threshold is sensitive.
+6. Use `data.feature.select` to bind roles: target, partial_target when applicable, text/text_id when applicable, features, and excluded fields with reasons.
+7. Call `model.metadata` with `model_family` to browse candidates, then call it again with one `model_key` to inspect role schema and parameters.
+8. Train an interpretable baseline with `model.train`.
+9. Interpret baseline metrics in business terms. Stop when data quality, label quality, sample size, tokenization quality, or leakage blocks a credible model.
+10. Use `model.hyper_train` only for one or two plausible candidates with a small search space.
+11. Use `model.apply` for scored records, probabilities, ranking, prediction output, cluster/topic assignment, or similarity retrieval against new rows.
+12. Explain model output as decision support, not truth. Include assumptions, fields used/excluded, metrics, threshold policy, Knowledge claims used, risk notes, and next data needed.
 
 ## Optional References
 

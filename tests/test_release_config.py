@@ -35,9 +35,19 @@ def test_release_config_normalizes_and_derives_release_urls() -> None:
     assert config.releases_oss_public_url == "https://downloads.example.test/published"
     assert config.update_feed_url == "https://downloads.example.test/published"
     assert config.setup_url == "https://downloads.example.test/published/Xenix-Setup.exe"
+    assert config.artifact_url("xenix-ocr.zip") == (
+        "https://downloads.example.test/published/xenix-ocr.zip"
+    )
     assert config.trial_llm_base_url == "https://trial.example.test/v1"
     assert config.trial_purchase_url == "https://example.test/purchase"
     assert config.trial_lock_build_id == "abcdef123456"
+
+
+@pytest.mark.parametrize("name", ["", "..", "../x.zip", "nested/x.zip", "nested\\x.zip"])
+def test_release_artifact_url_rejects_unsafe_names(name: str) -> None:
+    config = ReleaseConfig(releases_oss_public_url="https://downloads.example.test")
+
+    assert config.artifact_url(name) == ""
 
 
 def test_formal_release_requires_every_trial_product_input() -> None:

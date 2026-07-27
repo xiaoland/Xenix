@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 import sys
-import threading
 import time
+from collections.abc import Callable
 from datetime import datetime
 from importlib import import_module
 from pathlib import Path
@@ -20,7 +19,14 @@ from .config import APP_NAME, APP_ORGANIZATION, ensure_app_dirs, get_app_paths
 from .exceptions import StorageBootstrapError, install_exception_hooks
 from .i18n import TranslationManager
 from .logging import setup_logging
-from .observability import flush_observability, record_counter, setup_observability, start_span
+from .observability import (
+    LLM_USAGE_JOURNAL_FILE_NAME,
+    LocalLLMUsageObservability,
+    flush_observability,
+    record_counter,
+    setup_observability,
+    start_span,
+)
 from .resources import package_resource_path
 from .trial_lock import TrialLockCheck, check_trial_lock, trial_purchase_url
 from .ui.startup_splash import StartupSplash, StartupStage
@@ -34,7 +40,9 @@ STARTUP_TIMING_ENV = "XENIX_STARTUP_TIMING"
 _STARTUP_TIMING_T0 = time.perf_counter()
 StorageRecoveryAction = Literal["quarantine", "open", "exit"]
 
-
+# This is an advertisement policy, not a second tool registry.  The LLM
+# boundary remains the authority for registered definitions and validates the
+# frozen scope before accepting or invoking any provider Tool Call.
 class TrialLockStartupExit(Exception):
     pass
 
@@ -262,22 +270,37 @@ def _recover_storage_bootstrap(
     raise error
 
 
-def _load_runtime_imports() -> SimpleNamespace:
+def _load_runtime_imports(
+    *,
+    module_loaded: Callable[[], None] | None = None,
+) -> SimpleNamespace:
     runtime_start = time.perf_counter()
 
     def load_module(module_name: str):
         module_start = time.perf_counter()
         module = import_module(module_name)
         _emit_startup_timing("runtime_import.module", module_start, module=module_name)
+        if module_loaded is not None:
+            module_loaded()
         return module
 
     agent_harness = load_module("xenix.services.agent.harness_service")
+    agent_composition = load_module("xenix.services.agent.composition")
     agent_skill_catalog = load_module("xenix.services.agent.skill_catalog")
-    conversation_store = load_module("xenix.services.agent.conversation_store")
     lazy_tools = load_module("xenix.services.agent.lazy_tools")
     artifact_service = load_module("xenix.services.artifact_service")
     dataset_export_service = load_module("xenix.services.dataset_export_service")
+    embedding_service = load_module("xenix.services.embedding_service")
     link_router = load_module("xenix.services.link_router")
+    knowledge_import = load_module("xenix.services.knowledge_import_service")
+    knowledge_derivation = load_module("xenix.services.knowledge_derivation_service")
+    knowledge_document_lifecycle = load_module(
+        "xenix.services.knowledge_document_lifecycle_service"
+    )
+    knowledge_index = load_module("xenix.services.knowledge_index_service")
+    knowledge_task_query = load_module("xenix.services.knowledge_task_query")
+    knowledge_workspace = load_module("xenix.services.knowledge_workspace_service")
+    paddle_ocr = load_module("xenix.services.paddle_ocr_service")
     lazy_ml_service = load_module("xenix.services.lazy_ml_service")
     lazy_services = load_module("xenix.services.lazy_services")
     llm = load_module("xenix.services.llm")
@@ -288,13 +311,26 @@ def _load_runtime_imports() -> SimpleNamespace:
 
     return SimpleNamespace(
         AgentHarnessService=agent_harness.AgentHarnessService,
+        build_headless_agent_services=agent_composition.build_headless_agent_services,
         AgentSkillCatalog=agent_skill_catalog.AgentSkillCatalog,
         AgentToolRegistry=lazy_tools.LazyAgentToolRegistry,
         ArtifactService=artifact_service.ArtifactService,
-        ConversationStore=conversation_store.ConversationStore,
+        LLMConversationService=llm.LLMConversationService,
+        LLMToolRegistry=llm.AgentToolRegistry,
         DatasetExportService=dataset_export_service.DatasetExportService,
+        EmbeddingSettingsService=embedding_service.EmbeddingSettingsService,
         LazyServiceProxy=lazy_services.LazyServiceProxy,
         LinkRouter=link_router.LinkRouter,
+        KnowledgeImportService=knowledge_import.KnowledgeImportService,
+        KnowledgeDerivationService=knowledge_derivation.KnowledgeDerivationService,
+        KnowledgeDocumentLifecycleService=(
+            knowledge_document_lifecycle.KnowledgeDocumentLifecycleService
+        ),
+        KnowledgeIndexService=knowledge_index.KnowledgeIndexService,
+        KnowledgeTaskQueryService=knowledge_task_query.KnowledgeTaskQueryService,
+        KnowledgeWorkspaceService=knowledge_workspace.KnowledgeWorkspaceService,
+        PaddleOcrDeploymentService=paddle_ocr.PaddleOcrDeploymentService,
+        PaddleOcrService=paddle_ocr.PaddleOcrService,
         LLMService=llm.LLMService,
         LLMSettingsService=llm.LLMSettingsService,
         MLService=lazy_ml_service.LazyMLService,
@@ -302,6 +338,47 @@ def _load_runtime_imports() -> SimpleNamespace:
         StorageBootstrapService=storage.StorageBootstrapService,
         database_path=storage_layout.database_path,
     )
+
+
+def _register_agent_skill_tools(
+    registry,
+    catalog,
+    *,
+    activated_skill_names_provider: Callable[[str], set[str]] | None = None,
+) -> None:
+    """Compatibility forwarding for historical desktop/test imports."""
+
+    from .services.agent.composition import register_agent_skill_tools
+
+    register_agent_skill_tools(
+        registry,
+        catalog,
+        activated_skill_names_provider=activated_skill_names_provider,
+    )
+
+
+def _agent_skill_activated_skill_names(snapshot) -> set[str]:
+    """Compatibility forwarding for historical desktop/test imports."""
+
+    from .services.agent.composition import agent_skill_activated_skill_names
+
+    return agent_skill_activated_skill_names(snapshot)
+
+
+def _agent_skill_context_messages(catalog, snapshot) -> list:
+    """Compatibility forwarding for historical desktop/test imports."""
+
+    from .services.agent.composition import agent_skill_context_messages
+
+    return agent_skill_context_messages(catalog, snapshot)
+
+
+def _agent_skill_tool_scope_names(snapshot) -> tuple[str, ...] | None:
+    """Compatibility forwarding for historical desktop/test imports."""
+
+    from .services.agent.composition import agent_skill_tool_scope_names
+
+    return agent_skill_tool_scope_names(snapshot)
 
 
 def _load_runtime_imports_with_events(
@@ -314,33 +391,13 @@ def _load_runtime_imports_with_events(
         _emit_startup_timing("runtime_import.no_splash_wait", load_start)
         return runtime
 
-    completed = threading.Event()
-    result: SimpleNamespace | None = None
-    error: BaseException | None = None
-
-    def load() -> None:
-        nonlocal error, result
-        try:
-            result = _load_runtime_imports()
-        except BaseException as exc:
-            error = exc
-        finally:
-            completed.set()
-
     load_start = time.perf_counter()
-    thread = threading.Thread(target=load, name="xenix-startup-imports", daemon=True)
-    thread.start()
-    while not completed.is_set():
+    def process_module_boundary() -> None:
         app.processEvents(QEventLoop.ProcessEventsFlag.AllEvents, 50)
-        completed.wait(0.016)
-    thread.join()
+
+    result = _load_runtime_imports(module_loaded=process_module_boundary)
     app.processEvents()
     _emit_startup_timing("runtime_import.splash_wait", load_start)
-
-    if error is not None:
-        raise error
-    if result is None:
-        raise RuntimeError("Runtime imports did not produce a result.")
     return result
 
 
@@ -376,6 +433,7 @@ def build_main_window(
 
     startup_scope = None
     startup_span_active = False
+    runtime_shutdown: Callable[[], None] | None = None
     try:
         _update_startup_stage(app, splash, StartupStage.PREPARING_APP_DATA)
         step_start = time.perf_counter()
@@ -461,77 +519,89 @@ def build_main_window(
                 initial_error=exc,
             )
 
+        knowledge_import_service = None
+        knowledge_derivation_service = None
+        knowledge_index_service = None
+        runtime_shutdown_started = False
+        runtime_shutdown_connected = False
+
         def shutdown_runtime() -> None:
+            nonlocal runtime_shutdown_connected, runtime_shutdown_started
+            if runtime_shutdown_started:
+                return
+            runtime_shutdown_started = True
+            if runtime_shutdown_connected:
+                app.aboutToQuit.disconnect(shutdown_runtime)
+                runtime_shutdown_connected = False
+            if knowledge_import_service is not None:
+                knowledge_import_service.shutdown()
+            if knowledge_derivation_service is not None:
+                knowledge_derivation_service.shutdown()
+            if knowledge_index_service is not None:
+                knowledge_index_service.shutdown()
             context.engine.dispose()
             flush_observability()
 
-        app.aboutToQuit.connect(shutdown_runtime)
+        runtime_shutdown = shutdown_runtime
 
         _update_startup_stage(app, splash, StartupStage.LOADING_WORKBENCH)
         step_start = time.perf_counter()
-        dataset_service = runtime.LazyServiceProxy(
-            "xenix.services.dataset_service",
-            "DatasetService",
-            context.session_factory,
-            paths,
-        )
-        data_cleaning_service = runtime.LazyServiceProxy(
-            "xenix.services.data_cleaning",
-            "DataCleaningService",
-            paths,
-        )
-        data_transform_service = runtime.LazyServiceProxy(
-            "xenix.services.data_transform",
-            "DataQueryTransformService",
-            paths,
-        )
         ml_worker_settings_service = runtime.MLWorkerSettingsService(paths)
-        ml_task_service = runtime.LazyServiceProxy(
-            "xenix.services.ml_task_service",
-            "MLTaskService",
-            context.session_factory,
-            paths,
-            worker_settings_service=ml_worker_settings_service,
-        )
-        ml_service = runtime.MLService(
+        llm_settings_service = runtime.LLMSettingsService(paths)
+        embedding_settings_service = runtime.EmbeddingSettingsService(paths)
+        llm_service = runtime.LLMService(llm_settings_service)
+        agent_services = runtime.build_headless_agent_services(
             paths=paths,
             session_factory=context.session_factory,
-            dataset_service=dataset_service,
-            ml_task_service=ml_task_service,
-        )
-        artifact_service = runtime.ArtifactService(context.session_factory)
-        dataset_export_service = runtime.DatasetExportService(
-            paths=paths,
-            dataset_service=dataset_service,
-            artifact_service=artifact_service,
+            llm=llm_service,
+            embedding_settings_service=embedding_settings_service,
+            ml_worker_settings=ml_worker_settings_service,
+            usage_observability=LocalLLMUsageObservability(
+                paths.logs / LLM_USAGE_JOURNAL_FILE_NAME
+            ),
         )
         link_router = runtime.LinkRouter(
-            artifact_service=artifact_service,
-        )
-        conversation_store = runtime.ConversationStore(context.session_factory)
-        llm_settings_service = runtime.LLMSettingsService(paths)
-        llm_service = runtime.LLMService(llm_settings_service)
-        agent_tool_registry = runtime.AgentToolRegistry(
-            paths=paths,
-            dataset_service=dataset_service,
-            data_cleaning_service=data_cleaning_service,
-            data_transform_service=data_transform_service,
-            ml_service=ml_service,
-            artifact_service=artifact_service,
-            dataset_export_service=dataset_export_service,
-        )
-        agent_harness_service = runtime.AgentHarnessService(
-            session_factory=context.session_factory,
-            tool_registry=agent_tool_registry,
-            llm_service=llm_service,
-            conversation_store=conversation_store,
-            dataset_service=dataset_service,
-            artifact_service=artifact_service,
-            skill_catalog=runtime.AgentSkillCatalog.from_default_catalog(),
+            artifact_service=agent_services.artifacts,
         )
         from .services.update_service import UpdateService
 
         update_service = UpdateService(paths, runtime.database_path(paths))
+        paddle_ocr_deployment = runtime.PaddleOcrDeploymentService(paths)
+        knowledge_index_service = runtime.KnowledgeIndexService(
+            session_factory=context.session_factory,
+            semantic_service=agent_services.knowledge_semantic,
+            embedding_service=agent_services.embedding,
+            embedding_settings_source=embedding_settings_service,
+        )
+        knowledge_derivation_service = runtime.KnowledgeDerivationService(
+            paths=paths,
+            session_factory=context.session_factory,
+            retrieval_ready_notifier=knowledge_index_service.notify_corpus_changed,
+        )
+        knowledge_import_service = runtime.KnowledgeImportService(
+            paths=paths,
+            session_factory=context.session_factory,
+            artifact_service=agent_services.artifacts,
+            canonical_ready_notifier=knowledge_derivation_service.enqueue_generation,
+        )
+        knowledge_document_lifecycle_service = (
+            runtime.KnowledgeDocumentLifecycleService(
+                paths=paths,
+                session_factory=context.session_factory,
+                artifact_service=agent_services.artifacts,
+                index_service=knowledge_index_service,
+                content_cleanup=knowledge_import_service.cleanup_storage_orphans,
+            )
+        )
+        knowledge_task_query_service = runtime.KnowledgeTaskQueryService(
+            context.session_factory
+        )
+        knowledge_workspace_service = runtime.KnowledgeWorkspaceService(
+            knowledge_service=agent_services.knowledge,
+            task_query=knowledge_task_query_service,
+            index_service=knowledge_index_service,
+            ocr_deployment=paddle_ocr_deployment,
+        )
         _emit_startup_timing("services.construct", step_start)
 
         step_start = time.perf_counter()
@@ -540,17 +610,31 @@ def build_main_window(
             log_path=log_path,
             db_path=runtime.database_path(paths),
             translation_manager=translation_manager,
-            agent_harness_service=agent_harness_service,
+            agent_harness_service=agent_services.harness,
             llm_service=llm_service,
             llm_settings_service=llm_settings_service,
+            embedding_settings_service=embedding_settings_service,
             ml_worker_settings_service=ml_worker_settings_service,
-            artifact_service=artifact_service,
+            artifact_service=agent_services.artifacts,
             link_router=link_router,
-            dataset_service=dataset_service,
-            ml_service=ml_service,
+            dataset_service=agent_services.datasets,
+            ml_service=agent_services.ml,
             update_service=update_service,
+            knowledge_import_service=knowledge_import_service,
+            knowledge_derivation_service=knowledge_derivation_service,
+            knowledge_service=agent_services.knowledge,
+            knowledge_index_service=knowledge_index_service,
+            paddle_ocr_deployment=paddle_ocr_deployment,
+            knowledge_task_query_service=knowledge_task_query_service,
+            knowledge_workspace_service=knowledge_workspace_service,
+            knowledge_document_lifecycle_service=(
+                knowledge_document_lifecycle_service
+            ),
         )
         _emit_startup_timing("main_window.construct", step_start)
+        app.aboutToQuit.connect(shutdown_runtime)
+        runtime_shutdown_connected = True
+        window.closing.connect(shutdown_runtime)
 
         _update_startup_stage(app, splash, StartupStage.READY)
         _hold_startup_splash(app, splash, splash_hold_ms)
@@ -574,7 +658,10 @@ def build_main_window(
         if startup_span_active and startup_scope is not None:
             startup_scope.__exit__(*sys.exc_info())
             startup_span_active = False
-        flush_observability()
+        if runtime_shutdown is None:
+            flush_observability()
+        else:
+            runtime_shutdown()
         _close_startup_splash(app, splash)
         raise
 
@@ -687,6 +774,10 @@ def _run_smoke_checks(paths) -> None:
     xgboost_prediction = xgboost_estimator.predict([[1.5]])
     if len(xgboost_prediction) != 1:
         raise RuntimeError("XGBoost packaged runtime smoke fit failed.")
+
+    from .services.knowledge_packaged_smoke import run_knowledge_packaged_smoke
+
+    run_knowledge_packaged_smoke(paths)
 
 
 def run(*, smoke_test: bool = False) -> int:

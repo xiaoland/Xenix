@@ -20,6 +20,7 @@ src/xenix/_generated_build_info.py
 src/xenix/services/agent/skills/catalog.json
 
 # Logs and local runtime data
+/.runtime/
 logs/
 *.log
 tmp/

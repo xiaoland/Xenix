@@ -24,6 +24,9 @@ class LazyAgentToolRegistry:
     def execute(self, tool_name: str, arguments: dict[str, Any], context):
         return self._resolve().execute(tool_name, arguments, context)
 
+    def register_with_llm(self, registry) -> None:
+        self._resolve().register_with_llm(registry)
+
     def _resolve(self):
         registry = self._registry
         if registry is not None:

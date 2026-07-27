@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import pprint
 import re
@@ -139,6 +141,72 @@ def _remove_generated_release_config(project_root: Path) -> None:
     (project_root / "src" / "xenix" / "_generated_trial_lock.py").unlink(missing_ok=True)
 
 
+def _generated_knowledge_ocr_catalog_path(project_root: Path) -> Path:
+    return (
+        project_root
+        / "src"
+        / "xenix"
+        / "resources"
+        / "knowledge_ocr"
+        / "runtime_catalog.json"
+    )
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _prepare_knowledge_ocr_catalog(project_root: Path, *, required: bool) -> Path | None:
+    source = project_root / "dist" / "knowledge-ocr" / "runtime_catalog.json"
+    target = _generated_knowledge_ocr_catalog_path(project_root)
+    target.unlink(missing_ok=True)
+    if not source.is_file():
+        if required:
+            raise RuntimeError(
+                "A public build requires dist/knowledge-ocr/runtime_catalog.json. "
+                "Build the native Knowledge OCR runtime first."
+            )
+        return None
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    if (
+        not isinstance(payload, dict)
+        or payload.keys()
+        != {
+            "schema_version",
+            "artifact_name",
+            "artifact_bytes",
+            "artifact_sha256",
+            "protocol_version",
+            "runtime_id",
+            "model_pack_id",
+        }
+    ):
+        raise RuntimeError("The generated Knowledge OCR catalog is inconsistent.")
+    artifact_name = str(payload.get("artifact_name") or "")
+    artifact = source.parent / artifact_name
+    if (
+        payload.get("schema_version") != 1
+        or payload.get("protocol_version") != 2
+        or Path(artifact_name).name != artifact_name
+        or artifact_name in {"", ".", ".."}
+        or not artifact.is_file()
+        or artifact.stat().st_size != payload.get("artifact_bytes")
+        or _sha256(artifact) != payload.get("artifact_sha256")
+    ):
+        raise RuntimeError("The generated Knowledge OCR catalog is inconsistent.")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(source.read_bytes())
+    return target
+
+
+def _remove_generated_knowledge_ocr_catalog(project_root: Path) -> None:
+    _generated_knowledge_ocr_catalog_path(project_root).unlink(missing_ok=True)
+
+
 def _generate_agent_skill_catalog(project_root: Path) -> None:
     subprocess.run(
         [sys.executable, str(project_root / "scripts" / "agent_skills.py"), "generate"],
@@ -164,6 +232,10 @@ def main() -> int:
         build_commit=build_commit,
     )
     try:
+        _prepare_knowledge_ocr_catalog(
+            project_root,
+            required=os.environ.get("XENIX_PUBLIC_RELEASE_BUILD", "").strip() == "1",
+        )
         _write_generated_build_info(project_root, app_version, build_commit)
         _write_windows_version_info(project_root, app_version)
         _write_generated_release_config(project_root, release_config)
@@ -185,6 +257,7 @@ def main() -> int:
             ]
         )
     finally:
+        _remove_generated_knowledge_ocr_catalog(project_root)
         _remove_generated_build_info(project_root)
         _remove_generated_release_config(project_root)
     return 0

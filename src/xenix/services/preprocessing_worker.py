@@ -162,9 +162,6 @@ def _register_generated_dataset(payload: dict[str, Any], paths: AppPaths) -> dic
     try:
         export_artifact = dataset_export_service.materialize_dataset_export_artifact(
             dataset.id,
-            thread_id=_optional_string(payload.get("thread_id")),
-            turn_id=_optional_string(payload.get("turn_id")),
-            tool_call_id=_optional_string(payload.get("tool_call_id")),
             metadata_payload=payload.get("metadata_payload") if isinstance(payload.get("metadata_payload"), dict) else None,
         )
     except Exception:

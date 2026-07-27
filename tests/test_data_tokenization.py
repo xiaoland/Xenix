@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -5,8 +6,6 @@ import pytest
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import ValidationError
-from xenix.services.agent import ConversationStore
-from xenix.services.agent.conversation_store import CreateToolCallInput, StartTurnInput
 from xenix.services.agent.tools import AgentToolRegistry, ToolExecutionContext
 from xenix.services.artifact_service import ArtifactService
 from xenix.services.data_cleaning import DataCleaningService
@@ -47,41 +46,29 @@ def _build_runtime(monkeypatch, tmp_path: Path):
         artifact_service=artifact_service,
         preprocessing_worker_runner=worker_runner,
     )
-    conversation_store = ConversationStore(context.session_factory)
-    return paths, dataset_service, data_tokenization_service, artifact_service, registry, conversation_store
+    return paths, dataset_service, data_tokenization_service, artifact_service, registry, None
 
 
 def _tool_context(
-    conversation_store: ConversationStore,
+    _conversation_store,
     tool_name: str,
     arguments: dict,
 ) -> ToolExecutionContext:
-    thread = conversation_store.create_thread()
-    turn, _message = conversation_store.start_turn(
-        StartTurnInput(
-            thread_id=thread.id,
-            user_content_blocks=[{"type": "text", "text": "Tokenize this dataset."}],
-        )
-    )
-    _tool_message, tool_call = conversation_store.create_tool_call(
-        CreateToolCallInput(
-            thread_id=thread.id,
-            turn_id=turn.id,
-            tool_name=tool_name,
-            arguments_payload=arguments,
-        )
-    )
     return ToolExecutionContext(
-        thread_id=thread.id,
-        turn_id=turn.id,
-        tool_call_id=tool_call.id,
-        dataset_ids=[],
+        thread_id="tool-test-thread",
+        dataset_ids=(),
     )
 
 
 def _read_dataset_frame(path: str | Path) -> pd.DataFrame:
     source_path = Path(path)
     return load_dataframe(source_path, detect_source_format(source_path))
+
+
+def _xtt_metadata(value: str, key: str) -> str:
+    match = re.search(rf"^{re.escape(key)}: (.+)$", value, re.MULTILINE)
+    assert match is not None, f"missing XTT metadata field {key!r}: {value}"
+    return match.group(1)
 
 
 def test_data_tokenization_service_creates_token_text_dataset(monkeypatch, tmp_path: Path) -> None:
@@ -191,14 +178,15 @@ def test_data_tokenize_tool_registers_derived_dataset_and_artifact(monkeypatch, 
     context = _tool_context(store, "data.tokenize", arguments)
 
     result = registry.execute("data.tokenize", arguments, context)
-    derived_dataset = dataset_service.get_dataset(result.payload["dataset_id"])
+    assert isinstance(result.value, str)
+    derived_dataset = dataset_service.get_dataset(_xtt_metadata(result.value, "dataset_id"))
     tokenized_frame = _read_dataset_frame(derived_dataset.source_path).fillna("")
 
     assert derived_dataset.derived_from_dataset_id == source_dataset.id
     assert derived_dataset.project_id == source_dataset.project_id
-    assert "dataset_uri" not in result.payload
-    assert "artifact_uri" not in result.payload
-    artifact = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}")
+    assert "dataset_uri" not in result.value
+    assert "artifact_uri" not in result.value
+    artifact = artifact_service.resolve_uri(f"artifact://{_xtt_metadata(result.value, 'artifact_id')}")
     assert artifact.metadata_payload["dataset_id"] == derived_dataset.id
     assert artifact.metadata_payload["dataset_export"]["dataset_id"] == derived_dataset.id
     assert pd.read_excel(artifact.absolute_path).columns.tolist() == [
@@ -208,33 +196,9 @@ def test_data_tokenize_tool_registers_derived_dataset_and_artifact(monkeypatch, 
         "token_count",
     ]
     assert tokenized_frame.columns.tolist() == ["review_id", "review_text", "token_text", "token_count"]
-    assert result.payload["row_count"] == 2
-    assert result.payload["tokenization_report"]["output"] == "token_text"
-    assert "artifact_link" not in result.payload
-
-
-def test_data_tokenize_tool_schema_is_dataset_scoped(monkeypatch, tmp_path: Path) -> None:
-    _paths, _dataset_service, _tokenization_service, _artifact_service, registry, _store = _build_runtime(
-        monkeypatch,
-        tmp_path,
-    )
-    specs = {spec.name: spec for spec in registry.list_specs()}
-
-    assert "data.tokenize" in specs
-    schema = specs["data.tokenize"].parameters_schema
-    assert schema["required"] == ["dataset_id", "text_column"]
-    assert schema["additionalProperties"] is False
-    assert set(schema["properties"]) == {
-        "dataset_id",
-        "name",
-        "text_column",
-        "id_columns",
-        "output",
-        "tokenizer_profile",
-    }
-    assert schema["properties"]["output"]["enum"] == ["token_text", "token_rows"]
-    assert schema["properties"]["tokenizer_profile"]["enum"] == ["zh_business_v1"]
-    assert "jieba" not in str(schema)
+    assert "row_count: 2" in result.value
+    assert "output: token_text" in result.value
+    assert "artifact_link" not in result.value
 
 
 def test_data_tokenize_tool_rejects_non_list_id_columns(monkeypatch, tmp_path: Path) -> None:
@@ -259,3 +223,266 @@ def test_data_tokenize_tool_rejects_non_list_id_columns(monkeypatch, tmp_path: P
 
     with pytest.raises(ValidationError, match="id_columns must be a list of strings"):
         registry.execute("data.tokenize", arguments, context)
+
+
+def test_data_tokenization_service_resolves_column_indexes_to_canonical_names(monkeypatch, tmp_path: Path) -> None:
+    _paths, _dataset_service, tokenization_service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "reviews.csv"
+    source.write_text(
+        "review_id,,review_text\n"
+        "r1,app,苹果 手机 包装 好\n",
+        encoding="utf-8",
+    )
+
+    result = tokenization_service.tokenize_dataset(
+        TokenizeDatasetInput(
+            source_path=str(source.resolve()),
+            name="Review tokens",
+            text_column_index=2,
+            id_column_indexes=[0, 1],
+            output="token_rows",
+        )
+    )
+
+    frame = pd.read_csv(result.output_path, keep_default_na=False)
+    assert frame.columns.tolist() == [
+        "source_row_number",
+        "review_id",
+        "column_2",
+        "token_index",
+        "token",
+    ]
+    assert result.report["text_column"] == "review_text"
+    assert result.report["id_columns"] == ["review_id", "column_2"]
+
+
+def test_data_tokenization_canonicalizes_duplicate_unicode_headers_positionally(monkeypatch, tmp_path: Path) -> None:
+    _paths, _dataset_service, tokenization_service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "unicode-headers.csv"
+    source.write_text(
+        "订单号,订单号,评价文本\n"
+        "r1,web,苹果 手机\n",
+        encoding="utf-8",
+    )
+
+    result = tokenization_service.tokenize_dataset(
+        TokenizeDatasetInput(
+            source_path=str(source.resolve()),
+            name="Unicode header tokens",
+            text_column_index=2,
+            id_column_indexes=[0, 1],
+            output="token_rows",
+        )
+    )
+
+    frame = pd.read_csv(result.output_path, keep_default_na=False)
+    assert frame.columns.tolist() == [
+        "source_row_number",
+        "订单号",
+        "column_2",
+        "token_index",
+        "token",
+    ]
+    assert result.report["text_column"] == "评价文本"
+    assert result.report["id_columns"] == ["订单号", "column_2"]
+
+
+def test_data_tokenization_service_allows_mixed_selector_modes_per_field(monkeypatch, tmp_path: Path) -> None:
+    _paths, _dataset_service, tokenization_service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "reviews.csv"
+    source.write_text("review_id,review_text\nr1,订单 退款\n", encoding="utf-8")
+
+    result = tokenization_service.tokenize_dataset(
+        TokenizeDatasetInput(
+            source_path=str(source.resolve()),
+            name="Review tokens",
+            text_column="review_text",
+            id_column_indexes=[0],
+            output="token_rows",
+        )
+    )
+
+    assert result.report["text_column"] == "review_text"
+    assert result.report["id_columns"] == ["review_id"]
+
+
+def test_data_tokenization_service_accepts_empty_id_column_indexes(monkeypatch, tmp_path: Path) -> None:
+    _paths, _dataset_service, tokenization_service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "reviews.csv"
+    source.write_text("review_id,review_text\nr1,订单 退款\n", encoding="utf-8")
+
+    result = tokenization_service.tokenize_dataset(
+        TokenizeDatasetInput(
+            source_path=str(source.resolve()),
+            name="Review tokens",
+            text_column_index=1,
+            id_column_indexes=[],
+            output="token_rows",
+        )
+    )
+
+    assert result.report["id_columns"] == []
+
+
+@pytest.mark.parametrize(
+    ("text_column_index", "id_column_indexes", "message"),
+    [
+        (1, [0, 0], "cannot contain duplicates"),
+        (1, [1], "cannot include text_column"),
+    ],
+)
+def test_data_tokenization_service_rejects_invalid_resolved_id_indexes(
+    monkeypatch,
+    tmp_path: Path,
+    text_column_index: int,
+    id_column_indexes: list[int],
+    message: str,
+) -> None:
+    _paths, _dataset_service, tokenization_service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "reviews.csv"
+    source.write_text("review_id,review_text\nr1,订单 退款\n", encoding="utf-8")
+
+    with pytest.raises(ValidationError, match=message):
+        tokenization_service.tokenize_dataset(
+            TokenizeDatasetInput(
+                source_path=str(source.resolve()),
+                name="Review tokens",
+                text_column_index=text_column_index,
+                id_column_indexes=id_column_indexes,
+                output="token_rows",
+            )
+        )
+
+
+@pytest.mark.parametrize("bad_index", [True, "1", 1.0, -1, 3])
+def test_data_tokenization_service_rejects_invalid_text_column_indexes(
+    monkeypatch,
+    tmp_path: Path,
+    bad_index: object,
+) -> None:
+    _paths, _dataset_service, tokenization_service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "reviews.csv"
+    source.write_text("review_id,review_text\nr1,订单 退款\n", encoding="utf-8")
+
+    with pytest.raises(ValidationError, match="text_column_index"):
+        tokenization_service.tokenize_dataset(
+            TokenizeDatasetInput(
+                source_path=str(source.resolve()),
+                name="Review tokens",
+                text_column_index=bad_index,
+            )
+        )
+
+
+def test_data_tokenization_service_rejects_mixed_column_reference_forms(monkeypatch, tmp_path: Path) -> None:
+    _paths, _dataset_service, tokenization_service, _artifact_service, _registry, _store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "reviews.csv"
+    source.write_text("review_id,review_text\nr1,订单 退款\n", encoding="utf-8")
+
+    with pytest.raises(ValidationError, match="either text_column or text_column_index"):
+        tokenization_service.tokenize_dataset(
+            TokenizeDatasetInput(
+                source_path=str(source.resolve()),
+                name="Review tokens",
+                text_column="review_text",
+                text_column_index=1,
+            )
+        )
+    with pytest.raises(ValidationError, match="either id_columns or id_column_indexes"):
+        tokenization_service.tokenize_dataset(
+            TokenizeDatasetInput(
+                source_path=str(source.resolve()),
+                name="Review tokens",
+                text_column="review_text",
+                id_columns=[],
+                id_column_indexes=[],
+                output="token_rows",
+            )
+        )
+
+
+def test_data_tokenize_tool_rejects_mixed_selector_forms(monkeypatch, tmp_path: Path) -> None:
+    _paths, dataset_service, _tokenization_service, _artifact_service, registry, store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "reviews.csv"
+    source.write_text("review_id,review_text\nr1,订单 退款\n", encoding="utf-8")
+    dataset = dataset_service.register_dataset(
+        RegisterDatasetInput(source_path=str(source.resolve()), name="Reviews")
+    )
+    context = _tool_context(store, "data.tokenize", {})
+
+    with pytest.raises(ValidationError, match="either text_column or text_column_index"):
+        registry.execute(
+            "data.tokenize",
+            {"dataset_id": dataset.id, "text_column": "review_text", "text_column_index": 1},
+            context,
+        )
+    with pytest.raises(ValidationError, match="either id_columns or id_column_indexes"):
+        registry.execute(
+            "data.tokenize",
+            {
+                "dataset_id": dataset.id,
+                "text_column_index": 1,
+                "id_columns": [],
+                "id_column_indexes": [],
+            },
+            context,
+        )
+
+
+@pytest.mark.parametrize(
+    ("selector_arguments", "message"),
+    [
+        ({"text_column_index": True}, "text_column_index must be a zero-based integer"),
+        (
+            {"text_column_index": 1, "id_column_indexes": [True]},
+            "id_column_indexes must contain zero-based integers",
+        ),
+        (
+            {"text_column_index": 1, "id_column_indexes": [2]},
+            "id_column_indexes index 2 is outside the available zero-based column range",
+        ),
+    ],
+)
+def test_data_tokenize_tool_rejects_invalid_index_selectors(
+    monkeypatch,
+    tmp_path: Path,
+    selector_arguments: dict[str, object],
+    message: str,
+) -> None:
+    _paths, dataset_service, _tokenization_service, _artifact_service, registry, store = _build_runtime(
+        monkeypatch,
+        tmp_path,
+    )
+    source = tmp_path / "reviews.csv"
+    source.write_text("review_id,review_text\nr1,订单 退款\n", encoding="utf-8")
+    dataset = dataset_service.register_dataset(
+        RegisterDatasetInput(source_path=str(source.resolve()), name="Reviews")
+    )
+    arguments = {"dataset_id": dataset.id, **selector_arguments}
+
+    with pytest.raises(ValidationError, match=message):
+        registry.execute("data.tokenize", arguments, _tool_context(store, "data.tokenize", arguments))

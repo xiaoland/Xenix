@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import json
-import os
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Callable, Iterator
+from typing import Any, Callable, Iterator, Protocol
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -12,7 +11,6 @@ from ...config import AppPaths
 from ...exceptions import NotFoundError, ValidationError
 from ...release_config import load_release_config
 from .providers import (
-    AgentToolSpec,
     LLMRequestMetadata,
     LLMRetryEvent,
     OpenAICompatibleChatProvider,
@@ -20,6 +18,7 @@ from .providers import (
     ProviderResponse,
     ProviderStreamEvent,
 )
+from .tooling import AgentToolSpec
 
 SETTINGS_FILE_NAME = "agent_settings.json"
 DEFAULT_PROVIDER_KEY = "openai"
@@ -32,19 +31,8 @@ TRIAL_LLM_BASE_URL_FALLBACK = "https://api.openai.com"
 TRIAL_LLM_MODEL_FALLBACK = DEFAULT_MODEL_KEY
 
 
-class XenixEnvironment(StrEnum):
-    PRODUCTION = "production"
-    DEVELOPMENT = "development"
-
-
 class LLMDialect(StrEnum):
     OPENAI_COMPATIBLE = "openai_compatible"
-
-
-class AimockSettings(BaseModel):
-    enabled: bool = False
-    base_url: str = "http://127.0.0.1:4010"
-    api_key: str = "test"
 
 
 class LLMProviderConfig(BaseModel):
@@ -145,7 +133,6 @@ class LLMSettings(BaseModel):
     turn_completion_guard_fq_model_key: str = ""
     thread_title_fq_model_key: str = ""
     retry_attempts: int = Field(default=5, ge=1, le=20)
-    aimock: AimockSettings = Field(default_factory=AimockSettings)
 
     @model_validator(mode="before")
     @classmethod
@@ -187,21 +174,40 @@ class LLMSettings(BaseModel):
         return self
 
 
+class LLMSettingsSource(Protocol):
+    """Supplies the settings used by an ``LLMService`` instance."""
+
+    def load(self) -> LLMSettings: ...
+
+    def save(self, settings: LLMSettings) -> None: ...
+
+
+class FrozenLLMSettingsSource:
+    """Read-only, in-memory settings source for an isolated LLM service."""
+
+    def __init__(self, settings: LLMSettings) -> None:
+        self._settings = settings.model_copy(deep=True)
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}()"
+
+    def load(self) -> LLMSettings:
+        return self._settings.model_copy(deep=True)
+
+    def save(self, settings: LLMSettings) -> None:
+        raise ValidationError(
+            "LLM settings are read-only for this run.",
+            error_code="llm_settings_read_only",
+        )
+
+
 class LLMSettingsService:
     def __init__(self, paths: AppPaths) -> None:
         self._settings_path = paths.config / SETTINGS_FILE_NAME
-        self._environment = _read_environment()
 
     @property
     def settings_path(self) -> Path:
         return self._settings_path
-
-    @property
-    def environment(self) -> XenixEnvironment:
-        return self._environment
-
-    def is_development(self) -> bool:
-        return self._environment is XenixEnvironment.DEVELOPMENT
 
     def load(self) -> LLMSettings:
         if not self._settings_path.exists():
@@ -219,11 +225,11 @@ class LLMSettingsService:
 
 
 class LLMService:
-    def __init__(self, settings_service: LLMSettingsService) -> None:
+    def __init__(self, settings_service: LLMSettingsSource) -> None:
         self._settings_service = settings_service
 
     @property
-    def settings_service(self) -> LLMSettingsService:
+    def settings_service(self) -> LLMSettingsSource:
         return self._settings_service
 
     def load_settings(self) -> LLMSettings:
@@ -245,6 +251,7 @@ class LLMService:
         messages: list[ProviderMessage],
         tools: list[AgentToolSpec],
         retry_callback: Callable[[LLMRetryEvent], None] | None = None,
+        before_provider_request: Callable[[], None] | None = None,
     ) -> ProviderResponse:
         settings = self.load_settings()
         provider = self._build_provider_from_settings(settings, fq_model_key)
@@ -254,6 +261,7 @@ class LLMService:
             tools=tools,
             max_attempts=settings.retry_attempts,
             retry_callback=retry_callback,
+            before_provider_request=before_provider_request,
         )
 
     def stream(
@@ -262,6 +270,7 @@ class LLMService:
         fq_model_key: str | None = None,
         messages: list[ProviderMessage],
         tools: list[AgentToolSpec],
+        before_provider_request: Callable[[], None] | None = None,
     ) -> Iterator[ProviderStreamEvent | LLMRetryEvent]:
         settings = self.load_settings()
         provider = self._build_provider_from_settings(settings, fq_model_key)
@@ -274,17 +283,21 @@ class LLMService:
                     max_attempts=max_attempts,
                     exc=previous_error,
                 )
+            if before_provider_request is not None:
+                before_provider_request()
             try:
                 stream = getattr(provider, "stream", None)
                 if callable(stream):
                     buffered_events = []
-                    for event in stream(messages, tools):
+                    events = stream(messages, tools)
+                    for event in events:
                         if self._is_live_tool_call_progress(event):
                             yield event
                             continue
                         buffered_events.append(event)
                 else:
-                    buffered_events = [ProviderStreamEvent(response=provider.complete(messages, tools))]
+                    response = provider.complete(messages, tools)
+                    buffered_events = [ProviderStreamEvent(response=response)]
                 yield from buffered_events
                 return
             except Exception as exc:
@@ -329,15 +342,6 @@ class LLMService:
             raise ValidationError(
                 f"LLM dialect '{provider_config.dialect.value}' is not supported yet."
             )
-        if self._settings_service.is_development() and settings.aimock.enabled:
-            return OpenAICompatibleChatProvider(
-                provider_key=provider_config.key,
-                base_url=settings.aimock.base_url,
-                api_key=settings.aimock.api_key,
-                model=ref.model_key,
-                timeout_seconds=provider_config.timeout_seconds,
-                streaming_enabled=provider_config.streaming_enabled,
-            )
         trial_config = load_packaged_trial_llm_config()
         if provider_config.dialect_config.get("secret_source") == PACKAGED_TRIAL_SECRET_SOURCE:
             if not trial_config.enabled:
@@ -367,6 +371,7 @@ class LLMService:
         tools: list[AgentToolSpec],
         max_attempts: int,
         retry_callback: Callable[[LLMRetryEvent], None] | None,
+        before_provider_request: Callable[[], None] | None,
     ) -> ProviderResponse:
         attempts = self._max_attempts(max_attempts)
         previous_error: Exception | None = None
@@ -379,6 +384,8 @@ class LLMService:
                         exc=previous_error,
                     )
                 )
+            if before_provider_request is not None:
+                before_provider_request()
             try:
                 return provider.complete(messages, tools)
             except Exception as exc:
@@ -477,13 +484,6 @@ class LLMService:
         raise NotFoundError(f"LLM provider '{provider_key}' was not found.")
 
 
-def _read_environment() -> XenixEnvironment:
-    raw = os.getenv("XENIX_ENV", XenixEnvironment.PRODUCTION.value).strip().lower()
-    if raw == XenixEnvironment.DEVELOPMENT.value:
-        return XenixEnvironment.DEVELOPMENT
-    return XenixEnvironment.PRODUCTION
-
-
 def load_packaged_trial_llm_config() -> PackagedTrialLLMConfig:
     release_config = load_release_config()
     return PackagedTrialLLMConfig(
@@ -527,7 +527,6 @@ def _legacy_payload_to_settings(payload: dict[str, Any]) -> dict[str, Any]:
         "thread_title_fq_model_key": (
             LLMService.fq_model_key(DEFAULT_PROVIDER_KEY, title_model) if title_model else ""
         ),
-        "aimock": payload.get("aimock") or {},
     }
     return settings
 

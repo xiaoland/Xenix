@@ -17,9 +17,7 @@ from ..config import AppPaths
 from ..exceptions import NotFoundError, ValidationError
 from .dataset_inspection import (
     DatasetAttachmentMetadata,
-    DatasetColumnKind,
     DatasetInspection,
-    DatasetColumnMetadata,
     InspectDatasetInput,
     detect_source_format,
     inspect_attachment_metadata_file,
@@ -36,7 +34,13 @@ from .storage.models import (
     TrainedModelRow,
 )
 from .storage.repositories import DatasetRepository, ProjectRepository
-from .tabular import TabularRuntimeError, load_tabular_frame, resolve_tabular_schema
+from .tabular import (
+    TabularSchema,
+    TabularRuntimeError,
+    apply_tabular_schema,
+    load_tabular_frame,
+    resolve_tabular_schema_for_loaded_frame,
+)
 
 
 def _utc_now() -> datetime:
@@ -91,6 +95,23 @@ class RegisteredDatasetAttachmentItem(SQLModel):
 
 class RegisteredDatasetAttachment(RegisteredDatasetAttachmentItem):
     datasets: list[RegisteredDatasetAttachmentItem] = Field(default_factory=list)
+
+
+@dataclass(frozen=True, slots=True)
+class DatasetSourcePresentation:
+    """Read-only presentation of the original file behind an imported dataset.
+
+    ``DatasetRow.source_path`` points at app-owned materialized Parquet and is
+    intentionally not exposed here.  The source presentation is resolved from
+    the ``DatasetImportRow`` provenance instead, so a stale original path can
+    only make the local open action unavailable.
+    """
+
+    dataset_id: str
+    source_group_id: str
+    file_name: str
+    open_path: str | None
+    is_openable: bool
 
 
 class DatasetService:
@@ -164,7 +185,7 @@ class DatasetService:
             materialized: list[_MaterializedDataset] = []
             written_paths: list[Path] = []
             try:
-                for index, spec in enumerate(frame_specs):
+                for spec in frame_specs:
                     dataset_id = uuid4().hex
                     sheet_name = str(spec["sheet_name"]) if spec.get("sheet_name") is not None else None
                     dataset_name = name
@@ -337,6 +358,79 @@ class DatasetService:
                 raise NotFoundError(f"Dataset '{dataset_id}' was not found.")
             return row
 
+    def resolve_dataset_source_presentation(
+        self,
+        dataset_id: str,
+    ) -> DatasetSourcePresentation | None:
+        """Resolve bounded source metadata for a dataset without reading data.
+
+        This is deliberately a soft read: deleted datasets/imports, legacy
+        rows without import provenance, malformed identifiers and unavailable
+        original files simply produce ``None`` or an unopenable presentation.
+        In particular, the app-owned Parquet path on ``DatasetRow`` is never
+        substituted for the original user-selected source file.
+        """
+
+        if not isinstance(dataset_id, str):
+            return None
+        normalized_id = dataset_id.strip()
+        if not normalized_id:
+            return None
+
+        try:
+            with self._session_factory() as session:
+                dataset = self._datasets.get(session, normalized_id)
+                if dataset is None:
+                    return None
+
+                import_id = dataset.import_id
+                if not isinstance(import_id, str) or not import_id.strip():
+                    return None
+                import_id = import_id.strip()
+                imported = session.get(DatasetImportRow, import_id)
+                if imported is None:
+                    return None
+
+                file_name = imported.original_file_name
+                if not isinstance(file_name, str):
+                    return None
+                file_name = file_name.strip()
+                if not file_name:
+                    return None
+
+                original_path = imported.original_path
+                open_path: str | None = None
+                is_openable = False
+                if isinstance(original_path, str):
+                    original_path = original_path.strip()
+                    if original_path:
+                        try:
+                            candidate = Path(original_path)
+                            if candidate.is_absolute() and candidate.is_file():
+                                open_path = str(candidate)
+                                is_openable = True
+                        except (OSError, ValueError, RuntimeError):
+                            # A stale or malformed path is a projection-level
+                            # availability issue, not a thread-load failure.
+                            pass
+
+                return DatasetSourcePresentation(
+                    dataset_id=normalized_id,
+                    source_group_id=import_id,
+                    file_name=file_name,
+                    open_path=open_path,
+                    is_openable=is_openable,
+                )
+        except Exception:
+            # Historical/partially migrated storage must not make a Thread
+            # unreadable merely because source enrichment failed.
+            LOGGER.debug(
+                "Unable to resolve source presentation for dataset %s.",
+                normalized_id,
+                exc_info=True,
+            )
+            return None
+
     def get_dataset_by_ml_task(self, ml_task_id: str) -> DatasetRow | None:
         with self._session_factory() as session:
             return self._datasets.get_by_ml_task(session, ml_task_id)
@@ -492,10 +586,12 @@ class DatasetService:
     ) -> list[dict[str, object]]:
         if source_format is DatasetSourceFormat.CSV:
             frame = pl.read_csv(source_path, try_parse_dates=False, infer_schema_length=None)
-            return [self._frame_spec(frame, sheet_name=None, sheet_index=None)]
+            schema = resolve_tabular_schema_for_loaded_frame(source_path, source_format, frame)
+            return [self._frame_spec(frame, schema=schema, sheet_name=None, sheet_index=None)]
         if source_format is DatasetSourceFormat.PARQUET:
             frame = pl.read_parquet(source_path)
-            return [self._frame_spec(frame, sheet_name=None, sheet_index=None)]
+            schema = resolve_tabular_schema_for_loaded_frame(source_path, source_format, frame)
+            return [self._frame_spec(frame, schema=schema, sheet_name=None, sheet_index=None)]
         if source_format in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}:
             workbook = pl.read_excel(
                 source_path,
@@ -504,12 +600,31 @@ class DatasetService:
                 raise_if_empty=False,
             )
             if isinstance(workbook, pl.DataFrame):
-                return [self._frame_spec(workbook, sheet_name=None, sheet_index=0)]
+                schema = resolve_tabular_schema_for_loaded_frame(
+                    source_path,
+                    source_format,
+                    workbook,
+                    sheet_name=0,
+                )
+                return [self._frame_spec(workbook, schema=schema, sheet_name=None, sheet_index=0)]
             specs: list[dict[str, object]] = []
             for index, (sheet_name, frame) in enumerate(workbook.items()):
                 if frame.width == 0 or frame.height == 0:
                     continue
-                specs.append(self._frame_spec(frame, sheet_name=str(sheet_name), sheet_index=index))
+                schema = resolve_tabular_schema_for_loaded_frame(
+                    source_path,
+                    source_format,
+                    frame,
+                    sheet_name=str(sheet_name),
+                )
+                specs.append(
+                    self._frame_spec(
+                        frame,
+                        schema=schema,
+                        sheet_name=str(sheet_name),
+                        sheet_index=index,
+                    )
+                )
             return specs
         raise ValidationError("Only .csv, .parquet, .xlsx, and .xls dataset files are supported.")
 
@@ -517,6 +632,7 @@ class DatasetService:
         self,
         frame: pl.DataFrame,
         *,
+        schema: TabularSchema,
         sheet_name: str | None,
         sheet_index: int | None,
     ) -> dict[str, object]:
@@ -524,13 +640,9 @@ class DatasetService:
             raise ValidationError("Dataset file must contain at least one column.")
         if frame.height == 0:
             raise ValidationError("Dataset file must contain at least one data row.")
-        schema = resolve_tabular_schema(frame.columns)
-        renamed = frame.rename(
-            {
-                original_name: column.tool_name
-                for original_name, column in zip(frame.columns, schema.columns, strict=True)
-            }
-        )
+        if len(frame.columns) != len(schema.columns):
+            raise ValidationError("Dataset source schema could not be resolved consistently.")
+        renamed = apply_tabular_schema(frame, schema)
         return {
             "frame": renamed,
             "sheet_name": sheet_name,

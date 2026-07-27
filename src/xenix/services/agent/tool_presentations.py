@@ -33,6 +33,13 @@ DEFAULT_TOOL_PRESENTATION = ToolPresentation(
 
 
 TOOL_PRESENTATIONS: dict[str, ToolPresentation] = {
+    "knowledge.lookup": ToolPresentation(
+        icon_key="search",
+        pending_summary="Searching knowledge...",
+        success_summary="Searched knowledge",
+        failure_action="search knowledge",
+        cancellation_summary="Cancelled knowledge search",
+    ),
     "data.integrate": ToolPresentation(
         icon_key="merge",
         pending_summary="Integrating data...",

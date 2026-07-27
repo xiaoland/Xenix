@@ -27,6 +27,38 @@ def artifact_apply_root(paths: AppPaths) -> Path:
     return paths.artifacts / "apply"
 
 
+def knowledge_root(paths: AppPaths) -> Path:
+    return paths.artifacts / "knowledge"
+
+
+def knowledge_objects_root(paths: AppPaths) -> Path:
+    return knowledge_root(paths) / "objects"
+
+
+def knowledge_staging_root(paths: AppPaths) -> Path:
+    return knowledge_root(paths) / "staging"
+
+
+def knowledge_indexes_root(paths: AppPaths) -> Path:
+    return knowledge_root(paths) / "indexes"
+
+
+def knowledge_tasks_root(paths: AppPaths) -> Path:
+    return knowledge_root(paths) / "tasks"
+
+
+def knowledge_import_task_root(paths: AppPaths, import_id: str) -> Path:
+    return knowledge_tasks_root(paths) / "imports" / import_id
+
+
+def knowledge_import_result_path(paths: AppPaths, import_id: str) -> Path:
+    return knowledge_import_task_root(paths, import_id) / "result.json"
+
+
+def knowledge_import_logs_path(paths: AppPaths, import_id: str) -> Path:
+    return knowledge_import_task_root(paths, import_id) / "logs.jsonl"
+
+
 def ml_task_parent_root(paths: AppPaths) -> Path:
     return paths.artifacts / "ml-tasks"
 
@@ -74,5 +106,9 @@ def ensure_storage_layout(paths: AppPaths) -> None:
         artifact_training_root(paths),
         artifact_apply_root(paths),
         ml_task_parent_root(paths),
+        knowledge_objects_root(paths),
+        knowledge_indexes_root(paths),
+        knowledge_staging_root(paths),
+        knowledge_tasks_root(paths),
     ):
         directory.mkdir(parents=True, exist_ok=True)

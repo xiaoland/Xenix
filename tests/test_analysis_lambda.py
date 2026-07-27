@@ -4,8 +4,6 @@ import pytest
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import ValidationError
-from xenix.services.agent import ConversationStore
-from xenix.services.agent.conversation_store import CreateToolCallInput, StartTurnInput
 from xenix.services.agent.tools import AgentToolRegistry, ToolExecutionContext
 from xenix.services.analysis_lambda import AnalysisLambdaDataset, AnalysisLambdaInput, AnalysisLambdaService
 from xenix.services.artifact_service import ArtifactService
@@ -45,31 +43,13 @@ def _build_runtime(monkeypatch, tmp_path: Path, *, lambda_limits: dict | None = 
         analysis_lambda_service=analysis_lambda_service,
         preprocessing_worker_runner=worker_runner,
     )
-    conversation_store = ConversationStore(context.session_factory)
-    return dataset_service, registry, conversation_store, analysis_lambda_service
+    return dataset_service, registry, None, analysis_lambda_service
 
 
-def _tool_context(conversation_store: ConversationStore, tool_name: str, arguments: dict) -> ToolExecutionContext:
-    thread = conversation_store.create_thread()
-    turn, _message = conversation_store.start_turn(
-        StartTurnInput(
-            thread_id=thread.id,
-            user_content_blocks=[{"type": "text", "text": "Run a custom analysis."}],
-        )
-    )
-    _tool_message, tool_call = conversation_store.create_tool_call(
-        CreateToolCallInput(
-            thread_id=thread.id,
-            turn_id=turn.id,
-            tool_name=tool_name,
-            arguments_payload=arguments,
-        )
-    )
+def _tool_context(_conversation_store, tool_name: str, arguments: dict) -> ToolExecutionContext:
     return ToolExecutionContext(
-        thread_id=thread.id,
-        turn_id=turn.id,
-        tool_call_id=tool_call.id,
-        dataset_ids=[],
+        thread_id="tool-test-thread",
+        dataset_ids=(),
     )
 
 
@@ -222,15 +202,13 @@ def test_analysis_lambda_service_times_out_bad_code(monkeypatch, tmp_path: Path)
         lambda_service.run_lambda(input_data)
 
 
-def test_analysis_lambda_tool_is_not_registered(monkeypatch, tmp_path: Path) -> None:
+def test_agent_registry_rejects_unregistered_tool(monkeypatch, tmp_path: Path) -> None:
     _dataset_service, registry, conversation_store, _lambda_service = _build_runtime(monkeypatch, tmp_path)
-    specs = {spec.name: spec for spec in registry.list_specs()}
     arguments = {
         "code": "def analyze(ctx, inputs, params):\n    return {}\n",
         "datasets": {"sales": "dataset-1"},
     }
 
-    assert "analysis.lambda" not in specs
     with pytest.raises(ValidationError, match="not registered"):
         registry.execute(
             "analysis.lambda",

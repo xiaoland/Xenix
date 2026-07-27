@@ -21,7 +21,8 @@ class FakeManager:
 
     def download_updates(self, update_info, progress_callback=None):
         if progress_callback:
-            progress_callback(100)
+            for value in (7, 55, 100):
+                progress_callback(value)
 
     def wait_exit_then_apply_updates(self, update, silent=False, restart=True, restart_args=None):
         self.applied = True
@@ -37,7 +38,9 @@ def test_check_download_and_apply(monkeypatch, tmp_path: Path) -> None:
     manager = FakeManager(info)
     service = UpdateService(_paths(tmp_path), database, manager_factory=lambda _: manager, coordinator=ApplicationActivityCoordinator())
     assert service.check().state is UpdateState.UPDATE_AVAILABLE
-    assert service.download().state is UpdateState.READY
+    progress: list[int] = []
+    assert service.download(progress.append).state is UpdateState.READY
+    assert progress == [7, 55, 100]
     stopped = []
     service.apply(lambda: stopped.append(True))
     assert manager.applied and stopped == [True]

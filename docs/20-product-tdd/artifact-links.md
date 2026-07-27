@@ -18,6 +18,16 @@ Dataset ids identify registered data for later service or tool input. They are n
 link authorities. A derived dataset intended for user download must also have a
 ready export artifact.
 
+A Chatbot source attachment is not an Artifact link. Harness may project the
+original import's bounded label and an in-process local opening target from
+Dataset provenance for the desktop UI. That target is neither persisted
+conversation content nor provider input, and it must not be converted into an
+Artifact identity merely to reopen a Thread.
+
+Generic Chatbot-event diagnostic serialization and logging must redact that
+opening target. The desktop bubble keeps it only in its short-lived local
+activation map.
+
 Legacy `view` query hints are accepted for compatibility but ignored. Artifact kind,
 MIME type, and markdown syntax determine current presentation.
 
@@ -40,7 +50,9 @@ requests a normal openable artifact. Both retain the same artifact id authority.
 - ArtifactService owns registration, readiness, URI resolution, and local file
   activation. LinkRouter owns UI link dispatch.
 - UI and provider-facing content do not construct, expose, or activate raw local
-  paths as artifact identities.
+  paths as artifact identities. An ephemeral Chatbot source presentation may
+  carry a local opening target only inside the desktop UI boundary; it is not an
+  artifact URI, Markdown target, provider value, or canonical Message field.
 - Remote worker paths are never artifact links. Remote outputs become linkable only
   after local finalization and registration.
 - A missing registration or registered file is a service error and activation

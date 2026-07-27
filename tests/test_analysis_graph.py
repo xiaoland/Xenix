@@ -8,8 +8,6 @@ from PySide6.QtSvg import QSvgRenderer
 import xenix.services.analysis_graph as analysis_graph_module
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import ValidationError
-from xenix.services.agent import ConversationStore
-from xenix.services.agent.conversation_store import CreateToolCallInput, StartTurnInput
 from xenix.services.agent.tools import AgentToolRegistry, ToolExecutionContext
 from xenix.services.analysis_graph import AnalysisGraphService, GraphDatasetInput
 from xenix.services.artifact_service import ArtifactService
@@ -48,31 +46,13 @@ def _build_runtime(monkeypatch, tmp_path: Path):
         artifact_service=artifact_service,
         preprocessing_worker_runner=worker_runner,
     )
-    conversation_store = ConversationStore(context.session_factory)
-    return paths, dataset_service, artifact_service, registry, conversation_store
+    return paths, dataset_service, artifact_service, registry, None
 
 
-def _tool_context(conversation_store: ConversationStore, tool_name: str, arguments: dict) -> ToolExecutionContext:
-    thread = conversation_store.create_thread()
-    turn, _message = conversation_store.start_turn(
-        StartTurnInput(
-            thread_id=thread.id,
-            user_content_blocks=[{"type": "text", "text": "Draw this dataset."}],
-        )
-    )
-    _tool_message, tool_call = conversation_store.create_tool_call(
-        CreateToolCallInput(
-            thread_id=thread.id,
-            turn_id=turn.id,
-            tool_name=tool_name,
-            arguments_payload=arguments,
-        )
-    )
+def _tool_context(_conversation_store, tool_name: str, arguments: dict) -> ToolExecutionContext:
     return ToolExecutionContext(
-        thread_id=thread.id,
-        turn_id=turn.id,
-        tool_call_id=tool_call.id,
-        dataset_ids=[],
+        thread_id="tool-test-thread",
+        dataset_ids=(),
     )
 
 
@@ -265,6 +245,28 @@ def test_analysis_graph_service_writes_svg_from_vegalite_spec(monkeypatch, tmp_p
     assert all("h0" not in path for path in bar_paths)
     assert renderer.isValid()
     assert not any("Invalid path data" in message for message in qt_messages)
+
+
+def test_analysis_graph_repairs_process_wide_svg_namespace_pollution(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    source = _write_sales_csv(tmp_path)
+    ET.register_namespace("svg", analysis_graph_module._SVG_NS)
+
+    try:
+        result = AnalysisGraphService(paths).graph_dataset(
+            GraphDatasetInput(
+                source_path=str(source.resolve()),
+                dataset_name="Sales",
+                spec=_bar_spec(),
+            )
+        )
+    finally:
+        ET.register_namespace("", analysis_graph_module._SVG_NS)
+
+    svg = Path(result.output_path).read_text(encoding="utf-8")
+    assert svg.lstrip().startswith("<svg")
+    assert "<svg:svg" not in svg
 
 
 def test_analysis_graph_service_renders_wordcloud_from_wordcloud_spec(monkeypatch, tmp_path: Path) -> None:
@@ -572,11 +574,11 @@ def test_analysis_graph_tool_registers_image_artifact(monkeypatch, tmp_path: Pat
         arguments,
         _tool_context(conversation_store, "analysis.graph", arguments),
     )
-    resolved = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}?view=image")
+    assert isinstance(result.value, dict)
+    resolved = artifact_service.resolve_uri(f"artifact://{result.value['artifact_id']}?view=image")
 
-    assert result.payload["dataset_id"] == dataset.id
-    assert "artifact_link" not in result.payload
-    assert not hasattr(result, "content_blocks")
+    assert result.value["dataset_id"] == dataset.id
+    assert "artifact_link" not in result.value
     assert resolved.kind is ArtifactKind.IMAGE
     assert resolved.mime_type == "image/svg+xml"
     assert resolved.title == "Revenue by region"
@@ -601,41 +603,12 @@ def test_analysis_graph_tool_registers_wordcloud_artifact(monkeypatch, tmp_path:
         arguments,
         _tool_context(conversation_store, "analysis.graph", arguments),
     )
-    resolved = artifact_service.resolve_uri(f"artifact://{result.payload['artifact_id']}?view=image")
+    assert isinstance(result.value, dict)
+    resolved = artifact_service.resolve_uri(f"artifact://{result.value['artifact_id']}?view=image")
 
-    assert result.payload["dataset_id"] == dataset.id
+    assert result.value["dataset_id"] == dataset.id
     assert resolved.kind is ArtifactKind.IMAGE
     assert resolved.mime_type == "image/svg+xml"
     assert resolved.metadata_payload["analysis_graph"]["spec_format"] == "wordcloud"
     assert resolved.metadata_payload["analysis_graph"]["renderer"] == "wordcloud"
     assert Path(resolved.absolute_path).exists()
-
-
-def test_analysis_graph_tool_schema_is_dataset_scoped(monkeypatch, tmp_path: Path) -> None:
-    _paths, _dataset_service, _artifact_service, registry, _conversation_store = _build_runtime(monkeypatch, tmp_path)
-    specs = {spec.name: spec for spec in registry.list_specs()}
-
-    assert "analysis.graph" in specs
-    schema = specs["analysis.graph"].parameters_schema
-    assert schema["required"] == ["dataset_id"]
-    assert "oneOf" not in schema
-    assert "exactly one graph mode" in specs["analysis.graph"].description
-    assert "dataset_id" in schema["properties"]
-    assert "spec" in schema["properties"]
-    assert "wordcloud_spec" in schema["properties"]
-    assert "do not use this field for word clouds" in schema["properties"]["spec"]["description"]
-    assert "data.query or data.transform first" in schema["properties"]["wordcloud_spec"]["description"]
-    spec_schema = schema["properties"]["spec"]
-    assert "required" not in spec_schema
-    assert "mark" in spec_schema["properties"]
-    assert "encoding" in spec_schema["properties"]
-    assert "layer" in spec_schema["properties"]
-    assert "Vega-Lite" in spec_schema["description"]
-    wordcloud_schema = schema["properties"]["wordcloud_spec"]
-    assert wordcloud_schema["properties"]["top_n"]["minimum"] == 20
-    assert wordcloud_schema["properties"]["top_n"]["maximum"] == 80
-    assert wordcloud_schema["properties"]["color_mode"]["enum"] == ["rank_tier", "field"]
-    assert "operation" not in schema["properties"]
-    assert "params" not in schema["properties"]
-    assert "source_path" not in schema["properties"]
-    assert "rows" not in schema["properties"]

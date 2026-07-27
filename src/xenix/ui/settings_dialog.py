@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QUrl, Signal
+from PySide6.QtCore import QEvent, QThreadPool, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QApplication,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -24,11 +24,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..build_info import BUILD_COMMIT, BUILD_COMMIT_DISPLAY
+from ..build_info import APP_VERSION, BUILD_COMMIT, BUILD_COMMIT_DISPLAY
 from ..config import AppPaths
 from ..i18n import TranslationManager
+from ..services.embedding_service import EmbeddingSettings, EmbeddingSettingsService
 from ..services.llm import (
-    AimockSettings,
     LLMDialect,
     LLMProviderConfig,
     LLMService,
@@ -37,13 +37,29 @@ from ..services.llm import (
     PACKAGED_TRIAL_SECRET_SOURCE,
 )
 from ..services.ml.worker_settings import MLWorkerKind, MLWorkerSettingsService
-from ..services.update_service import UpdateService, UpdateState, UpdateStatus
+from ..services.knowledge_index_service import (
+    KnowledgeIndexKind,
+    KnowledgeIndexService,
+)
+from ..services.paddle_ocr_service import (
+    PaddleOcrDeploymentService,
+    PaddleOcrState,
+    PaddleOcrStatus,
+)
+from ..services.update_service import UpdateService
+from .ocr_deployment_tasks import OcrInstallTask, OcrStatusTask
+from .knowledge_index_ui import KnowledgeIndexRebuildDialog
 from .ssh_worker_setup_wizard import SshWorkerSetupWizard
 
 
+class SettingsTab(StrEnum):
+    AI = "ai"
+    KNOWLEDGE_BASE = "knowledge_base"
+    ML_WORKERS = "ml_workers"
+
+
 class AboutDialog(QDialog):
-    _update_finished = Signal(object)
-    _quit_for_update = Signal()
+    software_update_requested = Signal()
 
     def __init__(
         self,
@@ -51,14 +67,15 @@ class AboutDialog(QDialog):
         paths: AppPaths,
         log_path: Path,
         db_path: Path,
-        update_service: UpdateService | None = None,
+        software_updates_available: bool = False,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._paths = paths
         self._log_path = log_path
         self._db_path = db_path
-        self._update_service = update_service
+        self._software_updates_available = software_updates_available
+        self._update_operation_active = False
 
         self._runtime_card = QFrame()
         self._runtime_card.setFrameShape(QFrame.StyledPanel)
@@ -70,16 +87,17 @@ class AboutDialog(QDialog):
         self._artifacts_label = QLabel()
         self._database_label = QLabel()
         self._current_log_file_label = QLabel()
+        self._app_version_label = QLabel()
         self._build_commit_label = QLabel()
         self._open_logs_button = QPushButton()
         self._check_updates_button = QPushButton()
-        self._update_status_value = QLabel()
 
         self._app_home_value = QLabel(str(self._paths.home))
         self._state_value = QLabel(str(self._paths.state))
         self._artifacts_value = QLabel(str(self._paths.artifacts))
         self._database_value = QLabel(str(self._db_path))
         self._current_log_file_value = QLabel(str(self._log_path))
+        self._app_version_value = QLabel(APP_VERSION)
         self._build_commit_value = QLabel(BUILD_COMMIT_DISPLAY)
         if BUILD_COMMIT_DISPLAY != BUILD_COMMIT:
             self._build_commit_value.setToolTip(BUILD_COMMIT)
@@ -100,6 +118,7 @@ class AboutDialog(QDialog):
             self._artifacts_value,
             self._database_value,
             self._current_log_file_value,
+            self._app_version_value,
             self._build_commit_value,
         ):
             value_label.setWordWrap(True)
@@ -109,6 +128,7 @@ class AboutDialog(QDialog):
         self._runtime_card_layout.addRow(self._artifacts_label, self._artifacts_value)
         self._runtime_card_layout.addRow(self._database_label, self._database_value)
         self._runtime_card_layout.addRow(self._current_log_file_label, self._current_log_file_value)
+        self._runtime_card_layout.addRow(self._app_version_label, self._app_version_value)
         self._runtime_card_layout.addRow(self._build_commit_label, self._build_commit_value)
 
         layout.addWidget(self._runtime_card)
@@ -120,9 +140,9 @@ class AboutDialog(QDialog):
 
     def _wire_events(self) -> None:
         self._open_logs_button.clicked.connect(self._open_logs_dir)
-        self._check_updates_button.clicked.connect(self._check_for_updates)
-        self._update_finished.connect(self._handle_update_status)
-        self._quit_for_update.connect(QApplication.instance().quit)
+        self._check_updates_button.clicked.connect(
+            self.software_update_requested.emit
+        )
 
     def retranslate_ui(self) -> None:
         self.setWindowTitle(self.tr("About"))
@@ -131,11 +151,13 @@ class AboutDialog(QDialog):
         self._artifacts_label.setText(self.tr("Artifacts"))
         self._database_label.setText(self.tr("Database"))
         self._current_log_file_label.setText(self.tr("Current log file"))
+        self._app_version_label.setText(self.tr("App version"))
         self._build_commit_label.setText(self.tr("Build commit"))
         self._open_logs_button.setText(self.tr("Open log directory"))
         self._check_updates_button.setText(self.tr("Check for updates"))
-        if self._update_service is None:
-            self._check_updates_button.setEnabled(False)
+        self._check_updates_button.setEnabled(
+            self._software_updates_available and not self._update_operation_active
+        )
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == QEvent.LanguageChange:
@@ -145,58 +167,18 @@ class AboutDialog(QDialog):
     def _open_logs_dir(self) -> None:
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._paths.logs)))
 
-    def _run_update_operation(self, operation) -> None:
-        self._check_updates_button.setEnabled(False)
-
-        def run() -> None:
-            try:
-                result = operation()
-            except Exception as exc:
-                result = UpdateStatus(UpdateState.FAILED, "", message=str(exc))
-            self._update_finished.emit(result)
-
-        import threading
-
-        threading.Thread(target=run, name="xenix-update", daemon=True).start()
-
-    def _check_for_updates(self) -> None:
-        if self._update_service is not None:
-            self._run_update_operation(self._update_service.check)
-
-    def _handle_update_status(self, status: UpdateStatus) -> None:
-        self._check_updates_button.setEnabled(True)
-        if status.state is UpdateState.UNAVAILABLE:
-            QMessageBox.information(self, self.tr("Updates"), self.tr("Updates are unavailable in this build."))
-        elif status.state is UpdateState.IDLE:
-            QMessageBox.information(self, self.tr("Updates"), self.tr("Xenix is up to date."))
-        elif status.state is UpdateState.FAILED:
-            QMessageBox.warning(self, self.tr("Updates"), status.message)
-        elif status.state is UpdateState.UPDATE_AVAILABLE and self._update_service is not None:
-            answer = QMessageBox.question(
-                self,
-                self.tr("Update available"),
-                self.tr("Xenix {version} is available. Download it now?").format(version=status.target_version),
-            )
-            if answer == QMessageBox.Yes:
-                self._run_update_operation(self._update_service.download)
-        elif status.state is UpdateState.READY and self._update_service is not None:
-            answer = QMessageBox.question(
-                self,
-                self.tr("Update ready"),
-                self.tr("Restart Xenix now to apply version {version}?").format(version=status.target_version),
-            )
-            if answer == QMessageBox.Yes:
-                self._run_update_operation(lambda: self._apply_update(status))
-
-    def _apply_update(self, status: UpdateStatus) -> UpdateStatus:
-        assert self._update_service is not None
-        self._update_service.apply(self._quit_for_update.emit)
-        return UpdateStatus(UpdateState.APPLYING, status.installed_version, status.target_version)
+    def set_update_operation_active(self, active: bool) -> None:
+        self._update_operation_active = active
+        self._check_updates_button.setEnabled(
+            self._software_updates_available and not active
+        )
 
 
 class SettingsDialog(QDialog):
     agent_settings_saved = Signal()
+    embedding_settings_saved = Signal()
     ml_worker_settings_saved = Signal()
+    software_update_requested = Signal()
 
     def __init__(
         self,
@@ -207,8 +189,11 @@ class SettingsDialog(QDialog):
         llm_service: LLMService,
         llm_settings_service: LLMSettingsService,
         ml_worker_settings_service: MLWorkerSettingsService,
+        embedding_settings_service: EmbeddingSettingsService,
         update_service: UpdateService | None = None,
-        parent: QDialog | None = None,
+        paddle_ocr_deployment: PaddleOcrDeploymentService | None = None,
+        knowledge_index_service: KnowledgeIndexService | None = None,
+        parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._paths = paths
@@ -217,13 +202,29 @@ class SettingsDialog(QDialog):
         self._translation_manager = translation_manager
         self._llm_service = llm_service
         self._llm_settings_service = llm_settings_service
+        self._embedding_settings_service = embedding_settings_service
         self._ml_worker_settings_service = ml_worker_settings_service
-        self._update_service = update_service
+        self._software_updates_available = update_service is not None
+        self._update_operation_active = False
+        self._paddle_ocr_deployment = paddle_ocr_deployment
+        self._knowledge_index_service = knowledge_index_service
         self._provider_configs: list[LLMProviderConfig] = []
         self._loading_provider = False
         self._active_provider_index = 0
+        self._embedding_settings_snapshot = EmbeddingSettings()
         self._ssh_worker_wizard: SshWorkerSetupWizard | None = None
         self._about_dialog: AboutDialog | None = None
+        self._thread_pool = QThreadPool(self)
+        self._shutdown = False
+        self._lifecycle_generation = 0
+        self._active = False
+        self._cached_ocr_status: PaddleOcrStatus | None = None
+        self._ocr_status_task: OcrStatusTask | None = None
+        self._ocr_install_task: OcrInstallTask | None = None
+        self._index_dialog: KnowledgeIndexRebuildDialog | None = None
+        self._knowledge_refresh_timer = QTimer(self)
+        self._knowledge_refresh_timer.setInterval(1_000)
+        self._knowledge_refresh_timer.timeout.connect(self._render_index_status)
 
         self._language_label = QLabel()
         self._language_selector = QComboBox()
@@ -236,15 +237,25 @@ class SettingsDialog(QDialog):
         self._llm_card_layout = QFormLayout(self._llm_card)
         self._llm_card_layout.setContentsMargins(12, 12, 12, 12)
 
+        self._embedding_card = QFrame()
+        self._embedding_card.setFrameShape(QFrame.StyledPanel)
+        self._embedding_card_layout = QFormLayout(self._embedding_card)
+        self._embedding_card_layout.setContentsMargins(12, 12, 12, 12)
+
+        self._ocr_card = QFrame()
+        self._ocr_card.setFrameShape(QFrame.StyledPanel)
+        self._ocr_card_layout = QFormLayout(self._ocr_card)
+        self._ocr_card_layout.setContentsMargins(12, 12, 12, 12)
+
+        self._index_card = QFrame()
+        self._index_card.setFrameShape(QFrame.StyledPanel)
+        self._index_card_layout = QFormLayout(self._index_card)
+        self._index_card_layout.setContentsMargins(12, 12, 12, 12)
+
         self._global_models_card = QFrame()
         self._global_models_card.setFrameShape(QFrame.StyledPanel)
         self._global_models_card_layout = QFormLayout(self._global_models_card)
         self._global_models_card_layout.setContentsMargins(12, 12, 12, 12)
-
-        self._aimock_card = QFrame()
-        self._aimock_card.setFrameShape(QFrame.StyledPanel)
-        self._aimock_card_layout = QFormLayout(self._aimock_card)
-        self._aimock_card_layout.setContentsMargins(12, 12, 12, 12)
 
         self._ml_workers_card = QFrame()
         self._ml_workers_card.setFrameShape(QFrame.StyledPanel)
@@ -267,10 +278,23 @@ class SettingsDialog(QDialog):
         self._llm_thread_title_model_label = QLabel()
         self._llm_retry_attempts_label = QLabel()
 
-        self._aimock_title_label = QLabel()
-        self._aimock_enabled_label = QLabel()
-        self._aimock_base_url_label = QLabel()
-        self._aimock_api_key_label = QLabel()
+        self._embedding_title_label = QLabel()
+        self._embedding_enabled_label = QLabel()
+        self._embedding_base_url_label = QLabel()
+        self._embedding_api_key_label = QLabel()
+        self._embedding_model_label = QLabel()
+        self._embedding_dimensions_label = QLabel()
+        self._embedding_batch_size_label = QLabel()
+        self._embedding_timeout_label = QLabel()
+
+        self._ocr_title_label = QLabel()
+        self._ocr_status_label = QLabel()
+        self._ocr_setup_button = QPushButton()
+
+        self._index_title_label = QLabel()
+        self._index_status_label = QLabel()
+        self._index_status_label.setWordWrap(True)
+        self._index_rebuild_button = QPushButton()
 
         self._ml_workers_title_label = QLabel()
         self._ml_workers_summary_label = QLabel()
@@ -297,15 +321,25 @@ class SettingsDialog(QDialog):
         self._llm_retry_attempts_input = QSpinBox()
         self._llm_retry_attempts_input.setRange(1, 20)
 
-        self._aimock_enabled_checkbox = QCheckBox()
-        self._aimock_base_url_input = QLineEdit()
-        self._aimock_api_key_input = QLineEdit()
-        self._aimock_api_key_input.setEchoMode(QLineEdit.Password)
+        self._embedding_enabled_checkbox = QCheckBox()
+        self._embedding_base_url_input = QLineEdit()
+        self._embedding_api_key_input = QLineEdit()
+        self._embedding_api_key_input.setEchoMode(QLineEdit.Password)
+        self._embedding_model_input = QLineEdit()
+        self._embedding_dimensions_input = QSpinBox()
+        self._embedding_dimensions_input.setRange(0, 65_536)
+        self._embedding_batch_size_input = QSpinBox()
+        self._embedding_batch_size_input.setRange(1, 2_048)
+        self._embedding_timeout_input = QSpinBox()
+        self._embedding_timeout_input.setRange(1, 3_600)
+        self._embedding_timeout_input.setSuffix(" s")
+        self._tab_indexes: dict[SettingsTab, int] = {}
 
         self.resize(760, 760)
         self._build_ui()
         self._wire_events()
         self._load_agent_settings()
+        self._load_embedding_settings()
         self.retranslate_ui()
 
     def _build_ui(self) -> None:
@@ -356,11 +390,23 @@ class SettingsDialog(QDialog):
         self._llm_card_layout.addRow(self._provider_timeout_label, self._provider_timeout_input)
         self._llm_card_layout.addRow(self._provider_streaming_label, self._provider_streaming_checkbox)
 
-        self._aimock_card_layout.addRow(self._aimock_title_label)
-        self._aimock_card_layout.addRow(self._aimock_enabled_label, self._aimock_enabled_checkbox)
-        self._aimock_card_layout.addRow(self._aimock_base_url_label, self._aimock_base_url_input)
-        self._aimock_card_layout.addRow(self._aimock_api_key_label, self._aimock_api_key_input)
-        self._aimock_card.setVisible(self._llm_settings_service.is_development())
+        self._embedding_card_layout.addRow(self._embedding_title_label)
+        self._embedding_card_layout.addRow(self._embedding_enabled_label, self._embedding_enabled_checkbox)
+        self._embedding_card_layout.addRow(self._embedding_base_url_label, self._embedding_base_url_input)
+        self._embedding_card_layout.addRow(self._embedding_api_key_label, self._embedding_api_key_input)
+        self._embedding_card_layout.addRow(self._embedding_model_label, self._embedding_model_input)
+        self._embedding_card_layout.addRow(self._embedding_dimensions_label, self._embedding_dimensions_input)
+        self._embedding_card_layout.addRow(self._embedding_batch_size_label, self._embedding_batch_size_input)
+        self._embedding_card_layout.addRow(self._embedding_timeout_label, self._embedding_timeout_input)
+
+        self._ocr_status_label.setWordWrap(True)
+        self._ocr_card_layout.addRow(self._ocr_title_label)
+        self._ocr_card_layout.addRow(self._ocr_status_label)
+        self._ocr_card_layout.addRow(self._ocr_setup_button)
+
+        self._index_card_layout.addRow(self._index_title_label)
+        self._index_card_layout.addRow(self._index_status_label)
+        self._index_card_layout.addRow(self._index_rebuild_button)
 
         self._ml_workers_summary_label.setWordWrap(True)
         self._ml_workers_card_layout.addRow(self._ml_workers_title_label)
@@ -373,8 +419,16 @@ class SettingsDialog(QDialog):
         ai_layout.setSpacing(16)
         ai_layout.addWidget(self._global_models_card)
         ai_layout.addWidget(self._llm_card)
-        ai_layout.addWidget(self._aimock_card)
         ai_layout.addStretch(1)
+
+        knowledge_tab = QWidget()
+        knowledge_layout = QVBoxLayout(knowledge_tab)
+        knowledge_layout.setContentsMargins(12, 12, 12, 12)
+        knowledge_layout.setSpacing(16)
+        knowledge_layout.addWidget(self._embedding_card)
+        knowledge_layout.addWidget(self._ocr_card)
+        knowledge_layout.addWidget(self._index_card)
+        knowledge_layout.addStretch(1)
 
         ml_workers_tab = QWidget()
         ml_workers_layout = QVBoxLayout(ml_workers_tab)
@@ -383,8 +437,11 @@ class SettingsDialog(QDialog):
         ml_workers_layout.addWidget(self._ml_workers_card)
         ml_workers_layout.addStretch(1)
 
-        self._tabs.addTab(ai_tab, "")
-        self._tabs.addTab(ml_workers_tab, "")
+        self._tab_indexes = {
+            SettingsTab.AI: self._tabs.addTab(ai_tab, ""),
+            SettingsTab.KNOWLEDGE_BASE: self._tabs.addTab(knowledge_tab, ""),
+            SettingsTab.ML_WORKERS: self._tabs.addTab(ml_workers_tab, ""),
+        }
         scroll_layout.addWidget(self._tabs)
         scroll_layout.addStretch(1)
         layout.addWidget(scroll, 1)
@@ -403,12 +460,21 @@ class SettingsDialog(QDialog):
         self._add_provider_button.clicked.connect(self._add_provider)
         self._remove_provider_button.clicked.connect(self._remove_provider)
         self._ml_workers_setup_button.clicked.connect(self._open_ssh_worker_wizard)
+        self._ocr_setup_button.clicked.connect(self._install_ocr)
+        self._index_rebuild_button.clicked.connect(self._open_index_rebuild)
 
     def retranslate_ui(self) -> None:
         self.setWindowTitle(self.tr("Settings"))
         self._language_label.setText(self.tr("Language"))
-        self._tabs.setTabText(0, self.tr("AI"))
-        self._tabs.setTabText(1, self.tr("ML Workers"))
+        self._tabs.setTabText(self._tab_indexes[SettingsTab.AI], self.tr("AI"))
+        self._tabs.setTabText(
+            self._tab_indexes[SettingsTab.KNOWLEDGE_BASE],
+            self.tr("Knowledge Base"),
+        )
+        self._tabs.setTabText(
+            self._tab_indexes[SettingsTab.ML_WORKERS],
+            self.tr("ML Workers"),
+        )
         self._global_models_title_label.setText(self.tr("Global models"))
         self._llm_title_label.setText(self.tr("LLM providers"))
         self._provider_selector_label.setText(self.tr("Provider"))
@@ -424,14 +490,23 @@ class SettingsDialog(QDialog):
         self._llm_guard_model_label.setText(self.tr("Turn guard model"))
         self._llm_thread_title_model_label.setText(self.tr("Thread title model"))
         self._llm_retry_attempts_label.setText(self.tr("LLM retry attempts"))
+        self._embedding_title_label.setText(self.tr("Embedding provider"))
+        self._embedding_enabled_label.setText(self.tr("Enabled"))
+        self._embedding_base_url_label.setText(self.tr("Base URL"))
+        self._embedding_api_key_label.setText(self.tr("API key"))
+        self._embedding_model_label.setText(self.tr("Model"))
+        self._embedding_dimensions_label.setText(self.tr("Dimensions"))
+        self._embedding_dimensions_input.setSpecialValueText(self.tr("Provider default (0)"))
+        self._embedding_batch_size_label.setText(self.tr("Batch size"))
+        self._embedding_timeout_label.setText(self.tr("Timeout"))
+        self._ocr_title_label.setText(self.tr("OCR"))
+        self._ocr_setup_button.setText(self.tr("Set up local PaddleOCR"))
+        self._index_title_label.setText(self.tr("Indexes"))
+        self._index_rebuild_button.setText(self.tr("Rebuild indexes..."))
         self._add_provider_button.setText(self.tr("Add"))
         self._remove_provider_button.setText(self.tr("Remove"))
         self._provider_dialect_selector.setItemText(0, self.tr("OpenAI-compatible"))
         self._refresh_provider_field_state()
-        self._aimock_title_label.setText(self.tr("AIMock"))
-        self._aimock_enabled_label.setText(self.tr("Use AIMock"))
-        self._aimock_base_url_label.setText(self.tr("AIMock base URL"))
-        self._aimock_api_key_label.setText(self.tr("AIMock API key"))
         self._ml_workers_title_label.setText(self.tr("ML workers"))
         self._ml_workers_setup_button.setText(self.tr("Add SSH worker..."))
         self._about_button.setText(self.tr("About"))
@@ -443,11 +518,182 @@ class SettingsDialog(QDialog):
             title_key=self._llm_thread_title_model_selector.currentData(),
         )
         self._refresh_ml_worker_summary()
+        self._render_ocr_status()
+        self._render_index_status()
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == QEvent.LanguageChange:
             self.retranslate_ui()
         super().changeEvent(event)
+
+    def show_tab(self, tab: SettingsTab) -> None:
+        self._tabs.setCurrentIndex(self._tab_indexes[SettingsTab(tab)])
+
+    def _install_ocr(self) -> None:
+        if (
+            self._shutdown
+            or self._paddle_ocr_deployment is None
+            or self._ocr_install_task is not None
+        ):
+            return
+        self._ocr_setup_button.setEnabled(False)
+        generation = self._lifecycle_generation
+        task = OcrInstallTask(self._paddle_ocr_deployment, generation)
+        task.signals.phase.connect(self._on_ocr_phase)
+        task.signals.finished.connect(self._on_ocr_setup_finished)
+        self._ocr_install_task = task
+        self._thread_pool.start(task)
+
+    def _on_ocr_phase(self, generation: int, phase: str) -> None:
+        if generation != self._lifecycle_generation or not self._active:
+            return
+        translations = {
+            "downloading_bundle": self.tr("Downloading OCR component"),
+            "extracting_bundle": self.tr("Unpacking OCR component"),
+            "verifying_bundle": self.tr("Verifying OCR component"),
+            "self_testing": self.tr("Testing OCR component"),
+            "activating_bundle": self.tr("Activating OCR component"),
+            "ready": self.tr("Ready"),
+        }
+        translated = translations.get(phase, self.tr("Preparing local OCR"))
+        self._ocr_status_label.setText(
+            self.tr("Local OCR setup: %1").replace("%1", translated)
+        )
+
+    def _on_ocr_setup_finished(
+        self,
+        generation: int,
+        status: PaddleOcrStatus,
+    ) -> None:
+        self._ocr_install_task = None
+        self._cached_ocr_status = status
+        if generation != self._lifecycle_generation or not self._active:
+            if self._active:
+                self._schedule_ocr_status_probe()
+            return
+        self._ocr_setup_button.setEnabled(self._paddle_ocr_deployment is not None)
+        self._render_ocr_status()
+        if status.state is PaddleOcrState.FAILED:
+            QMessageBox.warning(
+                self,
+                self.tr("Local OCR Setup Failed"),
+                self._ocr_setup_failure_message(status.reason_code),
+            )
+
+    def _ocr_setup_failure_message(self, reason_code: str | None) -> str:
+        if reason_code == "knowledge_ocr_catalog_unavailable":
+            return self.tr("Local OCR is unavailable in this build.")
+        if reason_code == "knowledge_ocr_download_unavailable":
+            return self.tr("Local OCR download source is unavailable.")
+        if reason_code == "knowledge_ocr_download_failed":
+            return self.tr("Local OCR component could not be downloaded.")
+        if reason_code == "knowledge_ocr_bundle_source_unavailable":
+            return self.tr("Local OCR bundle source is unavailable.")
+        if reason_code in {
+            "knowledge_ocr_bundle_source_mismatch",
+            "knowledge_ocr_bundle_integrity_failed",
+            "knowledge_ocr_bundle_invalid",
+        }:
+            return self.tr("Local OCR component failed integrity verification.")
+        if reason_code in {
+            "knowledge_ocr_self_test_failed",
+            "knowledge_ocr_initialize_failed",
+            "knowledge_ocr_worker_incompatible",
+        }:
+            return self.tr("Local OCR component failed its self-test.")
+        return self.tr("Local OCR setup could not be completed.")
+
+    def _schedule_ocr_status_probe(self) -> None:
+        if (
+            self._shutdown
+            or not self._active
+            or self._paddle_ocr_deployment is None
+            or self._ocr_status_task is not None
+            or self._ocr_install_task is not None
+        ):
+            return
+        generation = self._lifecycle_generation
+        task = OcrStatusTask(self._paddle_ocr_deployment, generation)
+        task.signals.finished.connect(self._on_ocr_status_finished)
+        self._ocr_status_task = task
+        self._thread_pool.start(task)
+
+    def _on_ocr_status_finished(self, generation: int, status: PaddleOcrStatus) -> None:
+        self._ocr_status_task = None
+        if generation != self._lifecycle_generation or not self._active:
+            if self._active:
+                self._schedule_ocr_status_probe()
+            return
+        self._cached_ocr_status = status
+        self._render_ocr_status()
+
+    def _render_ocr_status(self) -> None:
+        status = self._cached_ocr_status
+        if self._paddle_ocr_deployment is None:
+            text = self.tr("Local PaddleOCR service is unavailable")
+            enabled = False
+        elif status is None:
+            text = self.tr("Checking local PaddleOCR status")
+            enabled = self._ocr_install_task is None
+        elif status.state is PaddleOcrState.READY:
+            text = self.tr("Local PaddleOCR is ready")
+            enabled = self._ocr_install_task is None
+            self._ocr_setup_button.setText(self.tr("Reinstall local PaddleOCR"))
+        elif status.state is PaddleOcrState.REPAIR_REQUIRED:
+            text = self.tr("Local PaddleOCR requires repair")
+            enabled = self._ocr_install_task is None
+            self._ocr_setup_button.setText(self.tr("Repair local PaddleOCR"))
+        elif status.state in {PaddleOcrState.INSTALLING, PaddleOcrState.CHECKING}:
+            text = self.tr("Preparing local PaddleOCR")
+            enabled = False
+            self._ocr_setup_button.setText(self.tr("Preparing local PaddleOCR"))
+        elif status.state is PaddleOcrState.FAILED:
+            text = self.tr("Local PaddleOCR setup needs attention")
+            enabled = self._ocr_install_task is None
+            self._ocr_setup_button.setText(self.tr("Try local PaddleOCR setup again"))
+        else:
+            text = self.tr("Local PaddleOCR is not installed")
+            enabled = self._ocr_install_task is None
+            self._ocr_setup_button.setText(self.tr("Set up local PaddleOCR"))
+        self._ocr_status_label.setText(text)
+        self._ocr_setup_button.setEnabled(enabled)
+
+    def showEvent(self, event) -> None:
+        if self._shutdown:
+            super().showEvent(event)
+            self.hide()
+            return
+        self._active = True
+        self._lifecycle_generation += 1
+        self._render_ocr_status()
+        self._render_index_status()
+        super().showEvent(event)
+        self._knowledge_refresh_timer.start()
+        self._schedule_ocr_status_probe()
+
+    def hideEvent(self, event) -> None:
+        self._deactivate_ocr()
+        super().hideEvent(event)
+
+    def closeEvent(self, event) -> None:
+        self._deactivate_ocr()
+        super().closeEvent(event)
+
+    def _deactivate_ocr(self) -> None:
+        if self._active:
+            self._lifecycle_generation += 1
+        self._active = False
+        self._knowledge_refresh_timer.stop()
+        if self._index_dialog is not None:
+            self._index_dialog.hide()
+
+    def shutdown(self) -> None:
+        """Quiesce UI-owned tasks before their application services are closed."""
+        if self._shutdown:
+            return
+        self._shutdown = True
+        self._deactivate_ocr()
+        self._thread_pool.waitForDone()
 
     def _reload_language_options(self) -> None:
         current_locale = self._translation_manager.current_locale()
@@ -487,12 +733,23 @@ class SettingsDialog(QDialog):
                 paths=self._paths,
                 log_path=self._log_path,
                 db_path=self._db_path,
-                update_service=self._update_service,
+                software_updates_available=self._software_updates_available,
                 parent=self,
+            )
+            self._about_dialog.software_update_requested.connect(
+                self.software_update_requested.emit
+            )
+            self._about_dialog.set_update_operation_active(
+                self._update_operation_active
             )
         self._about_dialog.show()
         self._about_dialog.raise_()
         self._about_dialog.activateWindow()
+
+    def set_update_operation_active(self, active: bool) -> None:
+        self._update_operation_active = active
+        if self._about_dialog is not None:
+            self._about_dialog.set_update_operation_active(active)
 
     def _load_agent_settings(self) -> None:
         settings = self._llm_settings_service.load()
@@ -505,30 +762,170 @@ class SettingsDialog(QDialog):
             title_key=settings.thread_title_fq_model_key,
         )
         self._llm_retry_attempts_input.setValue(settings.retry_attempts)
-        self._aimock_enabled_checkbox.setChecked(settings.aimock.enabled)
-        self._aimock_base_url_input.setText(settings.aimock.base_url)
-        self._aimock_api_key_input.setText(settings.aimock.api_key)
+
+    def _load_embedding_settings(self) -> None:
+        settings = self._embedding_settings_service.load()
+        self._embedding_settings_snapshot = settings.model_copy(deep=True)
+        self._embedding_enabled_checkbox.setChecked(settings.enabled)
+        self._embedding_base_url_input.setText(settings.base_url)
+        self._embedding_api_key_input.setText(settings.api_key)
+        self._embedding_model_input.setText(settings.model)
+        self._embedding_dimensions_input.setValue(settings.dimensions or 0)
+        self._embedding_batch_size_input.setValue(settings.batch_size)
+        self._embedding_timeout_input.setValue(settings.timeout_seconds)
 
     def _save_agent_settings(self) -> None:
+        rebuild_choice = "none"
         try:
             self._store_current_provider_fields()
-            settings = LLMSettings(
+            llm_settings = LLMSettings(
                 providers=self._provider_configs,
                 default_fq_model_key=str(self._llm_default_model_selector.currentData() or ""),
                 turn_completion_guard_fq_model_key=str(self._llm_guard_model_selector.currentData() or ""),
                 thread_title_fq_model_key=str(self._llm_thread_title_model_selector.currentData() or ""),
                 retry_attempts=self._llm_retry_attempts_input.value(),
-                aimock=AimockSettings(
-                    enabled=self._aimock_enabled_checkbox.isChecked(),
-                    base_url=self._aimock_base_url_input.text().strip(),
-                    api_key=self._aimock_api_key_input.text(),
-                ),
             )
+            embedding_settings = self._embedding_settings_from_fields()
         except Exception as exc:
             QMessageBox.warning(self, self.tr("Settings"), str(exc))
             return
-        self._llm_settings_service.save(settings)
+        try:
+            confirmation_required = (
+                self._knowledge_index_service is not None
+                and self._knowledge_index_service.embedding_change_requires_confirmation(
+                    self._embedding_settings_snapshot,
+                    embedding_settings,
+                )
+            )
+        except Exception:
+            QMessageBox.warning(
+                self,
+                self.tr("Knowledge Indexes"),
+                self.tr("Knowledge index status is unavailable"),
+            )
+            return
+        if confirmation_required:
+            rebuild_choice = self._confirm_embedding_compatibility_change()
+            if rebuild_choice == "cancel":
+                return
+        try:
+            self._llm_settings_service.save(llm_settings)
+            self._embedding_settings_service.save(embedding_settings)
+        except Exception as exc:
+            QMessageBox.warning(self, self.tr("Settings"), str(exc))
+            return
+        self._embedding_settings_snapshot = embedding_settings.model_copy(deep=True)
         self.agent_settings_saved.emit()
+        self.embedding_settings_saved.emit()
+        if rebuild_choice == "rebuild" and self._knowledge_index_service is not None:
+            try:
+                self._knowledge_index_service.enqueue_rebuild(
+                    (KnowledgeIndexKind.TEXT_VECTOR,),
+                    trigger="settings_change",
+                )
+            except Exception:
+                QMessageBox.warning(
+                    self,
+                    self.tr("Knowledge Indexes"),
+                    self.tr(
+                        "Embedding settings were saved, but the vector rebuild "
+                        "could not be queued."
+                    ),
+                )
+        self._render_index_status()
+
+    def _confirm_embedding_compatibility_change(self) -> str:
+        message = QMessageBox(self)
+        message.setIcon(QMessageBox.Warning)
+        message.setWindowTitle(self.tr("Rebuild text vectors?"))
+        message.setText(
+            self.tr(
+                "This change uses a different embedding space. Existing text "
+                "vectors cannot be reused for current Knowledge content."
+            )
+        )
+        rebuild = message.addButton(
+            self.tr("Save and rebuild now"),
+            QMessageBox.AcceptRole,
+        )
+        save_only = message.addButton(
+            self.tr("Save; rebuild later"),
+            QMessageBox.ActionRole,
+        )
+        cancel = message.addButton(QMessageBox.Cancel)
+        message.setDefaultButton(rebuild)
+        message.exec()
+        selected = message.clickedButton()
+        if selected is rebuild:
+            return "rebuild"
+        if selected is save_only:
+            return "later"
+        if selected is cancel:
+            return "cancel"
+        return "cancel"
+
+    def _embedding_settings_from_fields(self) -> EmbeddingSettings:
+        dimensions = self._embedding_dimensions_input.value()
+        current = self._embedding_settings_snapshot
+        return EmbeddingSettings(
+            schema_version=current.schema_version,
+            enabled=self._embedding_enabled_checkbox.isChecked(),
+            provider_key=current.provider_key,
+            dialect=current.dialect,
+            base_url=self._embedding_base_url_input.text(),
+            api_key=self._embedding_api_key_input.text(),
+            model=self._embedding_model_input.text(),
+            dimensions=dimensions or None,
+            batch_size=self._embedding_batch_size_input.value(),
+            timeout_seconds=self._embedding_timeout_input.value(),
+        )
+
+    def _open_index_rebuild(self) -> None:
+        if self._knowledge_index_service is None:
+            return
+        if self._index_dialog is None:
+            self._index_dialog = KnowledgeIndexRebuildDialog(
+                self._knowledge_index_service,
+                self,
+            )
+            self._index_dialog.submitted.connect(
+                lambda _task_id: self._render_index_status()
+            )
+        self._index_dialog.open()
+
+    def _render_index_status(self) -> None:
+        if self._knowledge_index_service is None:
+            self._index_status_label.setText(
+                self.tr("Knowledge index service is unavailable")
+            )
+            self._index_rebuild_button.setEnabled(False)
+            return
+        try:
+            status = self._knowledge_index_service.status()
+        except Exception:
+            self._index_status_label.setText(
+                self.tr("Knowledge index status is unavailable")
+            )
+            self._index_rebuild_button.setEnabled(False)
+            return
+        self._index_status_label.setText(
+            self.tr("Keyword: %1\nText vectors: %2")
+            .replace("%1", self._translated_index_state(status.keyword_state))
+            .replace(
+                "%2", self._translated_index_state(status.text_vector_state)
+            )
+        )
+        self._index_rebuild_button.setEnabled(status.unit_count > 0)
+
+    def _translated_index_state(self, state: str) -> str:
+        translations = {
+            "ready": self.tr("Ready"),
+            "building": self.tr("Building"),
+            "needs_rebuild": self.tr("Needs rebuild"),
+            "unavailable": self.tr("Unavailable"),
+            "needs_attention": self.tr("Needs attention"),
+        }
+        return translations.get(state, self.tr("Unknown status"))
 
     def _refresh_ml_worker_summary(self) -> None:
         settings = self._ml_worker_settings_service.load()

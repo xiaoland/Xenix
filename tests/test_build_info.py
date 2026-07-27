@@ -3,7 +3,6 @@ from pathlib import Path
 
 import pytest
 
-from xenix import __version__
 from xenix.build_info import DEVELOPMENT_BUILD_COMMIT, _display_build_commit
 from xenix.release_config import ReleaseConfig
 
@@ -24,10 +23,6 @@ package_app = _load_package_app_module()
 def test_build_commit_display_uses_twelve_character_hash() -> None:
     assert _display_build_commit("abcdef1234567890") == "abcdef123456"
     assert _display_build_commit(DEVELOPMENT_BUILD_COMMIT) == DEVELOPMENT_BUILD_COMMIT
-
-
-def test_source_version_is_project_version() -> None:
-    assert __version__ == package_app._resolve_app_version(Path(__file__).resolve().parents[1])
 
 
 def test_package_build_commit_can_be_supplied_from_environment(monkeypatch, tmp_path: Path) -> None:

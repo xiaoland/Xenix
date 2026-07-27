@@ -4,86 +4,82 @@
 <context>
     <name>AboutDialog</name>
     <message>
-        <location filename="../ui/settings_dialog.py" line="128"/>
+        <location filename="../ui/settings_dialog.py" line="148"/>
         <source>About</source>
         <translation>关于</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="129"/>
+        <location filename="../ui/settings_dialog.py" line="149"/>
         <source>App home</source>
         <translation>应用目录</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="130"/>
+        <location filename="../ui/settings_dialog.py" line="150"/>
         <source>State</source>
         <translation>状态目录</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="131"/>
+        <location filename="../ui/settings_dialog.py" line="151"/>
         <source>Artifacts</source>
         <translation>制品目录</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="132"/>
+        <location filename="../ui/settings_dialog.py" line="152"/>
         <source>Database</source>
         <translation>数据库</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="133"/>
+        <location filename="../ui/settings_dialog.py" line="153"/>
         <source>Current log file</source>
         <translation>当前日志文件</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="134"/>
+        <location filename="../ui/settings_dialog.py" line="154"/>
+        <source>App version</source>
+        <translation>应用版本</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="155"/>
         <source>Build commit</source>
         <translation>构建提交</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="135"/>
+        <location filename="../ui/settings_dialog.py" line="156"/>
         <source>Open log directory</source>
         <translation>打开日志目录</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="136"/>
+        <location filename="../ui/settings_dialog.py" line="157"/>
         <source>Check for updates</source>
         <translation>检查更新</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="169"/>
-        <location filename="../ui/settings_dialog.py" line="171"/>
-        <location filename="../ui/settings_dialog.py" line="173"/>
         <source>Updates</source>
-        <translation>更新</translation>
+        <translation type="vanished">更新</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="169"/>
         <source>Updates are unavailable in this build.</source>
-        <translation>此构建不支持更新。</translation>
+        <translation type="vanished">此构建不支持更新。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="171"/>
         <source>Xenix is up to date.</source>
-        <translation>Xenix 已是最新版本。</translation>
+        <translation type="vanished">Xenix 已是最新版本。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="177"/>
         <source>Update available</source>
-        <translation>发现可用更新</translation>
+        <translation type="vanished">发现可用更新</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="178"/>
         <source>Xenix {version} is available. Download it now?</source>
-        <translation>Xenix {version} 已发布。现在下载吗？</translation>
+        <translation type="vanished">Xenix {version} 已发布。现在下载吗？</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="185"/>
         <source>Update ready</source>
-        <translation>更新已就绪</translation>
+        <translation type="vanished">更新已就绪</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="186"/>
         <source>Restart Xenix now to apply version {version}?</source>
-        <translation>现在重启 Xenix 并应用版本 {version} 吗？</translation>
+        <translation type="vanished">现在重启 Xenix 并应用版本 {version} 吗？</translation>
     </message>
 </context>
 <context>
@@ -129,17 +125,17 @@
 <context>
     <name>ChatMessageBubble</name>
     <message>
-        <location filename="../ui/chatbot.py" line="781"/>
+        <location filename="../ui/chatbot.py" line="889"/>
         <source>You</source>
         <translation>你</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="783"/>
+        <location filename="../ui/chatbot.py" line="891"/>
         <source>Tool</source>
         <translation>工具</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="785"/>
+        <location filename="../ui/chatbot.py" line="893"/>
         <source>System</source>
         <translation>系统</translation>
     </message>
@@ -227,37 +223,37 @@ This route will stay available after model selection is connected.</source>
 <context>
     <name>ConnectionRetryItem</name>
     <message>
-        <location filename="../ui/chatbot.py" line="995"/>
+        <location filename="../ui/chatbot.py" line="1125"/>
         <source>Connecting ({attempt}/{max})</source>
         <translation>正在连接（{attempt}/{max}）</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1007"/>
+        <location filename="../ui/chatbot.py" line="1137"/>
         <source>Hide details</source>
         <translation>隐藏详情</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1007"/>
+        <location filename="../ui/chatbot.py" line="1137"/>
         <source>Show details</source>
         <translation>显示详情</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1034"/>
+        <location filename="../ui/chatbot.py" line="1164"/>
         <source>LLM connection retry</source>
         <translation>LLM 连接重试</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1041"/>
+        <location filename="../ui/chatbot.py" line="1171"/>
         <source>Attempt {attempt}/{max}</source>
         <translation>第 {attempt}/{max} 次尝试</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1047"/>
+        <location filename="../ui/chatbot.py" line="1177"/>
         <source>Attempt</source>
         <translation>尝试</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1051"/>
+        <location filename="../ui/chatbot.py" line="1181"/>
         <source>Error code: `{code}`</source>
         <translation>错误代码：`{code}`</translation>
     </message>
@@ -337,29 +333,1033 @@ This route will stay available after model selection is connected.</source>
     </message>
 </context>
 <context>
-    <name>MainWindow</name>
+    <name>KnowledgeImportLogDialog</name>
     <message>
-        <location filename="../ui/main_window.py" line="239"/>
-        <source>Xenix Native</source>
-        <translation>Xenix 原生版</translation>
+        <location filename="../ui/knowledge_workspace.py" line="219"/>
+        <source>The import log could not be read.</source>
+        <translation>无法读取导入日志。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="240"/>
-        <source>Xenix</source>
-        <translation>Xenix</translation>
+        <location filename="../ui/knowledge_workspace.py" line="227"/>
+        <source>No import events have been recorded yet.</source>
+        <translation>尚未记录导入事件。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="241"/>
+        <location filename="../ui/knowledge_workspace.py" line="232"/>
+        <source>Queued</source>
+        <translation>已排队</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="233"/>
+        <source>Source snapshot</source>
+        <translation>源文件快照</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="234"/>
+        <source>File probe</source>
+        <translation>文件探测</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="235"/>
+        <source>Normalization</source>
+        <translation>格式规范化</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="236"/>
+        <source>Parser routing</source>
+        <translation>解析器路由</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="237"/>
+        <source>Document parsing</source>
+        <translation>文档解析</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="238"/>
+        <source>Canonical publication</source>
+        <translation>规范内容发布</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="239"/>
+        <source>Completed</source>
+        <translation>已完成</translation>
+    </message>
+    <message>
+        <source>Needs attention</source>
+        <translation type="vanished">需要处理</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="240"/>
+        <source>Failed</source>
+        <translation>失败</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="241"/>
+        <source>Cancelled</source>
+        <translation>已取消</translation>
+    </message>
+    <message>
+        <source>Import queued</source>
+        <translation type="vanished">导入任务已排队</translation>
+    </message>
+    <message>
+        <source>Retry queued</source>
+        <translation type="vanished">重试任务已排队</translation>
+    </message>
+    <message>
+        <source>Source snapshot started</source>
+        <translation type="vanished">开始创建源文件快照</translation>
+    </message>
+    <message>
+        <source>Source snapshot published</source>
+        <translation type="vanished">源文件快照已发布</translation>
+    </message>
+    <message>
+        <source>Source snapshot verified</source>
+        <translation type="vanished">源文件快照已验证</translation>
+    </message>
+    <message>
+        <source>Source format verified</source>
+        <translation type="vanished">源文件格式已验证</translation>
+    </message>
+    <message>
+        <source>Import worker started</source>
+        <translation type="vanished">导入工作进程已启动</translation>
+    </message>
+    <message>
+        <source>Normalization started</source>
+        <translation type="vanished">已开始格式规范化</translation>
+    </message>
+    <message>
+        <source>Parser selected</source>
+        <translation type="vanished">已选择解析器</translation>
+    </message>
+    <message>
+        <source>Document parsing started</source>
+        <translation type="vanished">已开始解析文档</translation>
+    </message>
+    <message>
+        <source>Canonical content write started</source>
+        <translation type="vanished">已开始写入规范内容</translation>
+    </message>
+    <message>
+        <source>Import worker completed</source>
+        <translation type="vanished">导入工作进程已完成</translation>
+    </message>
+    <message>
+        <source>Import worker reported a failure</source>
+        <translation type="vanished">导入工作进程报告失败</translation>
+    </message>
+    <message>
+        <source>Import worker cancelled</source>
+        <translation type="vanished">导入工作进程已取消</translation>
+    </message>
+    <message>
+        <source>Import paused while Xenix was closing</source>
+        <translation type="vanished">Xenix 关闭时已暂停导入</translation>
+    </message>
+    <message>
+        <source>Import completed</source>
+        <translation type="vanished">导入已完成</translation>
+    </message>
+    <message>
+        <source>Existing document reused</source>
+        <translation type="vanished">已复用现有文档</translation>
+    </message>
+    <message>
+        <source>Cancellation requested</source>
+        <translation type="vanished">已请求取消</translation>
+    </message>
+    <message>
+        <source>Import cancelled</source>
+        <translation type="vanished">导入已取消</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="246"/>
+        <source>Knowledge Import Log</source>
+        <translation>知识导入日志</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="248"/>
+        <source>Knowledge Import Log — %1</source>
+        <translation>知识导入日志 — %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="250"/>
+        <source>Close</source>
+        <translation>关闭</translation>
+    </message>
+</context>
+<context>
+    <name>KnowledgeImportQueueDialog</name>
+    <message>
+        <source>Status: %1</source>
+        <translation type="vanished">状态：%1</translation>
+    </message>
+    <message>
+        <source>Phase: %1</source>
+        <translation type="vanished">阶段：%1</translation>
+    </message>
+    <message>
+        <source>Reused existing document</source>
+        <translation type="vanished">已复用现有文档</translation>
+    </message>
+    <message>
+        <source>Knowledge document</source>
+        <translation type="vanished">知识文档</translation>
+    </message>
+    <message>
+        <source>Document password</source>
+        <translation type="vanished">文档密码</translation>
+    </message>
+    <message>
+        <source>Enter the password for this document. It will not be saved.</source>
+        <translation type="vanished">请输入此文档的密码。密码不会被保存。</translation>
+    </message>
+    <message>
+        <source>Knowledge Import Failed</source>
+        <translation type="vanished">知识导入失败</translation>
+    </message>
+    <message>
+        <source>Search index: %1</source>
+        <translation type="vanished">检索索引：%1</translation>
+    </message>
+    <message>
+        <source>The search index could not be retried.</source>
+        <translation type="vanished">无法重试检索索引。</translation>
+    </message>
+    <message>
+        <source>Select Knowledge Source</source>
+        <translation type="vanished">选择知识源文件</translation>
+    </message>
+    <message>
+        <source>Knowledge documents</source>
+        <translation type="vanished">知识文件</translation>
+    </message>
+    <message>
+        <source>The import could not be retried.</source>
+        <translation type="vanished">无法重试此导入。</translation>
+    </message>
+    <message>
+        <source>Pending</source>
+        <translation type="vanished">待处理</translation>
+    </message>
+    <message>
+        <source>Queued</source>
+        <translation type="vanished">已排队</translation>
+    </message>
+    <message>
+        <source>In progress</source>
+        <translation type="vanished">进行中</translation>
+    </message>
+    <message>
+        <source>Canonical content ready</source>
+        <translation type="vanished">规范内容已就绪</translation>
+    </message>
+    <message>
+        <source>Ready for retrieval</source>
+        <translation type="vanished">检索已就绪</translation>
+    </message>
+    <message>
+        <source>Needs attention</source>
+        <translation type="vanished">需要处理</translation>
+    </message>
+    <message>
+        <source>Failed</source>
+        <translation type="vanished">失败</translation>
+    </message>
+    <message>
+        <source>Cancelled</source>
+        <translation type="vanished">已取消</translation>
+    </message>
+    <message>
+        <source>Reused</source>
+        <translation type="vanished">已复用</translation>
+    </message>
+    <message>
+        <source>Unknown status</source>
+        <translation type="vanished">未知状态</translation>
+    </message>
+    <message>
+        <source>Waiting in queue</source>
+        <translation type="vanished">正在队列中等待</translation>
+    </message>
+    <message>
+        <source>Copying source</source>
+        <translation type="vanished">正在复制源文件</translation>
+    </message>
+    <message>
+        <source>Checking file</source>
+        <translation type="vanished">正在检查文件</translation>
+    </message>
+    <message>
+        <source>Normalizing document</source>
+        <translation type="vanished">正在规范化文档</translation>
+    </message>
+    <message>
+        <source>Selecting parser</source>
+        <translation type="vanished">正在选择解析器</translation>
+    </message>
+    <message>
+        <source>Reading document</source>
+        <translation type="vanished">正在读取文档</translation>
+    </message>
+    <message>
+        <source>Saving canonical content</source>
+        <translation type="vanished">正在保存规范内容</translation>
+    </message>
+    <message>
+        <source>Waiting to build search index</source>
+        <translation type="vanished">正在等待构建检索索引</translation>
+    </message>
+    <message>
+        <source>Building search index</source>
+        <translation type="vanished">正在构建检索索引</translation>
+    </message>
+    <message>
+        <source>Completed</source>
+        <translation type="vanished">已完成</translation>
+    </message>
+    <message>
+        <source>Canonical content contains no searchable text</source>
+        <translation type="vanished">规范内容中没有可检索文本</translation>
+    </message>
+    <message>
+        <source>Search index build failed</source>
+        <translation type="vanished">搜索索引构建失败</translation>
+    </message>
+    <message>
+        <source>Source snapshot unavailable</source>
+        <translation type="vanished">源快照不可用</translation>
+    </message>
+    <message>
+        <source>Select the source file again</source>
+        <translation type="vanished">请重新选择源文件</translation>
+    </message>
+    <message>
+        <source>Unknown phase</source>
+        <translation type="vanished">未知阶段</translation>
+    </message>
+    <message>
+        <source>No searchable text</source>
+        <translation type="vanished">没有可检索文本</translation>
+    </message>
+    <message>
+        <source>Waiting</source>
+        <translation type="vanished">等待中</translation>
+    </message>
+    <message>
+        <source>Ready</source>
+        <translation type="vanished">就绪</translation>
+    </message>
+    <message>
+        <source>A password is required to continue this import.</source>
+        <translation type="vanished">需要密码才能继续导入。</translation>
+    </message>
+    <message>
+        <source>The document password was not accepted.</source>
+        <translation type="vanished">文档密码不正确。</translation>
+    </message>
+    <message>
+        <source>LibreOffice is required to import this DOC file.</source>
+        <translation type="vanished">导入此 DOC 文件需要 LibreOffice。</translation>
+    </message>
+    <message>
+        <source>The DOC file could not be converted.</source>
+        <translation type="vanished">无法转换该 DOC 文件。</translation>
+    </message>
+    <message>
+        <source>This file type is not supported by the Knowledge Library.</source>
+        <translation type="vanished">知识库不支持此文件类型。</translation>
+    </message>
+    <message>
+        <source>The file signature does not match its extension.</source>
+        <translation type="vanished">文件签名与扩展名不匹配。</translation>
+    </message>
+    <message>
+        <source>The PDF is structurally invalid.</source>
+        <translation type="vanished">PDF 结构无效。</translation>
+    </message>
+    <message>
+        <source>The file size is outside the supported range.</source>
+        <translation type="vanished">文件大小超出支持范围。</translation>
+    </message>
+    <message>
+        <source>The TXT encoding could not be identified safely.</source>
+        <translation type="vanished">无法安全识别 TXT 文件编码。</translation>
+    </message>
+    <message>
+        <source>The TXT content is invalid for its encoding.</source>
+        <translation type="vanished">TXT 内容与其编码不符。</translation>
+    </message>
+    <message>
+        <source>The TXT file contains unsupported control characters.</source>
+        <translation type="vanished">TXT 文件包含不支持的控制字符。</translation>
+    </message>
+    <message>
+        <source>The TXT file contains a line that is too long.</source>
+        <translation type="vanished">TXT 文件中存在过长的文本行。</translation>
+    </message>
+    <message>
+        <source>The DOCX file is not a valid Office document.</source>
+        <translation type="vanished">该 DOCX 不是有效的 Office 文档。</translation>
+    </message>
+    <message>
+        <source>The DOCX package contains too many entries.</source>
+        <translation type="vanished">DOCX 包含过多条目。</translation>
+    </message>
+    <message>
+        <source>The DOCX package contains ambiguous entries.</source>
+        <translation type="vanished">DOCX 包含名称冲突或重复的条目。</translation>
+    </message>
+    <message>
+        <source>The DOCX package contains an unsupported encrypted entry.</source>
+        <translation type="vanished">DOCX 包含不支持的加密条目。</translation>
+    </message>
+    <message>
+        <source>The DOCX package contains an unsafe entry.</source>
+        <translation type="vanished">DOCX 包含不安全的条目。</translation>
+    </message>
+    <message>
+        <source>The DOCX package contains an unsafe path.</source>
+        <translation type="vanished">DOCX 包含不安全的路径。</translation>
+    </message>
+    <message>
+        <source>The DOCX package contains invalid size metadata.</source>
+        <translation type="vanished">DOCX 包含无效的大小信息。</translation>
+    </message>
+    <message>
+        <source>The DOCX package contains an entry that is too large.</source>
+        <translation type="vanished">DOCX 中有条目超过大小限制。</translation>
+    </message>
+    <message>
+        <source>The expanded DOCX package is too large.</source>
+        <translation type="vanished">DOCX 解压后的大小超过限制。</translation>
+    </message>
+    <message>
+        <source>The DOCX package compression ratio is unsafe.</source>
+        <translation type="vanished">DOCX 的压缩比不安全。</translation>
+    </message>
+    <message>
+        <source>The document could not be parsed into canonical content.</source>
+        <translation type="vanished">无法将文档解析为规范内容。</translation>
+    </message>
+    <message>
+        <source>Canonical content failed integrity validation.</source>
+        <translation type="vanished">规范内容未通过完整性验证。</translation>
+    </message>
+    <message>
+        <source>Canonical content is unavailable for indexing.</source>
+        <translation type="vanished">规范内容不可用于构建索引。</translation>
+    </message>
+    <message>
+        <source>The search index could not be built.</source>
+        <translation type="vanished">无法构建搜索索引。</translation>
+    </message>
+    <message>
+        <source>The imported document is unavailable for indexing.</source>
+        <translation type="vanished">已导入的文档不可用于构建索引。</translation>
+    </message>
+    <message>
+        <source>The import was cancelled.</source>
+        <translation type="vanished">导入已取消。</translation>
+    </message>
+    <message>
+        <source>The app-owned source snapshot is unavailable.</source>
+        <translation type="vanished">应用托管的源快照不可用。</translation>
+    </message>
+    <message>
+        <source>The app-owned source snapshot failed integrity validation.</source>
+        <translation type="vanished">应用托管的源快照未通过完整性验证。</translation>
+    </message>
+    <message>
+        <source>Select the source file again to retry this import.</source>
+        <translation type="vanished">请重新选择源文件以重试此导入。</translation>
+    </message>
+    <message>
+        <source>The file could not be imported.</source>
+        <translation type="vanished">无法导入该文件。</translation>
+    </message>
+    <message>
+        <source>Knowledge Import Queue</source>
+        <translation type="vanished">知识导入队列</translation>
+    </message>
+    <message>
+        <source>Retry</source>
+        <translation type="vanished">重试</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation type="vanished">取消</translation>
+    </message>
+    <message>
+        <source>View log</source>
+        <translation type="vanished">查看日志</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation type="vanished">关闭</translation>
+    </message>
+</context>
+<context>
+    <name>KnowledgeIndexRebuildDialog</name>
+    <message>
+        <location filename="../ui/knowledge_index_ui.py" line="59"/>
+        <source>Knowledge index status is unavailable.</source>
+        <translation>无法获取知识库索引状态。</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_index_ui.py" line="66"/>
+        <source>%1 searchable unit(s). A text vector rebuild is estimated to use %2 provider request(s).</source>
+        <translation>%1 个可检索单元。预计重建文本向量需要 %2 次服务请求。</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_index_ui.py" line="95"/>
+        <source>Knowledge Indexes</source>
+        <translation>知识库索引</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_index_ui.py" line="96"/>
+        <source>The selected index rebuild could not be queued.</source>
+        <translation>无法将所选索引重建加入队列。</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_index_ui.py" line="109"/>
+        <source>Rebuild Knowledge Indexes</source>
+        <translation>重建知识库索引</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_index_ui.py" line="110"/>
+        <source>Keyword index</source>
+        <translation>关键词索引</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_index_ui.py" line="111"/>
+        <source>Text semantic vector index</source>
+        <translation>文本语义向量索引</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_index_ui.py" line="112"/>
+        <source>Rebuild</source>
+        <translation>重建</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_index_ui.py" line="113"/>
+        <source>Cancel</source>
+        <translation>取消</translation>
+    </message>
+</context>
+<context>
+    <name>KnowledgeTaskQueueDialog</name>
+    <message>
+        <source>Knowledge Task Failed</source>
+        <translation type="vanished">知识库任务失败</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="409"/>
+        <source>The selected task could not be retried.</source>
+        <translation>无法重试所选任务。</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="419"/>
+        <source>Document password</source>
+        <translation>文档密码</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="420"/>
+        <source>Enter the password for this document. It will not be saved.</source>
+        <translation>请输入此文档的密码。密码不会被保存。</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="428"/>
+        <source>Select Knowledge Source</source>
+        <translation>选择知识源文件</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="430"/>
+        <source>Knowledge documents</source>
+        <translation>知识文件</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="455"/>
+        <source>Phase: %1
+Trigger: %2</source>
+        <translation>阶段：%1
+触发方式：%2</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="459"/>
+        <source>Error: %1</source>
+        <translation>错误：%1</translation>
+    </message>
+    <message>
+        <source>Knowledge Task Details</source>
+        <translation type="vanished">知识库任务详情</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="408"/>
+        <source>Task Failed</source>
+        <translation>任务失败</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="461"/>
+        <source>Details: %1</source>
+        <translation>详情：%1</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="464"/>
+        <source>Task Details</source>
+        <translation>任务详情</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="475"/>
+        <source>Import</source>
+        <translation>导入</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="476"/>
+        <source>Content preparation</source>
+        <translation>内容准备</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="477"/>
+        <source>Index build</source>
+        <translation>索引构建</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="482"/>
+        <source>Pending</source>
+        <translation>待处理</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="483"/>
+        <source>Queued</source>
+        <translation>已排队</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="484"/>
+        <source>In progress</source>
+        <translation>进行中</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="485"/>
+        <source>Preparing content</source>
+        <translation>正在准备内容</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="486"/>
+        <source>Ready</source>
+        <translation>就绪</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="487"/>
+        <source>Completed</source>
+        <translation>已完成</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="488"/>
+        <source>Needs attention</source>
+        <translation>需要处理</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="489"/>
+        <source>Failed</source>
+        <translation>失败</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="490"/>
+        <source>Cancelled</source>
+        <translation>已取消</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="491"/>
+        <source>Reused</source>
+        <translation>已复用</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="492"/>
+        <source>Unknown status</source>
+        <translation>未知状态</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="495"/>
+        <source>Task queue</source>
+        <translation>任务队列</translation>
+    </message>
+    <message>
+        <source>Knowledge Task Queue</source>
+        <translation type="vanished">知识库任务队列</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="497"/>
+        <source>Type</source>
+        <translation>类型</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="497"/>
+        <source>Target</source>
+        <translation>对象</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="497"/>
+        <source>Status</source>
+        <translation>状态</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="497"/>
+        <source>Updated</source>
+        <translation>更新时间</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="499"/>
+        <source>Retry</source>
+        <translation>重试</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="500"/>
+        <source>Cancel</source>
+        <translation>取消</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="501"/>
+        <source>View log</source>
+        <translation>查看日志</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="502"/>
+        <source>Details</source>
+        <translation>详情</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="503"/>
+        <source>Close</source>
+        <translation>关闭</translation>
+    </message>
+</context>
+<context>
+    <name>KnowledgeWorkspaceDialog</name>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="658"/>
+        <source>Import Knowledge</source>
+        <translation>导入知识</translation>
+    </message>
+    <message>
+        <source>Knowledge documents (*.txt *.docx *.doc *.ppt *.pptx *.pdf)</source>
+        <translation type="vanished">知识文档 (*.txt *.docx *.doc *.ppt *.pptx *.pdf)</translation>
+    </message>
+    <message>
+        <source>Knowledge documents (*.txt *.doc *.docx *.pdf *.jpg *.jpeg *.png)</source>
+        <translation type="vanished">知识文件 (*.txt *.doc *.docx *.pdf *.jpg *.jpeg *.png)</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="660"/>
+        <source>Knowledge documents</source>
+        <translation>知识文件</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="682"/>
+        <source>Knowledge Import Failed</source>
+        <translation>知识导入失败</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="683"/>
+        <source>%1 file(s) could not be queued for import.</source>
+        <translation>%1 个文件无法加入导入队列。</translation>
+    </message>
+    <message>
+        <source>Local OCR setup: %1</source>
+        <translation type="vanished">本地 OCR 部署：%1</translation>
+    </message>
+    <message>
+        <source>Downloading embedded Python</source>
+        <translation type="vanished">正在下载嵌入式 Python</translation>
+    </message>
+    <message>
+        <source>Installing package manager</source>
+        <translation type="vanished">正在安装包管理器</translation>
+    </message>
+    <message>
+        <source>Installing OCR runtime</source>
+        <translation type="vanished">正在安装 OCR 运行时</translation>
+    </message>
+    <message>
+        <source>Preparing OCR models</source>
+        <translation type="vanished">正在准备 OCR 模型</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="999"/>
+        <location filename="../ui/knowledge_workspace.py" line="1009"/>
+        <source>Ready</source>
+        <translation>就绪</translation>
+    </message>
+    <message>
+        <source>Preparing local OCR</source>
+        <translation type="vanished">正在准备本地 OCR</translation>
+    </message>
+    <message>
+        <source>Local OCR Setup Failed</source>
+        <translation type="vanished">本地 OCR 部署失败</translation>
+    </message>
+    <message>
+        <source>Local OCR setup could not be completed.</source>
+        <translation type="vanished">无法完成本地 OCR 部署。</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="846"/>
+        <source>Knowledge content is temporarily unavailable.</source>
+        <translation>知识库内容暂时不可用。</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="850"/>
+        <source>No Knowledge documents yet. Import a file to get started.</source>
+        <translation>知识库中还没有文档。请先导入文件。</translation>
+    </message>
+    <message>
+        <source>Knowledge index status is unavailable</source>
+        <translation type="vanished">无法获取知识库索引状态</translation>
+    </message>
+    <message>
+        <source>Keyword: %1  ·  Text vectors: %2</source>
+        <translation type="vanished">关键词：%1  ·  文本向量：%2</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="1010"/>
+        <source>Building</source>
+        <translation>正在构建</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="1011"/>
+        <source>Needs rebuild</source>
+        <translation>需要重建</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="860"/>
+        <location filename="../ui/knowledge_workspace.py" line="861"/>
+        <location filename="../ui/knowledge_workspace.py" line="1005"/>
+        <location filename="../ui/knowledge_workspace.py" line="1012"/>
+        <source>Unavailable</source>
+        <translation>不可用</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="809"/>
+        <source>Removing…</source>
+        <translation>正在删除…</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="843"/>
+        <source>Loading Knowledge documents…</source>
+        <translation>正在加载知识库内容…</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="856"/>
+        <source>Loading Knowledge status…</source>
+        <translation>正在加载知识库状态…</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="864"/>
+        <source>OCR: %1  ·  Keyword: %2  ·  Text vectors: %3</source>
+        <translation>OCR：%1  ·  关键词：%2  ·  文本向量：%3</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="898"/>
+        <location filename="../ui/knowledge_workspace.py" line="934"/>
+        <source>Delete</source>
+        <translation>删除</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="919"/>
+        <location filename="../ui/knowledge_workspace.py" line="989"/>
+        <source>Delete document</source>
+        <translation>删除文档</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="921"/>
+        <source>Delete “%1” from the Knowledge Library?</source>
+        <translation>从知识库中删除“%1”？</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="928"/>
+        <source>Xenix will remove its imported copy, search data, and related task entries. The original file will remain unchanged. This action cannot be undone.</source>
+        <translation>Xenix 将删除其导入副本、检索数据及相关任务记录。原始文件不会被更改。此操作无法撤销。</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="977"/>
+        <source>This document is still being imported or prepared. Wait for the task to finish, then try again.</source>
+        <translation>此文档仍在导入或准备中。请等待任务完成后重试。</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="982"/>
+        <source>This document is no longer in the Knowledge Library.</source>
+        <translation>此文档已不在知识库中。</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="986"/>
+        <source>The document could not be deleted.</source>
+        <translation>无法删除此文档。</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="1000"/>
+        <source>Checking</source>
+        <translation>正在检查</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="1001"/>
+        <source>Not installed</source>
+        <translation>未安装</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="1002"/>
+        <source>Repair required</source>
+        <translation>需要修复</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="1003"/>
+        <source>Installing</source>
+        <translation>正在安装</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="1004"/>
+        <location filename="../ui/knowledge_workspace.py" line="1013"/>
+        <location filename="../ui/knowledge_workspace.py" line="1021"/>
+        <source>Needs attention</source>
+        <translation>需要处理</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="1014"/>
+        <location filename="../ui/knowledge_workspace.py" line="1022"/>
+        <source>Unknown status</source>
+        <translation>未知状态</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="1018"/>
+        <source>Searchable</source>
+        <translation>可检索</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="1019"/>
+        <source>Preparing search content</source>
+        <translation>正在准备检索内容</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="1020"/>
+        <source>No searchable text</source>
+        <translation>没有可检索文本</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="1027"/>
+        <source>Task queue</source>
+        <translation>任务队列</translation>
+    </message>
+    <message>
+        <source>Knowledge tasks</source>
+        <translation type="vanished">知识库任务</translation>
+    </message>
+    <message>
+        <source>OCR settings are unavailable</source>
+        <translation type="vanished">OCR 设置不可用</translation>
+    </message>
+    <message>
+        <source>Checking local PaddleOCR status</source>
+        <translation type="vanished">正在检查本地 PaddleOCR 状态</translation>
+    </message>
+    <message>
+        <source>Local PaddleOCR is ready</source>
+        <translation type="vanished">本地 PaddleOCR 已就绪</translation>
+    </message>
+    <message>
+        <source>Local PaddleOCR runtime is installed; models are not ready</source>
+        <translation type="vanished">本地 PaddleOCR 运行时已安装，模型尚未就绪</translation>
+    </message>
+    <message>
+        <source>Local PaddleOCR is not installed</source>
+        <translation type="vanished">本地 PaddleOCR 尚未安装</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="1025"/>
+        <source>Knowledge Workspace</source>
+        <translation>知识工作区</translation>
+    </message>
+    <message>
+        <source>Import TXT, DOC, DOCX, PDF, JPEG, or PNG files. Xenix indexes bounded evidence for Agent analysis.</source>
+        <translation type="vanished">导入 TXT、DOC、DOCX、PDF、JPEG 或 PNG 文件。Xenix 将为 Agent 分析索引有界证据。</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="1028"/>
+        <source>Rebuild indexes</source>
+        <translation>重建索引</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="1029"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="242"/>
+        <location filename="../ui/knowledge_workspace.py" line="1032"/>
+        <source>Document</source>
+        <translation>文档</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="1033"/>
+        <source>Type</source>
+        <translation>类型</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="1034"/>
+        <source>Content status</source>
+        <translation>内容状态</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="1035"/>
+        <source>Updated</source>
+        <translation>更新时间</translation>
+    </message>
+    <message>
+        <source>Import TXT, DOCX, DOC, PPTX, PPT, or PDF documents. Xenix indexes bounded evidence for Agent analysis.</source>
+        <translation type="vanished">导入 TXT、DOCX、DOC、PPTX、PPT 或 PDF 文档。Xenix 将为 Agent 分析索引有界证据。</translation>
+    </message>
+    <message>
+        <location filename="../ui/knowledge_workspace.py" line="1026"/>
+        <source>Import documents</source>
+        <translation>导入文档</translation>
+    </message>
+    <message>
+        <source>Import queue</source>
+        <translation type="vanished">导入队列</translation>
+    </message>
+    <message>
+        <source>Set up local OCR</source>
+        <translation type="vanished">部署本地 OCR</translation>
+    </message>
+</context>
+<context>
+    <name>MainWindow</name>
+    <message>
+        <location filename="../ui/main_window.py" line="278"/>
+        <source>Xenix Native</source>
+        <translation>Xenix 原生版</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="279"/>
+        <source>Xenix</source>
+        <translation>Xenix</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="280"/>
+        <source>Settings</source>
+        <translation>设置</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="281"/>
+        <source>Knowledge</source>
+        <translation>知识库</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="282"/>
         <source>History</source>
         <translation>历史</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="244"/>
+        <location filename="../ui/main_window.py" line="284"/>
         <source>New thread</source>
         <translation>新建线程</translation>
     </message>
@@ -380,93 +1380,148 @@ This route will stay available after model selection is connected.</source>
         <translation type="vanished">无法打开产物：{path}</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="559"/>
-        <location filename="../ui/main_window.py" line="576"/>
+        <location filename="../ui/main_window.py" line="691"/>
+        <location filename="../ui/main_window.py" line="708"/>
         <source>Opening link...</source>
         <translation>正在打开链接...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="577"/>
+        <location filename="../ui/main_window.py" line="709"/>
         <source>Open Link</source>
         <translation>打开链接</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="631"/>
+        <location filename="../ui/main_window.py" line="763"/>
         <source>The submitted message is being prepared and cannot be stopped.</source>
-        <translation type="unfinished"></translation>
+        <translation>已提交的消息正在准备中，无法停止。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="657"/>
         <source>Step budget used: {used}/{max}. Continue with up to {steps} more steps?</source>
-        <translation>步骤预算已使用：{used}/{max}。是否继续最多 {steps} 个步骤？</translation>
+        <translation type="vanished">步骤预算已使用：{used}/{max}。是否继续最多 {steps} 个步骤？</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="770"/>
+        <source>Updates</source>
+        <translation type="vanished">更新</translation>
+    </message>
+    <message>
+        <source>Updates are unavailable in this build.</source>
+        <translation type="vanished">此构建不支持更新。</translation>
+    </message>
+    <message>
+        <source>Xenix is up to date.</source>
+        <translation type="vanished">Xenix 已是最新版本。</translation>
+    </message>
+    <message>
+        <source>Update available</source>
+        <translation type="vanished">发现可用更新</translation>
+    </message>
+    <message>
+        <source>Xenix {version} is available. Download it now?</source>
+        <translation type="vanished">Xenix {version} 已发布。现在下载吗？</translation>
+    </message>
+    <message>
+        <source>Update ready</source>
+        <translation type="vanished">更新已就绪</translation>
+    </message>
+    <message>
+        <source>Restart Xenix now to apply version {version}?</source>
+        <translation type="vanished">现在重启 Xenix 并应用版本 {version} 吗？</translation>
+    </message>
+    <message>
+        <source>Software Update</source>
+        <translation type="vanished">软件更新</translation>
+    </message>
+    <message>
+        <source>Downloading Xenix {version}...</source>
+        <translation type="vanished">正在下载 Xenix {version}...</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="378"/>
+        <source>Knowledge Workspace</source>
+        <translation>知识工作区</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="379"/>
+        <source>Knowledge services are not available.</source>
+        <translation>知识库服务当前不可用。</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="508"/>
+        <source>The selected source path is not a file.</source>
+        <translation>所选源路径不是文件。</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="776"/>
+        <source>Stopped.</source>
+        <translation>已停止。</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="832"/>
         <source>Rename</source>
         <translation>重命名</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="771"/>
+        <location filename="../ui/main_window.py" line="833"/>
         <source>Generate title...</source>
         <translation>生成标题...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="772"/>
+        <location filename="../ui/main_window.py" line="834"/>
         <source>Copy thread ID</source>
         <translation>复制线程 ID</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="773"/>
+        <location filename="../ui/main_window.py" line="835"/>
         <source>Delete</source>
         <translation>删除</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="798"/>
+        <location filename="../ui/main_window.py" line="860"/>
         <source>Rename Thread</source>
         <translation>重命名线程</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="799"/>
-        <location filename="../ui/main_window.py" line="866"/>
+        <location filename="../ui/main_window.py" line="861"/>
+        <location filename="../ui/main_window.py" line="928"/>
         <source>Thread name</source>
         <translation>线程名称</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="815"/>
-        <location filename="../ui/main_window.py" line="846"/>
-        <location filename="../ui/main_window.py" line="876"/>
-        <location filename="../ui/main_window.py" line="886"/>
+        <location filename="../ui/main_window.py" line="877"/>
+        <location filename="../ui/main_window.py" line="908"/>
+        <location filename="../ui/main_window.py" line="938"/>
+        <location filename="../ui/main_window.py" line="948"/>
         <source>Generate Thread Title</source>
         <translation>生成线程标题</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="816"/>
+        <location filename="../ui/main_window.py" line="878"/>
         <source>Thread title model is not configured.</source>
         <translation>未配置线程标题模型。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="839"/>
+        <location filename="../ui/main_window.py" line="901"/>
         <source>Generating thread title...</source>
         <translation>正在生成线程标题...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="865"/>
+        <location filename="../ui/main_window.py" line="927"/>
         <source>Apply Generated Title</source>
         <translation>应用生成的标题</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="898"/>
-        <location filename="../ui/main_window.py" line="906"/>
+        <location filename="../ui/main_window.py" line="963"/>
+        <location filename="../ui/main_window.py" line="971"/>
         <source>Delete Thread</source>
         <translation>删除线程</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="899"/>
+        <location filename="../ui/main_window.py" line="964"/>
         <source>Stop the current run before deleting this thread.</source>
         <translation>删除此线程前请先停止当前运行。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="907"/>
+        <location filename="../ui/main_window.py" line="972"/>
         <source>Delete &quot;{title}&quot;? This action cannot be undone.</source>
         <translation>删除“{title}”？此操作无法撤销。</translation>
     </message>
@@ -474,14 +1529,15 @@ This route will stay available after model selection is connected.</source>
 <context>
     <name>SettingsDialog</name>
     <message>
-        <location filename="../ui/settings_dialog.py" line="408"/>
-        <location filename="../ui/settings_dialog.py" line="528"/>
-        <location filename="../ui/settings_dialog.py" line="577"/>
+        <location filename="../ui/settings_dialog.py" line="466"/>
+        <location filename="../ui/settings_dialog.py" line="772"/>
+        <location filename="../ui/settings_dialog.py" line="797"/>
+        <location filename="../ui/settings_dialog.py" line="956"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="409"/>
+        <location filename="../ui/settings_dialog.py" line="467"/>
         <source>Language</source>
         <translation>语言</translation>
     </message>
@@ -490,141 +1546,192 @@ This route will stay available after model selection is connected.</source>
         <translation type="vanished">LLM 提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="418"/>
+        <location filename="../ui/settings_dialog.py" line="483"/>
+        <location filename="../ui/settings_dialog.py" line="494"/>
         <source>Base URL</source>
         <translation>基础 URL</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="419"/>
+        <location filename="../ui/settings_dialog.py" line="484"/>
+        <location filename="../ui/settings_dialog.py" line="495"/>
         <source>API key</source>
         <translation>API 密钥</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.py" line="496"/>
         <source>Model</source>
-        <translation type="vanished">模型</translation>
+        <translation>模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="424"/>
+        <location filename="../ui/settings_dialog.py" line="489"/>
         <source>Turn guard model</source>
         <translation>轮次守卫模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="425"/>
+        <location filename="../ui/settings_dialog.py" line="490"/>
         <source>Thread title model</source>
         <translation>线程标题模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="421"/>
+        <location filename="../ui/settings_dialog.py" line="486"/>
+        <location filename="../ui/settings_dialog.py" line="500"/>
         <source>Timeout</source>
         <translation>超时</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="410"/>
+        <location filename="../ui/settings_dialog.py" line="468"/>
         <source>AI</source>
         <translation>AI</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="411"/>
+        <location filename="../ui/settings_dialog.py" line="471"/>
+        <source>Knowledge Base</source>
+        <translation>知识库</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="475"/>
         <source>ML Workers</source>
         <translation>ML 工作器</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="412"/>
+        <location filename="../ui/settings_dialog.py" line="477"/>
         <source>Global models</source>
         <translation>全局模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="413"/>
+        <location filename="../ui/settings_dialog.py" line="478"/>
         <source>LLM providers</source>
         <translation>LLM 提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="414"/>
+        <location filename="../ui/settings_dialog.py" line="479"/>
         <source>Provider</source>
         <translation>提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="415"/>
+        <location filename="../ui/settings_dialog.py" line="480"/>
         <source>Provider key</source>
         <translation>提供商键</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="416"/>
+        <location filename="../ui/settings_dialog.py" line="481"/>
         <source>Provider name</source>
         <translation>提供商名称</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="417"/>
+        <location filename="../ui/settings_dialog.py" line="482"/>
         <source>Dialect</source>
         <translation>方言</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="420"/>
+        <location filename="../ui/settings_dialog.py" line="485"/>
         <source>Models</source>
         <translation>模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="422"/>
+        <location filename="../ui/settings_dialog.py" line="487"/>
         <source>Streaming</source>
         <translation>流式输出</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="423"/>
+        <location filename="../ui/settings_dialog.py" line="488"/>
         <source>Default model</source>
         <translation>默认模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="426"/>
+        <location filename="../ui/settings_dialog.py" line="491"/>
         <source>LLM retry attempts</source>
         <translation>LLM 重试次数</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="427"/>
+        <location filename="../ui/settings_dialog.py" line="492"/>
+        <source>Embedding provider</source>
+        <translation>嵌入模型提供商</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="493"/>
+        <source>Enabled</source>
+        <translation>启用</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="497"/>
+        <source>Dimensions</source>
+        <translation>向量维度</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="498"/>
+        <source>Provider default (0)</source>
+        <translation>使用提供商默认值（0）</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="499"/>
+        <source>Batch size</source>
+        <translation>批次大小</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="501"/>
+        <source>OCR</source>
+        <translation>OCR</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="502"/>
+        <location filename="../ui/settings_dialog.py" line="651"/>
+        <source>Set up local PaddleOCR</source>
+        <translation>部署本地 PaddleOCR</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="503"/>
+        <source>Indexes</source>
+        <translation>索引</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="504"/>
+        <source>Rebuild indexes...</source>
+        <translation>重建索引...</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="505"/>
         <source>Add</source>
         <translation>添加</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="428"/>
+        <location filename="../ui/settings_dialog.py" line="506"/>
         <source>Remove</source>
         <translation>移除</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="429"/>
+        <location filename="../ui/settings_dialog.py" line="507"/>
         <source>OpenAI-compatible</source>
         <translation>OpenAI 兼容</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="431"/>
         <source>AIMock</source>
-        <translation>AIMock</translation>
+        <translation type="vanished">AIMock</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="432"/>
         <source>Use AIMock</source>
-        <translation>使用 AIMock</translation>
+        <translation type="vanished">使用 AIMock</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="433"/>
         <source>AIMock base URL</source>
-        <translation>AIMock 基础 URL</translation>
+        <translation type="vanished">AIMock 基础 URL</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="434"/>
         <source>AIMock API key</source>
-        <translation>AIMock API 密钥</translation>
+        <translation type="vanished">AIMock API 密钥</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="435"/>
+        <location filename="../ui/settings_dialog.py" line="509"/>
         <source>ML workers</source>
         <translation>ML 工作器</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="436"/>
+        <location filename="../ui/settings_dialog.py" line="510"/>
         <source>Add SSH worker...</source>
         <translation>添加 SSH 工作器...</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="437"/>
+        <location filename="../ui/settings_dialog.py" line="511"/>
         <source>About</source>
         <translation>关于</translation>
     </message>
@@ -657,27 +1764,93 @@ This route will stay available after model selection is connected.</source>
         <translation type="vanished">打开日志目录</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="438"/>
+        <location filename="../ui/settings_dialog.py" line="512"/>
         <source>Save</source>
         <translation>保存</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="455"/>
+        <source>Downloading embedded Python</source>
+        <translation type="vanished">正在下载嵌入式 Python</translation>
+    </message>
+    <message>
+        <source>Installing package manager</source>
+        <translation type="vanished">正在安装包管理器</translation>
+    </message>
+    <message>
+        <source>Installing OCR runtime</source>
+        <translation type="vanished">正在安装 OCR 运行时</translation>
+    </message>
+    <message>
+        <source>Preparing OCR models</source>
+        <translation type="vanished">正在准备 OCR 模型</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="551"/>
+        <location filename="../ui/settings_dialog.py" line="904"/>
+        <source>Ready</source>
+        <translation>就绪</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="553"/>
+        <source>Preparing local OCR</source>
+        <translation>正在准备本地 OCR</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="555"/>
+        <source>Local OCR setup: %1</source>
+        <translation>本地 OCR 部署：%1</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="574"/>
+        <source>Local OCR Setup Failed</source>
+        <translation>本地 OCR 部署失败</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="599"/>
+        <source>Local OCR setup could not be completed.</source>
+        <translation>无法完成本地 OCR 部署。</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="627"/>
+        <source>Local PaddleOCR service is unavailable</source>
+        <translation>本地 PaddleOCR 服务不可用</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="630"/>
+        <source>Checking local PaddleOCR status</source>
+        <translation>正在检查本地 PaddleOCR 状态</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="633"/>
+        <source>Local PaddleOCR is ready</source>
+        <translation>本地 PaddleOCR 已就绪</translation>
+    </message>
+    <message>
+        <source>Local PaddleOCR runtime is installed; models are not ready</source>
+        <translation type="vanished">本地 PaddleOCR 运行时已安装，模型尚未就绪</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="649"/>
+        <source>Local PaddleOCR is not installed</source>
+        <translation>本地 PaddleOCR 尚未安装</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="683"/>
         <source>English</source>
         <translation>English</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="456"/>
+        <location filename="../ui/settings_dialog.py" line="684"/>
         <source>Simplified Chinese</source>
         <translation>简体中文</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="480"/>
+        <location filename="../ui/settings_dialog.py" line="708"/>
         <source>Language Switch Failed</source>
         <translation>语言切换失败</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="481"/>
+        <location filename="../ui/settings_dialog.py" line="709"/>
         <source>Unable to switch the application language.
 
 {details}</source>
@@ -686,19 +1859,229 @@ This route will stay available after model selection is connected.</source>
 {details}</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="540"/>
+        <location filename="../ui/settings_dialog.py" line="785"/>
+        <location filename="../ui/settings_dialog.py" line="811"/>
+        <source>Knowledge Indexes</source>
+        <translation>知识库索引</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="813"/>
+        <source>Embedding settings were saved, but the vector rebuild could not be queued.</source>
+        <translation>Embedding 设置已保存，但无法将文本向量重建加入队列。</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="822"/>
+        <source>Rebuild text vectors?</source>
+        <translation>重建文本向量？</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="825"/>
+        <source>This change uses a different embedding space. Existing text vectors cannot be reused for current Knowledge content.</source>
+        <translation>此更改将使用不同的 Embedding 空间。现有文本向量无法用于当前知识库内容。</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="830"/>
+        <source>Save and rebuild now</source>
+        <translation>保存并立即重建</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="834"/>
+        <source>Save; rebuild later</source>
+        <translation>保存；稍后重建</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="881"/>
+        <source>Knowledge index service is unavailable</source>
+        <translation>知识库索引服务不可用</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="786"/>
+        <location filename="../ui/settings_dialog.py" line="889"/>
+        <source>Knowledge index status is unavailable</source>
+        <translation>无法获取知识库索引状态</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="546"/>
+        <source>Downloading OCR component</source>
+        <translation>正在下载 OCR 组件</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="547"/>
+        <source>Unpacking OCR component</source>
+        <translation>正在解压 OCR 组件</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="548"/>
+        <source>Verifying OCR component</source>
+        <translation>正在校验 OCR 组件</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="549"/>
+        <source>Testing OCR component</source>
+        <translation>正在测试 OCR 组件</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="550"/>
+        <source>Activating OCR component</source>
+        <translation>正在激活 OCR 组件</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="580"/>
+        <source>Local OCR is unavailable in this build.</source>
+        <translation>当前构建不提供本地 OCR。</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="582"/>
+        <source>Local OCR download source is unavailable.</source>
+        <translation>本地 OCR 下载源不可用。</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="584"/>
+        <source>Local OCR component could not be downloaded.</source>
+        <translation>无法下载本地 OCR 组件。</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="586"/>
+        <source>Local OCR bundle source is unavailable.</source>
+        <translation>本地 OCR 组件源不可用。</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="592"/>
+        <source>Local OCR component failed integrity verification.</source>
+        <translation>本地 OCR 组件未通过完整性校验。</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="598"/>
+        <source>Local OCR component failed its self-test.</source>
+        <translation>本地 OCR 组件未通过自检。</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="635"/>
+        <source>Reinstall local PaddleOCR</source>
+        <translation>重新安装本地 PaddleOCR</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="637"/>
+        <source>Local PaddleOCR requires repair</source>
+        <translation>本地 PaddleOCR 需要修复</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="639"/>
+        <source>Repair local PaddleOCR</source>
+        <translation>修复本地 PaddleOCR</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="641"/>
+        <location filename="../ui/settings_dialog.py" line="643"/>
+        <source>Preparing local PaddleOCR</source>
+        <translation>正在准备本地 PaddleOCR</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="645"/>
+        <source>Local PaddleOCR setup needs attention</source>
+        <translation>本地 PaddleOCR 设置需要处理</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="647"/>
+        <source>Try local PaddleOCR setup again</source>
+        <translation>重试设置本地 PaddleOCR</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="894"/>
+        <source>Keyword: %1
+Text vectors: %2</source>
+        <translation>关键词：%1
+文本向量：%2</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="905"/>
+        <source>Building</source>
+        <translation>正在构建</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="906"/>
+        <source>Needs rebuild</source>
+        <translation>需要重建</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="907"/>
+        <source>Unavailable</source>
+        <translation>不可用</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="908"/>
+        <source>Needs attention</source>
+        <translation>需要处理</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="910"/>
+        <source>Unknown status</source>
+        <translation>未知状态</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.py" line="919"/>
         <source>{local_count} local, {ssh_count} SSH, {slots} execution slot(s).</source>
         <translation>{local_count} 个本地，{ssh_count} 个 SSH，{slots} 个执行槽。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="676"/>
+        <location filename="../ui/settings_dialog.py" line="1055"/>
         <source>Built into packaged app</source>
         <translation>已内置于打包应用</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="727"/>
+        <location filename="../ui/settings_dialog.py" line="1106"/>
         <source>None</source>
         <translation>无</translation>
+    </message>
+</context>
+<context>
+    <name>SoftwareUpdateController</name>
+    <message>
+        <location filename="../ui/software_update.py" line="91"/>
+        <source>Software Update</source>
+        <translation>软件更新</translation>
+    </message>
+    <message>
+        <location filename="../ui/software_update.py" line="93"/>
+        <source>Downloading Xenix {version}...</source>
+        <translation>正在下载 Xenix {version}...</translation>
+    </message>
+    <message>
+        <location filename="../ui/software_update.py" line="174"/>
+        <location filename="../ui/software_update.py" line="181"/>
+        <location filename="../ui/software_update.py" line="188"/>
+        <source>Updates</source>
+        <translation>更新</translation>
+    </message>
+    <message>
+        <location filename="../ui/software_update.py" line="175"/>
+        <source>Updates are unavailable in this build.</source>
+        <translation>此构建不支持更新。</translation>
+    </message>
+    <message>
+        <location filename="../ui/software_update.py" line="182"/>
+        <source>Xenix is up to date.</source>
+        <translation>Xenix 已是最新版本。</translation>
+    </message>
+    <message>
+        <location filename="../ui/software_update.py" line="194"/>
+        <source>Update available</source>
+        <translation>发现可用更新</translation>
+    </message>
+    <message>
+        <location filename="../ui/software_update.py" line="196"/>
+        <source>Xenix {version} is available. Download it now?</source>
+        <translation>Xenix {version} 已发布。现在下载吗？</translation>
+    </message>
+    <message>
+        <location filename="../ui/software_update.py" line="211"/>
+        <source>Update ready</source>
+        <translation>更新已就绪</translation>
+    </message>
+    <message>
+        <location filename="../ui/software_update.py" line="213"/>
+        <source>Restart Xenix now to apply version {version}?</source>
+        <translation>现在重启 Xenix 并应用版本 {version} 吗？</translation>
     </message>
 </context>
 <context>
@@ -865,106 +2248,107 @@ This route will stay available after model selection is connected.</source>
         <translation type="vanished">图片</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="187"/>
+        <location filename="../ui/chatbot.py" line="192"/>
         <source>Error: {message}</source>
         <translation>错误：{message}</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="217"/>
+        <location filename="../ui/chatbot.py" line="235"/>
         <source>Thinking...</source>
         <translation>思考中...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="223"/>
-        <location filename="../ui/chatbot.py" line="233"/>
+        <location filename="../ui/chatbot.py" line="241"/>
+        <location filename="../ui/chatbot.py" line="251"/>
         <source>tool</source>
         <translation>工具</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="226"/>
+        <location filename="../ui/chatbot.py" line="244"/>
         <source>Calling `{tool_name}`...</source>
         <translation>正在调用 `{tool_name}`...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="237"/>
+        <location filename="../ui/chatbot.py" line="255"/>
         <source>`{tool_name}` {status}.</source>
         <translation>`{tool_name}` {status}。</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="253"/>
+        <location filename="../ui/chatbot.py" line="351"/>
         <source>completed</source>
         <translation>已完成</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="255"/>
+        <location filename="../ui/chatbot.py" line="353"/>
         <source>failed</source>
         <translation>失败</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="257"/>
+        <location filename="../ui/chatbot.py" line="355"/>
         <source>cancelled</source>
         <translation>已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="259"/>
+        <location filename="../ui/chatbot.py" line="357"/>
         <source>running</source>
         <translation>运行中</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="261"/>
+        <location filename="../ui/chatbot.py" line="359"/>
         <source>requested</source>
         <translation>已请求</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1339"/>
+        <location filename="../ui/chatbot.py" line="1474"/>
         <source>Message Xenix</source>
         <translation>给 Xenix 发消息</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1340"/>
-        <location filename="../ui/chatbot.py" line="1721"/>
-        <location filename="../ui/chatbot.py" line="1732"/>
+        <location filename="../ui/chatbot.py" line="1475"/>
+        <location filename="../ui/chatbot.py" line="1910"/>
+        <location filename="../ui/chatbot.py" line="1921"/>
         <source>Attach files</source>
         <translation>添加文件</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1341"/>
+        <location filename="../ui/chatbot.py" line="1476"/>
         <source>Model for the next turn</source>
         <translation>下一轮使用的模型</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1342"/>
+        <location filename="../ui/chatbot.py" line="1477"/>
         <source>Continue</source>
         <translation>继续</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1343"/>
-        <location filename="../ui/chatbot.py" line="1666"/>
+        <location filename="../ui/chatbot.py" line="1478"/>
+        <location filename="../ui/chatbot.py" line="1853"/>
         <source>Stop</source>
         <translation>停止</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1344"/>
+        <location filename="../ui/chatbot.py" line="1479"/>
         <source>Drop files to attach</source>
         <translation>拖放文件以添加附件</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1345"/>
+        <location filename="../ui/chatbot.py" line="1480"/>
         <source>Release here to add them to the next message</source>
         <translation>松开后添加到下一条消息</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1346"/>
+        <location filename="../ui/chatbot.py" line="1481"/>
         <source>Scroll to bottom</source>
         <translation>滚动到底部</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1672"/>
+        <location filename="../ui/chatbot.py" line="1855"/>
+        <location filename="../ui/chatbot.py" line="1861"/>
         <source>Send</source>
         <translation>发送</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1723"/>
+        <location filename="../ui/chatbot.py" line="1912"/>
         <source>Data files (*.csv *.xlsx *.xls)</source>
         <translation>数据文件 (*.csv *.xlsx *.xls)</translation>
     </message>
@@ -1063,237 +2447,257 @@ This route will stay available after model selection is connected.</source>
 <context>
     <name>ToolCallItem</name>
     <message>
-        <location filename="../ui/chatbot.py" line="267"/>
+        <location filename="../ui/chatbot.py" line="365"/>
         <source>Running tool...</source>
         <translation>正在运行工具...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="269"/>
+        <location filename="../ui/chatbot.py" line="367"/>
         <source>Ran tool</source>
         <translation>工具已运行</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="271"/>
+        <location filename="../ui/chatbot.py" line="369"/>
         <source>Cancelled tool run</source>
         <translation>工具运行已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="273"/>
+        <location filename="../ui/chatbot.py" line="371"/>
+        <source>Searching knowledge...</source>
+        <translation>正在搜索知识...</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="373"/>
+        <source>Searched knowledge</source>
+        <translation>已搜索知识</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="375"/>
+        <source>Failed to search knowledge</source>
+        <translation>知识搜索失败</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="377"/>
+        <source>Cancelled knowledge search</source>
+        <translation>已取消知识搜索</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="379"/>
         <source>Inspecting dataset...</source>
         <translation>正在检查数据集...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="275"/>
+        <location filename="../ui/chatbot.py" line="381"/>
         <source>Inspected dataset</source>
         <translation>已检查数据集</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="277"/>
+        <location filename="../ui/chatbot.py" line="383"/>
         <source>Cancelled dataset inspection</source>
         <translation>数据集检查已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="279"/>
+        <location filename="../ui/chatbot.py" line="385"/>
         <source>Integrating data...</source>
         <translation>正在整合数据...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="281"/>
+        <location filename="../ui/chatbot.py" line="387"/>
         <source>Integrated data</source>
         <translation>数据已整合</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="283"/>
+        <location filename="../ui/chatbot.py" line="389"/>
         <source>Cancelled data integration</source>
         <translation>数据整合已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="285"/>
+        <location filename="../ui/chatbot.py" line="391"/>
         <source>Profiling dataset...</source>
         <translation>正在分析数据集...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="287"/>
+        <location filename="../ui/chatbot.py" line="393"/>
         <source>Profiled dataset</source>
         <translation>数据集分析完成</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="289"/>
+        <location filename="../ui/chatbot.py" line="395"/>
         <source>Cancelled dataset profile</source>
         <translation>数据集分析已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="291"/>
+        <location filename="../ui/chatbot.py" line="397"/>
         <source>Drawing graph...</source>
         <translation>正在绘制图表...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="293"/>
+        <location filename="../ui/chatbot.py" line="399"/>
         <source>Drew graph</source>
         <translation>图表已绘制</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="295"/>
+        <location filename="../ui/chatbot.py" line="401"/>
         <source>Cancelled graph drawing</source>
         <translation>图表绘制已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="297"/>
+        <location filename="../ui/chatbot.py" line="403"/>
         <source>Cleaning dataset...</source>
         <translation>正在清洗数据集...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="299"/>
+        <location filename="../ui/chatbot.py" line="405"/>
         <source>Cleaned dataset</source>
         <translation>数据集已清洗</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="301"/>
+        <location filename="../ui/chatbot.py" line="407"/>
         <source>Cancelled dataset cleaning</source>
         <translation>数据集清洗已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="303"/>
+        <location filename="../ui/chatbot.py" line="409"/>
         <source>Querying dataset...</source>
         <translation>正在查询数据集...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="305"/>
+        <location filename="../ui/chatbot.py" line="411"/>
         <source>Queried dataset</source>
         <translation>数据集已查询</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="307"/>
+        <location filename="../ui/chatbot.py" line="413"/>
         <source>Cancelled dataset query</source>
         <translation>数据集查询已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="309"/>
+        <location filename="../ui/chatbot.py" line="415"/>
         <source>Transforming dataset...</source>
         <translation>正在转换数据集...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="311"/>
+        <location filename="../ui/chatbot.py" line="417"/>
         <source>Transformed dataset</source>
         <translation>数据集已转换</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="313"/>
+        <location filename="../ui/chatbot.py" line="419"/>
         <source>Cancelled dataset transformation</source>
         <translation>数据集转换已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="315"/>
+        <location filename="../ui/chatbot.py" line="421"/>
         <source>Selecting features...</source>
         <translation>正在选择特征...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="317"/>
+        <location filename="../ui/chatbot.py" line="423"/>
         <source>Selected features</source>
         <translation>特征已选择</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="319"/>
+        <location filename="../ui/chatbot.py" line="425"/>
         <source>Cancelled feature selection</source>
         <translation>特征选择已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="321"/>
+        <location filename="../ui/chatbot.py" line="427"/>
         <source>Loading model metadata...</source>
         <translation>正在加载模型元数据...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="323"/>
+        <location filename="../ui/chatbot.py" line="429"/>
         <source>Loaded model metadata</source>
         <translation>模型元数据已加载</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="325"/>
+        <location filename="../ui/chatbot.py" line="431"/>
         <source>Cancelled model metadata lookup</source>
         <translation>模型元数据查询已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="327"/>
+        <location filename="../ui/chatbot.py" line="433"/>
         <source>Training model...</source>
         <translation>正在训练模型...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="329"/>
+        <location filename="../ui/chatbot.py" line="435"/>
         <source>Trained model</source>
         <translation>模型已训练</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="331"/>
+        <location filename="../ui/chatbot.py" line="437"/>
         <source>Cancelled model training</source>
         <translation>模型训练已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="333"/>
+        <location filename="../ui/chatbot.py" line="439"/>
         <source>Tuning model...</source>
         <translation>正在调优模型...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="335"/>
+        <location filename="../ui/chatbot.py" line="441"/>
         <source>Tuned model</source>
         <translation>模型已调优</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="337"/>
+        <location filename="../ui/chatbot.py" line="443"/>
         <source>Model tuning running in background</source>
         <translation>模型调优正在后台运行</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="339"/>
+        <location filename="../ui/chatbot.py" line="445"/>
         <source>Cancelled model tuning</source>
         <translation>模型调优已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="341"/>
+        <location filename="../ui/chatbot.py" line="447"/>
         <source>Applying model...</source>
         <translation>正在应用模型...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="343"/>
+        <location filename="../ui/chatbot.py" line="449"/>
         <source>Applied model</source>
         <translation>模型已应用</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="345"/>
+        <location filename="../ui/chatbot.py" line="451"/>
         <source>Model training running in background</source>
         <translation>模型训练正在后台运行</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="347"/>
+        <location filename="../ui/chatbot.py" line="453"/>
         <source>Model apply running in background</source>
         <translation>模型应用正在后台运行</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="349"/>
+        <location filename="../ui/chatbot.py" line="455"/>
         <source>Checking model task...</source>
         <translation>正在检查模型任务...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="351"/>
+        <location filename="../ui/chatbot.py" line="457"/>
         <source>Checked model task</source>
         <translation>模型任务已检查</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="353"/>
+        <location filename="../ui/chatbot.py" line="459"/>
         <source>Cancelled model task check</source>
         <translation>模型任务检查已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="355"/>
+        <location filename="../ui/chatbot.py" line="461"/>
         <source>Cancelled model apply</source>
         <translation>模型应用已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="886"/>
+        <location filename="../ui/chatbot.py" line="1016"/>
         <source>Details</source>
         <translation>详情</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="887"/>
+        <location filename="../ui/chatbot.py" line="1017"/>
         <source>Open tool call details</source>
         <translation>打开工具调用详情</translation>
     </message>
@@ -1346,12 +2750,12 @@ This route will stay available after model selection is connected.</source>
         <translation type="vanished">预测运行已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="895"/>
+        <location filename="../ui/chatbot.py" line="1025"/>
         <source>Hide result</source>
         <translation>隐藏结果</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="895"/>
+        <location filename="../ui/chatbot.py" line="1025"/>
         <source>Show result</source>
         <translation>显示结果</translation>
     </message>
@@ -1359,12 +2763,12 @@ This route will stay available after model selection is connected.</source>
 <context>
     <name>UsageOverviewItem</name>
     <message>
-        <location filename="../ui/chatbot.py" line="373"/>
+        <location filename="../ui/chatbot.py" line="479"/>
         <source> ({cached} cached)</source>
         <translation>（{cached} 缓存命中）</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="377"/>
+        <location filename="../ui/chatbot.py" line="483"/>
         <source>↑ {input} · ↓ {output}</source>
         <translation>↑ {input} · ↓ {output}</translation>
     </message>
@@ -1372,22 +2776,22 @@ This route will stay available after model selection is connected.</source>
 <context>
     <name>XenixStartup</name>
     <message>
-        <location filename="../app.py" line="138"/>
+        <location filename="../app.py" line="148"/>
         <source>Local database recovery</source>
         <translation>本地数据库恢复</translation>
     </message>
     <message>
-        <location filename="../app.py" line="141"/>
+        <location filename="../app.py" line="151"/>
         <source>Xenix could not initialize the local database.</source>
         <translation>Xenix 无法初始化本地数据库。</translation>
     </message>
     <message>
-        <location filename="../app.py" line="147"/>
+        <location filename="../app.py" line="157"/>
         <source>The database may belong to an unsupported development build or may be damaged. You can back it up and rebuild a fresh database now.</source>
         <translation>该数据库可能来自不受支持的开发版本，或已经损坏。你可以现在备份它并重建一个新的数据库。</translation>
     </message>
     <message>
-        <location filename="../app.py" line="154"/>
+        <location filename="../app.py" line="164"/>
         <source>Database: {path}
 
 Reason: {reason}</source>
@@ -1396,33 +2800,33 @@ Reason: {reason}</source>
 原因：{reason}</translation>
     </message>
     <message>
-        <location filename="../app.py" line="160"/>
+        <location filename="../app.py" line="170"/>
         <source>Back up and rebuild</source>
         <translation>备份并重建</translation>
     </message>
     <message>
-        <location filename="../app.py" line="164"/>
+        <location filename="../app.py" line="174"/>
         <source>Open data folder</source>
         <translation>打开数据目录</translation>
     </message>
     <message>
-        <location filename="../app.py" line="168"/>
-        <location filename="../app.py" line="219"/>
+        <location filename="../app.py" line="178"/>
+        <location filename="../app.py" line="229"/>
         <source>Exit</source>
         <translation>退出</translation>
     </message>
     <message>
-        <location filename="../app.py" line="189"/>
+        <location filename="../app.py" line="199"/>
         <source>Xenix test build locked</source>
         <translation>Xenix 测试版已锁定</translation>
     </message>
     <message>
-        <location filename="../app.py" line="192"/>
+        <location filename="../app.py" line="202"/>
         <source>This Xenix test build is locked.</source>
         <translation>此 Xenix 测试版本已锁定。</translation>
     </message>
     <message>
-        <location filename="../app.py" line="205"/>
+        <location filename="../app.py" line="215"/>
         <source>Reason: {reason}
 Trial expired at: {expires_at}
 State file: {state_path}</source>
@@ -1439,7 +2843,7 @@ State file: {state_path}</source>
         <translation type="vanished">此 Xenix 测试版本已到期。</translation>
     </message>
     <message>
-        <location filename="../app.py" line="198"/>
+        <location filename="../app.py" line="208"/>
         <source>Please purchase a license or download a licensed Xenix build from {url}.</source>
         <translation>请前往 {url} 购买许可证或下载包含许可证激活的新版本。</translation>
     </message>
@@ -1450,17 +2854,17 @@ Reason: {reason}</source>
 原因：{reason}</translation>
     </message>
     <message>
-        <location filename="../app.py" line="215"/>
+        <location filename="../app.py" line="225"/>
         <source>Buy license</source>
         <translation>前往购买</translation>
     </message>
     <message>
-        <location filename="../app.py" line="708"/>
+        <location filename="../app.py" line="800"/>
         <source>Unable to start Xenix</source>
         <translation>无法启动 Xenix</translation>
     </message>
     <message>
-        <location filename="../app.py" line="709"/>
+        <location filename="../app.py" line="801"/>
         <source>Xenix could not finish startup.
 
 {error}</source>

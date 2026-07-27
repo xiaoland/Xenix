@@ -1,5 +1,5 @@
 {
-  "version": "0.3.0",
+  "version": "0.4.0",
   "business_intent": "",
   "dataset": {
     "table_name": "",
@@ -22,12 +22,20 @@
     "requires_user_confirmation": false,
     "confirmation_question": null
   },
+  "knowledge_context": {
+    "required": false,
+    "business_query": "",
+    "requested_mode": "auto",
+    "source_claims": [],
+    "conflicts_or_gaps": []
+  },
   "handoff": {
     "requires_preprocessing_skill": false,
     "requires_modeling_skill": false,
     "reason": ""
   },
   "tool_plan": {
+    "knowledge_lookup": [],
     "data_query": [],
     "data_transform": [],
     "analysis_graph": []

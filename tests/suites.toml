@@ -1,0 +1,102 @@
+version = 1
+
+[shards.analysis-data]
+
+[shards.analysis-data.cohorts.analysis-data]
+paths = [
+  "tests/test_analysis_graph.py",
+  "tests/test_analysis_lambda.py",
+  "tests/test_analysis_profile.py",
+  "tests/test_data_cleaning.py",
+  "tests/test_data_tokenization.py",
+  "tests/test_data_transform.py",
+  "tests/test_dataset_service_source_presentation.py",
+  "tests/test_preprocessing_worker.py",
+  "tests/test_tabular_schema.py",
+  "tests/test_xenix_table_text.py",
+]
+
+[shards.knowledge]
+
+[shards.knowledge.cohorts.knowledge]
+paths = [
+  "tests/test_embedding_service.py",
+  "tests/test_knowledge_content_store.py",
+  "tests/test_knowledge_document_lifecycle.py",
+  "tests/test_knowledge_import_lifecycle.py",
+  "tests/test_knowledge_import_service.py",
+  "tests/test_knowledge_import_storage_maintenance.py",
+  "tests/test_knowledge_import_ui.py",
+  "tests/test_knowledge_import_worker.py",
+  "tests/test_knowledge_index_service.py",
+  "tests/test_knowledge_lookup_tool.py",
+  "tests/test_knowledge_packaged_smoke.py",
+  "tests/test_knowledge_pdf_routing.py",
+  "tests/test_knowledge_pipeline_boundaries.py",
+  "tests/test_knowledge_pipeline_cancellation.py",
+  "tests/test_knowledge_retrieval.py",
+  "tests/test_knowledge_semantic_service.py",
+  "tests/test_knowledge_storage_maintenance.py",
+  "tests/test_knowledge_task_query.py",
+  "tests/test_knowledge_vector_store.py",
+  "tests/test_paddle_ocr_service.py",
+  "tests/test_paddle_ocr_worker.py",
+]
+
+[shards.agent-llm-ui]
+
+[shards.agent-llm-ui.cohorts.agent-llm-ui]
+paths = [
+  "tests/test_agent_composition.py",
+  "tests/test_agent_harness_benchmark_infra.py",
+  "tests/test_agent_harness_cleaning_efficiency.py",
+  "tests/test_agent_harness_first_slice.py",
+  "tests/test_agent_harness_foundation.py",
+  "tests/test_agent_harness_streaming.py",
+  "tests/test_agent_settings.py",
+  "tests/test_agent_skill_catalog.py",
+  "tests/test_i18n.py",
+  "tests/test_json_schema_form.py",
+  "tests/test_llm_conversation_lifecycle.py",
+  "tests/test_llm_conversation_titles.py",
+  "tests/test_llm_message_blocks.py",
+  "tests/test_llm_service_retry.py",
+  "tests/test_llm_tooling.py",
+  "tests/test_llm_usage_observability.py",
+  "tests/test_markdown_renderer.py",
+  "tests/test_settings_dialog.py",
+]
+
+[shards.agent-llm-ui.cohorts.main-window]
+paths = [
+  "tests/test_main.py",
+]
+
+[shards.platform-release]
+
+[shards.platform-release.cohorts.platform-release]
+paths = [
+  "tests/test_build_info.py",
+  "tests/test_config.py",
+  "tests/test_diagnostic_bundle.py",
+  "tests/test_logging.py",
+  "tests/test_migrations.py",
+  "tests/test_ml_execution.py",
+  "tests/test_ml_registry.py",
+  "tests/test_ml_workers.py",
+  "tests/test_native_workflow_timings.py",
+  "tests/test_observability.py",
+  "tests/test_release_config.py",
+  "tests/test_release_controls.py",
+  "tests/test_release_identity.py",
+  "tests/test_release_publication.py",
+  "tests/test_repositories.py",
+  "tests/test_resources.py",
+  "tests/test_runtime_activity.py",
+  "tests/test_services.py",
+  "tests/test_single_instance.py",
+  "tests/test_storage_artifacts.py",
+  "tests/test_storage_bootstrap.py",
+  "tests/test_trial_lock.py",
+  "tests/test_update_service.py",
+]

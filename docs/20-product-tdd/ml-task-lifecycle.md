@@ -46,7 +46,7 @@ pending -> cancelled
   after they are downloaded, normalized, finalized locally, and registered by the
   owning service.
 - Terminal metadata preserves enough identity, status, result references, and error
-  summary for later review after the originating conversation turn closes.
+  summary for later review independently of the originating conversation.
 - User-relevant task logs remain available through the ML task service. Log file
   layout and application-log rotation belong to source and Deployment.
 - Failure detail is actionable and may include bounded worker/setup diagnostics,

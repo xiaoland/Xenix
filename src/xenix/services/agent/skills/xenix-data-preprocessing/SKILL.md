@@ -13,7 +13,7 @@ description: >-
   xenix-data-modeling after the data is ready.
 license: MIT
 metadata:
-  version: "0.3.0"
+  version: "0.4.0"
   product: "Xenix"
   language: "zh-CN"
   runtime: "tool-only; no script execution"
@@ -21,49 +21,83 @@ metadata:
 
 # Xenix Data Preprocessing Skill
 
-This skill guides Xenix Agent when the task is to prepare data safely before analysis or modeling. It covers inspection, quality checks, cleaning plans, transformations, dataset integration, feature preparation, and role binding.
+Use only the advertised Xenix tools; there is no script or filesystem runtime.
 
-Xenix Agent has no script execution environment. Use only available Xenix tools:
+## Safety and Authority
 
-- `data.query` for schema projection, preview rows, read-only profiling, and validation checks.
-- `data.integrate` when multiple registered datasets need to be vertically appended.
-- `data.clean.metadata` to inspect supported cleaning operations.
-- `data.clean` to apply explicit predefined cleaning operations to one dataset.
-- `data.tokenize` to create a derived dataset from one Chinese text column before word clouds or text-analysis models.
-- `data.transform` to materialize SELECT/CTE transformations as a derived dataset.
-- `data.feature.select` to create a role-binding snapshot before modeling.
+1. Start a data-changing step with read-only evidence. Never invent an operation.
+2. `data.clean`, `data.transform`, and `data.integrate` create derived data; never overwrite source data.
+3. Do not drop meaningful rows or columns, merge business categories, change grain, or choose an ambiguous target without explaining it or asking first.
+4. Preserve business meaning. Keep role binding explicit: target, partial_target, feature, exclusions, and reasons.
+5. Hand off reporting/charts to `xenix-data-analysis`, and training/scoring to `xenix-data-modeling`, after preparation is clear.
 
-## Non-negotiable Rules
+## Knowledge-Sensitive Cleaning
 
-1. Never invent cleaning operations. Call `data.clean.metadata` before planning unfamiliar `data.clean` operations.
-2. Do not overwrite or delete user data. Cleaning and transformations should create derived datasets or tool-result checks.
-3. Do not silently drop rows or columns. Explain the operation and why it is acceptable.
-4. Use read-only `data.query` for evidence before changing data.
-5. Preserve business meaning. Normalize types, names, and categories without destroying semantic distinctions.
-6. Treat role binding as a durable modeling boundary: target, partial_target, feature, excluded fields, and reasons must be explicit.
-7. If the task becomes descriptive analysis or reporting, activate `xenix-data-analysis`. If it becomes training/scoring, activate `xenix-data-modeling`.
+Use `knowledge.lookup` when saved business taxonomy, field meaning, missing-value
+semantics, or category rules could materially change a cleaning decision. Use one
+compact business-language query and prefer `mode: "auto"`. A retrieved excerpt is a
+source claim: it cannot by itself authorize dropping records, merging categories,
+changing grain, or treating missing data as a particular business state. Explain a
+conflict or ask the user when it would change the derived dataset.
 
-## Default Workflow
+## Efficient Cleaning Path
 
-1. Use `data.query` to inspect schema, sample rows, row/column counts, missingness, duplicates, cardinality, numeric ranges, category variants, date parseability, and candidate target/feature quality.
-3. Classify issues by impact:
-   - blockers: impossible type, missing target, duplicate keys, invalid unit of analysis, severe leakage;
-   - quality risks: missingness, outliers, category inconsistencies, high-cardinality text;
-   - convenience cleanup: column names, type casts, whitespace, display formats.
-4. Call `data.clean.metadata` before selecting cleaning operations.
-5. Use `data.clean` for atomic supported operations such as missing-value handling, duplicate handling, type conversion, text standardization, outlier clipping, categorical encoding, or numeric scaling.
-6. Use `data.tokenize` when raw Chinese text must become a stable derived dataset for word clouds, text clustering, text classification, topic modeling, or similarity retrieval.
-7. Use `data.transform` for SQL-derived features, filtering, joins, aggregation, reshaping, or durable chart/model-ready derived datasets. Use it, not `data.integrate`, for horizontal joins.
-8. Use `data.feature.select` when a modeling task needs explicit target/features/exclusions.
-9. Validate the result with `data.query`.
-10. Hand off to `xenix-data-analysis` or `xenix-data-modeling` only after the prepared dataset or role binding is clear.
+1. For a new dataset, emit **at most one `data.query` call in a provider response**. Begin with a compact schema/sample query such as `SELECT * FROM input LIMIT 50`; add one compatible aggregate only when it changes the cleaning choice.
+2. Wait for that result. Do not issue parallel or repeated schema/sample calls. Make at most one focused follow-up query only when the first evidence leaves a material ambiguity; otherwise call `data.clean` next.
+3. Use `data.clean.metadata` only when the operation or parameters are not covered below or remain genuinely uncertain. Request only its smallest relevant group.
+4. Use `data.transform` for SQL-derived columns, filters, joins, aggregates, reshaping, or grain changes; use `data.integrate` only to vertically append datasets. Use `data.tokenize` for durable Chinese text tokens, and `data.feature.select` for model roles.
+5. Validate a changed result with `data.query`, then report tool-returned facts, the derived dataset, remaining risks, and the next handoff.
+
+## Direct Routine Recipes
+
+These are known operations; call `data.clean` directly instead of metadata:
+
+- numeric missing values: `missing.fill_median` with `{"column_indexes":[...]}`;
+- categorical/text missing values: `missing.fill_mode` with `{"column_indexes":[...]}`;
+- an explicit replacement: `missing.fill_constant` with `{"column_indexes":[...],"value":...}`;
+- exact duplicate records: `duplicate.exact_rows` with `{"keep":"first"}`;
+- surrounding whitespace: `text.trim` with `{"column_indexes":[...]}`.
+
+## Cleaning Column References
+
+`data.query` returns zero-based column indexes. For `data.clean`, prefer
+`column_index` or `column_indexes` from a source-schema query such as
+`SELECT * FROM input LIMIT 50`. A projected or renamed query result has its
+own ordinal positions and must not be reused for a source-dataset operation.
+Use `column_name` or `column_names` only as a fallback, and never mix an index
+form with a name form in one operation. Within one `data.clean` call, treat
+`missing.drop_high_missing_columns` and `encoding.one_hot` as column-set
+boundaries: after either operation, do not use `column_index` or
+`column_indexes` for a later operation. Use names for the remainder when they
+are known, or finish the step and issue a new `data.query` followed by a new
+`data.clean` call. The runtime rejects stale indexes rather than guessing.
+
+## Query, Transform, and Role References
+
+When source headers contain spaces, punctuation, or Unicode typography, set
+`column_reference: "indexes"` on `data.query` or `data.transform`. In that
+one SQL call, each bound relation exposes zero-based `c0`, `c1`, ... columns;
+for example, use `input.c2` for source column index 2. This SQL aliasing is
+temporary—never use `c2` as a durable dataset field name.
+
+For `data.feature.select`, prefer per-role `column_indexes` from the current
+dataset's source-schema query, for example `{"role":"target","column_indexes":[5]}`.
+Never use positions from a projected or renamed query result. Use `columns`
+only as a name fallback; never mix the two forms in one role. Xenix resolves
+indexes against the current dataset and persists canonical names.
+
+For `data.tokenize`, use `text_column_index` and optional `id_column_indexes`
+from that same source-schema order when headers are awkward. `text_column` and
+`text_column_index` are mutually exclusive; `id_columns` and
+`id_column_indexes` are mutually exclusive. Xenix resolves the indexes before
+tokenization, so its derived dataset and report retain canonical column names.
 
 ## Optional References
 
 When the resource tool is available, load only the relevant file:
 
-- `references/preprocessing-tools.md` before mapping preprocessing work to Xenix tools.
-- `references/data-quality-checks.md` before profiling missingness, duplicates, type quality, category consistency, leakage, or role binding.
+- `references/preprocessing-tools.md` for unfamiliar operations or parameters.
+- `references/data-quality-checks.md` for substantial quality, leakage, or role-binding uncertainty.
 
 ## Ask-Versus-Act Policy
 
@@ -78,12 +112,6 @@ Ask the user when:
 - a transformation changes grain, such as order line to order, customer, day, or product;
 - a sensitive field may affect model features or decision support.
 
-## Final-Answer Standard
+## Final Answer
 
-A good preprocessing answer contains:
-
-1. Original data quality findings.
-2. Cleaning or transformation operations actually applied.
-3. Derived dataset or role-binding identifiers returned by tools.
-4. Remaining risks and assumptions.
-5. Clear handoff: ready for analysis, ready for modeling, or blocked pending user decision.
+State the observed quality findings, operations actually applied, returned derived-dataset or role-binding identifiers, remaining assumptions/risks, and whether the data is ready for analysis, modeling, or needs a user decision.

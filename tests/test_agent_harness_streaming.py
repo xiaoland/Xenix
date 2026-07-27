@@ -1,1866 +1,951 @@
 import json
-import threading
-import time
 from pathlib import Path
-from typing import Any
+import threading
+from types import SimpleNamespace
 
 import pytest
 
 from xenix.config import ensure_app_dirs, get_app_paths
+from xenix.exceptions import ValidationError
 from xenix.services.agent import (
     AgentHarnessService,
-    AgentSkill,
-    AgentSkillCatalog,
+    AttachmentImportStatus,
     ChatbotEventKind,
-    ChatbotEventStatus,
-    ConversationStore,
-    ContinueStepBudgetInput,
-    OpenAICompatibleChatProvider,
-    ProviderMessage,
-    ProviderResponse,
-    ProviderStreamEvent,
-    ProviderToolCall,
-    DatasetAttachmentInput,
+    SourceAttachmentInput,
     SubmitUserTurnInput,
+    project_chatbot_events,
 )
-from xenix.services.agent.chatbot_events import project_turn_connection_events
-from xenix.services.agent.providers import AgentToolSpec
-from xenix.services.agent.tools import ToolExecutionContext, ToolExecutionResult
-from xenix.services.llm import LLMRequestMetadata, LLMRetryEvent
+from xenix.services.agent.chatbot_events import enrich_chatbot_events_with_source_attachments
+from xenix.services.dataset_service import DatasetService
+from xenix.services.llm import (
+    AgentToolRegistry,
+    AgentToolSpec,
+    DatasetBlock,
+    LLMConversationService,
+    ProviderResponse,
+    SourceAttachmentBlock,
+    TextBlock,
+    ToolFailure,
+    blocks_from_payload,
+)
 from xenix.services.storage import StorageBootstrapService
-from xenix.exceptions import ValidationError
-from xenix.services.storage.models import (
-    AgentMessageKind,
-    AgentMessageStatus,
-    AgentProviderRequestRow,
-    AgentProviderRequestStatus,
-    AgentRunStatus,
-    AgentToolCallStatus,
-    AgentTurnStatus,
-)
 
 
-def _dataset_attachment(dataset_id: str = "dataset-1") -> DatasetAttachmentInput:
-    return DatasetAttachmentInput(
-        dataset_id=dataset_id,
-        name="Orders",
-        file_name="orders.csv",
-        source_format="csv",
-        row_count=1,
-        column_count=1,
-        preview_columns=["value"],
-    )
+class TextProvider:
+    def complete(self, _messages, _tools):
+        return ProviderResponse(assistant_content_blocks=[{"type": "text", "text": "Ready."}])
 
 
-class StreamingProviderFixture:
-    def __init__(self, text: str, chunk_size: int = 6, usage_payload: dict[str, Any] | None = None) -> None:
-        self._text = text
-        self._chunk_size = chunk_size
-        self._usage_payload = usage_payload
-
-    def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
-        return ProviderResponse(
-            assistant_content_blocks=[{"type": "markdown", "text": self._text}],
-            tool_calls=[],
-            usage_payload=self._usage_payload,
-        )
-
-    def stream(self, messages: list[Any], tools: list[Any]):
-        for index in range(0, len(self._text), self._chunk_size):
-            yield ProviderStreamEvent(delta_text=self._text[index : index + self._chunk_size])
-        yield ProviderStreamEvent(
-            response=ProviderResponse(
-                assistant_content_blocks=[{"type": "markdown", "text": self._text}],
-                tool_calls=[],
-                usage_payload=self._usage_payload,
-            )
-        )
-
-
-class ToolCaptureStreamingProvider:
-    def __init__(self) -> None:
-        self.tools_by_call: list[list[str]] = []
-
-    def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
-        self.tools_by_call.append([tool.name for tool in tools])
-        return ProviderResponse(
-            assistant_content_blocks=[{"type": "markdown", "text": "Ready."}],
-            tool_calls=[],
-        )
-
-    def stream(self, messages: list[Any], tools: list[Any]):
-        self.tools_by_call.append([tool.name for tool in tools])
-        yield ProviderStreamEvent(
-            response=ProviderResponse(
-                assistant_content_blocks=[{"type": "markdown", "text": "Ready."}],
-                tool_calls=[],
-            )
-        )
-
-
-class HiddenToolCallStreamingProvider:
-    def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
-        return ProviderResponse(
-            tool_calls=[
-                ProviderToolCall(
-                    provider_call_id="call-hidden-train",
-                    tool_name="model.train",
-                    arguments={},
-                )
-            ],
-        )
-
-    def stream(self, messages: list[Any], tools: list[Any]):
-        yield ProviderStreamEvent(
-            response=ProviderResponse(
-                tool_calls=[
-                    ProviderToolCall(
-                        provider_call_id="call-hidden-train",
-                        tool_name="model.train",
-                        arguments={},
-                    )
-                ],
-            )
-        )
-
-
-class BlockingToolCallDeltaStreamingProvider:
-    def __init__(self) -> None:
-        self.calls = 0
-        self.tool_delta_seen = threading.Event()
-        self.release_tool_call_stream = threading.Event()
-
-    def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
-        raise AssertionError("Streaming path expected.")
-
-    def stream(self, messages: list[Any], tools: list[Any]):
-        self.calls += 1
-        if self.calls == 1:
-            yield ProviderStreamEvent(tool_call_delta=True)
-            self.tool_delta_seen.set()
-            assert self.release_tool_call_stream.wait(timeout=2)
-            yield ProviderStreamEvent(
-                response=ProviderResponse(
-                    tool_calls=[
-                        ProviderToolCall(
-                            provider_call_id="call-dummy",
-                            tool_name="dummy.step",
-                            arguments={},
-                        )
-                    ],
-                )
-            )
-            return
-        yield ProviderStreamEvent(delta_text="Done.")
-        yield ProviderStreamEvent(
-            response=ProviderResponse(
-                assistant_content_blocks=[{"type": "markdown", "text": "Done."}],
-            )
-        )
-
-
-class BlockingSecondActivityStreamingProvider:
-    def __init__(self) -> None:
-        self.calls = 0
-        self.second_stream_entered = threading.Event()
-        self.release_second_stream = threading.Event()
-
-    def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
-        raise AssertionError("Streaming path expected.")
-
-    def stream(self, messages: list[Any], tools: list[Any]):
-        self.calls += 1
-        if self.calls == 1:
-            yield ProviderStreamEvent(
-                response=ProviderResponse(
-                    tool_calls=[
-                        ProviderToolCall(
-                            provider_call_id="call-dummy",
-                            tool_name="dummy.step",
-                            arguments={},
-                        )
-                    ],
-                )
-            )
-            return
-        self.second_stream_entered.set()
-        assert self.release_second_stream.wait(timeout=2)
-        yield ProviderStreamEvent(delta_text="Done.")
-        yield ProviderStreamEvent(
-            response=ProviderResponse(
-                assistant_content_blocks=[{"type": "markdown", "text": "Done."}],
-            )
-        )
-
-
-class CapturingProviderFixture:
-    def __init__(self) -> None:
-        self.messages: list[ProviderMessage] = []
-
-    def complete(self, messages: list[ProviderMessage], tools: list[Any]) -> ProviderResponse:
-        self.messages = list(messages)
-        return ProviderResponse(
-            assistant_content_blocks=[{"type": "markdown", "text": "Done."}],
-            tool_calls=[],
-        )
-
-
-class EmptyProviderFixture:
-    def complete(self, messages: list[ProviderMessage], tools: list[Any]) -> ProviderResponse:
-        return ProviderResponse()
-
-
-class ThreadTitleProviderFixture:
-    def __init__(self, title: str) -> None:
-        self._title = title
-        self.messages_by_call: list[list[ProviderMessage]] = []
-
-    def complete(self, messages: list[ProviderMessage], tools: list[Any]) -> ProviderResponse:
-        self.messages_by_call.append(list(messages))
-        assert tools == []
-        return ProviderResponse(
-            assistant_content_blocks=[{"type": "markdown", "text": self._title}],
-            tool_calls=[],
-        )
-
-
-class FailingThreadTitleProvider:
-    def complete(self, messages: list[ProviderMessage], tools: list[Any]) -> ProviderResponse:
-        raise ValidationError("title provider unavailable")
-
-
-class UnexpectedThreadTitleProvider:
-    def complete(self, messages: list[ProviderMessage], tools: list[Any]) -> ProviderResponse:
-        raise AssertionError("Thread title provider should not be called.")
-
-
-class SequencedProviderFixture:
-    def __init__(self, responses: list[ProviderResponse]) -> None:
-        self._responses = list(responses)
-        self.messages_by_call: list[list[ProviderMessage]] = []
-
-    def complete(self, messages: list[ProviderMessage], tools: list[Any]) -> ProviderResponse:
-        self.messages_by_call.append(list(messages))
-        if not self._responses:
-            raise AssertionError("No provider responses left.")
-        return self._responses.pop(0)
-
-
-class GuardProviderFixture:
-    def __init__(self, verdicts: list[tuple[str, str]]) -> None:
-        self._verdicts = list(verdicts)
-        self.messages_by_call: list[list[ProviderMessage]] = []
-
-    def complete(self, messages: list[ProviderMessage], tools: list[Any]) -> ProviderResponse:
-        self.messages_by_call.append(list(messages))
-        if not self._verdicts:
-            raise AssertionError("No guard verdicts left.")
-        verdict, reason = self._verdicts.pop(0)
-        return ProviderResponse(
-            assistant_content_blocks=[
-                {"type": "markdown", "text": json.dumps({"verdict": verdict, "reason": reason})}
-            ],
-            tool_calls=[],
-        )
-
-
-class SkillActivatingProviderFixture:
-    def __init__(self) -> None:
-        self.messages_by_call: list[list[ProviderMessage]] = []
-        self.tools_by_call: list[list[str]] = []
-
-    def complete(self, messages: list[ProviderMessage], tools: list[Any]) -> ProviderResponse:
-        self.messages_by_call.append(list(messages))
-        self.tools_by_call.append([tool.name for tool in tools])
-        combined_content = "\n".join(message.content for message in messages)
-        if "Always mention the baseline before model tuning." not in combined_content:
-            return ProviderResponse(
-                tool_calls=[
-                    ProviderToolCall(
-                        provider_call_id="call-skill",
-                        tool_name="agent.skill.activate",
-                        arguments={"name": "tabular-analysis"},
-                    )
-                ]
-            )
-        return ProviderResponse(
-            assistant_content_blocks=[
-                {
-                    "type": "markdown",
-                    "text": "I will start with a baseline before considering model tuning.",
-                }
-            ],
-            tool_calls=[],
-        )
-
-
-class SkillResourceReadingProviderFixture:
-    def __init__(self) -> None:
-        self.messages_by_call: list[list[ProviderMessage]] = []
-        self.tools_by_call: list[list[str]] = []
-
-    def complete(self, messages: list[ProviderMessage], tools: list[Any]) -> ProviderResponse:
-        self.messages_by_call.append(list(messages))
-        self.tools_by_call.append([tool.name for tool in tools])
-        combined_content = "\n".join(message.content for message in messages)
-        if "Use the reference before answering." not in combined_content:
-            return ProviderResponse(
-                tool_calls=[
-                    ProviderToolCall(
-                        provider_call_id="call-skill",
-                        tool_name="agent.skill.activate",
-                        arguments={"name": "tabular-analysis"},
-                    )
-                ]
-            )
-        if "Reference says: segment by margin band." not in combined_content:
-            return ProviderResponse(
-                tool_calls=[
-                    ProviderToolCall(
-                        provider_call_id="call-reference",
-                        tool_name="agent.skill.read_reference",
-                        arguments={
-                            "skill_name": "tabular-analysis",
-                            "path": "references/routing.md",
-                        },
-                    )
-                ]
-            )
-        if "management-report" not in combined_content:
-            return ProviderResponse(
-                tool_calls=[
-                    ProviderToolCall(
-                        provider_call_id="call-asset",
-                        tool_name="agent.skill.read_asset",
-                        arguments={
-                            "skill_name": "tabular-analysis",
-                            "path": "assets/report-template.json",
-                        },
-                    )
-                ]
-            )
-        return ProviderResponse(
-            assistant_content_blocks=[
-                {
-                    "type": "markdown",
-                    "text": "I used the reference and the management-report template.",
-                }
-            ],
-            tool_calls=[],
-        )
-
-
-class EmptyToolRegistry:
-    def list_specs(self) -> list[AgentToolSpec]:
-        return []
-
-    def execute(
-        self,
-        tool_name: str,
-        arguments: dict[str, Any],
-        context: ToolExecutionContext,
-    ) -> ToolExecutionResult:
-        raise AssertionError(f"Unexpected tool execution: {tool_name}")
-
-
-class StaticSpecRegistry:
-    def list_specs(self) -> list[AgentToolSpec]:
-        return [
-            self._spec(tool_name)
-            for tool_name in [
-                "model.metadata",
-                "model.task.query",
-                "analysis.graph",
-                "data.integrate",
-                "data.clean",
-                "data.clean.metadata",
-                "data.query",
-                "data.transform",
-                "data.feature.select",
-                "model.train",
-                "model.hyper_train",
-                "model.apply",
-            ]
-        ]
-
-    def execute(
-        self,
-        tool_name: str,
-        arguments: dict[str, Any],
-        context: ToolExecutionContext,
-    ) -> ToolExecutionResult:
-        raise AssertionError(f"Unexpected tool execution: {tool_name}")
-
-    def _spec(self, tool_name: str) -> AgentToolSpec:
-        return AgentToolSpec(
-            name=tool_name,
-            provider_name=tool_name.replace(".", "_"),
-            description=f"{tool_name} test tool",
-            parameters_schema={
-                "type": "object",
-                "properties": {},
-                "additionalProperties": False,
-            },
-        )
-
-
-class BudgetedProviderFixture:
-    def __init__(self, *, provider_key: str = "test", model: str = "budgeted") -> None:
-        self.calls = 0
-        self.provider_key = provider_key
-        self.model = model
-
-    def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
-        self.calls += 1
-        if self.calls == 1:
-            return ProviderResponse(
-                assistant_content_blocks=[{"type": "markdown", "text": "Step one."}],
-                tool_calls=[
-                    ProviderToolCall(
-                        provider_call_id="call-dummy",
-                        tool_name="dummy.step",
-                        arguments={},
-                    )
-                ],
-            )
-        return ProviderResponse(
-            assistant_content_blocks=[{"type": "markdown", "text": "Finished after extension."}],
-            tool_calls=[],
-        )
-
-
-class BudgetedRegistry:
-    def list_specs(self) -> list[AgentToolSpec]:
-        return [
-            AgentToolSpec(
-                name="dummy.step",
-                provider_name="dummy_step",
-                description="Consume one harness step.",
-                parameters_schema={
-                    "type": "object",
-                    "properties": {},
-                    "additionalProperties": False,
-                },
-            ),
-        ]
-
-    def execute(
-        self,
-        tool_name: str,
-        arguments: dict[str, Any],
-        context: ToolExecutionContext,
-    ) -> ToolExecutionResult:
-        if tool_name == "dummy.step":
-            return ToolExecutionResult(
-                payload={"dummy_step": True},
-            )
-        raise AssertionError(f"Unexpected tool execution: {tool_name}")
-
-
-class SwitchingLLMServiceFixture:
-    def __init__(self) -> None:
-        self.first_provider = BudgetedProviderFixture(provider_key="openai", model="first")
-        self.second_provider = BudgetedProviderFixture(provider_key="openai", model="second")
-        self.build_requests: list[str | None] = []
-
-    def default_fq_model_key(self) -> str:
-        return "openai/first"
-
-    def validate_fq_model_key(self, fq_model_key: str) -> str:
-        if fq_model_key not in {"openai/first", "openai/second"}:
-            raise ValidationError(f"Unknown model: {fq_model_key}")
-        return fq_model_key
-
-    def request_metadata(self, fq_model_key: str | None = None) -> LLMRequestMetadata:
-        selected = fq_model_key or self.default_fq_model_key()
-        provider = self._provider_for_key(selected)
-        return LLMRequestMetadata(provider_name=provider.provider_key, model=provider.model)
-
-    def thread_title_fq_model_key(self) -> str | None:
-        return None
-
-    def turn_completion_guard_fq_model_key(self) -> str | None:
-        return None
-
-    def stream(self, *, fq_model_key: str | None = None, messages: list[Any], tools: list[Any]):
-        provider = self._provider_for_key(fq_model_key or self.default_fq_model_key())
-        self.build_requests.append(fq_model_key or self.default_fq_model_key())
-        yield ProviderStreamEvent(response=provider.complete(messages, tools))
-
-    def complete(self, *, fq_model_key: str | None = None, messages: list[Any], tools: list[Any], retry_callback=None):
-        provider = self._provider_for_key(fq_model_key or self.default_fq_model_key())
-        self.build_requests.append(fq_model_key or self.default_fq_model_key())
-        return provider.complete(messages, tools)
-
-    def _provider_for_key(self, fq_model_key: str):
-        selected = fq_model_key or self.default_fq_model_key()
-        if selected == "openai/second":
-            return self.second_provider
-        return self.first_provider
-
-
-class RetryingLLMServiceFixture:
-    def __init__(self) -> None:
-        self.calls = 0
-
-    def default_fq_model_key(self) -> str:
-        return "mock/chat"
-
-    def validate_fq_model_key(self, fq_model_key: str) -> str:
-        return fq_model_key
-
-    def request_metadata(self, fq_model_key: str | None = None) -> LLMRequestMetadata:
-        return LLMRequestMetadata(provider_name="mock", model="chat")
-
-    def thread_title_fq_model_key(self) -> str | None:
-        return None
-
-    def turn_completion_guard_fq_model_key(self) -> str | None:
-        return None
-
-    def stream(self, *, fq_model_key: str | None = None, messages: list[Any], tools: list[Any]):
-        self.calls += 1
-        yield LLMRetryEvent(
-            attempt_number=2,
-            max_attempts=5,
-            reason="retryable_error",
-            error_summary="Tool call 'analysis.graph' arguments are not valid JSON.",
-            error_code="llm_tool_arguments_invalid_json",
-        )
-        yield ProviderStreamEvent(
-            response=ProviderResponse(
-                assistant_content_blocks=[{"type": "markdown", "text": "Recovered."}],
-            )
-        )
-
-    def model_options(self) -> list[Any]:
-        return []
-
-
-class DummyToolRegistry:
-    def list_specs(self) -> list[AgentToolSpec]:
-        return [
-            AgentToolSpec(
-                name="dummy.step",
-                provider_name="dummy_step",
-                description="Run a dummy step.",
-                parameters_schema={
-                    "type": "object",
-                    "properties": {},
-                    "additionalProperties": False,
-                },
-            ),
-        ]
-
-    def execute(
-        self,
-        tool_name: str,
-        arguments: dict[str, Any],
-        context: ToolExecutionContext,
-    ) -> ToolExecutionResult:
-        if tool_name == "dummy.step":
-            return ToolExecutionResult(
-                payload={"ok": True},
-            )
-        raise AssertionError(f"Unexpected tool execution: {tool_name}")
-
-
-class BlockingToolProvider:
-    def complete(self, messages: list[Any], tools: list[Any]) -> ProviderResponse:
-        return ProviderResponse(
-            assistant_content_blocks=[],
-            tool_calls=[
-                ProviderToolCall(
-                    provider_call_id="call-block",
-                    tool_name="blocking.step",
-                    arguments={},
-                )
-            ],
-        )
-
-
-class BlockingToolRegistry:
+class BlockingProvider:
     def __init__(self) -> None:
         self.started = threading.Event()
+        self.release = threading.Event()
 
-    def list_specs(self) -> list[AgentToolSpec]:
-        return [
-            AgentToolSpec(
-                name="blocking.step",
-                provider_name="blocking_step",
-                description="Block until cancellation.",
-                parameters_schema={
-                    "type": "object",
-                    "properties": {},
-                    "additionalProperties": False,
+    def complete(self, _messages, _tools):
+        self.started.set()
+        self.release.wait(timeout=5)
+        return ProviderResponse(assistant_content_blocks=[{"type": "text", "text": "Late response."}])
+
+
+class RecordingTextProvider:
+    def __init__(self) -> None:
+        self.messages = []
+
+    def complete(self, messages, _tools):
+        self.messages = list(messages)
+        return ProviderResponse(assistant_content_blocks=[{"type": "text", "text": "Imported."}])
+
+
+class ToolThenTextProvider:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def complete(self, _messages, _tools):
+        self.calls += 1
+        if self.calls == 1:
+            from xenix.services.llm import ProviderToolCall
+
+            return ProviderResponse(
+                tool_calls=[
+                    ProviderToolCall(
+                        provider_call_id="provider-call-1",
+                        tool_name="test.tool",
+                        provider_name="test_tool",
+                        arguments={},
+                    )
+                ]
+            )
+        return ProviderResponse(assistant_content_blocks=[{"type": "text", "text": "Should not run."}])
+
+
+class BlockingImportDatasetService:
+    def __init__(self) -> None:
+        self.started = threading.Event()
+        self.release = threading.Event()
+
+    def register_dataset_attachment(self, _input):
+        self.started.set()
+        if not self.release.wait(timeout=5):
+            raise AssertionError("Dataset import test barrier timed out.")
+        return SimpleNamespace(
+            datasets=[
+                SimpleNamespace(
+                    dataset_id="imported-dataset",
+                    name="blocked-import",
+                    row_count=1,
+                    column_count=2,
+                )
+            ]
+        )
+
+
+def test_thinking_event_is_live_chatbot_event_and_never_persisted(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    context = StorageBootstrapService().initialize(ensure_app_dirs(get_app_paths()))
+    harness = AgentHarnessService(
+        conversation_service=LLMConversationService(
+            session_factory=context.session_factory, tool_registry=AgentToolRegistry(),
+        ),
+        provider=TextProvider(),
+    )
+
+    events = list(harness.submit_user_turn_stream(SubmitUserTurnInput(text="Hello")))
+    thinking = [event.chatbot_event for event in events if event.kind == "thinking"]
+    final = next(event.snapshot for event in events if event.is_final)
+
+    assert thinking and thinking[0] is not None
+    assert thinking[0].kind is ChatbotEventKind.THINKING
+    assert all(message.kind.value != "pending_llm_sampling" for message in final.messages)
+
+
+def test_cancelled_provider_completion_finishes_without_resurrecting_pending_message(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    context = StorageBootstrapService().initialize(ensure_app_dirs(get_app_paths()))
+    provider = BlockingProvider()
+    harness = AgentHarnessService(
+        conversation_service=LLMConversationService(
+            session_factory=context.session_factory, tool_registry=AgentToolRegistry(),
+        ),
+        provider=provider,
+    )
+    stream = harness.submit_user_turn_stream(SubmitUserTurnInput(text="Cancel this"))
+    next(stream)  # persisted user Message
+    thinking = next(stream)
+    assert thinking.pending_message_id is not None
+
+    outcome: list[object] = []
+    worker = threading.Thread(target=lambda: outcome.extend(stream), daemon=True)
+    worker.start()
+    assert provider.started.wait(timeout=2)
+    harness.cancel_sampling(thinking.pending_message_id)
+    provider.release.set()
+    worker.join(timeout=2)
+
+    assert not worker.is_alive()
+    assert outcome and outcome[-1].is_final is True
+    snapshot = outcome[-1].snapshot
+    assert snapshot is not None
+    assert [message.kind.value for message in snapshot.messages] == ["user"]
+
+
+def test_pause_before_provider_admission_sends_no_request_and_discards_placeholder(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    context = StorageBootstrapService().initialize(ensure_app_dirs(get_app_paths()))
+    provider = BlockingProvider()
+    conversation = LLMConversationService(
+        session_factory=context.session_factory,
+        tool_registry=AgentToolRegistry(),
+    )
+    harness = AgentHarnessService(conversation_service=conversation, provider=provider)
+    stream = harness.submit_user_turn_stream(
+        SubmitUserTurnInput(text="Pause before the request.", client_submission_id="pause-before-request")
+    )
+
+    append_ack = next(stream)
+    thinking = next(stream)
+    assert append_ack.snapshot is not None
+    assert thinking.thread_id == append_ack.thread_id
+    assert thinking.client_submission_id == "pause-before-request"
+    assert thinking.pending_message_id is not None
+    thread_id = append_ack.snapshot.thread.id
+
+    harness.pause_thread(thread_id)
+    events = list(stream)
+
+    assert provider.started.is_set() is False
+    assert events and events[-1].is_final is True
+    snapshot = events[-1].snapshot
+    assert snapshot is not None
+    assert [message.kind.value for message in snapshot.messages] == ["user"]
+    assert all(message.kind.value != "pending_llm_sampling" for message in snapshot.messages)
+
+
+def test_pause_after_tool_result_prevents_next_provider_sample(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    context = StorageBootstrapService().initialize(ensure_app_dirs(get_app_paths()))
+    provider = ToolThenTextProvider()
+    registry = AgentToolRegistry()
+    registry.register(
+        AgentToolSpec(name="test.tool", provider_name="test_tool", description="test"),
+        lambda _arguments, _context: {"ok": True},
+    )
+    conversation = LLMConversationService(session_factory=context.session_factory, tool_registry=registry)
+    harness = AgentHarnessService(conversation_service=conversation, provider=provider)
+    stream = harness.submit_user_turn_stream(
+        SubmitUserTurnInput(text="Pause after the tool.", client_submission_id="pause-after-tool")
+    )
+
+    append_ack = next(stream)
+    thinking = next(stream)
+    assert append_ack.snapshot is not None
+    assert thinking.kind == "thinking"
+    tool_snapshot = next(
+        event
+        for event in stream
+        if event.kind == "snapshot" and event.snapshot is not None
+        and any(message.kind.value == "tool_result" for message in event.snapshot.messages)
+    )
+    assert tool_snapshot.is_final is False
+    assert provider.calls == 1
+
+    harness.pause_thread(append_ack.snapshot.thread.id)
+    remaining = list(stream)
+
+    assert provider.calls == 1
+    assert remaining and remaining[-1].is_final is True
+    final = remaining[-1].snapshot
+    assert final is not None
+    assert [message.kind.value for message in final.messages] == ["user", "tool_call", "tool_result"]
+
+
+def test_new_user_message_reenters_paused_tool_result_frontier_without_replay(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    context = StorageBootstrapService().initialize(ensure_app_dirs(get_app_paths()))
+    provider = ToolThenTextProvider()
+    registry = AgentToolRegistry()
+    registry.register(
+        AgentToolSpec(name="test.tool", provider_name="test_tool", description="test"),
+        lambda _arguments, _context: {"ok": True},
+    )
+    conversation = LLMConversationService(session_factory=context.session_factory, tool_registry=registry)
+    harness = AgentHarnessService(conversation_service=conversation, provider=provider)
+    first_stream = harness.submit_user_turn_stream(
+        SubmitUserTurnInput(text="Create the paused tool result.", client_submission_id="paused-turn")
+    )
+    append_ack = next(first_stream)
+    next(first_stream)  # Thinking
+    tool_snapshot = next(
+        event
+        for event in first_stream
+        if event.kind == "snapshot"
+        and event.snapshot is not None
+        and any(message.kind.value == "tool_result" for message in event.snapshot.messages)
+    )
+    assert append_ack.snapshot is not None
+    thread_id = append_ack.snapshot.thread.id
+    assert tool_snapshot.is_final is False
+    harness.pause_thread(thread_id)
+    paused_events = list(first_stream)
+    assert paused_events and paused_events[-1].is_final is True
+    paused_snapshot = paused_events[-1].snapshot
+    assert paused_snapshot is not None
+    assert [message.kind.value for message in paused_snapshot.messages] == ["user", "tool_call", "tool_result"]
+
+    resumed_events = list(
+        harness.submit_user_turn_stream(
+            SubmitUserTurnInput(
+                thread_id=thread_id,
+                text="Continue with a new explicit message.",
+                client_submission_id="resumed-turn",
+            )
+        )
+    )
+
+    assert provider.calls == 2
+    resumed_snapshot = next(event.snapshot for event in reversed(resumed_events) if event.snapshot is not None)
+    assert [message.kind.value for message in resumed_snapshot.messages] == [
+        "user",
+        "tool_call",
+        "tool_result",
+        "user",
+        "assistant",
+    ]
+
+
+def test_pause_during_tool_allows_tool_to_finish_without_continuation(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    context = StorageBootstrapService().initialize(ensure_app_dirs(get_app_paths()))
+    provider = ToolThenTextProvider()
+    started = threading.Event()
+    release = threading.Event()
+
+    def blocking_tool(_arguments, _context):
+        started.set()
+        assert release.wait(timeout=3), "Tool test barrier timed out."
+        return {"ok": True}
+
+    registry = AgentToolRegistry()
+    registry.register(
+        AgentToolSpec(name="test.tool", provider_name="test_tool", description="test"),
+        blocking_tool,
+    )
+    conversation = LLMConversationService(session_factory=context.session_factory, tool_registry=registry)
+    harness = AgentHarnessService(conversation_service=conversation, provider=provider)
+    stream = harness.submit_user_turn_stream(
+        SubmitUserTurnInput(text="Pause during the tool.", client_submission_id="pause-during-tool")
+    )
+    append_ack = next(stream)
+    next(stream)  # Thinking
+    outcome: list[object] = []
+
+    worker = threading.Thread(target=lambda: outcome.extend(stream), daemon=True)
+    worker.start()
+    assert started.wait(timeout=2)
+    assert append_ack.snapshot is not None
+    harness.pause_thread(append_ack.snapshot.thread.id)
+    release.set()
+    worker.join(timeout=3)
+
+    assert not worker.is_alive()
+    assert provider.calls == 1
+    final_events = [event for event in outcome if getattr(event, "is_final", False)]
+    assert final_events
+    final = final_events[-1].snapshot
+    assert final is not None
+    assert [message.kind.value for message in final.messages] == ["user", "tool_call", "tool_result"]
+
+
+def test_pause_allows_an_already_started_tool_exchange_to_commit_its_atomic_result_set(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    class TwoToolThenTextProvider:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def complete(self, _messages, _tools):
+            self.calls += 1
+            if self.calls == 1:
+                from xenix.services.llm import ProviderToolCall
+
+                return ProviderResponse(
+                    tool_calls=[
+                        ProviderToolCall(
+                            provider_call_id="provider-call-a",
+                            tool_name="test.tool_a",
+                            provider_name="test_tool_a",
+                            arguments={},
+                        ),
+                        ProviderToolCall(
+                            provider_call_id="provider-call-b",
+                            tool_name="test.tool_b",
+                            provider_name="test_tool_b",
+                            arguments={},
+                        ),
+                    ]
+                )
+            return ProviderResponse(assistant_content_blocks=[{"type": "text", "text": "Should not run."}])
+
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    context = StorageBootstrapService().initialize(ensure_app_dirs(get_app_paths()))
+    provider = TwoToolThenTextProvider()
+    first_started = threading.Event()
+    release_first = threading.Event()
+    completed: list[str] = []
+
+    def first_tool(_arguments, _context):
+        first_started.set()
+        assert release_first.wait(timeout=3), "First tool test barrier timed out."
+        completed.append("a")
+        return {"tool": "a"}
+
+    def second_tool(_arguments, _context):
+        completed.append("b")
+        return {"tool": "b"}
+
+    registry = AgentToolRegistry()
+    registry.register(
+        AgentToolSpec(name="test.tool_a", provider_name="test_tool_a", description="test"),
+        first_tool,
+    )
+    registry.register(
+        AgentToolSpec(name="test.tool_b", provider_name="test_tool_b", description="test"),
+        second_tool,
+    )
+    conversation = LLMConversationService(session_factory=context.session_factory, tool_registry=registry)
+    harness = AgentHarnessService(conversation_service=conversation, provider=provider)
+    stream = harness.submit_user_turn_stream(
+        SubmitUserTurnInput(text="Pause an admitted two-tool exchange.", client_submission_id="pause-tool-batch")
+    )
+    append_ack = next(stream)
+    next(stream)  # Thinking
+    outcome: list[object] = []
+    worker = threading.Thread(target=lambda: outcome.extend(stream), daemon=True)
+    worker.start()
+    assert first_started.wait(timeout=2)
+    assert append_ack.snapshot is not None
+
+    harness.pause_thread(append_ack.snapshot.thread.id)
+    release_first.set()
+    worker.join(timeout=3)
+
+    assert not worker.is_alive()
+    assert completed == ["a", "b"]
+    assert provider.calls == 1
+    final_events = [event for event in outcome if getattr(event, "is_final", False)]
+    assert final_events
+    final = final_events[-1].snapshot
+    assert final is not None
+    assert [message.kind.value for message in final.messages] == [
+        "user",
+        "tool_call",
+        "tool_call",
+        "tool_result",
+        "tool_result",
+    ]
+
+
+def test_snapshot_projection_preserves_assistant_fields_and_reasoning_only_event() -> None:
+    snapshot = SimpleNamespace(
+        messages=[
+            SimpleNamespace(
+                id="user-message",
+                kind="user",
+                sequence_index=0,
+                content_payload={"blocks": [{"type": "text", "text": "Train a model."}]},
+            ),
+            SimpleNamespace(
+                id="internal-reasoning",
+                kind="assistant",
+                sequence_index=1,
+                content_payload={},
+                text=None,
+                reasoning="The assistant is about to activate a tool.",
+                refusal=None,
+            ),
+            SimpleNamespace(
+                id="visible-answer",
+                kind="assistant",
+                sequence_index=2,
+                content_payload={},
+                text="The dataset is ready.",
+                reasoning="Internal detail.",
+                refusal=None,
+            ),
+        ]
+    )
+
+    events = project_chatbot_events(snapshot)
+
+    assert [event.id for event in events] == ["user-message", "internal-reasoning", "visible-answer"]
+    assert events[1].content_blocks == []
+    assert events[1].reasoning == "The assistant is about to activate a tool."
+    assert events[1].text is None
+    assert events[1].refusal is None
+    assert events[-1].content_blocks == []
+    assert events[-1].text == "The dataset is ready."
+    assert events[-1].reasoning == "Internal detail."
+
+
+def test_snapshot_projection_preserves_refusal_and_tool_call_result_order() -> None:
+    snapshot = SimpleNamespace(
+        messages=[
+            SimpleNamespace(
+                id="user-message",
+                kind="user",
+                sequence_index=0,
+                content_payload={"blocks": [{"type": "text", "text": "Run it."}]},
+            ),
+            SimpleNamespace(
+                id="assistant-with-call",
+                kind="assistant",
+                sequence_index=1,
+                content_payload={},
+                text=None,
+                reasoning="Preparing the tool call.",
+                refusal=None,
+            ),
+            SimpleNamespace(
+                id="tool-call",
+                kind="tool_call",
+                sequence_index=2,
+                content_payload={"tool_name": "data.inspect"},
+                tool_id="data.inspect",
+                arguments_payload={"dataset_id": "dataset-1"},
+            ),
+            SimpleNamespace(
+                id="tool-result",
+                kind="tool_result",
+                sequence_index=3,
+                tool_call_message_id="tool-call",
+                result_status="succeeded",
+                value_payload={"ok": True},
+                error_summary=None,
+            ),
+            SimpleNamespace(
+                id="assistant-refusal",
+                kind="assistant",
+                sequence_index=4,
+                content_payload={},
+                text=None,
+                reasoning=None,
+                refusal="I cannot do that.",
+            ),
+        ]
+    )
+
+    events = project_chatbot_events(snapshot)
+
+    assert [event.id for event in events] == [
+        "user-message",
+        "assistant-with-call",
+        "tool-call",
+        "assistant-refusal",
+    ]
+    assert events[1].reasoning == "Preparing the tool call."
+    assert events[2].source_message_ids == ["tool-call", "tool-result"]
+    assert events[3].refusal == "I cannot do that."
+
+
+def test_tool_failure_projection_uses_the_canonical_typed_value() -> None:
+    failure = ToolFailure(
+        code="query_invalid",
+        message="Binder error: relation sales_missing does not exist.",
+        details={"sql": "SELECT * FROM sales_missing"},
+        repair_hints=("Inspect the registered dataset aliases.",),
+    ).to_value()
+    snapshot = SimpleNamespace(
+        messages=[
+            SimpleNamespace(
+                id="tool-call",
+                kind="tool_call",
+                sequence_index=0,
+                content_payload={"tool_name": "data.query"},
+                tool_id="data.query",
+                arguments_payload={"sql": "SELECT * FROM sales_missing"},
+            ),
+            SimpleNamespace(
+                id="tool-result",
+                kind="tool_result",
+                sequence_index=1,
+                tool_call_message_id="tool-call",
+                result_status="failed",
+                value_payload=failure,
+                error_summary="legacy generic summary must not win",
+            ),
+        ]
+    )
+
+    event = project_chatbot_events(snapshot)[0]
+
+    assert event.tool_result_value == failure
+    detail = event.detail_blocks[0]["text"]
+    assert "Binder error: relation sales_missing does not exist." in detail
+    assert "legacy generic summary must not win" not in detail
+
+
+def test_dataset_block_is_structural_until_optional_source_enrichment() -> None:
+    snapshot = SimpleNamespace(
+        messages=[
+            SimpleNamespace(
+                id="user-message",
+                kind="user",
+                sequence_index=0,
+                content_payload={
+                    "blocks": [{"type": "dataset", "dataset_id": "dataset-1", "name": "Sales"}]
                 },
             )
         ]
-
-    def execute(
-        self,
-        tool_name: str,
-        arguments: dict[str, Any],
-        context: ToolExecutionContext,
-    ) -> ToolExecutionResult:
-        self.started.set()
-        while not context.cancel_requested():
-            time.sleep(0.01)
-        raise ValidationError("Agent run was cancelled.")
-
-
-def test_openai_compatible_provider_streams_sse_text_and_tool_calls(monkeypatch) -> None:
-    captured_payload: dict[str, Any] = {}
-
-    class FakeSSE:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb) -> None:
-            return None
-
-        def __iter__(self):
-            chunks = [
-                {"choices": [{"delta": {"content": "Hel"}}]},
-                {"choices": [{"delta": {"content": "lo"}}]},
-                {
-                    "choices": [
-                        {
-                            "delta": {
-                                "tool_calls": [
-                                    {
-                                        "index": 0,
-                                            "id": "call_data_query",
-                                            "type": "function",
-                                            "function": {
-                                                "name": "data_query",
-                                                "arguments": "{\"name\": \"",
-                                            },
-                                    }
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "choices": [
-                        {
-                            "delta": {
-                                "tool_calls": [
-                                    {
-                                        "index": 0,
-                                        "function": {
-                                            "arguments": "sample\"}",
-                                        },
-                                    }
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "choices": [],
-                    "usage": {
-                        "prompt_tokens": 1240,
-                        "completion_tokens": 260,
-                        "total_tokens": 1500,
-                        "prompt_tokens_details": {"cached_tokens": 400},
-                    },
-                },
-            ]
-            for chunk in chunks:
-                yield f"data: {json.dumps(chunk)}\n\n".encode("utf-8")
-            yield b"data: [DONE]\n\n"
-
-    def fake_urlopen(http_request, timeout):
-        captured_payload.update(json.loads(http_request.data.decode("utf-8")))
-        return FakeSSE()
-
-    monkeypatch.setattr("xenix.services.agent.providers.request.urlopen", fake_urlopen)
-    provider = OpenAICompatibleChatProvider(base_url="http://aimock.local", api_key="test", model="mock-model")
-    events = list(
-        provider.stream(
-            [
-                ProviderMessage(role="system", content="You are Xenix."),
-                ProviderMessage(role="user", content="Hello"),
-            ],
-            [
-                AgentToolSpec(
-                    name="data.query",
-                    provider_name="data_query",
-                    description="Query a dataset.",
-                    parameters_schema={
-                        "type": "object",
-                        "properties": {"name": {"type": "string"}},
-                        "additionalProperties": False,
-                    },
-                )
-            ],
-        )
     )
 
-    assert captured_payload["stream"] is True
-    assert captured_payload["stream_options"] == {"include_usage": True}
-    assert captured_payload["messages"][:2] == [
-        {"role": "system", "content": "You are Xenix."},
-        {"role": "user", "content": "Hello"},
-    ]
-    assert "".join(event.delta_text for event in events if event.is_delta) == "Hello"
-    assert sum(1 for event in events if event.is_tool_call_delta) == 2
-    final_response = [event.response for event in events if event.is_complete][0]
-    assert final_response is not None
-    assert final_response.assistant_content_blocks == [{"type": "markdown", "text": "Hello"}]
-    assert final_response.tool_calls[0].tool_name == "data.query"
-    assert final_response.tool_calls[0].arguments == {"name": "sample"}
-    assert final_response.usage_payload == {
-        "input_tokens": 1240,
-        "cached_input_tokens": 400,
-        "output_tokens": 260,
-        "total_tokens": 1500,
-        "provider_usage": {
-            "prompt_tokens": 1240,
-            "completion_tokens": 260,
-            "total_tokens": 1500,
-            "prompt_tokens_details": {"cached_tokens": 400},
-        },
-    }
-
-
-def test_openai_compatible_provider_omits_tool_choice_without_tools(monkeypatch) -> None:
-    captured_payload: dict[str, Any] = {}
-
-    class FakeResponse:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb) -> None:
-            return None
-
-        def read(self):
-            return json.dumps(
-                {
-                    "choices": [{"message": {"content": "complete"}}],
-                    "usage": {
-                        "prompt_tokens": 12,
-                        "completion_tokens": 5,
-                        "total_tokens": 17,
-                        "prompt_tokens_details": {"cached_tokens": 3},
-                    },
-                }
-            ).encode("utf-8")
-
-    def fake_urlopen(http_request, timeout):
-        captured_payload.update(json.loads(http_request.data.decode("utf-8")))
-        return FakeResponse()
-
-    monkeypatch.setattr("xenix.services.agent.providers.request.urlopen", fake_urlopen)
-    provider = OpenAICompatibleChatProvider(base_url="http://aimock.local", api_key="test", model="mock-model")
-
-    response = provider.complete([ProviderMessage(role="user", content="classify")], [])
-
-    assert response.assistant_content_blocks == [{"type": "markdown", "text": "complete"}]
-    assert response.usage_payload == {
-        "input_tokens": 12,
-        "cached_input_tokens": 3,
-        "output_tokens": 5,
-        "total_tokens": 17,
-        "provider_usage": {
-            "prompt_tokens": 12,
-            "completion_tokens": 5,
-            "total_tokens": 17,
-            "prompt_tokens_details": {"cached_tokens": 3},
-        },
-    }
-    assert "tools" not in captured_payload
-    assert "tool_choice" not in captured_payload
-
-
-def test_openai_compatible_provider_serializes_assistant_tool_calls_before_tool_result(monkeypatch) -> None:
-    captured_payload: dict[str, Any] = {}
-    tool_result_json = json.dumps(
+    events = project_chatbot_events(snapshot)
+    assert events[0].content_blocks == [
         {
-            "tool_name": "data.query",
-            "status": "succeeded",
-            "result": {"dataset_id": "dataset-1"},
-        },
-        ensure_ascii=False,
-    )
-
-    class FakeResponse:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb) -> None:
-            return None
-
-        def read(self):
-            return json.dumps({"choices": [{"message": {"content": "complete"}}]}).encode("utf-8")
-
-    def fake_urlopen(http_request, timeout):
-        captured_payload.update(json.loads(http_request.data.decode("utf-8")))
-        return FakeResponse()
-
-    monkeypatch.setattr("xenix.services.agent.providers.request.urlopen", fake_urlopen)
-    provider = OpenAICompatibleChatProvider(
-        provider_key="moonshot",
-        base_url="http://aimock.local",
-        api_key="test",
-        model="mock-model",
-    )
-
-    provider.complete(
-        [
-            ProviderMessage(role="user", content="inspect"),
-            ProviderMessage(
-                role="assistant",
-                content="",
-                provider_payload={
-                    "reasoning_content": "Need to inspect the dataset first.",
-                    "tool_calls": [
-                        {
-                            "id": "call-data-query",
-                            "type": "function",
-                            "function": {
-                                "name": "data_query",
-                                "arguments": "{\"dataset_id\": \"dataset-1\", \"sql\": \"SELECT * FROM input LIMIT 3\"}",
-                            },
-                        }
-                    ]
-                },
-            ),
-            ProviderMessage(
-                role="tool",
-                content=tool_result_json,
-                provider_payload={"tool_call_id": "call-data-query"},
-            ),
-        ],
-        [],
-    )
-
-    assert captured_payload["messages"] == [
-        {"role": "user", "content": "inspect"},
-        {
-            "role": "assistant",
-            "content": "",
-            "reasoning_content": "Need to inspect the dataset first.",
-            "tool_calls": [
-                {
-                    "id": "call-data-query",
-                    "type": "function",
-                    "function": {
-                        "name": "data_query",
-                        "arguments": "{\"dataset_id\": \"dataset-1\", \"sql\": \"SELECT * FROM input LIMIT 3\"}",
-                    },
-                }
-            ],
-        },
-        {
-            "role": "tool",
-            "content": tool_result_json,
-            "tool_call_id": "call-data-query",
-        },
+            "type": "dataset",
+            "dataset_id": "dataset-1",
+            "name": "Sales",
+            "row_count": None,
+            "column_count": None,
+        }
     ]
 
-
-def test_agent_harness_streams_assistant_as_message_events(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    context = StorageBootstrapService().initialize(paths)
-    usage_payload = {
-        "input_tokens": 12430,
-        "cached_input_tokens": 9800,
-        "output_tokens": 2630,
-        "total_tokens": 15060,
+    enriched = enrich_chatbot_events_with_source_attachments(
+        snapshot,
+        events,
+        lambda dataset_id: {
+            "file_name": "sales.csv",
+            "file_path": r"C:\private\sales.csv",
+            "is_openable": True,
+            "source_group_id": "source-1",
+        },
+    )
+    assert enriched[0].content_blocks[-1] == {
+        "type": "source_attachment",
+        "dataset_id": "dataset-1",
+        "chatbot_source_projection": True,
+        "is_openable": True,
+        "file_name": "sales.csv",
+        "source_group_id": "source-1",
+        "file_path": r"C:\private\sales.csv",
     }
-    harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        provider=StreamingProviderFixture("streamed assistant text", chunk_size=6, usage_payload=usage_payload),
-        tool_registry=EmptyToolRegistry(),
-        conversation_store=ConversationStore(context.session_factory),
-    )
-
-    events = list(harness.submit_user_turn_stream(SubmitUserTurnInput(text="show streaming")))
-    message_events = [
-        event
-        for event in events
-        if event.kind in {"message_created", "message_updated", "message_finalized"}
-    ]
-    assistant_events = [
-        event
-        for event in message_events
-        if event.message is not None and event.message.kind is AgentMessageKind.ASSISTANT
-    ]
-    activity_events = [
-        event.chatbot_event
-        for event in events
-        if event.kind == "chatbot_event"
-        and event.chatbot_event is not None
-        and event.chatbot_event.kind is ChatbotEventKind.ACTIVITY
-    ]
-    snapshot = events[-1].snapshot
-
-    assert [event.status for event in activity_events] == [ChatbotEventStatus.IN_PROGRESS]
-    assert activity_events[0].content_blocks == []
-    assert events.index(next(event for event in events if event.chatbot_event is activity_events[0])) < events.index(
-        assistant_events[0]
-    )
-    assert [event.kind for event in assistant_events][0] == "message_created"
-    assert [event.kind for event in assistant_events][-1] == "message_finalized"
-    assert len({event.message.id for event in assistant_events if event.message is not None}) == 1
-    assert assistant_events[0].message is not None
-    assert assistant_events[0].message.status is AgentMessageStatus.IN_PROGRESS
-    assert assistant_events[0].chatbot_event is not None
-    assert assistant_events[0].chatbot_event.status is ChatbotEventStatus.IN_PROGRESS
-    assert assistant_events[-1].message is not None
-    assert assistant_events[-1].message.status is AgentMessageStatus.COMPLETED
-    assert assistant_events[-1].chatbot_event is not None
-    assert assistant_events[-1].chatbot_event.status is ChatbotEventStatus.COMPLETED
-    assert assistant_events[-1].message.content_blocks == [{"type": "markdown", "text": "streamed assistant text"}]
-    assert snapshot is not None
-    assert events[0].kind == "snapshot"
-    assert events[0].is_final is False
-    assert events[-1].kind == "snapshot"
-    assert events[-1].is_final is True
-    assert snapshot.turns[0].status is AgentTurnStatus.ENDED
-    assert [message.kind for message in snapshot.messages] == [
-        AgentMessageKind.SYSTEM,
-        AgentMessageKind.USER,
-        AgentMessageKind.ASSISTANT,
-    ]
-    assert snapshot.messages[2].content_blocks == [{"type": "markdown", "text": "streamed assistant text"}]
-    assert snapshot.tool_calls == []
-    assert len(snapshot.provider_requests) == 1
-    provider_request = snapshot.provider_requests[0]
-    assert provider_request.status is AgentProviderRequestStatus.SUCCEEDED
-    assert provider_request.input_message_ids == [snapshot.messages[0].id, snapshot.messages[1].id]
-    assert provider_request.output_message_ids == [snapshot.messages[2].id]
-    assert provider_request.usage_payload == usage_payload
+    serialized = json.loads(enriched[0].model_dump_json())
+    assert r"C:\private\sales.csv" not in json.dumps(serialized)
+    assert "file_path" not in serialized["content_blocks"][-1]
 
 
-def test_agent_harness_keeps_thinking_during_tool_call_delta_stream(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home-tool-delta"))
-    paths = ensure_app_dirs(get_app_paths())
-    context = StorageBootstrapService().initialize(paths)
-    provider = BlockingToolCallDeltaStreamingProvider()
-    harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        provider=provider,
-        tool_registry=DummyToolRegistry(),
-        conversation_store=ConversationStore(context.session_factory),
-    )
-
-    stream = harness.submit_user_turn_stream(SubmitUserTurnInput(text="run a tool"))
-    first_event = next(stream)
-    activity_started = next(stream)
-    pulled_events: list[Any] = []
-    pull_errors: list[BaseException] = []
-
-    def pull_next_event() -> None:
-        try:
-            pulled_events.append(next(stream))
-        except BaseException as exc:
-            pull_errors.append(exc)
-
-    puller = threading.Thread(target=pull_next_event, daemon=True)
-    puller.start()
-    try:
-        assert provider.tool_delta_seen.wait(timeout=1)
-        time.sleep(0.05)
-        assert first_event.kind == "snapshot"
-        assert activity_started.chatbot_event is not None
-        assert activity_started.chatbot_event.kind is ChatbotEventKind.ACTIVITY
-        assert activity_started.chatbot_event.status is ChatbotEventStatus.IN_PROGRESS
-        assert pulled_events == []
-        assert pull_errors == []
-
-        provider.release_tool_call_stream.set()
-        puller.join(timeout=1)
-        assert pull_errors == []
-        assert len(pulled_events) == 1
-        tool_event = pulled_events[0]
-        assert tool_event.chatbot_event is not None
-        assert tool_event.chatbot_event.kind is ChatbotEventKind.TOOL
-        assert tool_event.chatbot_event.status is ChatbotEventStatus.PENDING
-
-        remaining_events = list(stream)
-        assert remaining_events[-1].is_final is True
-        snapshot = remaining_events[-1].snapshot
-        assert snapshot is not None
-        assert [tool.tool_name for tool in snapshot.tool_calls] == ["dummy.step"]
-    finally:
-        provider.release_tool_call_stream.set()
-
-
-def test_agent_harness_emits_activity_again_after_visible_tool_result(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home-second-activity"))
-    paths = ensure_app_dirs(get_app_paths())
-    context = StorageBootstrapService().initialize(paths)
-    provider = BlockingSecondActivityStreamingProvider()
-    harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        provider=provider,
-        tool_registry=DummyToolRegistry(),
-        conversation_store=ConversationStore(context.session_factory),
-    )
-
-    stream = harness.submit_user_turn_stream(SubmitUserTurnInput(text="run a two-step tool flow"))
-    first_event = next(stream)
-    first_activity = next(stream)
-    tool_pending = next(stream)
-    tool_completed = next(stream)
-    second_activity = next(stream)
-    pulled_events: list[Any] = []
-    pull_errors: list[BaseException] = []
-
-    def pull_next_event() -> None:
-        try:
-            pulled_events.append(next(stream))
-        except BaseException as exc:
-            pull_errors.append(exc)
-
-    puller = threading.Thread(target=pull_next_event, daemon=True)
-    puller.start()
-    try:
-        assert first_event.kind == "snapshot"
-        assert first_activity.chatbot_event is not None
-        assert first_activity.chatbot_event.kind is ChatbotEventKind.ACTIVITY
-        assert tool_pending.chatbot_event is not None
-        assert tool_pending.chatbot_event.kind is ChatbotEventKind.TOOL
-        assert tool_pending.chatbot_event.status is ChatbotEventStatus.PENDING
-        assert tool_completed.chatbot_event is not None
-        assert tool_completed.chatbot_event.kind is ChatbotEventKind.TOOL
-        assert tool_completed.chatbot_event.status is ChatbotEventStatus.COMPLETED
-        assert second_activity.chatbot_event is not None
-        assert second_activity.chatbot_event.kind is ChatbotEventKind.ACTIVITY
-        assert second_activity.chatbot_event.status is ChatbotEventStatus.IN_PROGRESS
-        assert second_activity.chatbot_event.id != first_activity.chatbot_event.id
-
-        assert provider.second_stream_entered.wait(timeout=1)
-        time.sleep(0.05)
-        assert pulled_events == []
-        assert pull_errors == []
-
-        provider.release_second_stream.set()
-        puller.join(timeout=1)
-        assert pull_errors == []
-        assert pulled_events
-        assert pulled_events[0].kind == "message_created"
-        assert pulled_events[0].chatbot_event is not None
-        assert pulled_events[0].chatbot_event.kind is ChatbotEventKind.TEXT
-    finally:
-        provider.release_second_stream.set()
-
-
-def test_agent_harness_stream_filters_tools_by_thread_files(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home-no-file"))
-    paths = ensure_app_dirs(get_app_paths())
-    context = StorageBootstrapService().initialize(paths)
-    provider = ToolCaptureStreamingProvider()
-    harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        provider=provider,
-        tool_registry=StaticSpecRegistry(),
-        conversation_store=ConversationStore(context.session_factory),
-    )
-
-    list(harness.submit_user_turn_stream(SubmitUserTurnInput(text="hello")))
-
-    tool_names = provider.tools_by_call[0]
-    assert "model.metadata" in tool_names
-    assert "model.task.query" in tool_names
-    assert "analysis.profile" not in tool_names
-    assert "analysis.graph" not in tool_names
-    assert "analysis.lambda" not in tool_names
-    assert "data.peek" not in tool_names
-    assert "model.train" not in tool_names
-    assert "model.hyper_train" not in tool_names
-    assert "model.apply" not in tool_names
-
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home-with-file"))
-    paths = ensure_app_dirs(get_app_paths())
-    context = StorageBootstrapService().initialize(paths)
-    provider = ToolCaptureStreamingProvider()
-    harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        provider=provider,
-        tool_registry=StaticSpecRegistry(),
-        conversation_store=ConversationStore(context.session_factory),
-    )
-
-    events = list(
-        harness.submit_user_turn_stream(
-            SubmitUserTurnInput(
-                text="inspect file",
-                dataset_attachments=[_dataset_attachment()],
+def test_source_enrichment_soft_fails_without_resolver_result() -> None:
+    snapshot = SimpleNamespace(
+        messages=[
+            SimpleNamespace(
+                id="user-message",
+                kind="user",
+                sequence_index=0,
+                content_payload={
+                    "blocks": [{"type": "dataset", "dataset_id": "dataset-1"}]
+                },
             )
-        )
+        ]
     )
+    events = project_chatbot_events(snapshot)
+    enriched = enrich_chatbot_events_with_source_attachments(snapshot, events, lambda _id: None)
+    assert enriched == events
 
-    tool_names = provider.tools_by_call[0]
-    assert "data.peek" not in tool_names
-    assert "data.integrate" not in tool_names
-    assert "analysis.profile" not in tool_names
-    assert "analysis.graph" in tool_names
-    assert "analysis.lambda" not in tool_names
-    assert "data.clean" in tool_names
-    assert "data.clean.metadata" in tool_names
-    assert "data.query" in tool_names
-    assert "data.transform" in tool_names
-    assert "model.train" not in tool_names
-    assert "model.hyper_train" not in tool_names
-    assert "model.apply" not in tool_names
 
-    list(
-        harness.submit_user_turn_stream(
-            SubmitUserTurnInput(
-                thread_id=events[-1].snapshot.thread.id,
-                text="inspect the same file again",
+def test_source_enrichment_only_deduplicates_the_same_import_group() -> None:
+    snapshot = SimpleNamespace(
+        messages=[
+            SimpleNamespace(
+                id="user-message",
+                kind="user",
+                sequence_index=0,
+                content_payload={
+                    "blocks": [
+                        {"type": "dataset", "dataset_id": "dataset-1", "name": "North sales"},
+                        {"type": "dataset", "dataset_id": "dataset-2", "name": "South sales"},
+                    ]
+                },
             )
-        )
+        ]
+    )
+    events = project_chatbot_events(snapshot)
+    enriched = enrich_chatbot_events_with_source_attachments(
+        snapshot,
+        events,
+        lambda dataset_id: {
+            "file_name": "sales.xlsx",
+            "file_path": rf"C:\{dataset_id}\sales.xlsx",
+            "is_openable": True,
+            "source_group_id": f"import-{dataset_id}",
+        },
     )
 
-    tool_names = provider.tools_by_call[1]
-    assert "data.peek" not in tool_names
-    assert "data.integrate" not in tool_names
-    assert "analysis.profile" not in tool_names
-    assert "analysis.graph" in tool_names
-    assert "analysis.lambda" not in tool_names
-    assert "data.clean" in tool_names
-    assert "data.clean.metadata" in tool_names
-    assert "data.query" in tool_names
-    assert "data.transform" in tool_names
-    assert "model.train" not in tool_names
-    assert "model.hyper_train" not in tool_names
-    assert "model.apply" not in tool_names
+    attachments = [
+        block
+        for block in enriched[0].content_blocks
+        if block.get("chatbot_source_projection")
+    ]
+    assert [block["source_group_id"] for block in attachments] == [
+        "import-dataset-1",
+        "import-dataset-2",
+    ]
 
 
-def test_agent_harness_stream_rejects_provider_tool_call_that_was_not_exposed(
+def test_source_enrichment_deduplicates_workbook_sheets_from_one_import() -> None:
+    snapshot = SimpleNamespace(
+        messages=[
+            SimpleNamespace(
+                id="user-message",
+                kind="user",
+                sequence_index=0,
+                content_payload={
+                    "blocks": [
+                        {"type": "dataset", "dataset_id": "north", "name": "North"},
+                        {"type": "dataset", "dataset_id": "south", "name": "South"},
+                    ]
+                },
+            )
+        ]
+    )
+    events = project_chatbot_events(snapshot)
+    enriched = enrich_chatbot_events_with_source_attachments(
+        snapshot,
+        events,
+        lambda _dataset_id: {
+            "file_name": "sales.xlsx",
+            "file_path": r"C:\imports\sales.xlsx",
+            "is_openable": True,
+            "source_group_id": "import-sales",
+        },
+    )
+
+    attachments = [
+        block
+        for block in enriched[0].content_blocks
+        if block.get("chatbot_source_projection")
+    ]
+    assert len(attachments) == 1
+    assert attachments[0]["source_group_id"] == "import-sales"
+
+
+def test_source_import_persists_only_dataset_context_and_reopens_when_source_is_missing(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
-    harness = AgentHarnessService(
+    source = tmp_path / "customers.csv"
+    source.write_text("customer,value\nAcme,12\n", encoding="utf-8")
+    provider = RecordingTextProvider()
+    conversation = LLMConversationService(
         session_factory=context.session_factory,
-        provider=HiddenToolCallStreamingProvider(),
-        tool_registry=StaticSpecRegistry(),
-        conversation_store=ConversationStore(context.session_factory),
+        tool_registry=AgentToolRegistry(),
     )
-    thread = harness.create_thread("Hidden streaming tool call")
-
-    with pytest.raises(ValidationError, match="not attached to this request"):
-        list(harness.submit_user_turn_stream(SubmitUserTurnInput(thread_id=thread.thread.id, text="train now")))
-
-    snapshot = harness.get_thread_snapshot(thread.thread.id)
-    assert snapshot.provider_requests[0].status is AgentProviderRequestStatus.FAILED
-    assert snapshot.tool_calls == []
-
-
-def test_agent_harness_projects_thread_system_prompt_as_first_provider_message(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    context = StorageBootstrapService().initialize(paths)
-    provider = CapturingProviderFixture()
     harness = AgentHarnessService(
-        session_factory=context.session_factory,
+        conversation_service=conversation,
         provider=provider,
-        tool_registry=EmptyToolRegistry(),
-        conversation_store=ConversationStore(context.session_factory),
+        dataset_service=DatasetService(context.session_factory, paths),
     )
 
-    snapshot = harness.submit_user_turn(
-        SubmitUserTurnInput(text="show me the data", interface_locale="zh_CN")
-    )
-
-    assert snapshot.messages[0].kind is AgentMessageKind.SYSTEM
-    assert snapshot.messages[1].kind is AgentMessageKind.USER
-    assert "Communicate with the user in zh_CN." in snapshot.thread.system_prompt
-    assert "business scenario, analysis object, data grain, field roles" in snapshot.thread.system_prompt
-    assert "business meaning, action recommendations, risk notes, and process trace" in snapshot.thread.system_prompt
-    assert provider.messages[0].role == "system"
-    assert provider.messages[0].content == snapshot.thread.system_prompt
-    assert provider.messages[0].source_message_id == snapshot.messages[0].id
-    assert provider.messages[1].role == "user"
-    assert provider.messages[1].content == "show me the data"
-
-
-def test_agent_harness_activates_skill_and_uses_returned_instructions(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    context = StorageBootstrapService().initialize(paths)
-    provider = SkillActivatingProviderFixture()
-    conversations = ConversationStore(context.session_factory)
-    harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        provider=provider,
-        tool_registry=EmptyToolRegistry(),
-        conversation_store=conversations,
-        skill_catalog=AgentSkillCatalog(
-            [
-                AgentSkill(
-                    name="tabular-analysis",
-                    description="Use for tabular business analysis.",
-                    body="Always mention the baseline before model tuning.",
-                    metadata={"version": "test"},
-                )
-            ]
-        ),
-    )
-
-    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="Analyze this spreadsheet."))
-    events = harness.project_chatbot_events(snapshot)
-
-    assert len(provider.messages_by_call) == 2
-    assert "agent.skill.activate" in provider.tools_by_call[0]
-    assert "agent.skill.activate" not in provider.tools_by_call[1]
-    assert any(
-        message.role == "system"
-        and "<available_agent_skills>" in message.content
-        and "tabular-analysis" in message.content
-        for message in provider.messages_by_call[0]
-    )
-    assert any(
-        message.role == "tool"
-        and "Always mention the baseline before model tuning." in message.content
-        for message in provider.messages_by_call[1]
-    )
-    assert [tool_call.tool_name for tool_call in snapshot.tool_calls] == ["agent.skill.activate"]
-    assert snapshot.tool_calls[0].result_payload is not None
-    assert snapshot.tool_calls[0].result_payload["skill_name"] == "tabular-analysis"
-    assert "Always mention the baseline" in snapshot.tool_calls[0].result_payload["instructions"]
-    assert [event.kind for event in events] == [ChatbotEventKind.TEXT, ChatbotEventKind.TEXT]
-    assert events[-1].content_blocks == [
-        {
-            "type": "markdown",
-            "text": "I will start with a baseline before considering model tuning.",
-        }
-    ]
-
-
-def test_agent_harness_projects_skill_tools_in_development(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    monkeypatch.setenv("XENIX_ENV", "development")
-    paths = ensure_app_dirs(get_app_paths())
-    context = StorageBootstrapService().initialize(paths)
-    provider = SkillActivatingProviderFixture()
-    conversations = ConversationStore(context.session_factory)
-    harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        provider=provider,
-        tool_registry=EmptyToolRegistry(),
-        conversation_store=conversations,
-        skill_catalog=AgentSkillCatalog(
-            [
-                AgentSkill(
-                    name="tabular-analysis",
-                    description="Use for tabular business analysis.",
-                    body="Always mention the baseline before model tuning.",
-                )
-            ]
-        ),
-    )
-
-    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="Analyze this spreadsheet."))
-    events = harness.project_chatbot_events(snapshot)
-
-    tool_events = [event for event in events if event.kind is ChatbotEventKind.TOOL]
-    assert [event.tool_name for event in tool_events] == ["agent.skill.activate"]
-    assert "Always mention the baseline" in tool_events[0].detail_blocks[0]["text"]
-
-
-def test_agent_harness_reads_activated_skill_resources(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    skill_root = tmp_path / "skills-does-not-exist"
-
-    paths = ensure_app_dirs(get_app_paths())
-    context = StorageBootstrapService().initialize(paths)
-    provider = SkillResourceReadingProviderFixture()
-    conversations = ConversationStore(context.session_factory)
-    harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        provider=provider,
-        tool_registry=EmptyToolRegistry(),
-        conversation_store=conversations,
-        skill_catalog=AgentSkillCatalog(
-            [
-                AgentSkill(
-                    name="tabular-analysis",
-                    description="Use for tabular business analysis.",
-                    body="Use the reference before answering.",
-                    resources={
-                        "references": {
-                            "references/routing.md": "Reference says: segment by margin band.",
-                        },
-                        "assets": {
-                            "assets/report-template.json": '{"template": "management-report"}',
-                        },
-                    },
-                )
-            ],
-        ),
-    )
-
-    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="Analyze this spreadsheet."))
-
-    assert not skill_root.exists()
-    assert len(provider.messages_by_call) == 4
-    assert "agent.skill.activate" in provider.tools_by_call[0]
-    assert "agent.skill.read_reference" not in provider.tools_by_call[0]
-    assert "agent.skill.read_asset" not in provider.tools_by_call[0]
-    assert "agent.skill.activate" not in provider.tools_by_call[1]
-    assert "agent.skill.read_reference" in provider.tools_by_call[1]
-    assert "agent.skill.read_asset" in provider.tools_by_call[1]
-    assert "Reference says: segment by margin band." in "\n".join(
-        message.content for message in provider.messages_by_call[2]
-    )
-    assert "management-report" in "\n".join(
-        message.content for message in provider.messages_by_call[3]
-    )
-    assert [tool_call.tool_name for tool_call in snapshot.tool_calls] == [
-        "agent.skill.activate",
-        "agent.skill.read_reference",
-        "agent.skill.read_asset",
-    ]
-    assert snapshot.tool_calls[0].result_payload is not None
-    assert snapshot.tool_calls[0].result_payload["resources"] == {
-        "references": ["references/routing.md"],
-        "assets": ["assets/report-template.json"],
-    }
-    assert snapshot.tool_calls[1].result_payload is not None
-    assert snapshot.tool_calls[1].result_payload["content"] == "Reference says: segment by margin band."
-    assert snapshot.tool_calls[2].result_payload is not None
-    assert snapshot.tool_calls[2].result_payload["content"] == '{"template": "management-report"}'
-    assert snapshot.messages[-1].content_blocks == [
-        {
-            "type": "markdown",
-            "text": "I used the reference and the management-report template.",
-        }
-    ]
-
-
-def test_agent_harness_uses_thread_title_model_for_implicit_thread(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    context = StorageBootstrapService().initialize(paths)
-    title_provider = ThreadTitleProviderFixture('"Churn Risk Review."')
-    harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        provider=CapturingProviderFixture(),
-        thread_title_provider=title_provider,
-        tool_registry=EmptyToolRegistry(),
-        conversation_store=ConversationStore(context.session_factory),
-    )
-
-    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="Please analyze why churn increased last month."))
-
-    assert snapshot.thread.title == "Churn Risk Review"
-    assert len(title_provider.messages_by_call) == 1
-    assert title_provider.messages_by_call[0][0].role == "system"
-    assert "Please analyze why churn increased last month." in title_provider.messages_by_call[0][1].content
-    assert len(snapshot.provider_requests) == 1
-
-
-def test_agent_harness_auto_titles_precreated_empty_thread(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    context = StorageBootstrapService().initialize(paths)
-    title_provider = ThreadTitleProviderFixture("Customer Segmentation")
-    harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        provider=CapturingProviderFixture(),
-        thread_title_provider=title_provider,
-        tool_registry=EmptyToolRegistry(),
-        conversation_store=ConversationStore(context.session_factory),
-    )
-    thread = harness.create_thread()
-
-    snapshot = harness.submit_user_turn(
-        SubmitUserTurnInput(
-            thread_id=thread.thread.id,
-            text="Group customers into practical market segments.",
-        )
-    )
-
-    assert snapshot.thread.title == "Customer Segmentation"
-    assert len(title_provider.messages_by_call) == 1
-
-
-def test_agent_harness_thread_title_falls_back_when_model_is_unconfigured(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    context = StorageBootstrapService().initialize(paths)
-    harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        provider=CapturingProviderFixture(),
-        tool_registry=EmptyToolRegistry(),
-        conversation_store=ConversationStore(context.session_factory),
-    )
-
-    snapshot = harness.submit_user_turn(
-        SubmitUserTurnInput(text="  Analyze weekly revenue by region and product.  ")
-    )
-
-    assert snapshot.thread.title == "Analyze weekly revenue by region and product"
-
-
-def test_agent_harness_thread_title_falls_back_when_model_fails(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    context = StorageBootstrapService().initialize(paths)
-    harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        provider=CapturingProviderFixture(),
-        thread_title_provider=FailingThreadTitleProvider(),
-        tool_registry=EmptyToolRegistry(),
-        conversation_store=ConversationStore(context.session_factory),
-    )
-
-    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="", dataset_attachments=[_dataset_attachment()]))
-
-    assert snapshot.thread.title == "Orders"
-
-
-def test_agent_harness_thread_title_does_not_overwrite_existing_title(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    context = StorageBootstrapService().initialize(paths)
-    harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        provider=CapturingProviderFixture(),
-        thread_title_provider=UnexpectedThreadTitleProvider(),
-        tool_registry=EmptyToolRegistry(),
-        conversation_store=ConversationStore(context.session_factory),
-    )
-    thread = harness.create_thread("Manual title")
-
-    snapshot = harness.submit_user_turn(
-        SubmitUserTurnInput(thread_id=thread.thread.id, text="This should not rename the thread.")
-    )
-
-    assert snapshot.thread.title == "Manual title"
-
-
-def test_agent_harness_generates_manual_thread_title_from_all_messages(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    context = StorageBootstrapService().initialize(paths)
-    harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        provider=CapturingProviderFixture(),
-        tool_registry=EmptyToolRegistry(),
-        conversation_store=ConversationStore(context.session_factory),
-    )
-    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="Summarize this quarter's revenue."))
-    title_provider = ThreadTitleProviderFixture("Quarterly Revenue Review")
-    harness.set_thread_title_provider(title_provider)
-
-    proposal = harness.generate_thread_title(snapshot.thread.id)
-
-    assert proposal == "Quarterly Revenue Review"
-    assert len(title_provider.messages_by_call) == 1
-    prompt = title_provider.messages_by_call[0][1].content
-    assert '"kind": "system"' in prompt
-    assert '"kind": "user"' in prompt
-    assert '"kind": "assistant"' in prompt
-    assert "Summarize this quarter's revenue." in prompt
-    assert "Done." in prompt
-
-
-def test_agent_harness_manual_thread_title_requires_configured_model(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    context = StorageBootstrapService().initialize(paths)
-    harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        provider=CapturingProviderFixture(),
-        tool_registry=EmptyToolRegistry(),
-        conversation_store=ConversationStore(context.session_factory),
-    )
-
-    with pytest.raises(ValidationError, match="Thread title model is not configured"):
-        harness.generate_thread_title("thread-id")
-
-
-def test_agent_harness_ends_turn_on_empty_provider_response(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    context = StorageBootstrapService().initialize(paths)
-    harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        provider=EmptyProviderFixture(),
-        tool_registry=EmptyToolRegistry(),
-        conversation_store=ConversationStore(context.session_factory),
-    )
-
-    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="wait for next input"))
-
-    assert snapshot.turns[0].status is AgentTurnStatus.ENDED
-    assert [message.kind for message in snapshot.messages] == [AgentMessageKind.SYSTEM, AgentMessageKind.USER]
-    assert snapshot.tool_calls == []
-
-
-def test_turn_completion_guard_persists_system_message_and_retries(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    context = StorageBootstrapService().initialize(paths)
-    provider = SequencedProviderFixture(
-        [
-            ProviderResponse(
-                assistant_content_blocks=[
-                    {
-                        "type": "markdown",
-                        "text": "Now let me check which classification models are available for training.",
-                    }
-                ],
-                tool_calls=[],
-            ),
-            ProviderResponse(
-                tool_calls=[
-                    ProviderToolCall(
-                        provider_call_id="call-dummy",
-                        tool_name="dummy.step",
-                        arguments={},
-                    )
-                ],
-            ),
-            ProviderResponse(
-                assistant_content_blocks=[{"type": "markdown", "text": "Done."}],
-                tool_calls=[],
-            ),
-        ]
-    )
-    guard_provider = GuardProviderFixture(
-        [
-            ("continue", "The assistant stated a next action."),
-            ("complete", "The assistant provided a final answer."),
-        ]
-    )
-    conversations = ConversationStore(context.session_factory)
-    harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        provider=provider,
-        turn_completion_guard_provider=guard_provider,
-        tool_registry=DummyToolRegistry(),
-        conversation_store=conversations,
-    )
-
-    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="predict churn"))
-
-    assert snapshot.turns[0].status is AgentTurnStatus.ENDED
-    assert [message.kind for message in snapshot.messages] == [
-        AgentMessageKind.SYSTEM,
-        AgentMessageKind.USER,
-        AgentMessageKind.ASSISTANT,
-        AgentMessageKind.SYSTEM,
-        AgentMessageKind.TOOL_CALL,
-        AgentMessageKind.TOOL_CALL_RESULT,
-        AgentMessageKind.ASSISTANT,
-    ]
-    assert "did not complete it" in snapshot.messages[3].content_blocks[0]["text"]
-    assert provider.messages_by_call[1][-1].role == "system"
-    assert "did not complete it" in provider.messages_by_call[1][-1].content
-    guard_rows = conversations.list_turn_completion_guards(snapshot.turns[0].id)
-    assert [row.attempt_index for row in guard_rows] == [0, 1]
-    assert guard_rows[0].input == {
-        "last_assistant_text": "Now let me check which classification models are available for training."
-    }
-    assert guard_rows[0].output["verdict"] == "continue"
-    assert guard_rows[1].output["verdict"] == "complete"
-    assert [tool.tool_name for tool in snapshot.tool_calls] == ["dummy.step"]
-
-
-def test_turn_completion_guard_stops_after_two_continue_retries(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    context = StorageBootstrapService().initialize(paths)
-    provider = SequencedProviderFixture(
-        [
-            ProviderResponse(
-                assistant_content_blocks=[{"type": "markdown", "text": "Now I will inspect the data."}],
-                tool_calls=[],
-            ),
-            ProviderResponse(
-                assistant_content_blocks=[{"type": "markdown", "text": "Now I will inspect the data."}],
-                tool_calls=[],
-            ),
-            ProviderResponse(
-                assistant_content_blocks=[{"type": "markdown", "text": "Now I will inspect the data."}],
-                tool_calls=[],
-            ),
-        ]
-    )
-    guard_provider = GuardProviderFixture(
-        [
-            ("continue", "Still promises action."),
-            ("continue", "Still promises action."),
-        ]
-    )
-    conversations = ConversationStore(context.session_factory)
-    harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        provider=provider,
-        turn_completion_guard_provider=guard_provider,
-        tool_registry=EmptyToolRegistry(),
-        conversation_store=conversations,
-    )
-
-    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="inspect data"))
-
-    assert snapshot.turns[0].status is AgentTurnStatus.ENDED
-    assert [message.kind for message in snapshot.messages] == [
-        AgentMessageKind.SYSTEM,
-        AgentMessageKind.USER,
-        AgentMessageKind.ASSISTANT,
-        AgentMessageKind.SYSTEM,
-        AgentMessageKind.ASSISTANT,
-        AgentMessageKind.SYSTEM,
-        AgentMessageKind.ASSISTANT,
-    ]
-    assert len(provider.messages_by_call) == 3
-    guard_rows = conversations.list_turn_completion_guards(snapshot.turns[0].id)
-    assert [row.output["verdict"] for row in guard_rows] == ["continue", "continue"]
-    assert snapshot.tool_calls == []
-
-
-def test_agent_harness_pauses_for_step_budget_confirmation_and_resumes(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    context = StorageBootstrapService().initialize(paths)
-    provider = BudgetedProviderFixture()
-    conversations = ConversationStore(context.session_factory)
-    harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        provider=provider,
-        tool_registry=BudgetedRegistry(),
-        conversation_store=conversations,
-        initial_step_limit=1,
-        step_extension_limit=2,
-        max_total_steps=4,
-    )
-
-    events = list(harness.submit_user_turn_stream(SubmitUserTurnInput(text="run a long task")))
-    pause_event = events[-1]
-    paused_snapshot = pause_event.snapshot
-
-    assert pause_event.kind == "step_confirmation_required"
-    assert pause_event.used_steps == 1
-    assert pause_event.suggested_steps == 2
-    assert pause_event.thread_id is not None
-    assert pause_event.turn_id is not None
-    assert pause_event.run_id is not None
-    assert paused_snapshot is not None
-    assert paused_snapshot.turns[0].status is AgentTurnStatus.OPEN
-    assert any(
-        block.get("type") == "step_confirmation"
-        for message in paused_snapshot.messages
-        for block in message.content_blocks
-    )
-    assert conversations.get_run(pause_event.run_id).status is AgentRunStatus.AWAITING_CONFIRMATION
-    message_events = [
-        event
-        for event in events
-        if event.kind == "message_created" and event.message is not None
-    ]
-    assert [event.message.kind for event in message_events] == [
-        AgentMessageKind.ASSISTANT,
-        AgentMessageKind.TOOL_CALL,
-        AgentMessageKind.TOOL_CALL_RESULT,
-        AgentMessageKind.SYSTEM,
-    ]
-    tool_events = [
-        event.chatbot_event
-        for event in message_events
-        if event.chatbot_event is not None and event.chatbot_event.kind is ChatbotEventKind.TOOL
-    ]
-    assert [event.status for event in tool_events] == [
-        ChatbotEventStatus.PENDING,
-        ChatbotEventStatus.COMPLETED,
-    ]
-    assert tool_events[0].id == tool_events[1].id
-
-    resumed_events = list(
-        harness.continue_step_budget_stream(
-            ContinueStepBudgetInput(
-                thread_id=pause_event.thread_id,
-                turn_id=pause_event.turn_id,
-                run_id=pause_event.run_id,
-                additional_steps=pause_event.suggested_steps,
+    stream = list(
+        harness.submit_user_turn_stream(
+            SubmitUserTurnInput(
+                text="Analyze this source.",
+                source_attachments=[SourceAttachmentInput(file_path=str(source))],
             )
         )
     )
-    resumed_snapshot = resumed_events[-1].snapshot
+    initial = next(event for event in stream if event.kind == "snapshot" and not event.is_final)
+    assert initial.snapshot is not None
+    user_message = initial.snapshot.messages[0]
+    canonical_blocks = blocks_from_payload(user_message.content_payload)
 
-    assert resumed_events[0].kind == "snapshot"
-    assert resumed_events[0].is_final is False
-    assert resumed_snapshot is not None
-    assert resumed_snapshot.turns[0].status is AgentTurnStatus.ENDED
-    assert conversations.get_run(pause_event.run_id).status is AgentRunStatus.SUCCEEDED
-    assert [tool.tool_name for tool in resumed_snapshot.tool_calls] == ["dummy.step"]
-    assert provider.calls == 2
+    assert [type(block) for block in canonical_blocks] == [TextBlock, DatasetBlock]
+    dataset = canonical_blocks[1]
+    assert isinstance(dataset, DatasetBlock)
+    assert set(dataset.to_json()) == {
+        "type",
+        "dataset_id",
+        "name",
+        "row_count",
+        "column_count",
+    }
+    assert "customers.csv" not in str(user_message.content_payload)
+    assert str(source) not in str(user_message.content_payload)
+    assert all(
+        not isinstance(block, SourceAttachmentBlock)
+        for message in provider.messages
+        for block in message.content_blocks
+    )
+
+    assert initial.chatbot_events is not None
+    user_event = next(event for event in initial.chatbot_events if event.id == user_message.id)
+    attachment = next(
+        block
+        for block in user_event.content_blocks
+        if block.get("type") == "source_attachment" and block.get("chatbot_source_projection")
+    )
+    assert attachment["file_name"] == "customers.csv"
+    assert attachment["file_path"] == str(source)
+    assert attachment["is_openable"] is True
+
+    source.unlink()
+    reopened = AgentHarnessService(
+        conversation_service=LLMConversationService(
+            session_factory=context.session_factory,
+            tool_registry=AgentToolRegistry(),
+        ),
+        dataset_service=DatasetService(context.session_factory, paths),
+    )
+    reopened_snapshot = reopened.get_thread_snapshot(initial.snapshot.thread.id)
+    reopened_user_event = next(
+        event
+        for event in reopened.project_chatbot_events(reopened_snapshot)
+        if event.id == user_message.id
+    )
+    unavailable = next(
+        block
+        for block in reopened_user_event.content_blocks
+        if block.get("type") == "source_attachment" and block.get("chatbot_source_projection")
+    )
+    assert unavailable["file_name"] == "customers.csv"
+    assert unavailable["file_path"] is None
+    assert unavailable["is_openable"] is False
 
 
-def test_agent_harness_locks_model_for_step_budget_resume(monkeypatch, tmp_path: Path) -> None:
+def test_source_import_progress_is_path_free_and_precedes_append_ack_and_thinking(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
-    llm_service = SwitchingLLMServiceFixture()
+    source = tmp_path / "progress.csv"
+    source.write_text("customer,value\nAcme,12\n", encoding="utf-8")
+    submission_id = "import-progress"
     harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        llm_service=llm_service,
-        tool_registry=BudgetedRegistry(),
-        conversation_store=ConversationStore(context.session_factory),
-        initial_step_limit=1,
-        step_extension_limit=2,
-        max_total_steps=4,
+        conversation_service=LLMConversationService(
+            session_factory=context.session_factory,
+            tool_registry=AgentToolRegistry(),
+        ),
+        provider=RecordingTextProvider(),
+        dataset_service=DatasetService(context.session_factory, paths),
     )
 
     events = list(
         harness.submit_user_turn_stream(
-            SubmitUserTurnInput(text="run a long task", fq_model_key="openai/first")
-        )
-    )
-    pause_event = events[-1]
-    assert pause_event.thread_id is not None
-    assert pause_event.turn_id is not None
-    assert pause_event.run_id is not None
-
-    harness.set_thread_model(pause_event.thread_id, "openai/second")
-    resumed_events = list(
-        harness.continue_step_budget_stream(
-            ContinueStepBudgetInput(
-                thread_id=pause_event.thread_id,
-                turn_id=pause_event.turn_id,
-                run_id=pause_event.run_id,
-                additional_steps=pause_event.suggested_steps,
+            SubmitUserTurnInput(
+                text="Analyze this source.",
+                source_attachments=[SourceAttachmentInput(file_path=str(source))],
+                client_submission_id=submission_id,
             )
         )
     )
-    resumed_snapshot = resumed_events[-1].snapshot
 
-    assert resumed_snapshot is not None
-    assert resumed_snapshot.thread.selected_fq_model_key == "openai/second"
-    assert llm_service.build_requests == ["openai/first", "openai/first"]
-    assert llm_service.first_provider.calls == 2
-    assert llm_service.second_provider.calls == 0
-    assert [request.model for request in resumed_snapshot.provider_requests] == ["first", "first"]
+    import_events = [event for event in events if event.kind == "attachment_import"]
+    assert len(import_events) == 1
+    progress_event = import_events[0]
+    assert progress_event.thread_id is not None
+    assert progress_event.client_submission_id == submission_id
+    assert progress_event.attachment_import is not None
+    assert progress_event.attachment_import.source_index == 0
+    assert progress_event.attachment_import.status is AttachmentImportStatus.PENDING
+    assert progress_event.snapshot is None
+    assert progress_event.chatbot_event is None
+    assert progress_event.chatbot_events is None
+    assert progress_event.is_final is False
+    assert str(source) not in repr(progress_event)
+
+    import_index = events.index(progress_event)
+    append_ack_index = next(
+        index
+        for index, event in enumerate(events)
+        if event.kind == "snapshot" and not event.is_final
+    )
+    thinking_index = next(index for index, event in enumerate(events) if event.kind == "thinking")
+    assert import_index < append_ack_index < thinking_index
+    append_ack = events[append_ack_index]
+    assert append_ack.snapshot is not None
+    assert append_ack.snapshot.messages[0].kind.value == "user"
 
 
-def test_agent_harness_projects_llm_retry_connection_event(monkeypatch, tmp_path: Path) -> None:
+def test_source_import_pending_is_visible_while_materialization_blocks_append_and_sampling(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
-    llm_service = RetryingLLMServiceFixture()
+    source = tmp_path / "blocked.csv"
+    source.write_text("customer,value\nAcme,12\n", encoding="utf-8")
+    importer = BlockingImportDatasetService()
+    provider = RecordingTextProvider()
     harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        llm_service=llm_service,
-        tool_registry=BudgetedRegistry(),
-        conversation_store=ConversationStore(context.session_factory),
+        conversation_service=LLMConversationService(
+            session_factory=context.session_factory,
+            tool_registry=AgentToolRegistry(),
+        ),
+        provider=provider,
+        dataset_service=importer,  # type: ignore[arg-type]
     )
 
-    events = list(harness.submit_user_turn_stream(SubmitUserTurnInput(text="draw a chart")))
-    live_connection_events = [
-        event.chatbot_event
-        for event in events
-        if event.kind == "chatbot_event"
-        and event.chatbot_event is not None
-        and event.chatbot_event.kind is ChatbotEventKind.CONNECTION
-    ]
-    final_snapshot = events[-1].snapshot
-
-    assert [event.status for event in live_connection_events] == [
-        ChatbotEventStatus.IN_PROGRESS,
-        ChatbotEventStatus.COMPLETED,
-    ]
-    assert live_connection_events[-1].summary == "llm_connection_retry"
-    assert final_snapshot is not None
-    projected_connection = [
-        event
-        for event in harness.project_chatbot_events(final_snapshot)
-        if event.kind is ChatbotEventKind.CONNECTION
-    ]
-    assert projected_connection == []
-    provider_request = final_snapshot.provider_requests[0]
-    assert provider_request.usage_payload is not None
-    assert provider_request.usage_payload["retry_events"][0]["error_code"] == (
-        "llm_tool_arguments_invalid_json"
+    stream = harness.submit_user_turn_stream(
+        SubmitUserTurnInput(
+            text="Analyze this source.",
+            source_attachments=[SourceAttachmentInput(file_path=str(source))],
+            client_submission_id="blocked-import",
+        )
     )
+    pending = next(stream)
 
+    assert pending.kind == "attachment_import"
+    assert pending.client_submission_id == "blocked-import"
+    assert pending.attachment_import is not None
+    assert pending.attachment_import.status is AttachmentImportStatus.PENDING
+    assert pending.attachment_import.source_index == 0
+    assert str(source) not in repr(pending)
+    assert not importer.started.is_set()
 
-def test_connection_retry_snapshot_projection_keeps_failed_request_only() -> None:
-    retry_events = [
-        {
-            "attempt_number": 2,
-            "max_attempts": 5,
-            "error_code": "llm_network_error",
-            "error_summary": "Network dropped.",
-        }
-    ]
-    succeeded_request = AgentProviderRequestRow(
-        id="provider-success",
-        thread_id="thread",
-        turn_id="turn",
-        status=AgentProviderRequestStatus.SUCCEEDED,
-        usage_payload={"retry_events": retry_events},
+    outcome: list[object] = []
+    errors: list[Exception] = []
+
+    def consume() -> None:
+        try:
+            outcome.extend(stream)
+        except Exception as exc:  # Surface worker failures in the test thread.
+            errors.append(exc)
+
+    worker = threading.Thread(target=consume, daemon=True)
+    worker.start()
+    assert importer.started.wait(timeout=2)
+    assert pending.thread_id is not None
+    assert harness.get_thread_snapshot(pending.thread_id).messages == []
+    assert provider.messages == []
+    assert not any(event.kind == "thinking" for event in outcome)
+
+    importer.release.set()
+    worker.join(timeout=3)
+
+    assert not worker.is_alive()
+    assert errors == []
+    events = [pending, *outcome]
+    append_ack_index = next(
+        index
+        for index, event in enumerate(events)
+        if event.kind == "snapshot" and not event.is_final
     )
-    failed_request = AgentProviderRequestRow(
-        id="provider-failed",
-        thread_id="thread",
-        turn_id="turn",
-        status=AgentProviderRequestStatus.FAILED,
-        usage_payload={"retry_events": retry_events},
-    )
-
-    events = project_turn_connection_events(
-        turn_id="turn",
-        provider_requests=[succeeded_request, failed_request],
-    )
-
-    assert len(events) == 1
-    assert events[0].id == "provider-failed:connection"
-    assert events[0].kind is ChatbotEventKind.CONNECTION
-    assert events[0].status is ChatbotEventStatus.FAILED
-    assert events[0].detail_blocks[0]["retry_events"][0]["error_code"] == "llm_network_error"
+    thinking_index = next(index for index, event in enumerate(events) if event.kind == "thinking")
+    assert append_ack_index < thinking_index
 
 
-def test_agent_harness_cancel_run_stops_active_tool_call(monkeypatch, tmp_path: Path) -> None:
+def test_source_import_failure_emits_path_free_failed_event_without_append_or_thinking(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
-    registry = BlockingToolRegistry()
+    source = tmp_path / "missing.csv"
+    submission_id = "import-failure"
     harness = AgentHarnessService(
-        session_factory=context.session_factory,
-        provider=BlockingToolProvider(),
-        tool_registry=registry,
-        conversation_store=ConversationStore(context.session_factory),
+        conversation_service=LLMConversationService(
+            session_factory=context.session_factory,
+            tool_registry=AgentToolRegistry(),
+        ),
+        provider=TextProvider(),
+        dataset_service=DatasetService(context.session_factory, paths),
     )
-    events: list[Any] = []
 
-    def run_harness() -> None:
-        for event in harness.submit_user_turn_stream(SubmitUserTurnInput(text="start blocking tool")):
-            events.append(event)
+    stream = harness.submit_user_turn_stream(
+        SubmitUserTurnInput(
+            text="Analyze this source.",
+            source_attachments=[SourceAttachmentInput(file_path=str(source))],
+            client_submission_id=submission_id,
+        )
+    )
+    pending = next(stream)
+    failed = next(stream)
 
-    thread = threading.Thread(target=run_harness)
-    thread.start()
-    assert registry.started.wait(timeout=5)
-    run_id = next(event.run_id for event in events if event.kind == "snapshot" and not event.is_final)
+    assert pending.kind == failed.kind == "attachment_import"
+    assert pending.thread_id == failed.thread_id
+    assert pending.client_submission_id == failed.client_submission_id == submission_id
+    assert pending.attachment_import is not None
+    assert failed.attachment_import is not None
+    assert pending.attachment_import.status is AttachmentImportStatus.PENDING
+    assert failed.attachment_import.status is AttachmentImportStatus.FAILED
+    assert pending.attachment_import.source_index == failed.attachment_import.source_index == 0
+    assert str(source) not in repr(pending)
+    assert str(source) not in repr(failed)
 
-    harness.cancel_run(run_id)
-    thread.join(timeout=5)
+    with pytest.raises(ValidationError):
+        next(stream)
 
-    assert not thread.is_alive()
-    snapshot = events[-1].snapshot
-    assert snapshot is not None
-    assert snapshot.turns[0].status is AgentTurnStatus.CANCELLED
-    assert snapshot.tool_calls[0].status is AgentToolCallStatus.CANCELLED
-    assert ConversationStore(context.session_factory).get_run(run_id).status is AgentRunStatus.CANCELLED
-
-
-def test_streaming_provider_fixture_can_return_non_streaming_response() -> None:
-    provider = StreamingProviderFixture("same fixture content", chunk_size=4)
-
-    response = provider.complete([], EmptyToolRegistry().list_specs())
-    events = list(provider.stream([], EmptyToolRegistry().list_specs()))
-
-    assert response.assistant_content_blocks == [{"type": "markdown", "text": "same fixture content"}]
-    assert "".join(event.delta_text for event in events if isinstance(event, ProviderStreamEvent)) == "same fixture content"
+    assert pending.thread_id is not None
+    snapshot = harness.get_thread_snapshot(pending.thread_id)
+    assert snapshot.messages == []
