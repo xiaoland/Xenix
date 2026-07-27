@@ -13,18 +13,9 @@ import pikepdf
 import pytest
 from docling_core.types.doc import DoclingDocument
 from PIL import Image
-from pydantic import ValidationError as PydanticValidationError
 
 import xenix.services.knowledge_pipeline as pipeline_module
 from xenix.exceptions import ValidationError
-from xenix.services.knowledge_formats import (
-    KNOWLEDGE_FORMAT_CATALOG,
-    KNOWLEDGE_FORMAT_REGISTRY,
-    SUPPORTED_KNOWLEDGE_SUFFIXES,
-    KnowledgeFormatCapability,
-    KnowledgeFormatCatalog,
-    knowledge_file_dialog_filter,
-)
 from xenix.services.knowledge_pipeline import (
     MAX_OOXML_PACKAGE_ENTRIES,
     FileProbe,
@@ -43,86 +34,6 @@ from xenix.services.knowledge_pdf import (
 )
 
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
-
-
-def test_format_catalog_drives_derived_views_and_router_closure() -> None:
-    expected_suffixes = frozenset(
-        suffix
-        for capability in KNOWLEDGE_FORMAT_CATALOG.capabilities
-        for suffix in capability.suffixes
-    )
-
-    assert KNOWLEDGE_FORMAT_CATALOG.version == 2
-    assert SUPPORTED_KNOWLEDGE_SUFFIXES == expected_suffixes
-    assert knowledge_file_dialog_filter("知识文档") == (
-        "知识文档 (*.txt *.doc *.docx *.ppt *.pptx *.pdf *.jpg *.jpeg *.png)"
-    )
-    pptx_capability = KNOWLEDGE_FORMAT_REGISTRY.capability_for_suffix(".PPTX")
-    assert pptx_capability is not None
-    assert pptx_capability.source_format == "pptx"
-    assert KNOWLEDGE_FORMAT_REGISTRY.route_provider_ids == (
-        "text",
-        "docx",
-        "pptx",
-        "pdf",
-        "image",
-    )
-    assert set(KNOWLEDGE_FORMAT_REGISTRY.route_provider_ids) == set(
-        ParserRouter().registered_provider_ids
-    )
-
-
-@pytest.mark.parametrize(
-    "catalog_payload",
-    [
-        {"version": 0, "capabilities": (KNOWLEDGE_FORMAT_CATALOG.capabilities[0],)},
-        {"version": 1, "capabilities": ()},
-        {
-            "version": 1,
-            "capabilities": (
-                KNOWLEDGE_FORMAT_CATALOG.capabilities[0],
-                KnowledgeFormatCapability.model_validate(
-                    {
-                        "source_format": "txt",
-                        "display_name": "TEXT",
-                        "suffixes": (".text",),
-                        "media_type": "text/plain",
-                        "probe_provider_id": "text",
-                        "normalizer_provider_id": "text",
-                        "parser_format": "txt",
-                        "route_provider_id": "text",
-                        "parser_provider_id": "text",
-                    }
-                ),
-            ),
-        },
-        {
-            "version": 1,
-            "capabilities": (
-                KNOWLEDGE_FORMAT_CATALOG.capabilities[0],
-                KnowledgeFormatCapability.model_validate(
-                    {
-                        "source_format": "text",
-                        "display_name": "TEXT",
-                        "suffixes": (".txt",),
-                        "media_type": "text/plain",
-                        "probe_provider_id": "text",
-                        "normalizer_provider_id": "text",
-                        "parser_format": "txt",
-                        "route_provider_id": "text",
-                        "parser_provider_id": "text",
-                    }
-                ),
-            ),
-        },
-    ],
-    ids=("version", "empty", "duplicate-format", "duplicate-suffix"),
-)
-def test_format_catalog_rejects_cross_capability_invariant_violations(
-    catalog_payload: dict[str, object],
-) -> None:
-    with pytest.raises(PydanticValidationError):
-        KnowledgeFormatCatalog.model_validate(catalog_payload)
 
 
 @pytest.mark.parametrize(

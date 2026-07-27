@@ -8,12 +8,11 @@ from uuid import uuid4
 
 import jieba
 import pandas as pd
-from pydantic import Field
-from sqlmodel import SQLModel
 
 from ..config import AppPaths
 from ..exceptions import ValidationError
 from ..observability import record_counter, record_histogram, start_span
+from .data_tokenization_contracts import TokenizeDatasetInput, TokenizeDatasetResult
 from .dataset_inspection import detect_source_format
 from .storage.models import DatasetSourceFormat
 from .tabular import (
@@ -23,7 +22,6 @@ from .tabular import (
 )
 
 _TOKENIZER_PROFILE = "zh_business_v1"
-_OUTPUT_MODES = {"token_text", "token_rows"}
 _TOKEN_KEEP_RE = re.compile(r"[\u4e00-\u9fffA-Za-z0-9]+")
 _ZH_BUSINESS_STOPWORDS = {
     "的",
@@ -54,22 +52,6 @@ _ZH_BUSINESS_STOPWORDS = {
 }
 
 
-class TokenizeDatasetInput(SQLModel):
-    source_path: str
-    name: str
-    text_column: str | None = None
-    text_column_index: object | None = None
-    output: str = "token_text"
-    tokenizer_profile: str = _TOKENIZER_PROFILE
-    id_columns: list[str] | None = None
-    id_column_indexes: object | None = None
-
-
-class TokenizeDatasetResult(SQLModel):
-    output_path: str
-    report: dict[str, object] = Field(default_factory=dict)
-
-
 class DataTokenizationService:
     def __init__(self, paths: AppPaths) -> None:
         self._paths = paths
@@ -87,8 +69,8 @@ class DataTokenizationService:
             if source_format is DatasetSourceFormat.UNKNOWN:
                 raise ValidationError("Only .csv, .parquet, .xlsx, and .xls dataset files are supported.")
 
-            output_mode = self._normalize_output(input_data.output)
-            tokenizer_profile = self._normalize_profile(input_data.tokenizer_profile)
+            output_mode = input_data.output
+            tokenizer_profile = input_data.tokenizer_profile
             loaded = load_pandas_frame_with_schema(source_path, source_format)
             frame = loaded.frame
             if len(frame.columns) == 0:
@@ -146,24 +128,12 @@ class DataTokenizationService:
             unit="ms",
         )
 
-    def _normalize_output(self, value: str) -> str:
-        normalized = str(value or "").strip()
-        if normalized not in _OUTPUT_MODES:
-            raise ValidationError("data.tokenize output must be token_text or token_rows.")
-        return normalized
-
-    def _normalize_profile(self, value: str) -> str:
-        normalized = str(value or "").strip()
-        if normalized != _TOKENIZER_PROFILE:
-            raise ValidationError(f"data.tokenize tokenizer_profile must be {_TOKENIZER_PROFILE}.")
-        return normalized
-
     def _text_column(
         self,
         frame: pd.DataFrame,
         schema: TabularSchema,
         raw_column: str | None,
-        raw_index: object | None,
+        raw_index: int | None,
     ) -> str:
         if raw_column is not None and raw_index is not None:
             raise ValidationError("data.tokenize must use either text_column or text_column_index, not both.")
@@ -186,17 +156,13 @@ class DataTokenizationService:
         frame: pd.DataFrame,
         schema: TabularSchema,
         raw_columns: list[str] | None,
-        raw_indexes: object | None,
+        raw_indexes: list[int] | None,
         *,
         text_column: str,
     ) -> list[str]:
         if raw_columns is not None and raw_indexes is not None:
             raise ValidationError("data.tokenize must use either id_columns or id_column_indexes, not both.")
         if raw_indexes is not None:
-            if not isinstance(raw_indexes, list):
-                raise ValidationError(
-                    "data.tokenize id_column_indexes must be a list of zero-based integer column indexes."
-                )
             normalized = [
                 self._column_at_index(schema, value, "id_column_indexes")
                 for value in raw_indexes
@@ -215,7 +181,7 @@ class DataTokenizationService:
             seen.add(column)
         return normalized
 
-    def _column_at_index(self, schema: TabularSchema, value: object, field_name: str) -> str:
+    def _column_at_index(self, schema: TabularSchema, value: int, field_name: str) -> str:
         return resolve_tabular_column_index(
             schema,
             value,

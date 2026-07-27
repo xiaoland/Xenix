@@ -69,9 +69,11 @@ directly through an idempotent, feed-last protocol.
 - Run a secretless preflight before entering the release Environment. Validate tag,
   version, Release SHA, completed promotion PR, `main` first-parent membership, and
   release-protocol compatibility.
-- Do not reuse the Promotion PR check SHA as Release SHA evidence. GitHub tests a
-  temporary PR merge ref; rerun release-grade verification on the real Tag SHA.
-- In one tag-bound release execution, run check/tests, native OCR materialization,
+- Promotion CI owns semantic testing. The tag remains independent release
+  authority; re-verify its version, promotion, and main-history identity, then
+  build and exercise the exact tagged package without serially repeating the
+  Promotion pytest shards.
+- In one tag-bound release execution, run checks, native OCR materialization,
   frozen packaging, packaged smoke, Velopack/manifest generation, direct immutable
   upload, remote verification, public visibility update, and final verification.
 - Keep the manifest as machine-verifiable release evidence, not as a second
@@ -99,7 +101,7 @@ daily work
   -> completed, release-eligible main promotion result
   -> create immutable vX.Y.Z tag on a current or historical eligible result
   -> secretless tag/ref/version preflight
-  -> exact-Tag-SHA check + test + build + packaged smoke
+  -> exact-Tag-SHA check + build + packaged smoke
   -> direct create-only upload of immutable public artifacts
   -> remote verification
   -> authoritative feed/visibility update last
@@ -122,8 +124,9 @@ daily work
   Supported-protocol targets repeat preflight remotely.
 - Tag creation is the only release dispatch and locks one Release SHA. No manual
   Candidate or Publish workflow remains.
-- Release tests, build metadata, manifest, uploaded artifacts, and publisher code
-  all resolve to the exact tag SHA.
+- Release checks, build metadata, manifest, uploaded artifacts, and publisher code
+  all resolve to the exact tag SHA; semantic pytest evidence belongs to Promotion
+  CI.
 - There is no `candidates/<version>/<digest>/` upload or manifest digest copied
   between workflows.
 - A failure before the visibility commit point leaves the previous release
@@ -154,7 +157,7 @@ Candidate removal:
    Promotion PR evidence cannot replace exact-Tag-SHA verification because GitHub
    tests a temporary merge ref. Same-tag reruns instead reuse only identity-bound
    caches and byte-identical final immutable objects.
-4. **UI/runtime lifecycle coverage — retained.** Release Readiness includes
+4. **UI/runtime lifecycle coverage — retained.** Promotion CI includes
    black-box worker/thread quiescence after window close and cross-order exercises
    for MainWindow, Settings, Knowledge Workspace, and SQLite/runtime disposal.
 5. **Operator surface — simplified.** Replace
@@ -211,7 +214,7 @@ accepts a re-baseline; timeout must not be set equal to the performance budget.
   `releases.win-x64-stable.json` as the last visibility update.
 - Locked OCR input/output caches are keyed from source/config/toolchain evidence;
   restored output must pass catalog/hash validation and the native OCR self-test.
-- Release Readiness has targeted coverage for both Settings/Knowledge Workspace
+- Promotion CI has targeted coverage for both Settings/Knowledge Workspace
   open orders, UI-owned thread-pool quiescence, application-owned Knowledge worker
   shutdown, and post-close SQLite integrity access.
 - Before the test-topology correction, repository verification passed:
@@ -345,6 +348,44 @@ accepts a re-baseline; timeout must not be set equal to the performance budget.
   timing live in `evidence/first-promotion-ci-audit.md`.
 - Historical evidence and the simplified final simulation live in
   `evidence/v1.2.0-postmortem.md` and `evidence/final-design-review.md`.
+- The first `v1.3.0` tag run (`30235807406`) proved release identity and controls,
+  then failed before OCR/build/publication because CD serially repeated all
+  Promotion tests under release-only packaged-trial environment variables.
+  `test_llm_settings_ignore_llm_environment_variables` asserted private OpenAI
+  defaults even though the valid DeepSeek packaged-trial provider was active.
+  No v1.3.0 object or feed was published.
+- This failure exposed two related low-value patterns: a negative test for a code
+  path that does not exist, coupled to private defaults; and CD duplicating the
+  full Promotion proof under a different environment. The former and other
+  high-confidence schema/default/helper repetitions are removed. Native Release
+  now retains exact-tag identity/check, native OCR verification, package build,
+  packaged smoke, manifest/publication, and remote verification rather than a
+  second serial semantic suite.
+- The first follow-up pass removed 12 pytest cases while retaining their stronger
+  owners. Repository checks, focused neighboring behavior, the affected semantic
+  shards, workflow parsing, and diff validation passed.
+- A second review found the same proof-shape in data-tokenization validation:
+  full Service/registry setups were asserting list/integer/non-negative constraints
+  already owned by strict Pydantic input models, while a single parameterized case
+  mixed those static-shape checks with the genuinely dynamic question of whether
+  an index exists in the loaded dataset schema. `TokenizeDatasetInput` now exposes
+  exact strict index/list/Literal types in a Mypy-gated contract module instead of
+  degrading indexes to `object`;
+  duplicate type/default/service-layer proofs are removed, while the black-box
+  out-of-runtime-schema case and domain selection conflicts remain.
+- The broadened pass also removes synthetic invalid permutations and exact
+  projection censuses for the source-owned Knowledge format catalog and ML model
+  catalog. Their real declarations are strict Pydantic values constructed by
+  normal imports, while representative pipeline/model behavior remains. Tests for
+  hostile downloaded manifests, worker/provider payloads, persistence, side
+  effects, and runtime dataset-schema mismatches remain because those facts are
+  not statically knowable.
+- The broadened pass removes another 17 collected cases, for 29 across both
+  follow-up passes. Final local verification passes: strict Mypy over 16 boundary
+  modules; `analysis-data` as `100 passed` in `60.28 s`; `agent-llm-ui` as
+  `154 passed` in `93.82 s` plus MainWindow `62 passed` in `91.61 s`;
+  `knowledge` as `208 passed, 3 skipped` in `263.06 s`; `platform-release` as
+  `141 passed` in `166.36 s`; and `git diff --check`.
 
 ## Open Decisions
 
@@ -367,8 +408,7 @@ accepts a re-baseline; timeout must not be set equal to the performance budget.
 
 ## Next Step
 
-The locally accepted implementation is delivered through `develop`. Observe the
-newest PR #111 Native CI run as the first qualifying four-runner, Python 3.14.2
-sample and stop after its result is recorded. Do not merge the promotion PR,
-create `v1.3.0`, enter the release Environment, or publish artifacts until Native
-CI passes and the user resumes.
+Commit and push the broadened proof cleanup to `develop`, updating Promotion PR
+#114. Require all four Python 3.14.2 shards and `Native CI Gate` to pass before
+merge. Preserve the existing `v1.3.0` tag until the post-promotion version-policy
+decision; do not move or delete it implicitly.

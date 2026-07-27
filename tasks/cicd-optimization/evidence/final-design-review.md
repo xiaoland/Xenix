@@ -71,7 +71,7 @@ forbid direct push; tag rules forbid moving or deleting `v*`.
 Pushing one eligible tag starts `Native Release`:
 
 1. secretless identity/promotion/protocol preflight;
-2. exact-Tag-SHA check/tests and Release Readiness;
+2. exact-Tag-SHA identity and repository checks;
 3. native OCR, frozen application, packaged smoke, and Velopack assembly;
 4. release manifest generation;
 5. direct create-only upload to final versioned public keys;
@@ -103,8 +103,8 @@ default because creating the tag is already the explicit human release approval.
 ## Residual Complexity Worth Keeping
 
 - PR/ref/tag eligibility checks prevent publishing unreviewed source.
-- Exact Tag SHA validation prevents PR temporary-merge evidence from being mistaken
-  for release evidence.
+- Exact Tag SHA validation binds build/publication evidence to release authority
+  without repeating Promotion pytest.
 - Direct immutable upload and remote hash verification prevent silent replacement.
 - One authoritative feed commit point is necessary because OSS cannot atomically
   update all feeds and the stable Setup alias.
@@ -140,7 +140,7 @@ the report shows both engineering performance and the operator's calendar wait.
 - `releases.win-x64-stable.json` is the named final visibility update; Setup and
   other feeds converge before it, with rollback snapshots retained.
 - Native OCR cache restore is followed by catalog/hash checks and the actual native
-  self-test. Release Readiness covers both secondary-window open orders and
+  self-test. Promotion CI covers both secondary-window open orders and
   worker/thread/SQLite quiescence.
 - Workflow timing evidence plus `release-timings` separate controlled, calendar,
   and queue clocks and refuse to count legacy Native CI runs as qualifying

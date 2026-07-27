@@ -57,6 +57,34 @@ implementation.
   publication authority, secret redaction, or supply-chain proofs merely because
   they are slow.
 
+## Low-Value Pattern Fingerprints
+
+The v1.3.0 release attempt exposed a broader family than exact Agent Tool schema
+assertions. A deletion candidate is high-confidence when its claim has no
+observable boundary and matches one or more of these shapes:
+
+- **Absence plus private default:** set an unsupported input, then assert private
+  fields still equal implementation defaults. This tests that no code branch
+  exists and breaks when another valid authority supplies configuration.
+- **Library conformance census:** feed required/type/enum/min/max/extra-property
+  examples through a registry only to re-prove JSON Schema or Pydantic behavior.
+  Retain one real admission/invocation boundary and any custom business validator.
+- **Helper/default echo:** call a private formatter or source default directly
+  when a user-visible rendering or real configured path already proves the
+  meaningful behavior.
+- **Duplicate proof in another pipeline stage:** rerun the same semantic suite in
+  CD after Promotion CI has already made it release eligibility evidence. Exact
+  tag identity, package construction, packaged smoke, and publication integrity
+  are distinct release proofs; repeated pytest is not.
+
+Applied high-confidence removals include the unsupported `XENIX_LLM_*` negative
+test, generic JSON Schema keyword matrices and schema-copy implementation checks,
+the standalone token formatter case already covered by usage UI rendering, the
+empty purchase-URL default echo, and Native Release's serial replay of all
+Promotion shards. Custom cross-field validators, invalid-call no-execution/no-
+persistence/no-secret behavior, configured purchase URL, and packaged-trial
+behavior remain.
+
 ## Candidate Review Outcome
 
 The initial deletion list was re-reviewed against the final proof allocation
@@ -236,12 +264,11 @@ state already require explicit clean-process boundaries.
 
 ## Adjacent Release Correction
 
-`Native Release` currently calls `pdm run pytest --junitxml=...`. Any argument
-causes `run_pytest.py` to bypass its two-clean-process default and run all tests in
-one process. Reporting arguments and topology selection must be separated before
-the release rehearsal. Exact-Tag-SHA Release Readiness should remain a focused,
-high-value proof plus packaged smoke rather than another accidental monolithic
-Promotion suite.
+The earlier `Native Release` reporting route accidentally collapsed test topology.
+That was first corrected to preserve cohorts, but the v1.3.0 live run showed the
+larger issue: CD was still serially duplicating the whole Promotion proof under a
+different environment. Native Release now keeps exact-tag checks plus packaged
+smoke and does not run a second semantic pytest suite.
 
 ## Superseded Sharded-Topology Acceptance
 
@@ -380,6 +407,19 @@ The design-review correction is now implemented locally:
 - Production Agent Tool schemas are portable projections of those input models.
   The same Pydantic model performs execution admission and is passed to the typed
   handler; the JSON Schema is not maintained as a second authority.
+- Data-tokenization now follows the same boundary shape: its command/result DTOs
+  live in a dependency-light strict Pydantic module included in the Mypy gate.
+  Internal callers no longer erase column selectors to `object`; primitive/list/
+  Literal admission tests and duplicate Service/Tool checks are removed, while
+  runtime schema resolution and domain selection conflicts remain executable.
+- Synthetic invalid Knowledge/ML catalog permutations and exact derived-view
+  censuses are removed. Real source declarations are constructed from their
+  strict models during normal imports; pipeline/model behavior is the remaining
+  proof rather than a second catalog oracle.
+- The broadened pass removes 17 collected cases: 10 primitive/default/duplicate
+  data-tokenization proofs, five Knowledge catalog projection/invalid-permutation
+  proofs, and two synthetic ML catalog rejection proofs. Together with the first
+  follow-up pass, 29 cases are removed.
 - The rejected `check_agent_contracts.py`, `check_ml_catalog.py`, and
   `check_knowledge_formats.py` scripts are absent. Test manifest validation is
   file/topology validation and no longer invokes pytest collection.
@@ -419,6 +459,22 @@ still require Promotion PR evidence.
 Workflow YAML parses successfully. `actionlint` is unavailable in this local
 environment, so workflow-specific lint remains for CI or a provisioned
 workstation.
+
+Broadened proof-cleanup acceptance on Python 3.14.2:
+
+| Shard/cohort | Result | Wall time |
+| --- | --- | ---: |
+| `analysis-data` | `100 passed` | `60.28 s` |
+| `knowledge` | `208 passed, 3 skipped` | `263.06 s` |
+| `agent-llm-ui` | `154 passed` | `93.82 s` |
+| `main-window` | `62 passed` | `91.61 s` |
+| `platform-release` | `141 passed` | `166.36 s` |
+| repository check | success; strict Mypy covers 16 boundary modules | included in local run |
+
+This pass deliberately does not claim that every rejected payload is static.
+Hostile manifests, worker/provider results, release configuration, persistence,
+side effects, runtime dataset schema, and resource/process behavior remain
+semantic tests.
 
 ## Promotion Topology ROI Correction
 

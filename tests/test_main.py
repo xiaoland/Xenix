@@ -41,7 +41,7 @@ from xenix.services.storage.models import ArtifactKind, ConversationMessageKind,
 from xenix.services.update_service import UpdateState, UpdateStatus
 from xenix.trial_lock import TrialLockCheck, TrialLockReason
 from xenix.ui import icons as ui_icons
-from xenix.ui.chatbot import _format_token_count, _render_svg_preview_pixmap
+from xenix.ui.chatbot import _render_svg_preview_pixmap
 from xenix.ui.startup_splash import StartupSplash, StartupStage
 
 
@@ -1107,13 +1107,6 @@ def test_thread_detail_view_renders_turn_usage_overview(monkeypatch, tmp_path: P
         )
     finally:
         window.close()
-
-
-def test_token_count_format_uses_k_after_999() -> None:
-    assert _format_token_count(999) == "999"
-    assert _format_token_count(1000) == "1.0k"
-    assert _format_token_count(1050) == "1.1k"
-    assert _format_token_count(12430) == "12.4k"
 
 
 def test_main_window_new_thread_button_creates_and_selects_empty_thread(monkeypatch, tmp_path: Path) -> None:

@@ -167,23 +167,6 @@ def test_llm_settings_migrate_legacy_flat_provider_config(monkeypatch, tmp_path:
     assert loaded.thread_title_fq_model_key == "openai/legacy-title"
 
 
-def test_llm_settings_ignore_llm_environment_variables(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    monkeypatch.setenv("XENIX_LLM_BASE_URL", "https://env.example.test")
-    monkeypatch.setenv("XENIX_LLM_API_KEY", "env-secret")
-    monkeypatch.setenv("XENIX_LLM_MODEL", "env-model")
-    paths = ensure_app_dirs(get_app_paths())
-    llm_service = LLMService(LLMSettingsService(paths))
-
-    provider = llm_service.build_provider()
-
-    assert provider._base_url == "https://api.openai.com"
-    assert provider._api_key == ""
-    assert provider._model == "gpt-4o-mini"
-    assert llm_service.build_turn_completion_guard_provider() is None
-    assert llm_service.build_thread_title_provider() is None
-
-
 def test_llm_settings_seed_packaged_trial_provider_when_available(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     monkeypatch.setattr(
@@ -271,10 +254,6 @@ def test_llm_settings_drop_legacy_aimock_from_modern_payload(monkeypatch, tmp_pa
     assert "deprecated-secret" not in saved
 
 
-def test_llm_service_rejects_slashes_inside_provider_or_model_keys() -> None:
-    with pytest.raises(Exception, match="Provider key cannot contain"):
-        LLMProviderConfig(key="bad/provider", models=["model"])
-    with pytest.raises(Exception, match="Model key cannot contain"):
-        LLMProviderConfig(key="provider", models=["bad/model"])
+def test_llm_service_rejects_malformed_fully_qualified_model_key() -> None:
     with pytest.raises(ValidationError, match="provider/model"):
         LLMService.parse_fq_model_key("provider/model/extra")

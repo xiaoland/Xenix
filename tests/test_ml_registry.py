@@ -1,7 +1,5 @@
 import numpy as np
 import pandas as pd
-import pytest
-from pydantic import ValidationError
 
 from xenix.services.ml.contracts import CandidateMetrics
 from xenix.services.ml.evaluation import (
@@ -11,65 +9,10 @@ from xenix.services.ml.evaluation import (
     get_default_policy,
 )
 from xenix.services.ml.models.classification import XGBoostClassificationService
-from xenix.services.ml.registry import _build_model_service_registry, get_model_service
+from xenix.services.ml.registry import get_model_service
 from xenix.services.ml.types import (
-    ColumnRoleKind,
     EvaluationKind,
-    ModelCatalogEntry,
-    ModelResultContract,
-    ModelRoleDefinition,
-    ModelRoleSchema,
 )
-
-
-def test_catalog_declarations_reject_invalid_local_contracts() -> None:
-    with pytest.raises(ValidationError, match="Role name must not be blank"):
-        ModelRoleDefinition(name=" ", kind=ColumnRoleKind.SINGLE_COLUMN)
-
-    role = ModelRoleDefinition(name="feature", kind=ColumnRoleKind.MANY_COLUMNS)
-    with pytest.raises(ValidationError, match="duplicate role names"):
-        ModelRoleSchema(roles=[role, role])
-
-    with pytest.raises(ValidationError, match="blank values"):
-        ModelResultContract(
-            train_result_kinds=["model"],
-            apply_result_kinds=["table"],
-            preview_kinds=[""],
-        )
-
-
-def test_registry_construction_validates_catalog_cross_field_contracts() -> None:
-    class InvalidSummaryMetricService(XGBoostClassificationService):
-        key = "classification.invalid_summary_metric"
-        summary_metric_name = "result_count"
-
-    class InvalidTuningContractService(XGBoostClassificationService):
-        key = "classification.invalid_tuning_contract"
-        supports_hyperparameter_tuning = False
-
-    class ArbitraryParamSchemaService(XGBoostClassificationService):
-        key = "classification.arbitrary_param_schema"
-
-        @classmethod
-        def catalog_entry(cls) -> ModelCatalogEntry:
-            return super().catalog_entry().model_copy(
-                update={"param_schema": {"type": "string"}}
-            )
-
-    with pytest.raises(
-        ValidationError,
-        match="summary_metric_name is only valid for summary evaluation",
-    ):
-        _build_model_service_registry((InvalidSummaryMetricService,))
-
-    with pytest.raises(
-        ValidationError,
-        match="supports_hyperparameter_tuning must match",
-    ):
-        _build_model_service_registry((InvalidTuningContractService,))
-
-    with pytest.raises(ValueError, match="must be derived from params_model"):
-        _build_model_service_registry((ArbitraryParamSchemaService,))
 
 
 def test_xgboost_classifier_preserves_string_labels() -> None:

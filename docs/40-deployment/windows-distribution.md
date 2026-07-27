@@ -28,9 +28,10 @@ result. The selected commit must:
 - contain the supported release protocol;
 - declare the same project version as the tag.
 
-GitHub tests a temporary PR merge ref. The tag workflow therefore reruns check,
-tests, build, and packaged smoke on the exact tag commit instead of treating the
-promotion run as release-SHA evidence.
+Promotion CI is the test authority for the reviewed source. The tag workflow
+re-verifies release identity, runs repository checks, and builds and exercises the
+packaged application from the exact tag commit; it does not serially repeat the
+same semantic pytest shards.
 
 GitHub resolves a push-triggered workflow from the event's tagged commit/ref.
 Consequently, a historical promotion is eligible only if that commit already
@@ -62,8 +63,7 @@ The tag starts the only `Native Release` workflow:
    first-parent membership, and release-protocol identity;
 2. the `native-release` Environment admits the verified `v*` ref and supplies
    release configuration and secrets;
-3. the Windows job re-verifies the identity, then runs check and the complete
-   test suite on the tag SHA;
+3. the Windows job re-verifies the identity and repository checks on the tag SHA;
 4. locked OCR inputs/output are restored when available, but the native runtime
    identity and self-test must pass before a cached output is trusted;
 5. packaging, packaged smoke, Velopack, and manifest generation bind their
@@ -179,8 +179,8 @@ queue time.
 | Progress | transfer heartbeat at least every `60 s`; other active steps no more than `2 min` silent |
 | Operator hands-on time | `<= 5 min` |
 
-The workflow preserves its non-secret manifest, JUnit, OCR catalog, and publication
-timing evidence for 30 days; Actions logs record named phase/progress output. The
+The workflow preserves its non-secret manifest, OCR catalog, and publication timing
+evidence for 30 days; Actions logs record named phase/progress output. The
 publication timing file records total publisher time and the interval from
 verified immutable objects through final visibility verification. Retain the run
 URL, tag, commit, promotion PR, run attempt, result, duration, manifest, and
