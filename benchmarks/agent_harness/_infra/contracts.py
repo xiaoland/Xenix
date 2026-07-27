@@ -15,6 +15,11 @@ class BenchmarkRunStatus(StrEnum):
     MEASUREMENT_ERROR = "measurement_error"
 
 
+class BenchmarkExecutionMode(StrEnum):
+    HEADLESS = "headless"
+    HEADED = "headed"
+
+
 class SemanticVerdict(StrEnum):
     """Meaning of the final user-visible outcome, not runner health."""
 
@@ -299,6 +304,7 @@ class AgentHarnessBenchmarkResult:
     case_id: str
     run_id: str
     provider_model: str
+    execution_mode: BenchmarkExecutionMode
     run_status: BenchmarkRunStatus
     subject_metrics: BenchmarkMetrics
     semantic_verdict: SemanticVerdict = SemanticVerdict.NOT_EVALUATED
@@ -307,7 +313,7 @@ class AgentHarnessBenchmarkResult:
     judge: JudgeResult = field(default_factory=JudgeResult)
     identity: BenchmarkIdentity = field(default_factory=BenchmarkIdentity)
     failure_kind: str | None = None
-    schema_version: int = 3
+    schema_version: int = 4
 
     @property
     def integrity_passed(self) -> bool:
@@ -331,6 +337,7 @@ class AgentHarnessBenchmarkResult:
             "case_id": self.case_id,
             "run_id": self.run_id,
             "provider_model": self.provider_model,
+            "execution_mode": self.execution_mode.value,
             "run_status": self.run_status.value,
             "semantic": {
                 "verdict": self.semantic_verdict.value,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
@@ -30,6 +30,7 @@ from .contracts import (
     BenchmarkCase,
     BenchmarkCaseAssessment,
     BenchmarkCaseContext,
+    BenchmarkExecutionMode,
     BenchmarkCasePreparationServices,
     BenchmarkCaseServices,
     BenchmarkIdentity,
@@ -82,6 +83,7 @@ class _StreamMeasurements:
     pending_message_ids: set[str] | None = None
     provider_retry_count: int = 0
     title_event_count: int = 0
+    final_snapshot_seen: bool = False
 
     def __post_init__(self) -> None:
         if self.pending_message_ids is None:
@@ -99,12 +101,111 @@ class _StreamMeasurements:
         snapshot = getattr(event, "snapshot", None)
         if snapshot is not None:
             self.snapshot = snapshot
+            if event_kind == "snapshot" and bool(getattr(event, "is_final", False)):
+                self.final_snapshot_seen = True
             if not self.source_state_captured:
                 self.source_state = case.capture_source_state(
                     snapshot=snapshot,
                     services=services,
                 )
                 self.source_state_captured = True
+
+
+class _HeadlessBenchmarkCell:
+    """One isolated production-service composition behind the runner contract."""
+
+    def __init__(
+        self,
+        *,
+        paths: AppPaths,
+        settings: LLMSettings,
+        embedding_settings: EmbeddingSettings | None,
+    ) -> None:
+        self.paths = paths
+        self._closed = False
+        self._storage = None
+        self._knowledge_import = None
+        self._knowledge_derivation = None
+        self._knowledge_index = None
+        try:
+            self._storage = StorageBootstrapService().initialize(paths)
+            llm = LLMService(FrozenLLMSettingsSource(settings))
+            worker_settings = MLWorkerSettingsService(paths)
+            embedding_settings_service = EmbeddingSettingsService(paths)
+            if embedding_settings is not None:
+                embedding_settings_service.save(embedding_settings)
+            services = build_headless_agent_services(
+                paths=paths,
+                session_factory=self._storage.session_factory,
+                llm=llm,
+                embedding_settings_service=embedding_settings_service,
+                ml_worker_settings=worker_settings,
+                usage_observability=LocalLLMUsageObservability(
+                    paths.logs / LLM_USAGE_JOURNAL_FILE_NAME
+                ),
+            )
+            self._knowledge_index = KnowledgeIndexService(
+                session_factory=self._storage.session_factory,
+                semantic_service=services.knowledge_semantic,
+                embedding_service=services.embedding,
+                embedding_settings_source=embedding_settings_service,
+                start_worker=False,
+            )
+            self._knowledge_derivation = KnowledgeDerivationService(
+                paths=paths,
+                session_factory=self._storage.session_factory,
+            )
+            self._knowledge_import = KnowledgeImportService(
+                paths=paths,
+                session_factory=self._storage.session_factory,
+                artifact_service=services.artifacts,
+                canonical_ready_notifier=self._knowledge_derivation.enqueue_generation,
+            )
+            self.harness = services.harness
+            self.datasets = services.datasets
+            self.artifacts = services.artifacts
+            self.preparation_services = BenchmarkCasePreparationServices(
+                knowledge_import=self._knowledge_import,
+                knowledge_derivation=self._knowledge_derivation,
+                knowledge_index=self._knowledge_index,
+            )
+        except Exception:
+            self.close()
+            raise
+
+    def create_thread(self, *, title: str, fq_model_key: str) -> str:
+        snapshot = self.harness.create_thread(
+            title=title,
+            fq_model_key=fq_model_key,
+        )
+        return snapshot.thread.id
+
+    def execute_submission(
+        self,
+        *,
+        submission: Any,
+        measurements: _StreamMeasurements,
+        case: BenchmarkCase,
+        services: BenchmarkCaseServices,
+    ) -> None:
+        for event in self.harness.submit_user_turn_stream(submission):
+            measurements.observe(event, case=case, services=services)
+
+    def integrity_checks(self) -> tuple[Any, ...]:
+        return ()
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        if self._knowledge_import is not None:
+            self._knowledge_import.shutdown()
+        if self._knowledge_derivation is not None:
+            self._knowledge_derivation.shutdown()
+        if self._knowledge_index is not None:
+            self._knowledge_index.shutdown()
+        if self._storage is not None:
+            self._storage.engine.dispose()
 
 
 def resolve_llm_settings_path(explicit_path: Path | None = None) -> Path:
@@ -223,6 +324,7 @@ def run_benchmark(
     settings_path: Path | None,
     embedding_settings_path: Path | None = None,
     case: BenchmarkCase,
+    execution_mode: BenchmarkExecutionMode = BenchmarkExecutionMode.HEADLESS,
     output_directory: Path = DEFAULT_OUTPUT_DIRECTORY,
     requested_models: Iterable[str] | None = None,
     judge_settings_path: Path | None = None,
@@ -245,6 +347,7 @@ def run_benchmark(
                 _invalid_result(
                     case_id=case.case_id,
                     provider_model="unresolved",
+                    execution_mode=execution_mode,
                     identity=identity,
                     failure_kind=exc.code,
                 ),
@@ -274,6 +377,7 @@ def run_benchmark(
                     _invalid_result(
                         case_id=case.case_id,
                         provider_model=model_key,
+                        execution_mode=execution_mode,
                         identity=invalid_identity,
                         failure_kind=exc.code,
                     )
@@ -301,6 +405,7 @@ def run_benchmark(
                 _invalid_result(
                     case_id=case.case_id,
                     provider_model=model_key,
+                    execution_mode=execution_mode,
                     identity=invalid_identity,
                     failure_kind=exc.code,
                 )
@@ -321,6 +426,7 @@ def run_benchmark(
         tuple(
             _run_model_cell(
                 case=case,
+                execution_mode=execution_mode,
                 settings=settings,
                 settings_path=resolved_settings_path,
                 settings_sha256=settings_sha256,
@@ -339,6 +445,7 @@ def run_benchmark(
 def _run_model_cell(
     *,
     case: BenchmarkCase,
+    execution_mode: BenchmarkExecutionMode,
     settings: LLMSettings,
     settings_path: Path,
     settings_sha256: str,
@@ -355,6 +462,7 @@ def _run_model_cell(
         return _invalid_result(
             case_id=case.case_id,
             provider_model=model_key,
+            execution_mode=execution_mode,
             identity=identity,
             failure_kind=setup_error,
             run_id=run_id,
@@ -364,75 +472,45 @@ def _run_model_cell(
     subject_metrics = BenchmarkMetrics()
     run_status = BenchmarkRunStatus.COMPLETED
     failure_kind: str | None = None
-    assessment = None
+    assessment: BenchmarkCaseAssessment | None = None
     judge_result = JudgeResult()
     with tempfile.TemporaryDirectory(prefix="xenix-agent-benchmark-") as temporary_root:
-        root = Path(temporary_root)
-        paths = _benchmark_paths(root / "runtime")
-        storage = None
-        services = None
-        knowledge_derivation = None
-        knowledge_import = None
-        knowledge_index = None
+        paths = _benchmark_paths(Path(temporary_root) / "runtime")
+        cell: Any | None = None
+        case_services: BenchmarkCaseServices | None = None
         thread_id: str | None = None
+        turn_seconds = 0.0
         try:
-            storage = StorageBootstrapService().initialize(paths)
-            llm = LLMService(FrozenLLMSettingsSource(settings))
-            worker_settings = MLWorkerSettingsService(paths)
-            embedding_settings_service = EmbeddingSettingsService(paths)
-            if embedding_settings is not None:
-                embedding_settings_service.save(embedding_settings)
-            services = build_headless_agent_services(
+            cell = _open_benchmark_cell(
+                execution_mode=execution_mode,
                 paths=paths,
-                session_factory=storage.session_factory,
-                llm=llm,
-                embedding_settings_service=embedding_settings_service,
-                ml_worker_settings=worker_settings,
-                usage_observability=LocalLLMUsageObservability(
-                    paths.logs / LLM_USAGE_JOURNAL_FILE_NAME
-                ),
-            )
-            knowledge_index = KnowledgeIndexService(
-                session_factory=storage.session_factory,
-                semantic_service=services.knowledge_semantic,
-                embedding_service=services.embedding,
-                embedding_settings_source=embedding_settings_service,
-                start_worker=False,
-            )
-            knowledge_derivation = KnowledgeDerivationService(
-                paths=paths,
-                session_factory=storage.session_factory,
-            )
-            knowledge_import = KnowledgeImportService(
-                paths=paths,
-                session_factory=storage.session_factory,
-                artifact_service=services.artifacts,
-                canonical_ready_notifier=knowledge_derivation.enqueue_generation,
+                settings=settings,
+                embedding_settings=embedding_settings,
             )
             case_services = BenchmarkCaseServices(
-                datasets=services.datasets,
-                artifacts=services.artifacts,
+                datasets=cell.datasets,
+                artifacts=cell.artifacts,
             )
-            before_dataset_ids = {dataset.id for dataset in services.datasets.list_datasets()}
+            before_dataset_ids = {
+                dataset.id for dataset in cell.datasets.list_datasets()
+            }
             title = _synthetic_title(case.case_id, model_key, run_id)
-            thread = services.harness.create_thread(title=title, fq_model_key=model_key)
-            thread_id = thread.thread.id
+            thread_id = cell.create_thread(title=title, fq_model_key=model_key)
             _prepare_case(
                 case=case,
-                knowledge_import=knowledge_import,
-                knowledge_derivation=knowledge_derivation,
-                knowledge_index=knowledge_index,
+                services=cell.preparation_services,
             )
             started_at = time.perf_counter()
             try:
-                for event in services.harness.submit_user_turn_stream(
-                    case.build_submission(thread_id=thread_id, fq_model_key=model_key)
-                ):
-                    measurements.observe(
-                        event,
-                        case=case,
-                        services=case_services,
-                    )
+                cell.execute_submission(
+                    submission=case.build_submission(
+                        thread_id=thread_id,
+                        fq_model_key=model_key,
+                    ),
+                    measurements=measurements,
+                    case=case,
+                    services=case_services,
+                )
             except Exception as exc:
                 run_status = BenchmarkRunStatus.RUNTIME_ERROR
                 failure_kind = _exception_kind(exc)
@@ -445,11 +523,11 @@ def _run_model_cell(
 
             if measurements.snapshot is None and thread_id is not None:
                 try:
-                    measurements.snapshot = services.harness.get_thread_snapshot(thread_id)
+                    measurements.snapshot = cell.harness.get_thread_snapshot(thread_id)
                 except Exception:
                     pass
             run_dataset_ids = frozenset(
-                dataset.id for dataset in services.datasets.list_datasets()
+                dataset.id for dataset in cell.datasets.list_datasets()
             ) - before_dataset_ids
             try:
                 assessment_started_at = time.perf_counter()
@@ -475,8 +553,8 @@ def _run_model_cell(
                 )
                 assessment_seconds = time.perf_counter() - assessment_started_at
                 subject_metrics = _collect_metrics(
-                    harness=services.harness,
-                    dataset_service=services.datasets,
+                    harness=cell.harness,
+                    dataset_service=cell.datasets,
                     snapshot=measurements.snapshot,
                     turn_seconds=turn_seconds,
                     assessment_seconds=assessment_seconds,
@@ -490,8 +568,8 @@ def _run_model_cell(
                     failure_kind = _exception_kind(exc)
                 try:
                     subject_metrics = _collect_metrics(
-                        harness=services.harness,
-                        dataset_service=services.datasets,
+                        harness=cell.harness,
+                        dataset_service=cell.datasets,
                         snapshot=measurements.snapshot,
                         turn_seconds=turn_seconds,
                         assessment_seconds=None,
@@ -505,40 +583,49 @@ def _run_model_cell(
                         sampling_round_count=len(measurements.pending_message_ids),
                         provider_retry_count=measurements.provider_retry_count,
                     )
-            try:
-                judge_result = _evaluate_judge(
-                    assessment=assessment,
-                    run_status=run_status,
-                    configuration=judge_configuration,
-                    subject_model_key=model_key,
-                )
-            except Exception:
-                judge_result = JudgeResult(
-                    status=JudgeStatus.PROVIDER_ERROR,
-                    provider_model=judge_configuration.model_key,
-                    independence=judge_independence(
-                        judge_model_key=judge_configuration.model_key,
-                        subject_model_key=model_key,
-                    ),
-                    summary="judge_dispatch_error",
-                )
         except Exception as exc:
             run_status = BenchmarkRunStatus.RUNTIME_ERROR
             failure_kind = _exception_kind(exc)
         finally:
-            if knowledge_import is not None:
-                knowledge_import.shutdown()
-            if knowledge_derivation is not None:
-                knowledge_derivation.shutdown()
-            if knowledge_index is not None:
-                knowledge_index.shutdown()
-            if storage is not None:
-                storage.engine.dispose()
+            if cell is not None:
+                case_services = None
+                try:
+                    cell.close()
+                except Exception as exc:
+                    if run_status is BenchmarkRunStatus.COMPLETED:
+                        run_status = BenchmarkRunStatus.RUNTIME_ERROR
+                        failure_kind = _exception_kind(exc)
+                if assessment is not None:
+                    assessment = replace(
+                        assessment,
+                        integrity_checks=(
+                            *assessment.integrity_checks,
+                            *cell.integrity_checks(),
+                        ),
+                    )
+        try:
+            judge_result = _evaluate_judge(
+                assessment=assessment,
+                run_status=run_status,
+                configuration=judge_configuration,
+                subject_model_key=model_key,
+            )
+        except Exception:
+            judge_result = JudgeResult(
+                status=JudgeStatus.PROVIDER_ERROR,
+                provider_model=judge_configuration.model_key,
+                independence=judge_independence(
+                    judge_model_key=judge_configuration.model_key,
+                    subject_model_key=model_key,
+                ),
+                summary="judge_dispatch_error",
+            )
 
     return AgentHarnessBenchmarkResult(
         case_id=case.case_id,
         run_id=run_id,
         provider_model=model_key,
+        execution_mode=execution_mode,
         run_status=run_status,
         subject_metrics=subject_metrics,
         semantic_verdict=_semantic_verdict(assessment=assessment, run_status=run_status, judge_result=judge_result),
@@ -550,23 +637,39 @@ def _run_model_cell(
     )
 
 
+def _open_benchmark_cell(
+    *,
+    execution_mode: BenchmarkExecutionMode,
+    paths: AppPaths,
+    settings: LLMSettings,
+    embedding_settings: EmbeddingSettings | None,
+) -> Any:
+    if execution_mode is BenchmarkExecutionMode.HEADLESS:
+        return _HeadlessBenchmarkCell(
+            paths=paths,
+            settings=settings,
+            embedding_settings=embedding_settings,
+        )
+    if execution_mode is BenchmarkExecutionMode.HEADED:
+        from .headed import HeadedBenchmarkCell
+
+        return HeadedBenchmarkCell(
+            paths=paths,
+            settings=settings,
+            embedding_settings=embedding_settings,
+        )
+    raise BenchmarkInputError("unsupported_execution_mode")
+
+
 def _prepare_case(
     *,
     case: BenchmarkCase,
-    knowledge_import: Any,
-    knowledge_derivation: Any,
-    knowledge_index: Any,
+    services: BenchmarkCasePreparationServices,
 ) -> None:
     prepare = getattr(case, "prepare", None)
     if prepare is None:
         return
-    prepare(
-        services=BenchmarkCasePreparationServices(
-            knowledge_import=knowledge_import,
-            knowledge_derivation=knowledge_derivation,
-            knowledge_index=knowledge_index,
-        )
-    )
+    prepare(services=services)
 
 
 def _collect_metrics(
@@ -779,6 +882,7 @@ def _invalid_result(
     *,
     case_id: str,
     provider_model: str,
+    execution_mode: BenchmarkExecutionMode,
     identity: BenchmarkIdentity,
     failure_kind: str,
     run_id: str | None = None,
@@ -787,6 +891,7 @@ def _invalid_result(
         case_id=case_id,
         run_id=run_id or uuid4().hex,
         provider_model=provider_model,
+        execution_mode=execution_mode,
         run_status=BenchmarkRunStatus.INVALID_SETUP,
         subject_metrics=BenchmarkMetrics(),
         identity=identity,
@@ -869,6 +974,10 @@ def _safe_file_component(value: str) -> str:
 
 
 def _exception_kind(exc: BaseException) -> str:
+    for attribute in ("code", "error_code"):
+        code = getattr(exc, attribute, None)
+        if isinstance(code, str) and code.strip():
+            return code.strip()[:80]
     name = exc.__class__.__name__
     return name[:80] if name else "runtime_failure"
 

@@ -18,7 +18,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 from .config import APP_NAME, APP_ORGANIZATION, ensure_app_dirs, get_app_paths
 from .exceptions import StorageBootstrapError, install_exception_hooks
 from .i18n import TranslationManager
-from .logging import setup_logging
+from .logging import setup_logging, shutdown_logging
 from .observability import (
     LLM_USAGE_JOURNAL_FILE_NAME,
     LocalLLMUsageObservability,
@@ -433,6 +433,7 @@ def build_main_window(
 
     startup_scope = None
     startup_span_active = False
+    logging_initialized = False
     runtime_shutdown: Callable[[], None] | None = None
     try:
         _update_startup_stage(app, splash, StartupStage.PREPARING_APP_DATA)
@@ -468,6 +469,7 @@ def build_main_window(
         _update_startup_stage(app, splash, StartupStage.INITIALIZING_LOGGING)
         step_start = time.perf_counter()
         log_path = setup_logging(paths)
+        logging_initialized = True
         observability = setup_observability(paths)
         startup_scope = start_span("app.startup")
         startup_scope.__enter__()
@@ -541,6 +543,7 @@ def build_main_window(
                 knowledge_index_service.shutdown()
             context.engine.dispose()
             flush_observability()
+            shutdown_logging()
 
         runtime_shutdown = shutdown_runtime
 
@@ -583,14 +586,12 @@ def build_main_window(
             session_factory=context.session_factory,
             artifact_service=agent_services.artifacts,
             canonical_ready_notifier=knowledge_derivation_service.enqueue_generation,
+            corpus_changed_notifier=knowledge_index_service.notify_corpus_changed,
         )
         knowledge_document_lifecycle_service = (
             runtime.KnowledgeDocumentLifecycleService(
-                paths=paths,
                 session_factory=context.session_factory,
-                artifact_service=agent_services.artifacts,
                 index_service=knowledge_index_service,
-                content_cleanup=knowledge_import_service.cleanup_storage_orphans,
             )
         )
         knowledge_task_query_service = runtime.KnowledgeTaskQueryService(
@@ -660,6 +661,8 @@ def build_main_window(
             startup_span_active = False
         if runtime_shutdown is None:
             flush_observability()
+            if logging_initialized:
+                shutdown_logging()
         else:
             runtime_shutdown()
         _close_startup_splash(app, splash)

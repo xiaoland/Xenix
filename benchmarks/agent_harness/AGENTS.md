@@ -31,12 +31,13 @@ provider adapters, or production settings.
 
 ## Focused Verification
 
-- Run `pdm run test tests/test_agent_harness_benchmark_infra.py` for dynamic
-  runner, privacy, judge, persistence, and pytest-boundary changes; run
-  `pdm run check` when imports or result shapes change.
+- Run `pdm run check` for imports and result-shape continuity. Do not recreate an
+  ordinary pytest mirror for benchmark schemas, options, case logic, or private
+  runner branches.
 - Use `pdm run benchmark-agent-harness -- --collect-only` to verify discovery
-  without a provider, then use `pdm run benchmark-agent-harness -- ...` only
-  for explicit live acceptance with externally supplied, untracked subject and
-  judge settings.
+  without a provider; use `pdm run benchmark-agent-harness-headed --
+  --collect-only` to prove the visible mode discovers that same case catalog.
+  Use either live command only for explicit acceptance with externally supplied,
+  untracked subject, Embedding, and optional Judge settings.
 - Inspect a persisted result for bounded serialization and separate subject and
   judge measurements before treating a live score as evidence.

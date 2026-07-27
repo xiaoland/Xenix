@@ -2,15 +2,13 @@ from __future__ import annotations
 
 import codecs
 import hashlib
-import inspect
 import json
 import shutil
 import stat
 import subprocess
 import sys
-import time
 import unicodedata
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from contextlib import ExitStack
 from dataclasses import dataclass, field
 from importlib.metadata import PackageNotFoundError, version as package_version
@@ -51,7 +49,6 @@ MAX_OOXML_MEMBER_DEPTH = 32
 MAX_HASHABLE_IR_BYTES = 256 * 1024 * 1024
 _CFB_SIGNATURE = bytes.fromhex("D0CF11E0A1B11AE1")
 _IO_CHUNK_BYTES = 1024 * 1024
-_PROCESS_POLL_INTERVAL_SECONDS = 0.05
 _PROCESS_TERMINATE_GRACE_SECONDS = 2.0
 _LIBREOFFICE_TIMEOUT_SECONDS = 120
 _OOXML_RATIO_CHECK_MIN_BYTES = 1024 * 1024
@@ -72,7 +69,6 @@ _OCR_PROJECTION_FAILURES = (
     subprocess.SubprocessError,
 )
 
-CancellationCheck = Callable[[], object]
 _ProviderT = TypeVar("_ProviderT")
 
 
@@ -369,7 +365,6 @@ class NormalizationRequest:
     capability: KnowledgeFormatCapability
     work_dir: Path
     password: str | None
-    check_cancelled: CancellationCheck | None
     input_sha256: str
 
 
@@ -383,14 +378,11 @@ class _TextNormalizerProvider:
     provider_id = "text"
 
     def normalize(self, request: NormalizationRequest) -> NormalizedSource:
-        payload = _read_bytes_cooperatively(
-            request.probe.source_path,
-            check_cancelled=request.check_cancelled,
-        )
+        payload = _read_bytes(request.probe.source_path)
         decoded = _decode_text_payload(payload)
-        text = _normalize_text(decoded.text, check_cancelled=request.check_cancelled)
+        text = _normalize_text(decoded.text)
         target = request.work_dir / "normalized.txt"
-        _write_text_cooperatively(target, text, check_cancelled=request.check_cancelled)
+        _write_text(target, text)
         return NormalizedSource(
             target,
             request.capability.source_format,
@@ -406,7 +398,6 @@ class _TextNormalizerProvider:
                 },
                 input_sha256=request.input_sha256,
                 output_path=target,
-                check_cancelled=request.check_cancelled,
                 details={
                     "encoding": decoded.encoding,
                     "bom": decoded.bom,
@@ -438,7 +429,6 @@ class _LegacyOfficeNormalizerProvider:
             profile=self._profile,
             executable=self._executable,
             work_dir=request.work_dir,
-            check_cancelled=request.check_cancelled,
         )
         return NormalizedSource(
             normalized,
@@ -457,7 +447,6 @@ class _LegacyOfficeNormalizerProvider:
                 },
                 input_sha256=request.input_sha256,
                 output_path=normalized,
-                check_cancelled=request.check_cancelled,
             ),
         )
 
@@ -472,7 +461,6 @@ class _OoxmlNormalizerProvider:
         package_facts = _verify_ooxml_package(
             source,
             self._profile,
-            check_cancelled=request.check_cancelled,
         )
         return NormalizedSource(
             source,
@@ -493,7 +481,6 @@ class _OoxmlNormalizerProvider:
                 },
                 input_sha256=request.input_sha256,
                 output_path=source,
-                check_cancelled=request.check_cancelled,
             ),
         )
 
@@ -509,7 +496,6 @@ class _PdfNormalizerProvider:
                 source,
                 password=request.password,
                 work_dir=request.work_dir,
-                check_cancelled=request.check_cancelled,
             )
         return NormalizedSource(
             source,
@@ -522,7 +508,6 @@ class _PdfNormalizerProvider:
                 options={"encrypted_input": request.probe.encrypted, "repair": False},
                 input_sha256=request.input_sha256,
                 output_path=source,
-                check_cancelled=request.check_cancelled,
             ),
         )
 
@@ -540,7 +525,6 @@ class _ImageNormalizerProvider:
                 normalized.save(target, format="PNG")
         except (OSError, UnidentifiedImageError) as exc:
             raise ValidationError("The image could not be normalized.") from exc
-        _check_cancelled(request.check_cancelled)
         return NormalizedSource(
             target,
             request.capability.source_format,
@@ -556,7 +540,6 @@ class _ImageNormalizerProvider:
                 },
                 input_sha256=request.input_sha256,
                 output_path=target,
-                check_cancelled=request.check_cancelled,
             ),
         )
 
@@ -593,9 +576,7 @@ class FormatNormalizer:
         *,
         work_dir: Path,
         password: str | None = None,
-        check_cancelled: CancellationCheck | None = None,
     ) -> NormalizedSource:
-        _check_cancelled(check_cancelled)
         capability = self._registry.capability_for_format(probe.source_format)
         if capability is None:
             raise ValidationError("No Knowledge normalizer is registered for this format.")
@@ -610,11 +591,9 @@ class FormatNormalizer:
             capability=capability,
             work_dir=work_dir,
             password=password,
-            check_cancelled=check_cancelled,
             input_sha256=_sha256_file_bounded(
                 probe.source_path,
                 max_bytes=MAX_SOURCE_BYTES,
-                check_cancelled=check_cancelled,
             ),
         )
         return self._providers[capability.normalizer_provider_id].normalize(request)
@@ -637,7 +616,6 @@ def _office_source(request: NormalizationRequest) -> Path:
             error_code="knowledge_password_invalid",
             retryable=True,
         ) from exc
-    _check_cancelled(request.check_cancelled)
     return target
 
 
@@ -646,7 +624,6 @@ def _decrypt_pdf(
     *,
     password: str,
     work_dir: Path,
-    check_cancelled: CancellationCheck | None,
 ) -> Path:
     target = work_dir / "decrypted.pdf"
     try:
@@ -658,7 +635,6 @@ def _decrypt_pdf(
             error_code="knowledge_password_invalid",
             retryable=True,
         ) from exc
-    _check_cancelled(check_cancelled)
     return target
 
 
@@ -668,7 +644,6 @@ def _convert_legacy_office_source(
     profile: _OfficeConversionProfile,
     executable: Path | None,
     work_dir: Path,
-    check_cancelled: CancellationCheck | None,
 ) -> Path:
     executable = executable or _find_libreoffice()
     if executable is None:
@@ -680,7 +655,7 @@ def _convert_legacy_office_source(
     libreoffice_profile = work_dir / "libreoffice-profile"
     local_source = work_dir / f"source.{profile.source_format}"
     if source.resolve() != local_source.resolve():
-        _copy_file_cooperatively(source, local_source, check_cancelled=check_cancelled)
+        shutil.copyfile(source, local_source)
     command = [
         str(executable),
         "--headless",
@@ -710,7 +685,6 @@ def _convert_legacy_office_source(
     returncode = _wait_for_process(
         process,
         timeout_seconds=_LIBREOFFICE_TIMEOUT_SECONDS,
-        check_cancelled=check_cancelled,
         timeout_error=ValidationError(
             "LibreOffice could not normalize the legacy "
             f"{profile.source_display_name} document.",
@@ -729,7 +703,6 @@ def _convert_legacy_office_source(
     _verify_ooxml_package(
         output,
         profile.target_package,
-        check_cancelled=check_cancelled,
     )
     return output
 
@@ -788,7 +761,6 @@ class ParserExecutionContext:
     normalized: NormalizedSource
     plan: ParsePlan
     work_dir: Path
-    check_cancelled: CancellationCheck | None
     ocr_executor: Any
 
 
@@ -855,9 +827,7 @@ class ParseExecutor:
         *,
         probe: FileProbeResult,
         work_dir: Path,
-        check_cancelled: CancellationCheck | None = None,
     ) -> ParseResult:
-        _check_cancelled(check_cancelled)
         ocr_ready = plan.ocr_ready
         capability = self._registry.capability_for_format(normalized.source_format)
         if (
@@ -870,9 +840,7 @@ class ParseExecutor:
         parser_input_sha256 = _sha256_file_bounded(
             normalized.path,
             max_bytes=MAX_SOURCE_BYTES,
-            check_cancelled=check_cancelled,
         )
-        _check_cancelled(check_cancelled)
         needs_ocr = any(unit.route_id.startswith("paddleocr-") for unit in plan.units)
         ocr_runtime_descriptor: dict[str, object] | None = None
         with ExitStack() as stack:
@@ -893,11 +861,9 @@ class ParseExecutor:
                     normalized=normalized,
                     plan=plan,
                     work_dir=work_dir,
-                    check_cancelled=check_cancelled,
                     ocr_executor=ocr_executor,
                 )
             )
-        _check_cancelled(check_cancelled)
         parser_output_sha256 = _docling_document_sha256(content.document)
         ocr_status = _ocr_status(
             projection_count=content.ocr_projection_count,
@@ -1071,10 +1037,7 @@ class _TextParserProvider:
 
     def parse(self, context: ParserExecutionContext) -> ParsedContent:
         return ParsedContent(
-            _plain_text_docling_document(
-                context.normalized.path,
-                check_cancelled=context.check_cancelled,
-            )
+            _plain_text_docling_document(context.normalized.path)
         )
 
 
@@ -1092,7 +1055,6 @@ class _DoclingOfficeParserProvider:
                 context.normalized.path,
                 source_format=self._source_format,
                 work_dir=context.work_dir,
-                check_cancelled=context.check_cancelled,
             )
         )
 
@@ -1107,7 +1069,6 @@ class _PdfParserProvider:
             context.normalized.path,
             source_format="pdf",
             work_dir=context.work_dir,
-            check_cancelled=context.check_cancelled,
         )
         ocr_pages = [
             unit.page - 1
@@ -1132,7 +1093,6 @@ class _PdfParserProvider:
                 page_indexes=ocr_pages,
                 work_dir=context.work_dir,
                 ocr_service=context.ocr_executor,
-                check_cancelled=context.check_cancelled,
             )
             succeeded_count = len(page_result.succeeded_pages)
             unavailable_pages.extend(page_result.unavailable_pages)
@@ -1174,10 +1134,7 @@ class _ImageParserProvider:
     backend = "xenix-image-adapter"
 
     def parse(self, context: ParserExecutionContext) -> ParsedContent:
-        document = _image_docling_document(
-            context.normalized.path,
-            check_cancelled=context.check_cancelled,
-        )
+        document = _image_docling_document(context.normalized.path)
         if not context.plan.ocr_ready:
             return ParsedContent(
                 document,
@@ -1189,16 +1146,11 @@ class _ImageParserProvider:
         staged_image = (
             context.work_dir / f"ocr-image{context.normalized.path.suffix.lower()}"
         )
-        _copy_file_cooperatively(
-            context.normalized.path,
-            staged_image,
-            check_cancelled=context.check_cancelled,
-        )
+        shutil.copyfile(context.normalized.path, staged_image)
         payload = _recognize_projection(
             context.ocr_executor,
             staged_image,
             output_path=context.work_dir / "image-ocr.json",
-            check_cancelled=context.check_cancelled,
         )
         if payload is None:
             return ParsedContent(
@@ -1225,29 +1177,17 @@ class _ImageParserProvider:
         )
 
 
-def _check_cancelled(check_cancelled: CancellationCheck | None) -> None:
-    if check_cancelled is not None:
-        check_cancelled()
-
-
 def _wait_for_process(
     process: Any,
     *,
     timeout_seconds: float,
-    check_cancelled: CancellationCheck | None,
     timeout_error: Exception,
 ) -> int:
-    deadline = time.monotonic() + timeout_seconds
     try:
-        while True:
-            _check_cancelled(check_cancelled)
-            returncode = process.poll()
-            if returncode is not None:
-                return int(returncode)
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise timeout_error
-            time.sleep(min(_PROCESS_POLL_INTERVAL_SECONDS, remaining))
+        return int(process.wait(timeout=timeout_seconds))
+    except subprocess.TimeoutExpired:
+        _terminate_process(process)
+        raise timeout_error from None
     except BaseException:
         _terminate_process(process)
         raise
@@ -1281,68 +1221,31 @@ def _no_console_process_kwargs() -> dict[str, int]:
     return {"creationflags": int(getattr(subprocess, "CREATE_NO_WINDOW", 0))}
 
 
-def _read_bytes_cooperatively(
-    path: Path,
-    *,
-    check_cancelled: CancellationCheck | None,
-) -> bytes:
+def _read_bytes(path: Path) -> bytes:
     blocks: list[bytes] = []
     with path.open("rb") as source:
         while True:
-            _check_cancelled(check_cancelled)
             block = source.read(_IO_CHUNK_BYTES)
             if not block:
                 break
             blocks.append(block)
-    _check_cancelled(check_cancelled)
     return b"".join(blocks)
 
 
-def _read_text_cooperatively(
-    path: Path,
-    *,
-    check_cancelled: CancellationCheck | None,
-) -> str:
-    return _read_bytes_cooperatively(
-        path,
-        check_cancelled=check_cancelled,
-    ).decode("utf-8")
+def _read_text(path: Path) -> str:
+    return _read_bytes(path).decode("utf-8")
 
 
-def _write_text_cooperatively(
-    path: Path,
-    text: str,
-    *,
-    check_cancelled: CancellationCheck | None,
-) -> None:
+def _write_text(path: Path, text: str) -> None:
     with path.open("w", encoding="utf-8", newline="\n") as target:
         for start in range(0, len(text), _IO_CHUNK_BYTES):
-            _check_cancelled(check_cancelled)
             target.write(text[start : start + _IO_CHUNK_BYTES])
-    _check_cancelled(check_cancelled)
-
-
-def _copy_file_cooperatively(
-    source_path: Path,
-    target_path: Path,
-    *,
-    check_cancelled: CancellationCheck | None,
-) -> None:
-    with source_path.open("rb") as source, target_path.open("wb") as target:
-        while True:
-            _check_cancelled(check_cancelled)
-            block = source.read(_IO_CHUNK_BYTES)
-            if not block:
-                break
-            target.write(block)
-    _check_cancelled(check_cancelled)
 
 
 def _sha256_file_bounded(
     path: Path,
     *,
     max_bytes: int,
-    check_cancelled: CancellationCheck | None,
 ) -> str:
     size = path.stat().st_size
     if size < 0 or size > max_bytes:
@@ -1351,7 +1254,6 @@ def _sha256_file_bounded(
     consumed = 0
     with path.open("rb") as source:
         while True:
-            _check_cancelled(check_cancelled)
             block = source.read(_IO_CHUNK_BYTES)
             if not block:
                 break
@@ -1361,7 +1263,6 @@ def _sha256_file_bounded(
                     "Knowledge pipeline hash input exceeds the supported limit."
                 )
             digest.update(block)
-    _check_cancelled(check_cancelled)
     return digest.hexdigest()
 
 
@@ -1373,13 +1274,11 @@ def _normalization_descriptor(
     options: dict[str, Any],
     input_sha256: str,
     output_path: Path,
-    check_cancelled: CancellationCheck | None,
     details: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     output_sha256 = _sha256_file_bounded(
         output_path,
         max_bytes=MAX_SOURCE_BYTES,
-        check_cancelled=check_cancelled,
     )
     return {
         "operation": operation,
@@ -1480,15 +1379,12 @@ def _ocr_status(
 
 def _normalize_text(
     raw_text: str,
-    *,
-    check_cancelled: CancellationCheck | None,
 ) -> str:
     _reject_unsafe_text_controls(raw_text)
     pieces: list[str] = []
     pending_cr = ""
     current_line_chars = 0
     for start in range(0, len(raw_text), _IO_CHUNK_BYTES):
-        _check_cancelled(check_cancelled)
         chunk = pending_cr + raw_text[start : start + _IO_CHUNK_BYTES]
         if chunk.endswith("\r"):
             chunk, pending_cr = chunk[:-1], "\r"
@@ -1518,29 +1414,7 @@ def _normalize_text(
         pieces.append(chunk)
     if pending_cr:
         pieces.append("\n")
-    _check_cancelled(check_cancelled)
     return "".join(pieces)
-
-
-def _recognize_with_cancellation(
-    ocr_service: Any,
-    image_path: Path,
-    *,
-    output_path: Path,
-    check_cancelled: CancellationCheck | None,
-) -> Any:
-    recognize = ocr_service.recognize
-    _check_cancelled(check_cancelled)
-    if _callable_accepts_keyword(recognize, "check_cancelled"):
-        payload = recognize(
-            image_path,
-            output_path=output_path,
-            check_cancelled=check_cancelled,
-        )
-    else:
-        payload = recognize(image_path, output_path=output_path)
-    _check_cancelled(check_cancelled)
-    return payload
 
 
 def _recognize_projection(
@@ -1548,53 +1422,13 @@ def _recognize_projection(
     image_path: Path,
     *,
     output_path: Path,
-    check_cancelled: CancellationCheck | None,
 ) -> Any | None:
-    """Return ``None`` only for expected OCR availability failures.
+    """Return ``None`` only for expected OCR availability failures."""
 
-    The callback wrapper preserves cancellation exception identity even when the
-    cancellation type also belongs to the expected operational-failure taxonomy.
-    """
-
-    callback_error: BaseException | None = None
-
-    def guarded_cancel_check() -> object:
-        nonlocal callback_error
-        assert check_cancelled is not None
-        try:
-            return check_cancelled()
-        except BaseException as exc:
-            callback_error = exc
-            raise
-
-    effective_check = guarded_cancel_check if check_cancelled is not None else None
     try:
-        return _recognize_with_cancellation(
-            ocr_service,
-            image_path,
-            output_path=output_path,
-            check_cancelled=effective_check,
-        )
-    except _OCR_PROJECTION_FAILURES as exc:
-        if exc is callback_error:
-            raise
+        return ocr_service.recognize(image_path, output_path=output_path)
+    except _OCR_PROJECTION_FAILURES:
         return None
-
-
-def _callable_accepts_keyword(function: Any, keyword: str) -> bool:
-    try:
-        parameters = inspect.signature(function).parameters.values()
-    except (TypeError, ValueError):
-        return False
-    return any(
-        (
-            parameter.name == keyword
-            and parameter.kind
-            in {inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY}
-        )
-        or parameter.kind is inspect.Parameter.VAR_KEYWORD
-        for parameter in parameters
-    )
 
 
 def _ocr_runtime_payload(value: object) -> dict[str, object] | None:
@@ -1921,10 +1755,7 @@ def _ooxml_error(
 def _verify_ooxml_package(
     path: Path,
     profile: _OoxmlPackageProfile,
-    *,
-    check_cancelled: CancellationCheck | None = None,
 ) -> dict[str, int]:
-    _check_cancelled(check_cancelled)
     try:
         with ZipFile(path) as package:
             entries = package.infolist()
@@ -1939,7 +1770,6 @@ def _verify_ooxml_package(
             expanded_bytes = 0
             maximum_ratio = 1
             for entry in entries:
-                _check_cancelled(check_cancelled)
                 _validate_ooxml_member_path(
                     entry.filename,
                     profile=profile,
@@ -2013,7 +1843,6 @@ def _verify_ooxml_package(
             "package_invalid",
             "is not a valid Office package",
         ) from exc
-    _check_cancelled(check_cancelled)
     return {
         "container_entry_count": len(entries),
         "container_expanded_bytes": expanded_bytes,
@@ -2070,33 +1899,22 @@ def _find_libreoffice() -> Path | None:
     return next((candidate for candidate in candidates if candidate is not None and candidate.is_file()), None)
 
 
-def _plain_text_docling_document(
-    path: Path,
-    *,
-    check_cancelled: CancellationCheck | None = None,
-):
+def _plain_text_docling_document(path: Path):
     from docling_core.types.doc import DocItemLabel, DoclingDocument
 
-    text = _read_text_cooperatively(path, check_cancelled=check_cancelled)
+    text = _read_text(path)
     document = DoclingDocument(name=path.stem)
     for paragraph in (part.strip() for part in text.split("\n\n")):
-        _check_cancelled(check_cancelled)
         if paragraph:
             document.add_text(DocItemLabel.TEXT, paragraph)
     return document
 
 
-def _image_docling_document(
-    path: Path,
-    *,
-    check_cancelled: CancellationCheck | None = None,
-):
+def _image_docling_document(path: Path):
     from docling_core.types.doc import DoclingDocument
 
-    _check_cancelled(check_cancelled)
     document = DoclingDocument(name=path.stem)
     document.add_picture()
-    _check_cancelled(check_cancelled)
     return document
 
 
@@ -2105,11 +1923,9 @@ def _docling_convert(
     *,
     source_format: str,
     work_dir: Path,
-    check_cancelled: CancellationCheck | None = None,
 ):
     from .knowledge_docling import convert_document
 
-    _check_cancelled(check_cancelled)
     _ = work_dir
     try:
         document = convert_document(path, source_format=source_format)
@@ -2120,7 +1936,6 @@ def _docling_convert(
             error_details={"diagnostic_code": _docling_diagnostic_code(exc)},
             retryable=True,
         ) from exc
-    _check_cancelled(check_cancelled)
     return document
 
 
@@ -2141,11 +1956,9 @@ def _append_paddle_ocr_pages(
     page_indexes: list[int],
     work_dir: Path,
     ocr_service: PaddleOcrService,
-    check_cancelled: CancellationCheck | None = None,
 ) -> _OcrBatchResult:
     import pypdfium2
 
-    _check_cancelled(check_cancelled)
     succeeded_pages: list[int] = []
     unavailable_pages: list[int] = []
     payload_hashes: list[tuple[int, str]] = []
@@ -2153,20 +1966,17 @@ def _append_paddle_ocr_pages(
     pdf = pypdfium2.PdfDocument(pdf_path)
     try:
         for page_index in page_indexes:
-            _check_cancelled(check_cancelled)
             page = pdf[page_index]
             try:
                 image_path = work_dir / f"ocr-page-{page_index + 1}.png"
                 page.render(scale=2).to_pil().save(image_path)
             finally:
                 page.close()
-            _check_cancelled(check_cancelled)
             output_path = work_dir / f"ocr-page-{page_index + 1}.json"
             payload = _recognize_projection(
                 ocr_service,
                 image_path,
                 output_path=output_path,
-                check_cancelled=check_cancelled,
             )
             page_number = page_index + 1
             if payload is None:
@@ -2184,7 +1994,6 @@ def _append_paddle_ocr_pages(
                     ),
                 )
             )
-            _check_cancelled(check_cancelled)
     finally:
         pdf.close()
     return _OcrBatchResult(

@@ -2,10 +2,9 @@
 
 ## Status
 
-Release execution is blocked after the first immutable-tag attempt failed before
-build or publication. The source/test-topology correction can be promoted, but
-the already-pushed `v1.3.0` tag cannot receive it without an explicit release
-policy decision.
+Closed without publication. The immutable v1.3.0 attempt failed before build or
+public mutation and consumes the version. The selected successor is v1.3.1, whose
+release is paused pending CI/test-portfolio redesign.
 
 ## Objective
 
@@ -100,11 +99,14 @@ promotion and tag-triggered release path as its first production rehearsal.
 - Final local results for the broadened PR head are `analysis-data` 100 passed,
   `agent-llm-ui` 154 plus MainWindow 62 passed, `knowledge` 208 passed/3 skipped,
   and `platform-release` 141 passed. Repository checks and diff validation pass.
+- PR #114 run `30238677216` passed all four final-head shards and Gate, then
+  merged as `a5b1f905`. Durations were 7m17s platform-release, 9m29s Knowledge,
+  15m40s Agent/LLM/UI, and 23m12s analysis/data; the latter's 9m21s dependency
+  install and 3m54s repository check dominated the critical path.
+- `v1.3.0` remains unchanged at `8b7dd79a`; the corrected promotion result is
+  `a5b1f905`.
 
 ## Next Step
 
-Push the broadened correction to Promotion PR #114 and require its four shards
-plus `Native CI Gate`. After merge, choose explicitly between preserving tag
-immutability and releasing a bumped version, or authorizing a one-time
-delete/recreate exception for the unpublished `v1.3.0` tag. Do not mutate the
-existing tag before that decision.
+Keep this packet as the failed-attempt record. Continue through
+`tasks/release-v1.3.1.md`; never move or delete the v1.3.0 tag.

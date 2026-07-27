@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import text
@@ -26,13 +25,6 @@ from ...knowledge_projection import (
 )
 
 
-@dataclass(frozen=True)
-class KnowledgeDocumentRemovalLineage:
-    import_ids: tuple[str, ...]
-    source_artifact_ids: tuple[str, ...]
-    vector_generation_ids: tuple[str, ...]
-
-
 class KnowledgeRepository:
     def create_document(self, session: Session, row: KnowledgeDocumentRow) -> KnowledgeDocumentRow:
         session.add(row)
@@ -49,14 +41,15 @@ class KnowledgeRepository:
         *,
         library_id: str,
         source_sha256: str,
+        include_inactive: bool = False,
     ) -> KnowledgeDocumentRow | None:
-        return session.exec(
-            select(KnowledgeDocumentRow).where(
-                KnowledgeDocumentRow.library_id == library_id,
-                KnowledgeDocumentRow.source_sha256 == source_sha256,
-                KnowledgeDocumentRow.active.is_(True),
-            )
-        ).first()
+        statement = select(KnowledgeDocumentRow).where(
+            KnowledgeDocumentRow.library_id == library_id,
+            KnowledgeDocumentRow.source_sha256 == source_sha256,
+        )
+        if not include_inactive:
+            statement = statement.where(KnowledgeDocumentRow.active.is_(True))
+        return session.exec(statement).first()
 
     def list_documents(
         self,
@@ -79,7 +72,7 @@ class KnowledgeRepository:
             )
         )
 
-    def claim_document_for_removal(
+    def deactivate_document_membership(
         self,
         session: Session,
         *,
@@ -132,131 +125,6 @@ class KnowledgeRepository:
                 ")"
             ),
             {"document_id": document_id},
-        ).first()
-        return bool(row and row[0])
-
-    def remove_claimed_document(
-        self,
-        session: Session,
-        *,
-        library_id: str,
-        document_id: str,
-    ) -> KnowledgeDocumentRemovalLineage:
-        session.expire_all()
-        document = session.get(KnowledgeDocumentRow, document_id)
-        if (
-            document is None
-            or document.library_id != library_id
-            or document.active
-        ):
-            raise ValueError("Knowledge document is not claimed for removal.")
-
-        imports = list(
-            session.exec(
-                select(KnowledgeImportRow).where(
-                    (KnowledgeImportRow.document_id == document_id)
-                    | (KnowledgeImportRow.planned_document_id == document_id)
-                )
-            )
-        )
-        generations = list(
-            session.exec(
-                select(KnowledgeCanonicalGenerationRow).where(
-                    KnowledgeCanonicalGenerationRow.document_id == document_id
-                )
-            )
-        )
-        vector_generations = list(
-            session.exec(
-                select(KnowledgeVectorGenerationRow).where(
-                    KnowledgeVectorGenerationRow.library_id == library_id
-                )
-            )
-        )
-        import_ids = tuple(row.id for row in imports)
-        artifact_ids = tuple(
-            dict.fromkeys(
-                artifact_id
-                for artifact_id in (
-                    document.source_artifact_id,
-                    *(row.source_artifact_id for row in imports),
-                    *(row.source_artifact_id for row in generations),
-                )
-                if artifact_id
-            )
-        )
-
-        session.execute(
-            text(
-                "DELETE FROM knowledge_unit_fts WHERE unit_id IN ("
-                "SELECT id FROM knowledge_unit WHERE document_id=:document_id)"
-            ),
-            {"document_id": document_id},
-        )
-        session.execute(
-            text("DELETE FROM knowledge_unit WHERE document_id=:document_id"),
-            {"document_id": document_id},
-        )
-        session.execute(
-            text("DELETE FROM knowledge_derivation WHERE document_id=:document_id"),
-            {"document_id": document_id},
-        )
-        session.execute(
-            text(
-                "DELETE FROM knowledge_canonical_generation "
-                "WHERE document_id=:document_id"
-            ),
-            {"document_id": document_id},
-        )
-        if import_ids:
-            placeholders = ", ".join(
-                f":import_{index}" for index in range(len(import_ids))
-            )
-            session.execute(
-                text(f"DELETE FROM knowledge_import WHERE id IN ({placeholders})"),
-                {
-                    f"import_{index}": import_id
-                    for index, import_id in enumerate(import_ids)
-                },
-            )
-        session.execute(
-            text("DELETE FROM knowledge_document WHERE id=:document_id AND active=0"),
-            {"document_id": document_id},
-        )
-        session.execute(
-            text(
-                "DELETE FROM knowledge_vector_generation "
-                "WHERE library_id=:library_id"
-            ),
-            {"library_id": library_id},
-        )
-        session.flush()
-        return KnowledgeDocumentRemovalLineage(
-            import_ids=import_ids,
-            source_artifact_ids=artifact_ids,
-            vector_generation_ids=tuple(row.id for row in vector_generations),
-        )
-
-    def artifact_is_referenced(
-        self,
-        session: Session,
-        *,
-        artifact_id: str,
-    ) -> bool:
-        row = session.execute(
-            text(
-                "SELECT EXISTS("
-                "SELECT 1 FROM knowledge_document "
-                "WHERE source_artifact_id=:artifact_id "
-                "UNION ALL "
-                "SELECT 1 FROM knowledge_import "
-                "WHERE source_artifact_id=:artifact_id "
-                "UNION ALL "
-                "SELECT 1 FROM knowledge_canonical_generation "
-                "WHERE source_artifact_id=:artifact_id"
-                ")"
-            ),
-            {"artifact_id": artifact_id},
         ).first()
         return bool(row and row[0])
 

@@ -4,7 +4,7 @@ import hashlib
 import json
 import os
 import shutil
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -69,6 +69,16 @@ class CanonicalBundleIdentity:
     source_format: str
 
 
+@dataclass(frozen=True)
+class _CanonicalBundleMaterial:
+    envelope_bytes: bytes
+    document_bytes: bytes
+    envelope_sha256: str
+    content_ir_sha256: str
+    assets: tuple[CanonicalAsset, ...]
+    asset_descriptors: tuple[dict[str, Any], ...]
+
+
 class KnowledgeContentStore:
     """Own immutable source snapshots and verified canonical bundles.
 
@@ -89,13 +99,10 @@ class KnowledgeContentStore:
         self,
         source_path: Path,
         *,
-        check_cancelled: Callable[[], object] | None = None,
         maximum_bytes: int | None = None,
     ) -> StoredKnowledgeSource:
         if maximum_bytes is not None and maximum_bytes < 1:
             raise ValueError("Knowledge source byte limit must be positive.")
-        if check_cancelled is not None:
-            check_cancelled()
         source = source_path.expanduser().resolve()
         if not source.is_file():
             raise ValidationError("Knowledge source must be an existing local file.")
@@ -105,8 +112,6 @@ class KnowledgeContentStore:
         try:
             with source.open("rb") as source_stream, staged.open("xb") as target_stream:
                 for block in iter(lambda: source_stream.read(1024 * 1024), b""):
-                    if check_cancelled is not None:
-                        check_cancelled()
                     size += len(block)
                     if maximum_bytes is not None and size > maximum_bytes:
                         raise ValidationError(
@@ -118,8 +123,6 @@ class KnowledgeContentStore:
                 target_stream.flush()
                 os.fsync(target_stream.fileno())
             digest = digest_builder.hexdigest()
-            if check_cancelled is not None:
-                check_cancelled()
             suffix = _safe_source_suffix(source.suffix)
             target = self._source_directory(digest) / f"source{suffix}"
             if target.exists():
@@ -129,8 +132,6 @@ class KnowledgeContentStore:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 self._atomic_publish_file(staged, target)
                 self._verify_source(target, expected_sha256=digest, expected_size=size)
-            if check_cancelled is not None:
-                check_cancelled()
             return StoredKnowledgeSource(sha256=digest, path=target, size=size)
         finally:
             staged.unlink(missing_ok=True)
@@ -182,63 +183,30 @@ class KnowledgeContentStore:
         docling_document: dict[str, Any],
         assets: Sequence[CanonicalAsset] = (),
     ) -> StoredCanonicalBundle:
-        verified_assets = _validated_assets(assets)
-        asset_descriptors = [asset.descriptor() for asset in verified_assets]
-        document_bytes = _canonical_json_bytes(docling_document)
-        content_ir_sha256 = _sha256_bytes(document_bytes)
-        frozen_envelope = json.loads(json.dumps(envelope, ensure_ascii=False))
-        frozen_envelope["schema_version"] = CANONICAL_SCHEMA_VERSION
-        frozen_envelope["content_ir"] = {
-            "kind": "DoclingDocument",
-            "relative_path": _DOCUMENT_FILE,
-            "sha256": content_ir_sha256,
-        }
-        declared_assets = frozen_envelope.get("assets")
-        if declared_assets not in (None, asset_descriptors):
-            raise ValidationError(
-                "Knowledge canonical asset manifest does not match its payloads.",
-                error_code="knowledge_canonical_asset_integrity_failed",
-            )
-        frozen_envelope["assets"] = asset_descriptors
-        envelope_bytes = _canonical_json_bytes(frozen_envelope)
-        envelope_sha256 = _sha256_bytes(envelope_bytes)
-        target = self._canonical_directory(envelope_sha256)
+        material = _prepare_canonical_bundle(
+            envelope=envelope,
+            docling_document=docling_document,
+            assets=assets,
+        )
+        target = self._canonical_directory(material.envelope_sha256)
         relative_path = target.relative_to(self._root).as_posix()
         stored = StoredCanonicalBundle(
-            envelope_sha256=envelope_sha256,
-            content_ir_sha256=content_ir_sha256,
+            envelope_sha256=material.envelope_sha256,
+            content_ir_sha256=material.content_ir_sha256,
             relative_path=relative_path,
             path=target,
         )
         if target.exists():
             self.read_canonical_bundle(
                 relative_path,
-                expected_envelope_sha256=envelope_sha256,
-                expected_content_ir_sha256=content_ir_sha256,
+                expected_envelope_sha256=material.envelope_sha256,
+                expected_content_ir_sha256=material.content_ir_sha256,
             )
             return stored
 
         staged = self._staging / f"canonical-{uuid4().hex}"
-        staged.mkdir(parents=False, exist_ok=False)
         try:
-            compressor = zstandard.ZstdCompressor(level=7, write_checksum=True)
-            envelope_compressed = compressor.compress(envelope_bytes)
-            document_compressed = compressor.compress(document_bytes)
-            manifest = {
-                "schema_version": CANONICAL_SCHEMA_VERSION,
-                "envelope_file": _ENVELOPE_FILE,
-                "envelope_sha256": envelope_sha256,
-                "content_ir_file": _DOCUMENT_FILE,
-                "content_ir_sha256": content_ir_sha256,
-                "assets": asset_descriptors,
-            }
-            for asset in verified_assets:
-                asset_path = staged.joinpath(*Path(asset.relative_path).parts)
-                asset_path.parent.mkdir(parents=True, exist_ok=True)
-                _write_file_fsynced(asset_path, asset.payload)
-            _write_file_fsynced(staged / _ENVELOPE_FILE, envelope_compressed)
-            _write_file_fsynced(staged / _DOCUMENT_FILE, document_compressed)
-            _write_file_fsynced(staged / _MANIFEST_FILE, _canonical_json_bytes(manifest))
+            _write_canonical_directory(staged, material)
             target.parent.mkdir(parents=True, exist_ok=True)
             try:
                 os.replace(staged, target)
@@ -247,13 +215,109 @@ class KnowledgeContentStore:
                     raise
             self.read_canonical_bundle(
                 relative_path,
-                expected_envelope_sha256=envelope_sha256,
-                expected_content_ir_sha256=content_ir_sha256,
+                expected_envelope_sha256=material.envelope_sha256,
+                expected_content_ir_sha256=material.content_ir_sha256,
             )
             return stored
         finally:
             if staged.exists():
                 shutil.rmtree(staged, ignore_errors=True)
+
+    def stage_canonical_bundle(
+        self,
+        stage: Path,
+        *,
+        envelope: dict[str, Any],
+        docling_document: dict[str, Any],
+        assets: Sequence[CanonicalAsset] = (),
+    ) -> StoredCanonicalBundle:
+        """Write a worker result only inside its private task directory."""
+
+        relative_path = self._task_canonical_relative_path(stage)
+        if stage.exists():
+            raise ValidationError("Knowledge task output already exists.")
+        material = _prepare_canonical_bundle(
+            envelope=envelope,
+            docling_document=docling_document,
+            assets=assets,
+        )
+        try:
+            _write_canonical_directory(stage, material)
+            bundle = self.read_canonical_bundle(
+                relative_path,
+                expected_envelope_sha256=material.envelope_sha256,
+                expected_content_ir_sha256=material.content_ir_sha256,
+            )
+            return bundle.stored
+        except Exception:
+            if stage.exists():
+                shutil.rmtree(stage, ignore_errors=True)
+            raise
+
+    def publish_staged_canonical_bundle(
+        self,
+        relative_path: str,
+        *,
+        import_id: str,
+        expected_envelope_sha256: str,
+        expected_content_ir_sha256: str,
+        expected_identity: CanonicalBundleIdentity,
+    ) -> CanonicalBundle:
+        """Admit one validated worker output into immutable CAS.
+
+        Only the parent write coordinator calls this method. The child process can
+        create a private task directory but cannot choose or mutate the published
+        CAS location.
+        """
+
+        expected_relative = f"tasks/imports/{import_id}/canonical"
+        if relative_path != expected_relative:
+            raise ValidationError(
+                "Knowledge worker output is outside its private task directory.",
+                error_code="knowledge_canonical_integrity_failed",
+            )
+        staged = self._contained_path(relative_path)
+        self._task_canonical_relative_path(staged)
+        self.read_canonical_bundle(
+            relative_path,
+            expected_envelope_sha256=expected_envelope_sha256,
+            expected_content_ir_sha256=expected_content_ir_sha256,
+            expected_identity=expected_identity,
+        )
+        target = self._canonical_directory(expected_envelope_sha256)
+        target_relative = target.relative_to(self._root).as_posix()
+        if target.exists():
+            bundle = self.read_canonical_bundle(
+                target_relative,
+                expected_envelope_sha256=expected_envelope_sha256,
+                expected_content_ir_sha256=expected_content_ir_sha256,
+                expected_identity=expected_identity,
+            )
+            shutil.rmtree(staged, ignore_errors=True)
+            return bundle
+        target.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            os.replace(staged, target)
+        except OSError:
+            if not target.exists():
+                raise
+            shutil.rmtree(staged, ignore_errors=True)
+        return self.read_canonical_bundle(
+            target_relative,
+            expected_envelope_sha256=expected_envelope_sha256,
+            expected_content_ir_sha256=expected_content_ir_sha256,
+            expected_identity=expected_identity,
+        )
+
+    def discard_staged_canonical_bundle(self, import_id: str) -> None:
+        if (
+            len(import_id) != 32
+            or any(character not in "0123456789abcdef" for character in import_id)
+        ):
+            return
+        staged = self._root / "tasks" / "imports" / import_id / "canonical"
+        self._task_canonical_relative_path(staged)
+        shutil.rmtree(staged, ignore_errors=True)
 
     def read_canonical_bundle(
         self,
@@ -381,6 +445,23 @@ class KnowledgeContentStore:
             raise ValidationError("Knowledge content path is invalid.") from exc
         return resolved
 
+    def _task_canonical_relative_path(self, stage: Path) -> str:
+        resolved = stage.resolve()
+        try:
+            relative = resolved.relative_to(self._root)
+        except ValueError as exc:
+            raise ValidationError("Knowledge task output path is invalid.") from exc
+        parts = relative.parts
+        if (
+            len(parts) != 4
+            or parts[:2] != ("tasks", "imports")
+            or len(parts[2]) != 32
+            or any(character not in "0123456789abcdef" for character in parts[2])
+            or parts[3] != "canonical"
+        ):
+            raise ValidationError("Knowledge task output path is invalid.")
+        return relative.as_posix()
+
     @staticmethod
     def _reject_link_like_path(path: Path, *, stop: Path) -> None:
         current = path
@@ -408,6 +489,74 @@ class KnowledgeContentStore:
             os.replace(staged, target)
         finally:
             staged.unlink(missing_ok=True)
+
+
+def _prepare_canonical_bundle(
+    *,
+    envelope: dict[str, Any],
+    docling_document: dict[str, Any],
+    assets: Sequence[CanonicalAsset],
+) -> _CanonicalBundleMaterial:
+    verified_assets = tuple(_validated_assets(assets))
+    asset_descriptors = tuple(asset.descriptor() for asset in verified_assets)
+    document_bytes = _canonical_json_bytes(docling_document)
+    content_ir_sha256 = _sha256_bytes(document_bytes)
+    frozen_envelope = json.loads(json.dumps(envelope, ensure_ascii=False))
+    frozen_envelope["schema_version"] = CANONICAL_SCHEMA_VERSION
+    frozen_envelope["content_ir"] = {
+        "kind": "DoclingDocument",
+        "relative_path": _DOCUMENT_FILE,
+        "sha256": content_ir_sha256,
+    }
+    declared_assets = frozen_envelope.get("assets")
+    if declared_assets not in (None, list(asset_descriptors)):
+        raise ValidationError(
+            "Knowledge canonical asset manifest does not match its payloads.",
+            error_code="knowledge_canonical_asset_integrity_failed",
+        )
+    frozen_envelope["assets"] = list(asset_descriptors)
+    envelope_bytes = _canonical_json_bytes(frozen_envelope)
+    return _CanonicalBundleMaterial(
+        envelope_bytes=envelope_bytes,
+        document_bytes=document_bytes,
+        envelope_sha256=_sha256_bytes(envelope_bytes),
+        content_ir_sha256=content_ir_sha256,
+        assets=verified_assets,
+        asset_descriptors=asset_descriptors,
+    )
+
+
+def _write_canonical_directory(
+    directory: Path,
+    material: _CanonicalBundleMaterial,
+) -> None:
+    directory.mkdir(parents=False, exist_ok=False)
+    compressor = zstandard.ZstdCompressor(level=7, write_checksum=True)
+    for asset in material.assets:
+        asset_path = directory.joinpath(*Path(asset.relative_path).parts)
+        asset_path.parent.mkdir(parents=True, exist_ok=True)
+        _write_file_fsynced(asset_path, asset.payload)
+    _write_file_fsynced(
+        directory / _ENVELOPE_FILE,
+        compressor.compress(material.envelope_bytes),
+    )
+    _write_file_fsynced(
+        directory / _DOCUMENT_FILE,
+        compressor.compress(material.document_bytes),
+    )
+    _write_file_fsynced(
+        directory / _MANIFEST_FILE,
+        _canonical_json_bytes(
+            {
+                "schema_version": CANONICAL_SCHEMA_VERSION,
+                "envelope_file": _ENVELOPE_FILE,
+                "envelope_sha256": material.envelope_sha256,
+                "content_ir_file": _DOCUMENT_FILE,
+                "content_ir_sha256": material.content_ir_sha256,
+                "assets": list(material.asset_descriptors),
+            }
+        ),
+    )
 
 
 def _canonical_json_bytes(value: Any) -> bytes:

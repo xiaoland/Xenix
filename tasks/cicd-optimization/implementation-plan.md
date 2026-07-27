@@ -179,3 +179,64 @@ Acceptance:
   a new version.
 - Release and rollback invariants are demonstrated without modifying the production
   feed during rehearsal.
+
+## Slice 04 — Boundary Modeling and Proof Portfolio Reset
+
+Outcome: replace branch-mirroring defensive tests with a <=100-case Promotion
+portfolio whose cases protect user/system contracts, while moving input-shape
+authority to explicit trust-boundary models.
+
+Implementation status: repository implementation complete; local check, 30-case
+portfolio, application smoke, frozen package, packaged smoke, workflow YAML, diff
+validation, and all three real-provider headed benchmark journeys pass their
+execution/integrity boundary. The cleaning journey records a semantic model failure
+without failing its UI execution. Workflow control transition and remote timing
+acceptance remain.
+
+Planned changes:
+
+- Replace distributed Knowledge cancellation callbacks with one parent-owned,
+  killable process-tree boundary and one typed private-stage result.
+- Make the parent/write coordinator the only authority that admits worker output
+  to canonical CAS.
+- Replace synchronous document cleanup orchestration with transactional membership
+  deactivation; retrieval/corpus generation bind to active membership while GC,
+  logs, and index convergence remain independent concerns.
+- Retain exactly 30 residual-risk cases and delete branch-mirroring, schema
+  restatement, library, generic lifecycle, and low-value presentation tests.
+- Delete the semantic suite manifest/topology generator and run one direct pytest
+  portfolio.
+- Run one Windows/Python 3.14.2 CI job with one frozen dependency install,
+  repository checks, pytest, and JUnit evidence. Do not upload the 2.83 GiB venv
+  into a PR-scoped cache that later promotion PRs cannot reuse.
+- Expand strict Mypy/Pydantic coverage at the new Knowledge worker, content-store,
+  and lifecycle boundaries.
+- Add one case-agnostic headed execution adapter to the Agent Harness benchmark.
+  Reuse each case's real fixtures, provider matrix, preparation intent, outcome
+  oracle, Judge, and result persistence while driving Knowledge import, composer
+  attachment, model selection, and submission through the real Qt application.
+
+Acceptance:
+
+- Repository semantic pytest collects exactly 30 explicit cases with no hidden
+  Promotion selection or parameter inflation.
+- Knowledge cancellation has one managed-process authority rather than callback
+  checks distributed through the pipeline, and document removal is a corpus
+  membership transaction rather than a synchronous cleanup workflow.
+- Every retained case names one externally meaningful contract or costly
+  state/side-effect invariant; every removed case points to a stronger owner or
+  retained scenario.
+- Internal services consume Mypy-visible typed commands after boundary admission;
+  primitive/list/Literal/default checks are not repeated across layers.
+- Runtime dataset/state rules and external file/network/process/storage validation
+  remain at their true authority boundaries.
+- Local `pdm run check`, `pdm run test`, application smoke, package, and packaged
+  smoke pass.
+- Offline collection proves that headed mode adds no ordinary pytest cases, and
+  an explicit live headed run completes the existing cleaning, chart, and
+  Knowledge-plus-data scenarios with real configured providers and files.
+- The required check is transitioned from `Native CI Gate` to the one real
+  `Native CI` job without opening a merge gap.
+- Dependency, check, pytest, controlled total, and queue time are visible; at
+  least five qualifying Promotion runs meet the approved budget.
+- v1.3.1 release remains paused until this slice is accepted.

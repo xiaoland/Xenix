@@ -143,18 +143,6 @@ class KnowledgeIndexService:
             library_id=library_id,
         )
 
-    def reconcile_removed_corpus(self, library_id: str = "global") -> str | None:
-        """Reclaim invalidated vector bytes, then rebuild only when still useful."""
-
-        try:
-            self._semantic.cleanup_storage()
-        except Exception:
-            LOGGER.warning(
-                "Knowledge vector cleanup was deferred after document removal",
-                extra={"event_name": "knowledge.index.removal_cleanup_deferred"},
-            )
-        return self.notify_corpus_changed(library_id)
-
     def embedding_change_requires_confirmation(
         self,
         previous: EmbeddingSettings,

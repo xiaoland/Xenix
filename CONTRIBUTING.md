@@ -13,7 +13,7 @@
   run Native CI.
 - Promote accepted work through one same-repository GitHub PR whose head is
   `develop` and base is `main`. Native CI is scoped to PRs targeting `main`; its
-  stable `Native CI Gate` check is required before merge.
+  single stable `Native CI` check is required before merge.
 - Do not locally merge `develop` into `main` and push the result. Do not open
   feature-branch PRs directly to `main`.
 - A merged promotion makes its resulting `main` state release-eligible but does not
@@ -34,14 +34,13 @@
 - Python `3.14.2` is the project and packaged runtime.
 - `pdm install` installs project dependencies.
 - `pdm run dev` runs the desktop application.
-- `pdm run test` runs the manifest-owned test topology.
-- `pdm run pytest --promotion-shard <name>` runs one Promotion semantic shard;
-  `pdm run pytest --direct <pytest selectors/options>` is the explicit targeted
-  single-process route.
+- `pdm run test` runs the curated acceptance portfolio in one process.
+- `pdm run pytest --direct <pytest selectors/options>` runs a focused selection
+  with the same isolated temporary-path setup.
 - `pdm run lint` runs Ruff over source, tests, scripts, and benchmarks.
 - `pdm run typecheck` runs the strict Mypy slice over typed boundary modules.
 - `pdm run check` regenerates/checks Agent Skills, runs Ruff and Mypy, validates
-  the test manifest and native OCR lock, then compiles the Python tree.
+  the native OCR lock, then compiles the Python tree.
 - `pdm run i18n-extract` and `pdm run i18n-compile` update Qt translations.
 - `pdm run package` builds the Windows bundle.
 - `pdm run smoke-package` verifies the packaged executable.
@@ -61,6 +60,11 @@ Use the smallest verification set that proves the affected contract. Run `pdm ru
 ## Testing Intent
 
 - Avoid adding a narrow regression test for every fixed bug. A past failure is evidence to inspect the durable contract, not by itself a reason to preserve a tiny test forever.
-- Prefer high-signal tests that protect stable behavior: golden tests for deterministic payloads, projections, migrations, and artifact shapes; integrated tests for UI/service/storage/ML adapter boundaries; and E2E or smoke tests for critical user workflows.
-- Add lower-level unit or boundary tests when they protect a stable contract, isolate high-risk logic, shorten feedback for expensive failures, or cover config resolution, logging, resource loading, ML task orchestration, storage boundaries, migrations, or data-loss risks.
-- Do not add tests that only restate facts already guaranteed by source definitions, type contracts, enum membership, schema definitions, data models, or incidental implementation details.
+- Prefer a small acceptance portfolio around irreplaceable business outcomes,
+  irreversible data risks, migration/release compatibility, and a few critical
+  cross-boundary workflows.
+- Use typed boundary models, mature library guarantees, static analysis, packaged
+  smoke, and clear ownership before adding lower-level behavioral cases.
+- Do not add tests that restate source definitions, type/schema constraints,
+  enum membership, library behavior, defensive branches, widget structure, or
+  incidental implementation details.

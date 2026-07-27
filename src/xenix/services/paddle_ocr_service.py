@@ -707,7 +707,6 @@ class PaddleOcrSession(AbstractContextManager["PaddleOcrSession"]):
         *,
         output_path: Path | None = None,
         timeout: int = 300,
-        check_cancelled: Callable[[], object] | None = None,
     ) -> dict[str, object]:
         image = image_path.resolve()
         try:
@@ -721,7 +720,6 @@ class PaddleOcrSession(AbstractContextManager["PaddleOcrSession"]):
             "recognize",
             {"image_path": str(image)},
             timeout=timeout,
-            check_cancelled=check_cancelled,
         )
         payload = _normalized_ocr_result(result)
         if output_path is not None:
@@ -738,7 +736,6 @@ class PaddleOcrSession(AbstractContextManager["PaddleOcrSession"]):
         arguments: dict[str, object],
         *,
         timeout: int,
-        check_cancelled: Callable[[], object] | None = None,
     ) -> object:
         process = self._process
         if process is None or process.stdin is None or process.stdout is None:
@@ -754,13 +751,10 @@ class PaddleOcrSession(AbstractContextManager["PaddleOcrSession"]):
             "arguments": arguments,
         }
         with self._request_lock:
-            if check_cancelled is not None:
-                check_cancelled()
             _write_frame(process.stdin, message)
             response = _read_frame_with_poll(
                 process,
                 timeout=timeout,
-                check_cancelled=check_cancelled,
             )
         if (
             not isinstance(response, dict)
@@ -829,10 +823,7 @@ class PaddleOcrService:
         *,
         output_path: Path,
         timeout: int = 300,
-        check_cancelled: Callable[[], object] | None = None,
     ) -> dict[str, object]:
-        if check_cancelled is not None:
-            check_cancelled()
         with self.open_session(
             allowed_root=image_path.resolve().parent,
             log_path=output_path.with_suffix(".ocr.log"),
@@ -841,7 +832,6 @@ class PaddleOcrService:
                 image_path,
                 output_path=output_path,
                 timeout=timeout,
-                check_cancelled=check_cancelled,
             )
         return payload
 
@@ -1020,7 +1010,6 @@ def _read_frame_with_poll(
     process: subprocess.Popen[bytes],
     *,
     timeout: int,
-    check_cancelled: Callable[[], object] | None,
 ) -> object:
     assert process.stdout is not None
     result_queue: queue.Queue[tuple[object | None, BaseException | None]] = queue.Queue(maxsize=1)
@@ -1034,8 +1023,6 @@ def _read_frame_with_poll(
     threading.Thread(target=read, name="xenix-ocr-response", daemon=True).start()
     deadline = time.monotonic() + max(1, timeout)
     while True:
-        if check_cancelled is not None:
-            check_cancelled()
         if process.poll() is not None and result_queue.empty():
             raise ValidationError(
                 "Local OCR worker exited unexpectedly.",

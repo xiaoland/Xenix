@@ -45,6 +45,20 @@ def setup_logging(paths: AppPaths) -> Path:
     return log_path
 
 
+def shutdown_logging() -> None:
+    """Release process-wide handlers owned by the desktop runtime."""
+
+    root_logger = logging.getLogger()
+    handlers = tuple(root_logger.handlers)
+    root_logger.handlers.clear()
+    for handler in handlers:
+        try:
+            handler.flush()
+        finally:
+            handler.close()
+    logging.captureWarnings(False)
+
+
 def get_logger(name: str):
     return structlog.get_logger(name)
 

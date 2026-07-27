@@ -19,55 +19,7 @@ def _load_script(name: str):
     return module
 
 
-package_velopack = _load_script("package_velopack")
 publish_release = _load_script("publish_oss_release")
-
-
-def test_package_assets_drop_deleted_portable(tmp_path: Path) -> None:
-    setup_name = "xenix-Setup.exe"
-    full_name = "xenix-full.nupkg"
-    (tmp_path / setup_name).write_bytes(b"setup")
-    (tmp_path / full_name).write_bytes(b"full")
-    assets_path = tmp_path / "assets.win-x64-stable.json"
-    assets_path.write_text(
-        json.dumps(
-            [
-                {"RelativeFileName": setup_name, "Type": "Installer"},
-                {"RelativeFileName": full_name, "Type": "Full"},
-                {"RelativeFileName": "xenix-Portable.zip", "Type": "Portable"},
-            ]
-        ),
-        encoding="utf-8",
-    )
-
-    package_velopack.prune_missing_assets(tmp_path)
-
-    assert json.loads(assets_path.read_text(encoding="utf-8")) == [
-        {"RelativeFileName": setup_name, "Type": "Installer"},
-        {"RelativeFileName": full_name, "Type": "Full"},
-    ]
-
-
-def test_public_assets_project_from_manifest_artifacts() -> None:
-    release_data = json.dumps(
-        [
-            {"RelativeFileName": "xenix-Setup.exe", "Type": "Installer"},
-            {"RelativeFileName": "xenix-full.nupkg", "Type": "Full"},
-            {"RelativeFileName": "xenix-Portable.zip", "Type": "Portable"},
-        ],
-        separators=(",", ":"),
-    ).encode("utf-8")
-
-    projected = publish_release.public_feed_data(
-        "assets.win-x64-stable.json",
-        release_data,
-        {"assets.win-x64-stable.json", "xenix-Setup.exe", "xenix-full.nupkg"},
-    )
-
-    assert json.loads(projected) == [
-        {"RelativeFileName": "xenix-Setup.exe", "Type": "Installer"},
-        {"RelativeFileName": "xenix-full.nupkg", "Type": "Full"},
-    ]
 
 
 def _release_fixture(tmp_path: Path, *, version: str = "1.2.0"):
@@ -217,32 +169,6 @@ class FakeReleaseStore:
         assert key in self.objects
 
 
-def test_manifest_contract_binds_tag_commit_promotion_and_ocr(tmp_path: Path) -> None:
-    plan, _ = _release_fixture(tmp_path)
-
-    assert plan.tag == "v1.2.0"
-    assert plan.manifest["commit"] == "a" * 40
-    assert [item["type"] for item in plan.artifacts].count(
-        "knowledge_ocr_runtime"
-    ) == 1
-
-
-def test_manifest_contract_rejects_unsafe_artifact_path(tmp_path: Path) -> None:
-    plan, _ = _release_fixture(tmp_path)
-    manifest = dict(plan.manifest)
-    manifest["artifacts"] = [dict(item) for item in plan.artifacts]
-    manifest["artifacts"][0]["path"] = "../unsafe.exe"
-
-    with pytest.raises(RuntimeError, match="artifact identity"):
-        publish_release.validated_artifacts(
-            manifest,
-            expected_tag=plan.tag,
-            expected_commit=plan.manifest["commit"],
-            expected_promotion_pr=42,
-            expected_repository="xiaoland/Xenix",
-        )
-
-
 def test_direct_release_updates_setup_and_publishes_canonical_feed_last(
     tmp_path: Path,
 ) -> None:
@@ -313,32 +239,3 @@ def test_release_version_regression_is_rejected_before_mutation(tmp_path: Path) 
         publish_release.publish_release(plan, store)
 
     assert store.mutations == []
-
-
-def test_release_status_outputs_bind_tag_version_and_rollback_history(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    plan, _ = _release_fixture(tmp_path)
-    output = tmp_path / "github-output.txt"
-    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
-    result = publish_release.PublicationResult(
-        history_prefix="published/publication-history/v1.2.0/run-attempt",
-        publication_seconds=42.5,
-        visibility_seconds=3.25,
-    )
-
-    evidence_path = publish_release._write_publication_evidence(plan, result)
-    publish_release._write_github_outputs(plan, result)
-
-    assert output.read_text(encoding="utf-8").splitlines() == [
-        "published_version=1.2.0",
-        "published_tag=v1.2.0",
-        "rollback_history=published/publication-history/v1.2.0/run-attempt/",
-        "publication_seconds=42.5",
-        "visibility_seconds=3.25",
-    ]
-    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
-    assert evidence["commit"] == "a" * 40
-    assert evidence["publication_seconds"] == 42.5
-    assert evidence["visibility_seconds"] == 3.25

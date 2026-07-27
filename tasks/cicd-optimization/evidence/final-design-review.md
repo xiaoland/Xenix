@@ -1,5 +1,9 @@
 # Final Simplified Design Review and Execution Simulation
 
+> Historical design evidence. Slice 04 supersedes its multi-shard and
+> `Native CI Gate` decisions with one real `Native CI` job and the 30-case
+> residual-risk portfolio documented in the task packet.
+
 ## Verdict
 
 Remove Candidate as a business state and delivery boundary. Its private object

@@ -670,12 +670,11 @@ def test_fresh_v23_schema_is_orm_fts_fk_and_unique_readable(
     _assert_current_round_trip(context, suffix="f")
 
 
-@pytest.mark.parametrize("version", [15, 16, 17, 18, 19, 20, 21])
 def test_static_supported_fixture_upgrades_with_orm_fts_and_fk_proof(
     monkeypatch,
     tmp_path: Path,
-    version: int,
 ) -> None:
+    version = 21
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / f"xenix-home-{version}"))
     paths = ensure_app_dirs(get_app_paths())
     _create_static_knowledge_database(database_path(paths), version)
@@ -759,23 +758,12 @@ def test_v20_migration_deterministically_repairs_duplicate_import_attempt_number
         ]
 
 
-@pytest.mark.parametrize(
-    ("version", "table_to_remove"),
-    [
-        (15, "artifact"),
-        (16, "knowledge_import"),
-        (17, "knowledge_unit_fts"),
-        (18, "knowledge_vector_generation"),
-        (19, "knowledge_canonical_generation"),
-        (20, "knowledge_derivation"),
-    ],
-)
 def test_supported_version_with_incomplete_source_shape_is_preserved(
     monkeypatch,
     tmp_path: Path,
-    version: int,
-    table_to_remove: str,
 ) -> None:
+    version = 20
+    table_to_remove = "knowledge_derivation"
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / f"xenix-home-{version}"))
     paths = ensure_app_dirs(get_app_paths())
     db_path = database_path(paths)
