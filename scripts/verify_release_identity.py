@@ -44,17 +44,24 @@ def _git(root: Path, *args: str) -> str:
 
 
 def _release_configuration(root: Path) -> tuple[str, int]:
-    version = str(
-        tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))[
-            "project"
-        ]["version"]
-    )
+    project = tomllib.loads(
+        (root / "pyproject.toml").read_text(encoding="utf-8")
+    )["project"]
+    version = str(project["version"])
     release = tomllib.loads((root / "release.toml").read_text(encoding="utf-8"))
     protocol_version = release.get("release", {}).get("protocol_version")
     if protocol_version != RELEASE_PROTOCOL_VERSION:
         raise RuntimeError(
             "Release protocol is unsupported: "
             f"expected {RELEASE_PROTOCOL_VERSION}, found {protocol_version!r}."
+        )
+    release_python = release.get("toolchain", {}).get("python")
+    project_python = project.get("requires-python")
+    if project_python != f"=={release_python}":
+        raise RuntimeError(
+            "Release Python toolchain must exactly match project requires-python: "
+            f"release.toml declares {release_python!r}, "
+            f"pyproject.toml declares {project_python!r}."
         )
     return version, protocol_version
 
