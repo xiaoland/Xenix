@@ -2,9 +2,9 @@
 
 ## Status
 
-Release preparation is active. The first stopping point is a successful Native CI
-run on the `develop -> main` promotion PR. No `v1.3.0` tag exists and no release
-workflow or public publication is authorized before the user resumes.
+Release execution is active. Promotion PR #111 passed Native CI and was merged,
+but release preflight found a Python toolchain identity drift that must be promoted
+before the immutable `v1.3.0` tag is created.
 
 ## Objective
 
@@ -19,10 +19,10 @@ promotion and tag-triggered release path as its first production rehearsal.
   without rebasing or force-pushing.
 - Promote only through the same-repository `develop -> main` PR and require its
   stable `Native CI Gate`.
-- Stop after the promotion CI succeeds. Do not merge the PR or create/push
-  `v1.3.0` in this slice.
-- After resumption, tag only the completed promotion result on `main`; run the
+- Tag only the completed promotion result on `main`; run the
   mandatory local release-identity preflight before pushing the immutable tag.
+- Keep `pyproject.toml`, `release.toml`, CI, and release workflows on the same
+  exact Python runtime; release identity must reject configuration drift.
 - Release secrets remain confined to the tag-bound `native-release` Environment.
 - Preserve the unrelated uncommitted files in the primary develop worktree.
 
@@ -34,20 +34,31 @@ promotion and tag-triggered release path as its first production rehearsal.
   `main` base.
 - All four Python 3.14.2 semantic shards and the stable `Native CI Gate` pass on
   the final promotion head.
+- Local release identity accepts the exact `v1.3.0` tag, main first-parent
+  membership, and promotion PR before the tag is pushed.
+- The tag-bound Native Release workflow succeeds and publishes the canonical
+  v1.3.0 feed and release evidence.
 - The CI timing report records controlled, queue, and calendar durations; this
   first run is evidence but does not by itself satisfy the five-run acceptance
   sample.
 
 ## Current Truth
 
-- `origin/codex/cicd-simplification` was fast-forwarded into `origin/develop`.
-- Local `develop` merge-pulled that remote state while preserving product commit
-  `931450f`; the resulting source declares version `1.3.0`.
-- `v1.3.0` is unused remotely and no existing `develop -> main` PR is open.
+- Promotion PR #111 merged `develop` into `main` as `6fcbb001`, after all four
+  Python 3.14.2 semantic shards and `Native CI Gate` succeeded.
+- The promoted source declares project/runtime Python `3.14.2`, but
+  `release.toml` still recorded `3.14.6`; publishing from that state would make
+  the immutable release manifest false.
+- `v1.3.0` remains unused locally and remotely, and no release workflow has run.
+- PR #112's first Native CI attempt exposed three release-identity behavior
+  fixtures that omitted the newly required Python fields. The validator remained
+  fail-closed; the fixtures now share one complete configuration writer, and the
+  full 144-test `platform-release` shard passes locally.
 - GitHub branch/tag rules and the `native-release` Environment still require the
   separately verified rollout described by the CI/CD task packet.
 
 ## Next Step
 
-Commit and push the v1.3.0 release preparation on `develop`, open the promotion PR,
-wait for the final Native CI run, record its result, and stop before merge or tag.
+Promote the exact Python toolchain correction through `develop -> main`, then tag
+that completed promotion result, run local release-identity preflight, push the
+tag, and monitor Native Release through canonical publication.

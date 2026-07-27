@@ -10,6 +10,6 @@ channel = "win-x64-stable"
 runtime = "win10.0.17763-x64"
 
 [toolchain]
-python = "3.14.6"
+python = "3.14.2"
 pdm = "2.26.6"
 velopack = "1.2.0"

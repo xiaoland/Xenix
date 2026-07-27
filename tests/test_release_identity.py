@@ -21,6 +21,26 @@ def _load_script(name: str):
 release_identity = _load_script("verify_release_identity")
 
 
+def _write_release_configuration(
+    root: Path,
+    *,
+    version: str = "1.2.0",
+    python: str = "3.14.2",
+    protocol_version: int = 1,
+) -> None:
+    (root / "pyproject.toml").write_text(
+        f'[project]\nversion = "{version}"\nrequires-python = "=={python}"\n',
+        encoding="utf-8",
+    )
+    (root / "release.toml").write_text(
+        "[release]\n"
+        f"protocol_version = {protocol_version}\n"
+        "[toolchain]\n"
+        f'python = "{python}"\n',
+        encoding="utf-8",
+    )
+
+
 def _promotion_record(
     commit: str,
     *,
@@ -68,14 +88,7 @@ def test_verify_accepts_historical_first_parent_promotion(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     commit = "a" * 40
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nversion = "1.2.0"\n',
-        encoding="utf-8",
-    )
-    (tmp_path / "release.toml").write_text(
-        "[release]\nprotocol_version = 1\n",
-        encoding="utf-8",
-    )
+    _write_release_configuration(tmp_path)
 
     def git(_root: Path, *args: str) -> str:
         if args == ("rev-parse", "HEAD"):
@@ -111,14 +124,7 @@ def test_verify_rejects_side_branch_ancestor(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     commit = "a" * 40
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nversion = "1.2.0"\n',
-        encoding="utf-8",
-    )
-    (tmp_path / "release.toml").write_text(
-        "[release]\nprotocol_version = 1\n",
-        encoding="utf-8",
-    )
+    _write_release_configuration(tmp_path)
 
     def git(_root: Path, *args: str) -> str:
         if args == ("rev-parse", "HEAD"):
@@ -145,14 +151,7 @@ def test_release_protocol_and_tag_must_match_project_version(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     commit = "a" * 40
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nversion = "1.2.0"\n',
-        encoding="utf-8",
-    )
-    (tmp_path / "release.toml").write_text(
-        "[release]\nprotocol_version = 1\n",
-        encoding="utf-8",
-    )
+    _write_release_configuration(tmp_path)
     monkeypatch.setattr(
         release_identity,
         "_git",
@@ -164,9 +163,6 @@ def test_release_protocol_and_tag_must_match_project_version(
     with pytest.raises(RuntimeError, match="exactly tag"):
         release_identity.verify(tmp_path, require_tag=True)
 
-    (tmp_path / "release.toml").write_text(
-        "[release]\nprotocol_version = 2\n",
-        encoding="utf-8",
-    )
+    _write_release_configuration(tmp_path, protocol_version=2)
     with pytest.raises(RuntimeError, match="protocol is unsupported"):
         release_identity.verify(tmp_path, require_tag=False)
