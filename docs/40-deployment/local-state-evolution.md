@@ -43,14 +43,15 @@ unknown, corrupt, link-like, referenced, and out-of-root shapes remain untouched
 This authority is separate from vector reconciliation and never deletes vector
 generations or arbitrary staging entries.
 
-Knowledge document removal uses the same ownership boundaries but is not startup
-recovery. One guarded SQLite transaction is the visibility cutover: it removes the
-document's searchable and completed lifecycle lineage, releases only unreferenced
-Knowledge-owned source Artifact registrations, and invalidates affected Library
-vector-generation metadata. Import logs and source/canonical/vector bytes are then
-best-effort post-commit maintenance. A cleanup failure is safe to retry through the
-existing owner-specific maintenance paths and must not restore SQLite visibility.
-The original user-selected file is outside every cleanup root.
+Knowledge document removal is a library-membership change, not startup recovery or
+physical cleanup. One guarded SQLite transaction deactivates membership and is the
+visibility cutover. Retrieval and corpus fingerprints admit active membership only;
+index convergence follows through an independent corpus-change task. Import,
+derivation, canonical, Artifact, and task-log lineage remains managed state and is
+not synchronously dismantled. A future retention/reachability policy may reclaim
+eligible app-owned payloads under its own authority. Re-importing the same
+same-library SHA-256 reactivates the existing identity. The original user-selected
+file remains outside every app cleanup root.
 
 Observable Knowledge index tasks are SQLite business metadata, not Lance authority.
 When their table is introduced, use a fixed forward migration and prove both the

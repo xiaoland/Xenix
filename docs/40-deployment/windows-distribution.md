@@ -14,7 +14,7 @@ Setup.
 
 `develop` is the integration line. Promote it through a same-repository
 `develop -> main` pull request. Native CI is scoped to PRs targeting `main`; its
-stable `Native CI Gate` check is required. Do not locally merge and push `main`,
+single stable `Native CI` check is required. Do not locally merge and push `main`,
 and do not use a feature branch as the head of a `main` PR.
 
 Merging the promotion PR creates a release-eligible `main` result but publishes
@@ -125,7 +125,7 @@ Activation or a parser-helper exercise alone is insufficient.
 Before enabling the workflow:
 
 - protect `main` with pull-request-only changes, deletion/force-push prevention,
-  and required check `Native CI Gate`;
+  and required check `Native CI`;
 - protect `refs/tags/v*` from deletion and non-fast-forward updates;
 - create the `native-release` Environment with a custom deployment policy that
   admits `v*` tags only and has no second required reviewer or wait timer;
@@ -171,7 +171,7 @@ queue time.
 
 | Boundary | Acceptance budget |
 | --- | --- |
-| Promotion Native CI | median `<= 18 min`, no qualifying run `> 25 min`, over at least five successes |
+| Promotion Native CI | median `<= 12 min`, no qualifying run `> 15 min`, over at least five successes; queue time reported separately |
 | Cold tag release to canonical feed | `<= 90 min` |
 | Direct upload plus remote verification | `<= 30 min` |
 | Interrupted-upload same-tag retry | `<= 70 min` |

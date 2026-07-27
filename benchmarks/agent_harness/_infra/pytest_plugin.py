@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from .contracts import BenchmarkCase, BenchmarkRunStatus
+from .contracts import BenchmarkCase, BenchmarkExecutionMode, BenchmarkRunStatus
 from .runner import DEFAULT_OUTPUT_DIRECTORY, BenchmarkRun, run_benchmark
 
 if TYPE_CHECKING:
@@ -32,6 +32,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=False,
         dest="agent_harness_live",
         help="Allow selected Agent Harness benchmark cases to call configured providers.",
+    )
+    group.addoption(
+        "--headed",
+        action="store_true",
+        default=False,
+        dest="agent_harness_headed",
+        help="Drive each selected real-provider case through the visible desktop UI.",
     )
     group.addoption(
         "--llm-settings",
@@ -113,6 +120,11 @@ class AgentHarnessBenchmarkController:
                 "agent_harness_embedding_settings",
             ),
             case=case,
+            execution_mode=(
+                BenchmarkExecutionMode.HEADED
+                if self.config.getoption("agent_harness_headed")
+                else BenchmarkExecutionMode.HEADLESS
+            ),
             output_directory=Path(
                 self.config.getoption("agent_harness_output_directory")
             ),
@@ -141,6 +153,7 @@ class AgentHarnessBenchmarkController:
                 "agent-harness-benchmark:",
                 f"case={result.case_id}",
                 f"model={result.provider_model}",
+                f"mode={result.execution_mode.value}",
                 f"run={result.run_status.value}",
                 f"semantic={result.semantic_verdict.value}",
                 f"integrity={result.integrity_passed}",

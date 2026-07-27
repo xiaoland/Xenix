@@ -158,6 +158,7 @@ class KnowledgeImportService:
         artifact_service: ArtifactService,
         worker_runner: KnowledgeImportWorkerRunner | None = None,
         canonical_ready_notifier: Callable[[str, str, str | None], object] | None = None,
+        corpus_changed_notifier: Callable[[str], object] | None = None,
         start_worker: bool = True,
     ) -> None:
         self._paths = paths
@@ -168,6 +169,7 @@ class KnowledgeImportService:
         self._probe = FileProbe()
         self._worker_runner = worker_runner or LocalKnowledgeImportWorkerRunner()
         self._canonical_ready_notifier = canonical_ready_notifier
+        self._corpus_changed_notifier = corpus_changed_notifier
         self._queue: queue.Queue[str | object] = queue.Queue()
         self._passwords: dict[str, str] = {}
         self._password_lock = threading.Lock()
@@ -439,6 +441,8 @@ class KnowledgeImportService:
                     )
                     self._record_failure(item, exc)
             finally:
+                if isinstance(item, str):
+                    self._store.discard_staged_canonical_bundle(item)
                 self._queue.task_done()
 
     def _process_import(self, import_id: str) -> None:
@@ -502,9 +506,6 @@ class KnowledgeImportService:
                 error_code="knowledge_import_worker_timed_out",
                 retryable=True,
             ) from exc
-        if result.status == "cancelled":
-            self._mark_import_cancelled(import_id)
-            raise _ImportCancelled
         if result.status != "succeeded":
             error_code = result.error_code or "knowledge_import_failed"
             raise ValidationError(
@@ -520,14 +521,22 @@ class KnowledgeImportService:
             or result.media_type != probe.media_type
             or result.envelope_sha256 is None
             or result.content_ir_sha256 is None
-            or result.relative_path is None
+            or result.staged_relative_path is None
         ):
             raise ValidationError(
                 _SAFE_IMPORT_ERRORS["knowledge_canonical_integrity_failed"],
                 error_code="knowledge_canonical_integrity_failed",
             )
-        bundle = self._store.read_canonical_bundle(
-            result.relative_path,
+        self._raise_if_cancelled(import_id)
+        self._advance(import_id, status="running", phase="publishing_canonical")
+        self._log_event(
+            import_id,
+            phase="publishing_canonical",
+            event_code="canonical_publish_started",
+        )
+        bundle = self._store.publish_staged_canonical_bundle(
+            result.staged_relative_path,
+            import_id=import_id,
             expected_envelope_sha256=result.envelope_sha256,
             expected_content_ir_sha256=result.content_ir_sha256,
             expected_identity=CanonicalBundleIdentity(
@@ -673,7 +682,6 @@ class KnowledgeImportService:
             self._raise_if_cancelled(import_id)
             snapshot = self._store.snapshot_source(
                 source_reference,
-                check_cancelled=lambda: self._raise_if_cancelled(import_id),
                 maximum_bytes=MAX_SOURCE_BYTES,
             )
             authoritative = self._probe.probe(snapshot.path)
@@ -686,10 +694,14 @@ class KnowledgeImportService:
                     select(KnowledgeDocumentRow).where(
                         KnowledgeDocumentRow.library_id == row.library_id,
                         KnowledgeDocumentRow.source_sha256 == snapshot.sha256,
-                        KnowledgeDocumentRow.active.is_(True),
                     )
                 ).first()
                 if existing is not None:
+                    was_inactive = not existing.active
+                    if was_inactive:
+                        existing.active = True
+                        existing.updated_at = utc_now()
+                        session.add(existing)
                     row.attempt_number = self._next_attempt_number(
                         session,
                         planned_document_id=existing.id,
@@ -711,8 +723,24 @@ class KnowledgeImportService:
                     self._log_event(
                         import_id,
                         phase="completed",
-                        event_code="document_reused",
+                        event_code=(
+                            "document_reactivated"
+                            if was_inactive
+                            else "document_reused"
+                        ),
                     )
+                    if was_inactive and self._corpus_changed_notifier is not None:
+                        try:
+                            self._corpus_changed_notifier(row.library_id)
+                        except Exception:
+                            LOGGER.warning(
+                                "Knowledge index notification deferred to startup recovery",
+                                extra={
+                                    "event_name": (
+                                        "knowledge.index.notification_deferred"
+                                    )
+                                },
+                            )
                     return None
                 artifact = self._artifacts.register_artifact_in_session(
                     session,
@@ -931,7 +959,7 @@ class KnowledgeImportService:
             "routing",
             "parsing",
             "canonicalizing",
-            "publishing_canonical",
+            "staging_canonical",
         }:
             self._advance(import_id, status="running", phase=event.phase)
         self._log_event(

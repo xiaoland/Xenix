@@ -93,7 +93,7 @@ class _PendingComposerSubmission:
 
 class MainWindow(QMainWindow):
     closing = Signal()
-    _harness_failed = Signal(str)
+    _harness_failed = Signal(object)
     _harness_stream_event = Signal(object)
     _thread_title_generated = Signal(str, str)
     _thread_title_generation_failed = Signal(str, str)
@@ -505,7 +505,7 @@ class MainWindow(QMainWindow):
                     self._harness_stream_event.emit(event)
             except Exception as exc:
                 if isValid(self):
-                    self._harness_failed.emit(str(exc))
+                    self._harness_failed.emit(exc)
 
         threading.Thread(target=run_harness, name="xenix-agent-harness", daemon=True).start()
 
@@ -597,7 +597,8 @@ class MainWindow(QMainWindow):
             self._thread_detail_view.apply_chatbot_event(event.chatbot_event)
             return
 
-    def _render_harness_error(self, message: str) -> None:
+    def _render_harness_error(self, failure: object) -> None:
+        message = str(failure)
         self._thread_detail_view.hide_thinking_indicator()
         pending = self._pending_composer_submission
         self._pending_composer_submission = None

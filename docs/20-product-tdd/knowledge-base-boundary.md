@@ -54,17 +54,20 @@ canonical-ready generation
   generation, model pack, engine, protocol, and manifest identity actually used. It
   installs no Python packages and uses no global Paddle model cache. OCR runtime
   ownership is separate from LLM configuration and from import orchestration.
-- The selected user file is never modified. App-owned source and canonical bytes are
-  published through staging plus atomic rename. Same-library SHA-256 content reuses
-  the current imported document by default.
+- The selected user file is never modified. The parent snapshots source bytes into
+  app-owned CAS. A worker may write canonical bytes only to its exact private
+  attempt directory and returns one strict typed result manifest; the parent
+  validates its hashes/identity and atomically moves it into canonical CAS.
+  Same-library SHA-256 content reuses the current document membership by default.
 - Heavy probe/normalize/parse/OCR/canonical work for one attempt executes in one
   spawned process, including Docling conversion in that process. The child has no
-  SQLite or publication authority; the parent snapshots the source, supervises a
-  bounded operation timeout, validates the result and canonical identity, and alone
-  publishes application state. Crash, timeout, or cancellation cannot make a partial
-  document current. On Windows the import worker owns a kill-on-close Job Object, so
-  forced cancellation terminates the worker and any LibreOffice or native OCR
-  descendants as one process tree after the cooperative grace period.
+  SQLite or CAS-publication authority; the parent supervises one bounded operation,
+  validates its envelope, and alone publishes application state. Crash, timeout, or
+  cancellation leaves at most disposable private staging and cannot make a partial
+  document current. On Windows the import worker owns a kill-on-close Job Object.
+  Parent cancellation terminates that one managed boundary and its LibreOffice or
+  native OCR descendants; cancellation callbacks do not propagate through pipeline,
+  file, or OCR APIs.
 - Default application and service composition always selects the spawned runner.
   Inline execution is an explicit test seam; injecting a normalizer or OCR double
   cannot silently change the process topology or count as package evidence.
@@ -116,15 +119,16 @@ canonical-ready generation
   FTS rows. `KnowledgeService` is retrieval-only; test corpus seeders remain outside
   production code. A benchmark fixture enters through Import and canonical
   derivation rather than manufacturing a ready corpus.
-- `KnowledgeDocumentLifecycleService` owns user-requested document removal. It
-  atomically removes the exact inactive-claimed document's FTS/Unit and completed
-  import/derivation/canonical lineage, releases only unreferenced Knowledge-owned
-  source Artifact registrations, and invalidates vector-generation metadata for
-  the affected Library. Active import or derivation work yields a typed busy result.
-  Post-commit maintenance may reclaim proven-orphan app-owned source, canonical,
-  task-log, and vector bytes; it never mutates the user-selected original file.
-  When compatible content remains, the existing index owner receives one coalesced
-  corpus-change notification.
+- `KnowledgeDocumentLifecycleService` owns user-requested library membership
+  removal. One guarded transaction deactivates the active membership; active import
+  or derivation work yields a typed busy result. Retrieval and corpus fingerprints
+  select active membership, so the visibility cutover is immediate and a
+  superseded vector generation cannot remain authoritative. Index convergence is a
+  separate coalesced corpus-change notification. Source/canonical lineage, task
+  logs, and managed bytes are not synchronously deleted; retention/reachability
+  policy remains an independent storage concern and never mutates the user's
+  original file. Re-importing identical same-library content reactivates the same
+  document identity and emits the symmetric corpus-change notification.
 
 ## Agent Contract
 

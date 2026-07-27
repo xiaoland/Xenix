@@ -104,8 +104,8 @@ def validate_controls(
         )
         if isinstance(check, dict)
     }
-    if "Native CI Gate" not in status_contexts:
-        failures.append("main does not require the stable 'Native CI Gate' check")
+    if "Native CI" not in status_contexts:
+        failures.append("main does not require the stable 'Native CI' check")
 
     tag_rules = _applicable_rules(
         rulesets,
@@ -224,7 +224,7 @@ def audit_repository(
     if forbidden:
         raise RuntimeError(f"Superseded release workflows still exist: {forbidden!r}")
     print("release_controls=ready")
-    print("required_check=Native CI Gate")
+    print("required_check=Native CI")
     print("release_environment=native-release")
     print("release_ref_policy=v* tags only")
 

@@ -1,6 +1,6 @@
 [project]
 name = "xenix-native"
-version = "1.3.0"
+version = "1.3.1"
 description = "Xenix native"
 authors = [{ name = "Lan_zhijiang", email = "lanzhijiang@foxmail.com" }]
 readme = "README.md"
@@ -61,7 +61,6 @@ distribution = false
 agent-skills-check = "python scripts/agent_skills.py check"
 agent-skills-generate = "python scripts/agent_skills.py generate"
 knowledge-ocr-lock-check = "python scripts/build_knowledge_ocr_runtime.py --check-lock"
-test-suites-check = "python scripts/test_suites.py check"
 lint = "ruff check src tests scripts benchmarks"
 typecheck = "mypy"
 dev = { composite = ["agent-skills-generate", "python scripts/run_dev.py"] }
@@ -83,7 +82,8 @@ dist = "python scripts/build_distribution_zip.py"
 pytest = "python scripts/run_pytest.py"
 test = { composite = ["i18n-compile", "python scripts/run_pytest.py {args}"] }
 benchmark-agent-harness = "python scripts/run_agent_harness_benchmark.py"
-check = { composite = ["agent-skills-generate", "agent-skills-check", "lint", "typecheck", "knowledge-ocr-lock-check", "test-suites-check", "python -m compileall src tests benchmarks scripts"] }
+benchmark-agent-harness-headed = "python scripts/run_agent_harness_headed_benchmark.py"
+check = { composite = ["agent-skills-generate", "agent-skills-check", "lint", "typecheck", "knowledge-ocr-lock-check", "python -m compileall src tests benchmarks scripts"] }
 diagnostic-bundle = "python scripts/create_diagnostic_bundle.py"
 
 [tool.pytest.ini_options]
@@ -94,7 +94,7 @@ markers = [
 ]
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py314"
 line-length = 120
 src = ["src"]
 extend-exclude = ["ml", "tasks"]
@@ -113,7 +113,6 @@ platform = "win32"
 mypy_path = "src"
 files = [
     "scripts/build_knowledge_ocr_runtime.py",
-    "scripts/test_suites.py",
     "src/xenix/datetime_utils.py",
     "src/xenix/release_config.py",
     "src/xenix/trial_lock.py",
@@ -121,7 +120,10 @@ files = [
     "src/xenix/services/agent/skill_catalog.py",
     "src/xenix/services/agent/tool_inputs.py",
     "src/xenix/services/data_tokenization_contracts.py",
+    "src/xenix/services/knowledge_content_store.py",
+    "src/xenix/services/knowledge_document_lifecycle_service.py",
     "src/xenix/services/knowledge_formats.py",
+    "src/xenix/services/knowledge_import_worker.py",
     "src/xenix/services/llm/tooling.py",
     "src/xenix/services/ml/contracts.py",
     "src/xenix/services/ml/registry.py",

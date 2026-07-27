@@ -3,14 +3,24 @@ from __future__ import annotations
 import json
 import os
 import queue
-import re
+import shutil
 import time
 from collections.abc import Callable
-from dataclasses import asdict, dataclass, field
 from multiprocessing import get_context
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Protocol
+from typing import Annotated, Any, Literal, Protocol, Self
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PositiveInt,
+    StringConstraints,
+    TypeAdapter,
+    ValidationError as PydanticValidationError,
+    model_validator,
+)
 
 from ..config import AppPaths
 from ..exceptions import ValidationError
@@ -21,66 +31,96 @@ from .paddle_ocr_service import PaddleOcrDeploymentService, PaddleOcrService
 from .storage.layout import knowledge_import_result_path, knowledge_import_task_root
 from .windows_process_tree import arm_current_process_tree
 
-_RESULT_SCHEMA_VERSION = 2
 _MAX_RESULT_BYTES = 256 * 1024
 _DEFAULT_OPERATION_TIMEOUT_SECONDS = 15 * 60
-_TASK_ID = re.compile(r"[0-9a-f]{32}\Z")
-_SHA256 = re.compile(r"[0-9a-f]{64}\Z")
-_EVENT_TOKEN = re.compile(r"[a-z0-9_.-]{1,80}\Z")
-_SUCCESS_KEYS = frozenset(
-    {
-        "schema_version",
-        "status",
-        "worker_pid",
-        "canonical_generation_id",
-        "media_type",
-        "envelope_sha256",
-        "content_ir_sha256",
-        "relative_path",
-        "pipeline",
-        "warnings",
-        "error_code",
-        "failure_stage",
-        "diagnostic_code",
-        "retryable",
-    }
-)
+TaskId = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{32}$")]
+Sha256 = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
+EventToken = Annotated[str, StringConstraints(pattern=r"^[a-z0-9_.-]{1,80}$")]
+BoundedWarning = Annotated[str, StringConstraints(max_length=200)]
+_EVENT_TOKEN_ADAPTER = TypeAdapter(EventToken)
 
 
-@dataclass(frozen=True)
-class KnowledgeImportWorkerRequest:
+class _WorkerBoundaryModel(BaseModel):
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        extra="forbid",
+        frozen=True,
+        strict=True,
+    )
+
+
+class KnowledgeImportWorkerRequest(_WorkerBoundaryModel):
     paths: AppPaths
-    import_id: str
+    import_id: TaskId
     source_path: str
-    expected_source_sha256: str
+    expected_source_sha256: Sha256
     expected_source_format: str
     expected_media_type: str | None
     identity: CanonicalIdentity
-    password: str | None = field(default=None, repr=False)
+    password: str | None = Field(default=None, repr=False)
+
+    @model_validator(mode="after")
+    def _identity_is_consistent(self) -> Self:
+        if (
+            self.identity.import_id != self.import_id
+            or self.identity.source_sha256 != self.expected_source_sha256
+        ):
+            raise ValueError("Knowledge import worker identity is inconsistent.")
+        return self
 
 
-@dataclass(frozen=True)
-class KnowledgeImportWorkerEvent:
-    phase: str
-    event_code: str
-    level: str = "info"
+class KnowledgeImportWorkerEvent(_WorkerBoundaryModel):
+    phase: EventToken
+    event_code: EventToken
+    level: Literal["info", "warning", "error"] = "info"
 
 
-@dataclass(frozen=True)
-class KnowledgeImportWorkerResult:
-    status: str
-    worker_pid: int
-    canonical_generation_id: str | None = None
+class KnowledgeImportWorkerResult(_WorkerBoundaryModel):
+    schema_version: Literal[3] = 3
+    status: Literal["succeeded", "failed"]
+    worker_pid: PositiveInt
+    canonical_generation_id: TaskId | None = None
     media_type: str | None = None
-    envelope_sha256: str | None = None
-    content_ir_sha256: str | None = None
-    relative_path: str | None = None
-    pipeline: dict[str, Any] = field(default_factory=dict)
-    warnings: tuple[str, ...] = ()
-    error_code: str | None = None
-    failure_stage: str | None = None
-    diagnostic_code: str | None = None
+    envelope_sha256: Sha256 | None = None
+    content_ir_sha256: Sha256 | None = None
+    staged_relative_path: str | None = None
+    pipeline: dict[str, Any] = Field(default_factory=dict)
+    warnings: tuple[BoundedWarning, ...] = ()
+    error_code: EventToken | None = None
+    failure_stage: EventToken | None = None
+    diagnostic_code: EventToken | None = None
     retryable: bool = False
+
+    @model_validator(mode="after")
+    def _status_fields_are_consistent(self) -> Self:
+        if self.status == "succeeded":
+            if (
+                self.canonical_generation_id is None
+                or not self.staged_relative_path
+                or self.envelope_sha256 is None
+                or self.content_ir_sha256 is None
+                or self.error_code is not None
+                or self.failure_stage is not None
+                or self.diagnostic_code is not None
+            ):
+                raise ValueError("Knowledge import worker success result is invalid.")
+            return self
+        if (
+            self.error_code is None
+            or self.failure_stage is None
+            or self.diagnostic_code is None
+            or any(
+                value is not None
+                for value in (
+                    self.canonical_generation_id,
+                    self.envelope_sha256,
+                    self.content_ir_sha256,
+                    self.staged_relative_path,
+                )
+            )
+        ):
+            raise ValueError("Knowledge import worker failure result is invalid.")
+        return self
 
 
 class KnowledgeImportWorkerRunner(Protocol):
@@ -121,16 +161,16 @@ class LocalKnowledgeImportWorkerRunner:
         task_root = knowledge_import_task_root(request.paths, request.import_id)
         task_root.mkdir(parents=True, exist_ok=True)
         result_path.unlink(missing_ok=True)
+        shutil.rmtree(task_root / "canonical", ignore_errors=True)
         context = get_context("spawn")
-        cancel_event = context.Event()
         event_queue = context.Queue()
         process = context.Process(
             target=_managed_knowledge_import_worker_entry,
-            args=(self._entrypoint, request, cancel_event, event_queue),
+            args=(self._entrypoint, request, event_queue),
             name=f"xenix-knowledge-import-{request.import_id[:8]}",
         )
-        cancellation_started: float | None = None
         timed_out = False
+        cancelled = False
         process_started = False
         try:
             try:
@@ -139,9 +179,9 @@ class LocalKnowledgeImportWorkerRunner:
             except (OSError, RuntimeError) as exc:
                 on_event(
                     KnowledgeImportWorkerEvent(
-                        "failed",
-                        "worker_launch_failed",
-                        "error",
+                        phase="failed",
+                        event_code="worker_launch_failed",
+                        level="error",
                     )
                 )
                 raise KnowledgeImportWorkerLaunchFailed from exc
@@ -149,43 +189,32 @@ class LocalKnowledgeImportWorkerRunner:
             while process.is_alive():
                 _drain_events(event_queue, on_event)
                 if is_cancelled():
-                    cancel_event.set()
-                    if cancellation_started is None:
-                        cancellation_started = time.monotonic()
-                    elif time.monotonic() - cancellation_started >= self._cancel_grace:
-                        process.terminate()
-                elif (
-                    cancellation_started is None
-                    and time.monotonic() - operation_started >= self._operation_timeout
-                ):
+                    cancelled = True
+                    _stop_process(process, grace=self._cancel_grace)
+                    break
+                if time.monotonic() - operation_started >= self._operation_timeout:
                     timed_out = True
-                    cancellation_started = time.monotonic()
-                    cancel_event.set()
                     on_event(
                         KnowledgeImportWorkerEvent(
-                            "failed",
-                            "worker_operation_timed_out",
-                            "error",
+                            phase="failed",
+                            event_code="worker_operation_timed_out",
+                            level="error",
                         )
                     )
-                elif (
-                    timed_out
-                    and cancellation_started is not None
-                    and time.monotonic() - cancellation_started >= self._cancel_grace
-                ):
-                    process.terminate()
+                    _stop_process(process, grace=self._cancel_grace)
+                    break
                 process.join(self._poll_interval)
             _drain_events(event_queue, on_event)
             if timed_out:
                 raise KnowledgeImportWorkerTimedOut
-            if cancellation_started is not None or is_cancelled():
+            if cancelled or is_cancelled():
                 raise KnowledgeImportWorkerCancelled
             if process.exitcode != 0:
                 on_event(
                     KnowledgeImportWorkerEvent(
-                        "failed",
-                        "worker_process_crashed",
-                        "error",
+                        phase="failed",
+                        event_code="worker_process_crashed",
+                        level="error",
                     )
                 )
                 raise KnowledgeImportWorkerCrashed
@@ -194,19 +223,15 @@ class LocalKnowledgeImportWorkerRunner:
             except KnowledgeImportWorkerCrashed:
                 on_event(
                     KnowledgeImportWorkerEvent(
-                        "failed",
-                        "worker_result_invalid",
-                        "error",
+                        phase="failed",
+                        event_code="worker_result_invalid",
+                        level="error",
                     )
                 )
                 raise
         finally:
             if process_started and process.is_alive():
-                process.terminate()
-                process.join(self._cancel_grace)
-            if process_started and process.is_alive():
-                process.kill()
-                process.join()
+                _stop_process(process, grace=self._cancel_grace)
             event_queue.close()
             event_queue.join_thread()
 
@@ -242,9 +267,12 @@ class InlineKnowledgeImportWorkerRunner:
             parents=True, exist_ok=True
         )
         result_path.unlink(missing_ok=True)
+        shutil.rmtree(
+            knowledge_import_task_root(request.paths, request.import_id) / "canonical",
+            ignore_errors=True,
+        )
         _run_worker_operation(
             request,
-            is_cancelled=is_cancelled,
             on_event=on_event,
             normalizer=self._normalizer,
             parser=self._parser,
@@ -272,23 +300,22 @@ class KnowledgeImportWorkerLaunchFailed(Exception):
 
 
 def _managed_knowledge_import_worker_entry(
-    entrypoint,
-    request,
-    cancel_event,
-    event_queue,
+    entrypoint: Callable[[KnowledgeImportWorkerRequest, Any], None],
+    request: KnowledgeImportWorkerRequest,
+    event_queue: Any,
 ) -> None:
     # Keep this handle live until process exit. Closing the last handle while the
     # worker is still alive would intentionally terminate the worker itself.
     process_tree_handle = arm_current_process_tree()
-    entrypoint(request, cancel_event, event_queue)
+    entrypoint(request, event_queue)
     _ = process_tree_handle
 
 
-def knowledge_import_worker_entry(request, cancel_event, event_queue) -> None:
+def knowledge_import_worker_entry(
+    request: KnowledgeImportWorkerRequest,
+    event_queue: Any,
+) -> None:
     """Top-level entrypoint required by Windows spawn and frozen executables."""
-
-    def is_cancelled() -> bool:
-        return bool(cancel_event.is_set())
 
     def on_event(event: KnowledgeImportWorkerEvent) -> None:
         try:
@@ -296,13 +323,12 @@ def knowledge_import_worker_entry(request, cancel_event, event_queue) -> None:
         except Exception:
             pass
 
-    _run_worker_operation(request, is_cancelled=is_cancelled, on_event=on_event)
+    _run_worker_operation(request, on_event=on_event)
 
 
 def _run_worker_operation(
     request: KnowledgeImportWorkerRequest,
     *,
-    is_cancelled: Callable[[], bool],
     on_event: Callable[[KnowledgeImportWorkerEvent], None],
     normalizer: FormatNormalizer | None = None,
     parser: ParseExecutor | None = None,
@@ -320,7 +346,6 @@ def _run_worker_operation(
         router = ParserRouter()
         canonicalizer = Canonicalizer()
         _emit(on_event, "probing", "worker_started")
-        _raise_if_cancelled(is_cancelled)
         source = actual_store.verify_source_snapshot(
             Path(request.source_path),
             expected_sha256=request.expected_source_sha256,
@@ -336,14 +361,12 @@ def _run_worker_operation(
             )
         with TemporaryDirectory(prefix="xenix-knowledge-import-") as temp:
             work_dir = Path(temp)
-            check_cancelled = lambda: _raise_if_cancelled(is_cancelled)
             failure_stage = "normalizing"
             _emit(on_event, "normalizing", "normalization_started")
             normalized = actual_normalizer.normalize(
                 probe,
                 work_dir=work_dir,
                 password=request.password,
-                check_cancelled=check_cancelled,
             )
             failure_stage = "routing"
             _emit(on_event, "routing", "routing_started")
@@ -355,9 +378,7 @@ def _run_worker_operation(
                 plan,
                 probe=probe,
                 work_dir=work_dir,
-                check_cancelled=check_cancelled,
             )
-            _raise_if_cancelled(is_cancelled)
             failure_stage = "canonicalizing"
             _emit(on_event, "canonicalizing", "canonicalization_started")
             material = canonicalizer.freeze(
@@ -367,14 +388,15 @@ def _run_worker_operation(
                 warnings=parsed.warnings,
                 projections=parsed.projections,
             )
-            failure_stage = "publishing_canonical"
-            _emit(on_event, "publishing_canonical", "canonical_write_started")
-            stored = actual_store.write_canonical_bundle(
+            failure_stage = "staging_canonical"
+            _emit(on_event, "staging_canonical", "canonical_stage_started")
+            stored = actual_store.stage_canonical_bundle(
+                knowledge_import_task_root(request.paths, request.import_id)
+                / "canonical",
                 envelope=material.envelope,
                 docling_document=material.docling_document,
                 assets=material.assets,
             )
-        _raise_if_cancelled(is_cancelled)
         result = KnowledgeImportWorkerResult(
             status="succeeded",
             worker_pid=os.getpid(),
@@ -382,25 +404,12 @@ def _run_worker_operation(
             media_type=probe.media_type,
             envelope_sha256=stored.envelope_sha256,
             content_ir_sha256=stored.content_ir_sha256,
-            relative_path=stored.relative_path,
+            staged_relative_path=stored.relative_path,
             pipeline=dict(parsed.pipeline),
             warnings=tuple(str(item) for item in parsed.warnings),
         )
         write_worker_result(result_path, result)
         _emit(on_event, "completed", "worker_succeeded")
-    except _WorkerCancelled:
-        write_worker_result(
-            result_path,
-            KnowledgeImportWorkerResult(
-                status="cancelled",
-                worker_pid=os.getpid(),
-                error_code="knowledge_import_cancelled",
-                failure_stage="cancelled",
-                diagnostic_code="cancelled",
-                retryable=True,
-            ),
-        )
-        _emit(on_event, "cancelled", "worker_cancelled", level="warning")
     except Exception as exc:
         error_code = getattr(exc, "error_code", None)
         if not isinstance(error_code, str) or not error_code.startswith("knowledge_"):
@@ -423,9 +432,7 @@ def _run_worker_operation(
 
 
 def write_worker_result(path: Path, result: KnowledgeImportWorkerResult) -> None:
-    payload = asdict(result)
-    payload["schema_version"] = _RESULT_SCHEMA_VERSION
-    payload["warnings"] = list(result.warnings)
+    payload = result.model_dump(mode="json")
     encoded = json.dumps(
         payload,
         ensure_ascii=True,
@@ -453,105 +460,26 @@ def read_worker_result(path: Path) -> KnowledgeImportWorkerResult:
         size = path.stat().st_size
         if size < 1 or size > _MAX_RESULT_BYTES:
             raise ValueError("result size")
-        payload = json.loads(path.read_bytes())
-        if not isinstance(payload, dict) or set(payload) != _SUCCESS_KEYS:
-            raise ValueError("result shape")
-        if payload.get("schema_version") != _RESULT_SCHEMA_VERSION:
-            raise ValueError("result version")
-        status = payload.get("status")
-        worker_pid = payload.get("worker_pid")
-        if status not in {"succeeded", "failed", "cancelled"}:
-            raise ValueError("result status")
-        if type(worker_pid) is not int or worker_pid < 1:
-            raise ValueError("worker pid")
-        warnings = payload.get("warnings")
-        pipeline = payload.get("pipeline")
-        if not isinstance(warnings, list) or not all(
-            isinstance(item, str) and len(item) <= 200 for item in warnings
-        ):
-            raise ValueError("result warnings")
-        if not isinstance(pipeline, dict):
-            raise ValueError("result pipeline")
-        result = KnowledgeImportWorkerResult(
-            status=status,
-            worker_pid=worker_pid,
-            canonical_generation_id=_optional_string(payload, "canonical_generation_id"),
-            media_type=_optional_string(payload, "media_type"),
-            envelope_sha256=_optional_string(payload, "envelope_sha256"),
-            content_ir_sha256=_optional_string(payload, "content_ir_sha256"),
-            relative_path=_optional_string(payload, "relative_path"),
-            pipeline=pipeline,
-            warnings=tuple(warnings),
-            error_code=_optional_string(payload, "error_code"),
-            failure_stage=_optional_string(payload, "failure_stage"),
-            diagnostic_code=_optional_string(payload, "diagnostic_code"),
-            retryable=payload.get("retryable") is True,
+        return KnowledgeImportWorkerResult.model_validate_json(
+            path.read_bytes(),
+            strict=True,
         )
-        _validate_result(result)
-        return result
-    except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeError, ValueError, PydanticValidationError) as exc:
         raise KnowledgeImportWorkerCrashed from exc
 
 
 def _validate_request(request: KnowledgeImportWorkerRequest) -> None:
-    if _TASK_ID.fullmatch(request.import_id) is None:
-        raise ValueError("Knowledge import worker task identity is invalid.")
-    if request.identity.import_id != request.import_id:
-        raise ValueError("Knowledge import worker identity is inconsistent.")
-    if _SHA256.fullmatch(request.expected_source_sha256) is None:
-        raise ValueError("Knowledge import worker source identity is invalid.")
-    if request.identity.source_sha256 != request.expected_source_sha256:
-        raise ValueError("Knowledge import worker source identity is inconsistent.")
-
-
-def _validate_result(result: KnowledgeImportWorkerResult) -> None:
-    if result.status == "succeeded":
-        if (
-            not result.canonical_generation_id
-            or _TASK_ID.fullmatch(result.canonical_generation_id) is None
-            or not result.relative_path
-            or not result.envelope_sha256
-            or _SHA256.fullmatch(result.envelope_sha256) is None
-            or not result.content_ir_sha256
-            or _SHA256.fullmatch(result.content_ir_sha256) is None
-            or result.error_code is not None
-            or result.failure_stage is not None
-            or result.diagnostic_code is not None
-        ):
-            raise ValueError("Knowledge import worker success result is invalid.")
-    elif (
-        not result.error_code
-        or _EVENT_TOKEN.fullmatch(result.error_code) is None
-        or not result.failure_stage
-        or _EVENT_TOKEN.fullmatch(result.failure_stage) is None
-        or not result.diagnostic_code
-        or _EVENT_TOKEN.fullmatch(result.diagnostic_code) is None
-        or any(
-            value is not None
-            for value in (
-                result.canonical_generation_id,
-                result.envelope_sha256,
-                result.content_ir_sha256,
-                result.relative_path,
-            )
-        )
-    ):
-        raise ValueError("Knowledge import worker failure result is invalid.")
-
-
-def _optional_string(payload: dict[str, Any], key: str) -> str | None:
-    value = payload.get(key)
-    if value is not None and not isinstance(value, str):
-        raise ValueError(f"result {key}")
-    return value
+    KnowledgeImportWorkerRequest.model_validate(request, strict=True)
 
 
 def _failure_diagnostic_code(exc: Exception) -> str:
     error_details = getattr(exc, "error_details", None)
     if isinstance(error_details, dict):
         candidate = error_details.get("diagnostic_code")
-        if isinstance(candidate, str) and _EVENT_TOKEN.fullmatch(candidate):
-            return candidate
+        try:
+            return _EVENT_TOKEN_ADAPTER.validate_python(candidate, strict=True)
+        except PydanticValidationError:
+            pass
     if isinstance(exc, MemoryError):
         return "memory_error"
     if isinstance(exc, (ImportError, ModuleNotFoundError)):
@@ -563,7 +491,10 @@ def _failure_diagnostic_code(exc: Exception) -> str:
     return "unexpected_error"
 
 
-def _drain_events(event_queue, callback: Callable[[KnowledgeImportWorkerEvent], None]) -> None:
+def _drain_events(
+    event_queue: Any,
+    callback: Callable[[KnowledgeImportWorkerEvent], None],
+) -> None:
     while True:
         try:
             event = event_queue.get_nowait()
@@ -578,18 +509,21 @@ def _emit(
     phase: str,
     event_code: str,
     *,
-    level: str = "info",
+    level: Literal["info", "warning", "error"] = "info",
 ) -> None:
     callback(KnowledgeImportWorkerEvent(phase=phase, event_code=event_code, level=level))
 
 
-def _raise_if_cancelled(check: Callable[[], bool]) -> None:
-    if check():
-        raise _WorkerCancelled
+def _stop_process(process: Any, *, grace: float) -> None:
+    """Stop the one managed worker boundary; its Job Object owns descendants."""
 
-
-class _WorkerCancelled(Exception):
-    pass
+    if not process.is_alive():
+        return
+    process.terminate()
+    process.join(grace)
+    if process.is_alive():
+        process.kill()
+        process.join()
 
 
 __all__ = [

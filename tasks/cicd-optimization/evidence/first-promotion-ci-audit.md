@@ -1,5 +1,9 @@
 # First Promotion CI Audit
 
+> Historical audit evidence. Its run measurements remain valid, but Slice 04
+> supersedes the recorded manifest/shard/Gate topology. Current truth is owned by
+> the task packet and `test-portfolio-reassessment.md`.
+
 ## Result
 
 Promotion PR #111 run `30193238273` did not establish a successful Native CI
@@ -475,6 +479,21 @@ This pass deliberately does not claim that every rejected payload is static.
 Hostile manifests, worker/provider results, release configuration, persistence,
 side effects, runtime dataset schema, and resource/process behavior remain
 semantic tests.
+
+Promotion PR #114 then passed on run `30238677216` and merged as `a5b1f905`:
+
+| Remote job | Duration |
+| --- | ---: |
+| `platform-release` | `7m17s` |
+| `knowledge` | `9m29s` |
+| `agent-llm-ui` | `15m40s` |
+| `analysis-data` | `23m12s` |
+| `Native CI Gate` | `2s` |
+
+The analysis/data runner spent `9m21s` in dependency installation and `3m54s`
+in the single repository check before starting its 100 semantic cases. This
+successful run remains under the `25 min` tail budget, but its critical path is
+setup/check variance and it is only one of the five required qualifying samples.
 
 ## Promotion Topology ROI Correction
 

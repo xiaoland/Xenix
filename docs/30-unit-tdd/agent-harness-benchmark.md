@@ -10,8 +10,11 @@ benchmark code observes public outcomes and does not alter that contract.
 ## Subject and Case Boundary
 
 A subject is one isolated `AgentHarness × configured subject model × case`
-cell. It uses the real provider path and ordinary public Harness submission,
-then observes the settled public product state. The runner is case-agnostic.
+cell. It uses the real provider path, then observes the settled public product
+state. The runner is case-agnostic. `headless` submits through the public Harness
+service directly; `headed` drives the same submission through the visible desktop
+UI. Execution mode is recorded in result schema v4 and does not change the case,
+oracle, Judge, or subject model.
 
 `benchmarks/agent_harness/` is the benchmark home. Each `test_*.py` case
 module is both the case definition and its explicitly collected pytest item;
@@ -29,10 +32,12 @@ appropriate presentation form rather than bars, a title, or a particular axis
 layout.
 
 A case may prepare isolated product state through a narrow public-service seam.
-Preparation runs once per cell after the production headless graph and Thread
-exist, but before subject timing begins. The rainy-season case uses this seam
-to index its rule in the cell's global Knowledge Library; it does not add a
-per-Thread enablement state or alter the production conversation boundary.
+Preparation runs once per cell after the production graph and Thread exist, but
+before subject timing begins. The rainy-season case uses this seam to index its
+rule in the cell's global Knowledge Library; it does not add a per-Thread
+enablement state or alter the production conversation boundary. In headed mode,
+the adapter realizes that same intent through the Knowledge Workspace file-drop
+surface and its real background task queue.
 
 Knowledge-plus-data cases judge the Agent's final answer surfaces: terminal Assistant
 content and the public Datasets, Artifacts, or charts it actually delivered. Tool
@@ -74,6 +79,14 @@ settings fingerprints, isolated-runtime confinement, and safe serialization.
 An integrity breach invalidates the measurement instead of becoming a model
 quality result.
 
+Headed integrity additionally proves that the real MainWindow was visible,
+source attachments were accepted through the composer drop surface, the terminal
+Assistant message was rendered, imported Knowledge appeared in the Workspace,
+Knowledge tasks settled, window-owned services shut down, and the isolated SQLite
+database remained readable. These are execution facts only. The case still grades
+the final answer, Dataset, and Artifact outcomes and never passes because the UI
+journey itself completed.
+
 A semantic `fail` is a valid subject outcome. Missing terminal output may be
 such a failure; insufficient final evidence is `inconclusive`. An evaluator
 uses `fail` only for positive evidence of an irrelevant or materially
@@ -88,12 +101,10 @@ retries are evaluation metadata and never contribute to subject performance.
 
 ## Offline and Live Policy
 
-The default test suite is deterministic and offline. It does not collect the
-benchmark case directory or call a provider. Its small
-`tests/test_agent_harness_benchmark_infra.py` coverage is reserved for dynamic
-shared-boundary behavior—such as privacy-safe judge dispatch, persistence,
-matrix continuation, metrics folding, and the explicit pytest live gate—not
-for duplicating case logic, schemas, types, or component-level Tool checks.
+The default 30-case test suite is deterministic and offline. It does not collect
+the benchmark case directory, open headed benchmark windows, or call a provider.
+Static analysis and benchmark source own schema and option continuity; no ordinary
+pytest case duplicates benchmark case logic, result schemas, types, or Tool checks.
 
 Use `pdm run benchmark-agent-harness -- --collect-only` to prove discovery
 without provider access. A live run is an explicit
@@ -103,6 +114,13 @@ id) selects its case. A live report must retain the separate channels above
 without secrets or raw evidence. Calibrate a configured judge before using
 scores for comparison; disagreement with clear fixtures is a signal to refine
 the case evidence or rubric, not to add Tool-trajectory assertions.
+
+Use `pdm run benchmark-agent-harness-headed -- --collect-only` for offline headed
+discovery and `pdm run benchmark-agent-harness-headed -- [pytest options]` for
+explicit visible E2E acceptance. Headed execution requires an interactive desktop
+and uses the same external, untracked Subject, Embedding, and optional Judge
+settings as headless execution. Every cell gets a fresh `XENIX_APP_HOME`; real
+fixture files enter through Qt drop events, and no mock/replay provider is admitted.
 
 ## Change Guidance
 

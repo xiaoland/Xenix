@@ -127,10 +127,7 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
             canonical_ready_notifier=derivation.enqueue_generation,
         )
         lifecycle = KnowledgeDocumentLifecycleService(
-            paths=smoke_paths,
             session_factory=storage.session_factory,
-            artifact_service=artifacts,
-            content_cleanup=importer.cleanup_storage_orphans,
         )
         try:
             imported_by_format = {}
@@ -179,11 +176,11 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
                 )
             reimported = importer.import_file(worker_pptx, timeout=180)
             if (
-                reimported.document_id == presentation_import.document_id
-                or reimported.reused_existing
+                reimported.document_id != presentation_import.document_id
+                or not reimported.reused_existing
             ):
                 raise RuntimeError(
-                    "Removed Knowledge document did not re-import as a fresh identity."
+                    "Removed Knowledge membership did not reactivate its identity."
                 )
         finally:
             importer.shutdown()
