@@ -407,6 +407,19 @@ The design-review correction is now implemented locally:
 - Production Agent Tool schemas are portable projections of those input models.
   The same Pydantic model performs execution admission and is passed to the typed
   handler; the JSON Schema is not maintained as a second authority.
+- Data-tokenization now follows the same boundary shape: its command/result DTOs
+  live in a dependency-light strict Pydantic module included in the Mypy gate.
+  Internal callers no longer erase column selectors to `object`; primitive/list/
+  Literal admission tests and duplicate Service/Tool checks are removed, while
+  runtime schema resolution and domain selection conflicts remain executable.
+- Synthetic invalid Knowledge/ML catalog permutations and exact derived-view
+  censuses are removed. Real source declarations are constructed from their
+  strict models during normal imports; pipeline/model behavior is the remaining
+  proof rather than a second catalog oracle.
+- The broadened pass removes 17 collected cases: 10 primitive/default/duplicate
+  data-tokenization proofs, five Knowledge catalog projection/invalid-permutation
+  proofs, and two synthetic ML catalog rejection proofs. Together with the first
+  follow-up pass, 29 cases are removed.
 - The rejected `check_agent_contracts.py`, `check_ml_catalog.py`, and
   `check_knowledge_formats.py` scripts are absent. Test manifest validation is
   file/topology validation and no longer invokes pytest collection.
@@ -446,6 +459,22 @@ still require Promotion PR evidence.
 Workflow YAML parses successfully. `actionlint` is unavailable in this local
 environment, so workflow-specific lint remains for CI or a provisioned
 workstation.
+
+Broadened proof-cleanup acceptance on Python 3.14.2:
+
+| Shard/cohort | Result | Wall time |
+| --- | --- | ---: |
+| `analysis-data` | `100 passed` | `60.28 s` |
+| `knowledge` | `208 passed, 3 skipped` | `263.06 s` |
+| `agent-llm-ui` | `154 passed` | `93.82 s` |
+| `main-window` | `62 passed` | `91.61 s` |
+| `platform-release` | `141 passed` | `166.36 s` |
+| repository check | success; strict Mypy covers 16 boundary modules | included in local run |
+
+This pass deliberately does not claim that every rejected payload is static.
+Hostile manifests, worker/provider results, release configuration, persistence,
+side effects, runtime dataset schema, and resource/process behavior remain
+semantic tests.
 
 ## Promotion Topology ROI Correction
 

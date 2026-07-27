@@ -201,30 +201,6 @@ def test_data_tokenize_tool_registers_derived_dataset_and_artifact(monkeypatch, 
     assert "artifact_link" not in result.value
 
 
-def test_data_tokenize_tool_rejects_non_list_id_columns(monkeypatch, tmp_path: Path) -> None:
-    _paths, dataset_service, _tokenization_service, _artifact_service, registry, store = _build_runtime(
-        monkeypatch,
-        tmp_path,
-    )
-    source = tmp_path / "reviews.csv"
-    source.write_text("review_id,review_text\n1,订单 退款\n", encoding="utf-8")
-    source_dataset = dataset_service.register_dataset(
-        RegisterDatasetInput(
-            source_path=str(source.resolve()),
-            name="Reviews",
-        )
-    )
-    arguments = {
-        "dataset_id": source_dataset.id,
-        "text_column": "review_text",
-        "id_columns": "review_id",
-    }
-    context = _tool_context(store, "data.tokenize", arguments)
-
-    with pytest.raises(ValidationError, match="id_columns must be a list of strings"):
-        registry.execute("data.tokenize", arguments, context)
-
-
 def test_data_tokenization_service_resolves_column_indexes_to_canonical_names(monkeypatch, tmp_path: Path) -> None:
     _paths, _dataset_service, tokenization_service, _artifact_service, _registry, _store = _build_runtime(
         monkeypatch,
@@ -315,27 +291,6 @@ def test_data_tokenization_service_allows_mixed_selector_modes_per_field(monkeyp
     assert result.report["id_columns"] == ["review_id"]
 
 
-def test_data_tokenization_service_accepts_empty_id_column_indexes(monkeypatch, tmp_path: Path) -> None:
-    _paths, _dataset_service, tokenization_service, _artifact_service, _registry, _store = _build_runtime(
-        monkeypatch,
-        tmp_path,
-    )
-    source = tmp_path / "reviews.csv"
-    source.write_text("review_id,review_text\nr1,订单 退款\n", encoding="utf-8")
-
-    result = tokenization_service.tokenize_dataset(
-        TokenizeDatasetInput(
-            source_path=str(source.resolve()),
-            name="Review tokens",
-            text_column_index=1,
-            id_column_indexes=[],
-            output="token_rows",
-        )
-    )
-
-    assert result.report["id_columns"] == []
-
-
 @pytest.mark.parametrize(
     ("text_column_index", "id_column_indexes", "message"),
     [
@@ -364,59 +319,6 @@ def test_data_tokenization_service_rejects_invalid_resolved_id_indexes(
                 name="Review tokens",
                 text_column_index=text_column_index,
                 id_column_indexes=id_column_indexes,
-                output="token_rows",
-            )
-        )
-
-
-@pytest.mark.parametrize("bad_index", [True, "1", 1.0, -1, 3])
-def test_data_tokenization_service_rejects_invalid_text_column_indexes(
-    monkeypatch,
-    tmp_path: Path,
-    bad_index: object,
-) -> None:
-    _paths, _dataset_service, tokenization_service, _artifact_service, _registry, _store = _build_runtime(
-        monkeypatch,
-        tmp_path,
-    )
-    source = tmp_path / "reviews.csv"
-    source.write_text("review_id,review_text\nr1,订单 退款\n", encoding="utf-8")
-
-    with pytest.raises(ValidationError, match="text_column_index"):
-        tokenization_service.tokenize_dataset(
-            TokenizeDatasetInput(
-                source_path=str(source.resolve()),
-                name="Review tokens",
-                text_column_index=bad_index,
-            )
-        )
-
-
-def test_data_tokenization_service_rejects_mixed_column_reference_forms(monkeypatch, tmp_path: Path) -> None:
-    _paths, _dataset_service, tokenization_service, _artifact_service, _registry, _store = _build_runtime(
-        monkeypatch,
-        tmp_path,
-    )
-    source = tmp_path / "reviews.csv"
-    source.write_text("review_id,review_text\nr1,订单 退款\n", encoding="utf-8")
-
-    with pytest.raises(ValidationError, match="either text_column or text_column_index"):
-        tokenization_service.tokenize_dataset(
-            TokenizeDatasetInput(
-                source_path=str(source.resolve()),
-                name="Review tokens",
-                text_column="review_text",
-                text_column_index=1,
-            )
-        )
-    with pytest.raises(ValidationError, match="either id_columns or id_column_indexes"):
-        tokenization_service.tokenize_dataset(
-            TokenizeDatasetInput(
-                source_path=str(source.resolve()),
-                name="Review tokens",
-                text_column="review_text",
-                id_columns=[],
-                id_column_indexes=[],
                 output="token_rows",
             )
         )
@@ -453,25 +355,9 @@ def test_data_tokenize_tool_rejects_mixed_selector_forms(monkeypatch, tmp_path: 
         )
 
 
-@pytest.mark.parametrize(
-    ("selector_arguments", "message"),
-    [
-        ({"text_column_index": True}, "text_column_index must be a zero-based integer"),
-        (
-            {"text_column_index": 1, "id_column_indexes": [True]},
-            "id_column_indexes must contain zero-based integers",
-        ),
-        (
-            {"text_column_index": 1, "id_column_indexes": [2]},
-            "id_column_indexes index 2 is outside the available zero-based column range",
-        ),
-    ],
-)
-def test_data_tokenize_tool_rejects_invalid_index_selectors(
+def test_data_tokenize_tool_rejects_index_outside_runtime_schema(
     monkeypatch,
     tmp_path: Path,
-    selector_arguments: dict[str, object],
-    message: str,
 ) -> None:
     _paths, dataset_service, _tokenization_service, _artifact_service, registry, store = _build_runtime(
         monkeypatch,
@@ -482,7 +368,14 @@ def test_data_tokenize_tool_rejects_invalid_index_selectors(
     dataset = dataset_service.register_dataset(
         RegisterDatasetInput(source_path=str(source.resolve()), name="Reviews")
     )
-    arguments = {"dataset_id": dataset.id, **selector_arguments}
+    arguments = {
+        "dataset_id": dataset.id,
+        "text_column_index": 1,
+        "id_column_indexes": [2],
+    }
 
-    with pytest.raises(ValidationError, match=message):
+    with pytest.raises(
+        ValidationError,
+        match="id_column_indexes index 2 is outside the available zero-based column range",
+    ):
         registry.execute("data.tokenize", arguments, _tool_context(store, "data.tokenize", arguments))

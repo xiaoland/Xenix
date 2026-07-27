@@ -361,10 +361,31 @@ accepts a re-baseline; timeout must not be set equal to the performance budget.
   now retains exact-tag identity/check, native OCR verification, package build,
   packaged smoke, manifest/publication, and remote verification rather than a
   second serial semantic suite.
-- The follow-up removes 12 pytest cases while retaining their stronger owners.
-  Local verification passes: repository checks; 18 focused neighboring behavior
-  boundaries; `agent-llm-ui` as `154 + 62` passes; `platform-release` as 143
-  passes; workflow YAML parsing; and `git diff --check`.
+- The first follow-up pass removed 12 pytest cases while retaining their stronger
+  owners. Repository checks, focused neighboring behavior, the affected semantic
+  shards, workflow parsing, and diff validation passed.
+- A second review found the same proof-shape in data-tokenization validation:
+  full Service/registry setups were asserting list/integer/non-negative constraints
+  already owned by strict Pydantic input models, while a single parameterized case
+  mixed those static-shape checks with the genuinely dynamic question of whether
+  an index exists in the loaded dataset schema. `TokenizeDatasetInput` now exposes
+  exact strict index/list/Literal types in a Mypy-gated contract module instead of
+  degrading indexes to `object`;
+  duplicate type/default/service-layer proofs are removed, while the black-box
+  out-of-runtime-schema case and domain selection conflicts remain.
+- The broadened pass also removes synthetic invalid permutations and exact
+  projection censuses for the source-owned Knowledge format catalog and ML model
+  catalog. Their real declarations are strict Pydantic values constructed by
+  normal imports, while representative pipeline/model behavior remains. Tests for
+  hostile downloaded manifests, worker/provider payloads, persistence, side
+  effects, and runtime dataset-schema mismatches remain because those facts are
+  not statically knowable.
+- The broadened pass removes another 17 collected cases, for 29 across both
+  follow-up passes. Final local verification passes: strict Mypy over 16 boundary
+  modules; `analysis-data` as `100 passed` in `60.28 s`; `agent-llm-ui` as
+  `154 passed` in `93.82 s` plus MainWindow `62 passed` in `91.61 s`;
+  `knowledge` as `208 passed, 3 skipped` in `263.06 s`; `platform-release` as
+  `141 passed` in `166.36 s`; and `git diff --check`.
 
 ## Open Decisions
 
@@ -387,8 +408,7 @@ accepts a re-baseline; timeout must not be set equal to the performance budget.
 
 ## Next Step
 
-The locally accepted implementation is delivered through `develop`. Observe the
-newest PR #111 Native CI run as the first qualifying four-runner, Python 3.14.2
-sample and stop after its result is recorded. Do not merge the promotion PR,
-create `v1.3.0`, enter the release Environment, or publish artifacts until Native
-CI passes and the user resumes.
+Commit and push the broadened proof cleanup to `develop`, updating Promotion PR
+#114. Require all four Python 3.14.2 shards and `Native CI Gate` to pass before
+merge. Preserve the existing `v1.3.0` tag until the post-promotion version-policy
+decision; do not move or delete it implicitly.

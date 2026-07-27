@@ -92,10 +92,19 @@ promotion and tag-triggered release path as its first production rehearsal.
 - Local correction verification passes: repository checks, 18 focused retained
   boundaries, the `agent-llm-ui` shard (`154 + 62`), the `platform-release` shard
   (143), workflow YAML parsing, and diff validation.
+- Promotion PR #114 carries the correction. A broadened test-value review then
+  found 17 more collected cases that tested strict primitive/list/Literal input
+  shapes or synthetic invalid source-owned catalogs. Data-tokenization now has a
+  dependency-light strict Pydantic contract in the Mypy gate; runtime dataset
+  bounds and domain conflicts remain tested.
+- Final local results for the broadened PR head are `analysis-data` 100 passed,
+  `agent-llm-ui` 154 plus MainWindow 62 passed, `knowledge` 208 passed/3 skipped,
+  and `platform-release` 141 passed. Repository checks and diff validation pass.
 
 ## Next Step
 
-Promote the test/proof-topology correction through a new `develop -> main` PR.
-Then choose explicitly between preserving tag immutability and releasing a bumped
-version, or authorizing a one-time delete/recreate exception for the unpublished
-`v1.3.0` tag. Do not mutate the existing tag before that decision.
+Push the broadened correction to Promotion PR #114 and require its four shards
+plus `Native CI Gate`. After merge, choose explicitly between preserving tag
+immutability and releasing a bumped version, or authorizing a one-time
+delete/recreate exception for the unpublished `v1.3.0` tag. Do not mutate the
+existing tag before that decision.

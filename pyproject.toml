@@ -120,6 +120,7 @@ files = [
     "src/xenix/services/agent/knowledge_tool.py",
     "src/xenix/services/agent/skill_catalog.py",
     "src/xenix/services/agent/tool_inputs.py",
+    "src/xenix/services/data_tokenization_contracts.py",
     "src/xenix/services/knowledge_formats.py",
     "src/xenix/services/llm/tooling.py",
     "src/xenix/services/ml/contracts.py",

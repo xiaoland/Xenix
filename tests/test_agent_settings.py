@@ -254,10 +254,6 @@ def test_llm_settings_drop_legacy_aimock_from_modern_payload(monkeypatch, tmp_pa
     assert "deprecated-secret" not in saved
 
 
-def test_llm_service_rejects_slashes_inside_provider_or_model_keys() -> None:
-    with pytest.raises(Exception, match="Provider key cannot contain"):
-        LLMProviderConfig(key="bad/provider", models=["model"])
-    with pytest.raises(Exception, match="Model key cannot contain"):
-        LLMProviderConfig(key="provider", models=["bad/model"])
+def test_llm_service_rejects_malformed_fully_qualified_model_key() -> None:
     with pytest.raises(ValidationError, match="provider/model"):
         LLMService.parse_fq_model_key("provider/model/extra")
