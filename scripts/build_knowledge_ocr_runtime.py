@@ -5,12 +5,14 @@ import hashlib
 import json
 import os
 import shutil
+import stat
 import struct
 import subprocess
 import tarfile
+import time
 import urllib.request
 import zipfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, BinaryIO, Literal, Self, cast
 from uuid import uuid4
 from urllib.parse import urlparse
@@ -33,6 +35,9 @@ DEFAULT_OUTPUT_ROOT = ROOT / "dist" / "knowledge-ocr"
 MAX_PROTOCOL_MESSAGE_BYTES = 16 * 1024 * 1024
 ARCHIVE_TIMESTAMP = (2026, 1, 1, 0, 0, 0)
 RUNTIME_DIRECTORY = "xenix-knowledge-ocr"
+PIPELINE_CONFIG_NAME = "OCR.yaml"
+RUNTIME_MANIFEST_NAME = "runtime.json"
+BINARY_SUFFIXES = frozenset({".dll", ".exe"})
 REQUIRED_DOWNLOADS = {
     "paddle_inference",
     "opencv",
@@ -386,6 +391,73 @@ def _source_tree(root: Path) -> Path:
     raise RuntimeError(f"Expected a source tree under {root}.")
 
 
+def _remove_tree(path: Path) -> None:
+    """Remove a generated tree, including Git's read-only pack indexes."""
+
+    def clear_readonly(function: Any, target: str, _exception: BaseException) -> None:
+        os.chmod(target, stat.S_IWRITE)
+        function(target)
+
+    shutil.rmtree(path, onexc=clear_readonly)
+
+
+def _opencv_root(stage: Path) -> Path | None:
+    configs = stage.rglob("OpenCVConfig.cmake")
+    config = next(
+        (
+            candidate
+            for candidate in configs
+            if candidate.as_posix().endswith("x64/vc16/lib/OpenCVConfig.cmake")
+        ),
+        None,
+    )
+    if config is None:
+        return None
+    root = config.parent.parent.parent.parent
+    required = (
+        config,
+        root / "x64/vc16/bin/opencv_world470.dll",
+        root / "x64/vc16/lib/opencv_world470.lib",
+    )
+    return root if all(path.is_file() for path in required) else None
+
+
+def _extract_opencv(archive: Path, destination: Path) -> Path:
+    """Extract the locked OpenCV self-extractor without waiting indefinitely."""
+
+    process = subprocess.Popen([str(archive), f"-o{destination}", "-y"])
+    ready_since: float | None = None
+    deadline = time.monotonic() + 120
+    try:
+        while True:
+            root = _opencv_root(destination)
+            returncode = process.poll()
+            if root is not None:
+                if returncode is not None:
+                    if returncode != 0:
+                        raise RuntimeError("Locked OpenCV self-extractor failed.")
+                    return root
+                if ready_since is None:
+                    ready_since = time.monotonic()
+                elif time.monotonic() - ready_since >= 2:
+                    process.terminate()
+                    try:
+                        process.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait(timeout=10)
+                    return root
+            elif returncode is not None:
+                raise RuntimeError("Locked OpenCV self-extractor did not produce its SDK.")
+            if time.monotonic() >= deadline:
+                raise RuntimeError("Locked OpenCV self-extractor timed out.")
+            time.sleep(0.2)
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=10)
+
+
 def _extract_inputs(
     downloads: dict[str, Path],
     work: Path,
@@ -405,11 +477,7 @@ def _extract_inputs(
 
     opencv_stage = extracted / "opencv"
     opencv_stage.mkdir()
-    _run([str(downloads["opencv"]), f"-o{opencv_stage}", "-y"])
-    opencv_root = next(
-        path.parent.parent.parent.parent
-        for path in opencv_stage.rglob("x64/vc16/lib/OpenCVConfig.cmake")
-    )
+    opencv_root = _extract_opencv(downloads["opencv"], opencv_stage)
 
     model_stage = extracted / "models"
     detection_stage = model_stage / "detection"
@@ -461,6 +529,7 @@ def _build_worker(
             "-A",
             toolchain.architecture,
             f"-DXENIX_PADDLEOCR_SOURCE={source}",
+            f"-DXENIX_BUILD_WORKSPACE={work}",
             f"-DPADDLE_LIB={paddle_root}",
             f"-DOPENCV_DIR={opencv_root}",
             "-DWITH_GPU=OFF",
@@ -551,6 +620,7 @@ def _stage_runtime(
     lock: KnowledgeOcrRuntimeLock,
     *,
     work: Path,
+    source: Path,
     worker: Path,
     paddle_root: Path,
     opencv_root: Path,
@@ -566,20 +636,20 @@ def _stage_runtime(
     build_root = work / "cmake"
     dependency_roots = [build_root, paddle_root, opencv_root]
     for name in lock.runtime_files:
-        source: Path | None
+        dependency_source: Path | None
         if name == "xenix-ocr.exe":
-            source = worker
+            dependency_source = worker
         elif name == "vcomp140.dll":
             _verify_vcomp(vcomp140, lock.toolchain)
-            source = vcomp140
+            dependency_source = vcomp140
         else:
-            source = next(
+            dependency_source = next(
                 (_find_unique(root, name) for root in dependency_roots if list(root.rglob(name))),
                 None,
             )
-            if source is None:
+            if dependency_source is None:
                 raise RuntimeError(f"Required native OCR dependency is missing: {name}")
-        shutil.copy2(source, runtime / name)
+        shutil.copy2(dependency_source, runtime / name)
 
     models = runtime / "models"
     shutil.copytree(detection_model, models / "PP-OCRv6_medium_det")
@@ -588,18 +658,16 @@ def _stage_runtime(
 
     licenses = runtime / "licenses"
     licenses.mkdir()
-    paddle_license = _find_unique(
-        work / "PaddleOCR", "LICENSE"
-    )
+    paddle_license = _find_unique(source, "LICENSE")
     shutil.copy2(paddle_license, licenses / "PaddleOCR-LICENSE.txt")
     shutil.copy2(paddle_license, licenses / "Paddle-Inference-LICENSE.txt")
     shutil.copy2(_find_unique(opencv_root, "LICENSE"), licenses / "OpenCV-LICENSE.txt")
     shutil.copy2(
-        _find_unique(work / "PaddleOCR" / "deploy" / "cpp_infer" / "third_party" / "abseil-cpp", "LICENSE"),
+        _find_unique(source / "deploy" / "cpp_infer" / "third_party" / "abseil-cpp", "LICENSE"),
         licenses / "Abseil-LICENSE.txt",
     )
     shutil.copy2(
-        _find_unique(work / "PaddleOCR" / "deploy" / "cpp_infer" / "third_party" / "nlohmann", "LICENSE.MIT"),
+        _find_unique(source / "deploy" / "cpp_infer" / "third_party" / "nlohmann", "LICENSE.MIT"),
         licenses / "nlohmann-json-LICENSE.txt",
     )
 
@@ -619,7 +687,7 @@ def _stage_runtime(
         },
         "files": files,
     }
-    (runtime / "runtime.json").write_text(
+    (runtime / RUNTIME_MANIFEST_NAME).write_text(
         json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         + "\n",
         encoding="utf-8",
@@ -685,12 +753,12 @@ def _request(
     return response.get("result")
 
 
-def verify_runtime(runtime: Path, golden_image: Path) -> None:
+def verify_runtime(runtime: Path, golden_image: Path, *, cwd: Path) -> None:
     log = runtime / "build-verification.log"
     with log.open("wb") as stderr:
         process = subprocess.Popen(
             [str(runtime / "xenix-ocr.exe"), "--stdio"],
-            cwd=runtime,
+            cwd=cwd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=stderr,
@@ -772,6 +840,168 @@ def write_content_addressed_archive(
         temporary.unlink(missing_ok=True)
 
 
+def _verify_archive_members(archive: Path) -> None:
+    with zipfile.ZipFile(archive) as package:
+        members = package.infolist()
+        if not members:
+            raise RuntimeError("Knowledge OCR archive is empty.")
+        names: set[str] = set()
+        prefix = f"{RUNTIME_DIRECTORY}/"
+        for member in members:
+            name = member.filename
+            if (
+                not name
+                or name in names
+                or name.endswith("/")
+                or not name.startswith(prefix)
+            ):
+                raise RuntimeError("Knowledge OCR archive layout is invalid.")
+            names.add(name)
+            if PurePosixPath(name).name == PIPELINE_CONFIG_NAME:
+                raise RuntimeError(
+                    "Knowledge OCR archive must not contain a pipeline config."
+                )
+
+
+def _manifest_path(value: object) -> str:
+    if not isinstance(value, str) or not value or "\\" in value:
+        raise RuntimeError("Knowledge OCR runtime manifest has an invalid file path.")
+    path = PurePosixPath(value)
+    if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
+        raise RuntimeError("Knowledge OCR runtime manifest has an invalid file path.")
+    return path.as_posix()
+
+
+def _verify_runtime_manifest(runtime: Path, lock: KnowledgeOcrRuntimeLock) -> None:
+    manifest_path = runtime / RUNTIME_MANIFEST_NAME
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("Knowledge OCR runtime manifest is invalid.") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError("Knowledge OCR runtime manifest is invalid.")
+    if (
+        payload.get("schema_version") != 1
+        or payload.get("protocol_version") != 2
+        or payload.get("protocol_version") != lock.protocol_version
+        or payload.get("runtime_id") != lock.runtime_id
+        or payload.get("model_pack_id") != lock.model_pack_id
+    ):
+        raise RuntimeError("Knowledge OCR runtime manifest identity is invalid.")
+    files = payload.get("files")
+    if not isinstance(files, list):
+        raise RuntimeError("Knowledge OCR runtime manifest is invalid.")
+
+    expected: set[str] = set()
+    for entry in files:
+        if not isinstance(entry, dict) or set(entry) != {"path", "bytes", "sha256"}:
+            raise RuntimeError("Knowledge OCR runtime manifest is invalid.")
+        relative = _manifest_path(entry["path"])
+        if relative == RUNTIME_MANIFEST_NAME or relative in expected:
+            raise RuntimeError("Knowledge OCR runtime manifest is invalid.")
+        size = entry["bytes"]
+        digest = entry["sha256"]
+        if type(size) is not int or size < 0 or not isinstance(digest, str):
+            raise RuntimeError("Knowledge OCR runtime manifest is invalid.")
+        target = runtime.joinpath(*PurePosixPath(relative).parts)
+        if (
+            not target.is_file()
+            or target.stat().st_size != size
+            or sha256_file(target) != digest
+        ):
+            raise RuntimeError("Knowledge OCR runtime manifest file verification failed.")
+        expected.add(relative)
+
+    actual = {
+        path.relative_to(runtime).as_posix()
+        for path in runtime.rglob("*")
+        if path.is_file() and path.name != RUNTIME_MANIFEST_NAME
+    }
+    if actual != expected:
+        raise RuntimeError("Knowledge OCR archive contains unmanifested files.")
+    if any(PurePosixPath(relative).name == PIPELINE_CONFIG_NAME for relative in actual):
+        raise RuntimeError("Knowledge OCR archive must not contain a pipeline config.")
+
+
+def _binary_contains(path: Path, pattern: bytes) -> bool:
+    overlap = max(0, len(pattern) - 1)
+    tail = b""
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            content = tail + chunk
+            if pattern in content:
+                return True
+            tail = content[-overlap:] if overlap else b""
+    return False
+
+
+def _verify_runtime_binary_provenance(
+    runtime: Path,
+    forbidden_fragments: tuple[str, ...],
+) -> None:
+    patterns: set[bytes] = set()
+    for fragment in forbidden_fragments:
+        if not fragment:
+            raise RuntimeError("Knowledge OCR binary provenance marker is invalid.")
+        try:
+            patterns.add(fragment.encode("ascii"))
+        except UnicodeEncodeError:
+            patterns.add(fragment.encode("utf-8"))
+        patterns.add(fragment.encode("utf-16le"))
+    binaries = sorted(
+        path
+        for path in runtime.rglob("*")
+        if path.is_file() and path.suffix.lower() in BINARY_SUFFIXES
+    )
+    if not binaries:
+        raise RuntimeError("Knowledge OCR runtime has no native binaries to verify.")
+    for binary in binaries:
+        if any(_binary_contains(binary, pattern) for pattern in patterns):
+            raise RuntimeError(
+                "Knowledge OCR runtime binary contains forbidden build provenance."
+            )
+
+
+def _source_provenance_markers(source: Path, build_nonce: str) -> tuple[str, ...]:
+    resolved = source.resolve()
+    return (build_nonce, str(resolved), resolved.as_posix())
+
+
+def verify_consumer_archive(
+    archive: Path,
+    golden_image: Path,
+    verification: Path,
+    lock: KnowledgeOcrRuntimeLock,
+    *,
+    unavailable_source: Path | None = None,
+    forbidden_binary_fragments: tuple[str, ...] = (),
+) -> None:
+    """Verify the release artifact from a source-free consumer topology."""
+
+    if unavailable_source is not None and unavailable_source.exists():
+        raise RuntimeError("Knowledge OCR builder source checkout is still available.")
+    shutil.rmtree(verification, ignore_errors=True)
+    try:
+        consumer = verification / "consumer"
+        foreign_cwd = verification / "foreign-cwd"
+        _verify_archive_members(archive)
+        _safe_extract_zip(archive, consumer)
+        runtime = consumer / RUNTIME_DIRECTORY
+        if not runtime.is_dir():
+            raise RuntimeError("Knowledge OCR archive layout is invalid.")
+        _verify_runtime_manifest(runtime, lock)
+        _verify_runtime_binary_provenance(runtime, forbidden_binary_fragments)
+        foreign_cwd.mkdir(parents=True)
+        (foreign_cwd / PIPELINE_CONFIG_NAME).write_text(
+            "invalid_pipeline_config: true\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        verify_runtime(runtime, golden_image, cwd=foreign_cwd)
+    finally:
+        shutil.rmtree(verification, ignore_errors=True)
+
+
 def write_catalog(
     lock: KnowledgeOcrRuntimeLock,
     archive: Path,
@@ -822,16 +1052,15 @@ def verify_output(args: argparse.Namespace) -> tuple[Path, Path]:
 
     golden = download_locked("golden_image", lock.downloads["golden_image"], cache)
     verification = args.work_dir.resolve() / "cached-output-verification"
-    shutil.rmtree(verification, ignore_errors=True)
-    try:
-        _safe_extract_zip(archive, verification)
-        runtime = verification / RUNTIME_DIRECTORY
-        if not runtime.is_dir():
-            raise RuntimeError("Cached Knowledge OCR archive layout is invalid.")
-        verify_runtime(runtime, golden)
-    finally:
-        shutil.rmtree(verification, ignore_errors=True)
+    verify_consumer_archive(archive, golden, verification, lock)
     return archive, catalog
+
+
+def _new_build_workspace(work: Path) -> tuple[Path, str]:
+    build_nonce = uuid4().hex
+    workspace = work / f"build-{build_nonce}"
+    workspace.mkdir()
+    return workspace, build_nonce
 
 
 def build(args: argparse.Namespace) -> tuple[Path, Path]:
@@ -845,11 +1074,12 @@ def build(args: argparse.Namespace) -> tuple[Path, Path]:
         name: download_locked(name, item, cache)
         for name, item in lock.downloads.items()
     }
-    source = _prepare_source(lock, work / "PaddleOCR")
-    paddle, opencv, detection, recognition = _extract_inputs(downloads, work, source)
+    workspace, build_nonce = _new_build_workspace(work)
+    source = _prepare_source(lock, workspace / "PaddleOCR")
+    paddle, opencv, detection, recognition = _extract_inputs(downloads, workspace, source)
     worker = _build_worker(
         lock,
-        work=work,
+        work=workspace,
         source=source,
         paddle_root=paddle,
         opencv_root=opencv,
@@ -857,7 +1087,8 @@ def build(args: argparse.Namespace) -> tuple[Path, Path]:
     vcomp = _resolve_vcomp(args.vcomp140, lock.toolchain)
     runtime = _stage_runtime(
         lock,
-        work=work,
+        work=workspace,
+        source=source,
         worker=worker,
         paddle_root=paddle,
         opencv_root=opencv,
@@ -865,11 +1096,19 @@ def build(args: argparse.Namespace) -> tuple[Path, Path]:
         recognition_model=recognition,
         vcomp140=vcomp,
     )
-    verify_runtime(runtime, downloads["golden_image"])
     archive = write_content_addressed_archive(
         runtime,
         output,
         runtime_id=lock.runtime_id,
+    )
+    _remove_tree(source)
+    verify_consumer_archive(
+        archive,
+        downloads["golden_image"],
+        work / f"consumer-verification-{build_nonce}",
+        lock,
+        unavailable_source=source,
+        forbidden_binary_fragments=_source_provenance_markers(source, build_nonce),
     )
     catalog = output / "runtime_catalog.json"
     write_catalog(lock, archive, catalog)

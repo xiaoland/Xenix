@@ -40,14 +40,16 @@ canonical-ready generation
   OCR is ready. Xenix does not claim generic complex-layout understanding from this
   classifier alone.
 - Local OCR uses one optional, one-click-installed archive containing an
-  Xenix-owned native worker built on official Paddle Inference C++, its complete
-  dependency closure, and an explicitly identified model pack. Setup verifies the
-  catalog, archive, member manifest, protocol, and self-test before atomic
-  activation. Deployment consumes one bundle source that binds catalog authority to
-  either the generated local development archive or the immutable release origin;
-  transport cannot bypass deployment-owned integrity gates. `ready` additionally
-  requires a compact content-addressed generation directory and a self-test executed
-  at that final Windows path before active-pointer publication, plus a
+  Xenix-owned native worker built on official Paddle Inference C++, its compiled-in
+  fixed pipeline configuration, complete dependency closure, and an explicitly
+  identified model pack. Setup verifies the catalog, archive, member manifest,
+  protocol, and self-test before atomic activation. The worker does not resolve a
+  pipeline config from the build tree, its working directory, or a companion file.
+  Deployment consumes one bundle source that binds catalog authority to either the
+  generated local development archive or the immutable release origin; transport
+  cannot bypass deployment-owned integrity gates. `ready` additionally requires a
+  compact content-addressed generation directory and a self-test executed at that
+  final Windows path before active-pointer publication, plus a
   freshness-bounded verification
   record produced by full member hashing and self-test; missing/stale evidence is
   refreshed off the UI thread. Canonical provenance records the exact runtime,
