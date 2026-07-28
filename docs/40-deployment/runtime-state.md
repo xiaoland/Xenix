@@ -100,7 +100,10 @@ remain import-owned; index build detail and retry remain index-service-owned.
 Local OCR setup downloads only the immutable artifact named by the catalog embedded
 in the installed Xenix build. It verifies the outer size/digest, safe archive shape,
 runtime member manifest, runtime/model/protocol identities, and native self-test in
-staging before replacing `active.json`. A separate verification record binds the
+staging before replacing `active.json`. The fixed OCR pipeline configuration is
+compiled into the worker, so it cannot be resolved from a build-tree path, process
+working directory, or companion configuration file. A separate verification record
+binds the
 active generation, model, engine/protocol, and manifest hash to a recent full member
 scan and self-test. Fast status reads only bounded manifests/that record; absent or
 stale verification reports `checking` and is refreshed in a background task before

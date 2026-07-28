@@ -9,6 +9,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "src/pipelines/ocr/pipeline.h"
@@ -23,6 +24,55 @@ constexpr std::uint32_t kMaxMessageBytes = 16U * 1024U * 1024U;
 constexpr const char *kRuntimeId =
     "paddle-inference-3.3.0-paddleocr-3.7.0-win-x64";
 constexpr const char *kModelPackId = "pp-ocrv6-medium-zh-en-1";
+
+const std::unordered_map<std::string, std::string> &XenixPipelineConfig() {
+  // Flattened from PaddleOCR v3.7.0's deploy/cpp_infer/src/configs/OCR.yaml.
+  // The caller overrides the optional document and textline stages below.
+  static const std::unordered_map<std::string, std::string> config = {
+      {"pipeline_name", "OCR"},
+      {"text_type", "general"},
+      {"use_doc_preprocessor", "True"},
+      {"use_textline_orientation", "True"},
+      {"SubPipelines.DocPreprocessor.pipeline_name", "doc_preprocessor"},
+      {"SubPipelines.DocPreprocessor.use_doc_orientation_classify", "True"},
+      {"SubPipelines.DocPreprocessor.use_doc_unwarping", "True"},
+      {"SubPipelines.DocPreprocessor.SubModules.DocOrientationClassify."
+       "module_name",
+       "doc_text_orientation"},
+      {"SubPipelines.DocPreprocessor.SubModules.DocOrientationClassify."
+       "model_name",
+       "PP-LCNet_x1_0_doc_ori"},
+      {"SubPipelines.DocPreprocessor.SubModules.DocOrientationClassify."
+       "model_dir",
+       "null"},
+      {"SubPipelines.DocPreprocessor.SubModules.DocUnwarping.module_name",
+       "image_unwarping"},
+      {"SubPipelines.DocPreprocessor.SubModules.DocUnwarping.model_name",
+       "UVDoc"},
+      {"SubPipelines.DocPreprocessor.SubModules.DocUnwarping.model_dir",
+       "null"},
+      {"SubModules.TextDetection.module_name", "text_detection"},
+      {"SubModules.TextDetection.model_name", "PP-OCRv6_medium_det"},
+      {"SubModules.TextDetection.model_dir", "null"},
+      {"SubModules.TextDetection.limit_side_len", "64"},
+      {"SubModules.TextDetection.limit_type", "min"},
+      {"SubModules.TextDetection.max_side_limit", "4000"},
+      {"SubModules.TextDetection.thresh", "0.3"},
+      {"SubModules.TextDetection.box_thresh", "0.6"},
+      {"SubModules.TextDetection.unclip_ratio", "1.5"},
+      {"SubModules.TextLineOrientation.module_name", "textline_orientation"},
+      {"SubModules.TextLineOrientation.model_name",
+       "PP-LCNet_x1_0_textline_ori"},
+      {"SubModules.TextLineOrientation.model_dir", "null"},
+      {"SubModules.TextLineOrientation.batch_size", "6"},
+      {"SubModules.TextRecognition.module_name", "text_recognition"},
+      {"SubModules.TextRecognition.model_name", "PP-OCRv6_medium_rec"},
+      {"SubModules.TextRecognition.model_dir", "null"},
+      {"SubModules.TextRecognition.batch_size", "6"},
+      {"SubModules.TextRecognition.score_thresh", "0.0"},
+  };
+  return config;
+}
 
 class Engine {
 public:
@@ -45,6 +95,8 @@ public:
     params.text_detection_model_dir = detection;
     params.text_recognition_model_name = "PP-OCRv6_medium_rec";
     params.text_recognition_model_dir = recognition;
+    params.paddlex_config =
+        Utility::PaddleXConfigVariant(XenixPipelineConfig());
     params.use_doc_orientation_classify = false;
     params.use_doc_unwarping = false;
     params.use_textline_orientation = false;

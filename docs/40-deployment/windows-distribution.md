@@ -123,7 +123,10 @@ native self-test and golden-image recognition through the spawned Knowledge
 worker, imports the image, derives bounded Units, reaches keyword lookup, and
 checks the recorded runtime generation. It also imports valid DOCX and PPTX
 documents through the frozen worker and retrieves bounded presentation text.
-Activation or a parser-helper exercise alone is insufficient.
+Native runtime verification runs the extracted worker from a foreign working
+directory after the builder PaddleOCR checkout has been made unavailable, and scans
+released binaries for real builder paths. Activation or a parser-helper exercise
+alone is insufficient.
 
 ## GitHub Controls
 

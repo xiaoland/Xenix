@@ -2,8 +2,8 @@
 
 ## Status
 
-Implementing the content-addressed Knowledge OCR artifact correction before a new
-`develop -> main` promotion.
+Completed. v1.3.2 is publicly visible and verified from main promotion commit
+`8fbaedd5`.
 
 ## Objective
 
@@ -40,8 +40,20 @@ runtime object that has the same logical runtime ID but different build bytes.
   immutable object identity.
 - The embedded catalog already owns artifact name, byte count, and SHA-256; the
   client generation ID already incorporates the artifact SHA-256.
+- Commit `ef04625` was promoted through PR #116; Native CI run `30263030953`
+  passed in 5 minutes 17 seconds.
+- `v1.3.2` resolves to main promotion commit `8fbaedd5`; local and remote release
+  identity checks bound it to PR #116.
+- Native Release run `30263473671` passed in 1 hour 3 minutes 13 seconds,
+  including native OCR build/self-test and packaged smoke.
+- The published OCR archive is 205,199,980 bytes. Its name and catalog both carry
+  SHA-256 `3e76bae9cb17bbacac0174bcd3db80a6e10617afc2f9b98c913de7850b4b1322`.
+- Publisher time was 961.25 seconds and visibility/final verification was 447.39
+  seconds. The public OCR object returns HTTP 200, supports byte ranges, and
+  returns 206 for `bytes=0-0`; Setup returns 200 with `no-cache`.
+- The canonical stable feed now declares v1.3.2.
 
 ## Next Step
 
-Validate the producer and existing portfolio, then promote v1.3.2 through Native
-CI before creating its immutable tag.
+No release action remains. Retain the immutable tag, workflow evidence, manifest,
+runtime catalog, publication timing, and rollback-history key.
