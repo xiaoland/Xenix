@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from ...observability import LLMUsageObservability
     from ..artifact_service import ArtifactService
     from ..dataset_service import DatasetService
+    from ..embedding_provider_factory import EmbeddingProviderFactoryRegistry
     from ..embedding_service import EmbeddingService, EmbeddingSettingsService
     from ..knowledge_semantic_service import KnowledgeSemanticService
     from ..llm import LLMService
@@ -91,6 +92,7 @@ def build_headless_agent_services(
     session_factory: sessionmaker,
     llm: LLMService,
     embedding_settings_service: EmbeddingSettingsService,
+    embedding_provider_factory_registry: EmbeddingProviderFactoryRegistry | None = None,
     ml_worker_settings: MLWorkerSettingsService,
     usage_observability: LLMUsageObservability,
 ) -> HeadlessAgentServices:
@@ -149,7 +151,14 @@ def build_headless_agent_services(
         ml_task_service=ml_task_service,
     )
     artifacts = ArtifactService(session_factory)
-    embedding = OpenAICompatibleEmbeddingService(embedding_settings_service)
+    # The application composition root owns the one registry instance.  Keeping
+    # this optional preserves ordinary headless callers while letting an
+    # optional deployment slice contribute a managed factory without teaching
+    # the Agent graph about that slice.
+    embedding = OpenAICompatibleEmbeddingService(
+        embedding_settings_service,
+        provider_factory_registry=embedding_provider_factory_registry,
+    )
     semantic_knowledge = KnowledgeSemanticService(
         session_factory,
         embedding_service=embedding,

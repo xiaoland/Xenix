@@ -33,6 +33,8 @@ from .knowledge_import_worker import (
     KnowledgeImportWorkerTimedOut,
     LocalKnowledgeImportWorkerRunner,
 )
+from .ocr.composition import LocalPaddleOcrAttemptFactory
+from .ocr.contracts import OcrAttemptFactory
 from .knowledge_import_storage_maintenance import (
     KnowledgeImportStorageMaintenance,
     KnowledgeImportStorageMaintenanceError,
@@ -157,6 +159,7 @@ class KnowledgeImportService:
         session_factory: sessionmaker,
         artifact_service: ArtifactService,
         worker_runner: KnowledgeImportWorkerRunner | None = None,
+        ocr_attempt_factory: OcrAttemptFactory | None = None,
         canonical_ready_notifier: Callable[[str, str, str | None], object] | None = None,
         corpus_changed_notifier: Callable[[str], object] | None = None,
         start_worker: bool = True,
@@ -168,6 +171,7 @@ class KnowledgeImportService:
         self._task_logs = KnowledgeTaskLogStore(paths)
         self._probe = FileProbe()
         self._worker_runner = worker_runner or LocalKnowledgeImportWorkerRunner()
+        self._ocr_attempt_factory = ocr_attempt_factory or LocalPaddleOcrAttemptFactory()
         self._canonical_ready_notifier = canonical_ready_notifier
         self._corpus_changed_notifier = corpus_changed_notifier
         self._queue: queue.Queue[str | object] = queue.Queue()
@@ -459,23 +463,28 @@ class KnowledgeImportService:
             media_type=probe.media_type,
             title=Path(str(identity_values["display_name"])).stem,
         )
-        request = KnowledgeImportWorkerRequest(
-            paths=self._paths,
-            import_id=import_id,
-            source_path=str(source_path),
-            expected_source_sha256=str(identity_values["source_sha256"]),
-            expected_source_format=str(identity_values["source_format"]),
-            expected_media_type=probe.media_type,
-            identity=identity,
-            password=password,
-        )
         try:
-            result = self._worker_runner.run(
-                request,
-                is_cancelled=lambda: self._stop.is_set()
-                or self._cancel_requested(import_id),
-                on_event=lambda event: self._handle_worker_event(import_id, event),
-            )
+            attempt = self._ocr_attempt_factory.prepare()
+            try:
+                request = KnowledgeImportWorkerRequest(
+                    paths=self._paths,
+                    import_id=import_id,
+                    source_path=str(source_path),
+                    expected_source_sha256=str(identity_values["source_sha256"]),
+                    expected_source_format=str(identity_values["source_format"]),
+                    expected_media_type=probe.media_type,
+                    identity=identity,
+                    ocr_spawn_spec=attempt.spawn_spec,
+                    password=password,
+                )
+                result = self._worker_runner.run(
+                    request,
+                    is_cancelled=lambda: self._stop.is_set()
+                    or self._cancel_requested(import_id),
+                    on_event=lambda event: self._handle_worker_event(import_id, event),
+                )
+            finally:
+                attempt.close()
         except KnowledgeImportWorkerCancelled:
             if self._stop.is_set() and not self._cancel_requested(import_id):
                 self._advance(import_id, status="queued", phase="queued")

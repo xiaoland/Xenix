@@ -12,6 +12,7 @@ from xenix.services.embedding_service import (
 )
 from xenix.services.llm import LLMService, LLMSettingsService
 from xenix.services.ml.worker_settings import MLWorkerSettingsService
+from xenix.services.settings_store import SettingsStore
 from xenix.ui.settings_dialog import SettingsDialog
 
 
@@ -46,14 +47,16 @@ def test_embedding_model_change_requires_user_confirmation_before_rebuild(
 
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
-    llm_settings = LLMSettingsService(paths)
-    embeddings = EmbeddingSettingsService(paths)
-    embeddings.save(
+    settings_store = SettingsStore(paths.config)
+    llm_settings = LLMSettingsService(settings_store=settings_store)
+    embeddings = EmbeddingSettingsService(settings_store=settings_store)
+    embeddings.replace_user_settings(
         EmbeddingSettings(
             enabled=True,
             base_url="https://embedding.example.test",
             model="meaning-v1",
-        )
+        ),
+        expected_revision=0,
     )
     indexes = Indexes()
     dialog = SettingsDialog(
@@ -91,4 +94,6 @@ def test_embedding_model_change_requires_user_confirmation_before_rebuild(
         assert embeddings.load().model == "meaning-v2"
         assert indexes.enqueued == [(("text_vector",), "settings_change")]
     finally:
+        dialog.shutdown()
         dialog.close()
+        settings_store.close()

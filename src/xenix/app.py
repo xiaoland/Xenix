@@ -7,6 +7,7 @@ import time
 from collections.abc import Callable
 from datetime import datetime
 from importlib import import_module
+from importlib.util import find_spec
 from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Literal
@@ -37,6 +38,8 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger("xenix.bootstrap")
 STARTUP_SPLASH_HOLD_MS = 2200
 STARTUP_TIMING_ENV = "XENIX_STARTUP_TIMING"
+AMD_ONE_CLICK_ENABLED_ENV = "XENIX_ENABLE_AMD_ONE_CLICK"
+AMD_RETIRE_ONLY_ENV = "XENIX_AMD_RETIRE_ONLY"
 _STARTUP_TIMING_T0 = time.perf_counter()
 StorageRecoveryAction = Literal["quarantine", "open", "exit"]
 
@@ -49,6 +52,37 @@ class TrialLockStartupExit(Exception):
 
 def _startup_timing_enabled() -> bool:
     return os.environ.get(STARTUP_TIMING_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _amd_one_click_enabled() -> bool:
+    """Whether the optional AMD composition slice is enabled for this build/run.
+
+    This deliberately lives at the application composition anchor.  Setting the
+    switch to false (or removing this bounded branch during a hard cut-off)
+    prevents every AMD import, resource read, target connection, and process
+    action while the ordinary product keeps its capability-owned contracts.
+    """
+
+    raw = os.environ.get(AMD_ONE_CLICK_ENABLED_ENV, "0").strip().casefold()
+    if raw not in {"1", "true", "yes", "on"}:
+        return False
+    try:
+        return find_spec("xenix.services.amd.composition") is not None
+    except (ImportError, ModuleNotFoundError, ValueError):
+        # An AMD-free package must remain a working generic desktop even if a
+        # parent environment accidentally sets the optional feature variable.
+        return False
+
+
+def _amd_retirement_only() -> bool:
+    """Whether this AMD-containing build permits retirement but no new deploys."""
+
+    return os.environ.get(AMD_RETIRE_ONLY_ENV, "0").strip().casefold() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 def _emit_startup_timing(event: str, start: float | None = None, **attributes: object) -> None:
@@ -291,6 +325,7 @@ def _load_runtime_imports(
     artifact_service = load_module("xenix.services.artifact_service")
     dataset_export_service = load_module("xenix.services.dataset_export_service")
     embedding_service = load_module("xenix.services.embedding_service")
+    embedding_provider_factory = load_module("xenix.services.embedding_provider_factory")
     link_router = load_module("xenix.services.link_router")
     knowledge_import = load_module("xenix.services.knowledge_import_service")
     knowledge_derivation = load_module("xenix.services.knowledge_derivation_service")
@@ -301,6 +336,8 @@ def _load_runtime_imports(
     knowledge_task_query = load_module("xenix.services.knowledge_task_query")
     knowledge_workspace = load_module("xenix.services.knowledge_workspace_service")
     paddle_ocr = load_module("xenix.services.paddle_ocr_service")
+    ocr_settings = load_module("xenix.services.ocr.settings")
+    settings_store = load_module("xenix.services.settings_store")
     lazy_ml_service = load_module("xenix.services.lazy_ml_service")
     lazy_services = load_module("xenix.services.lazy_services")
     llm = load_module("xenix.services.llm")
@@ -318,7 +355,14 @@ def _load_runtime_imports(
         LLMConversationService=llm.LLMConversationService,
         LLMToolRegistry=llm.AgentToolRegistry,
         DatasetExportService=dataset_export_service.DatasetExportService,
+        ConfiguredOcrAttemptFactory=ocr_settings.ConfiguredOcrAttemptFactory,
         EmbeddingSettingsService=embedding_service.EmbeddingSettingsService,
+        EmbeddingProviderFactoryRegistry=(
+            embedding_provider_factory.EmbeddingProviderFactoryRegistry
+        ),
+        OcrProviderFactoryRegistry=ocr_settings.OcrProviderFactoryRegistry,
+        OcrSettingsService=ocr_settings.OcrSettingsService,
+        SettingsStore=settings_store.SettingsStore,
         LazyServiceProxy=lazy_services.LazyServiceProxy,
         LinkRouter=link_router.LinkRouter,
         KnowledgeImportService=knowledge_import.KnowledgeImportService,
@@ -333,6 +377,12 @@ def _load_runtime_imports(
         PaddleOcrService=paddle_ocr.PaddleOcrService,
         LLMService=llm.LLMService,
         LLMSettingsService=llm.LLMSettingsService,
+        create_builtin_embedding_provider_factory_registry=(
+            embedding_service.create_builtin_embedding_provider_factory_registry
+        ),
+        create_builtin_llm_provider_factory_registry=(
+            llm.create_builtin_llm_provider_factory_registry
+        ),
         MLService=lazy_ml_service.LazyMLService,
         MLWorkerSettingsService=worker_settings.MLWorkerSettingsService,
         StorageBootstrapService=storage.StorageBootstrapService,
@@ -524,6 +574,8 @@ def build_main_window(
         knowledge_import_service = None
         knowledge_derivation_service = None
         knowledge_index_service = None
+        settings_store = None
+        amd_composition = None
         runtime_shutdown_started = False
         runtime_shutdown_connected = False
 
@@ -541,6 +593,13 @@ def build_main_window(
                 knowledge_derivation_service.shutdown()
             if knowledge_index_service is not None:
                 knowledge_index_service.shutdown()
+            if amd_composition is not None:
+                try:
+                    amd_composition.close()
+                except Exception:
+                    LOGGER.exception("AMD composition shutdown did not complete cleanly.")
+            if settings_store is not None:
+                settings_store.close()
             context.engine.dispose()
             flush_observability()
             shutdown_logging()
@@ -550,14 +609,61 @@ def build_main_window(
         _update_startup_stage(app, splash, StartupStage.LOADING_WORKBENCH)
         step_start = time.perf_counter()
         ml_worker_settings_service = runtime.MLWorkerSettingsService(paths)
-        llm_settings_service = runtime.LLMSettingsService(paths)
-        embedding_settings_service = runtime.EmbeddingSettingsService(paths)
-        llm_service = runtime.LLMService(llm_settings_service)
+        settings_store = runtime.SettingsStore(paths.config)
+        llm_settings_service = runtime.LLMSettingsService(
+            paths,
+            settings_store=settings_store,
+        )
+        embedding_settings_service = runtime.EmbeddingSettingsService(
+            paths,
+            settings_store=settings_store,
+        )
+        ocr_settings_service = runtime.OcrSettingsService(store=settings_store)
+        llm_provider_factory_registry = runtime.create_builtin_llm_provider_factory_registry()
+        embedding_provider_factory_registry = (
+            runtime.create_builtin_embedding_provider_factory_registry()
+        )
+        ocr_provider_factory_registry = runtime.OcrProviderFactoryRegistry()
+        action_contributions: tuple[object, ...] = ()
+        if _amd_one_click_enabled():
+            # Keep the whole optional slice behind this composition edge.  A
+            # hard cut-off is one bounded branch removal; the ordinary runtime
+            # neither imports nor packages AMD control-plane behavior.
+            try:
+                amd_composition_module = import_module("xenix.services.amd.composition")
+                amd_composition = amd_composition_module.build_amd_composition(
+                    session_factory=context.session_factory,
+                    settings_store=settings_store,
+                    llm_settings_service=llm_settings_service,
+                    embedding_settings_service=embedding_settings_service,
+                    ocr_settings_service=ocr_settings_service,
+                    llm_provider_factory_registry=llm_provider_factory_registry,
+                    embedding_provider_factory_registry=embedding_provider_factory_registry,
+                    ocr_provider_factory_registry=ocr_provider_factory_registry,
+                    local_cache_root=(paths.cache / "amd-runtime").resolve(strict=False),
+                    temporary_root=paths.temp.resolve(strict=False),
+                    retirement_only=_amd_retirement_only(),
+                )
+                amd_setup_module = import_module("xenix.ui.amd_setup")
+                action_contributions = (
+                    amd_setup_module.AmdGuidedSetupContribution(amd_composition),
+                )
+            except Exception:
+                # The AMD slice is optional.  A malformed optional catalog or
+                # composition failure must not prevent the ordinary workbench
+                # from opening with its existing providers.
+                amd_composition = None
+                LOGGER.exception("AMD one-click composition is unavailable.")
+        llm_service = runtime.LLMService(
+            llm_settings_service,
+            provider_factory_registry=llm_provider_factory_registry,
+        )
         agent_services = runtime.build_headless_agent_services(
             paths=paths,
             session_factory=context.session_factory,
             llm=llm_service,
             embedding_settings_service=embedding_settings_service,
+            embedding_provider_factory_registry=embedding_provider_factory_registry,
             ml_worker_settings=ml_worker_settings_service,
             usage_observability=LocalLLMUsageObservability(
                 paths.logs / LLM_USAGE_JOURNAL_FILE_NAME
@@ -585,6 +691,10 @@ def build_main_window(
             paths=paths,
             session_factory=context.session_factory,
             artifact_service=agent_services.artifacts,
+            ocr_attempt_factory=runtime.ConfiguredOcrAttemptFactory(
+                ocr_settings_service,
+                ocr_provider_factory_registry,
+            ),
             canonical_ready_notifier=knowledge_derivation_service.enqueue_generation,
             corpus_changed_notifier=knowledge_index_service.notify_corpus_changed,
         )
@@ -631,6 +741,7 @@ def build_main_window(
             knowledge_document_lifecycle_service=(
                 knowledge_document_lifecycle_service
             ),
+            action_contributions=action_contributions,
         )
         _emit_startup_timing("main_window.construct", step_start)
         app.aboutToQuit.connect(shutdown_runtime)

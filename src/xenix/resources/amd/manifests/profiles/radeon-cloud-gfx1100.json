@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "profile_id": "radeon-cloud-gfx1100-chat-embedding-ocr",
+  "profile_version": "1",
+  "compatibility_cell_id": "radeon-cloud-gfx1100-ubuntu-24.04-rocm-7.2.1",
+  "components": [
+    {
+      "capability": "chat",
+      "manifest_id": "granite-3.1-8b-instruct-vllm-rocm721",
+      "manifest_digest": "3da41cd0449cea7c2fbd11310defb6206dc6a81a730abdb9858e9fd904aa0b45"
+    },
+    {
+      "capability": "embedding",
+      "manifest_id": "bge-m3-vllm-rocm721",
+      "manifest_digest": "fb8f209643b0fd2ab088932279170929f45a5ccf3f99b72036462a028f8943c3"
+    },
+    {
+      "capability": "ocr",
+      "manifest_id": "rapidocr-3.9.2-pp-ocrv6-small-torch",
+      "manifest_digest": "d3fcd1bc0f5afa85f0447a53d9ae8660afbe6649657be5569d41d6bb2469bf94"
+    }
+  ],
+  "capacity": {
+    "min_gpu_count": 1,
+    "min_free_vram_bytes": 50000000000,
+    "min_free_system_memory_bytes": 68719476736,
+    "required_persistent_bytes": 50000000000
+  },
+  "admission": "admitted",
+  "admission_blockers": []
+}

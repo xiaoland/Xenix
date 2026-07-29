@@ -577,3 +577,60 @@ class TrainedModelRow(SQLModel, table=True):
     )
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+
+# These rows intentionally remain primitive SQLite compatibility records.  They
+# do not import the optional AMD composition slice, and remain readable inert
+# history if that slice is omitted from a later desktop build.
+class AmdTargetEnrollmentRow(SQLModel, table=True):
+    __tablename__ = "amd_target_enrollment"
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    host: str = Field(index=True)
+    user: str
+    port: int
+    pinned_host_key: str
+    identity_file_reference: str
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class AmdInstallationRow(SQLModel, table=True):
+    __tablename__ = "amd_installation"
+    __table_args__ = (
+        UniqueConstraint("id", "placement", name="uq_amd_installation_id_placement"),
+    )
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    placement: str = Field(index=True)
+    target_id: str | None = Field(default=None, foreign_key="amd_target_enrollment.id", index=True)
+    profile_id: str = Field(index=True)
+    profile_digest: str = Field(index=True)
+    desired_presence: bool = Field(default=True, index=True)
+    lifecycle_state: str = Field(default="active", index=True)
+    revision: int = Field(default=0)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class AmdComponentGenerationRow(SQLModel, table=True):
+    __tablename__ = "amd_component_generation"
+    __table_args__ = (
+        UniqueConstraint(
+            "installation_id",
+            "capability",
+            "manifest_digest",
+            name="uq_amd_component_generation_identity",
+        ),
+    )
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    installation_id: str = Field(foreign_key="amd_installation.id", index=True)
+    capability: str = Field(index=True)
+    manifest_digest: str = Field(index=True)
+    lifecycle_state: str = Field(default="staging", index=True)
+    phase: str = Field(default="planned", index=True)
+    error_code: str | None = Field(default=None, index=True)
+    attestation_reference: str | None = None
+    revision: int = Field(default=0)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)

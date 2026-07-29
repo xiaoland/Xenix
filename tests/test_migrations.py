@@ -642,7 +642,7 @@ def test_storage_bootstrap_rejects_unknown_schema_version(monkeypatch, tmp_path:
         StorageBootstrapService().initialize(paths)
 
 
-def test_fresh_v23_schema_is_orm_fts_fk_and_unique_readable(
+def test_fresh_v24_schema_is_orm_fts_fk_and_unique_readable(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -651,11 +651,14 @@ def test_fresh_v23_schema_is_orm_fts_fk_and_unique_readable(
 
     context = StorageBootstrapService().initialize(paths)
 
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 23
+    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 24
     assert {
         "knowledge_canonical_generation",
         "knowledge_derivation",
         "knowledge_index_task",
+        "amd_target_enrollment",
+        "amd_installation",
+        "amd_component_generation",
     }.issubset(inspect(context.engine).get_table_names())
     with context.session_factory() as session:
         session.add(
@@ -681,7 +684,7 @@ def test_static_supported_fixture_upgrades_with_orm_fts_and_fk_proof(
 
     context = StorageBootstrapService().initialize(paths)
 
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 23
+    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 24
     with context.session_factory() as session:
         artifact = session.get(ArtifactRow, "artifact-1")
         assert artifact is not None and artifact.kind is ArtifactKind.FILE

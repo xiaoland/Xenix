@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "manifest_id": "granite-3.1-8b-instruct-vllm-rocm721",
+  "manifest_version": "1",
+  "capability": "chat",
+  "sources": [
+    {
+      "source_id": "granite-model-source",
+      "kind": "hugging_face",
+      "locator": "ibm-granite/granite-3.1-8b-instruct",
+      "revision": "4009206d5fc95d2e65a7b7633e159d6e97e25d35",
+      "acquisition_verified": true,
+      "verification_reference": "granite-revision-target-download-20260728"
+    },
+    {
+      "source_id": "vllm-wheel-source",
+      "kind": "https",
+      "locator": "https://wheels.vllm.ai/rocm/321fa2d6d1644629ac39d173f6393f37e14bf7b4/vllm-0.20.2rc1.dev15%2Bg321fa2d6d.rocm721-cp312-cp312-manylinux_2_34_x86_64.whl",
+      "revision": "0.20.2rc1.dev15+g321fa2d6d.rocm721",
+      "acquisition_verified": true,
+      "verification_reference": "vllm-rocm721-target-import-20260728"
+    }
+  ],
+  "artifacts": [
+    {
+      "artifact_id": "granite-weight-00001",
+      "kind": "model",
+      "relative_path": "model-00001-of-00004.safetensors",
+      "source_id": "granite-model-source",
+      "sha256": "191c4e9c6263d9cf591104f2d16ab2c39dcc43c1ad0680cc5a34d5c86d61ee41",
+      "size_bytes": 4974661520,
+      "license_spdx": "Apache-2.0"
+    },
+    {
+      "artifact_id": "granite-weight-00002",
+      "kind": "model",
+      "relative_path": "model-00002-of-00004.safetensors",
+      "source_id": "granite-model-source",
+      "sha256": "c7c38b0d5a436775b09d764465ed6e6eb7a8c4e302d05e301e151c96e3076f22",
+      "size_bytes": 4991447808,
+      "license_spdx": "Apache-2.0"
+    },
+    {
+      "artifact_id": "granite-weight-00003",
+      "kind": "model",
+      "relative_path": "model-00003-of-00004.safetensors",
+      "source_id": "granite-model-source",
+      "sha256": "f02784b72391fa04e9b986313c1a1720ce88f0eb40f7ae81fa0daadc93049457",
+      "size_bytes": 4970460032,
+      "license_spdx": "Apache-2.0"
+    },
+    {
+      "artifact_id": "granite-weight-00004",
+      "kind": "model",
+      "relative_path": "model-00004-of-00004.safetensors",
+      "source_id": "granite-model-source",
+      "sha256": "9d86d201ff8e73d8a46e92b543c9dd44f133e60b35ccada4a76439af62f22212",
+      "size_bytes": 1405169256,
+      "license_spdx": "Apache-2.0"
+    },
+    {
+      "artifact_id": "vllm-rocm721-wheel",
+      "kind": "runtime",
+      "relative_path": "vllm-0.20.2rc1.dev15+g321fa2d6d.rocm721-cp312-cp312-manylinux_2_34_x86_64.whl",
+      "source_id": "vllm-wheel-source",
+      "sha256": "a0834d6dc4244f6f87aa39d8a66f3942377dea8aaa80bdd5e4d71433ba486acf",
+      "size_bytes": 307012829,
+      "license_spdx": "Apache-2.0"
+    }
+  ],
+  "models": [
+    {
+      "model_id": "ibm-granite/granite-3.1-8b-instruct",
+      "revision": "4009206d5fc95d2e65a7b7633e159d6e97e25d35",
+      "license_spdx": "Apache-2.0",
+      "artifact_ids": [
+        "granite-weight-00001",
+        "granite-weight-00002",
+        "granite-weight-00003",
+        "granite-weight-00004"
+      ],
+      "tokenizer_id": "ibm-granite/granite-3.1-8b-instruct",
+      "tokenizer_revision": "4009206d5fc95d2e65a7b7633e159d6e97e25d35",
+      "output_dimensions": null
+    }
+  ],
+  "runtime": {
+    "runtime_id": "vllm-rocm721-nightly",
+    "runtime_version": "0.20.2rc1.dev15+g321fa2d6d.rocm721",
+    "framework_id": "vllm",
+    "framework_version": "0.20.2rc1.dev15+g321fa2d6d.rocm721",
+    "python_version": "3.12.3",
+    "packages": [
+      {
+        "name": "vllm",
+        "version": "0.20.2rc1.dev15+g321fa2d6d.rocm721",
+        "artifact_id": "vllm-rocm721-wheel"
+      }
+    ],
+    "allowed_plugins": []
+  },
+  "protocol": {
+    "protocol_id": "openai-compatible-chat",
+    "protocol_version": "vllm-0.20.2rc1",
+    "profile_id": "chat-completions",
+    "authentication_required": true,
+    "unauthenticated_request_rejected": true,
+    "field_rules": [
+      {
+        "field_name": "stream",
+        "disposition": "optional",
+        "expected_value": null
+      },
+      {
+        "field_name": "tools",
+        "disposition": "optional",
+        "expected_value": null
+      }
+    ]
+  },
+  "launch": {
+    "executable": "vllm",
+    "served_model_name": "granite-3.1-8b-instruct",
+    "arguments": [
+      "--dtype=float16",
+      "--max-model-len=8192",
+      "--gpu-memory-utilization=0.65",
+      "--enable-auto-tool-choice",
+      "--tool-call-parser=granite"
+    ],
+    "environment": [
+      {
+        "name": "HF_HUB_OFFLINE",
+        "value": "1"
+      },
+      {
+        "name": "TRANSFORMERS_OFFLINE",
+        "value": "1"
+      },
+      {
+        "name": "VLLM_DO_NOT_TRACK",
+        "value": "1"
+      },
+      {
+        "name": "VLLM_NO_USAGE_STATS",
+        "value": "1"
+      },
+      {
+        "name": "VLLM_PLUGINS",
+        "value": ""
+      },
+      {
+        "name": "VLLM_ROCM_USE_AITER",
+        "value": "0"
+      }
+    ],
+    "loopback_only": true,
+    "protected_auth_handoff_required": true,
+    "isolated_cache_required": true,
+    "isolated_config_required": true
+  },
+  "self_tests": [
+    {
+      "test_id": "chat-protocol-and-rocm-workload",
+      "deadline_seconds": 180.0,
+      "required_evidence": [
+        "automatic-tool-call",
+        "chat-completion",
+        "rocm-workload",
+        "unauthenticated-request-rejected"
+      ]
+    }
+  ],
+  "compatibility_cells": [
+    {
+      "cell_id": "radeon-cloud-gfx1100-ubuntu-24.04-rocm-7.2.1",
+      "os_name": "Ubuntu",
+      "os_version": "24.04",
+      "kernel_version": "6.8.0-79-generic",
+      "architecture": "x86_64",
+      "gpu_architecture": "gfx1100",
+      "driver_version": "6.14.14",
+      "rocm_version": "7.2.1",
+      "hip_version": "7.2.53211-e1a6bc5663",
+      "python_version": "3.12.3",
+      "admission": "admitted",
+      "admission_blockers": []
+    }
+  ],
+  "capacity": {
+    "min_gpu_count": 1,
+    "min_free_vram_bytes": 35000000000,
+    "min_free_system_memory_bytes": 34359738368,
+    "required_persistent_bytes": 30000000000
+  },
+  "admission": "admitted",
+  "admission_blockers": []
+}

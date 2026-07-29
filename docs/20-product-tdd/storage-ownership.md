@@ -18,6 +18,13 @@ outputs, or delete user-owned input.
   delete them as a side effect of removing app state.
 - Remote worker files are reproducible execution/cache state, never canonical
   product storage.
+- Managed AMD installation identity, immutable placement reference, desired
+  presence, and component-generation lifecycle are bounded SQLite authority.
+  Exact model/runtime/protocol descriptors belong to versioned manifests;
+  target files, processes, forwards, live URLs, tokens, health, and runtime
+  incarnations belong only to the execution session. Released AMD tables remain
+  inert readable compatibility history if the optional AMD composition slice is
+  removed.
 
 Schema versions, table shapes, serialized enum values, runtime directories, and
 storage libraries are owned by source, migrations, configuration, and tests.
@@ -37,6 +44,10 @@ storage libraries are owned by source, migrations, configuration, and tests.
   [artifact link contract](artifact-links.md).
 - Trained analyzers and ML results use durable records that point to canonical local
   artifacts; remote paths never become registered authorities.
+- Capability settings own managed provider projections and selection. They store
+  an exact generation reference and compatibility descriptor, never a URL, port,
+  token, PID, tunnel, health fact, or runtime incarnation. A missing manager
+  implementation projects the reference as unavailable without rewriting it.
 
 ## Deletion Invariants
 

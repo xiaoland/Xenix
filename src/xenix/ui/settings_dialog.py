@@ -28,12 +28,17 @@ from ..build_info import APP_VERSION, BUILD_COMMIT, BUILD_COMMIT_DISPLAY
 from ..config import AppPaths
 from ..i18n import TranslationManager
 from ..services.embedding_service import EmbeddingSettings, EmbeddingSettingsService
+from ..services.embedding_settings import (
+    EmbeddingProviderProjection,
+    StaticEmbeddingTarget,
+)
 from ..services.llm import (
     LLMDialect,
     LLMProviderConfig,
     LLMService,
     LLMSettings,
     LLMSettingsService,
+    LLMSettingsSnapshot,
     PACKAGED_TRIAL_SECRET_SOURCE,
 )
 from ..services.ml.worker_settings import MLWorkerKind, MLWorkerSettingsService
@@ -46,6 +51,7 @@ from ..services.paddle_ocr_service import (
     PaddleOcrState,
     PaddleOcrStatus,
 )
+from ..services.settings_store import SettingsConflictError
 from ..services.update_service import UpdateService
 from .ocr_deployment_tasks import OcrInstallTask, OcrStatusTask
 from .knowledge_index_ui import KnowledgeIndexRebuildDialog
@@ -140,9 +146,7 @@ class AboutDialog(QDialog):
 
     def _wire_events(self) -> None:
         self._open_logs_button.clicked.connect(self._open_logs_dir)
-        self._check_updates_button.clicked.connect(
-            self.software_update_requested.emit
-        )
+        self._check_updates_button.clicked.connect(self.software_update_requested.emit)
 
     def retranslate_ui(self) -> None:
         self.setWindowTitle(self.tr("About"))
@@ -155,9 +159,7 @@ class AboutDialog(QDialog):
         self._build_commit_label.setText(self.tr("Build commit"))
         self._open_logs_button.setText(self.tr("Open log directory"))
         self._check_updates_button.setText(self.tr("Check for updates"))
-        self._check_updates_button.setEnabled(
-            self._software_updates_available and not self._update_operation_active
-        )
+        self._check_updates_button.setEnabled(self._software_updates_available and not self._update_operation_active)
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == QEvent.LanguageChange:
@@ -169,9 +171,7 @@ class AboutDialog(QDialog):
 
     def set_update_operation_active(self, active: bool) -> None:
         self._update_operation_active = active
-        self._check_updates_button.setEnabled(
-            self._software_updates_available and not active
-        )
+        self._check_updates_button.setEnabled(self._software_updates_available and not active)
 
 
 class SettingsDialog(QDialog):
@@ -211,7 +211,11 @@ class SettingsDialog(QDialog):
         self._provider_configs: list[LLMProviderConfig] = []
         self._loading_provider = False
         self._active_provider_index = 0
+        self._llm_settings_revision = 0
         self._embedding_settings_snapshot = EmbeddingSettings()
+        self._embedding_settings_revision = 0
+        self._embedding_static_overrides: dict[str, EmbeddingProviderProjection] = {}
+        self._embedding_loading = False
         self._ssh_worker_wizard: SshWorkerSetupWizard | None = None
         self._about_dialog: AboutDialog | None = None
         self._thread_pool = QThreadPool(self)
@@ -279,6 +283,7 @@ class SettingsDialog(QDialog):
         self._llm_retry_attempts_label = QLabel()
 
         self._embedding_title_label = QLabel()
+        self._embedding_provider_selector_label = QLabel()
         self._embedding_enabled_label = QLabel()
         self._embedding_base_url_label = QLabel()
         self._embedding_api_key_label = QLabel()
@@ -322,6 +327,7 @@ class SettingsDialog(QDialog):
         self._llm_retry_attempts_input.setRange(1, 20)
 
         self._embedding_enabled_checkbox = QCheckBox()
+        self._embedding_provider_selector = QComboBox()
         self._embedding_base_url_input = QLineEdit()
         self._embedding_api_key_input = QLineEdit()
         self._embedding_api_key_input.setEchoMode(QLineEdit.Password)
@@ -391,6 +397,10 @@ class SettingsDialog(QDialog):
         self._llm_card_layout.addRow(self._provider_streaming_label, self._provider_streaming_checkbox)
 
         self._embedding_card_layout.addRow(self._embedding_title_label)
+        self._embedding_card_layout.addRow(
+            self._embedding_provider_selector_label,
+            self._embedding_provider_selector,
+        )
         self._embedding_card_layout.addRow(self._embedding_enabled_label, self._embedding_enabled_checkbox)
         self._embedding_card_layout.addRow(self._embedding_base_url_label, self._embedding_base_url_input)
         self._embedding_card_layout.addRow(self._embedding_api_key_label, self._embedding_api_key_input)
@@ -457,6 +467,7 @@ class SettingsDialog(QDialog):
         self._language_selector.currentIndexChanged.connect(self._on_language_changed)
         self._save_button.clicked.connect(self._save_agent_settings)
         self._provider_selector.currentIndexChanged.connect(self._on_provider_changed)
+        self._embedding_provider_selector.currentIndexChanged.connect(self._on_embedding_provider_changed)
         self._add_provider_button.clicked.connect(self._add_provider)
         self._remove_provider_button.clicked.connect(self._remove_provider)
         self._ml_workers_setup_button.clicked.connect(self._open_ssh_worker_wizard)
@@ -491,6 +502,7 @@ class SettingsDialog(QDialog):
         self._llm_thread_title_model_label.setText(self.tr("Thread title model"))
         self._llm_retry_attempts_label.setText(self.tr("LLM retry attempts"))
         self._embedding_title_label.setText(self.tr("Embedding provider"))
+        self._embedding_provider_selector_label.setText(self.tr("Provider"))
         self._embedding_enabled_label.setText(self.tr("Enabled"))
         self._embedding_base_url_label.setText(self.tr("Base URL"))
         self._embedding_api_key_label.setText(self.tr("API key"))
@@ -530,11 +542,7 @@ class SettingsDialog(QDialog):
         self._tabs.setCurrentIndex(self._tab_indexes[SettingsTab(tab)])
 
     def _install_ocr(self) -> None:
-        if (
-            self._shutdown
-            or self._paddle_ocr_deployment is None
-            or self._ocr_install_task is not None
-        ):
+        if self._shutdown or self._paddle_ocr_deployment is None or self._ocr_install_task is not None:
             return
         self._ocr_setup_button.setEnabled(False)
         generation = self._lifecycle_generation
@@ -556,9 +564,7 @@ class SettingsDialog(QDialog):
             "ready": self.tr("Ready"),
         }
         translated = translations.get(phase, self.tr("Preparing local OCR"))
-        self._ocr_status_label.setText(
-            self.tr("Local OCR setup: %1").replace("%1", translated)
-        )
+        self._ocr_status_label.setText(self.tr("Local OCR setup: %1").replace("%1", translated))
 
     def _on_ocr_setup_finished(
         self,
@@ -736,12 +742,8 @@ class SettingsDialog(QDialog):
                 software_updates_available=self._software_updates_available,
                 parent=self,
             )
-            self._about_dialog.software_update_requested.connect(
-                self.software_update_requested.emit
-            )
-            self._about_dialog.set_update_operation_active(
-                self._update_operation_active
-            )
+            self._about_dialog.software_update_requested.connect(self.software_update_requested.emit)
+            self._about_dialog.set_update_operation_active(self._update_operation_active)
         self._about_dialog.show()
         self._about_dialog.raise_()
         self._about_dialog.activateWindow()
@@ -752,7 +754,9 @@ class SettingsDialog(QDialog):
             self._about_dialog.set_update_operation_active(active)
 
     def _load_agent_settings(self) -> None:
-        settings = self._llm_settings_service.load()
+        snapshot: LLMSettingsSnapshot = self._llm_settings_service.load_snapshot()
+        settings = snapshot.settings
+        self._llm_settings_revision = snapshot.revision
         self._provider_configs = [provider.model_copy(deep=True) for provider in settings.providers]
         self._reload_provider_selector(0)
         self._load_provider_fields(0)
@@ -764,20 +768,112 @@ class SettingsDialog(QDialog):
         self._llm_retry_attempts_input.setValue(settings.retry_attempts)
 
     def _load_embedding_settings(self) -> None:
-        settings = self._embedding_settings_service.load()
-        self._embedding_settings_snapshot = settings.model_copy(deep=True)
-        self._embedding_enabled_checkbox.setChecked(settings.enabled)
-        self._embedding_base_url_input.setText(settings.base_url)
-        self._embedding_api_key_input.setText(settings.api_key)
-        self._embedding_model_input.setText(settings.model)
-        self._embedding_dimensions_input.setValue(settings.dimensions or 0)
-        self._embedding_batch_size_input.setValue(settings.batch_size)
-        self._embedding_timeout_input.setValue(settings.timeout_seconds)
+        snapshot = self._embedding_settings_service.load_snapshot()
+        self._embedding_settings_snapshot = snapshot.settings.model_copy(deep=True)
+        self._embedding_settings_revision = snapshot.revision
+        self._embedding_static_overrides.clear()
+        self._reload_embedding_provider_selector(selected_provider_id=snapshot.settings.active_provider_id)
+
+    def _reload_embedding_provider_selector(self, *, selected_provider_id: str) -> None:
+        self._embedding_loading = True
+        self._embedding_provider_selector.clear()
+        for provider in self._embedding_settings_snapshot.providers:
+            label = provider.display_name
+            if provider.retiring:
+                label = f"{label} ({self.tr('Retiring')})"
+            self._embedding_provider_selector.addItem(label, provider.id)
+        index = self._embedding_provider_selector.findData(selected_provider_id)
+        if index < 0:
+            index = 0
+        self._embedding_provider_selector.setCurrentIndex(index)
+        self._embedding_loading = False
+        self._load_embedding_provider_fields(selected_provider_id)
+
+    def _load_embedding_provider_fields(self, provider_id: str) -> None:
+        projection = self._embedding_projection_for_id(provider_id)
+        if projection is None:
+            return
+        self._embedding_loading = True
+        target = projection.target
+        is_static = isinstance(target, StaticEmbeddingTarget)
+        self._embedding_enabled_checkbox.setChecked(target.enabled if is_static else not projection.retiring)
+        self._embedding_base_url_input.setText(target.base_url if is_static else "")
+        self._embedding_api_key_input.setText(target.api_key if is_static else "")
+        self._embedding_model_input.setText(projection.model)
+        self._embedding_dimensions_input.setValue(projection.dimensions or 0)
+        self._embedding_batch_size_input.setValue(projection.batch_size)
+        self._embedding_timeout_input.setValue(projection.timeout_seconds)
+        self._apply_embedding_provider_field_state(projection)
+        self._embedding_loading = False
+
+    def _on_embedding_provider_changed(self, _index: int) -> None:
+        if self._embedding_loading:
+            return
+        self._store_current_embedding_fields()
+        provider_id = str(self._embedding_provider_selector.currentData() or "")
+        self._load_embedding_provider_fields(provider_id)
+
+    def _embedding_projection_for_id(self, provider_id: str) -> EmbeddingProviderProjection | None:
+        return self._embedding_static_overrides.get(provider_id) or self._embedding_settings_snapshot.provider(
+            provider_id
+        )
+
+    def _store_current_embedding_fields(self) -> None:
+        if self._embedding_loading:
+            return
+        provider_id = str(self._embedding_provider_selector.currentData() or "")
+        current = self._embedding_projection_for_id(provider_id)
+        if current is None or not isinstance(current.target, StaticEmbeddingTarget):
+            return
+        dimensions = self._embedding_dimensions_input.value() or None
+        target = StaticEmbeddingTarget(
+            enabled=self._embedding_enabled_checkbox.isChecked(),
+            provider_key=current.target.provider_key,
+            dialect=current.target.dialect,
+            base_url=self._embedding_base_url_input.text(),
+            api_key=self._embedding_api_key_input.text(),
+            model=self._embedding_model_input.text(),
+            dimensions=dimensions,
+            batch_size=self._embedding_batch_size_input.value(),
+            timeout_seconds=self._embedding_timeout_input.value(),
+        )
+        self._embedding_static_overrides[provider_id] = EmbeddingProviderProjection(
+            id=current.id,
+            display_name=current.display_name,
+            model=target.model,
+            dimensions=target.dimensions,
+            batch_size=target.batch_size,
+            timeout_seconds=target.timeout_seconds,
+            target=target,
+        )
+
+    def _apply_embedding_provider_field_state(
+        self,
+        projection: EmbeddingProviderProjection,
+    ) -> None:
+        managed = projection.is_managed or projection.read_only
+        self._embedding_enabled_checkbox.setEnabled(not managed)
+        for field in (
+            self._embedding_base_url_input,
+            self._embedding_api_key_input,
+            self._embedding_model_input,
+            self._embedding_dimensions_input,
+            self._embedding_batch_size_input,
+            self._embedding_timeout_input,
+        ):
+            field.setEnabled(not managed)
+        if managed:
+            self._embedding_base_url_input.setPlaceholderText(self.tr("Managed by deployment"))
+            self._embedding_api_key_input.setPlaceholderText(self.tr("Managed by deployment"))
+        else:
+            self._embedding_base_url_input.setPlaceholderText("")
+            self._embedding_api_key_input.setPlaceholderText("")
 
     def _save_agent_settings(self) -> None:
         rebuild_choice = "none"
         try:
             self._store_current_provider_fields()
+            self._store_current_embedding_fields()
             llm_settings = LLMSettings(
                 providers=self._provider_configs,
                 default_fq_model_key=str(self._llm_default_model_selector.currentData() or ""),
@@ -808,16 +904,53 @@ class SettingsDialog(QDialog):
             rebuild_choice = self._confirm_embedding_compatibility_change()
             if rebuild_choice == "cancel":
                 return
+        llm_saved = False
+        embedding_saved = False
+        failures: list[str] = []
         try:
-            self._llm_settings_service.save(llm_settings)
-            self._embedding_settings_service.save(embedding_settings)
+            llm_snapshot = self._llm_settings_service.replace_user_settings(
+                llm_settings,
+                expected_revision=self._llm_settings_revision,
+            )
+        except SettingsConflictError:
+            self._llm_settings_revision = self._llm_settings_service.load_snapshot().revision
+            failures.append(
+                self.tr("LLM settings changed elsewhere. Your edits are still shown; save again to reapply them.")
+            )
         except Exception as exc:
-            QMessageBox.warning(self, self.tr("Settings"), str(exc))
-            return
-        self._embedding_settings_snapshot = embedding_settings.model_copy(deep=True)
-        self.agent_settings_saved.emit()
-        self.embedding_settings_saved.emit()
-        if rebuild_choice == "rebuild" and self._knowledge_index_service is not None:
+            failures.append(str(exc))
+        else:
+            self._llm_settings_revision = llm_snapshot.revision
+            llm_saved = True
+
+        try:
+            embedding_snapshot = self._embedding_settings_service.replace_user_settings(
+                embedding_settings,
+                expected_revision=self._embedding_settings_revision,
+            )
+        except SettingsConflictError:
+            self._embedding_settings_revision = self._embedding_settings_service.load_snapshot().revision
+            failures.append(
+                self.tr("Embedding settings changed elsewhere. Your edits are still shown; save again to reapply them.")
+            )
+        except Exception as exc:
+            failures.append(str(exc))
+        else:
+            self._embedding_settings_snapshot = embedding_snapshot.settings.model_copy(deep=True)
+            self._embedding_settings_revision = embedding_snapshot.revision
+            self._embedding_static_overrides.clear()
+            embedding_saved = True
+
+        if llm_saved:
+            self._load_agent_settings()
+            self.agent_settings_saved.emit()
+        if embedding_saved:
+            selected_provider_id = embedding_settings.active_provider_id
+            self._reload_embedding_provider_selector(selected_provider_id=selected_provider_id)
+            self.embedding_settings_saved.emit()
+        if failures:
+            QMessageBox.warning(self, self.tr("Settings"), "\n\n".join(failures))
+        if embedding_saved and rebuild_choice == "rebuild" and self._knowledge_index_service is not None:
             try:
                 self._knowledge_index_service.enqueue_rebuild(
                     (KnowledgeIndexKind.TEXT_VECTOR,),
@@ -827,12 +960,10 @@ class SettingsDialog(QDialog):
                 QMessageBox.warning(
                     self,
                     self.tr("Knowledge Indexes"),
-                    self.tr(
-                        "Embedding settings were saved, but the vector rebuild "
-                        "could not be queued."
-                    ),
+                    self.tr("Embedding settings were saved, but the vector rebuild could not be queued."),
                 )
-        self._render_index_status()
+        if embedding_saved:
+            self._render_index_status()
 
     def _confirm_embedding_compatibility_change(self) -> str:
         message = QMessageBox(self)
@@ -865,19 +996,15 @@ class SettingsDialog(QDialog):
         return "cancel"
 
     def _embedding_settings_from_fields(self) -> EmbeddingSettings:
-        dimensions = self._embedding_dimensions_input.value()
         current = self._embedding_settings_snapshot
+        selected_provider_id = str(self._embedding_provider_selector.currentData() or "")
+        if current.provider(selected_provider_id) is None:
+            raise ValueError("Selected Embedding provider is unavailable.")
+        providers = tuple(self._embedding_static_overrides.get(provider.id, provider) for provider in current.providers)
         return EmbeddingSettings(
             schema_version=current.schema_version,
-            enabled=self._embedding_enabled_checkbox.isChecked(),
-            provider_key=current.provider_key,
-            dialect=current.dialect,
-            base_url=self._embedding_base_url_input.text(),
-            api_key=self._embedding_api_key_input.text(),
-            model=self._embedding_model_input.text(),
-            dimensions=dimensions or None,
-            batch_size=self._embedding_batch_size_input.value(),
-            timeout_seconds=self._embedding_timeout_input.value(),
+            providers=providers,
+            active_provider_id=selected_provider_id,
         )
 
     def _open_index_rebuild(self) -> None:
@@ -888,32 +1015,24 @@ class SettingsDialog(QDialog):
                 self._knowledge_index_service,
                 self,
             )
-            self._index_dialog.submitted.connect(
-                lambda _task_id: self._render_index_status()
-            )
+            self._index_dialog.submitted.connect(lambda _task_id: self._render_index_status())
         self._index_dialog.open()
 
     def _render_index_status(self) -> None:
         if self._knowledge_index_service is None:
-            self._index_status_label.setText(
-                self.tr("Knowledge index service is unavailable")
-            )
+            self._index_status_label.setText(self.tr("Knowledge index service is unavailable"))
             self._index_rebuild_button.setEnabled(False)
             return
         try:
             status = self._knowledge_index_service.status()
         except Exception:
-            self._index_status_label.setText(
-                self.tr("Knowledge index status is unavailable")
-            )
+            self._index_status_label.setText(self.tr("Knowledge index status is unavailable"))
             self._index_rebuild_button.setEnabled(False)
             return
         self._index_status_label.setText(
             self.tr("Keyword: %1\nText vectors: %2")
             .replace("%1", self._translated_index_state(status.keyword_state))
-            .replace(
-                "%2", self._translated_index_state(status.text_vector_state)
-            )
+            .replace("%2", self._translated_index_state(status.text_vector_state))
         )
         self._index_rebuild_button.setEnabled(status.unit_count > 0)
 
@@ -994,6 +1113,13 @@ class SettingsDialog(QDialog):
         if len(self._provider_configs) <= 1:
             return
         index = max(0, self._provider_selector.currentIndex())
+        if index < len(self._provider_configs) and self._provider_configs[index].read_only:
+            QMessageBox.information(
+                self,
+                self.tr("Settings"),
+                self.tr("This provider is managed by a deployment and cannot be removed here."),
+            )
+            return
         self._provider_configs.pop(index)
         next_index = min(index, len(self._provider_configs) - 1)
         self._reload_provider_selector(next_index)
@@ -1037,6 +1163,9 @@ class SettingsDialog(QDialog):
         if index < 0 or index >= len(self._provider_configs):
             return
         current = self._provider_configs[index]
+        if current.read_only or current.is_managed:
+            self._apply_provider_field_state(current)
+            return
         packaged_trial = self._is_packaged_trial_provider(current)
         self._provider_configs[index] = LLMProviderConfig(
             key=self._provider_key_input.text().strip(),
@@ -1066,12 +1195,29 @@ class SettingsDialog(QDialog):
             self._apply_provider_field_state(self._provider_configs[index])
 
     def _apply_provider_field_state(self, provider: LLMProviderConfig) -> None:
+        managed = provider.read_only or provider.is_managed
         packaged_trial = self._is_packaged_trial_provider(provider)
-        self._provider_base_url_input.setReadOnly(packaged_trial)
-        self._provider_api_key_input.setReadOnly(packaged_trial)
-        if packaged_trial:
+        for field in (
+            self._provider_key_input,
+            self._provider_name_input,
+            self._provider_base_url_input,
+            self._provider_api_key_input,
+            self._provider_models_input,
+            self._provider_timeout_input,
+            self._provider_streaming_checkbox,
+        ):
+            field.setEnabled(not managed)
+        self._provider_dialect_selector.setEnabled(not managed)
+        self._provider_base_url_input.setReadOnly(packaged_trial or managed)
+        self._provider_api_key_input.setReadOnly(packaged_trial or managed)
+        self._remove_provider_button.setEnabled(not managed and len(self._provider_configs) > 1)
+        if managed:
+            self._provider_base_url_input.setPlaceholderText(self.tr("Managed by deployment"))
+            self._provider_api_key_input.setPlaceholderText(self.tr("Managed by deployment"))
+        elif packaged_trial:
             self._provider_api_key_input.setPlaceholderText(self.tr("Built into packaged app"))
         else:
+            self._provider_base_url_input.setPlaceholderText("")
             self._provider_api_key_input.setPlaceholderText("")
 
     def _is_packaged_trial_provider(self, provider: LLMProviderConfig) -> bool:

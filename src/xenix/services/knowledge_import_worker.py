@@ -27,7 +27,8 @@ from ..exceptions import ValidationError
 from .knowledge_canonical import CanonicalIdentity, Canonicalizer
 from .knowledge_content_store import KnowledgeContentStore
 from .knowledge_pipeline import FileProbe, FormatNormalizer, ParseExecutor, ParserRouter
-from .paddle_ocr_service import PaddleOcrDeploymentService, PaddleOcrService
+from .ocr.composition import build_ocr_service_from_spawn_spec
+from .ocr.contracts import OcrSpawnSpec
 from .storage.layout import knowledge_import_result_path, knowledge_import_task_root
 from .windows_process_tree import arm_current_process_tree
 
@@ -57,6 +58,7 @@ class KnowledgeImportWorkerRequest(_WorkerBoundaryModel):
     expected_source_format: str
     expected_media_type: str | None
     identity: CanonicalIdentity
+    ocr_spawn_spec: OcrSpawnSpec = Field(default_factory=lambda: OcrSpawnSpec(kind="paddle"))
     password: str | None = Field(default=None, repr=False)
 
     @model_validator(mode="after")
@@ -341,7 +343,7 @@ def _run_worker_operation(
         actual_store = store or KnowledgeContentStore(request.paths)
         actual_normalizer = normalizer or FormatNormalizer()
         actual_parser = parser or ParseExecutor(
-            PaddleOcrService(PaddleOcrDeploymentService(request.paths))
+            build_ocr_service_from_spawn_spec(request.paths, request.ocr_spawn_spec)
         )
         router = ParserRouter()
         canonicalizer = Canonicalizer()

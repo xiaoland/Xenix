@@ -213,6 +213,15 @@ opening or cause provider/canonical data to gain a local path.
   and possible domain side-effect orphans. A later user-driven sample may
   repeat semantic work; it must not infer a ToolResult from logs, Artifacts, or
   domain rows.
+- Managed provider references are exact, generation-specific identities. Default,
+  completion-guard, and title references block their exact provider's removal;
+  an executing operation blocks through its capability admission scope. A
+  historical Thread reference alone does not keep remote compute installed. If
+  that exact provider was removed, reopening or sampling reports
+  `llm_model_reference_stale`; it never silently selects another static, trial,
+  managed, or newer generation provider. If the optional provider manager is
+  absent, the result is `provider_implementation_unavailable`. Deployment never
+  rewrites Thread references or picks a fallback.
 
 ## Verification Routes
 

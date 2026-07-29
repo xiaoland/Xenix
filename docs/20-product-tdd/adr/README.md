@@ -14,3 +14,5 @@ tests own implementation mechanics.
 | [0007 — Remote adapters](0007-remote-integrations-remain-adapters.md) | 2026-07-11 | Accepted | Clarifies 0004 and 0005 | Current |
 | [0008 — Canonical LLM conversation boundary](0008-canonical-llm-conversation-boundary.md) | 2026-07-15 | Accepted | Relates to 0006 and 0007 | Current |
 | [0009 — Native Paddle local OCR](0009-official-paddle-native-local-ocr.md) | 2026-07-22 | Accepted | Relates to 0003, 0006, and 0007 | Current |
+| [0010 — Managed AMD ROCm deployments](0010-managed-amd-rocm-deployments.md) | 2026-07-28 | Accepted | Extends 0007; relates to 0006, 0008, and 0009 | Current |
+| [0011 — KServe PAGE OCR provider boundary](0011-kserve-page-ocr-provider-boundary.md) | 2026-07-28 | Accepted | Relates to 0009 and 0010 | Current |

@@ -3,6 +3,7 @@ from __future__ import annotations
 import codecs
 import hashlib
 import json
+import math
 import shutil
 import stat
 import subprocess
@@ -29,13 +30,9 @@ from .knowledge_formats import (
     KnowledgeFormatRegistry,
 )
 from .knowledge_pdf import PdfPageTextState, probe_pdf_pages
-from .paddle_ocr_service import (
-    MAX_PROTOCOL_MESSAGE_BYTES,
-    NATIVE_OCR_PROTOCOL_VERSION,
-    PaddleOcrService,
-)
+from .ocr.contracts import OcrService, normalize_runtime_descriptor
 
-MAX_OCR_RESULT_BYTES = MAX_PROTOCOL_MESSAGE_BYTES
+MAX_OCR_RESULT_BYTES = 64 * 1024 * 1024
 
 MAX_SOURCE_BYTES = 512 * 1024 * 1024
 MAX_TEXT_LINE_CHARS = 1_000_000
@@ -62,13 +59,6 @@ _TEXT_FALLBACK_ENCODINGS = _TEXT_ENCODING_ALLOWLIST - {
 }
 _TEXT_MAX_CANDIDATE_CHAOS = 0.1
 _TEXT_MIN_CANDIDATE_SEPARATION = 0.05
-_OCR_PROJECTION_FAILURES = (
-    ValidationError,
-    OSError,
-    TimeoutError,
-    subprocess.SubprocessError,
-)
-
 _ProviderT = TypeVar("_ProviderT")
 
 
@@ -787,7 +777,7 @@ class DocumentParserProvider(Protocol):
 class ParseExecutor:
     def __init__(
         self,
-        ocr_service: PaddleOcrService | None = None,
+        ocr_service: OcrService | None = None,
         *,
         registry: KnowledgeFormatRegistry = KNOWLEDGE_FORMAT_REGISTRY,
         providers: tuple[DocumentParserProvider, ...] | None = None,
@@ -841,7 +831,7 @@ class ParseExecutor:
             normalized.path,
             max_bytes=MAX_SOURCE_BYTES,
         )
-        needs_ocr = any(unit.route_id.startswith("paddleocr-") for unit in plan.units)
+        needs_ocr = any(unit.route_id.startswith("ocr-") for unit in plan.units)
         ocr_runtime_descriptor: dict[str, object] | None = None
         with ExitStack() as stack:
             ocr_executor: Any = self._ocr
@@ -852,7 +842,7 @@ class ParseExecutor:
                     ocr_executor = stack.enter_context(
                         open_session(
                             allowed_root=work_dir,
-                            log_path=work_dir / "paddle-ocr.log",
+                            log_path=work_dir / "ocr.log",
                         )
                     )
                 ocr_runtime_descriptor = _ocr_runtime_payload(ocr_executor)
@@ -905,21 +895,16 @@ class ParseExecutor:
                     "output_sha256": parser_output_sha256,
                 },
                 "ocr": {
-                    "service": "paddle-inference",
+                    "service": str((ocr_runtime_descriptor or {}).get("engine", "not-selected")),
                     "package": _runtime_package(
-                        "paddle-inference",
-                        str(
-                            (ocr_runtime_descriptor or {}).get(
-                                "engine_version",
-                                "runtime-resolved",
-                            )
-                        ),
+                        str((ocr_runtime_descriptor or {}).get("engine", "not-selected")),
+                        str((ocr_runtime_descriptor or {}).get("engine_version", "runtime-resolved")),
                     ),
-                    "backend": "xenix-native-worker",
+                    "backend": "provider-session" if needs_ocr else "not-requested",
                     "options": {
                         "page_scoped": normalized.parser_format == "pdf",
                         "projection": "text",
-                        "protocol": NATIVE_OCR_PROTOCOL_VERSION,
+                        "protocol": str((ocr_runtime_descriptor or {}).get("protocol", "none")),
                     },
                     "status": ocr_status,
                     "ready": ocr_ready,
@@ -990,9 +975,9 @@ class _PdfRouteProvider:
                 reason = "native_text_credible"
             elif ocr_ready:
                 route_id = (
-                    "paddleocr-page"
+                    "ocr-page"
                     if evidence.text_state is PdfPageTextState.ABSENT
-                    else "paddleocr-hybrid-page"
+                    else "ocr-hybrid-page"
                 )
                 reason = f"native_text_{evidence.text_state.value}"
             else:
@@ -1017,7 +1002,7 @@ class _ImageRouteProvider:
         units.append(
             ParsePlanUnit(
                 "image",
-                "paddleocr-image" if ocr_ready else "text-projection-unavailable",
+                "ocr-image" if ocr_ready else "text-projection-unavailable",
                 "ocr_ready" if ocr_ready else "ocr_unavailable",
             )
         )
@@ -1073,7 +1058,7 @@ class _PdfParserProvider:
         ocr_pages = [
             unit.page - 1
             for unit in context.plan.units
-            if unit.route_id in {"paddleocr-page", "paddleocr-hybrid-page"}
+            if unit.route_id in {"ocr-page", "ocr-hybrid-page"}
             and unit.page
         ]
         unavailable_pages = [
@@ -1087,7 +1072,7 @@ class _PdfParserProvider:
         succeeded_count = 0
         payload_hashes: tuple[tuple[int, str], ...] = ()
         if ocr_pages:
-            page_result = _append_paddle_ocr_pages(
+            page_result = _append_ocr_pages(
                 document,
                 pdf_path=context.normalized.path,
                 page_indexes=ocr_pages,
@@ -1143,25 +1128,34 @@ class _ImageParserProvider:
                 ocr_projection_count=1,
                 ocr_unavailable_count=1,
             )
-        staged_image = (
-            context.work_dir / f"ocr-image{context.normalized.path.suffix.lower()}"
-        )
-        shutil.copyfile(context.normalized.path, staged_image)
+        staged_image = context.work_dir / "ocr-image.png"
+        try:
+            with Image.open(context.normalized.path) as source:
+                ImageOps.exif_transpose(source).convert("RGB").save(staged_image, format="PNG")
+                image_width, image_height = source.size
+        except (OSError, ValueError) as exc:
+            raise ValidationError(
+                "The image could not be prepared for OCR.",
+                error_code="knowledge_ocr_input_invalid",
+            ) from exc
         payload = _recognize_projection(
             context.ocr_executor,
             staged_image,
             output_path=context.work_dir / "image-ocr.json",
         )
         if payload is None:
-            return ParsedContent(
-                document,
-                warnings=("ocr_projection_unavailable",),
-                projections=({"kind": "ocr_text", "status": "unavailable"},),
-                ocr_projection_count=1,
-                ocr_attempted_count=1,
-                ocr_unavailable_count=1,
+            raise ValidationError(
+                "OCR provider returned no result.",
+                error_code="knowledge_ocr_response_invalid",
             )
-        count = _append_ocr_text(document, payload, page_no=1)
+        count = _append_ocr_text(
+            document,
+            payload,
+            page_no=1,
+            coordinate_scale=1.0,
+            maximum_width=float(image_width),
+            maximum_height=float(image_height),
+        )
         payload_hash = _bounded_json_sha256(
             payload,
             label="OCR result",
@@ -1422,60 +1416,15 @@ def _recognize_projection(
     image_path: Path,
     *,
     output_path: Path,
-) -> Any | None:
-    """Return ``None`` only for expected OCR availability failures."""
+) -> Any:
+    """Provider/protocol failures propagate so the parent publishes no partial document."""
 
-    try:
-        return ocr_service.recognize(image_path, output_path=output_path)
-    except _OCR_PROJECTION_FAILURES:
-        return None
+    return ocr_service.recognize(image_path, output_path=output_path)
 
 
 def _ocr_runtime_payload(value: object) -> dict[str, object] | None:
-    descriptor = getattr(value, "runtime_descriptor", None)
-    if callable(descriptor):
-        descriptor = descriptor()
-    to_payload = getattr(descriptor, "to_payload", None)
-    if callable(to_payload):
-        payload = to_payload()
-        if isinstance(payload, dict):
-            descriptor = dict(payload)
-        else:
-            return None
-    if isinstance(descriptor, dict):
-        descriptor = dict(descriptor)
-    else:
-        return None
-    if descriptor.keys() != {
-        "generation_id",
-        "runtime_id",
-        "model_pack_id",
-        "engine",
-        "engine_version",
-        "protocol_version",
-        "manifest_sha256",
-    }:
-        return None
-    if any(
-        not isinstance(descriptor[key], str) or not descriptor[key]
-        for key in (
-            "generation_id",
-            "runtime_id",
-            "model_pack_id",
-            "engine",
-            "engine_version",
-        )
-    ):
-        return None
-    manifest_sha256 = descriptor["manifest_sha256"]
-    if (
-        not isinstance(manifest_sha256, str)
-        or len(manifest_sha256) != 64
-        or any(character not in "0123456789abcdef" for character in manifest_sha256)
-        or type(descriptor["protocol_version"]) is not int
-    ):
-        return None
-    return descriptor
+    descriptor = normalize_runtime_descriptor(value)
+    return descriptor.to_payload() if descriptor is not None else None
 
 
 @dataclass(frozen=True)
@@ -1949,13 +1898,13 @@ def _docling_diagnostic_code(exc: Exception) -> str:
     return "docling_conversion_error"
 
 
-def _append_paddle_ocr_pages(
+def _append_ocr_pages(
     document: Any,
     *,
     pdf_path: Path,
     page_indexes: list[int],
     work_dir: Path,
-    ocr_service: PaddleOcrService,
+    ocr_service: OcrService,
 ) -> _OcrBatchResult:
     import pypdfium2
 
@@ -1969,7 +1918,10 @@ def _append_paddle_ocr_pages(
             page = pdf[page_index]
             try:
                 image_path = work_dir / f"ocr-page-{page_index + 1}.png"
-                page.render(scale=2).to_pil().save(image_path)
+                render_scale = 2.0
+                page_width = float(page.get_width())
+                page_height = float(page.get_height())
+                page.render(scale=render_scale).to_pil().save(image_path)
             finally:
                 page.close()
             output_path = work_dir / f"ocr-page-{page_index + 1}.json"
@@ -1980,9 +1932,18 @@ def _append_paddle_ocr_pages(
             )
             page_number = page_index + 1
             if payload is None:
-                unavailable_pages.append(page_number)
-                continue
-            item_count += _append_ocr_text(document, payload, page_no=page_number)
+                raise ValidationError(
+                    "OCR provider returned no result.",
+                    error_code="knowledge_ocr_response_invalid",
+                )
+            item_count += _append_ocr_text(
+                document,
+                payload,
+                page_no=page_number,
+                coordinate_scale=render_scale,
+                maximum_width=page_width,
+                maximum_height=page_height,
+            )
             succeeded_pages.append(page_number)
             payload_hashes.append(
                 (
@@ -2004,11 +1965,19 @@ def _append_paddle_ocr_pages(
     )
 
 
-def _append_ocr_text(document: Any, payload: Any, *, page_no: int) -> int:
+def _append_ocr_text(
+    document: Any,
+    payload: Any,
+    *,
+    page_no: int,
+    coordinate_scale: float,
+    maximum_width: float,
+    maximum_height: float,
+) -> int:
     from docling_core.types.doc import BoundingBox, DocItemLabel, ProvenanceItem
 
     count = 0
-    for text, bbox in _paddle_text_boxes(payload):
+    for text, bbox in _ocr_text_boxes(payload):
         clean = text.strip()
         if not clean:
             continue
@@ -2017,7 +1986,12 @@ def _append_ocr_text(document: Any, payload: Any, *, page_no: int) -> int:
             clean,
             prov=ProvenanceItem(
                 page_no=page_no,
-                bbox=BoundingBox(l=bbox[0], t=bbox[1], r=bbox[2], b=bbox[3]),
+                bbox=BoundingBox(
+                    l=_inverse_clamped_coordinate(bbox[0], coordinate_scale, maximum_width),
+                    t=_inverse_clamped_coordinate(bbox[1], coordinate_scale, maximum_height),
+                    r=_inverse_clamped_coordinate(bbox[2], coordinate_scale, maximum_width),
+                    b=_inverse_clamped_coordinate(bbox[3], coordinate_scale, maximum_height),
+                ),
                 charspan=(0, len(clean)),
             ),
         )
@@ -2025,7 +1999,7 @@ def _append_ocr_text(document: Any, payload: Any, *, page_no: int) -> int:
     return count
 
 
-def _paddle_text_boxes(payload: Any) -> list[tuple[str, tuple[float, float, float, float]]]:
+def _ocr_text_boxes(payload: Any) -> list[tuple[str, tuple[float, float, float, float]]]:
     matches: list[tuple[str, tuple[float, float, float, float]]] = []
     if isinstance(payload, dict):
         regions = payload.get("regions")
@@ -2047,10 +2021,10 @@ def _paddle_text_boxes(payload: Any) -> list[tuple[str, tuple[float, float, floa
                 polygon = polygons[index] if isinstance(polygons, list) and index < len(polygons) else None
                 matches.append((str(raw_text), _polygon_bbox(polygon)))
         for value in payload.values():
-            matches.extend(_paddle_text_boxes(value))
+            matches.extend(_ocr_text_boxes(value))
     elif isinstance(payload, list):
         for value in payload:
-            matches.extend(_paddle_text_boxes(value))
+            matches.extend(_ocr_text_boxes(value))
     return matches
 
 
@@ -2062,3 +2036,11 @@ def _polygon_bbox(value: Any) -> tuple[float, float, float, float]:
             ys = [float(point[1]) for point in points]
             return min(xs), min(ys), max(xs), max(ys)
     return 0.0, 0.0, 0.0, 0.0
+
+
+def _inverse_clamped_coordinate(value: float, scale: float, maximum: float) -> float:
+    if not math.isfinite(value) or not math.isfinite(scale) or scale <= 0 or maximum < 0:
+        raise ValidationError("OCR provider returned an invalid coordinate.", error_code="knowledge_ocr_result_invalid")
+    inverted = value / scale
+    quantized = math.floor(inverted + 0.5)
+    return float(min(maximum, max(0, quantized)))
