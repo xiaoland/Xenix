@@ -76,11 +76,12 @@ Therefore the two synchronous status calls account for about `98%` of the
 measured first-click time. Removing only that dependency reduces the same Qt
 button-to-visible path to about `17 ms`.
 
-The user's exact `5–8 s` magnitude was not reproduced outside the attached
-debugger. The active app was running under `debugpy`; Windows cold native-module
-loading, filesystem cache state, and endpoint protection can amplify the
-LanceDB/Arrow first-use cost. This explains the magnitude as an inference, while
-the blocking ownership and critical path are directly measured.
+The original diagnostic process did not reproduce the user's exact `5–8 s`
+magnitude outside the attached debugger. A later isolated run against the same
+real runtime, after moving the unchanged check off the GUI thread, measured that
+check at `6.829751 s`. The magnitude is therefore now directly reproduced;
+debugger hooks, native-module cache state, and endpoint protection may still
+change it between runs but are no longer needed to establish the cause.
 
 ## Exclusions
 

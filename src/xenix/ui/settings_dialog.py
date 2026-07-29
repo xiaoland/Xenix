@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import StrEnum
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QThreadPool, QTimer, QUrl, Signal
+from PySide6.QtCore import QEvent, QThreadPool, QTimer, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -44,6 +44,7 @@ from ..services.llm import (
 from ..services.ml.worker_settings import MLWorkerKind, MLWorkerSettingsService
 from ..services.knowledge_index_service import (
     KnowledgeIndexKind,
+    KnowledgeIndexOverview,
     KnowledgeIndexService,
 )
 from ..services.paddle_ocr_service import (
@@ -53,8 +54,9 @@ from ..services.paddle_ocr_service import (
 )
 from ..services.settings_store import SettingsConflictError
 from ..services.update_service import UpdateService
-from .ocr_deployment_tasks import OcrInstallTask, OcrStatusTask
+from .knowledge_index_status import KnowledgeIndexStatusRequest
 from .knowledge_index_ui import KnowledgeIndexRebuildDialog
+from .ocr_deployment_tasks import OcrInstallTask, OcrStatusTask
 from .ssh_worker_setup_wizard import SshWorkerSetupWizard
 
 
@@ -225,10 +227,15 @@ class SettingsDialog(QDialog):
         self._cached_ocr_status: PaddleOcrStatus | None = None
         self._ocr_status_task: OcrStatusTask | None = None
         self._ocr_install_task: OcrInstallTask | None = None
+        self._cached_index_status: KnowledgeIndexOverview | None = None
+        self._index_status_request: KnowledgeIndexStatusRequest | None = None
+        self._index_status_failed = False
+        self._index_status_refresh_pending = False
         self._index_dialog: KnowledgeIndexRebuildDialog | None = None
-        self._knowledge_refresh_timer = QTimer(self)
-        self._knowledge_refresh_timer.setInterval(1_000)
-        self._knowledge_refresh_timer.timeout.connect(self._render_index_status)
+        self._index_refresh_timer = QTimer(self)
+        self._index_refresh_timer.setInterval(1_000)
+        self._index_refresh_timer.setSingleShot(True)
+        self._index_refresh_timer.timeout.connect(self._schedule_index_status_probe)
 
         self._language_label = QLabel()
         self._language_selector = QComboBox()
@@ -674,31 +681,34 @@ class SettingsDialog(QDialog):
         self._render_ocr_status()
         self._render_index_status()
         super().showEvent(event)
-        self._knowledge_refresh_timer.start()
+        self._request_index_status_refresh(delay_ms=0)
         self._schedule_ocr_status_probe()
 
     def hideEvent(self, event) -> None:
-        self._deactivate_ocr()
+        self._deactivate()
         super().hideEvent(event)
 
     def closeEvent(self, event) -> None:
-        self._deactivate_ocr()
+        self._deactivate()
         super().closeEvent(event)
 
-    def _deactivate_ocr(self) -> None:
+    def _deactivate(self) -> None:
         if self._active:
             self._lifecycle_generation += 1
         self._active = False
-        self._knowledge_refresh_timer.stop()
+        self._index_refresh_timer.stop()
+        self._index_status_refresh_pending = False
+        if self._index_status_request is not None:
+            self._index_status_request.cancel()
         if self._index_dialog is not None:
             self._index_dialog.hide()
 
     def shutdown(self) -> None:
-        """Quiesce UI-owned tasks before their application services are closed."""
+        """Quiesce UI-owned OCR tasks before their application services close."""
         if self._shutdown:
             return
         self._shutdown = True
-        self._deactivate_ocr()
+        self._deactivate()
         self._thread_pool.waitForDone()
 
     def _reload_language_options(self) -> None:
@@ -963,7 +973,7 @@ class SettingsDialog(QDialog):
                     self.tr("Embedding settings were saved, but the vector rebuild could not be queued."),
                 )
         if embedding_saved:
-            self._render_index_status()
+            self._request_index_status_refresh()
 
     def _confirm_embedding_compatibility_change(self) -> str:
         message = QMessageBox(self)
@@ -1015,18 +1025,87 @@ class SettingsDialog(QDialog):
                 self._knowledge_index_service,
                 self,
             )
-            self._index_dialog.submitted.connect(lambda _task_id: self._render_index_status())
+            self._index_dialog.submitted.connect(
+                lambda _task_id: self._request_index_status_refresh()
+            )
         self._index_dialog.open()
+
+    def _request_index_status_refresh(self, *, delay_ms: int = 0) -> None:
+        if self._shutdown or not self._active or self._knowledge_index_service is None:
+            return
+        if self._index_status_request is not None:
+            self._index_status_refresh_pending = True
+            return
+        if self._cached_index_status is None:
+            self._index_status_failed = False
+            self._render_index_status()
+        self._index_refresh_timer.start(max(0, delay_ms))
+
+    def _schedule_index_status_probe(self) -> None:
+        if self._shutdown or not self._active or self._knowledge_index_service is None:
+            return
+        if self._index_status_request is not None:
+            self._index_status_refresh_pending = True
+            return
+        generation = self._lifecycle_generation
+        request = KnowledgeIndexStatusRequest(generation)
+        request.finished.connect(
+            self._on_index_status_finished,
+            Qt.ConnectionType.QueuedConnection,
+        )
+        self._index_status_request = request
+        request.start(self._knowledge_index_service)
+
+    def _on_index_status_finished(
+        self,
+        request: object,
+        generation: int,
+        result: object,
+    ) -> None:
+        if request is not self._index_status_request:
+            return
+        self._index_status_request = None
+        if self._shutdown:
+            return
+        if generation != self._lifecycle_generation or not self._active:
+            if self._active:
+                self._index_status_refresh_pending = False
+                self._request_index_status_refresh()
+            return
+
+        refresh_pending = self._index_status_refresh_pending
+        self._index_status_refresh_pending = False
+        if refresh_pending:
+            self._request_index_status_refresh()
+            return
+
+        if isinstance(result, KnowledgeIndexOverview):
+            self._cached_index_status = result
+            self._index_status_failed = False
+        else:
+            self._cached_index_status = None
+            self._index_status_failed = True
+        self._render_index_status()
+
+        if (
+            isinstance(result, KnowledgeIndexOverview)
+            and result.active_task_status in {"queued", "running"}
+        ):
+            self._request_index_status_refresh(delay_ms=1_000)
 
     def _render_index_status(self) -> None:
         if self._knowledge_index_service is None:
             self._index_status_label.setText(self.tr("Knowledge index service is unavailable"))
             self._index_rebuild_button.setEnabled(False)
             return
-        try:
-            status = self._knowledge_index_service.status()
-        except Exception:
-            self._index_status_label.setText(self.tr("Knowledge index status is unavailable"))
+        status = self._cached_index_status
+        if status is None:
+            text = (
+                self.tr("Knowledge index status is unavailable")
+                if self._index_status_failed
+                else self.tr("Checking Knowledge index status")
+            )
+            self._index_status_label.setText(text)
             self._index_rebuild_button.setEnabled(False)
             return
         self._index_status_label.setText(

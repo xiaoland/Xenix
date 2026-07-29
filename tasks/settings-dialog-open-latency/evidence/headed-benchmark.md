@@ -64,3 +64,28 @@ The headed benchmark preloads settings into an isolated runtime and does not
 open `SettingsDialog`; it validates the broader visible product journey, while
 the Settings click path was measured separately in
 [diagnosis.md](diagnosis.md).
+
+## Post-repair Rerun
+
+After the Settings implementation reached its final architecture, the same two
+self-contained headed cases were selected again with the explicit Kimi,
+Embedding, and Judge settings. Both runs opened the real application and
+persisted bounded reports, but the subject provider returned
+`llm_provider_http_429` before either Agent turn could complete. A sequential
+Knowledge-only retry after a two-minute cooldown received the same provider
+response.
+
+These three post-repair attempts are external-provider runtime errors, not
+semantic failures or product acceptance passes:
+
+- completed runs: `0`
+- `llm_provider_http_429`: `3`
+- semantic verdict: `not_evaluated`
+- Judge: `not_requested` or `blocked`
+- credential-, endpoint-, or `XENIX_*`-shaped report matches: `0`
+
+The earlier successful headed results above remain the completed broad
+end-to-end evidence. The repair changes only the Settings status-request path,
+which the headed cases intentionally do not open; its final code is covered by
+the real-runtime first-paint measurement, service-topology regressions, full
+manifest, and application smoke.

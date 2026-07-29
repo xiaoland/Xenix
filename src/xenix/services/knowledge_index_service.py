@@ -4,7 +4,9 @@ import logging
 import math
 import queue
 import threading
+import time
 from collections.abc import Iterable
+from concurrent.futures import Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -73,7 +75,13 @@ class KnowledgeIndexService:
         self._embedding_settings = embedding_settings_source
         self._repository = KnowledgeRepository()
         self._queue: queue.Queue[str | object] = queue.Queue()
+        self._status_executor = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="xenix-knowledge-status",
+        )
         self._enqueue_lock = threading.Lock()
+        self._status_requests_lock = threading.Lock()
+        self._status_requests: set[Future[KnowledgeIndexOverview]] = set()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         pending = self._recover_tasks()
@@ -209,23 +217,31 @@ class KnowledgeIndexService:
         else:
             keyword_state = "needs_rebuild"
 
-        try:
-            semantic = self._semantic.inspect_index(library_id=library_id)
-        except Exception:
-            semantic = None
-        vector_configured = bool(semantic is not None and semantic.configured)
         if KnowledgeIndexKind.TEXT_VECTOR.value in active_kinds:
+            try:
+                vector_configured = self._semantic.is_configured()
+            except Exception:
+                vector_configured = False
             vector_state = "building"
-        elif semantic is None:
-            vector_state = "needs_attention"
-        elif not semantic.configured or semantic.unit_count == 0:
-            vector_state = "unavailable"
-        elif semantic.ready:
-            vector_state = "ready"
-        elif latest_vector_task is not None and latest_vector_task.status == "failed":
-            vector_state = "needs_attention"
         else:
-            vector_state = "needs_rebuild"
+            try:
+                semantic = self._semantic.inspect_index(library_id=library_id)
+            except Exception:
+                semantic = None
+            vector_configured = bool(semantic is not None and semantic.configured)
+            if semantic is None:
+                vector_state = "needs_attention"
+            elif not semantic.configured or semantic.unit_count == 0:
+                vector_state = "unavailable"
+            elif semantic.ready:
+                vector_state = "ready"
+            elif (
+                latest_vector_task is not None
+                and latest_vector_task.status == "failed"
+            ):
+                vector_state = "needs_attention"
+            else:
+                vector_state = "needs_rebuild"
 
         relevant_failure = next(
             (
@@ -262,6 +278,25 @@ class KnowledgeIndexService:
                 relevant_failure.error_code if relevant_failure is not None else None
             ),
         )
+
+    def request_status(
+        self,
+        *,
+        library_id: str = "global",
+    ) -> Future[KnowledgeIndexOverview]:
+        """Run a status read on the service-owned single-query lane."""
+        with self._status_requests_lock:
+            if self._stop.is_set():
+                future: Future[KnowledgeIndexOverview] = Future()
+                future.cancel()
+                return future
+            future = self._status_executor.submit(
+                self.status,
+                library_id=library_id,
+            )
+            self._status_requests.add(future)
+        future.add_done_callback(self._forget_status_request)
+        return future
 
     def list_tasks(
         self,
@@ -365,12 +400,28 @@ class KnowledgeIndexService:
                 return _task_view(row)
 
     def shutdown(self, *, timeout: float = 15.0) -> None:
-        if self._stop.is_set():
-            return
-        self._stop.set()
+        deadline = time.monotonic() + max(0.0, timeout)
+        with self._status_requests_lock:
+            if self._stop.is_set():
+                return
+            self._stop.set()
+            pending_status = tuple(self._status_requests)
+        self._status_executor.shutdown(wait=False, cancel_futures=True)
         self._queue.put(_STOP)
         if self._thread is not None:
-            self._thread.join(timeout=max(0.0, timeout))
+            self._thread.join(timeout=max(0.0, deadline - time.monotonic()))
+        if pending_status:
+            _done, not_done = wait(
+                pending_status,
+                timeout=max(0.0, deadline - time.monotonic()),
+            )
+            if not_done:
+                LOGGER.warning(
+                    "Knowledge index status shutdown exceeded %.1f seconds; "
+                    "waiting for safe quiescence.",
+                    max(0.0, timeout),
+                )
+        self._status_executor.shutdown(wait=True, cancel_futures=True)
 
     def _set_phase(self, task_id: str, phase: str) -> None:
         with self._session_factory() as session:
@@ -392,6 +443,13 @@ class KnowledgeIndexService:
                 self.rebuild_now(item)
             finally:
                 self._queue.task_done()
+
+    def _forget_status_request(
+        self,
+        future: Future[KnowledgeIndexOverview],
+    ) -> None:
+        with self._status_requests_lock:
+            self._status_requests.discard(future)
 
     def _recover_tasks(self) -> list[str]:
         pending: list[str] = []
