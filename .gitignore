@@ -45,6 +45,9 @@ nul
 *.db-wal
 *.db-shm
 
+# Mock data
+.mock-data
+
 # IDE
 .vscode\tasks.json
 .vscode\launch.json
