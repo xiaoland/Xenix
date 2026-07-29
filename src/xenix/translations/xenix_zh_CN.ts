@@ -85,127 +85,695 @@
 <context>
     <name>AmdGuidedSetupDialog</name>
     <message>
-        <location filename="../ui/amd_setup.py" line="171"/>
+        <location filename="../ui/amd_setup.py" line="217"/>
         <source>AMD Radeon setup</source>
         <translation>AMD Radeon 设置</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="172"/>
         <source>Local Linux Radeon</source>
-        <translation>本地 Linux Radeon</translation>
+        <translation type="vanished">本地 Linux Radeon</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="173"/>
+        <location filename="../ui/amd_setup.py" line="233"/>
         <source>Private SSH Radeon</source>
         <translation>私有 SSH Radeon</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="174"/>
+        <location filename="../ui/amd_setup.py" line="251"/>
         <source>Installation ID</source>
         <translation>安装 ID</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="175"/>
         <source>Target ID</source>
-        <translation>目标 ID</translation>
+        <translation type="vanished">目标 ID</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="176"/>
+        <location filename="../ui/amd_setup.py" line="236"/>
         <source>Host</source>
         <translation>主机</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="177"/>
         <source>User</source>
-        <translation>用户</translation>
+        <translation type="vanished">用户</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="178"/>
         <source>Port</source>
-        <translation>端口</translation>
+        <translation type="vanished">端口</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="179"/>
+        <location filename="../ui/amd_setup.py" line="239"/>
         <source>Identity file</source>
         <translation>身份文件</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="180"/>
+        <location filename="../ui/amd_setup.py" line="240"/>
         <source>Browse…</source>
         <translation>浏览…</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="181"/>
         <source>Pinned public host key</source>
-        <translation>已固定的主机公钥</translation>
+        <translation type="vanished">已固定的主机公钥</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="183"/>
         <source>OpenSSH public key</source>
-        <translation>OpenSSH 公钥</translation>
+        <translation type="vanished">OpenSSH 公钥</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="185"/>
+        <location filename="../ui/amd_setup.py" line="252"/>
         <source>Condition</source>
         <translation>状态</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="186"/>
+        <location filename="../ui/amd_setup.py" line="253"/>
         <source>Phase</source>
         <translation>阶段</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="187"/>
         <source>Error code</source>
-        <translation>错误代码</translation>
+        <translation type="vanished">错误代码</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="188"/>
+        <source>This build only removes an existing managed AMD installation. Enter its installation ID and request removal.</source>
+        <translation type="vanished">此构建仅用于移除已有的 AMD 托管安装。请输入其安装 ID 并请求移除。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="228"/>
+        <source>Install saves this Private SSH target and starts the fixed LLM, Embedding, and OCR deployment in one step. No separate Save action is required.</source>
+        <translation>“安装”会一步保存此私有 SSH 目标，并开始部署固定的 LLM、Embedding 和 OCR 服务，无需单独执行“保存”。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="237"/>
+        <source>SSH user</source>
+        <translation>SSH 用户</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="238"/>
+        <source>SSH port</source>
+        <translation>SSH 端口</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="241"/>
+        <source>Verified server host key</source>
+        <translation>已核验的服务器主机密钥</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="243"/>
+        <source>ssh-ed25519 AAAA… or [host]:port ssh-ed25519 AAAA…</source>
+        <translation>ssh-ed25519 AAAA… 或 [主机]:端口 ssh-ed25519 AAAA…</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="247"/>
+        <source>Paste one verified OpenSSH server host public key. Do not paste a fingerprint, private key, or login public key.</source>
+        <translation>请粘贴一条已核验的 OpenSSH 服务器主机公钥。不要粘贴指纹、私钥或登录公钥。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="254"/>
+        <source>Support code</source>
+        <translation>支持代码</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="255"/>
+        <source>Details</source>
+        <translation>详情</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="262"/>
         <source>Install</source>
         <translation>安装</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="189"/>
+        <location filename="../ui/amd_setup.py" line="264"/>
         <source>Repair</source>
         <translation>修复</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="191"/>
+        <location filename="../ui/amd_setup.py" line="266"/>
         <source>Retry removal</source>
         <translation>重试移除</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="191"/>
+        <location filename="../ui/amd_setup.py" line="266"/>
         <source>Remove</source>
         <translation>移除</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="193"/>
+        <location filename="../ui/amd_setup.py" line="268"/>
         <source>Close</source>
         <translation>关闭</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="291"/>
+        <location filename="../ui/amd_setup.py" line="653"/>
         <source>Choose an identity file</source>
         <translation>选择身份文件</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="293"/>
+        <location filename="../ui/amd_setup.py" line="655"/>
         <source>All files (*)</source>
         <translation>所有文件 (*)</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="464"/>
+        <location filename="../ui/amd_setup.py" line="1047"/>
+        <source>None</source>
+        <translation>无</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1057"/>
+        <source>Needs attention</source>
+        <translation>需要处理</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1058"/>
+        <source>Working</source>
+        <translation>进行中</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1059"/>
+        <source>Failed</source>
+        <translation>失败</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1060"/>
+        <source>Not installed</source>
+        <translation>未安装</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1061"/>
+        <location filename="../ui/amd_setup.py" line="1071"/>
+        <source>Installing</source>
+        <translation>正在安装</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1062"/>
+        <source>Degraded</source>
+        <translation>部分故障</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1063"/>
+        <source>Operational</source>
+        <translation>可用</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1064"/>
+        <source>Incompatible</source>
+        <translation>不兼容</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1065"/>
+        <source>Retiring</source>
+        <translation>正在退役</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1066"/>
+        <source>Removal blocked</source>
+        <translation>移除受阻</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1067"/>
+        <source>Removed</source>
+        <translation>已移除</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1068"/>
+        <source>Validating input</source>
+        <translation>正在校验输入</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1072"/>
+        <source>Repairing</source>
+        <translation>正在修复</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1073"/>
+        <source>Planned</source>
+        <translation>已规划</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1074"/>
+        <source>Reconciling</source>
+        <translation>正在协调部署状态</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1075"/>
+        <source>Verified</source>
+        <translation>已验证</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1076"/>
+        <source>Registered</source>
+        <translation>已注册</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1077"/>
+        <source>Deployment failed</source>
+        <translation>部署失败</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1078"/>
+        <source>Provider registration blocked</source>
+        <translation>Provider 注册受阻</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1079"/>
         <source>Requesting safe retirement</source>
         <translation>正在请求安全退役</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="466"/>
-        <source>Removal requested; retiring safely</source>
-        <translation>已请求移除；正在安全退役</translation>
+        <location filename="../ui/amd_setup.py" line="1080"/>
+        <source>Removal requested</source>
+        <translation>已请求移除</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="467"/>
+        <location filename="../ui/amd_setup.py" line="1081"/>
+        <source>Removal already requested</source>
+        <translation>已请求过移除</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1082"/>
+        <source>Already removed</source>
+        <translation>已移除</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1092"/>
+        <source>Recording the removal request safely.</source>
+        <translation>正在安全地记录移除请求。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1094"/>
+        <source>Checking the target and advancing the managed deployment. This may take several minutes.</source>
+        <translation>正在检查目标并推进托管部署，可能需要几分钟。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1099"/>
+        <source>LLM, Embedding, and OCR are operational through the managed Radeon target.</source>
+        <translation>LLM、Embedding 和 OCR 已通过托管的 Radeon 目标正常运行。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1103"/>
+        <source>Removal is durably requested and physical cleanup continues safely.</source>
+        <translation>移除请求已持久记录，物理清理正在安全地继续。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1106"/>
+        <source>The managed AMD installation has been removed.</source>
+        <translation>AMD 托管安装已移除。</translation>
+    </message>
+    <message>
+        <source>Enter an installation ID to request safe removal.</source>
+        <translation type="vanished">请输入安装 ID 以请求安全移除。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="221"/>
+        <source>This build only removes an existing managed AMD installation. Xenix discovers its durable installation identity automatically.</source>
+        <translation>此版本仅用于移除现有的 AMD 托管安装。Xenix 会自动发现其持久化安装标识。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="234"/>
+        <source>Managed installation</source>
+        <translation>托管安装</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="257"/>
+        <source>Continue setup</source>
+        <translation>继续设置</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="505"/>
+        <source>Private SSH installation {number}</source>
+        <translation>私有 SSH 安装 {number}</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="509"/>
+        <source>Historical Local installation {number}</source>
+        <translation>历史本地安装 {number}</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="514"/>
+        <source>Historical Private SSH installation {number}</source>
+        <translation>历史私有 SSH 安装 {number}</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1069"/>
+        <source>Loading managed installation</source>
+        <translation>正在载入托管安装</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1070"/>
+        <source>Saving target security</source>
+        <translation>正在保存目标安全信息</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1109"/>
+        <source>Xenix will use the durable managed installation identity shown above.</source>
+        <translation>Xenix 将使用上方显示的持久化托管安装标识。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1112"/>
+        <source>Complete the SSH fields and choose Install. Install also saves the target; there is no separate Save action.</source>
+        <translation>请填写 SSH 字段并选择“安装”。“安装”也会保存目标，无需单独执行“保存”。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1118"/>
+        <source>Enter the SSH host.</source>
+        <translation>请输入 SSH 主机。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1120"/>
+        <source>Enter a valid IP address or DNS host name without spaces.</source>
+        <translation>请输入不含空格的有效 IP 地址或 DNS 主机名。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1122"/>
+        <source>Enter the SSH user.</source>
+        <translation>请输入 SSH 用户。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1124"/>
+        <source>Enter a valid OpenSSH user name.</source>
+        <translation>请输入有效的 OpenSSH 用户名。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1127"/>
+        <source>Enter an SSH port between 1 and 65535.</source>
+        <translation>请输入 1 到 65535 之间的 SSH 端口。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1130"/>
+        <source>Choose the private identity file used for SSH authentication.</source>
+        <translation>请选择用于 SSH 身份验证的私钥文件。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1133"/>
+        <source>Choose an identity file by its absolute local path.</source>
+        <translation>请通过本机绝对路径选择身份文件。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1136"/>
+        <source>The selected identity file is not available. Choose an existing file.</source>
+        <translation>所选身份文件不可用，请选择一个实际存在的文件。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1139"/>
+        <source>Paste the verified server host public key.</source>
+        <translation>请粘贴已核验的服务器主机公钥。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1142"/>
+        <source>Paste one complete OpenSSH server host public key, not a fingerprint, private key, or login public key.</source>
+        <translation>请粘贴一条完整的 OpenSSH 服务器主机公钥，而不是指纹、私钥或登录公钥。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1146"/>
+        <source>These security details conflict with an existing enrollment. Verify the identity file and server host key.</source>
+        <translation>这些安全信息与已有登记冲突，请核验身份文件和服务器主机密钥。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1150"/>
+        <source>The local AMD target enrollment limit has been reached.</source>
+        <translation>已达到本机 AMD 目标登记数量上限。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1153"/>
+        <source>Xenix could not save or read the local SSH security record.</source>
+        <translation>Xenix 无法保存或读取本机 SSH 安全记录。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1156"/>
+        <source>The installation identity was saved safely, but SSH security setup did not finish. Re-enter the identity file and verified host key, then choose Continue setup.</source>
+        <translation>安装标识已安全保存，但 SSH 安全设置尚未完成。请重新填写身份文件和已验证的主机公钥，然后选择“继续设置”。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1161"/>
+        <source>This target identity conflicts with an existing immutable enrollment.</source>
+        <translation>此目标标识与已有的不可变登记冲突。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1164"/>
+        <source>This installation identity conflicts with an existing deployment.</source>
+        <translation>此安装标识与已有部署冲突。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1167"/>
+        <source>Another managed Private SSH installation already exists. Repair or remove it before creating a new one.</source>
+        <translation>已有另一个托管的 Private SSH 安装。请先修复或移除它，再创建新安装。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1171"/>
+        <source>More than one active managed Private SSH installation exists. Use the diagnostic bundle to resolve the conflicting inventory safely.</source>
+        <translation>存在多个活跃的托管 Private SSH 安装。请使用诊断包安全处理冲突的安装清单。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1175"/>
+        <source>The managed AMD installation inventory is incomplete or damaged.</source>
+        <translation>托管 AMD 安装清单不完整或已损坏。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1178"/>
+        <source>Windows OpenSSH is unavailable. Install or enable the OpenSSH client.</source>
+        <translation>Windows OpenSSH 不可用，请安装或启用 OpenSSH 客户端。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1181"/>
+        <source>The server host key did not match. Stop and verify the key with the target owner.</source>
+        <translation>服务器主机密钥不匹配。请停止操作并向目标所有者核验密钥。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1184"/>
+        <source>SSH authentication failed. Verify the SSH user and identity file.</source>
+        <translation>SSH 身份验证失败，请核验 SSH 用户和身份文件。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1187"/>
+        <source>The SSH connection timed out. Verify the host, port, and target availability.</source>
+        <translation>SSH 连接超时，请核验主机、端口和目标可用性。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1190"/>
+        <source>The SSH target reset or rejected the connection. Verify the host, port, and cloud instance state.</source>
+        <translation>SSH 目标重置或拒绝了连接，请核验主机、端口和云实例状态。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1194"/>
+        <source>Xenix could not establish the private loopback connection to the managed services.</source>
+        <translation>Xenix 无法建立通往托管服务的私有环回连接。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1197"/>
+        <source>The enrolled SSH target or its local security material is unavailable.</source>
+        <translation>已登记的 SSH 目标或其本机安全材料不可用。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1200"/>
+        <source>Xenix could not inspect the Radeon target safely.</source>
+        <translation>Xenix 无法安全检查 Radeon 目标。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1203"/>
+        <source>The managed Radeon services could not be deployed or verified.</source>
+        <translation>无法部署或验证 Radeon 托管服务。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1206"/>
+        <source>The managed Radeon services did not finish deployment.</source>
+        <translation>Radeon 托管服务未能完成部署。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1209"/>
+        <source>Deployment completed, but one or more provider registrations were blocked.</source>
+        <translation>部署已经完成，但一个或多个 Provider 注册受阻。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1212"/>
+        <source>The installation exists, but one or more LLM, Embedding, or OCR components failed.</source>
+        <translation>安装记录已存在，但一个或多个 LLM、Embedding 或 OCR 组件失败。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1215"/>
+        <source>The installation has not reached operational state. Choose Repair to continue forward.</source>
+        <translation>安装尚未达到可用状态，请选择“修复”以继续向前收敛。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1218"/>
+        <source>The target was enrolled, but the managed services were not installed.</source>
+        <translation>目标已登记，但托管服务尚未安装。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1221"/>
+        <source>This installation is being removed and cannot be reactivated.</source>
+        <translation>此安装正在被移除，不能重新激活。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1224"/>
+        <source>Safe physical cleanup is blocked. Retry removal after restoring target access.</source>
+        <translation>安全物理清理受阻，请恢复目标访问后重试移除。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1227"/>
+        <source>Xenix could not establish the trusted control session needed for physical cleanup. Restore target access, then retry removal.</source>
+        <translation>Xenix 无法建立物理清理所需的可信控制会话。请恢复目标访问后重试移除。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1231"/>
+        <source>Provider settings could not be removed safely. Retry removal or use the diagnostic bundle.</source>
+        <translation>无法安全移除 Provider 设置。请重试移除或使用诊断包。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1235"/>
+        <source>No managed AMD installation exists with that installation ID.</source>
+        <translation>不存在使用该安装 ID 的 AMD 托管安装。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1238"/>
+        <source>Enter the installation ID to remove.</source>
+        <translation>请输入要移除的安装 ID。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1241"/>
+        <location filename="../ui/amd_setup.py" line="1244"/>
+        <source>The bundled Radeon deployment profile is unavailable.</source>
+        <translation>内置的 Radeon 部署配置不可用。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1247"/>
+        <source>Private SSH Radeon deployment is unavailable in this build.</source>
+        <translation>此构建不支持私有 SSH Radeon 部署。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1250"/>
+        <source>This build permits removal only; new AMD installations are disabled.</source>
+        <translation>此构建仅允许移除，已禁用新的 AMD 安装。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1253"/>
+        <source>AMD deployment is shutting down. Reopen Xenix and try again.</source>
+        <translation>AMD 部署服务正在关闭，请重新打开 Xenix 后重试。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1256"/>
+        <source>Xenix could not start the deployment worker. Try again.</source>
+        <translation>Xenix 无法启动部署工作线程，请重试。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1259"/>
+        <source>The guided deployment request is invalid. Review the form and try again.</source>
+        <translation>引导部署请求无效，请检查表单后重试。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1262"/>
+        <source>Xenix received an invalid deployment status.</source>
+        <translation>Xenix 收到了无效的部署状态。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1265"/>
+        <source>The AMD operation failed unexpectedly. Use the support code with the diagnostic bundle.</source>
+        <translation>AMD 操作意外失败，请将支持代码与诊断包一同用于排障。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1274"/>
+        <source>The AMD operation could not complete. Use the support code with the diagnostic bundle.</source>
+        <translation>AMD 操作未能完成，请将支持代码与诊断包一同用于排障。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1280"/>
+        <source>The bundled Radeon profile is not admitted for product deployment.</source>
+        <translation>内置 Radeon 配置尚未获准用于产品部署。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1283"/>
+        <source>At least one bundled LLM, Embedding, or OCR component is not admitted.</source>
+        <translation>至少有一个内置 LLM、Embedding 或 OCR 组件尚未获准使用。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1286"/>
+        <source>This Radeon software and hardware cell is not admitted.</source>
+        <translation>此 Radeon 软硬件执行单元尚未获准使用。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1289"/>
+        <source>The target did not provide all required compatibility facts.</source>
+        <translation>目标未能提供全部必需的兼容性信息。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1292"/>
+        <source>The target operating system is unsupported.</source>
+        <translation>不支持目标的操作系统。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1295"/>
+        <source>The target operating-system version is unsupported.</source>
+        <translation>不支持目标的操作系统版本。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1298"/>
+        <source>The target Linux kernel version is unsupported.</source>
+        <translation>不支持目标的 Linux 内核版本。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1301"/>
+        <source>The target CPU architecture is unsupported.</source>
+        <translation>不支持目标的 CPU 架构。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1304"/>
+        <source>The Radeon GPU architecture is unsupported.</source>
+        <translation>不支持该 Radeon GPU 架构。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1307"/>
+        <source>The AMD GPU driver version is unsupported.</source>
+        <translation>不支持该 AMD GPU 驱动版本。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1310"/>
+        <source>The ROCm version is unsupported.</source>
+        <translation>不支持该 ROCm 版本。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1313"/>
+        <source>The HIP version is unsupported.</source>
+        <translation>不支持该 HIP 版本。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1316"/>
+        <source>The target Python version is unsupported.</source>
+        <translation>不支持目标的 Python 版本。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1319"/>
+        <source>The target does not have enough admitted Radeon GPUs.</source>
+        <translation>目标没有足够数量的受支持 Radeon GPU。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1322"/>
+        <source>The target does not have enough free GPU memory.</source>
+        <translation>目标没有足够的可用 GPU 显存。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1325"/>
+        <source>The target does not have enough free system memory.</source>
+        <translation>目标没有足够的可用系统内存。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1328"/>
+        <source>The target does not have enough free persistent storage.</source>
+        <translation>目标没有足够的可用持久存储空间。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1331"/>
+        <source>The bundled profile is missing a required capacity measurement.</source>
+        <translation>内置配置缺少必需的容量测量值。</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1334"/>
+        <location filename="../ui/amd_setup.py" line="1339"/>
+        <source>The target does not satisfy the fixed Radeon deployment profile.</source>
+        <translation>目标不满足固定 Radeon 部署配置的要求。</translation>
+    </message>
+    <message>
+        <source>Removal requested; retiring safely</source>
+        <translation type="vanished">已请求移除；正在安全退役</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1084"/>
         <source>Not available</source>
         <translation>不可用</translation>
     </message>
@@ -3017,12 +3585,12 @@ Reason: {reason}</source>
         <translation>前往购买</translation>
     </message>
     <message>
-        <location filename="../app.py" line="913"/>
+        <location filename="../app.py" line="915"/>
         <source>Unable to start Xenix</source>
         <translation>无法启动 Xenix</translation>
     </message>
     <message>
-        <location filename="../app.py" line="914"/>
+        <location filename="../app.py" line="916"/>
         <source>Xenix could not finish startup.
 
 {error}</source>
@@ -3034,12 +3602,12 @@ Reason: {reason}</source>
 <context>
     <name>_AmdGuidedSetupHandle</name>
     <message>
-        <location filename="../ui/amd_setup.py" line="77"/>
+        <location filename="../ui/amd_setup.py" line="82"/>
         <source>AMD setup</source>
         <translation>AMD 设置</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="78"/>
+        <location filename="../ui/amd_setup.py" line="83"/>
         <source>Set up the fixed Radeon profile</source>
         <translation>设置固定的 Radeon 配置</translation>
     </message>

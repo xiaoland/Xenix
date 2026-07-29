@@ -119,6 +119,19 @@ class _FakePlacement:
         self.retired.append(generation.generation_id)
 
 
+class _BlockedRetirementPlacement(_FakePlacement):
+    def open_retirement_session(
+        self,
+        *,
+        installation_id: str,
+        target_id: str | None,
+        profile,
+        generations: tuple[AmdGenerationMaterialization, ...],
+    ) -> _FakeExecutionSession:
+        del installation_id, target_id, profile, generations
+        raise RuntimeError("simulated trusted cleanup-session failure")
+
+
 @dataclass
 class _FakeParticipant:
     capability: ManifestCapability
@@ -301,6 +314,143 @@ def test_retirement_only_deployment_rejects_new_installations(tmp_path: Path) ->
         assert error.value.error_code == "amd_retirement_only"
     finally:
         deployment.close()
+        engine.dispose()
+
+
+def test_cleanup_only_local_owner_retires_history_but_rejects_new_local_intent(
+    tmp_path: Path,
+) -> None:
+    engine = create_engine_for_path(tmp_path / "amd-local-history.sqlite")
+    bootstrap_current_schema(engine)
+    session_factory = create_session_factory(engine)
+    catalog = load_product_manifest_catalog()
+    profile = catalog.profiles[0]
+    initial_placement = _FakePlacement(_admitted_facts(catalog))
+    initial = AmdAiDeploymentService(
+        session_factory=session_factory,
+        catalog=catalog,
+        placements={initial_placement.placement_kind: initial_placement},
+        participants={
+            capability: _FakeParticipant(capability)
+            for capability in ManifestCapability
+        },
+        runtime_directory=AmdRuntimeDirectory(),
+    )
+    try:
+        initial.prepare(
+            AmdInstallationSpec(
+                installation_id="amd-test-installation",
+                placement="local_linux",
+                profile_digest=profile.manifest_digest,
+            )
+        )
+    finally:
+        initial.close()
+
+    cleanup_placement = _FakePlacement(_admitted_facts(catalog))
+    cleanup_only = AmdAiDeploymentService(
+        session_factory=session_factory,
+        catalog=catalog,
+        placements={cleanup_placement.placement_kind: cleanup_placement},
+        participants={
+            capability: _FakeParticipant(capability)
+            for capability in ManifestCapability
+        },
+        runtime_directory=AmdRuntimeDirectory(),
+        new_installation_placements=frozenset(),
+    )
+    try:
+        with pytest.raises(AmdDeploymentError) as error:
+            cleanup_only.prepare(
+                AmdInstallationSpec(
+                    installation_id="amd-new-local-installation",
+                    placement="local_linux",
+                    profile_digest=profile.manifest_digest,
+                )
+            )
+        assert error.value.error_code == "amd_placement_unavailable"
+        for operation in (
+            cleanup_only.reconcile,
+            cleanup_only.repair,
+            cleanup_only.resume,
+        ):
+            with pytest.raises(AmdDeploymentError) as error:
+                operation("amd-test-installation")
+            assert error.value.error_code == "amd_placement_unavailable"
+        with pytest.raises(AmdDeploymentError) as error:
+            cleanup_only.prepare_upgrade(
+                "amd-test-installation",
+                new_profile_digest=profile.manifest_digest,
+            )
+        assert error.value.error_code == "amd_placement_unavailable"
+        assert cleanup_placement.materialized == []
+
+        removed = cleanup_only.retire(
+            "amd-test-installation",
+            drain_timeout_seconds=None,
+        )
+
+        assert removed.condition is AmdInstallationCondition.REMOVED
+        assert cleanup_placement.retired
+    finally:
+        cleanup_only.close()
+        engine.dispose()
+
+
+def test_restart_retirement_marks_missing_control_session_as_blocked(
+    tmp_path: Path,
+) -> None:
+    engine = create_engine_for_path(tmp_path / "amd-blocked-retirement.sqlite")
+    bootstrap_current_schema(engine)
+    session_factory = create_session_factory(engine)
+    catalog = load_product_manifest_catalog()
+    profile = catalog.profiles[0]
+    initial_placement = _FakePlacement(_admitted_facts(catalog))
+    initial = AmdAiDeploymentService(
+        session_factory=session_factory,
+        catalog=catalog,
+        placements={initial_placement.placement_kind: initial_placement},
+        participants={
+            capability: _FakeParticipant(capability)
+            for capability in ManifestCapability
+        },
+        runtime_directory=AmdRuntimeDirectory(),
+    )
+    try:
+        initial.prepare(
+            AmdInstallationSpec(
+                installation_id="amd-test-installation",
+                placement="local_linux",
+                profile_digest=profile.manifest_digest,
+            )
+        )
+    finally:
+        initial.close()
+
+    blocked_placement = _BlockedRetirementPlacement(_admitted_facts(catalog))
+    restarted = AmdAiDeploymentService(
+        session_factory=session_factory,
+        catalog=catalog,
+        placements={blocked_placement.placement_kind: blocked_placement},
+        participants={
+            capability: _FakeParticipant(capability)
+            for capability in ManifestCapability
+        },
+        runtime_directory=AmdRuntimeDirectory(),
+    )
+    try:
+        status = restarted.retire(
+            "amd-test-installation",
+            drain_timeout_seconds=None,
+        )
+
+        assert status.condition is AmdInstallationCondition.REMOVAL_BLOCKED
+        assert {
+            component.error_code
+            for component in status.components
+        } == {"physical_cleanup_blocked"}
+    finally:
+        restarted.close()
         engine.dispose()
 
 

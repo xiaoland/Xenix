@@ -10,9 +10,17 @@ from urllib.parse import urlsplit
 class AmdPlacementError(RuntimeError):
     """A placement/session cannot safely realize the requested runtime."""
 
+    error_code = "amd_placement_failed"
+
+    def __init__(self, message: str, *, error_code: str | None = None) -> None:
+        super().__init__(message)
+        self.error_code = error_code or type(self).error_code
+
 
 class AmdMaterializationCancelledError(AmdPlacementError):
     """A committed retirement revoked an in-flight materialization."""
+
+    error_code = "amd_materialization_cancelled"
 
 
 @dataclass(frozen=True, slots=True)

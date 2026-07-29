@@ -640,7 +640,9 @@ def build_main_window(
                     llm_provider_factory_registry=llm_provider_factory_registry,
                     embedding_provider_factory_registry=embedding_provider_factory_registry,
                     ocr_provider_factory_registry=ocr_provider_factory_registry,
-                    local_cache_root=(paths.cache / "amd-runtime").resolve(strict=False),
+                    local_cache_root=(paths.cache / "amd-runtime").resolve(
+                        strict=False
+                    ),
                     temporary_root=paths.temp.resolve(strict=False),
                     retirement_only=_amd_retirement_only(),
                 )

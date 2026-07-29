@@ -51,6 +51,7 @@ class AmdInstallationStatus:
     desired_presence: bool
     lifecycle_state: str
     condition: AmdInstallationCondition
+    target_observation_error_code: str | None
     compatibility_issues: tuple[str, ...]
     components: tuple[AmdComponentStatus, ...]
 

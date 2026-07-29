@@ -85,127 +85,695 @@
 <context>
     <name>AmdGuidedSetupDialog</name>
     <message>
-        <location filename="../ui/amd_setup.py" line="171"/>
+        <location filename="../ui/amd_setup.py" line="217"/>
         <source>AMD Radeon setup</source>
         <translation>AMD Radeon setup</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="172"/>
         <source>Local Linux Radeon</source>
-        <translation>Local Linux Radeon</translation>
+        <translation type="vanished">Local Linux Radeon</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="173"/>
+        <location filename="../ui/amd_setup.py" line="233"/>
         <source>Private SSH Radeon</source>
         <translation>Private SSH Radeon</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="174"/>
+        <location filename="../ui/amd_setup.py" line="251"/>
         <source>Installation ID</source>
         <translation>Installation ID</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="175"/>
         <source>Target ID</source>
-        <translation>Target ID</translation>
+        <translation type="vanished">Target ID</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="176"/>
+        <location filename="../ui/amd_setup.py" line="236"/>
         <source>Host</source>
         <translation>Host</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="177"/>
         <source>User</source>
-        <translation>User</translation>
+        <translation type="vanished">User</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="178"/>
         <source>Port</source>
-        <translation>Port</translation>
+        <translation type="vanished">Port</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="179"/>
+        <location filename="../ui/amd_setup.py" line="239"/>
         <source>Identity file</source>
         <translation>Identity file</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="180"/>
+        <location filename="../ui/amd_setup.py" line="240"/>
         <source>Browse…</source>
         <translation>Browse…</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="181"/>
         <source>Pinned public host key</source>
-        <translation>Pinned public host key</translation>
+        <translation type="vanished">Pinned public host key</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="183"/>
         <source>OpenSSH public key</source>
-        <translation>OpenSSH public key</translation>
+        <translation type="vanished">OpenSSH public key</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="185"/>
+        <location filename="../ui/amd_setup.py" line="252"/>
         <source>Condition</source>
         <translation>Condition</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="186"/>
+        <location filename="../ui/amd_setup.py" line="253"/>
         <source>Phase</source>
         <translation>Phase</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="187"/>
         <source>Error code</source>
-        <translation>Error code</translation>
+        <translation type="vanished">Error code</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="188"/>
+        <source>This build only removes an existing managed AMD installation. Enter its installation ID and request removal.</source>
+        <translation type="vanished">This build only removes an existing managed AMD installation. Enter its installation ID and request removal.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="228"/>
+        <source>Install saves this Private SSH target and starts the fixed LLM, Embedding, and OCR deployment in one step. No separate Save action is required.</source>
+        <translation>Install saves this Private SSH target and starts the fixed LLM, Embedding, and OCR deployment in one step. No separate Save action is required.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="237"/>
+        <source>SSH user</source>
+        <translation>SSH user</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="238"/>
+        <source>SSH port</source>
+        <translation>SSH port</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="241"/>
+        <source>Verified server host key</source>
+        <translation>Verified server host key</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="243"/>
+        <source>ssh-ed25519 AAAA… or [host]:port ssh-ed25519 AAAA…</source>
+        <translation>ssh-ed25519 AAAA… or [host]:port ssh-ed25519 AAAA…</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="247"/>
+        <source>Paste one verified OpenSSH server host public key. Do not paste a fingerprint, private key, or login public key.</source>
+        <translation>Paste one verified OpenSSH server host public key. Do not paste a fingerprint, private key, or login public key.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="254"/>
+        <source>Support code</source>
+        <translation>Support code</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="255"/>
+        <source>Details</source>
+        <translation>Details</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="262"/>
         <source>Install</source>
         <translation>Install</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="189"/>
+        <location filename="../ui/amd_setup.py" line="264"/>
         <source>Repair</source>
         <translation>Repair</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="191"/>
+        <location filename="../ui/amd_setup.py" line="266"/>
         <source>Retry removal</source>
         <translation>Retry removal</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="191"/>
+        <location filename="../ui/amd_setup.py" line="266"/>
         <source>Remove</source>
         <translation>Remove</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="193"/>
+        <location filename="../ui/amd_setup.py" line="268"/>
         <source>Close</source>
         <translation>Close</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="291"/>
+        <location filename="../ui/amd_setup.py" line="653"/>
         <source>Choose an identity file</source>
         <translation>Choose an identity file</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="293"/>
+        <location filename="../ui/amd_setup.py" line="655"/>
         <source>All files (*)</source>
         <translation>All files (*)</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="464"/>
+        <location filename="../ui/amd_setup.py" line="1047"/>
+        <source>None</source>
+        <translation>None</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1057"/>
+        <source>Needs attention</source>
+        <translation>Needs attention</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1058"/>
+        <source>Working</source>
+        <translation>Working</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1059"/>
+        <source>Failed</source>
+        <translation>Failed</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1060"/>
+        <source>Not installed</source>
+        <translation>Not installed</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1061"/>
+        <location filename="../ui/amd_setup.py" line="1071"/>
+        <source>Installing</source>
+        <translation>Installing</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1062"/>
+        <source>Degraded</source>
+        <translation>Degraded</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1063"/>
+        <source>Operational</source>
+        <translation>Operational</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1064"/>
+        <source>Incompatible</source>
+        <translation>Incompatible</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1065"/>
+        <source>Retiring</source>
+        <translation>Retiring</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1066"/>
+        <source>Removal blocked</source>
+        <translation>Removal blocked</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1067"/>
+        <source>Removed</source>
+        <translation>Removed</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1068"/>
+        <source>Validating input</source>
+        <translation>Validating input</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1072"/>
+        <source>Repairing</source>
+        <translation>Repairing</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1073"/>
+        <source>Planned</source>
+        <translation>Planned</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1074"/>
+        <source>Reconciling</source>
+        <translation>Reconciling</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1075"/>
+        <source>Verified</source>
+        <translation>Verified</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1076"/>
+        <source>Registered</source>
+        <translation>Registered</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1077"/>
+        <source>Deployment failed</source>
+        <translation>Deployment failed</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1078"/>
+        <source>Provider registration blocked</source>
+        <translation>Provider registration blocked</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1079"/>
         <source>Requesting safe retirement</source>
         <translation>Requesting safe retirement</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="466"/>
-        <source>Removal requested; retiring safely</source>
-        <translation>Removal requested; retiring safely</translation>
+        <location filename="../ui/amd_setup.py" line="1080"/>
+        <source>Removal requested</source>
+        <translation>Removal requested</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="467"/>
+        <location filename="../ui/amd_setup.py" line="1081"/>
+        <source>Removal already requested</source>
+        <translation>Removal already requested</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1082"/>
+        <source>Already removed</source>
+        <translation>Already removed</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1092"/>
+        <source>Recording the removal request safely.</source>
+        <translation>Recording the removal request safely.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1094"/>
+        <source>Checking the target and advancing the managed deployment. This may take several minutes.</source>
+        <translation>Checking the target and advancing the managed deployment. This may take several minutes.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1099"/>
+        <source>LLM, Embedding, and OCR are operational through the managed Radeon target.</source>
+        <translation>LLM, Embedding, and OCR are operational through the managed Radeon target.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1103"/>
+        <source>Removal is durably requested and physical cleanup continues safely.</source>
+        <translation>Removal is durably requested and physical cleanup continues safely.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1106"/>
+        <source>The managed AMD installation has been removed.</source>
+        <translation>The managed AMD installation has been removed.</translation>
+    </message>
+    <message>
+        <source>Enter an installation ID to request safe removal.</source>
+        <translation type="vanished">Enter an installation ID to request safe removal.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="221"/>
+        <source>This build only removes an existing managed AMD installation. Xenix discovers its durable installation identity automatically.</source>
+        <translation>This build only removes an existing managed AMD installation. Xenix discovers its durable installation identity automatically.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="234"/>
+        <source>Managed installation</source>
+        <translation>Managed installation</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="257"/>
+        <source>Continue setup</source>
+        <translation>Continue setup</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="505"/>
+        <source>Private SSH installation {number}</source>
+        <translation>Private SSH installation {number}</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="509"/>
+        <source>Historical Local installation {number}</source>
+        <translation>Historical Local installation {number}</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="514"/>
+        <source>Historical Private SSH installation {number}</source>
+        <translation>Historical Private SSH installation {number}</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1069"/>
+        <source>Loading managed installation</source>
+        <translation>Loading managed installation</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1070"/>
+        <source>Saving target security</source>
+        <translation>Saving target security</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1109"/>
+        <source>Xenix will use the durable managed installation identity shown above.</source>
+        <translation>Xenix will use the durable managed installation identity shown above.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1112"/>
+        <source>Complete the SSH fields and choose Install. Install also saves the target; there is no separate Save action.</source>
+        <translation>Complete the SSH fields and choose Install. Install also saves the target; there is no separate Save action.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1118"/>
+        <source>Enter the SSH host.</source>
+        <translation>Enter the SSH host.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1120"/>
+        <source>Enter a valid IP address or DNS host name without spaces.</source>
+        <translation>Enter a valid IP address or DNS host name without spaces.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1122"/>
+        <source>Enter the SSH user.</source>
+        <translation>Enter the SSH user.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1124"/>
+        <source>Enter a valid OpenSSH user name.</source>
+        <translation>Enter a valid OpenSSH user name.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1127"/>
+        <source>Enter an SSH port between 1 and 65535.</source>
+        <translation>Enter an SSH port between 1 and 65535.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1130"/>
+        <source>Choose the private identity file used for SSH authentication.</source>
+        <translation>Choose the private identity file used for SSH authentication.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1133"/>
+        <source>Choose an identity file by its absolute local path.</source>
+        <translation>Choose an identity file by its absolute local path.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1136"/>
+        <source>The selected identity file is not available. Choose an existing file.</source>
+        <translation>The selected identity file is not available. Choose an existing file.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1139"/>
+        <source>Paste the verified server host public key.</source>
+        <translation>Paste the verified server host public key.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1142"/>
+        <source>Paste one complete OpenSSH server host public key, not a fingerprint, private key, or login public key.</source>
+        <translation>Paste one complete OpenSSH server host public key, not a fingerprint, private key, or login public key.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1146"/>
+        <source>These security details conflict with an existing enrollment. Verify the identity file and server host key.</source>
+        <translation>These security details conflict with an existing enrollment. Verify the identity file and server host key.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1150"/>
+        <source>The local AMD target enrollment limit has been reached.</source>
+        <translation>The local AMD target enrollment limit has been reached.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1153"/>
+        <source>Xenix could not save or read the local SSH security record.</source>
+        <translation>Xenix could not save or read the local SSH security record.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1156"/>
+        <source>The installation identity was saved safely, but SSH security setup did not finish. Re-enter the identity file and verified host key, then choose Continue setup.</source>
+        <translation>The installation identity was saved safely, but SSH security setup did not finish. Re-enter the identity file and verified host key, then choose Continue setup.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1161"/>
+        <source>This target identity conflicts with an existing immutable enrollment.</source>
+        <translation>This target identity conflicts with an existing immutable enrollment.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1164"/>
+        <source>This installation identity conflicts with an existing deployment.</source>
+        <translation>This installation identity conflicts with an existing deployment.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1167"/>
+        <source>Another managed Private SSH installation already exists. Repair or remove it before creating a new one.</source>
+        <translation>Another managed Private SSH installation already exists. Repair or remove it before creating a new one.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1171"/>
+        <source>More than one active managed Private SSH installation exists. Use the diagnostic bundle to resolve the conflicting inventory safely.</source>
+        <translation>More than one active managed Private SSH installation exists. Use the diagnostic bundle to resolve the conflicting inventory safely.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1175"/>
+        <source>The managed AMD installation inventory is incomplete or damaged.</source>
+        <translation>The managed AMD installation inventory is incomplete or damaged.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1178"/>
+        <source>Windows OpenSSH is unavailable. Install or enable the OpenSSH client.</source>
+        <translation>Windows OpenSSH is unavailable. Install or enable the OpenSSH client.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1181"/>
+        <source>The server host key did not match. Stop and verify the key with the target owner.</source>
+        <translation>The server host key did not match. Stop and verify the key with the target owner.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1184"/>
+        <source>SSH authentication failed. Verify the SSH user and identity file.</source>
+        <translation>SSH authentication failed. Verify the SSH user and identity file.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1187"/>
+        <source>The SSH connection timed out. Verify the host, port, and target availability.</source>
+        <translation>The SSH connection timed out. Verify the host, port, and target availability.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1190"/>
+        <source>The SSH target reset or rejected the connection. Verify the host, port, and cloud instance state.</source>
+        <translation>The SSH target reset or rejected the connection. Verify the host, port, and cloud instance state.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1194"/>
+        <source>Xenix could not establish the private loopback connection to the managed services.</source>
+        <translation>Xenix could not establish the private loopback connection to the managed services.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1197"/>
+        <source>The enrolled SSH target or its local security material is unavailable.</source>
+        <translation>The enrolled SSH target or its local security material is unavailable.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1200"/>
+        <source>Xenix could not inspect the Radeon target safely.</source>
+        <translation>Xenix could not inspect the Radeon target safely.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1203"/>
+        <source>The managed Radeon services could not be deployed or verified.</source>
+        <translation>The managed Radeon services could not be deployed or verified.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1206"/>
+        <source>The managed Radeon services did not finish deployment.</source>
+        <translation>The managed Radeon services did not finish deployment.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1209"/>
+        <source>Deployment completed, but one or more provider registrations were blocked.</source>
+        <translation>Deployment completed, but one or more provider registrations were blocked.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1212"/>
+        <source>The installation exists, but one or more LLM, Embedding, or OCR components failed.</source>
+        <translation>The installation exists, but one or more LLM, Embedding, or OCR components failed.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1215"/>
+        <source>The installation has not reached operational state. Choose Repair to continue forward.</source>
+        <translation>The installation has not reached operational state. Choose Repair to continue forward.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1218"/>
+        <source>The target was enrolled, but the managed services were not installed.</source>
+        <translation>The target was enrolled, but the managed services were not installed.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1221"/>
+        <source>This installation is being removed and cannot be reactivated.</source>
+        <translation>This installation is being removed and cannot be reactivated.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1224"/>
+        <source>Safe physical cleanup is blocked. Retry removal after restoring target access.</source>
+        <translation>Safe physical cleanup is blocked. Retry removal after restoring target access.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1227"/>
+        <source>Xenix could not establish the trusted control session needed for physical cleanup. Restore target access, then retry removal.</source>
+        <translation>Xenix could not establish the trusted control session needed for physical cleanup. Restore target access, then retry removal.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1231"/>
+        <source>Provider settings could not be removed safely. Retry removal or use the diagnostic bundle.</source>
+        <translation>Provider settings could not be removed safely. Retry removal or use the diagnostic bundle.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1235"/>
+        <source>No managed AMD installation exists with that installation ID.</source>
+        <translation>No managed AMD installation exists with that installation ID.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1238"/>
+        <source>Enter the installation ID to remove.</source>
+        <translation>Enter the installation ID to remove.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1241"/>
+        <location filename="../ui/amd_setup.py" line="1244"/>
+        <source>The bundled Radeon deployment profile is unavailable.</source>
+        <translation>The bundled Radeon deployment profile is unavailable.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1247"/>
+        <source>Private SSH Radeon deployment is unavailable in this build.</source>
+        <translation>Private SSH Radeon deployment is unavailable in this build.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1250"/>
+        <source>This build permits removal only; new AMD installations are disabled.</source>
+        <translation>This build permits removal only; new AMD installations are disabled.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1253"/>
+        <source>AMD deployment is shutting down. Reopen Xenix and try again.</source>
+        <translation>AMD deployment is shutting down. Reopen Xenix and try again.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1256"/>
+        <source>Xenix could not start the deployment worker. Try again.</source>
+        <translation>Xenix could not start the deployment worker. Try again.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1259"/>
+        <source>The guided deployment request is invalid. Review the form and try again.</source>
+        <translation>The guided deployment request is invalid. Review the form and try again.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1262"/>
+        <source>Xenix received an invalid deployment status.</source>
+        <translation>Xenix received an invalid deployment status.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1265"/>
+        <source>The AMD operation failed unexpectedly. Use the support code with the diagnostic bundle.</source>
+        <translation>The AMD operation failed unexpectedly. Use the support code with the diagnostic bundle.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1274"/>
+        <source>The AMD operation could not complete. Use the support code with the diagnostic bundle.</source>
+        <translation>The AMD operation could not complete. Use the support code with the diagnostic bundle.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1280"/>
+        <source>The bundled Radeon profile is not admitted for product deployment.</source>
+        <translation>The bundled Radeon profile is not admitted for product deployment.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1283"/>
+        <source>At least one bundled LLM, Embedding, or OCR component is not admitted.</source>
+        <translation>At least one bundled LLM, Embedding, or OCR component is not admitted.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1286"/>
+        <source>This Radeon software and hardware cell is not admitted.</source>
+        <translation>This Radeon software and hardware cell is not admitted.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1289"/>
+        <source>The target did not provide all required compatibility facts.</source>
+        <translation>The target did not provide all required compatibility facts.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1292"/>
+        <source>The target operating system is unsupported.</source>
+        <translation>The target operating system is unsupported.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1295"/>
+        <source>The target operating-system version is unsupported.</source>
+        <translation>The target operating-system version is unsupported.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1298"/>
+        <source>The target Linux kernel version is unsupported.</source>
+        <translation>The target Linux kernel version is unsupported.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1301"/>
+        <source>The target CPU architecture is unsupported.</source>
+        <translation>The target CPU architecture is unsupported.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1304"/>
+        <source>The Radeon GPU architecture is unsupported.</source>
+        <translation>The Radeon GPU architecture is unsupported.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1307"/>
+        <source>The AMD GPU driver version is unsupported.</source>
+        <translation>The AMD GPU driver version is unsupported.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1310"/>
+        <source>The ROCm version is unsupported.</source>
+        <translation>The ROCm version is unsupported.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1313"/>
+        <source>The HIP version is unsupported.</source>
+        <translation>The HIP version is unsupported.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1316"/>
+        <source>The target Python version is unsupported.</source>
+        <translation>The target Python version is unsupported.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1319"/>
+        <source>The target does not have enough admitted Radeon GPUs.</source>
+        <translation>The target does not have enough admitted Radeon GPUs.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1322"/>
+        <source>The target does not have enough free GPU memory.</source>
+        <translation>The target does not have enough free GPU memory.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1325"/>
+        <source>The target does not have enough free system memory.</source>
+        <translation>The target does not have enough free system memory.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1328"/>
+        <source>The target does not have enough free persistent storage.</source>
+        <translation>The target does not have enough free persistent storage.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1331"/>
+        <source>The bundled profile is missing a required capacity measurement.</source>
+        <translation>The bundled profile is missing a required capacity measurement.</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1334"/>
+        <location filename="../ui/amd_setup.py" line="1339"/>
+        <source>The target does not satisfy the fixed Radeon deployment profile.</source>
+        <translation>The target does not satisfy the fixed Radeon deployment profile.</translation>
+    </message>
+    <message>
+        <source>Removal requested; retiring safely</source>
+        <translation type="vanished">Removal requested; retiring safely</translation>
+    </message>
+    <message>
+        <location filename="../ui/amd_setup.py" line="1084"/>
         <source>Not available</source>
         <translation>Not available</translation>
     </message>
@@ -2742,12 +3310,12 @@ State file: {state_path}</translation>
         <translation>Buy license</translation>
     </message>
     <message>
-        <location filename="../app.py" line="913"/>
+        <location filename="../app.py" line="915"/>
         <source>Unable to start Xenix</source>
         <translation>Unable to start Xenix</translation>
     </message>
     <message>
-        <location filename="../app.py" line="914"/>
+        <location filename="../app.py" line="916"/>
         <source>Xenix could not finish startup.
 
 {error}</source>
@@ -2759,12 +3327,12 @@ State file: {state_path}</translation>
 <context>
     <name>_AmdGuidedSetupHandle</name>
     <message>
-        <location filename="../ui/amd_setup.py" line="77"/>
+        <location filename="../ui/amd_setup.py" line="82"/>
         <source>AMD setup</source>
         <translation>AMD setup</translation>
     </message>
     <message>
-        <location filename="../ui/amd_setup.py" line="78"/>
+        <location filename="../ui/amd_setup.py" line="83"/>
         <source>Set up the fixed Radeon profile</source>
         <translation>Set up the fixed Radeon profile</translation>
     </message>

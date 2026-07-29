@@ -11,7 +11,7 @@ from __future__ import annotations
 import threading
 from collections.abc import Callable, Mapping
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -22,7 +22,12 @@ from ..storage.repositories.amd_installations import AmdInstallationRepository
 from .compatibility import CompatibilityDecision, CompatibilityPlanner
 from .manifests import ExecutionProfileManifest, ManifestCapability, ManifestCatalog
 from .participants import AmdComponentParticipant, AmdParticipantError, AmdProjectionStatus
-from .placement import AmdExecutionSession, AmdMaterializationCancelledError, AmdRuntimeKey
+from .placement import (
+    AmdExecutionSession,
+    AmdMaterializationCancelledError,
+    AmdPlacementError,
+    AmdRuntimeKey,
+)
 from .reconcile import AmdGenerationMaterialization, AmdPlacementController
 from .runtime import (
     AmdRuntimeBusyError,
@@ -138,6 +143,41 @@ class AmdPrivateTargetSpec:
             raise ValueError("Target SSH port is invalid.")
 
 
+@dataclass(frozen=True, slots=True)
+class AmdPrivateInstallationEnrollment:
+    """Read-only durable identity needed by the guided Private SSH surface.
+
+    Endpoint fields are user-authored enrollment facts, but they stay out of
+    representations so accidental diagnostics cannot disclose them.
+    """
+
+    installation_id: str
+    target_id: str
+    host: str = field(repr=False)
+    user: str = field(repr=False)
+    port: int = field(repr=False)
+    desired_presence: bool
+    lifecycle_state: str
+
+    def __post_init__(self) -> None:
+        _require_identifier(self.installation_id, "Installation ID")
+        _require_identifier(self.target_id, "Target ID")
+        _require_identifier(self.host, "Target host")
+        _require_identifier(self.user, "Target user")
+        if not isinstance(self.port, int) or isinstance(self.port, bool) or not 1 <= self.port <= 65_535:
+            raise ValueError("Target SSH port is invalid.")
+
+
+@dataclass(frozen=True, slots=True)
+class AmdInstallationInventoryItem:
+    """Minimal durable lifecycle identity for restart/removal discovery."""
+
+    installation_id: str
+    placement: str
+    desired_presence: bool
+    lifecycle_state: str
+
+
 class AmdAiDeploymentService:
     """Deep optional facade for AMD desired-state reconciliation.
 
@@ -157,6 +197,7 @@ class AmdAiDeploymentService:
         runtime_directory: AmdRuntimeDirectory,
         repository: AmdInstallationRepository | None = None,
         allow_new_installations: bool = True,
+        new_installation_placements: frozenset[str] | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._catalog = catalog
@@ -166,6 +207,13 @@ class AmdAiDeploymentService:
         self._runtime_directory = runtime_directory
         self._repository = repository or AmdInstallationRepository()
         self._allow_new_installations = bool(allow_new_installations)
+        self._new_installation_placements = (
+            frozenset(self._placements)
+            if new_installation_placements is None
+            else frozenset(new_installation_placements)
+        )
+        if not self._new_installation_placements.issubset(self._placements):
+            raise ValueError("AMD new-installation placement policy is invalid.")
         self._lock = threading.RLock()
         # A reconcile can legitimately spend minutes provisioning a target.
         # Shutdown must not wait for that command lock before fencing access to
@@ -175,6 +223,7 @@ class AmdAiDeploymentService:
         self._sessions: dict[str, AmdExecutionSession] = {}
         self._live_keys: set[AmdRuntimeKey] = set()
         self._compatibility_issues: dict[str, tuple[str, ...]] = {}
+        self._target_observation_errors: dict[str, str] = {}
         self._materialization_controls: dict[str, _MaterializationControl] = {}
         self._retirement_cancellation_active: set[str] = set()
         self._retirement_workers: set[threading.Thread] = set()
@@ -236,6 +285,7 @@ class AmdAiDeploymentService:
             self._sessions.clear()
             self._live_keys.clear()
             self._compatibility_issues.clear()
+            self._target_observation_errors.clear()
             self._materialization_controls.clear()
             self._retirement_cancellation_active.clear()
             self._retirement_workers.clear()
@@ -259,7 +309,7 @@ class AmdAiDeploymentService:
 
     def enroll_private_target(self, spec: AmdPrivateTargetSpec) -> str:
         self._require_open()
-        self._require_new_installations_enabled()
+        self._require_new_installations_enabled("private_ssh")
         with self._lock, self._database_session() as session:
             row = AmdTargetEnrollmentRow(
                 id=spec.target_id,
@@ -273,11 +323,105 @@ class AmdAiDeploymentService:
             session.commit()
         return spec.target_id
 
+    def ensure_private_install(
+        self,
+        *,
+        target: AmdPrivateTargetSpec,
+        installation: AmdInstallationSpec,
+    ) -> AmdInstallationStatus:
+        """Exact-ensure one Private target and installation, then reconcile.
+
+        Target and installation rows share one SQLite transaction.  A retry
+        with the exact same immutable intent re-enters reconcile; a reused ID
+        with different facts is rejected instead of overwritten.
+        """
+
+        self.ensure_private_install_intent(
+            target=target,
+            installation=installation,
+        )
+        return self.reconcile(installation.installation_id)
+
+    def ensure_private_install_intent(
+        self,
+        *,
+        target: AmdPrivateTargetSpec,
+        installation: AmdInstallationSpec,
+    ) -> None:
+        """Persist one exact Private target/installation checkpoint only.
+
+        This local transaction intentionally precedes the SettingsStore
+        security checkpoint in the guided command.  If the process stops
+        between authorities, the installation identity remains discoverable
+        and the same command can continue forward after restart.
+        """
+
+        self._require_open()
+        self._require_new_installations_enabled("private_ssh")
+        if (
+            installation.placement != "private_ssh"
+            or installation.target_id != target.target_id
+        ):
+            raise AmdDeploymentError(
+                "Private AMD installation intent is inconsistent.",
+                error_code="amd_request_invalid",
+            )
+        profile = self._profile(installation.profile_digest)
+        with self._lock, self._database_session() as session:
+            existing_target = self._repository.get_target(session, target.target_id)
+            if existing_target is None:
+                self._repository.create_target(
+                    session,
+                    AmdTargetEnrollmentRow(
+                        id=target.target_id,
+                        host=target.host,
+                        user=target.user,
+                        port=target.port,
+                        pinned_host_key=target.pinned_host_key,
+                        identity_file_reference=target.identity_file_reference,
+                    ),
+                )
+            elif not _target_matches(existing_target, target):
+                raise AmdDeploymentError(
+                    "Private AMD target identity conflicts with its existing enrollment.",
+                    error_code="amd_target_conflict",
+                )
+
+            existing_installation = self._repository.get_installation(
+                session,
+                installation.installation_id,
+            )
+            if existing_installation is None:
+                self._repository.create_installation(
+                    session,
+                    AmdInstallationRow(
+                        id=installation.installation_id,
+                        placement=installation.placement,
+                        target_id=installation.target_id,
+                        profile_id=profile.profile_id,
+                        profile_digest=installation.profile_digest,
+                    ),
+                )
+            elif not _installation_matches(existing_installation, installation, profile):
+                raise AmdDeploymentError(
+                    "AMD installation identity conflicts with its existing intent.",
+                    error_code="amd_installation_conflict",
+                )
+            elif (
+                not existing_installation.desired_presence
+                or existing_installation.lifecycle_state != "active"
+            ):
+                raise AmdDeploymentError(
+                    "A retiring AMD installation cannot be reactivated.",
+                    error_code="amd_installation_retiring",
+                )
+            session.commit()
+
     def prepare(self, spec: AmdInstallationSpec) -> AmdInstallationStatus:
         """Persist one immutable installation intent, then reconcile forward."""
 
         self._require_open()
-        self._require_new_installations_enabled()
+        self._require_new_installations_enabled(spec.placement)
         profile = self._profile(spec.profile_digest)
         with self._lock, self._database_session() as session:
             row = AmdInstallationRow(
@@ -300,6 +444,7 @@ class AmdAiDeploymentService:
         self._require_new_installations_enabled()
         with self._lock, self._database_session() as session:
             existing = self._require_installation(session, installation_id)
+            self._require_new_installations_enabled(existing.placement)
             if not existing.desired_presence or existing.lifecycle_state != "active":
                 raise AmdDeploymentError(
                     "A retired AMD installation cannot be upgraded.",
@@ -320,6 +465,8 @@ class AmdAiDeploymentService:
         self._require_open()
         self._require_new_installations_enabled()
         with self._lock:
+            installation = self._read_installation(installation_id)
+            self._require_active_reconciliation_enabled(installation.placement)
             self._drop_session(installation_id)
         return self.reconcile(installation_id)
 
@@ -385,6 +532,7 @@ class AmdAiDeploymentService:
                 return self._reconcile_retirement(installation_id)
             if installation.lifecycle_state == "removed":
                 return self.status(installation_id)
+            self._require_active_reconciliation_enabled(installation.placement)
 
             profile = self._profile_for_installation(installation)
             placement = self._placement(installation.placement)
@@ -393,10 +541,25 @@ class AmdAiDeploymentService:
                     profile.manifest_digest,
                     placement.observe(profile=profile, target_id=installation.target_id),
                 )
-            except Exception:
-                self._set_compatibility_issues(installation_id, ("target_observation_failed",))
+            except AmdPlacementError as exc:
+                self._set_admission_result(
+                    installation_id,
+                    target_observation_error_code=_bounded_error_code(
+                        exc.error_code,
+                        fallback="amd_target_observation_failed",
+                    ),
+                )
                 return self.status(installation_id)
-            self._set_compatibility_issues(installation_id, _decision_issue_codes(decision))
+            except Exception:
+                self._set_admission_result(
+                    installation_id,
+                    target_observation_error_code="amd_target_observation_failed",
+                )
+                return self.status(installation_id)
+            self._set_admission_result(
+                installation_id,
+                compatibility_issues=_decision_issue_codes(decision),
+            )
             if not decision.supported:
                 return self.status(installation_id)
 
@@ -409,11 +572,16 @@ class AmdAiDeploymentService:
                 return self._reconcile_retirement(installation_id)
             return self.status(installation_id)
 
-    def retire(self, installation_id: str, *, drain_timeout_seconds: float = 0.0) -> AmdInstallationStatus:
+    def retire(
+        self,
+        installation_id: str,
+        *,
+        drain_timeout_seconds: float | None = 0.0,
+    ) -> AmdInstallationStatus:
         """Commit desired absence and advance retirement without selection rewrite."""
 
         self._require_open()
-        if drain_timeout_seconds < 0:
+        if drain_timeout_seconds is not None and drain_timeout_seconds < 0:
             raise ValueError("AMD retirement drain timeout cannot be negative.")
         request = self.request_retirement(installation_id)
         if request.phase == "already_removed":
@@ -468,6 +636,9 @@ class AmdAiDeploymentService:
                     )
                 )
             ordered_components = tuple(sorted(components, key=lambda component: component.capability.value))
+            compatibility_issues, target_observation_error_code = (
+                self._admission_result_for(installation.id)
+            )
             return AmdInstallationStatus(
                 installation_id=installation.id,
                 placement=installation.placement,
@@ -478,11 +649,73 @@ class AmdAiDeploymentService:
                 condition=_derive_condition(
                     installation=installation,
                     components=ordered_components,
-                    compatibility_issues=self._compatibility_issues_for(installation.id),
+                    compatibility_issues=compatibility_issues,
+                    target_observation_error_code=target_observation_error_code,
                 ),
-                compatibility_issues=self._compatibility_issues_for(installation.id),
+                target_observation_error_code=target_observation_error_code,
+                compatibility_issues=compatibility_issues,
                 components=ordered_components,
             )
+
+    def has_installation(self, installation_id: str) -> bool:
+        """Return whether one durable installation identity exists, without I/O."""
+
+        self._require_open()
+        _require_identifier(installation_id, "Installation ID")
+        with self._database_session() as session:
+            return self._repository.get_installation(session, installation_id) is not None
+
+    def private_installations(self) -> tuple[AmdPrivateInstallationEnrollment, ...]:
+        """Return durable Private SSH identities without live target access."""
+
+        self._require_open()
+        with self._database_session() as session:
+            rows = tuple(
+                row
+                for row in self._repository.list_installations(session)
+                if row.placement == "private_ssh"
+            )
+            enrollments: list[AmdPrivateInstallationEnrollment] = []
+            for row in rows:
+                if row.target_id is None:
+                    raise AmdDeploymentError(
+                        "Private AMD installation target identity is unavailable.",
+                        error_code="amd_installation_inventory_invalid",
+                    )
+                target = self._repository.get_target(session, row.target_id)
+                if target is None:
+                    raise AmdDeploymentError(
+                        "Private AMD installation target enrollment is unavailable.",
+                        error_code="amd_installation_inventory_invalid",
+                    )
+                enrollments.append(
+                    AmdPrivateInstallationEnrollment(
+                        installation_id=row.id,
+                        target_id=target.id,
+                        host=target.host,
+                        user=target.user,
+                        port=target.port,
+                        desired_presence=row.desired_presence,
+                        lifecycle_state=row.lifecycle_state,
+                    )
+                )
+        return tuple(enrollments)
+
+    def installations(self) -> tuple[AmdInstallationInventoryItem, ...]:
+        """Return durable lifecycle identities without placement or target I/O."""
+
+        self._require_open()
+        with self._database_session() as session:
+            rows = tuple(self._repository.list_installations(session))
+        return tuple(
+            AmdInstallationInventoryItem(
+                installation_id=row.id,
+                placement=row.placement,
+                desired_presence=row.desired_presence,
+                lifecycle_state=row.lifecycle_state,
+            )
+            for row in rows
+        )
 
     def _ensure_generations(
         self,
@@ -575,6 +808,20 @@ class AmdAiDeploymentService:
                         for row in rows:
                             self._mark_materialization_failure(row.id)
                     return False
+                except AmdPlacementError as exc:
+                    if not self._is_open():
+                        return False
+                    if self._retirement_is_committed(installation.id):
+                        return True
+                    for row in rows:
+                        self._mark_materialization_failure(
+                            row.id,
+                            error_code=_bounded_error_code(
+                                exc.error_code,
+                                fallback="materialization_failed",
+                            ),
+                        )
+                    return False
                 except Exception:
                     if not self._is_open():
                         return False
@@ -623,6 +870,18 @@ class AmdAiDeploymentService:
                     if self._retirement_is_committed(installation.id):
                         return True
                     self._mark_projection_blocked(row.id)
+                except AmdPlacementError as exc:
+                    if not self._is_open():
+                        return False
+                    if self._retirement_is_committed(installation.id):
+                        return True
+                    self._mark_materialization_failure(
+                        row.id,
+                        error_code=_bounded_error_code(
+                            exc.error_code,
+                            fallback="materialization_failed",
+                        ),
+                    )
                 except Exception:
                     if not self._is_open():
                         return False
@@ -952,6 +1211,7 @@ class AmdAiDeploymentService:
                     generations=tuple(materializations.values()),
                 )
             except Exception:
+                self._mark_retirement_control_blocked(tuple(rows))
                 return self.status(installation_id)
             if not self._remember_session(installation_id, session):
                 try:
@@ -990,6 +1250,30 @@ class AmdAiDeploymentService:
                     )
                     session_db.commit()
         return self.status(installation_id)
+
+    def _mark_retirement_control_blocked(
+        self,
+        rows: tuple[AmdComponentGenerationRow, ...],
+    ) -> None:
+        """Expose failed trusted cleanup-session setup as retryable blocked state."""
+
+        for row in rows:
+            current = self._read_generation(row.id)
+            if current.lifecycle_state == "removed":
+                continue
+            if current.lifecycle_state not in {"retiring", "removal_blocked"}:
+                current = self._transition_generation(
+                    current.id,
+                    next_state="retiring",
+                    phase="retiring",
+                )
+            if current.lifecycle_state == "retiring":
+                self._transition_generation(
+                    current.id,
+                    next_state="removal_blocked",
+                    phase="removal_blocked",
+                    error_code="physical_cleanup_blocked",
+                )
 
     def _retirement_metadata_unavailable_status(
         self,
@@ -1040,6 +1324,7 @@ class AmdAiDeploymentService:
             desired_presence=installation.desired_presence,
             lifecycle_state=installation.lifecycle_state,
             condition=condition,
+            target_observation_error_code=None,
             compatibility_issues=("retirement_metadata_unavailable",),
             components=ordered_components,
         )
@@ -1155,14 +1440,22 @@ class AmdAiDeploymentService:
         if latest.lifecycle_state == "retiring":
             self._transition_generation(latest.id, next_state="removed", phase="removed")
 
-    def _mark_materialization_failure(self, generation_id: str) -> None:
+    def _mark_materialization_failure(
+        self,
+        generation_id: str,
+        *,
+        error_code: str = "materialization_failed",
+    ) -> None:
         row = self._read_generation(generation_id)
         if row.lifecycle_state in {"staging", "verified", "registered"}:
             self._transition_generation(
                 row.id,
                 next_state="failed",
                 phase="materialization_failed",
-                error_code="materialization_failed",
+                error_code=_bounded_error_code(
+                    error_code,
+                    fallback="materialization_failed",
+                ),
             )
 
     def _mark_projection_blocked(self, generation_id: str) -> None:
@@ -1242,19 +1535,33 @@ class AmdAiDeploymentService:
             self._sessions[installation_id] = session
             return True
 
-    def _set_compatibility_issues(
+    def _set_admission_result(
         self,
         installation_id: str,
-        issues: tuple[str, ...],
+        *,
+        compatibility_issues: tuple[str, ...] = (),
+        target_observation_error_code: str | None = None,
     ) -> None:
         with self._state_lock:
             self._require_open()
-            self._compatibility_issues[installation_id] = issues
+            self._compatibility_issues[installation_id] = compatibility_issues
+            if target_observation_error_code is None:
+                self._target_observation_errors.pop(installation_id, None)
+            else:
+                self._target_observation_errors[installation_id] = (
+                    target_observation_error_code
+                )
 
-    def _compatibility_issues_for(self, installation_id: str) -> tuple[str, ...]:
+    def _admission_result_for(
+        self,
+        installation_id: str,
+    ) -> tuple[tuple[str, ...], str | None]:
         with self._state_lock:
             self._require_open()
-            return self._compatibility_issues.get(installation_id, ())
+            return (
+                self._compatibility_issues.get(installation_id, ()),
+                self._target_observation_errors.get(installation_id),
+            )
 
     def _add_live_key(self, key: AmdRuntimeKey) -> None:
         with self._state_lock:
@@ -1330,11 +1637,33 @@ class AmdAiDeploymentService:
                     error_code="amd_deployment_closed",
                 )
 
-    def _require_new_installations_enabled(self) -> None:
+    def _require_new_installations_enabled(self, placement: str | None = None) -> None:
         if not self._allow_new_installations:
             raise AmdDeploymentError(
                 "This AMD build accepts retirement only.",
                 error_code="amd_retirement_only",
+            )
+        if (
+            placement is not None
+            and placement not in self._new_installation_placements
+        ):
+            raise AmdDeploymentError(
+                "This AMD placement accepts existing lifecycle work only.",
+                error_code="amd_placement_unavailable",
+            )
+
+    def _require_active_reconciliation_enabled(self, placement: str) -> None:
+        if (
+            not self._allow_new_installations
+            or placement not in self._new_installation_placements
+        ):
+            raise AmdDeploymentError(
+                "This AMD placement accepts retirement work only.",
+                error_code=(
+                    "amd_retirement_only"
+                    if not self._allow_new_installations
+                    else "amd_placement_unavailable"
+                ),
             )
 
     def _require_installation(self, session: Session, installation_id: str) -> AmdInstallationRow:
@@ -1353,11 +1682,40 @@ class AmdAiDeploymentService:
         return row
 
 
+def _target_matches(
+    row: AmdTargetEnrollmentRow,
+    spec: AmdPrivateTargetSpec,
+) -> bool:
+    return (
+        row.id == spec.target_id
+        and row.host == spec.host
+        and row.user == spec.user
+        and row.port == spec.port
+        and row.pinned_host_key == spec.pinned_host_key
+        and row.identity_file_reference == spec.identity_file_reference
+    )
+
+
+def _installation_matches(
+    row: AmdInstallationRow,
+    spec: AmdInstallationSpec,
+    profile: ExecutionProfileManifest,
+) -> bool:
+    return (
+        row.id == spec.installation_id
+        and row.placement == spec.placement
+        and row.target_id == spec.target_id
+        and row.profile_id == profile.profile_id
+        and row.profile_digest == spec.profile_digest
+    )
+
+
 def _derive_condition(
     *,
     installation: AmdInstallationRow,
     components: tuple[AmdComponentStatus, ...],
     compatibility_issues: tuple[str, ...],
+    target_observation_error_code: str | None,
 ) -> AmdInstallationCondition:
     if installation.lifecycle_state == "removed":
         return AmdInstallationCondition.REMOVED
@@ -1365,6 +1723,10 @@ def _derive_condition(
         if any(component.lifecycle_state == "removal_blocked" for component in components):
             return AmdInstallationCondition.REMOVAL_BLOCKED
         return AmdInstallationCondition.RETIRING
+    if target_observation_error_code is not None:
+        if not components or all(component.generation_id is None for component in components):
+            return AmdInstallationCondition.NOT_MATERIALIZED
+        return AmdInstallationCondition.DEGRADED
     if compatibility_issues:
         return AmdInstallationCondition.INCOMPATIBLE
     if not components or all(component.generation_id is None for component in components):
@@ -1377,7 +1739,22 @@ def _derive_condition(
 
 
 def _decision_issue_codes(decision: CompatibilityDecision) -> tuple[str, ...]:
-    return tuple(f"{issue.phase.value}:{issue.reason.value}:{issue.field}" for issue in decision.issues)
+    return tuple(
+        dict.fromkeys(
+            f"amd_compatibility_{issue.reason.value}"
+            for issue in decision.issues
+        )
+    )
+
+
+def _bounded_error_code(value: object, *, fallback: str) -> str:
+    if (
+        isinstance(value, str)
+        and 1 <= len(value) <= 120
+        and all(character.isascii() and (character.islower() or character.isdigit() or character == "_") for character in value)
+    ):
+        return value
+    return fallback
 
 
 def _now() -> datetime:
@@ -1410,7 +1787,9 @@ __all__ = [
     "AmdDeploymentNotFoundError",
     "AmdDeploymentPlacementError",
     "AmdDeploymentProfileError",
+    "AmdInstallationInventoryItem",
     "AmdInstallationSpec",
+    "AmdPrivateInstallationEnrollment",
     "AmdPrivateTargetSpec",
     "AmdRetirementRequest",
 ]
