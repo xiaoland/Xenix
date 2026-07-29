@@ -1,5 +1,13 @@
 # Candidate AMD Adapter Product Architecture
 
+> Current-placement correction (2026-07-29): the Windows product exposes only
+> Private SSH Radeon for new deployment. The Local controller remains
+> composition-private solely to clean historical `local_linux` generations;
+> new Local intent is rejected. References below to a Local Linux desktop
+> placement preserve earlier design exploration and are superseded by
+> [TP-20A](implementation/subtasks/TP-20A-guided-amd-ui-repair.md), the accepted
+> ADR, and the current product direction.
+
 This file owns the candidate topology and repository mapping. It incorporates the
 [scheme review](scheme-review.md), but remains design material rather than an
 accepted technical contract or implementation plan.

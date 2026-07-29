@@ -1,7 +1,7 @@
 # AMD ROCm One-click Deployment
 
-**Status:** implementation and automated acceptance complete; only manual
-placement acceptance remains
+**Status:** implementation and verification complete; one fresh Private SSH
+operational/Remove human acceptance remains
 
 **Opened:** 2026-07-26
 
@@ -10,8 +10,8 @@ placement acceptance remains
 ## Objective
 
 Deliver a removable AMD Radeon/ROCm deployment slice that installs one pinned
-Chat, Embedding, and OCR profile on either a compatible Local Linux Radeon host
-or a pre-enrolled Private SSH Radeon target. Each verified component becomes an
+Chat, Embedding, and OCR profile from the Windows Xenix desktop onto a Private
+SSH Linux Radeon target. Each verified component becomes an
 ordinary generation-specific provider instance in its own LLM, Embedding, or OCR
 domain; Xenix remains authoritative for settings, SQLite state, Knowledge,
 conversations, and Artifacts.
@@ -47,11 +47,14 @@ conversations, and Artifacts.
   acquisition semantics, deployment-to-retirement lifecycle, OCR durable
   provenance, retirement-only mode, generic-to-AMD import fencing, and v24
   storage migration.
-- [x] `pdm run test` passed (45 tests), `pdm run check` passed, and `pdm run
+- [x] `pdm run test` passed (104 tests), `pdm run check` passed, and `pdm run
   smoke` passed.
 - [x] The default AMD-enabled Windows package and its packaged smoke passed.
 - [x] An AMD-absent package (`XENIX_BUILD_AMD_ONE_CLICK=0`) contained no AMD
   slice paths and passed packaged smoke even with `XENIX_ENABLE_AMD_ONE_CLICK=1`.
+- [x] The production headed dialog passed read-only field validation/focus, no
+  Save/Local action, a real typed SSH failure, truthful Repair/Remove state, and
+  log redaction.
 
 The detailed evidence and remaining acceptance boundary are in
 [verification](verification.md).
@@ -60,10 +63,13 @@ The detailed evidence and remaining acceptance boundary are in
 
 - The released profile is the admitted Granite/vLLM Chat, BGE-M3/vLLM Embedding,
   and RapidOCR/KServe/PAGE OCR set for the captured Linux Radeon Cloud cell.
-- The product has both `LocalAmdPlacement` and `PrivateSshAmdPlacement` behind
-  one deployment lifecycle. The Private SSH path has real cloud product-level
-  evidence; the Local Linux implementation has static/lifecycle coverage but no
-  physical Radeon acceptance host in this workspace.
+- The Windows product exposes only `PrivateSshAmdPlacement` for new deployment.
+  `LocalAmdPlacement` remains composition-private solely to retire historical
+  generations; policy rejects new Local intent. This is not a Linux desktop
+  distribution, product route, or remaining acceptance requirement.
+- `Install` is one enrollment-plus-deployment command. It validates the whole
+  form before scheduling and retains exact forward checkpoints for retry; there
+  is no separate Save action or ML Worker target.
 - The settings repair is architectural, not a mutex: UI and deployment submit
   domain commands to LLM/Embedding/OCR owners, which write through one
   revisioned `SettingsStore`. A former UI test that bypassed this writer was
@@ -76,13 +82,10 @@ The detailed evidence and remaining acceptance boundary are in
 
 ## Next Step
 
-Perform only manual acceptance:
-
-1. A user-guided Private SSH setup/removal walkthrough against a fresh enrolled
-   Radeon target, including visible status and redacted failure handling.
-2. A fresh compatible Local Linux Radeon host walkthrough. This is the required
-   hardware acceptance for same-host placement; it does not imply native Windows
-   ROCm support.
+After the assigned endpoint is restored or replaced, perform the one remaining
+human journey: operational Private SSH setup of all three capabilities and
+Remove through the visible dialog. Field validation, readable typed failure,
+redacted logs, automated verification, and both package modes already pass.
 
 No architecture or product decision remains open for this task.
 
@@ -92,6 +95,7 @@ No architecture or product decision remains open for this task.
 - [Cloud and product development validation](development-validation.md)
 - [Completion architecture review](implementation/completion-review.md)
 - [Implementation plan and delivery map](implementation/README.md)
+- [Guided UI repair packet](implementation/subtasks/TP-20A-guided-amd-ui-repair.md)
 - [Hard cut-off contract and record](implementation/hard-cutoff.md)
 - [Lifecycle acceptance boundary](implementation/clean-room-acceptance.md)
 - [Original scheme review and issue dispositions](scheme-review.md)

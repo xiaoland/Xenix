@@ -1,5 +1,9 @@
 # Clean-room and Lifecycle Acceptance
 
+> Current product correction: only the Windows-to-Private-SSH matrix is a product
+> acceptance gate. The Local Linux row below is retained as historical controller
+> evidence, not a Linux desktop or remaining manual acceptance requirement.
+
 ## Baseline Vocabulary
 
 - **Feasibility lab:** manually prepared runtimes/assets/caches used to prove a

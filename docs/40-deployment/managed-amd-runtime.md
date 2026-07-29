@@ -1,8 +1,8 @@
 # Managed AMD Runtime
 
-Use this route for the optional AMD one-click profile only. The feature is a local
-control plane for a pre-enrolled Private SSH target or a compatible Local Linux
-Radeon host; it is not a hosted Xenix backend and Private SSH is not offline.
+Use this route for the optional AMD one-click profile only. The feature is a
+Windows-desktop control plane for a Private SSH Linux Radeon target; it is not a
+hosted Xenix backend, an ML Worker target, or an offline mode.
 
 ## Inclusion and Staged Cut-off
 
@@ -19,28 +19,53 @@ unverified remote path.
 
 ## Safe Operation
 
-- Start from the guided setup surface. It accepts only `This computer` or an
-  already enrolled Private SSH target and installs the fixed supported profile.
-  It does not create hosts, start `sshd`, accept an unknown host key, select a
-  model, tune GPU/cache/ports, or fall back to CPU or an API.
+- Start from the AMD guided setup surface, not ML Worker settings. Enter the SSH
+  host, user, port, local identity-file path, and one independently verified
+  server host public key. `Install` validates the whole form, saves an immutable
+  enrollment, and starts the fixed profile in one explicit action; there is no
+  separate Save or pre-enrollment screen.
+- The accepted host-key forms are one OpenSSH public-key line
+  (`key-type base64 [comment]`) or the exact endpoint-matching, un-hashed
+  `known_hosts` line. A fingerprint, private key, login public key, wildcard/
+  hashed host pattern, mismatched endpoint prefix, multi-line scan, or
+  algorithm/blob mismatch is rejected. Xenix does not discover or trust a host
+  key through TOFU.
+- The workflow does not create hosts, start `sshd`, select a model, tune
+  GPU/cache/forward ports, or fall back to CPU, ML Worker, or an API.
 - The target must pass manifest compatibility, capacity, pinned trust, and
-  authenticated-loopback preflight before acquisition. Failure is an admission
-  result; do not repair it by manually changing product state.
+  authenticated-loopback preflight before acquisition. Input failures start no
+  worker and identify the affected field. Connectivity, compatibility, and
+  component failures retain a stable support code and a durable installation
+  handle only when one actually exists. An unreachable target is shown as not
+  installed or degraded; `incompatible` is reserved for measured profile
+  constraint failures.
 - Installation/generation lifecycle is stored locally. Target processes, files,
   loopback forwards, URLs, ports, bearer secrets, and health are live session
   facts. Do not copy them into settings, diagnostics, or support tickets.
 - Reconcile and repair are forward-only. A broken current user operation fails
   honestly; a later explicit operation may rematerialize the same verified
-  generation. Do not use a PID file alone to stop a target process.
+  generation. Exact retries preserve completed enrollment checkpoints; they do
+  not delete or overwrite them as compensation. Do not use a PID file alone to
+  stop a target process.
+- Installation/target IDs are internal. On restart, the guided surface discovers
+  every non-removed managed installation from SQLite and offers a stable,
+  non-technical selector only when multiple identities need management. If SSH
+  security setup stopped after that SQLite checkpoint, the immutable endpoint is
+  restored and the user re-enters only the identity file and verified host key
+  before choosing `Continue setup`. A status/security read error never converts
+  unknown availability into absence; SQLite desired presence and lifecycle still
+  fence Repair and Remove.
 
 ## Retirement and Feature Removal
 
-Retire an installation from the guided surface. Remove immediately commits
-durable desired absence and reports `retiring requested`; it does not wait for a
-large model download, tunnel, or target cleanup. That commit revokes an
-in-flight deployment through a memory-only signal and, where the placement can
-prove the exact target-side recipe identity, an identity-fenced stop. Normal
-install, repair, and resume never use this stop path.
+Retire an installation from the guided surface. The control-plane request
+immediately commits durable desired absence without waiting behind a large model
+download or tunnel. The UI worker then observes exact cleanup through
+`removed`, `retiring`, or a typed `removal_blocked` result; an older
+Install/Repair completion cannot overwrite that newer Remove intent. The commit
+revokes an in-flight deployment through a memory-only signal and, where the
+placement can prove the exact target-side recipe identity, an identity-fenced
+stop. Normal install, repair, and resume never use this stop path.
 
 The target-side retirement operation first writes an exact generation tombstone
 under that generation's control fence. Provisioning, asset transfer, and runtime
@@ -63,6 +88,13 @@ delete source to clean a remote target: removal of source is not authorization t
 terminate an unknown process or delete an unverified path.
 
 ## Evidence and Support
+
+The UI displays a localized explanation plus a stable support code. AMD guided
+logs contain only the operation, success/installation-available and
+security-checkpoint flags, derived condition/phase, optional input-field name,
+stable error code, and (for an exceptional path) exception class name. They do
+not contain host, user, port, identity path, host key, SSH output, request
+representation, or exception message.
 
 Collect only redacted installation ID, generation/manifest digest, phase, typed
 failure code, and local log/diagnostic bundle references. Never include private

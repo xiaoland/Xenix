@@ -5,8 +5,8 @@ remains in [README](README.md); implementation is not authorized.
 
 ## Product Promise
 
-Xenix should let a non-technical business user prepare either a compatible Radeon
-in this machine or a private SSH AMD ROCm target, then complete a source-linked
+Xenix should let a non-technical business user prepare a private SSH AMD ROCm
+target from the Windows desktop, then complete a source-linked
 workflow with OCR, LLM, and Embedding model inference on the managed services. The
 desktop Xenix installation remains the sole application authority; the execution
 target holds only app-owned generation realizations, runtime/cache, process, and
@@ -17,11 +17,11 @@ endpoints, tunnels, containers, or GPU parameters by hand.
 The product should present business capability and truthful derived status, not an
 AMD model laboratory.
 
-“AMD integration” is the product concept: one placement-neutral guided deployment
+“AMD integration” is the product concept: one guided Private SSH deployment
 control plane and one truthful status projection backed by independent OCR, LLM,
-and Embedding services. Local Radeon and Private SSH are target placements, not
-different semantic providers. It is not one universal inference provider and not a
-new authority over Knowledge, conversations, indexes, or Artifacts.
+and Embedding services. Private SSH is a placement, not a different semantic
+provider. It is not one universal inference provider and not a new authority over
+Knowledge, conversations, indexes, or Artifacts.
 
 ## Track 2 Fit
 
@@ -59,14 +59,14 @@ The success claim is a shorter, source-linked, locally authoritative
 scan-to-decision path with correct and reviewable output. Inputs required for model
 inference cross the declared contest SSH boundary; engine names, live transport
 bindings, deployment commands, and GPU placement remain behind the service
-boundary. The product architecture supports the same journey on an admitted Local
-Radeon placement without changing capability semantics.
+boundary. The current product does not claim a Linux desktop or native Windows
+ROCm placement.
 
 ## Product Scope
 
 Selected task-plan product scope:
 
-- discover or connect to a supported Radeon target and verify its OS, driver,
+- connect to a supported Private SSH Radeon target and verify its OS, driver,
   HIP/ROCm, capacity, and transport facts;
 - offer one guided setup action for the complete AMD ROCm execution profile;
 - admit exactly the pinned Granite/BGE-M3/RapidOCR profile from bounded hardware
@@ -114,14 +114,9 @@ accident.
 ## Product Modes and Placements
 
 The product must not blend managed execution with compatibility or an external
-provider. The first two entries are peer placements of the same AMD-managed core:
+provider:
 
-1. **Local AMD ROCm:** Xenix and the managed inference services execute on this
-   user's machine. A placement-specific controller owns local process/runtime state
-   and loopback bindings. Native Windows and WSL/Linux are different execution cells
-   with independent admission; unsupported cells fail clearly without CPU, network,
-   or SSH fallback.
-2. **Private SSH AMD ROCm:** Xenix services and canonical state remain on the
+1. **Private SSH AMD ROCm:** Xenix services and canonical state remain on the
    desktop. Through `AmdAiDeploymentService`, the AMD deployment domain prepares and
    supervises the user-controlled target with its internal coordinator/driver, then
    registers three ordinary managed provider instances. Their providers are
@@ -132,11 +127,11 @@ provider. The first two entries are peer placements of the same AMD-managed core
    “Private” means the accepted
    SSH/loopback/no-external-inference-API profile; it does not mean offline and
    remains bounded by the cloud/provider threat model.
-3. **Compatibility profile:** existing providers and the verified Paddle Inference
+2. **Compatibility profile:** existing providers and the verified Paddle Inference
    OCR remain available and truthfully named, but the product does not label this
    as complete AMD/ROCm execution.
-4. **Optional Dedicated Model API:** an explicit platform-managed network provider
-   choice for bounded use cases. It is outside both managed deployment placements
+3. **Optional Dedicated Model API:** an explicit platform-managed network provider
+   choice for bounded use cases. It is outside the managed deployment placement
    and does not replace the Track 2 core path.
 
 CPU work that is not neural-model inference—image decoding, resizing, OCR
@@ -164,15 +159,15 @@ claim.
 
 ## Resolved Design and External Admission Facts
 
-The task plan fixes the placement-neutral `AmdAiDeploymentService` control plane,
-Local/Private SSH peer placements, fixed three-component profile, strict
-public-key SSH trust, authenticated loopback services, forward-only lifecycle,
-owner-neutral managed refs, PAGE-only OCR profile, and removable AMD composition
-slice. The optional Dedicated Model API remains outside TP-00–24 as an ordinary
-explicit network-provider category and is never fallback.
+The task fixes the `AmdAiDeploymentService` control plane, current Private SSH
+placement, fixed three-component profile, strict public-key SSH trust,
+authenticated loopback services, forward-only lifecycle, owner-neutral managed
+refs, PAGE-only OCR profile, and removable AMD composition slice. The optional
+Dedicated Model API remains outside the managed slice as an ordinary explicit
+network-provider category and is never fallback.
 
 The exact persistent bytes, deadlines/resource ceilings, artifact availability,
-licenses, first Local cell, target reachability/trust, and clean-room hardware/
+licenses, target reachability/trust, and clean-room hardware/
 runtime evidence are external admission facts. Unsupported or unmeasured cells are
 rejected; they do not create user-facing model, backend, fallback, or
 continue-anyway decisions.

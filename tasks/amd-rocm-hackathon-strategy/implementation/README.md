@@ -2,8 +2,8 @@
 
 **Prepared:** 2026-07-28
 
-**Status:** delivered; automated verification complete; physical placement
-acceptance remains manual
+**Status:** implementation and verification complete; one fresh Private SSH
+operational/Remove human acceptance pending
 
 **Permission boundary:** this directory now records the approved implementation
 and its evidence. It still does not authorize a commit, release, submission, or
@@ -13,8 +13,8 @@ new cloud mutation.
 
 Implement one guided AMD deployment capability that:
 
-- supports a compatible Radeon host through either `LocalAmdPlacement` or
-  `PrivateSshAmdPlacement`;
+- supports the Windows Xenix product through a managed Private SSH Linux Radeon
+  placement; experimental same-host Linux code is not a desktop product path;
 - installs pinned Chat, Embedding, and OCR generations, proves real ROCm execution,
   and exposes them through existing capability-owned protocols;
 - adds generation-specific managed provider instances through LLM, Embedding, and
@@ -95,7 +95,7 @@ parallel.
 | AMD data-plane adapters | TP-12–TP-14 | Bind Chat, Embedding, and OCR operation scopes to exact AMD generations |
 | Placement and recipes | TP-15–TP-18 | Realize Private SSH and three pinned ROCm services |
 | Product integration | TP-19–TP-21 | Compose, expose guided UI, package, and operate the vertical slice |
-| Local and final acceptance | TP-22–TP-24 | Prove Local semantics, removability, and clean-room lifecycle behavior |
+| Final acceptance and cut-off | TP-23–TP-24 plus TP-20A | Prove guided Private SSH semantics, removability, and clean-room lifecycle behavior |
 
 See [the dependency graph](dependency-graph.md), [the implementation
 rehearsal](rehearsal.md), [clean-room acceptance](clean-room-acceptance.md), and
@@ -131,10 +131,11 @@ state is summarized here; final evidence is in the
 | TP-17 | [BGE-M3/vLLM recipe](subtasks/TP-17-bge-recipe.md) | TP-10, TP-15 | Delivered and cloud-validated |
 | TP-18 | [RapidOCR/PAGE recipe](subtasks/TP-18-rapidocr-recipe.md) | TP-07, TP-10, TP-15 | Delivered and cloud-validated |
 | TP-19 | [Private SSH vertical slice](subtasks/TP-19-private-ssh-vertical-slice.md) | TP-11–TP-18 | Delivered and product-validated |
-| TP-20 | [Guided AMD UI](subtasks/TP-20-guided-amd-ui.md) | TP-19 | Delivered; manual walkthrough remains |
+| TP-20 | [Guided AMD UI](subtasks/TP-20-guided-amd-ui.md) | TP-19 | Superseded in part by TP-20A after silent-failure diagnosis |
+| TP-20A | [Guided AMD UI repair](subtasks/TP-20A-guided-amd-ui-repair.md) | TP-20 | Delivered; headed validation and real SSH failure path passed |
 | TP-21 | [Packaging and operations](subtasks/TP-21-packaging-operations.md) | TP-20 | Delivered and package-validated |
-| TP-22 | [Local Linux Radeon placement](subtasks/TP-22-local-linux-placement.md) | TP-09–TP-14, TP-16–TP-18 | Delivered; physical Radeon acceptance remains |
-| TP-23 | [Clean-room lifecycle acceptance](subtasks/TP-23-clean-room-acceptance.md) | TP-19, TP-21, TP-22, TP-24 | Automated/Private evidence complete; manual cells remain |
+| TP-22 | [Local Linux Radeon placement](subtasks/TP-22-local-linux-placement.md) | TP-09–TP-14, TP-16–TP-18 | Historical implementation evidence; not a current Windows desktop product/acceptance path |
+| TP-23 | [Clean-room lifecycle acceptance](subtasks/TP-23-clean-room-acceptance.md) | TP-19, TP-21, TP-22, TP-24 | Automated/product evidence complete; one visible fresh-target operational lifecycle remains |
 | TP-24 | [AMD feature hard cut-off proof](subtasks/TP-24-amd-hard-cutoff.md) | TP-21 | Delivered |
 
 ## Delivery Waves
@@ -149,7 +150,7 @@ overlap.
 4. **Control/data-plane join:** TP-11 and TP-12–TP-14 after their prerequisites.
 5. **Private placement:** TP-15, then TP-16–TP-18, then TP-19.
 6. **Product surface:** TP-20 → TP-21.
-7. **Local, cut-off, and lifecycle proof:** TP-22 and TP-24, then TP-23.
+7. **Cut-off and lifecycle proof:** TP-24, TP-20A, then the Private SSH cells in TP-23.
 
 The critical path is OCR:
 
@@ -186,8 +187,8 @@ with the deployment facade or hide settings/transport behavior inside it.
 
 The feature is complete only when all of the following are true:
 
-- a fresh Private SSH target and a fresh same-host Linux Radeon target each pass
-  the lifecycle matrix;
+- a fresh Private SSH Radeon target passes the guided lifecycle matrix from the
+  Windows desktop;
 - one public product action performs compatibility check, acquisition, install,
   ROCm self-test, publication, and independent provider registration;
 - Chat SSE/Tool, 1024-dimensional BGE-M3 Embedding, and PNG-to-PAGE OCR pass
@@ -201,7 +202,6 @@ The feature is complete only when all of the following are true:
   refs typed unavailable, inert AMD tables readable, and no generic-to-AMD import;
 - product code and packaged smoke pass the repository verification manifest.
 
-The Local proof may run headlessly on a fresh Radeon Cloud instance by executing
-the product controller on the GPU host itself. That proves same-host Linux
-placement semantics; it does not claim native Windows ROCm or a Linux desktop
-installer.
+Headless same-host controller experiments remain useful engineering evidence but
+are not a Xenix desktop product run: the software has no Linux distribution and
+does not claim native Windows ROCm.

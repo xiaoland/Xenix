@@ -1,0 +1,27 @@
+{
+  "blank_validation": {
+    "condition": "Needs attention",
+    "error_code": "amd_ssh_host_required",
+    "focused_object": "amdSshHostInput",
+    "settings_documents": 0,
+    "sqlite_installations": 0,
+    "sqlite_targets": 0
+  },
+  "final_result": {
+    "condition": "not_materialized",
+    "elapsed_seconds": 2.319,
+    "error_code": "amd_ssh_connection_failed",
+    "installation_available": true,
+    "phase": "planned",
+    "remove_enabled": true,
+    "repair_enabled": true,
+    "succeeded": false
+  },
+  "redaction_passed": true,
+  "restart_recovery_passed": true,
+  "topology": {
+    "has_local_linux": false,
+    "has_save_action": false,
+    "placement": "private_ssh"
+  }
+}

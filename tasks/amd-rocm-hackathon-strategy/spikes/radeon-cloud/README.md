@@ -41,6 +41,7 @@ Failures and their implementation consequences are in
 | `rapidocr_kserve_server.py` | Real RapidOCR KServe V2 Binary Tensor + PAGE-only spike server |
 | `validate_kserve_ocr_contract.py` | KServe metadata, inference, PAGE region, and typed-error validation |
 | `validate_private_tunnel.ps1` | One-process three-forward validation with identity-guarded cleanup |
+| `validate_guided_ui_headed.py` | Production Qt guided-command, typed SSH failure, and log-redaction acceptance helper |
 
 The PAGE XSD validator remains in
 [`../ocr-protocol/validate_official_schemas.py`](../ocr-protocol/validate_official_schemas.py).

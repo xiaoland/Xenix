@@ -1,5 +1,11 @@
 # Decision Closure
 
+> Placement correction (2026-07-29): Xenix is a Windows desktop product and
+> exposes only Private SSH Radeon for new deployment. The Local controller is
+> composed cleanup-only for historical generations; new Local intent is
+> rejected. Earlier Local/Private peer wording is retained below as historical
+> plan evidence and is superseded by TP-20A and ADR 0010.
+
 ## Rule
 
 The implementation tasks do not reopen the choices below. Apply the recorded
@@ -12,7 +18,7 @@ implementation has several reasonable internal techniques.
 | Area | Locked choice |
 | --- | --- |
 | Product profile | One pinned Chat + Embedding + OCR profile; all three must verify for the profile to be usable |
-| Placement | Explicit Local Linux Radeon or one pre-enrolled Private SSH target; never switch placement automatically |
+| Placement | Current Windows product offers one explicit Private SSH Radeon target; historical Local Linux controller is cleanup-only and cannot accept new installation intent |
 | Models/protocols | Granite/vLLM Chat, BGE-M3/vLLM Embedding, RapidOCR/KServe Binary Tensor PNG/PAGE 2024-07-15 |
 | Deployment | `AmdAiDeploymentService` is a removable control-plane facade, never the inference path |
 | Settings | Capability owner → one app-lifetime revisioned SettingsStore; no full-document shared save or cross-domain transaction |
@@ -41,7 +47,6 @@ These are measured or supplied facts, not product-design questions:
 - OCR compressed/decode/XML/node/point/memory ceilings and accuracy;
 - real ROCm workload/device attestation and three-service coexistence;
 - fresh instance/PVC or equivalent clean-room attestation;
-- availability of a separate Local Linux Radeon acceptance baseline.
 
 An absent, changed, insufficient, or unmeasured fact produces a typed admission
 failure. It does not produce a new UI choice or silent fallback.
@@ -50,7 +55,7 @@ failure. It does not produce a new UI choice or silent fallback.
 
 The product still needs intentional commands, not architecture decisions:
 
-- enroll/select a Local or Private target;
+- enter and verify one Private SSH target through the guided Install command;
 - deploy, repair, upgrade, retire, or reinstall;
 - explicitly select providers after registration;
 - resolve a selection/reference blocker;

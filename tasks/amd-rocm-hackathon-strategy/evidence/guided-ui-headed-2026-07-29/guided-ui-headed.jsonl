@@ -1,0 +1,3 @@
+{"event_name": "amd.guided.operation.started", "level": "info", "message": "AMD guided operation started", "operation": "install"}
+{"condition": "not_materialized", "error_code": "amd_ssh_connection_failed", "event_name": "amd.guided.operation.completed", "input_field": "none", "installation_available": true, "level": "warning", "message": "AMD guided operation completed", "operation": "install", "phase": "planned", "security_enrolled": true, "succeeded": false}
+{"condition": "not_materialized", "error_code": "amd_ssh_connection_failed", "event_name": "amd.guided.inventory.item", "level": "warning", "message": "AMD guided inventory item needs attention", "phase": "planned", "secondary_error_code": "none", "security_enrolled": true}

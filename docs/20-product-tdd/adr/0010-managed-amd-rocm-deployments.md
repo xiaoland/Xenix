@@ -9,8 +9,9 @@
 
 ## Context
 
-Xenix needs a guided way to deploy a fixed, verified Chat, Embedding, and OCR
-profile on a compatible Radeon Linux host. A remote execution target must not
+The Windows Xenix desktop needs a guided way to deploy a fixed, verified Chat,
+Embedding, and OCR profile on a compatible Radeon Linux host reached through
+Private SSH. The remote execution target must not
 become a product backend, an inference gateway, a second settings authority, or
 an extension of the batch SSH worker pool in ADR 0005.
 
@@ -35,19 +36,34 @@ adapter or settings owner.
   those same bytes; it never changes the declared source or revision, and a
   size-and-hash failure rejects the artifact rather than falling back to a
   different version, model, or provider.
-- A Local Linux execution session and a Private SSH execution session are peer
-  placement adapters. They own only target files, processes, loopback forwards,
-  live bindings, health, and runtime incarnations. Those facts are memory-only
-  and never appear in provider settings or SQLite lifecycle rows.
+- The composed product placement is Private SSH: Windows Xenix remains the
+  application and settings authority, while a Linux Radeon execution session
+  owns only target files, processes, loopback forwards, live bindings, health,
+  and runtime incarnations. Those facts are memory-only and never appear in
+  provider settings or SQLite lifecycle rows. Experimental same-host Linux
+  placement code is not a current desktop product entry or acceptance claim.
+  Its controller remains composed only as the cleanup owner for historical
+  `local_linux` generations; new Local installation intent is rejected.
 - LLM, Embedding, and OCR settings owners independently own their
   generation-specific managed provider projections and selections. Deployment
   requests registration through capability-owned ports; it never writes another
   domain's settings or changes a selection.
-- Private SSH is limited to an already enrolled target, OpenSSH public-key
-  authentication, an explicit opaque identity-file reference, and an isolated
-  pinned host-key record. Password authentication, TOFU, global SSH config or
-  agent fallback, and changed-host-key continuation are unsupported. Private-key
-  bytes never enter Xenix state.
+- One explicit guided Install command validates the complete form, records an
+  immutable Private SSH enrollment, creates the installation intent, and
+  reconciles it forward. At the lower deployment-service boundary the target is
+  therefore already enrolled; the user is not asked to visit a separate target
+  editor or press Save first.
+- Private SSH is limited to OpenSSH public-key authentication, an explicit
+  identity-file handle, and an isolated pinned server-host-key record. Password
+  authentication, TOFU, global SSH config or agent fallback, and changed-host-key
+  continuation are unsupported. Private-key bytes never enter Xenix state.
+- The guided command first commits one SQLite target/installation transaction,
+  then SettingsStore security handles, through monotonic checkpoints. SQLite
+  therefore exposes the exact hidden command identity after a process stop
+  between authorities. A reopened dialog rediscovers it; an exact retry
+  continues the unfinished security/reconcile work. Conflicting immutable
+  identities fail typed. Partially completed checkpoints are not compensated or
+  rolled back.
 - Each runtime incarnation receives a fresh protected secret by a restricted
   launch handoff. A service that cannot reject unauthenticated loopback requests
   is not admitted.
@@ -70,8 +86,7 @@ adapter or settings owner.
   generation retirement tombstone under that generation's control fence. Recipe
   execution, target-asset transfer, and runtime start reject that tombstone;
   cleanup removes it only with the matching target, installation, generation,
-  and manifest fence. The Local Linux and Private SSH placements preserve this
-  same semantic even though their process-control mechanisms differ.
+  and manifest fence.
 - Build inclusion and retirement-only admission are composition concerns at the
   app/package boundary. They may omit AMD code from a later package or reject new
   deployment while retaining cleanup ownership, but they never alter generic
@@ -90,8 +105,11 @@ a later release may delete the slice and its bounded composition anchors.
   supervisor nor a configuration dependency for AMD deployments.
 - Runtime packages such as ROCm, vLLM, and RapidOCR are target artifacts, not
   base desktop dependencies.
-- An unprepared target, insufficient capacity, unsupported GPU/runtime, missing
-  authentication capability, or unsafe SSH trust state fails before mutation.
-- Private SSH can be a product path, but it is not called offline. Local Linux
-  Radeon uses the same profile semantics without SSH.
+- Invalid or incomplete user input fails before any durable write or worker
+  start. A later target-connectivity or compatibility failure retains exact
+  enrollment/installation checkpoints so Repair or Remove can continue forward.
+  Target-observation failures have their own typed status channel and never
+  masquerade as measured profile incompatibility.
+- Private SSH is the current product path and is not called offline. There is no
+  Linux desktop distribution or native Windows ROCm claim.
 - Removing AMD code is a controlled feature cut-off, not a migration rollback.
